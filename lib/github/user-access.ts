@@ -216,6 +216,22 @@ export async function githubRepositoryReadCredential(userId: string, remoteKey: 
     kind: fromCloud ? 'installation' : 'user', githubAccountId }
 }
 
+/** Resolve the selected Git ref inside the admitted repository and return visible metadata only. */
+export async function readRepositoryTree(userId: string, fullName: string, ref: string, budget: RequestBudget) {
+  const { token, repository } = await githubRepositoryReadCredential(userId, 'v2/github.com/' + fullName.toLowerCase(), budget)
+  const path = `/repositories/${repository.id}`
+  const { data: commit } = await githubGet(token, `${path}/commits/${encodeURIComponent(ref)}`, budget)
+  const treeSha = object(object(commit.commit).tree).sha
+  if (typeof commit.sha !== 'string' || !/^[0-9a-f]{40}$/.test(commit.sha)
+    || typeof treeSha !== 'string' || !/^[0-9a-f]{40}$/.test(treeSha)) throw new GitHubAccessError('githubUnavailable', 502)
+  const { data } = await githubGet(token, `${path}/git/trees/${treeSha}?recursive=1`, budget)
+  const { verifiedGitHubTree } = await import('../coding-workspace/diff/github-manifest')
+  const { visibleWorkspacePath } = await import('@mikka/protocol/coding-workspace')
+  const { sha, nodes } = verifiedGitHubTree(data, treeSha)
+  const entries = [...nodes.values()].filter(entry => visibleWorkspacePath(entry.path))
+  return { repository: repository.fullName, commitSha: commit.sha, treeSha: sha, entries }
+}
+
 /** For server code acting for a user id with no browser request (the Coordinator). Never returns the token. */
 export async function listRepositoriesForUser(userId: string) {
   const { token: _token, ...result } = await repositoriesForUser(userId)

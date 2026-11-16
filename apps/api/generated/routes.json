@@ -1318,6 +1318,15 @@
       "sourceHash": "7eaa7d4da7df0917328fb6ee3f352eb121ea21f357885d83db46fccec2d9c623"
     },
     {
+      "path": "/mikka/api/integrations/github/repositories/tree",
+      "template": "/api/integrations/github/repositories/tree",
+      "source": "app/api/integrations/github/repositories/tree/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "bd0fe75fc064156852560706d01d9910e92a99e3514a4486944cde5225b67b8b"
+    },
+    {
       "path": "/mikka/api/integrations/github/repositories/verification",
       "template": "/api/integrations/github/repositories/verification",
       "source": "app/api/integrations/github/repositories/verification/route.ts",
