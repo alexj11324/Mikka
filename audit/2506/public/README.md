@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 106 |
+| complete | 122 |
 | partial | 28 |
 | prior-partial | 36 |
-| unreviewed | 6386 |
+| unreviewed | 6370 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -22,3 +22,5 @@ api-entries.jsonl maps all 324 generated API route declarations (430 HTTP method
 ## 2026-11-16 World and main reconciliation
 
 Four previously unreviewed World Node, business binding and SQL catalog files now have individual source conclusions. The fixed source and exact package runs are in reviews.jsonl. In addition to its earlier snapshot, main-delta.jsonl now enumerates the union of changed names between the fixed tree and a1e31323a381b97d8e0a7b7d098fadb3c4b767e3 including old/new modes and Git objects. 1350 changed names (974 modified, 361 added, 15 deleted); 8342 tracked paths on this main. This inventory retains deleted paths and represents a rename as one removal and one addition. It does not certify the changed consumers. G-046 source ad84143b9665375d278fbe31f35a7e22d87f610f is tracked by PR #2613.
+
+Sixteen Expo route entries now have independent records for the exact reachable path, screen/export and consumer at the fixed SHA. Expo Router 58.0.29 resolved all 16 entries on both iOS and web; this was a route-resolution test, with no screen render, device use or backend mutation. The screen destinations remain separately accounted. [Expo file-based routing](https://docs.expo.dev/router/basics/core-concepts/)
