@@ -104,7 +104,14 @@ jobs:
       - name: Install the product's test dependencies for the conversion proof
         run: corepack pnpm install --frozen-lockfile --ignore-scripts
       - name: Prove Anthropic and Responses conversion against a Chat-Completions-only provider
-        run: bash deploy/litellm/conversion-check.sh mikka-litellm
+        # The product source supplies the gateway under test; the proof's own
+        # script and mock provider come from this workflow's commit.
+        run: |
+          proof="$RUNNER_TEMP/litellm-proof"
+          mkdir -p "$proof"
+          git show "$GITHUB_SHA:deploy/litellm/conversion-check.sh" > "$proof/conversion-check.sh"
+          git show "$GITHUB_SHA:deploy/litellm/mock-provider.py" > "$proof/mock-provider.py"
+          bash "$proof/conversion-check.sh" mikka-litellm
       - name: Tag the verified LiteLLM runtime for release
         run: docker tag mikka-litellm "mikka-litellm:$MIKKA_DEPLOYMENT_ID"
       - name: Issue a short-lived Registry publication credential

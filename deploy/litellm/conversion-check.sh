@@ -8,13 +8,15 @@
 # .github/workflows/cloudflare-litellm-image.yml before publication.
 set -euo pipefail
 image="$1"
+# Any failing command names itself; the master key is never part of a command line.
+trap 'echo "conversion proof failed at line $LINENO: $BASH_COMMAND" >&2' ERR
 network="litellm-proof-$$"
 key="sk-$(openssl rand -hex 32)"
 cleanup() { docker rm -f litellm-proof litellm-proof-provider > /dev/null 2>&1 || true; docker network rm "$network" > /dev/null 2>&1 || true; }
 trap cleanup EXIT
 docker network create "$network" > /dev/null
 docker run -d --name litellm-proof-provider --network "$network" --cap-drop ALL --security-opt=no-new-privileges \
-  -v "$PWD/deploy/litellm/mock-provider.py:/mock-provider.py:ro" --entrypoint python "$image" /mock-provider.py 9911 > /dev/null
+  -v "$(cd "$(dirname "$0")" && pwd)/mock-provider.py:/mock-provider.py:ro" --entrypoint python "$image" /mock-provider.py 9911 > /dev/null
 docker run -d --name litellm-proof --network "$network" --cap-drop ALL --security-opt=no-new-privileges -p 127.0.0.1:4012:4000 \
   -e LITELLM_LOCAL_MODEL_COST_MAP=True -e LITELLM_MASTER_KEY="$key" "$image" > /dev/null
 for _ in $(seq 1 90); do
