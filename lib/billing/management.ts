@@ -29,9 +29,10 @@ export const billingScopeSchema = z.object({ kind: z.enum(['workspace', 'organiz
 
 /** Finance metadata only. Never reads a title, prompt, output, file or credential reference. */
 export async function billingManagementView(actorId: string, target: BillingScope, selectedWorkspaceId?: string | null,
-  principal?: EnterprisePrincipal): Promise<BillingManagementView> {
+  principal?: EnterprisePrincipal, usageMemberId?: string | null): Promise<BillingManagementView> {
   billingScopeSchema.parse(target)
   if (selectedWorkspaceId) z.uuid().parse(selectedWorkspaceId)
+  if (usageMemberId != null) z.string().min(1).max(256).parse(usageMemberId)
   if (target.kind === 'workspace') {
     await workspaceDb.transaction(tx => requireWorkspace(tx, target.id, actorId, true, principal))
     await ensureLegacyVerification(target.id)
@@ -99,7 +100,9 @@ export async function billingManagementView(actorId: string, target: BillingScop
     const usageIds = available.map(row => row.id)
     const dayExpression = `to_char("createdAt" at time zone 'UTC','YYYY-MM-DD')`
     const usageGrouping = effective.usageExport ? `grouping sets (("actorId"), (${dayExpression}))` : '"actorId"'
-    const [billing, credits, budgets, totals, external, policies] = await Promise.all([
+    const payerFilter = `($3::boolean and "workspaceId"=$4::uuid or not $3::boolean and coalesce("usageWorkspaceId","workspaceId")=any($5::uuid[]))`
+    const usageParams = [start, end, target.kind === 'organization', accountId, usageIds]
+    const [billing, credits, budgets, totals, external, policies, memberModels] = await Promise.all([
       accountId ? readBillingAccount(accountId, process.env, memberCount) : null,
       accountId ? readCreditBillingAccount(accountId) : null,
       budgetWorkspaceId ? readResourceBudgets(pool, [budgetWorkspaceId]) : [],
@@ -109,14 +112,22 @@ export async function billingManagementView(actorId: string, target: BillingScop
         coalesce(sum(coalesce("costMicroUsd","holdMicroUsd")) filter(where state in ('pending','unknown')),0)::float8 held,
         count(*) filter(where state='unknown' or (state='settled' and "costMicroUsd" is null))::int unknown
         from hosted_usage where "createdAt">=$1 and "createdAt"<$2 and state<>'failed'
-        and ($3::boolean and "workspaceId"=$4::uuid or not $3::boolean and coalesce("usageWorkspaceId","workspaceId")=any($5::uuid[]))
+        and ${payerFilter}
         group by ${usageGrouping}`,
-        [start, end, target.kind === 'organization', accountId, usageIds]),
+        usageParams),
       pool.query<{ count: number }>(`select count(*)::int count from agent_runs where "workspaceId"=any($1::uuid[]) and "createdAt">=$2 and "createdAt"<$3
         and "agentDefinition"->'executionIdentity'->>'version' in ('1','2') and (
         "agentDefinition"->'executionIdentity'->'billingAccount'->'model'->>'amount'='provider_unknown'
         or "agentDefinition"->'executionIdentity'->'billingAccount'->'runtime'->>'amount'='provider_unknown')`, [usageIds, start, end]),
       pool.query<{ available: boolean }>(`select to_regclass('resource_access_policies') is not null available`),
+      usageMemberId && effective.usageExport
+        ? pool.query<NonNullable<BillingManagementView['usage']['memberDetail']>['models'][number]>(`select model,
+          coalesce(sum("costMicroUsd"),0)::float8 as "costMicroUsd",
+          coalesce(sum("inputTokens"),0)::text as "inputTokens", coalesce(sum("outputTokens"),0)::text as "outputTokens",
+          count(*) filter (where "costMicroUsd" is null)::int as "unknownCalls"
+          from hosted_usage where "createdAt">=$1 and "createdAt"<$2 and ${payerFilter} and "actorId"=$6 and state='settled'
+          group by model order by "costMicroUsd" desc, model`, [...usageParams, usageMemberId])
+        : null,
     ])
     const resources = budgetWorkspaceId && policies.rows[0]?.available ? (await pool.query<BillingManagementView['resourceTargets'][number]>(`
       select id,kind,visibility,"ownerId" from resource_access_policies where "workspaceId"=$1 and kind in ('project','thread') order by kind,id limit 200`, [budgetWorkspaceId])).rows : []
@@ -136,6 +147,7 @@ export async function billingManagementView(actorId: string, target: BillingScop
           const row = byDay.get(date)
           return { date, costMicroUsd: row?.cost ?? 0, reservedMicroUsd: row?.held ?? 0, unknownCalls: row?.unknown ?? 0 }
         }) : undefined,
+        memberDetail: usageMemberId && memberModels ? { id: usageMemberId, models: memberModels.rows } : undefined,
         members: byMember.map(row => ({ id: row.id, name: row.id ? names.get(row.id) ?? null : null, costMicroUsd: row.cost, unknownCalls: row.unknown })) } }
   })
 }
