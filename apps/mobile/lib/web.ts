@@ -22,16 +22,15 @@ export async function openPrivacyPolicy(): Promise<void> {
  * shows the target account for confirmation before setting its session. Without a
  * token the native page stays open; it cannot fall into another browser session.
  */
-export async function openOnWeb(path: string): Promise<void> {
+export async function openOnWeb(path: string, options?: { confirmAccount?: boolean }): Promise<void> {
   const connection = apiConnection()
   const web = Platform.OS === 'web'
-  if (web && !mobileTaskTarget(path)) {
+  if (web && !options?.confirmAccount && !mobileTaskTarget(path)) {
     // The app root is /mikka, not /mikka/ (lib/base-path.ts).
     window.open(`${API_URL}${path.startsWith('/?') || path === '/' ? path.slice(1) : path}`, '_blank', 'noopener')
     return
   }
-  // Reserve the tab during the gesture. The authorized handoff resolves the
-  // Task's workspace and selects the official client for self-hosted servers.
+  // Reserve the tab during the gesture, before the account confirmation opens.
   const tab = web ? window.open('about:blank', '_blank') : null
   if (tab) tab.opener = null
   const context = apiCache.context()

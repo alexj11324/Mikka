@@ -58,6 +58,8 @@ async function handleGET(request: Request) {
   if (!profile) return unauthorized()
   const organization = context.role === 'admin' ? null : (await listOrganizations(user.id)).find(item => item.role === 'owner' || item.role === 'admin')
   return json({
+    personalFilesAvailable: isCloudEdition() && user[enterprisePrincipal]?.kind === 'session' &&
+      /^[0-9a-f]{40}$/i.test(process.env.MIKKA_UI_OVERLAY_SHA ?? ''),
     billingScope: context.role === 'admin' ? { kind: 'workspace', id: context.workspace.id } : organization ? { kind: 'organization', id: organization.id } : null,
     user: { id: profile.id, name: profile.name, email: profile.email, image: profile.image },
     workspace: {

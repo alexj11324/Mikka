@@ -32,6 +32,13 @@ test('Members accepts only the exact Workspace destination from mobile Settings'
     '/settings/members?workspace=invalid', '/settings/members?workspace=']) assert.equal(mobileWebTarget(target), '/')
 })
 
+test('personal Files reopens only the requested workspace', () => {
+  const target = `/?section=artifacts&workspace=${BOT}`
+  assert.equal(mobileWebTarget(target), target)
+  assert.equal(mobileWebTarget('/?section=artifacts'), '/')
+  assert.equal(mobileWebTarget(target + '&workspace=' + BOT), '/')
+})
+
 test('scoped chats reject malformed, extra and repeated authority parameters', () => {
   for (const value of ['/?section=coordinator&workspace=private', `/?section=coordinator&workspace=${BOT}&workspace=${BOT}`, `/?section=coordinator&bot=${BOT}&workspace=${BOT}&owner=other`, `/?section=coordinator&bot=${BOT}&bot=${BOT}`, `/?section=coordinator&workspace=${BOT}#fragment`]) assert.equal(mobileWebTarget(value), '/', value)
 })

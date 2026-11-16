@@ -280,6 +280,8 @@ export interface Preferences {
 }
 
 export interface Settings {
+  /** Older and community servers do not advertise the official personal Files page. */
+  personalFilesAvailable?: boolean
   /** Fresh finance entry scope; absent on older servers. */
   billingScope?: { kind: 'workspace' | 'organization'; id: string } | null
   user: Person
