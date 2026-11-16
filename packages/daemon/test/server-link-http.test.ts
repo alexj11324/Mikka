@@ -503,6 +503,7 @@ describe("mikka daemon login (device authorization)", () => {
       client_id: "mikka-daemon",
       device_name: "build-box",
       device_platform: process.platform,
+      device_arch: process.arch,
       client_version: DAEMON_VERSION,
     })
     expect(calls[1]?.body).toEqual({

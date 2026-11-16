@@ -1,7 +1,7 @@
 // `mikka daemon login`: OAuth 2.0 device authorization (RFC 8628) against
 // the server's Better Auth device-authorization plugin, like `gh auth login`.
 //
-//   1. POST /api/auth/device/code   { client_id: "mikka-daemon", device_name, device_platform, client_version }
+//   1. POST /api/auth/device/code   { client_id: "mikka-daemon", device_name, device_platform, device_arch, client_version }
 //   2. show the user code and the web verification link (including base path)
 //   3. poll POST /api/auth/device/token every `interval` seconds until the
 //      user approved (or denied, or the code expired)
@@ -13,7 +13,7 @@ import {
   CLIENT_VERSION_HEADER,
   DAEMON_CLIENT_ID,
 } from "@mikka/protocol"
-import { hostname, platform } from "node:os"
+import { arch, hostname, platform } from "node:os"
 import { z } from "zod"
 
 import { DaemonError, ServerUnreachableError } from "./errors"
@@ -96,6 +96,7 @@ export async function deviceLogin(
     client_id: DAEMON_CLIENT_ID,
     device_name: options.deviceName ?? hostname(),
     device_platform: platform(),
+    device_arch: arch(),
     client_version: DAEMON_VERSION,
   })
   const code = deviceCodeResponse.safeParse(started.json)
