@@ -579,14 +579,17 @@ test('dispatch_task automations run as their creator through the existing create
 
   await t.test('repeating a personal pin or shared folder and tags leaves the schedule list quiet', async t => {
     const { schedule } = await create()
-    const changed = t.mock.method(runtime.automationSeams, 'changed', async () => {})
+    const originalChanged = runtime.automationSeams.changed
+    let changes = 0
+    runtime.automationSeams.changed = async () => { changes++ }
+    t.after(() => { runtime.automationSeams.changed = originalChanged })
     const pin = (pinned: boolean) => page(member, memberChat, { action: 'pin', scheduleId: schedule.id, pinned })
     await pin(true)
     await Promise.all([pin(true), pin(true)])
-    assert.equal(changed.mock.callCount(), 1)
+    assert.equal(changes, 1)
     await pin(false)
     await Promise.all([pin(false), pin(false)])
-    assert.equal(changed.mock.callCount(), 2)
+    assert.equal(changes, 2)
 
     const organize = (folder: string, tags: string[]) => page<{ schedule: Row }>(owner, chat, { action: 'organize', scheduleId: schedule.id, folder, tags })
     type Row = Schedule & { folder: string; tags: string[] }
@@ -596,9 +599,9 @@ test('dispatch_task automations run as their creator through the existing create
     const matches = await Promise.all([organize('Releases', ['Cafe\u0301', 'QA', 'QA']), organize('Releases', ['Café', 'QA'])])
     assert.deepEqual(matches, [first, first])
     assert.deepEqual(await tuple(), before)
-    assert.equal(changed.mock.callCount(), 3)
+    assert.equal(changes, 3)
     assert.deepEqual((await organize('Releases', ['QA', 'Café'])).schedule.tags, ['QA', 'Café'])
-    assert.equal(changed.mock.callCount(), 4)
+    assert.equal(changes, 4)
   })
 
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {
