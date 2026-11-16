@@ -948,6 +948,13 @@
     "test": "lib/coding-workspace/preview/route.test.ts",
     "suite": "test:coding-workspace-review-runtime"
   },
+  "lib/coding-workspace/preview/port.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates the numeric port before requesting a Task machine lease or resume.",
+    "test": "lib/coding-workspace/preview/route.test.ts",
+    "suite": "test:coding-workspace-review-runtime"
+  },
   "lib/coding-workspace/preview/runtime.ts": {
     "mode": "operator-configured",
     "environment": [
