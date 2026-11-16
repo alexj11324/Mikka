@@ -64,35 +64,47 @@ async function verifyDownloadedFile(application, page, fixture) {
   assert.equal(hash.digest('hex'), fixture.sha256)
 }
 
-export async function verifyPersonalDriveUploads({ application, page, rpc, fixture, passed, setPhase, workspaceId, directory }) {
+export async function verifyPersonalDriveUploads({ application, page, rpc, fixture, passed, setPhase, workspaceId, directory, folderCheck }) {
   const files = await mkdtemp(join(directory, 'personal-drive-'))
   try {
-    setPhase('personal_drive_new_folder')
+    setPhase('personal_drive_open_artifacts')
     // The previous scenario left the owner in this shared workspace. Both
     // people are members, so membership alone cannot explain the later denial.
     const location = new URL('mikka://app/mikka/en/')
     location.search = new URLSearchParams({ workspace: workspaceId, section: 'artifacts' }).toString()
     await page.goto(location.href, { waitUntil: 'domcontentloaded' })
     const folderName = 'Personal upload ' + randomUUID()
-    await page.getByRole('button', { name: 'New folder', exact: true }).click()
+    const newFolder = page.getByRole('button', { name: 'New folder', exact: true }).filter({ visible: true })
+    setPhase('personal_drive_open_folder_dialog')
+    await newFolder.first().waitFor({ state: 'visible' })
+    folderCheck.newFolderButtons = await newFolder.count()
+    await newFolder.first().click()
     const dialog = page.getByRole('dialog', { name: 'New folder', exact: true })
+    setPhase('personal_drive_name_folder')
     const folderInput = dialog.getByRole('textbox')
     await folderInput.fill(folderName)
     const volumes = '/mikka/api/drive/volumes'
+    setPhase('personal_drive_submit_folder')
     const [creation] = await Promise.all([
       page.waitForResponse(r => r.request().method() === 'POST' && new URL(r.url()).pathname === volumes),
-      folderInput.press('Enter'),
+      dialog.getByRole('button', { name: 'Create', exact: true }).click(),
     ])
+    folderCheck.createStatus = creation.status()
+    folderCheck.workspaceMatched = new URL(creation.url()).searchParams.get('workspaceId') === workspaceId
+    assert.equal(folderCheck.workspaceMatched, true)
     assert.equal(creation.status(), 201)
     const { volume } = await creation.json()
     assert.equal(volume.driveScope, 'user')
     assert.equal(volume.scopeId, fixture.ownerId)
     assert.equal(volume.name, folderName)
-    const folder = page.getByText(new RegExp(folderName + '$'))
+    setPhase('personal_drive_open_created_folder')
+    const folder = page.getByText('My files · ' + folderName, { exact: true })
     const upload = page.getByRole('button', { name: 'Upload files', exact: true })
     // Some renderer versions open a newly created folder immediately.
     await expect(upload.or(folder).first()).toBeVisible()
     if (!await upload.isVisible()) await folder.click()
+    await expect(upload).toBeVisible()
+    passed('packaged_personal_drive_new_folder_committed_and_open')
     const receipts = []
     const headPath = volumes + '/' + encodeURIComponent(volume.id)
     for (const size of [33, DRIVE_MAX_FILE_BYTES / MiB]) {
