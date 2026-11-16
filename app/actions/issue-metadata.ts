@@ -46,7 +46,7 @@ export async function getIssuePropertyOptions(id: string) {
     .where(and(eq(workspaceMembers.workspaceId, issue.workspaceId!), eq(workspaceMembers.status, 'active')))
   const members = activeMembers.length ? await tx.select({ id: users.id, name: users.name, image: users.image }).from(users)
     .where(inArray(users.id, activeMembers.map(member => member.id))) : []
-  const choices = await issuePropertyChoices(user.id)
+  const choices = await issuePropertyChoices(user, locked.workspaceId!, tx)
   const projectRecords = await listWorkspaceProjects(locked.workspaceId!)
   return {
     members,
