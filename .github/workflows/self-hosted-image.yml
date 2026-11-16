@@ -386,13 +386,27 @@ jobs:
           import { withOverlayKey } from './scripts/cloudflare-ci.mjs'
           import { verifyOverlayMain } from './scripts/cloudflare-native-oci.mjs'
           const sha = process.env.EXPECTED_OVERLAY_SHA
-          execFileSync('git', ['init', '--quiet', '.hosted-ui'])
+          const knownErrors = new Set([
+            'CI_OVERLAY_READ_KEY_REQUIRED', 'CI_GITHUB_HOST_KEYS_UNAVAILABLE', 'CI_GITHUB_HOST_KEYS_INVALID',
+            'CF_OCI_STAGE_OVERLAY_HISTORY_FAILED', 'CF_OCI_STAGE_OVERLAY_MAIN_FETCH_FAILED',
+            'CF_OCI_STAGE_OVERLAY_MAIN_ANCESTRY_FAILED',
+          ])
+          let stage = 'PREPARE_READ_ONLY_SSH'
+          execFileSync('git', ['init', '--quiet', '.hosted-ui'], { stdio: 'ignore' })
           await withOverlayKey(process.env, async env => {
             const options = { cwd: '.hosted-ui', env, stdio: 'pipe' }
+            stage = 'FETCH_PINNED_REVISION'
             execFileSync('git', ['fetch', '--quiet', '--no-tags', '--depth=1', 'git@github.com:alexj11324/mikka-hosted-ui.git', sha], options)
+            stage = 'CHECK_OUT_PINNED_REVISION'
             execFileSync('git', ['checkout', '--quiet', '--detach', 'FETCH_HEAD'], options)
+            stage = 'VERIFY_MAIN_ANCESTRY'
             verifyOverlayMain('.hosted-ui', sha, env)
-          }).catch(() => { throw new Error('OFFICIAL_UI_CHECKOUT_OR_MAIN_ANCESTRY_FAILED') })
+            stage = 'CLEAN_UP_READ_ONLY_SSH'
+          }).catch(error => {
+            // Child-process diagnostics can contain private paths or SSH material.
+            const code = knownErrors.has(error?.message) ? error.message : stage
+            throw new Error('OFFICIAL_UI_' + code)
+          })
           JS
       - name: Verify the fixed pair and build the official Desktop client
         env:
