@@ -314,4 +314,4 @@ export type DriveWorkspaceFileLink = DriveFileLink & {
   projectId: string | null
   manageable: boolean
 }
-export type DriveWorkspaceFileLinkPage = { links: DriveWorkspaceFileLink[]; nextCursor: string | null }
+export type DriveWorkspaceFileLinkPage = { links: DriveWorkspaceFileLink[]; page: number; pageCount: number; total: number }

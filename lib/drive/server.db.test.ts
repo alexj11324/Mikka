@@ -608,7 +608,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     assert.equal((await call(privateFile.collection + '/' + onlyOwner.id, { ...mine, method: 'PATCH', body: { visibility: 'org' } })).status, 422)
     assert.equal((await call(privateFile.collection + '/' + onlyOwner.id, { ...mine, token: peerToken })).status, 404)
     await context.test('a Workspace link directory intersects creator visibility, active Project ACL and file location before pagination', async () => {
-      const myDirectory = (token: string, workspaceId = team.id, suffix = '') => fetch(
+      const myDirectory = (token: string, workspaceId: string = team.id, suffix = '') => fetch(
         origin + '/api/drive/shares?workspaceId=' + workspaceId + suffix, { headers: { authorization: 'Bearer ' + token } })
       const group = await seedTeam(fixture, team.id, owner)
       const projectId = await seedProject(fixture, owner, [{ teamId: group.id, workspaceId: team.id }])
@@ -631,8 +631,10 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       assert.deepEqual(received.map(l => l.id).sort(), [teamLink, projectLink].sort())
       assert.ok(received.every(l => !l.manageable))
       const first = await (await myDirectory(peerToken, team.id, '&limit=1')).json()
-      const second = await (await myDirectory(peerToken, team.id, '&limit=1&after=' + first.nextCursor)).json()
-      assert.equal(second.nextCursor, null)
+      const second = await (await myDirectory(peerToken, team.id, '&limit=1&page=2')).json()
+      assert.deepEqual([first.page, first.pageCount, first.total, second.page, second.pageCount, second.total], [1, 2, 2, 2, 2, 2])
+      const last = await (await myDirectory(peerToken, team.id, '&limit=1&page=8')).json()
+      assert.deepEqual(last, second)
       assert.deepEqual([first.links[0].id, second.links[0].id], [teamLink, projectLink].sort())
       await fixture.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [projectId])
       assert.deepEqual((await actual(peerToken)).map(l => l.id), [teamLink])

@@ -49,12 +49,13 @@ export async function fileLinkProjectIds(database: Database, workspaceId: string
 /** The tenant membership and selected canonical Project rows are held by the caller.
  * Recheck each Project's current ACL in the same APP statement as its link metadata. */
 export async function listWorkspaceDriveFileLinks(database: Database, workspaceId: string, reader: string, projects: string[],
-  page: { after: string | null; limit: number }): Promise<DriveWorkspaceFileLinkPage> {
-  const { rows } = await database.query<DriveWorkspaceFileLinkPage['links'][number]>(`SELECT l.id,l.path,l.visibility,
+  page: { number: number; limit: number }): Promise<DriveWorkspaceFileLinkPage> {
+  const { rows: [result] } = await database.query<DriveWorkspaceFileLinkPage>(`WITH visible AS MATERIALIZED (
+    SELECT l.id,l.path,l.visibility,
       v.id AS "volumeId",v.name AS "volumeName",v."driveScope",p.id::text AS "projectId",l."createdBy"=$2 AS manageable
     FROM drive_file_links l JOIN drive_volumes v ON v.id=l."volumeId"
     LEFT JOIN unnest($3::uuid[]) AS p(id) ON v."driveScope" IN ('project','project-user') AND p.id::text=v."scopeId"
-    WHERE v."workspaceId"=$1::uuid AND v."archivedAt" IS NULL AND ($4::uuid IS NULL OR l.id>$4)
+    WHERE v."workspaceId"=$1::uuid AND v."archivedAt" IS NULL
       AND (l."createdBy"=$2 OR l.visibility='org' AND v."driveScope" IN ('project','team-workspace'))
       AND (
         (v."driveScope"='user' AND v."ownerId"=$2 AND v."scopeId"=$2 AND v."scopeUserId" IS NULL)
@@ -64,9 +65,15 @@ export async function listWorkspaceDriveFileLinks(database: Database, workspaceI
           AND ((v."driveScope"='project-user' AND v."scopeUserId"=$2 AND v."ownerId"=$2)
             OR (v."driveScope"='project' AND v."scopeUserId" IS NULL AND v."ownerId"='drive-project:'||v."workspaceId"::text||':'||p.id::text)))
       )
-    ORDER BY l.id LIMIT $5`, [workspaceId, reader, projects, page.after, page.limit + 1])
-  const links = rows.slice(0, page.limit)
-  return { links, nextCursor: rows.length > page.limit ? links.at(-1)!.id : null }
+  ), tally AS (
+    SELECT count(*)::integer AS total, greatest(1,ceil(count(*)::numeric/$5::integer)::integer) AS "pageCount" FROM visible
+  ), selected AS (
+    SELECT total,"pageCount",least($4::integer,"pageCount") AS page FROM tally
+  )
+  SELECT total,page,"pageCount",coalesce((SELECT jsonb_agg(to_jsonb(batch) ORDER BY batch.id) FROM (
+    SELECT * FROM visible ORDER BY id LIMIT $5 OFFSET (SELECT (page-1)::bigint*$5 FROM selected)
+  ) AS batch),'[]'::jsonb) AS links FROM selected`, [workspaceId, reader, projects, page.number, page.limit])
+  return result
 }
 
 export async function updateDriveFileLink(database: Database, volumeId: string, id: string, creator: string, visibility: DriveFileLinkVisibility) {

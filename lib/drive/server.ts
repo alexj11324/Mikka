@@ -48,8 +48,9 @@ export async function driveResponse(request: Request, operation: Operation, para
     const search = new URL(request.url).searchParams
     const workspaceId = z.uuid().parse(search.get('workspaceId')).toLowerCase()
     if (operation === 'workspaceLinks') {
-      if (search.has('driveScope') || search.has('projectId') || search.has('view')) throw new DriveError('drive_write_invalid', 400)
-      const page = fileLinkPage(search)
+      if (search.has('driveScope') || search.has('projectId') || search.has('view') || search.has('after')) throw new DriveError('drive_write_invalid', 400)
+      const page = { number: z.coerce.number().int().min(1).max(2_147_483_647).parse(search.get('page') ?? '1'),
+        limit: z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50') }
       return await withTaskWorkspace(session.user, workspaceId, async (workspace, tx) => {
         if (workspace.kind !== 'team') throw new DriveError('drive_not_found', 404)
         const candidates = await fileLinkProjectIds(pool, workspaceId, session.user.id)

@@ -82,9 +82,8 @@ export function driveFileLinkUrl(location: DriveLocation, volumeId: string, link
   return url(location, `/${encodeURIComponent(volumeId)}/shares/${encodeURIComponent(linkId)}`)
 }
 
-export function readWorkspaceDriveFileLinks(workspaceId: string, after?: string, send?: typeof fetch) {
-  const query = new URLSearchParams({ workspaceId })
-  if (after) query.set('after', after)
+export function readWorkspaceDriveFileLinks(workspaceId: string, page = 1, send?: typeof fetch) {
+  const query = new URLSearchParams({ workspaceId, page: String(page) })
   return request<DriveWorkspaceFileLinkPage>(withBasePath(`/api/drive/shares?${query}`), {}, send)
 }
 
