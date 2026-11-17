@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { expect } from '@playwright/test'
 
 /** The signed-in renderer uses the same organization endpoints as the Settings screen. */
 export async function verifyOrganizationLifecycle({ page, workspaceId, passed, setPhase }) {
@@ -60,20 +61,44 @@ export async function verifyOrganizationLifecycle({ page, workspaceId, passed, s
   passed('packaged_owner_detaches_archives_and_reads_archived_organization')
 }
 
-/** Run this while the independently authenticated recipient is using the installed client. */
-export async function acceptReceivedOrganizationInvitation(page, invitation, passed) {
-  const result = await page.evaluate(async ({ id }) => {
-    const inbox = await fetch('/mikka/api/me/invitations')
-    const visible = (await inbox.json()).invitations.some(row => row.id === id)
-    if (!visible) return { visible: false }
-    const response = await fetch('/mikka/api/organization-invitations/accept', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ invitationId: id }),
-    })
-    const accepted = await response.json()
-    const after = await fetch('/mikka/api/me/invitations')
-    return { visible, status: response.status, organizationId: accepted.organizationId, joined: accepted.joined,
-      role: accepted.role, removed: !(await after.json()).invitations.some(row => row.id === id) }
-  }, invitation)
-  assert.deepEqual(result, { visible: true, status: 200, organizationId: invitation.organizationId, joined: true, role: 'member', removed: true })
+/** The independently authenticated recipient accepts from installed Settings. Only the rendered control writes. */
+export async function acceptReceivedOrganizationInvitation(page, invitation, revokedId, words, passed) {
+  const settings = 'mikka://app/mikka/en/settings?section=organization'
+  const matches = (response, path, method) => new URL(response.url()).pathname === '/mikka/api/' + path
+    && response.request().method() === method
+  async function openInbox() {
+    const [response] = await Promise.all([
+      page.waitForResponse(reply => matches(reply, 'me/invitations', 'GET')),
+      page.goto(settings, { waitUntil: 'domcontentloaded' }),
+    ])
+    await expect(page).toHaveURL(settings)
+    assert.equal(response.status(), 200)
+    return (await response.json()).invitations
+  }
+
+  const inbox = await openInbox()
+  assert.notEqual(revokedId, invitation.id)
+  assert.equal(inbox.some(item => item.id === revokedId), false)
+  assert.deepEqual(inbox.map(item => item.id), [invitation.id])
+  await expect(page.getByText(words.invitations.receivedTitle, { exact: true })).toBeVisible()
+  const name = page.getByText(inbox[0].organizationName, { exact: true })
+  await expect(name).toBeVisible()
+  // Domain discovery can show another Join on this page. Use the addressed invitation's row.
+  const row = name.locator('xpath=ancestor::*[.//button][1]')
+  const join = row.getByRole('button', { name: words.invitations.accept, exact: true })
+    .or(row.getByRole('button', { name: words.domains.join, exact: true }))
+  const [response] = await Promise.all([
+    page.waitForResponse(reply => matches(reply, 'organization-invitations/accept', 'POST')),
+    join.click(),
+  ])
+  const body = response.request().postDataJSON()
+  assert.equal(Object.keys(body).length === 1 && body.invitationId === invitation.id, true)
+  assert.equal(response.status(), 200)
+  const accepted = await response.json()
+  assert.equal(accepted.organizationId, invitation.organizationId)
+  assert.equal(accepted.joined, true)
+  assert.equal(accepted.role, 'member')
+  assert.deepEqual(await openInbox(), [])
   passed('packaged_verified_recipient_accepts_received_organization_mail_invitation_as_member')
+  passed('packaged_settings_join_click_sends_addressed_invitation_id_and_reopened_inbox_excludes_revoked_and_accepted')
 }

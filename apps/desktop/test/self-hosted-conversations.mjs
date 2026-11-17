@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { expect } from '@playwright/test'
 import { acceptReceivedOrganizationInvitation } from './self-hosted-organization.mjs'
-import { enableOrganizationDomain, joinDiscoveredOrganization, removeOrganizationDomain } from './self-hosted-organization-domain.mjs'
+import { enableOrganizationDomain, joinDiscoveredOrganization, prepareRevokedInvitation, removeOrganizationDomain } from './self-hosted-organization-domain.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
 
 const english = JSON.parse(await readFile(new URL('../../../messages/en.json', import.meta.url), 'utf8'))
@@ -183,11 +183,12 @@ export async function verifyConversationOrganization({ page, fixture, rpc, passe
   passed('owner_manual_unread_persisted_in_directory_across_reload')
   setPhase('organization_owner_configures_verified_domain')
   const joinDomain = fixture.member.invitation ? await enableOrganizationDomain(page, fixture.email) : null
+  const revokedInvitation = joinDomain ? await prepareRevokedInvitation(page, joinDomain.organizationId, fixture.member.email) : null
   setPhase('conversation_member_authorization')
   await signInAs(fixture.member, fixture.member.id)
   if (fixture.member.invitation) {
     setPhase('organization_verified_recipient_accepts_received_invitation')
-    await acceptReceivedOrganizationInvitation(page, fixture.member.invitation, passed)
+    await acceptReceivedOrganizationInvitation(page, fixture.member.invitation, revokedInvitation, english.Organization, passed)
     setPhase('organization_member_discovers_and_joins_matching_domain')
     await joinDiscoveredOrganization(page, joinDomain)
     passed('packaged_verified_member_discovers_and_joins_organization_by_domain')
