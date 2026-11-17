@@ -1254,3 +1254,14 @@ test('live observer evidence leaves legacy, unrelated failures and passing recei
       { ...proof, bootstrapReceipt: bootstrapReceipt(harness) }, accepted(harness)))
   }
 })
+
+test('a failed candidate machine reports only fixed-shape worker evidence', async () => {
+  const { vmProbeDiagnostic } = await import('./validate-template-subscriptions.mjs')
+  const probe = vmProbeDiagnostic('{"workers":1,"acceptanceDaemons":1,"fenceHolders":1,"logFiles":2,"fence":{"phase":"active","nativeExited":false,"worktree":true},'
+    + '"problems":[{"level":50,"time":1,"msg":"Run failed","code":"terminal_control_unavailable","name":"CodedError","detail":"fence_lost"},{"level":50,"msg":"token=secret$value"}]}')
+  assert.equal(probe.status, 'read')
+  assert.deepEqual(probe.fence, { phase: 'active', nativeExited: false, worktree: true, error: null })
+  assert.deepEqual(probe.problems[0], { level: 50, time: 1, msg: 'Run failed', code: 'terminal_control_unavailable', name: 'CodedError', detail: 'fence_lost' })
+  assert.equal(probe.problems[1].msg, null, 'free text outside the fixed alphabet never leaves the machine')
+  assert.deepEqual(vmProbeDiagnostic('not json'), { status: 'invalid' })
+})

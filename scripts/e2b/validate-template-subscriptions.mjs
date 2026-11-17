@@ -47,6 +47,43 @@ const CLEANUP_STEPS = new Map([['factoryCancelled', 'factory_cancel'], ['taskDel
   ...['profile_archive', 'timing_variable_delete', 'stop_test_bot', 'workspace_restore', 'sign_out', 'device_remove', 'sandbox_kill'].map(step => [step, step])])
 const CLEANUP_CODES = new Set(['startup_cleanup_scope_mismatch', 'startup_factory_list_invalid',
   'startup_api_refused', 'startup_rpc_refused', 'startup_action_refused', 'startup_workspace_restore_failed'])
+// A failed candidate's own machine says what its worker did. Only fixed-shape
+// fields leave it: process counts, the fence receipt's phase and the daemon
+// log's warning/error lines reduced to their message and error code.
+const VM_PROBE = String.raw`
+import glob,json,os,re,subprocess
+safe=lambda v,n=120:v if isinstance(v,str) and re.fullmatch(r'[A-Za-z0-9 _.:,()/\-]{1,%d}'%n,v) else None
+def count(pattern):
+ r=subprocess.run(['pgrep','-fc',pattern],capture_output=True,text=True);return int(r.stdout.strip() or 0)
+out={'workers':count('cloud-worker.js'),'acceptanceDaemons':count('acceptance-daemon.mts'),'fenceHolders':count('import fcntl,json,os,stat,sys')}
+try:
+ r=json.load(open('/run/mikka-review-control/machine.json'));out['fence']={'phase':safe(r.get('phase'),16),'nativeExited':r.get('nativeExited') is True,'worktree':bool(r.get('worktreePath'))}
+except Exception as e:out['fence']={'error':type(e).__name__}
+lines=[]
+for f in sorted(glob.glob('/home/user/.mikka/**/daemon.log*',recursive=True),key=os.path.getmtime):
+ for raw in open(f,errors='replace').read().splitlines()[-4000:]:
+  try:v=json.loads(raw)
+  except Exception:continue
+  if not isinstance(v,dict) or not isinstance(v.get('level'),int) or v['level']<40:continue
+  err=v.get('err') if isinstance(v.get('err'),dict) else {}
+  lines.append({k:x for k,x in {'level':v['level'],'time':v.get('time') if isinstance(v.get('time'),int) else None,'msg':safe(v.get('msg')),'code':safe(err.get('code'),64),'name':safe(err.get('type') or err.get('name'),64),'detail':safe(err.get('detail'),64)}.items() if x is not None})
+out['logFiles']=len(glob.glob('/home/user/.mikka/**/daemon.log*',recursive=True));out['problems']=lines[-20:]
+print(json.dumps(out,separators=(',',':')))
+`
+const probeText = (value, limit) => typeof value === 'string' && value.length <= limit && /^[A-Za-z0-9 _.:,()/-]+$/.test(value) ? value : undefined
+const probeCount = value => Number.isInteger(value) && value >= 0 && value <= 64 ? value : null
+export function vmProbeDiagnostic(raw) {
+  let value
+  try { value = JSON.parse(String(raw).trim().split('\n').at(-1)) } catch { return { status: 'invalid' } }
+  if (!value || typeof value !== 'object') return { status: 'invalid' }
+  const fence = value.fence && typeof value.fence === 'object' ? value.fence : {}
+  return { status: 'read', workers: probeCount(value.workers), acceptanceDaemons: probeCount(value.acceptanceDaemons),
+    fenceHolders: probeCount(value.fenceHolders), logFiles: probeCount(value.logFiles),
+    fence: { phase: probeText(fence.phase, 16) ?? null, nativeExited: fence.nativeExited === true, worktree: fence.worktree === true, error: probeText(fence.error, 64) ?? null },
+    problems: (Array.isArray(value.problems) ? value.problems.slice(-20) : []).map(row => ({
+      level: Number.isInteger(row?.level) ? row.level : null, time: Number.isInteger(row?.time) ? row.time : null,
+      msg: probeText(row?.msg, 120) ?? null, code: probeText(row?.code, 64) ?? null, name: probeText(row?.name, 64) ?? null, detail: probeText(row?.detail, 64) ?? null })) }
+}
 const cliVersion = value => typeof value === 'string' && value.length <= 32 && /^[0-9]+\.[0-9]+\.[0-9]+$/.test(value)
 const REQUEST_TRACE_SCOPE = 'submission_http_only_workflow_may_use_another_trace'
 // Existing public action codes plus the dispatch, repository, Profile and
@@ -158,7 +195,7 @@ function bootstrapReceiptChecks(kind, proof, sample, expectedScope) {
   }
 }
 
-function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, deviceId, { sourceCommit, cleanupDetails, passedReceipt, registeredProof, bootstrapChecks }) {
+function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, deviceId, { sourceCommit, cleanupDetails, passedReceipt, registeredProof, bootstrapChecks, vmProbe }) {
   const sample = acceptance?.samples?.[0]
   const sampleFailure = startupFailure(sample)
   const failure = sampleFailure ?? startupFailure(acceptance)
@@ -224,6 +261,7 @@ function candidateDiagnostic(kind, stage, error, acceptance, cleanupErrors, devi
     // Registration proves the selected original binary, not task execution.
     ...(error && registeredProof ? { candidateProof: registeredProof } : {}),
     ...(bootstrapDiagnostics ? { bootstrapDiagnostics } : {}),
+    ...(error && vmProbe?.status === 'read' ? { vmProbe } : {}),
     ...(retainedFixture ? { retainedFixture } : {}),
     ...(cleanup.has('device_remove_failed') && UUID.test(deviceId ?? '') ? { registeredDeviceId: deviceId } : {}) }
 }
@@ -317,7 +355,7 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
     scope = await selectAcceptanceTeam(client, { ownerId, workspace: env.MIKKA_ACCEPTANCE_WORKSPACE_ID }, value => { originalWorkspaceId = value })
     bot = await acceptanceBot(client, env.MIKKA_ACCEPTANCE_BOT_ID, randomUUID())
     for (const [kind, harness] of KINDS) {
-      let sandbox, deviceId, acceptance, diagnosticError, registeredProof, bootstrapChecks, enrollmentIssued = false, stage = 'candidate'
+      let sandbox, deviceId, acceptance, diagnosticError, registeredProof, bootstrapChecks, vmProbe, enrollmentIssued = false, stage = 'candidate'
       const cleanupErrors = [], cleanupDetails = []
       try {
         const template = report.templates?.[kind]
@@ -418,6 +456,13 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
             }
           } catch { /* No successful registration may have been recorded. */ }
         }
+        if (diagnosticError && sandbox) {
+          try {
+            await sandbox.files.write('/run/mikka-template-acceptance/probe.py', VM_PROBE, { user: 'root' })
+            vmProbe = vmProbeDiagnostic((await sandbox.commands.run('python3 -I /run/mikka-template-acceptance/probe.py', { user: 'root', timeoutMs: 20000 })).stdout)
+          }
+          catch { vmProbe = { status: 'unavailable' } }
+        }
         if (deviceId) {
           try { await client.rpc('agents.removeDevice', [deviceId]) }
           catch (error) {
@@ -437,7 +482,7 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
           }
         }
         onDiagnostic(candidateDiagnostic(kind, stage, diagnosticError, acceptance, cleanupErrors, deviceId,
-          { sourceCommit: report.sourceCommit, cleanupDetails, passedReceipt: passed[kind], registeredProof, bootstrapChecks }))
+          { sourceCommit: report.sourceCommit, cleanupDetails, passedReceipt: passed[kind], registeredProof, bootstrapChecks, vmProbe }))
       }
     }
     check((await client.json('/api/version')).build === version.build, 'application_build_changed')
