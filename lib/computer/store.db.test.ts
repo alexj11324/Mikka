@@ -228,7 +228,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     // own cloud device. Every cloud thread runs there; the Bot's computer serves only the Bot.
     const onThreadMachine = async (runId: string) => {
       const deviceId = randomUUID()
-      await pool.query(`INSERT INTO devices(id,"ownerId",kind) VALUES ($1,$2,'cloud')`, [deviceId, actor.userId])
+      await pool.query(`INSERT INTO devices(id,"ownerId",kind,"sessionOpenedAt") VALUES ($1,$2,'cloud',now())`, [deviceId, actor.userId])
       await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId")
         SELECT "runId","workspaceId","ownerId","botId",$2,'snapshot-thread',$3,'running',$4 FROM computer_run_bindings WHERE "runId"=$1
         ON CONFLICT ("runId") DO UPDATE SET "sandboxId"=EXCLUDED."sandboxId",state='running',"deviceId"=EXCLUDED."deviceId"`, [runId, `sandbox-${runId}`, randomUUID(), deviceId])
@@ -361,7 +361,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(bindComputerRun(pool, actor, runId, bobBot.id), { status: 404 })
     await bindComputerRun(pool, actor, runId, bot.id)
     const deviceId = randomUUID()
-    await pool.query('INSERT INTO devices (id,"ownerId") VALUES ($1,$2)', [deviceId, actor.userId])
+    await pool.query('INSERT INTO devices (id,"ownerId","sessionOpenedAt") VALUES ($1,$2,now())', [deviceId, actor.userId])
     await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [runId, deviceId])
     assert.equal(await claimLocalRun(pool, runId, deviceId, new Date(Date.now() + 30000)), 'cloud-required')
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'queued')
@@ -592,7 +592,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     // A Bot on :3 can dispatch a dedicated thread on its own :1. Both sync
     // and the owner decision must use the thread binding, never the Bot's X11.
     const threadRun = randomUUID(), threadDevice = randomUUID()
-    await pool.query(`INSERT INTO devices(id,"ownerId",kind) VALUES ($1,$2,'cloud')`, [threadDevice, actor.userId])
+    await pool.query(`INSERT INTO devices(id,"ownerId",kind,"sessionOpenedAt") VALUES ($1,$2,'cloud',now())`, [threadDevice, actor.userId])
     await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt","workspaceId") VALUES ($1,$2,$3,$4,'running',now()+interval '5 minutes',$5)`, [threadRun, actor.userId, consumer, threadDevice, actor.workspaceId])
     await pool.query(`INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [threadRun, later.id, actor.workspaceId, actor.userId])
     await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,$3,$4,'sandbox-thread','snapshot-thread',$5,'running',$6)`, [threadRun, actor.workspaceId, actor.userId, later.id, randomUUID(), threadDevice])
