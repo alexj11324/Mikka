@@ -20,6 +20,7 @@ export const DRIVE_BLOB_UPLOAD = new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_
 const UUID = '[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[1-8][0-9A-Fa-f]{3}-[89aAbB][0-9A-Fa-f]{3}-[0-9A-Fa-f]{12}'
 const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/drive\/(?:scopes|shares)$/, ['GET']],
+  [new RegExp(`^/api/drive/shares/${UUID}$`), ['GET']],
   [/^\/api\/drive\/volumes$/, ['GET', 'POST']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}$`), ['GET']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:files|versions)$`), ['GET']],
