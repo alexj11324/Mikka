@@ -10,6 +10,8 @@ import { accessibleProjectNames, withReadableProject } from '@/lib/project-acces
 import { workspaceSelection } from '@/lib/workspace-selection'
 import { findShareLocation, readShareView, requireCurrentDownload } from './share-view'
 import { withTaskWorkspace } from '@/lib/task-workspace'
+import { organizationSession } from '@/lib/enterprise/http'
+import { workspacePool } from '@/lib/workspace-db'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
 import { boundedDriveBytes, driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
@@ -30,7 +32,7 @@ const write = z.object({ expectedDigest: digest, mutationId, changes: z.array(z.
 ])).min(1).max(DRIVE_MAX_CHANGES) }).strict()
 const restore = z.object({ versionId, expectedDigest: digest, mutationId }).strict()
 type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive' | 'links' | 'link' | 'workspaceLinks' | 'shareView'
-type Params = { volumeId?: string; versionId?: string; shareId?: string }
+type Params = { volumeId?: string; versionId?: string; shareId?: string; organizationId?: string }
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers })
 
 async function body(request: Request) {
@@ -44,13 +46,13 @@ function fileLinkPage(search: URLSearchParams) {
 
 /** First HTTP surface over the existing volume, CAS and object-store implementation. */
 export async function driveResponse(request: Request, operation: Operation, params: Params = {}): Promise<Response> {
-  const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
+  const session = params.organizationId ? await organizationSession(request, params.organizationId) : await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
   if (!session?.user) return json({ error: 'authRequired' }, 401)
   if (request.method !== 'GET' && !writeAllowed(request)) return json({ error: 'originNotAllowed' }, 403)
   try {
     const search = new URL(request.url).searchParams
     const viewId = operation === 'shareView' ? z.uuid().parse(params.shareId) : null
-    if (viewId && [...search.keys()].some(key => key !== 'download')) throw new DriveError('drive_write_invalid', 400)
+    if (viewId && (params.organizationId ? search.size !== 0 : [...search.keys()].some(key => key !== 'download'))) throw new DriveError('drive_write_invalid', 400)
     const located = viewId ? await findShareLocation(pool, viewId, session.user.id) : null
     const workspaceId = located?.workspaceId ?? z.uuid().parse(search.get('workspaceId')).toLowerCase()
     if (located) {
@@ -136,7 +138,7 @@ export async function driveResponse(request: Request, operation: Operation, para
         return json({ archived })
       }
       const volume = await readDriveVolume(pool, actor, located?.volumeId ?? params.volumeId)
-      if (located && viewId && !search.has('download')) return json(await readShareView(pool, located, viewId, actor.ownerId, session.user.id))
+      if (located && viewId && !params.organizationId && !search.has('download')) return json(await readShareView(pool, located, viewId, actor.ownerId, session.user.id))
       if (operation === 'links') {
         if (request.method === 'POST') {
           const { path } = z.object({ path: z.string().refine(isDrivePath) }).strict().parse(await body(request))
@@ -152,11 +154,12 @@ export async function driveResponse(request: Request, operation: Operation, para
       if (linkId && request.method === 'PATCH') {
         const { visibility } = z.object({ visibility: z.enum(['private', 'org']) }).strict().parse(await body(request))
         if (visibility === 'org' && !sharedProject && !teamFiles) throw new DriveError('drive_scope_invalid', 422)
-        return json({ link: await updateDriveFileLink(pool, volume.id, linkId, session.user.id, visibility, location) })
+        const link = await updateDriveFileLink(pool, volume.id, linkId, session.user.id, visibility, location)
+        return json(params.organizationId ? link : { link })
       }
       if (linkId && request.method === 'DELETE') {
         await revokeDriveFileLink(pool, volume.id, linkId, session.user.id)
-        return json({ revoked: true })
+        return params.organizationId ? new Response(null, { status: 204, headers }) : json({ revoked: true })
       }
       if (operation === 'volume') {
         // Read an immutable manifest named by the head receipt, so a concurrent
@@ -221,12 +224,23 @@ export async function driveResponse(request: Request, operation: Operation, para
       return new Response(content, { headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(blob.sizeBytes),
         'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(blob.path.split('/').at(-1)!)}` } })
     }
-    const response = projectId
-      ? await withReadableProject(session.user, workspaceId, projectId, serve, sharedProject && request.method !== 'GET' && !['links', 'link'].includes(operation) ? 'canSteer' : 'canReadContent')
-      : await withTaskWorkspace(session.user, workspaceId, async workspace => {
+    const authorized = () => projectId
+      ? withReadableProject(session.user, workspaceId, projectId, serve, sharedProject && request.method !== 'GET' && !['links', 'link', 'shareView'].includes(operation) ? 'canSteer' : 'canReadContent')
+      : withTaskWorkspace(session.user, workspaceId, async workspace => {
         if (teamFiles && workspace.kind !== 'team') return json({ error: 'drive_not_found' }, 404)
         return serve()
       })
+    const organizationId = params.organizationId
+    const response = organizationId ? await withTaskWorkspace(session.user, workspaceId, async workspace => {
+      // The original Workspace lease pins its attachment. Lock the active Organization
+      // and its member before the canonical Project and content ACL are acquired.
+      const membership = await workspacePool.query(`SELECT 1 FROM mikka_organization_workspaces a
+        JOIN mikka_organizations o ON o.id=a."organizationId" AND o."archivedAt" IS NULL
+        JOIN mikka_organization_members m ON m."organizationId"=o.id AND m."userId"=$3 AND m.status='active'
+        WHERE a."workspaceId"=$1 AND a."organizationId"=$2 FOR SHARE OF o,m`, [workspaceId, organizationId, session.user.id])
+      if (workspace.kind !== 'team' || !membership.rowCount) throw new DriveError('drive_not_found', 404)
+      return projectId ? authorized() : serve()
+    }) : await authorized()
     // Both the file mutation and its membership lease have finished. The
     // existing invalidation path resolves recipients afresh and carries no content.
     if (changed) await workspaceListChanged(pool, workspaceId, ['workspace_settings'])

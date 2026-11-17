@@ -62,6 +62,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/organizations/[organizationId]/drive-shares/[shareId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An active Organization member can edit or revoke only a share they created in a currently attached, readable Workspace and Project.",
+    "test": "lib/drive/organization-share.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/drive/shares/[shareId]/route.ts": {
     "mode": "built-in",
     "environment": ["BETTER_AUTH_SECRET"],

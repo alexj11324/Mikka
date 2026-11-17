@@ -31,6 +31,7 @@ const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:restore|archive|unarchive)$`), ['POST']],
 ]
+const ORGANIZATION_FILE_SHARE = new RegExp(`^/api/organizations/${UUID}/drive-shares/${UUID}$`)
 const ORGANIZATION_OVERVIEW = new RegExp(`^/api/organizations/${UUID}$`)
 const ORGANIZATION_KEYS = new RegExp(`^/api/organizations/${UUID}/api-keys$`)
 const ORGANIZATION_WORKSPACES = new RegExp(`^/api/organizations/${UUID}/workspaces$`)
@@ -97,6 +98,7 @@ export function normalizedRendererPath(value: string): string | null {
 }
 
 export function allowedApiPath(path: string, method: string): boolean {
+  if (ORGANIZATION_FILE_SHARE.test(path)) return method === 'PATCH' || method === 'DELETE'
   if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
   if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
   // This human approval/read surface has exactly its declared methods. Do not
