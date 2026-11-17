@@ -37,7 +37,10 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
   const organization = await org.createOrganization(owner, { name: 'Enterprise governance fixture' })
   const organizationId = organization.id
   await org.addOrganizationMember(organizationId, owner.id, { userId: admin.id, role: 'admin' })
-  await org.addOrganizationMember(organizationId, owner.id, { userId: member.id })
+  const admission = await org.addOrganizationMember(organizationId, owner.id, { userId: member.id })
+  assert.deepEqual(await org.addOrganizationMember(organizationId, owner.id, { userId: member.id, role: 'member' }), admission)
+  await assert.rejects(org.addOrganizationMember(organizationId, owner.id, { userId: member.id, role: 'admin' }),
+    (error: unknown) => (error as { detail?: string }).detail === 'invalid_request')
   const wsA = randomUUID(), wsB = randomUUID(), unrelated = randomUUID()
   for (const id of [wsA, wsB, unrelated]) {
     await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Workspace ACL fixture\',\'team\')', [id, owner.id])
