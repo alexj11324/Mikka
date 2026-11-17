@@ -26,6 +26,12 @@ test('platform credentials and deployment identity remain distinct from customer
   assert.equal(selected.runtimeEnv.BETTER_AUTH_URL, 'https://app.example.test')
 })
 
+test('idle queue polling stays slow unless the deployment sets its own interval', () => {
+  assert.equal(hostConfiguration(environment()).runtimeEnv.WORKFLOW_POSTGRES_POLL_INTERVAL_MS, '5000')
+  const tuned = hostConfiguration({ ...environment(), EVE_ENV_WORKFLOW_POSTGRES_POLL_INTERVAL_MS: '2000' })
+  assert.equal(tuned.runtimeEnv.WORKFLOW_POSTGRES_POLL_INTERVAL_MS, '2000')
+})
+
 test('native routing preserves protocol, cookies, body and origin while replacing forged forwarding fields', async () => {
   const original = new Request('https://app.example.test/mikka/api/agents/eve/v1/session/s1?botId=owned-bot', {
     method: 'POST', headers: { cookie: 'owned=fixture', origin: 'https://app.example.test',
