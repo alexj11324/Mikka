@@ -66,7 +66,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Apply the selected archive state under current Organization, Workspace and Project authority and return the original immutable-head Volume.",
-    "test": "lib/drive/organization-share.db.test.ts",
+    "test": "lib/drive/organization-archive-http.db.test.mjs",
     "suite": "test:drive-db"
   },
   "app/api/organizations/[organizationId]/drive/[volumeId]/unarchive/route.ts": {
@@ -3360,6 +3360,13 @@
     "behavior": "Stores the optional architecture reported by the daemon on its pending sign-in request. An existing daemon that omits it can still sign in.",
     "test": "lib/daemon-authorization.test.ts",
     "suite": "test:auth-composio"
+  },
+  "app/api/organizations/[organizationId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current Organization through its human session. Authorized administrators use the existing profile writer to rename it or change its icon. Archiving retains the existing owner check.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   },
   "app/api/organizations/deleted/route.ts": {
     "mode": "built-in",

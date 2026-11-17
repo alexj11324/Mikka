@@ -148,15 +148,16 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
     assert.ok(runId && runId!==original)
     async function waitForStatus(status) {
       const end = Date.now()+45_000
-      let latest, lastPhase
+      let latest, lastPhase, sawRunning = false
       while (Date.now()<end) {
         latest = (await pool.query(`select status,"stopReason", "worktreePath" is not null as checkout,
           exists(select 1 from run_chunks c where c."runId"=r.id and c.chunk->>'type'='text-delta') as replied
           from agent_runs r where r.id=$1`,[runId])).rows[0]
         const phase = latest?.status+' checkout='+latest?.checkout+' reply='+latest?.replied
         if (phase!==lastPhase) { t.diagnostic('Daemon Run '+phase); lastPhase=phase }
-        // The first model observation can write running before the preparing
-        // outbox is drained. Read the live thread once its real turn is open.
+        if (latest?.status==='running') sawRunning = true
+        if (sawRunning) assert.notEqual(latest?.status,'preparing','a running Task must not return to preparation')
+        // The checkout and first persisted output tie the directory read to the opened turn.
         if (latest?.status===status && (status!=='running' || (latest.checkout && latest.replied))) return
         assert.ok(!['failed','succeeded','stopped','cancelled'].includes(latest?.status),
           'unexpected terminal status '+latest?.status+', reason '+latest?.stopReason)

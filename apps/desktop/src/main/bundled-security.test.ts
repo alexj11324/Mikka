@@ -155,7 +155,7 @@ test('organization lifecycle, workspace binding and service keys use their decla
     assert.equal(allowedApiPath('/api/organizations', method), ['GET', 'POST'].includes(method))
     assert.equal(allowedApiPath('/api/organizations/deleted', method), method === 'GET')
     assert.equal(allowedApiPath('/api/organizations/deleted/extra', method), false)
-    assert.equal(allowedApiPath(overview, method), ['GET', 'PATCH', 'DELETE'].includes(method))
+    assert.equal(allowedApiPath(overview, method), ['GET', 'PUT', 'PATCH', 'DELETE'].includes(method))
     assert.equal(allowedApiPath(overview + '/workspaces', method), ['POST', 'DELETE'].includes(method))
     assert.equal(allowedApiPath(collection, method), method === 'GET')
     assert.equal(allowedApiPath(collection + '/' + key, method), method === 'PATCH')
