@@ -24,21 +24,18 @@ const marker = (patch = {}) => '<!-- mikka-memory-1821 ' + JSON.stringify({ stat
 
 function metadata(options = {}) {
   const calls = [], env = { MIKKA_ACCEPTANCE_TARGET_MODE: CORE_MODE, GITHUB_REPOSITORY: repository.full_name,
-    GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_run',
+    GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch',
     GITHUB_SHA: SOURCE, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: String(options.attempt ?? 1), GH_TOKEN: 'synthetic-metadata-token',
     GITHUB_WORKFLOW_REF: repository.full_name + '/' + CORE_WORKFLOW + '@refs/heads/main' }
   for (const key of ['SMOKE_OWNER_EMAIL', 'SMOKE_OWNER_PASSWORD', 'INFISICAL_CLIENT_SECRET'])
     Object.defineProperty(env, key, { get() { return assert.fail('selection cannot read ' + key) } })
-  const release = { id: 51, run_attempt: 1, repository, head_repository: repository,
-    url: API + '/actions/runs/51', name: 'Web deploy', path: '.github/workflows/web-deploy.yml',
-    event: 'push', head_branch: 'main', head_sha: SOURCE, status: 'completed', conclusion: 'success' }
-  const event = { action: 'completed', repository, workflow_run: release }
+  const event = { repository }
   const comment = { id: 1821001, user: { login: options.author ?? 'alexj11324' }, body: marker(options.marker) }
   const comments = options.noMarker ? [] : [comment]
   const pr = { number: 1830, merged: true, merge_commit_sha: SOURCE,
     base: { ref: 'main', repo: repository }, head: { ref: MEMORY_BRANCH, sha: HEAD, repo: repository }, ...options.pr }
   const attestation = { ...coreProductionGuard(env, event), version: 1, purpose: 'self-hosted-core-production',
-    status: 'ready', readable: true, openIssues: options.openIssues ?? [1821], checkedAt: new Date(NOW).toISOString(), webAttempt: 1, webDeployJobId: 61 }
+    status: 'ready', readable: true, openIssues: options.openIssues ?? [1821], checkedAt: new Date(NOW).toISOString() }
   let clock = NOW
   const fetchImpl = async (input, init) => {
     const url = new URL(input), headers = new Headers(init.headers)
@@ -70,7 +67,7 @@ function metadata(options = {}) {
         state: (options.openIssues ?? [1821]).includes(number) && !options.closed ? 'open' : 'closed' })
     }
     if (path === '/actions/runs/17') return Response.json({ id: 17, run_attempt: options.attempt ?? 1, repository, head_repository: repository,
-      url: url.href, path: CORE_WORKFLOW, event: 'workflow_run', head_branch: 'main', head_sha: SOURCE,
+      url: url.href, path: CORE_WORKFLOW, event: 'workflow_dispatch', head_branch: 'main', head_sha: SOURCE,
       status: 'in_progress', conclusion: null })
     if (path === '/actions/runs/17/attempts/1/jobs?per_page=100') return Response.json({ total_count: 1, jobs: [{
       id: 171, name: 'Core production API and gateway acceptance', run_id: 17, run_attempt: 1,
@@ -80,12 +77,6 @@ function metadata(options = {}) {
         { number: 12, name: MEMORY_CASE_STEPS.pending, status: 'completed', conclusion: 'skipped' }],
     }] })
     if (path === '/git/ref/heads/main') return Response.json({ ref: 'refs/heads/main', object: { type: 'commit', sha: options.main ?? SOURCE } })
-    if (path === '/actions/runs/51') return Response.json(release)
-    if (path === '/actions/runs/51/attempts/1/jobs?per_page=100') return Response.json({ total_count: 1,
-      jobs: [{ id: 61, name: 'deploy', run_id: 51, head_sha: SOURCE, status: 'completed', conclusion: 'success',
-        steps: ['Verify the official runtime stays on the cloud edition', 'Build (runs migrations last, as the Vercel build did)',
-          'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
-          .map(name => ({ name, status: 'completed', conclusion: 'success' })) }] })
     return assert.fail('Unexpected metadata request ' + path)
   }
   const args = { env, event, attestation, fetchImpl, now: () => clock }
@@ -93,13 +84,13 @@ function metadata(options = {}) {
     select: expectedSelection => selectMemoryProduction({ ...args, expectedSelection }) }
 }
 
-test('only the ordinary PR 1830 merge, current real Web publication and live own marker select before credentials', async () => {
+test('only the ordinary PR 1830 merge, current live build and live own marker select before credentials', async () => {
   const f = metadata(), proof = await f.select()
   assert.equal(proof.selected, true); assert.equal(proof.status, 'selected'); assert.equal(proof.headSha, HEAD)
   assert.equal(proof.applicationSha, SOURCE); assert.equal(proof.window.sourceSha, SOURCE)
   assert.equal(proof.window.markerSha256.length, 64); assert.equal(proof.window.commentId, f.comment.id)
   assert.deepEqual(proof.attestation.openIssues, [1821])
-  assert.equal(f.calls.filter(path => path.endsWith('/mikka/api/version')).length, 2)
+  assert.equal(f.calls.filter(path => path.endsWith('/mikka/api/version')).length, 1)
   assert.ok(f.calls.includes(API + '/git/commits/' + SOURCE))
   assert.ok(f.calls.includes(API + '/issues/comments/' + f.comment.id))
   assert.equal(proof.notification, null)
@@ -149,7 +140,7 @@ test('old main and a different served production revision decline before any tes
 })
 
 test('a relabelled dispatch or wrong workflow cannot even request PR or window metadata', async () => {
-  for (const patch of [{ GITHUB_EVENT_NAME: 'workflow_dispatch' }, { GITHUB_WORKFLOW_REF: 'someone/else@refs/heads/main' }]) {
+  for (const patch of [{ GITHUB_EVENT_NAME: 'push' }, { GITHUB_WORKFLOW_REF: 'someone/else@refs/heads/main' }]) {
     const f = metadata()
     await assert.rejects(selectMemoryProduction({ ...f.args, env: { ...f.args.env, ...patch } }), /core_configuration/)
     assert.equal(f.calls.length, 0)

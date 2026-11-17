@@ -120,7 +120,7 @@ export async function readInboxRecovery({ reference, selected, env, fetchImpl = 
   }
   const run = await read(`/actions/runs/${ref.runId}/attempts/${ref.attempt}`)
   check(run?.id === ref.runId && run.run_attempt === ref.attempt && run.status === 'completed'
-    && run.event === 'workflow_run' && run.head_branch === 'main' && run.head_sha === selected.applicationSha
+    && run.event === 'workflow_dispatch' && run.head_branch === 'main' && run.head_sha === selected.applicationSha
     && run.path === CORE_WORKFLOW && run.repository?.full_name === REPOSITORY && run.head_repository?.full_name === REPOSITORY)
   const listing = await read(`/actions/runs/${ref.runId}/attempts/${ref.attempt}/jobs?per_page=100`)
   check(Number.isSafeInteger(listing?.total_count) && listing.total_count > 0 && listing.total_count <= 100

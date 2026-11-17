@@ -140,9 +140,7 @@ export async function runProductionMcpProof({
       const proof = await assertDeployedTarget({ env, event, attestation: targetProof, fetchImpl, now })
       targetProof = proof
       Object.assign(report, { targetMode: proof.targetMode, applicationSha: proof.applicationSha,
-        driverRevision: proof.driverRevision, driverRunId: proof.driverRunId, driverRunAttempt: proof.driverRunAttempt,
-        webDeployRunId: proof.webDeployRunId, webAttempt: proof.webAttempt, webDeployJobId: proof.webDeployJobId,
-        deploymentId: proof.deploymentId })
+        driverRevision: proof.driverRevision, driverRunId: proof.driverRunId, driverRunAttempt: proof.driverRunAttempt })
       return
     }
     try {
@@ -159,11 +157,9 @@ export async function runProductionMcpProof({
     need(typeof env.GH_TOKEN === 'string' && env.GH_TOKEN.length > 0, 'application_binding')
     remember([env.GH_TOKEN])
     if (binding.targetMode === 'deployed-target') {
-      remember([env.VERCEL_TEAM_TOKEN])
       await assertBinding()
       initialTargetVerified = true
-      report.deployment = { webRunId: targetProof.webDeployRunId, webAttempt: targetProof.webAttempt,
-        exactApplication: targetProof.applicationSha === binding.applicationSha, deploymentId: targetProof.deploymentId }
+      report.deployment = { exactApplication: targetProof.applicationSha === binding.applicationSha }
     } else {
       let deployment
       try {

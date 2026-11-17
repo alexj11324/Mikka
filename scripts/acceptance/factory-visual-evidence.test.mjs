@@ -432,7 +432,7 @@ test('actual GET bytes through activity and immutable report links must match; e
 test('workflow keeps failed native steps red, continues the other path, and gates all credentials behind exact release checks', async () => {
   const text = await readFile(new URL('../../.github/workflows/factory-visual-evidence-acceptance.yml', import.meta.url), 'utf8')
   assert.doesNotMatch(text, /continue-on-error|secrets:\s*inherit|pull_request_target/)
-  assert.match(text, /workflows: \[Web deploy, E2B additive runtime release\]/)
+  assert.match(text, /workflows: \[E2B additive runtime release\]/)
   assert.match(text, /group: production-smoke-owner-acceptance/)
   assert.match(text, /ref: \$\{\{ needs\.authorize\.outputs\.source-sha \}\}/)
   const codex = text.slice(text.indexOf('- name: ' + CASE_STEPS.codex), text.indexOf('- name: Require both official'))

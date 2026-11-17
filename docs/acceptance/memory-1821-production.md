@@ -1,10 +1,10 @@
 # Memory #1821 production API acceptance
 
-The entry point is the existing **Mikka cloud core compatibility** workflow after a successful main Web deployment. It uses the existing shared-account queue and Infisical smoke identity. It has no dispatch trigger, provider write credential, webhook injection, direct database access or extraction endpoint.
+The entry point is the existing **Mikka cloud core compatibility** workflow, dispatched on main after a release. It uses the existing shared-account queue and Infisical smoke identity. It has no provider write credential, webhook injection, direct database access or extraction endpoint.
 
 ## Source and release-window selection
 
-Read-only selection precedes both account-secret reads. It requires the actual ordinary merge of PR #1830 (`feat/1821-memory-provenance-scope`): the current main/source commit has exactly two parents and its second parent is the PR's final head. The existing Core attestor binds the current main, actual successful Web run/attempt and deploy job steps, and the served `/mikka/api/version`.
+Read-only selection precedes both account-secret reads. It requires the actual ordinary merge of PR #1830 (`feat/1821-memory-provenance-scope`): the current main/source commit has exactly two parents and its second parent is the PR's final head. The existing Core attestor binds the current main and the served `/mikka/api/version`.
 
 An owner-authored #1752 comment also supplies exactly one marker. Substitute the actual full commit IDs and UTC timestamps, and generate a fresh UUID for `fixtureNonce`:
 

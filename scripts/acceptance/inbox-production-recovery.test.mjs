@@ -19,7 +19,7 @@ function fixture(options = {}) {
   const bound = inboxJournalEnvelope(journal()), calls = []
   const reference = { schema: 1, purpose: 'mikka1820-journal-recovery', runId: 123, attempt: 1, jobId: 71, journalSha256: bound.sha256 }
   const selected = { selected: true, driverRunId: 123, driverRunAttempt: 2, applicationSha: SHA, headSha: HEAD, window: { phase: 'cleanup' } }
-  const run = { id: 123, run_attempt: 1, status: 'completed', conclusion: 'cancelled', event: 'workflow_run', head_branch: 'main',
+  const run = { id: 123, run_attempt: 1, status: 'completed', conclusion: 'cancelled', event: 'workflow_dispatch', head_branch: 'main',
     head_sha: SHA, path: CORE_WORKFLOW, repository: { full_name: 'alexj11324/Mikka' }, head_repository: { full_name: 'alexj11324/Mikka' }, ...options.run }
   const job = { id: 71, run_id: 123, run_attempt: 1, head_sha: SHA, head_branch: 'main', name: 'Core production API and gateway acceptance',
     run_url: API + '/actions/runs/123', status: 'completed', started_at: new Date(NOW - 120_000).toISOString(),
@@ -57,7 +57,7 @@ test('completed failed/cancelled attempt proves the exact journal without forwar
 test('foreign source, workflow, repository, attempt and active original job cannot authorize recovery', async () => {
   for (const options of [
     ...[{ head_sha: 'c'.repeat(40) }, { path: '.github/workflows/other.yml' }, { head_branch: 'someone' },
-      { event: 'workflow_dispatch' }, { run_attempt: 2 }, { status: 'in_progress' },
+      { event: 'push' }, { run_attempt: 2 }, { status: 'in_progress' },
       { repository: { full_name: 'someone/else' } }, { head_repository: { full_name: 'someone/fork' } }].map(run => ({ run })),
     ...[{ run_id: 456 }, { run_attempt: 2 }, { run_attempt: undefined }, { head_sha: 'c'.repeat(40) }, { name: 'Other job' }, { status: 'in_progress' },
       { steps: [] }, { id: 72 }].map(job => ({ job })),

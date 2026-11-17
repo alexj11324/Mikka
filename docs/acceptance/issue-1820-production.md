@@ -2,7 +2,7 @@
 
 Use this guide to run and recover the issue 1820 production acceptance as its
 release operator. The driver is `scripts/acceptance/inbox-production.mjs`. It uses the existing
-`self-hosted-production.yml` current-main `workflow_run` entry, the normal
+`self-hosted-production.yml` current-main dispatch, the normal
 shared smoke account, and owner HTTP APIs. Its credentials are still the two
 named Infisical `prod:/` smoke secrets delivered by the existing OIDC identity.
 No database access, provider credential export, synthetic webhook, model prompt,

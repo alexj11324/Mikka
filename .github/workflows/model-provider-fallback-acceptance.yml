@@ -1,9 +1,6 @@
 name: Issue 1225 model provider acceptance
 # Paid acceptance is authorized by these two merged issue PRs only.
 on:
-  workflow_run:
-    workflows: [Web deploy]
-    types: [completed]
   workflow_dispatch:
     inputs:
       mode:
@@ -24,7 +21,7 @@ concurrency:
   queue: max
 jobs:
   acceptance:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == 'alexj11324/Mikka' && (contains(github.event.workflow_run.head_commit.message, '(#1232)') || contains(github.event.workflow_run.pull_requests.*.number, 1232) || contains(github.event.workflow_run.head_commit.message, '(#1249)') || contains(github.event.workflow_run.pull_requests.*.number, 1249))))
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 55
     permissions:
@@ -55,15 +52,8 @@ jobs:
           const valid = (pr, number) => pr.number === number && pr.merged === true && pr.base?.ref === 'main'
             && pr.base?.repo?.full_name === repository && /^[a-f0-9]{40}$/.test(pr.merge_commit_sha ?? '')
             && /(?:refs?|fix(?:es)?|clos(?:e[sd]?|ing)|resolv(?:e[sd]?|ing))\s+(?:https:\/\/github\.com\/alexj11324\/Mikka\/issues\/)?#?1225\b/i.test(pr.body ?? '')
-          const run = event.workflow_run
-          const guard = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
-            ? [feature, acceptance].find(pr => pr.number === Number(event.inputs?.guard_pr ?? 1249))
-            : [feature, acceptance].find(pr => pr.merge_commit_sha === run?.head_sha
-              && (run.head_commit?.message?.includes(`(#${pr.number})`) || run.pull_requests?.some(item => item.number === pr.number)))
+          const guard = [feature, acceptance].find(pr => pr.number === Number(event.inputs?.guard_pr ?? 1249))
           const trigger = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
-            || (process.env.GITHUB_EVENT_NAME === 'workflow_run' && run?.name === 'Web deploy' && run.event === 'push'
-              && run.status === 'completed' && run.conclusion === 'success' && run.head_branch === 'main'
-              && run.head_repository?.full_name === repository)
           if (!valid(feature, 1232) || !valid(acceptance, 1249) || !guard || !trigger) {
             appendFileSync(process.env.GITHUB_OUTPUT, 'eligible=false\n')
             console.log('merge_scope_rejected: no authorized issue deployment; no acceptance or smoke secret read.')
