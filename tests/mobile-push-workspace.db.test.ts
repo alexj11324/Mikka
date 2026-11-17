@@ -179,6 +179,37 @@ test('phone delivery rechecks native sessions and the persisted Workspace with b
     }
   })
 
+  await t.test('unsubscribe removes only the current native session binding by its confirmed installation ID', async () => {
+    const { DELETE: unsubscribe } = await import('../app/api/mobile/push-tokens/[id]/route')
+    const otherSession = await nativeSession(owner)
+    const value = 'ExpoPushToken[' + randomUUID() + ']'
+    const bind = async (bearer: string) => {
+      const response = await POST(request('POST', bearer, { token: value, platform: 'ios' }))
+      assert.equal(response.status, 200)
+      return (await response.json() as { id: string }).id
+    }
+    const remove = (bearer: string, id: string) =>
+      unsubscribe(request('DELETE', bearer, undefined), { params: Promise.resolve({ id }) })
+    try {
+      const id = await bind(ownerSession.token)
+      assert.ok(id)
+      assert.equal((await remove(otherSession.token, id)).status, 404)
+      assert.equal((await remove(peerSession.token, id)).status, 404)
+      assert.equal(await bind(otherSession.token), id)
+      assert.equal((await remove(ownerSession.token, id)).status, 404)
+      assert.equal(await bind(peerSession.token), id)
+      assert.equal((await remove(otherSession.token, id)).status, 404)
+      const response = await remove(peerSession.token, id)
+      assert.equal(response.status, 204)
+      assert.equal(await response.text(), '')
+      assert.equal((await remove(peerSession.token, id)).status, 404)
+      assert.equal((await admin.query('SELECT id FROM mobile_push_tokens WHERE token=$1', [value])).rowCount, 0)
+    } finally {
+      await admin.query('DELETE FROM mobile_push_tokens WHERE token=$1', [value])
+      await admin.query('DELETE FROM "session" WHERE id=$1', [otherSession.id])
+    }
+  })
+
   await t.test('installation labels belong to the person through re-registration and only the bound current session can edit them', async () => {
     const { PATCH } = await import('../app/api/mobile/push-tokens/[id]/route')
     const extraToken = 'ExpoPushToken[' + randomUUID() + ']'

@@ -1385,6 +1385,15 @@
       "sourceHash": "0eab86e939f6215b0c361e16b9769129208338ba55a7a4b71a2175ca26a77875"
     },
     {
+      "path": "/mikka/api/integrations/github/tools",
+      "template": "/api/integrations/github/tools",
+      "source": "app/api/integrations/github/tools/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "bb9a1de43538e83717aabb98d6b37a9311c4454a285a4e04cdabc952a6258b94"
+    },
+    {
       "path": "/mikka/api/integrations/google/callback",
       "template": "/api/integrations/google/callback",
       "source": "app/api/integrations/google/callback/route.ts",
@@ -1695,16 +1704,17 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "e47f35ac6342a3f2cd2c51dd435d3d5b77049ffb866166c0295bcce5fccf1051"
+      "sourceHash": "a04a7ef08d18463ef3767648d4add73d38bfbe1b3047e8af6f7b7da3110134e4"
     },
     {
       "path": "/mikka/api/mobile/push-tokens/[id]",
       "template": "/api/mobile/push-tokens/[id]",
       "source": "app/api/mobile/push-tokens/[id]/route.ts",
       "methods": [
+        "DELETE",
         "PATCH"
       ],
-      "sourceHash": "6bd6f4433a17e9b4cefaa7d3fefe3ff9316b39fcdd1cc3f461d3ede0235c3b56"
+      "sourceHash": "a29f923dfcabd9f72cd3aa0984442749ea32b92bb9089c238e8ff60f4b9a8f22"
     },
     {
       "path": "/mikka/api/mobile/push-tokens/[id]/test",
