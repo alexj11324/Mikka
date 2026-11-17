@@ -93,7 +93,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     assert.ok(workspaceId, 'a person seeded by this test')
     return workspaceId
   }
-  const dispatch = async (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId ?? await chatBotId(userId, null, await ownWorkspace(userId)))
+  const dispatch = async (userId: string, issueId: string, botId: string | null = null) => steps.dispatchRun(userId, { model: { harness: 'codex' as const }, issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, botId ?? await chatBotId(userId, null, await ownWorkspace(userId)))
   type NoMachine = { error: string; reason: string; card: { title: string; description: string; options: { value: string; action: string }[] } }
   const order = await import('../lib/model-order')
   const runAt = (who: { id: string; workspaceId: string }, location: 'cloud' | 'local') => order.changeOrder(pool, { ownerId: who.id, workspaceId: who.workspaceId }, { kind: 'location', location })
@@ -116,7 +116,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,"deliveredAt")
       VALUES($1,$2,$3,'user_message',$4,$5,now())`, [sourceEventId, who.id, botId, `placement:${sourceEventId}`,
       JSON.stringify({ text: named ? `Use device ${deviceA} for this task.` : 'Choose an available computer automatically for this task.' })])
-    const dispatched = await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', sourceEventId,
+    const dispatched = await steps.dispatchRun(who.id, { model: { harness: 'codex' as const }, issueId: who.issueId, repo: 'octo/repo', sourceEventId,
       requestKey: `placement:${randomUUID()}`, ...(named ? { target: { deviceId: deviceA } } : {}) }, undefined, botId) as unknown as { runId?: string; error?: string }
     assert.ok(dispatched.runId, JSON.stringify(dispatched))
     const original = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [dispatched.runId])).rows[0]
@@ -219,7 +219,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const deviceId = await onlineMac(r.id)
     const botId = await chatBotId(r.id, null, await ownWorkspace(r.id))
     // The App is not installed on octo/elsewhere: nothing in Mikka checks that any more (decision 2026-11-02-1600).
-    const queued = await steps.dispatchRun(r.id, { issueId: r.issueId, repo: 'octo/elsewhere', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { runId: string; status: string }
+    const queued = await steps.dispatchRun(r.id, { model: { harness: 'codex' as const }, issueId: r.issueId, repo: 'octo/elsewhere', readOnly: true, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as { runId: string; status: string }
     assert.equal(queued.status, 'queued')
     const run = (await pool.query('SELECT "deviceId","agentDefinition" FROM agent_runs WHERE id=$1', [queued.runId])).rows[0]
     assert.equal(run.deviceId, deviceId)
@@ -237,7 +237,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const g = await person('github-grant')
     await onlineMac(g.id)
     const botId = await chatBotId(g.id, null, await ownWorkspace(g.id))
-    const dispatchTo = (repo: string, issueId: string) => steps.dispatchRun(g.id, { issueId, repo, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as Promise<{ error?: string; runId?: string; status?: string }>
+    const dispatchTo = (repo: string, issueId: string) => steps.dispatchRun(g.id, { model: { harness: 'codex' as const }, issueId, repo, requestKey: `dispatch:${randomUUID()}` }, undefined, botId) as unknown as Promise<{ error?: string; runId?: string; status?: string }>
     github.install('octo/read-only-app', { contents: 'read', pull_requests: 'write' })
     const queued = await dispatchTo('octo/read-only-app', g.issueId)
     assert.equal(queued.status, 'queued', JSON.stringify(queued))
@@ -312,7 +312,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     }
     const sourceEventId = randomUUID()
     await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload,"deliveredAt") VALUES ($1::uuid,$2,$3,'user_message',$1::text,$4,now())`, [sourceEventId, who.id, botId, JSON.stringify({ text: 'Run the recovery role.', ...(profileId ? { profileId } : {}) })])
-    const result = await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', profileId, sourceEventId, requestKey: `startup:${randomUUID()}` }, undefined, botId) as unknown as { runId?: string; error?: string; fallback?: string }
+    const result = await steps.dispatchRun(who.id, { model: { harness: 'codex' as const }, issueId: who.issueId, repo: 'octo/repo', profileId, sourceEventId, requestKey: `startup:${randomUUID()}` }, undefined, botId) as unknown as { runId?: string; error?: string; fallback?: string }
     {
       assert.ok(result.runId, JSON.stringify(result)); assert.equal(result.fallback, 'cloudUnavailable')
       const run = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [result.runId])).rows[0]
@@ -366,7 +366,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     assert.deepEqual([fallback.status, fallback.fallback, (await runOf(fallback.runId)).deviceId], ['queued', 'cloudUnavailable', deviceId])
     assert.equal((await pool.query(`SELECT count(*)::int AS n FROM agent_runs r JOIN thread_machines m ON m."runId"=r.id WHERE r."userId"=$1 AND r.status='failed' AND r."stopReason"='device_lost' AND r."stopRequestedAt" IS NULL AND m.state='ended'`, [c.id])).rows[0].n, 2, 'the second refused cloud run is ended too')
     // A run the person put in the cloud goes nowhere else.
-    const pinned = await steps.dispatchRun(c.id, { issueId: await anotherTask(c.id), repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, target: 'cloud' }, undefined, botId) as unknown as NoMachine
+    const pinned = await steps.dispatchRun(c.id, { model: { harness: 'codex' as const }, issueId: await anotherTask(c.id), repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, target: 'cloud' }, undefined, botId) as unknown as NoMachine
     assert.equal(pinned.error, 'machineUnavailable')
     // 本地 goes straight to the server.
     await runAt(c, 'local')
@@ -439,7 +439,7 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     const kept = await onlineMac(e.id, false)
     const none = await dispatch(e.id, e.issueId) as unknown as NoMachine
     assert.deepEqual([none.reason, actions(none)], ['noDevice', ['connectServer', 'e2bKey', 'modelSettings']])
-    const named = await steps.dispatchRun(e.id, { issueId: e.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, target: { deviceId: kept } }, undefined, await chatBotId(e.id, null, await ownWorkspace(e.id))) as unknown as NoMachine
+    const named = await steps.dispatchRun(e.id, { model: { harness: 'codex' as const }, issueId: e.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, target: { deviceId: kept } }, undefined, await chatBotId(e.id, null, await ownWorkspace(e.id))) as unknown as NoMachine
     assert.equal(named.error, 'machineUnavailable')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1', [e.id])).rows[0].n, 0)
   })

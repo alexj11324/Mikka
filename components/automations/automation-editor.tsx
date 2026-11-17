@@ -40,6 +40,7 @@ import { LinearTriggers } from './linear-triggers'
 import { SlackTriggers } from './slack-triggers'
 import { AutomationUsagePanel } from './automation-usage'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
+import { harnessName } from '@/components/labels/entity-labels'
 
 const zones = (() => { try { return Intl.supportedValuesOf('timeZone') } catch { return ['UTC'] } })()
 const localZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' } catch { return 'UTC' } }
@@ -246,6 +247,11 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
         <NativeSelectOption value="cloud">{t('machineCloud')}</NativeSelectOption>
         {draft.machine === 'cloudflare' && <NativeSelectOption value="cloudflare">{t('machineCloud')}</NativeSelectOption>}
         {localDevices.map(device => <NativeSelectOption key={device.id} value={device.id}>{device.name}</NativeSelectOption>)}
+      </NativeSelect>)}
+      {field(t('agent'), <NativeSelect aria-label={t('agent')} value={draft.agent ?? ''} onChange={event => set({ agent: event.target.value === 'claude_code' || event.target.value === 'codex' ? event.target.value : null })}>
+        <NativeSelectOption value="" disabled>{t('agentNone')}</NativeSelectOption>
+        <NativeSelectOption value="claude_code">{harnessName('claude_code')}</NativeSelectOption>
+        <NativeSelectOption value="codex">{harnessName('codex')}</NativeSelectOption>
       </NativeSelect>)}
       {field(t('profile'), <NativeSelect aria-label={t('profile')} value={draft.profileId} disabled={!workspaceId} onChange={event => set({ profileId: event.target.value })}>
         {profileChoices.choices.map(choice => <NativeSelectOption key={choice.value} value={choice.value} disabled={'disabled' in choice && choice.disabled}>{choice.label}</NativeSelectOption>)}

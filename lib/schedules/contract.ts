@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { SCHEDULE_READ_TOOL_IDS } from '@/lib/coordinator/scheduled-read-tools'
 import { taskDestinationSchema } from '@/lib/task-destination'
+import { taskAgentSchema } from '@/lib/task-create-command'
 import { slackUserId } from '@/lib/slack/user-id'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
@@ -25,6 +26,8 @@ export const taskSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('dispatch_task'), botId: z.uuid().nullable(), prompt: z.string().trim().min(1).max(8000),
     title: taskTitleInputSchema.optional(), destination: taskDestinationSchema.optional(), profileId: agentProfileReferenceSchema.optional(),
+    // The Agent each run's task runs on (decision 2026-11-17-1800). A schedule without one is refused at dispatch (agentRequired).
+    agent: taskAgentSchema.optional(),
   }).strict(),
 ])
 export type DispatchTask = Extract<z.infer<typeof taskSchema>, { kind: 'dispatch_task' }>

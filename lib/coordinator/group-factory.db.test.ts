@@ -6,7 +6,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { authorizeGroupFactoryActor, delegateGroupTask, groupExecutionRemedy, groupTaskReferences, groupTaskReport, groupsWithPendingTaskReports, reconcileGroupTaskReports, type GroupFactoryAdapters } from './group-factory'
+import { authorizeGroupFactoryActor, delegateGroupTask, groupExecutionRemedy, groupMessageAgent, groupTaskReferences, groupTaskReport, groupsWithPendingTaskReports, reconcileGroupTaskReports, type GroupFactoryAdapters } from './group-factory'
 import { initializeGroupDecisionTrace, recordGroupDecisionRoute, type GroupDecisionTrace } from './group-decision-trace'
 import { groupTraceObservation } from './group-decision-eval'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -157,6 +157,16 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
     assert.ok(authorizations>5)
     console.log(`Retained isolated group Factory bridge schema ${schema}; source/dispatch adapters synthetic, PG persistence real`)
   } finally {client.release();await pool.end();await outer.end();await authority.end()}
+})
+
+test('a group task names its Agent in the message; none or both names none, and agentRequired says how to fix it',()=>{
+  // Decision 2026-11-17-1800: every dispatch names its Agent; nothing picks a default.
+  assert.equal(groupMessageAgent('@bot 用 Codex 修一下登录'),'codex')
+  assert.equal(groupMessageAgent('@bot let Claude Code fix the login'),'claude_code')
+  assert.equal(groupMessageAgent('@bot fix the login'),undefined)
+  assert.equal(groupMessageAgent('@bot Claude Code or Codex, fix it'),undefined)
+  assert.match(groupExecutionRemedy('agentRequired','zh-CN'),/Claude Code 或 Codex/)
+  assert.match(groupExecutionRemedy('agentRequired','en'),/Claude Code or Codex/)
 })
 
 test('server reports do not claim work passed merely because execute passed',()=>{

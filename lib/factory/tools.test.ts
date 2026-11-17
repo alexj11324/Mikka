@@ -12,7 +12,7 @@ test('normal Coordinator dispatch tools carry the closed task Profile reference,
  const tools=registry.createCoordinatorRegistry('owner',randomUUID(),undefined,{computerEnabled:true,switches:{issueTools:true,factoryRouting:true,factoryLifecycle:true}})
  for(const name of ['dispatch_run','dispatch_bot_computer']){
   const schema=tools[name]!.inputSchema as {safeParse:(value:unknown)=>{success:boolean;data?:Record<string,unknown>}}
-  const input={issueId:randomUUID()}
+  const input=name==='dispatch_run'?{issueId:randomUUID(),model:{harness:'codex'}}:{issueId:randomUUID()}
   for(const profileId of ['default',randomUUID()]){
    const result=schema.safeParse({...input,profileId,defaultOnly:true})
    assert.equal(result.success,true,name);assert.equal(result.data?.profileId,profileId)

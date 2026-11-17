@@ -69,7 +69,7 @@ export const automationSeams:AutomationSeams={
       }
     }
     const {eventId}=await recordPersonalSubmission(db,ownerId,text,{botId,submissionId:occurrenceId,
-      taskCommand:{version:1,intent:'create_and_dispatch',description:text},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event&&source==='slack'?{slack:true as const}:event?{event:true as const}:{})},
+      taskCommand:{version:1,intent:'create_and_dispatch',description:text,...(task.agent?{agent:task.agent}:{})},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event&&source==='slack'?{slack:true as const}:event?{event:true as const}:{})},
       ...(task.title?{taskTitle:task.title}:{}),...(task.destination?{taskDestination:task.destination}:{}),...(task.profileId?{profileId:task.profileId}:{})})
     const created=await createIssueFromRequest(ownerId,{sourceEventId:eventId,title:task.title??task.prompt.split(/\r?\n/,1)[0]!.slice(0,200)})
     const row=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i

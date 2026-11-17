@@ -250,6 +250,8 @@ export async function resolveAgentProfileDispatch(pool: Pool, scope: DispatchSco
   // The model and machine come from the task, never from the Profile.
   const resolveTarget = async () => {
     const constraints = await requestConstraints(pool, scope, request)
+    // Every task dispatch names its Agent (decision 2026-11-17-1800); its entry
+    // points refuse one without (agentRequired) before reaching this resolver.
     return (deps.resolve ?? resolveModelDispatch)(pool, scope, request.asked?.model ? request.asked : undefined, request.location, constraints.deviceId, { withoutCloud: request.withoutCloud, cloudPurpose: request.cloudPurpose, harness: constraints.harness ?? request.defaultHarness, agentId: request.agentId, bindSubscription: false })
   }
   const selectionMode = request.asked?.model ? 'picked' as const : 'preference' as const
