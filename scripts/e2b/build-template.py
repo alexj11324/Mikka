@@ -12,6 +12,7 @@ The key is sent only to the E2B API (by the SDK, and in the X-API-Key header of
 the publish call); it is never printed, logged or written to disk.
 """
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -62,6 +63,16 @@ PREBUILT_READY_PHASES = frozenset((*[phase for phase, _command in ANONYMOUS_WORK
                                  'viewer_key_absent', 'viewer_unauthorized', 'official_files'))
 
 
+# The fence check ships inside the ready command itself, from this builder's
+# source. It never depends on the worker version the template installs.
+FENCE_CHECK = ROOT / 'packages/daemon/scripts/workspace-control-check.py'
+
+
+def fence_check_command():
+    code = base64.b64encode(FENCE_CHECK.read_bytes()).decode()
+    return f"runuser -u user -- python3 -I -c 'import base64;exec(compile(base64.b64decode(\"{code}\"),\"workspace-control-check\",\"exec\"))' >/dev/null"
+
+
 def prebuilt_ready_command(kind):
     """Preserve every original predicate/order/status and the provider deadline.
 
@@ -71,7 +82,7 @@ def prebuilt_ready_command(kind):
     checks = [*ANONYMOUS_WORKER_CHECKS,
               ('ingress_ready', 'python3 /opt/mikka/runtime/ingress-v1/guard.py ready "$mikka_preloaded_pid" > /opt/mikka/ingress-ready.json'),
               # The daemon's user must be able to take the execution fence, or every run would fail at claim.
-              ('control_fence', 'runuser -u user -- python3 -I /opt/mikka/worker/packages/daemon/scripts/workspace-control-check.py >/dev/null'),
+              ('control_fence', fence_check_command()),
               ('bootstrap_absent', 'test ! -e /home/user/.mikka/bootstrap.json'),
               ('device_absent', 'test ! -e /home/user/.mikka/worker/device.json')]
     if kind == 'desktop':
