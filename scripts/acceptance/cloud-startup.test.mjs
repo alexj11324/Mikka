@@ -188,10 +188,11 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           const input = JSON.parse(args[0].match(/参数如下：(.*)。使用/)[1])
           assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, !leaseAudit)
           assert.deepEqual(input.target, candidate ? { deviceId } : 'cloud')
-          assert.equal(input.model, undefined)
           assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
           assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
           current.dispatchInput = input; current.harness = chosenModel?.provider === 'codex' ? 'codex' : 'claude_code'; current.profileId = input.profileId
+          // A named computer does not follow the chat's model, so the candidate names it.
+          assert.deepEqual(input.model, candidate ? { harness: current.harness, model: models[current.harness] } : undefined)
           assert.equal(chosenModel?.modelId, models[current.harness], 'the coordinator must use the same explicitly chosen small subscription model')
           current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
           assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
