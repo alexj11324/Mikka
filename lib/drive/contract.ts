@@ -319,3 +319,12 @@ export type DriveWorkspaceFileLink = DriveFileLink & {
   manageable: boolean
 }
 export type DriveWorkspaceFileLinkPage = { links: DriveWorkspaceFileLink[]; page: number; pageCount: number; total: number }
+
+/** Standalone Workspaces can share within their own membership without an
+ * Organization. Only an actual active Organization supplies its display name. */
+export type DriveShareView = DriveFileLink & {
+  type: 'file'; url: string; orgName: string | null; authorName: string | null;
+  member: { orgId: string; manageable: boolean; projectId: string | null; userId: string | null; automationId: null } | null;
+  versionId: string; versionCreatedAt: string; sizeBytes: number;
+  file: { type: 'url'; url: string; expiresAt: string };
+}

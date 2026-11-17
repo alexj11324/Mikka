@@ -23,6 +23,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   const scopes = await import('../../app/api/drive/scopes/route')
   const collection = await import('../../app/api/drive/volumes/route')
   const workspaceLinks = await import('../../app/api/drive/shares/route')
+  const shareView = await import('../../app/api/drive/shares/[shareId]/route')
   const detail = await import('../../app/api/drive/volumes/[volumeId]/route')
   const upload = await import('../../app/api/drive/volumes/[volumeId]/blobs/route')
   const entries = await import('../../app/api/drive/volumes/[volumeId]/entries/route')
@@ -44,7 +45,8 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       const segments = new URL(request.url).pathname.split('/').filter(Boolean).slice(3)
       const params = Promise.resolve({ volumeId: segments[0], versionId: segments[2], shareId: segments[2] })
       const pathname = new URL(request.url).pathname
-      const response = pathname === '/api/drive/shares' ? await workspaceLinks.GET(request) : pathname === '/api/drive/scopes' ? await scopes.GET(request) : !segments.length
+      const response = pathname.startsWith('/api/drive/shares/') ? await shareView.GET(request, { params: Promise.resolve({ shareId: segments[0] }) })
+        : pathname === '/api/drive/shares' ? await workspaceLinks.GET(request) : pathname === '/api/drive/scopes' ? await scopes.GET(request) : !segments.length
         ? await (request.method === 'POST' ? collection.POST : collection.GET)(request)
         : segments.length === 1 ? await detail.GET(request, { params })
           : segments[1] === 'shares' ? segments.length === 2
@@ -636,6 +638,49 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       const last = await (await myDirectory(peerToken, team.id, '&limit=1&page=8')).json()
       assert.deepEqual(last, second)
       assert.deepEqual([first.links[0].id, second.links[0].id], [teamLink, projectLink].sort())
+      const view = (id: string, token: string, selected?: string) => fetch(`${origin}/api/drive/shares/${id}`, { headers: {
+        authorization: 'Bearer ' + token, ...(selected && { 'x-mikka-workspace-id': selected }),
+      } })
+      await directoryContext.test('one share ID resolves the current file version and expiring bytes only under the original membership', async () => {
+        const base = await (await view(teamLink, peerToken)).json()
+        assert.equal(base.type, 'file')
+        assert.equal(base.id, teamLink)
+        assert.equal(base.path, 'notes.txt')
+        assert.equal(base.visibility, 'org')
+        assert.equal(base.orgName, null)
+        assert.equal(base.member, null)
+        assert.equal(base.authorName, (await fixture.query('SELECT name FROM "user" WHERE id=$1', [owner])).rows[0].name)
+        assert.match(base.versionId, /^vver_/)
+        assert.ok(Number.isFinite(Date.parse(base.versionCreatedAt)))
+        assert.equal(base.sizeBytes, Buffer.byteLength('selected file'))
+        assert.equal(base.file.type, 'url')
+        assert.ok(Date.parse(base.file.expiresAt) > Date.now())
+        const bytes = (path: string, token: string) => fetch(new URL(path, origin), { headers: { authorization: 'Bearer ' + token } })
+        assert.equal(await (await bytes(base.file.url, peerToken)).text(), 'selected file')
+        assert.equal((await bytes(base.file.url, sharedToken)).status, 404)
+        assert.equal((await view(teamLink, peerToken, personal)).status, 404)
+        assert.equal((await view(teamLink, ownerToken)).status, 404)
+        assert.equal((await view(projectPrivate, peerToken)).status, 404)
+        assert.equal((await fetch(new URL(base.url, origin))).status, 401)
+        assert.equal((await fetch(new URL(base.file.url, origin))).status, 401)
+        const expired = new URL(base.file.url, origin)
+        const proof = expired.searchParams.get('download')!
+        expired.searchParams.set('download', proof.replace(/^\d+/, String(Date.now() - 1)))
+        assert.equal((await bytes(expired.href, peerToken)).status, 404)
+        const orgId = randomUUID()
+        await fixture.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,$2,$3)', [orgId, 'Drive schema owner', owner])
+        try {
+          await fixture.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES($1,$2)', [team.id, orgId])
+          await fixture.query(`INSERT INTO mikka_organization_members("organizationId","userId",role,status,name,email)
+            VALUES($1,$2,'owner','active','Owner','owner@example.test')`, [orgId, owner])
+          const joined = await (await view(projectLink, sharedToken)).json()
+          assert.equal(joined.orgName, 'Drive schema owner')
+          assert.deepEqual(joined.member, { orgId, manageable: true, projectId, userId: null, automationId: null })
+          const workspaceOnly = await (await view(projectLink, peerToken)).json()
+          assert.equal(workspaceOnly.orgName, null)
+          assert.equal(workspaceOnly.member, null)
+        } finally { await fixture.query('DELETE FROM mikka_organizations WHERE id=$1', [orgId]) }
+      })
       await directoryContext.test('shared file directory metadata follows its actual path change, stable creation and current signed-in address', async () => {
         const link = () => myDirectory(peerToken).then(r => r.json()).then(page => page.links.find((item: {id: string}) => item.id === teamLink))
         const original = await link()
@@ -656,10 +701,15 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
         }
         assert.equal((await write('unrelated.txt', 0o644)).status, 200)
         assert.equal((await link()).changedAt, original.changedAt)
+        const viewBeforeMode = await (await view(teamLink, peerToken)).json()
+        assert.equal(Date.parse(viewBeforeMode.versionCreatedAt), Date.parse(original.changedAt))
         assert.equal((await write(original.path, 0o755)).status, 200)
         const modified = await link()
         assert.ok(Date.parse(modified.changedAt) > Date.parse(original.changedAt))
         assert.equal(modified.createdAt, original.createdAt)
+        const viewAfterMode = await (await view(teamLink, peerToken)).json()
+        assert.notEqual(viewAfterMode.versionId, viewBeforeMode.versionId)
+        assert.equal(Date.parse(viewAfterMode.versionCreatedAt), Date.parse(modified.changedAt))
         // Fixture a pre-upgrade row: its link creation date is unknown but the
         // current file's last change can be recovered from immutable history.
         await fixture.query('update drive_file_links set "createdAt"=null where id=$1', [teamLink])
@@ -670,9 +720,11 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       })
       await fixture.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [projectId])
       assert.deepEqual((await actual(peerToken)).map(l => l.id), [teamLink])
+      assert.equal((await view(projectLink, peerToken)).status, 404)
       await fixture.query('update workspace_projects set "archivedAt"=now() where id=$1', [projectId])
       assert.deepEqual((await actual(sharedToken)).map(l => l.id).sort(), [onlyOwner.id, teamLink].sort())
       assert.equal((await myDirectory(ownerToken, personal)).status, 404)
+      assert.equal((await view(projectLink, sharedToken)).status, 404)
     })
 
   })

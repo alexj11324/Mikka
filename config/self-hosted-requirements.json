@@ -55,6 +55,20 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/drive/shares/[shareId]/route.ts": {
+    "mode": "built-in",
+    "environment": ["BETTER_AUTH_SECRET"],
+    "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/drive/share-view.ts": {
+    "mode": "built-in",
+    "environment": ["BETTER_AUTH_SECRET"],
+    "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/drive/shares/route.ts": {
     "mode": "built-in",
     "environment": [],

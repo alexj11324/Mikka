@@ -7,6 +7,8 @@ import { writeAllowed } from '@/lib/mobile-api'
 import { ActionFailureError } from '@/lib/action-error'
 import { WorkspaceError } from '@/lib/workspace-error'
 import { accessibleProjectNames, withReadableProject } from '@/lib/project-access'
+import { workspaceSelection } from '@/lib/workspace-selection'
+import { findShareLocation, readShareView, requireCurrentDownload } from './share-view'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
@@ -26,7 +28,7 @@ const write = z.object({ expectedDigest: digest, mutationId, changes: z.array(z.
   z.object({ op: z.literal('delete'), path: z.string().refine(isDrivePath) }).strict(),
 ])).min(1).max(DRIVE_MAX_CHANGES) }).strict()
 const restore = z.object({ versionId, expectedDigest: digest, mutationId }).strict()
-type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive' | 'links' | 'link' | 'workspaceLinks'
+type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive' | 'links' | 'link' | 'workspaceLinks' | 'shareView'
 type Params = { volumeId?: string; versionId?: string; shareId?: string }
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers })
 
@@ -46,7 +48,14 @@ export async function driveResponse(request: Request, operation: Operation, para
   if (request.method !== 'GET' && !writeAllowed(request)) return json({ error: 'originNotAllowed' }, 403)
   try {
     const search = new URL(request.url).searchParams
-    const workspaceId = z.uuid().parse(search.get('workspaceId')).toLowerCase()
+    const viewId = operation === 'shareView' ? z.uuid().parse(params.shareId) : null
+    if (viewId && [...search.keys()].some(key => key !== 'download')) throw new DriveError('drive_write_invalid', 400)
+    const located = viewId ? await findShareLocation(pool, viewId, session.user.id) : null
+    const workspaceId = located?.workspaceId ?? z.uuid().parse(search.get('workspaceId')).toLowerCase()
+    if (located) {
+      const selected = workspaceSelection(request.headers)
+      if (selected.present && selected.workspaceId !== workspaceId) throw new DriveError('drive_not_found', 404)
+    }
     if (operation === 'workspaceLinks') {
       if (search.has('driveScope') || search.has('projectId') || search.has('view') || search.has('after')) throw new DriveError('drive_write_invalid', 400)
       const page = { number: z.coerce.number().int().min(1).max(2_147_483_647).parse(search.get('page') ?? '1'),
@@ -58,7 +67,7 @@ export async function driveResponse(request: Request, operation: Operation, para
         return json(await listWorkspaceDriveFileLinks(pool, workspaceId, session.user.id, projects.map(project => project.id), page))
       })
     }
-    const selection = search.get('driveScope')
+    const selection = located ? (located.driveScope === 'project' || located.driveScope === 'team-workspace' ? located.driveScope : null) : search.get('driveScope')
     if (selection !== null && selection !== 'project' && selection !== 'team-workspace') return json({ error: 'drive_write_invalid' }, 400)
     const sharedProject = selection === 'project'
     const teamFiles = selection === 'team-workspace'
@@ -79,7 +88,7 @@ export async function driveResponse(request: Request, operation: Operation, para
       })
     }
     let changed = false
-    const projectId = search.has('projectId') ? z.uuid().parse(search.get('projectId')).toLowerCase() : undefined
+    const projectId = located?.projectId ?? (search.has('projectId') ? z.uuid().parse(search.get('projectId')).toLowerCase() : undefined)
     if (sharedProject && !projectId) return json({ error: 'drive_write_invalid' }, 400)
     // A project names its own storage namespace. A member's existing private bytes and
     // versions never move into it, even when they have the same digest.
@@ -124,7 +133,8 @@ export async function driveResponse(request: Request, operation: Operation, para
         changed = await setPersonalDriveArchive(pool, actor, params.volumeId, archived)
         return json({ archived })
       }
-      const volume = await readDriveVolume(pool, actor, params.volumeId)
+      const volume = await readDriveVolume(pool, actor, located?.volumeId ?? params.volumeId)
+      if (located && viewId && !search.has('download')) return json(await readShareView(pool, located, viewId, actor.ownerId, session.user.id))
       if (operation === 'links') {
         if (request.method === 'POST') {
           const { path } = z.object({ path: z.string().refine(isDrivePath) }).strict().parse(await body(request))
@@ -136,7 +146,7 @@ export async function driveResponse(request: Request, operation: Operation, para
         }
         return json(await listDriveFileLinks(pool, volume.id, session.user.id, fileLinkPage(search)))
       }
-      const linkId = operation === 'link' ? z.uuid().parse(params.shareId) : null
+      const linkId = viewId ?? (operation === 'link' ? z.uuid().parse(params.shareId) : null)
       if (linkId && request.method === 'PATCH') {
         const { visibility } = z.object({ visibility: z.enum(['private', 'org']) }).strict().parse(await body(request))
         if (visibility === 'org' && !sharedProject && !teamFiles) throw new DriveError('drive_scope_invalid', 422)
@@ -203,6 +213,7 @@ export async function driveResponse(request: Request, operation: Operation, para
              AND entry->>'path' = $4 AND entry->'sizeBytes' = to_jsonb(b."sizeBytes")
            LIMIT 1`, [selectedVersion, volume.id, actor.ownerId, path])
       if (!blob) throw new DriveError('drive_not_found', 404)
+      if (viewId) requireCurrentDownload(search.get('download') ?? '', viewId, session.user.id, blob.sha256)
       if (blob.inlineContent && driveSha256(driveBytes(blob.inlineContent)) !== blob.sha256) throw new DriveError('drive_blob_size_mismatch', 422)
       const content = blob.inlineContent ? driveBytes(blob.inlineContent) : await readDriveBlobObject(actor.ownerId, blob.sha256, request.signal)
       return new Response(content, { headers: { ...headers, 'Content-Type': 'application/octet-stream', 'Content-Length': String(blob.sizeBytes),

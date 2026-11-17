@@ -1,7 +1,7 @@
 import { withBasePath } from '../base-path'
-import { driveFileLinkUrl, driveVolumeUrl as url, type DriveLocation } from './location'
+import { driveFileLinkUrl, driveShareViewUrl, driveVolumeUrl as url, type DriveLocation } from './location'
 export { driveFileLinkUrl, type DriveLocation } from './location'
-import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileLink, type DriveFileLinkPage, type DriveWorkspaceFileLinkPage, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
+import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileLink, type DriveFileLinkPage, type DriveShareView, type DriveWorkspaceFileLinkPage, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
 import type { DriveVolumeSummary } from './volumes'
 import type { DriveVersionSummary } from './store'
 
@@ -67,6 +67,10 @@ export function readProjectDriveScopes(workspaceId: string, send?: typeof fetch)
 export function readPersonalDriveScopes(workspaceId: string, send?: typeof fetch) {
   const params = new URLSearchParams({ workspaceId })
   return request<{ scopes: PersonalDriveScope[] }>(withBasePath(`/api/drive/scopes?${params}`), {}, send)
+}
+
+export function readDriveShareView(shareId: string, send?: typeof fetch) {
+  return request<DriveShareView>(driveShareViewUrl(shareId), {}, send)
 }
 
 export function readWorkspaceDriveFileLinks(workspaceId: string, page = 1, send?: typeof fetch) {
