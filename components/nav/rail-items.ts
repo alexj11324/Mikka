@@ -9,12 +9,12 @@ export type RailDestination = 'chats' | 'pulls' | 'suggestions' | 'board' | 'plu
 /** A lucide icon or one of ours drawn the same way (components/icons). */
 type RailIcon = ComponentType<{ className?: string; 'data-icon'?: string }>
 
-// 主页 (the bot chats), 建议, the board, plugins, Artifact. `selectedIcon` is the solid twin shown on the current item.
-export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'ArtifactsPage.category.pullRequests' | 'Nav.conversations' | 'Nav.suggestions' | 'Nav.board' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
+// 主页 (the bot chats), 建议, 任务 (one entry; 看板 and 列表 are its views, 2026-11-17-1500), plugins, Artifact. `selectedIcon` is the solid twin shown on the current item.
+export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'ArtifactsPage.category.pullRequests' | 'Nav.conversations' | 'Nav.suggestions' | 'Nav.tasks' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
   { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.conversations' },
   { id: 'suggestions', icon: Lightbulb, selectedIcon: LightbulbFilled, label: 'Nav.suggestions' },
   { id: 'pulls', icon: GitPullRequest, selectedIcon: GitPullRequest, label: 'ArtifactsPage.category.pullRequests' },
-  { id: 'board', icon: Columns3, selectedIcon: Columns3Filled, label: 'Nav.board' },
+  { id: 'board', icon: Columns3, selectedIcon: Columns3Filled, label: 'Nav.tasks' },
   { id: 'plugins', icon: PlugCircle, selectedIcon: PlugCircleFilled, label: 'Nav.plugins' },
   { id: 'artifacts', icon: ArtifactIcon, selectedIcon: ArtifactFilled, label: 'Nav.artifacts' },
 ]
