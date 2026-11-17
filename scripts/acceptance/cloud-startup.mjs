@@ -406,7 +406,10 @@ export async function dispatchThroughCoordinator(client, record, { botId, profil
       record.dispatchReturnedAt = iso(now())
       const code = event.data.error?.code ?? event.data.output?.error ?? (event.data.output?.ok === false ? event.data.output.code : undefined)
       if (event.data.outcome !== 'completed' || code) {
-        record.dispatchRefusal = { code: typeof code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(code) ? code : 'unavailable' }
+        const reason = event.data.output?.reason
+        record.dispatchRefusal = { code: typeof code === 'string' && /^[A-Za-z][A-Za-z0-9_.:-]{0,127}$/.test(code) ? code : 'unavailable',
+          // A refused run names its admission reason (lib/run-invalid-reason.ts).
+          ...(typeof reason === 'string' && /^[A-Za-z]{1,64}$/.test(reason) ? { reason } : {}) }
         fail('dispatch_refused')
       }
       const result = event.data.output

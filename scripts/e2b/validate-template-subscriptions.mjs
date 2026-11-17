@@ -9,6 +9,7 @@ import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, selectAcc
   STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, bootstrapAdoptionEvidence, bootstrapAdoptionDiagnostics } from '../acceptance/cloud-startup.mjs'
 import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
 import { ACTION_ERROR_CODES } from '../../lib/action-result.ts'
+import { RUN_INVALID_REASONS } from '../../lib/run-invalid-reason.ts'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 const KINDS = [['claude', 'claude_code', 'claude-haiku-5-5'], ['codex', 'codex', 'gpt-6-luna']]
@@ -111,7 +112,8 @@ function startupCorrelation(sample, sourceCommit, harness) {
   const workflowRunId = typeof workflow === 'string' && /^wrun_[A-Za-z0-9]{1,128}$/.test(workflow) ? workflow : null
   const code = refusal?.code
   return { requestTraceId, requestTraceScope: requestTraceId ? REQUEST_TRACE_SCOPE : null, workflowRunId,
-    dispatchRefusal: refusal == null ? null : { code: typeof code === 'string' && STARTUP_CORRELATION_REFUSAL_CODES.has(code) ? code : 'unknown' } }
+    dispatchRefusal: refusal == null ? null : { code: typeof code === 'string' && STARTUP_CORRELATION_REFUSAL_CODES.has(code) ? code : 'unknown',
+      ...(Object.hasOwn(RUN_INVALID_REASONS, refusal.reason ?? '') ? { reason: refusal.reason } : {}) } }
 }
 
 function registrationDiagnostic(report, kind, proof) {
