@@ -224,25 +224,21 @@ test('the list is the 优先使用的 Agent\'s own: the other Agent\'s rows stay
   assert.doesNotMatch(container.textContent ?? '', /claude-opus/)
 })
 
-test('nothing for the 优先使用的 Agent but models for the other: the line says tasks go there, and one button switches', async () => {
+test('nothing for this Agent but models for the other: no fallback line or switch, only what gets this Agent models (decision 2026-11-17-1800)', async () => {
   const keyId = randomUUID()
   data = { ...data, candidates: [{ harness: 'codex', model: 'gpt-codex', name: 'gpt-codex', provider: 'openai', source: { kind: 'api_key', keyId } }] as OrderView['candidates'] }
   await render()
-  assert.ok(container.textContent?.includes('emptyUseOther'), 'not 「订阅和 API Key 还没有报告模型」')
-  assert.ok(!container.textContent?.includes('emptyNoModels'))
-  await act(async () => button('switchAgent')!.click())
-  assert.deepEqual(changes.at(-1), { kind: 'preferred', harness: 'codex' })
+  assert.ok(!container.textContent?.includes('emptyUseOther'), 'tasks never go to the other Agent')
+  assert.equal(button('switchAgent'), undefined)
+  assert.ok(container.textContent?.includes('emptyNoModels'))
 })
 
-test('the other Agent\'s list folds under this one as the fallback, an API key marked as billed by its provider', async () => {
+test('the other Agent\'s list is not shown under this one as a fallback', async () => {
   const claude = { ...row(null), model: 'claude-opus' }
   const codex = { ...row(null, { kind: 'api_key', keyId: randomUUID() }), model: 'gpt-codex', harness: 'codex' as const, provider: 'openai', agents: ['codex' as const] }
   data = { ...data, entries: [claude, codex] }
   await render()
-  const fold = button('backup')
-  assert.ok(fold, 'one line for the fallback list')
-  assert.doesNotMatch(container.textContent ?? '', /gpt-codex/, 'folded until tapped')
-  await act(async () => fold!.click())
-  assert.match(container.textContent ?? '', /gpt-codex/)
-  assert.match(container.textContent ?? '', /billedByProvider/)
+  assert.equal(button('backup'), undefined, 'no fallback list')
+  assert.doesNotMatch(container.textContent ?? '', /gpt-codex/)
+  assert.match(container.textContent ?? '', /claude-opus/)
 })

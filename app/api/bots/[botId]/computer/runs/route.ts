@@ -35,7 +35,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
     const sourceEventId = previousThread && parsed.data.note ? await (await import('@/lib/factory/request-epoch')).recordOwnerFactoryContinuation(pool, session.user.id, previousThread.id, parsed.data.note) : undefined
     const result = await dispatchToTask(session.user.id, parsed.data.issueId, {
       note: parsed.data.note, sourceEventId,
-      // A new thread takes 优先使用的模型's first cloud entry for this harness; the thread's next run keeps its own model.
+      // A new thread takes 优先使用的模型's first cloud entry for the Agent it names; the thread's next run keeps its own Agent and model.
       start: async (previous, note) => {
         const scope = { ownerId: session.user.id, workspaceId: context.workspace.id, botId }
         const needsSpec = !previous && await (await import('@/lib/factory/task-dispatch')).factoryTaskNeedsSpec(pool, session.user.id, { issueId: issue.id, botId, needsSpec: parsed.data.needsSpec })
@@ -49,10 +49,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
           runModel = kept
           harness = previous.harness
         } else {
+          // A new thread names its Agent; nothing picks one (decision 2026-11-17-1800).
+          if (!parsed.data.harness) throw new ComputerError(409, 'agentRequired')
           const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
           const picked = await resolveAgentProfileDispatch(pool, scope, { issueId: issue.id, stage: needsSpec ? 'spec' : 'execute', note,
             profileId: parsed.data.profileId, location: 'cloud', cloudPurpose: 'desktop',
-            ...(parsed.data.harness ? { asked: { harness: parsed.data.harness } } : {}) })
+            asked: { harness: parsed.data.harness } })
           const target = picked.target
           if (target.kind !== 'cloud') throw new ComputerError(409, 'agentProfileUnavailable')
           harness = target.harness

@@ -6,8 +6,9 @@ type Query = Pick<Pool, 'query'>
 export interface MainThreadModel { harness: OrderHarness; model: string }
 
 /**
- * The model a new task follows when nobody named one (decision 2026-11-15-1630):
- * the model of the chat that dispatches it, the Coordinator's or a Bot's.
+ * The runnable model of a chat, the Coordinator's or a Bot's. Dispatch no longer
+ * uses it as a default: every dispatch names its Agent (decision 2026-11-17-1800,
+ * superseding 2026-11-15-1630's 「跟随主线程」).
  *
  * Only a model a thread can run counts: a subscription or API-key model that is
  * one of the person's task candidates, or a chat's Mikka 额度 model

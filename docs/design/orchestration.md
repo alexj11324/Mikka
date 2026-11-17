@@ -185,10 +185,12 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
 
 1. A machine the run asks for is used as asked: a thread continuing in its
    environment, a device-only source event, or a device the person picked.
-2. Otherwise the model the person picked; else, for a new thread, the
-   dispatching chat's own model when a thread can run it (a subscription or
-   API-key model); else 优先使用的模型 in order. An Agent 配置 never sets the
-   model. There is no automatic routing
+2. Every dispatch names its Agent (Claude Code or Codex); one that does not is
+   refused with `agentRequired` and creates no run, and nothing picks a default
+   Agent ([2026-11-17-1800](decisions/2026-11-17-1800-one-agent-per-thread.md)).
+   A thread keeps that Agent for life. The model is the one the person picked;
+   else that Agent's 优先使用的模型 in order, never the other Agent's. An Agent
+   配置 never sets the model. There is no automatic routing
    ([2026-11-15-1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md)).
    运行位置 decides where, trying places in order and moving on only when
    no allowed model runs in the one before
@@ -197,7 +199,8 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
    server, then a computer. Among the devices with 参与调度 on that can run
    the entry, the one with the fewest unfinished runs goes first, then the one
    that joined first ([1530](decisions/2026-11-02-1530-local-server-first.md)).
-   A cloud that fails to start the run hands it to a server, then a computer.
+   A cloud that fails to start the run hands it to a server, then a computer,
+   on the same Agent.
    The 运行位置 line in 模型与订阅 writes the order and names where a run
    goes now (会先用 云端 / <设备名>).
 3. Otherwise 立即警告: no run is created and the bot at once shows the action
@@ -212,8 +215,11 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
 can discover an empty balance, refused credentials or a provider outage only
 after a real model request; a successful model-list request does not prove it
 can run. That run ends with its original model frozen. The host creates a new
-run from the latest allowed preferences, excluding entries already tried for
-this task and rechecking credential and machine authority. An explicitly
+run from the latest allowed preferences of the thread's own Agent, excluding
+entries already tried for this task and rechecking credential and machine
+authority. It never moves the thread to the other Agent: with nothing left on
+its Agent the run stops with the coded reason
+([2026-11-17-1800](decisions/2026-11-17-1800-one-agent-per-thread.md)). An explicitly
 selected model stays selected and gets the unavailable card. Older quota-only
 runs keep the quota recovery in §2.
 

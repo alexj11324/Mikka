@@ -79,7 +79,7 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   await t.test('the Coordinator and a Bot both get the whole list, in the cached prefix, byte for byte the same on the next turn', async () => {
     for (const botId of [coordinator, bot]) {
       const instructions = await composeEveInstructions(userId, botId)
-      const head = instructions.indexOf('Allowed models (优先使用的模型), in the order a new thread tries them')
+      const head = instructions.indexOf('Allowed models (优先使用的模型), in order; a new thread tries only the entries of the Agent it was dispatched to')
       assert.ok(head >= 0, `the list reaches ${botId === bot ? 'the Bot' : 'the Coordinator'}`)
       const lines = instructions.slice(head).split('\n').slice(1, 6)
       assert.deepEqual(lines.map(line => line.replace(/^\d+\. \S+(?: \S+)? \((\w+)\) (\S+) .*$/, '$1:$2')), listed, 'every entry, in order')

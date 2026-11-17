@@ -80,6 +80,8 @@ import { listTeams } from '@/app/actions/teams'
 import { listProjectTeams } from '@/app/actions/team-relations'
 import { WorkspaceOverview } from './workspace-overview'
 import { GroupChatView } from './group-chat-view'
+import { GroupLeaveAction } from './group-leave-action'
+import type { GroupSummary } from '@/lib/group-messages'
 import { forgetGroupReads, useGroupMembershipLoss } from './group-membership-cache'
 import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
 import { InlineLoadError } from '@/components/load-error'
@@ -627,7 +629,9 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const resolvingBot = section === 'coordinator' && !!activeBotId && activeBotId !== coordinatorBot?.id && !activeBot
   const activeChat: ChatTarget | null = resolvingBot ? null : section === 'coordinator' ? activeBot ? { kind: 'bot', botId: activeBot.id } : { kind: 'coordinator' } : section === 'agent' ? { kind: 'agent', sessionId: activeAgentId } : section === 'group' && groupRequest ? { kind: 'group', ...groupRequest } : null
   // The same rows as the bot list, for a frame that draws its own navigation (RailProps.chats).
-  const { entries: chatNav, reloadGroups, referenceGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items })
+  // 退出群聊 from a group row's right-click menu asks with the same confirmation as the group's page.
+  const [leavingGroup, setLeavingGroup] = useState<GroupSummary | null>(null)
+  const { entries: chatNav, reloadGroups, referenceGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items, onLeaveGroup: setLeavingGroup })
   const referenceTitles = useMemo(() => conversationReferenceTitles(user.id, listWorkspaceId, threadsError ? undefined : threadList, referenceGroups), [user.id, listWorkspaceId, threadList, threadsError, referenceGroups])
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
   const openSettings = (href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }
@@ -745,6 +749,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
         openChat({ kind: 'group', ...group })
       }}
       onNewBot={() => { closeComposer(); setCreatingBot(true) }} onReviewGroups={() => { closeComposer(); if (creation === 'conversation') navigateSection('conversations'); void reloadGroups().catch(() => {}) }} />}
+    {leavingGroup && <GroupLeaveAction key={leavingGroup.id} group={leavingGroup} userId={user.id} open onOpenChange={open => { if (!open) setLeavingGroup(null) }}
+      onLeft={() => { const id = leavingGroup.id; setLeavingGroup(null); notifyOtherGroupTabs(); leftGroup(id) }} />}
     {creationWorkspace && <NewBotDialog key={creationWorkspace} workspaceId={creationWorkspace} open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
     {search.value && <GlobalSearch open={search.open} onOpenChange={setSearchOpen} onOpenChangeComplete={search.onOpenChangeComplete} bots={bots} sessions={conversationSessions} coordinatorLine={coordinatorSummary?.line ? chatPreview(coordinatorSummary.line) ?? i18nText('Nav.cardPreview') : undefined} issues={tasks} projects={projects} threads={threads} onThread={runId => openThread(runId)} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null}
       onChat={openChat} onNewBot={() => setCreatingBot(true)} onIssue={open} onCreateIssue={() => create()}

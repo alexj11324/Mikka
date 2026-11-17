@@ -63,7 +63,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,'user_message',$4,$5)`,
     [sourceEventId, userId, botId, `acme:${sourceEventId}`, JSON.stringify({ text: `Please fix the checkout tax rounding in ${REPO}.` })])
 
-  const dispatched = await steps.dispatchRun(userId, { issueId, repo: REPO, requestKey: `acme:${randomUUID()}`, sourceEventId }, undefined, botId) as unknown as { runId?: string; error?: string }
+  const dispatched = await steps.dispatchRun(userId, { model: { harness: 'codex' as const }, issueId, repo: REPO, requestKey: `acme:${randomUUID()}`, sourceEventId }, undefined, botId) as unknown as { runId?: string; error?: string }
   assert.equal((await pool.query(`SELECT i.content->'attrs'->'mikka'->'delegate'->>'id'=r."agentId"::text AS assigned
     FROM issues i JOIN agent_runs r ON r."issueId"=i.id WHERE r.id=$1 AND i.id=$2`,[dispatched.runId,issueId])).rows[0]?.assigned,true)
 
@@ -139,7 +139,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   const nextRequest = randomUUID()
   await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
     VALUES($1,$2,$3,$4,'user_message',$5,$6)`, [nextRequest, userId, botId, issueId, `continuity:${nextRequest}`, JSON.stringify({ text: 'Add a null-input regression while preserving the accepted tax fix.' })])
-  const continued = await steps.dispatchRun(userId, { issueId, note: 'Add the null-input regression.', sourceEventId: nextRequest, requestKey: `continue:${nextRequest}` }, undefined, botId) as unknown as { runId: string }
+  const continued = await steps.dispatchRun(userId, { model: { harness: 'codex' as const }, issueId, note: 'Add the null-input regression.', sourceEventId: nextRequest, requestKey: `continue:${nextRequest}` }, undefined, botId) as unknown as { runId: string }
   assert.ok(continued.runId)
   const continuedTask = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [acceptance.id])).rows[0]
   assert.equal(continuedTask.id, acceptance.id)

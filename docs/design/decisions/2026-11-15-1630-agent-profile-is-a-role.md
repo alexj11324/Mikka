@@ -3,6 +3,7 @@
 - Date: 2026-11-15
 - Source: Alex, 2026-11-15, after comparing Mikka with Capy and Warp: 「我感觉我们把它过度复杂化了」, 「太复杂用户看不懂」, 「capy 似乎没有这么复杂」, then: 「Agent profile 还是要有，但只需包含 skill 和 instruction，不要限制它的 device 和模型，也就是它只有内容。到时候调用时，直接调用这个 Agent profile 即可。至于模型和设备，都由主线程自己去做选择，默认跟随主线程的模型和设备。用户也可以明确进行指定」.
 - Status: decided. Implemented: Agent 配置 hold content only and nothing chooses one automatically; automatic model routing is removed; a new task dispatched from a chat follows that chat's model when a thread can run it, and the thread's model row says 「跟随主线程」 (`modelDispatch.followed`); 「Mikka 默认」 is gone, so following always applies. Not yet implemented: a thread's own child tasks following its machine (a running thread has no tool to dispatch a child task yet); telling 你 from 主线程 for a named model (both arrive as the dispatch tool's `model`).
+- Superseded in part by: [2026-11-17-1800](2026-11-17-1800-one-agent-per-thread.md) (a new task no longer follows the dispatching chat's model; every dispatch names its Agent, and a thread keeps it for life)
 - Rule: —
 - Replaces:
   - in [factory-agent-profiles.md](../factory-agent-profiles.md): the Profile's Agent/model policy, harness, reasoning effort and `roles` capability tags; automatic Profile selection by the Decision API; the built-in Default as a selectable object and its `default` reference; availability of a Profile per destination;
