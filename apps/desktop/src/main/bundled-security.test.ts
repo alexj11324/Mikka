@@ -83,6 +83,7 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/restore', ['POST']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions', ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000', ['GET']],
+    [`/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000/files/${'a'.repeat(64)}`, ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/file-versions', ['GET']],
     ['/api/drive/volumes', ['GET', 'POST']],
     [`/api/drive/volumes/${volume}`, ['GET']],
@@ -152,6 +153,8 @@ test('organization lifecycle, workspace binding and service keys use their decla
   const collection = overview + '/api-keys'
   for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
     assert.equal(allowedApiPath('/api/organizations', method), ['GET', 'POST'].includes(method))
+    assert.equal(allowedApiPath('/api/organizations/deleted', method), method === 'GET')
+    assert.equal(allowedApiPath('/api/organizations/deleted/extra', method), false)
     assert.equal(allowedApiPath(overview, method), ['GET', 'PATCH', 'DELETE'].includes(method))
     assert.equal(allowedApiPath(overview + '/workspaces', method), ['POST', 'DELETE'].includes(method))
     assert.equal(allowedApiPath(collection, method), method === 'GET')

@@ -27,3 +27,7 @@ export function driveFileLinkUrl(location: DriveLocation, volumeId: string, link
 export function driveShareViewUrl(shareId: string) {
   return withBasePath(`/api/drive/shares/${encodeURIComponent(shareId)}`)
 }
+
+export function organizationDriveVersionFileUrl(organizationId: string, volumeId: string, versionId: string, sha256: string) {
+  return withBasePath(`/api/organizations/${encodeURIComponent(organizationId)}/drive/${encodeURIComponent(volumeId)}/versions/${encodeURIComponent(versionId)}/files/${encodeURIComponent(sha256)}`)
+}

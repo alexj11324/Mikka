@@ -1883,6 +1883,15 @@
       "sourceHash": "8bb0d4a4b0b9353fca0b37af7c8edf5112925782ac383ffe671dacb501e642d3"
     },
     {
+      "path": "/mikka/api/organizations/deleted",
+      "template": "/api/organizations/deleted",
+      "source": "app/api/organizations/deleted/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "2b9d96a85429c8e052539e39d207770d55bc544f2b95aa1ed7cbd12306a0f0f2"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]",
       "template": "/api/organizations/[organizationId]",
       "source": "app/api/organizations/[organizationId]/route.ts",
@@ -2069,6 +2078,15 @@
         "GET"
       ],
       "sourceHash": "b39f90be13c570dbacd79a2989ad3dca725515db9e2894d83cc21e3d341763b7"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/files/[sha256]",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/files/[sha256]",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/files/[sha256]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "f47fddf4c539b7a2056d51dd811ed6e9ae523deea8cd74e3156552c982d6ae6f"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/identity",
