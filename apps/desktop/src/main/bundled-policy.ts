@@ -118,6 +118,7 @@ export function allowedApiPath(path: string, method: string): boolean {
   }
   if (WORKSPACE_GOVERNANCE.test(path) || ORGANIZATION_KEYS.test(path) || ORGANIZATION_FILES.test(path)) return method === 'GET'
   if (path === '/api/organizations') return method === 'GET' || method === 'POST'
+  if (path === '/api/organizations/deleted') return method === 'GET'
   if (ORGANIZATION_OVERVIEW.test(path)) return method === 'GET' || method === 'PATCH' || method === 'DELETE'
   if (ORGANIZATION_WORKSPACES.test(path)) return method === 'POST' || method === 'DELETE'
   if (path === '/api/me/joinable-organizations' || path === '/api/me/invitations') return method === 'GET'
