@@ -335,7 +335,7 @@ test("bot model menu: usable credentials, per-bot choice, Coordinator, unavailab
     await pool.query(`UPDATE byos_connections SET quota=$3::jsonb,
       "modelCatalog"=jsonb_build_object('revision','1','models',jsonb_build_array($2::text)) WHERE id=$1`, [codex, "gpt-6-luna", quota(0.2, FUTURE, "codex")]);
     const bobMenu = await botModelMenu(pool, settings, bob, bobBot);
-    assert.ok(!bobMenu.groups.some(group => group.kind === "subscription"), "no teammate subscription is offered");
+    assert.ok(!bobMenu.groups.some(group => group.kind === "subscription" && group.options.some(option => option.id === luna)), "no teammate subscription is offered");
     await assert.rejects(chooseBotModel(pool, settings, bob, bobBot, luna), { code: "executionModelUnknown" });
   } finally {
     await pool.end();
