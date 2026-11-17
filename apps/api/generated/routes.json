@@ -1998,6 +1998,15 @@
       "sourceHash": "3b6c56ccec32fdfb5a07beec55c17975b3af1bd1833cd92974b8eba9fc9a0d3a"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive-skills",
+      "template": "/api/organizations/[organizationId]/drive-skills",
+      "source": "app/api/organizations/[organizationId]/drive-skills/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "2df18c63a0acb21dce9c2c86339808c096707ef2db53b81e0ce3b16f7e999a6b"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/file-versions",
       "template": "/api/organizations/[organizationId]/drive/[volumeId]/file-versions",
       "source": "app/api/organizations/[organizationId]/drive/[volumeId]/file-versions/route.ts",

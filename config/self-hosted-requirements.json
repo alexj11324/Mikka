@@ -386,6 +386,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/organizations/[organizationId]/drive-skills/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read only declared Skill names and descriptions from the current immutable heads of authorized Organization Files and optionally the selected Project. Existing local or S3-compatible storage supplies the original bytes.",
+    "test": "lib/drive/organization-share.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/organizations/[organizationId]/drive-scopes/route.ts": {
     "mode": "built-in",
     "environment": [],
