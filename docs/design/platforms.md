@@ -69,8 +69,9 @@ ship a smaller surface without the UI claiming a feature it cannot perform.
 - The desktop window is opaque on every platform, with no vibrancy material
   ([decision](decisions/2026-11-17-1500-desktop-window-opaque.md)). On macOS
   the window keeps the inset traffic lights over the page's own top bar
-  (`apps/desktop/src/main/window-appearance.ts`), and every control there is
-  `-webkit-app-region: no-drag` (`app/globals.css`), so only empty bar space
-  moves the window.
+  (`apps/desktop/src/main/window-appearance.ts`). Controls over a drag strip
+  are `-webkit-app-region: no-drag`, and a strip never extends under a control
+  that sits outside it (the official frame ends the window bar short of the
+  work area's open button), so only empty bar space moves the window.
 - Feature flags (PostHog) gate rollout; capabilities gate possibility. Compose
   them with `&&`, never substitute one for the other.
