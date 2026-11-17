@@ -54,6 +54,9 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
     assert.equal(value.baseBranch, 'develop', 'the project target branch is frozen instead of the device default')
     assert.equal(value.environment?.id, environmentId)
     assert.equal(value.environment?.variables.FEATURE_MODE, 'test')
+    assert.deepEqual(await resources.readProjectEnvironmentVariable(owner, { workspaceId: workspace.id, projectId, name: 'FEATURE_MODE' }),
+      { name: 'FEATURE_MODE', value: 'test' })
+    assert.equal(await resources.readProjectEnvironmentVariable(owner, { workspaceId: workspace.id, projectId, name: 'UNCONFIGURED' }), null)
     assert.equal((await admission(repoB)).repositoryKey, repoB)
     await rejects(admission(repoC), 'projectRepositoryDenied')
     await resources.saveWorkspaceRepositoryPolicy(owner, { workspaceId: workspace.id, revision: 0, mode: 'restricted', repositoryKeys: [repoA, repoC] })

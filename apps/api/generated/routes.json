@@ -2964,6 +2964,15 @@
       "sourceHash": "080e75b968dbc25bc9d07d4ca5237913edc711467b34defa9bcb3634e5f892e2"
     },
     {
+      "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/environment-variables/[name]/value",
+      "template": "/api/workspaces/[workspaceId]/projects/[projectId]/environment-variables/[name]/value",
+      "source": "app/api/workspaces/[workspaceId]/projects/[projectId]/environment-variables/[name]/value/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "cf70f5251663a625f8d4d6277738f477662cf3982dbf88bc5cc066d3f6e1fb94"
+    },
+    {
       "path": "/mikka/api/workspaces/[workspaceId]/service-identities",
       "template": "/api/workspaces/[workspaceId]/service-identities",
       "source": "app/api/workspaces/[workspaceId]/service-identities/route.ts",
