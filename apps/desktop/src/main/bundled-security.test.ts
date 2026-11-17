@@ -74,6 +74,7 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
   const volume = 'vol_01ARZ3NDEKTSV4RRFFQ69G5FAV', version = 'vver_01ARZ3NDEKTSV4RRFFQ69G5FAW'
   const routes: [string, string[]][] = [
     ['/api/drive/scopes', ['GET']],
+    ['/api/drive/shares', ['GET']],
     ['/api/drive/volumes', ['GET', 'POST']],
     [`/api/drive/volumes/${volume}`, ['GET']],
     [`/api/drive/volumes/${volume}/files`, ['GET']],
@@ -92,7 +93,7 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
       assert.equal(allowedApiPath(path, method), methods.includes(method), `${method} ${path}`)
     }
   }
-  for (const path of ['/api/drive/admin', '/api/drive/scopes/extra', '/api/drive/volumes/not-a-volume', `/api/drive/volumes/${volume}/files/extra`,
+  for (const path of ['/api/drive/admin', '/api/drive/scopes/extra', '/api/drive/shares/extra', '/api/drive/volumes/not-a-volume', `/api/drive/volumes/${volume}/files/extra`,
     `/api/drive/volumes/${volume}/versions/not-a-version`, `/api/drive/volumes/${volume}/shares/non-uuid`, `/api/drive/volumes/${volume}/delete`]) {
     for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
   }

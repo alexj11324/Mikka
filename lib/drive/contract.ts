@@ -307,3 +307,11 @@ export interface DriveSkillPage { skills: DriveSkillMetadata[]; nextCursor: Driv
 export type DriveFileLinkVisibility = 'private' | 'org'
 export type DriveFileLink = { id: string; path: string; visibility: DriveFileLinkVisibility }
 export type DriveFileLinkPage = { links: (DriveFileLink & { manageable: boolean })[]; nextCursor: string | null }
+export type DriveWorkspaceFileLink = DriveFileLink & {
+  volumeId: string
+  volumeName: string
+  driveScope: 'user' | 'project-user' | 'project' | 'team-workspace'
+  projectId: string | null
+  manageable: boolean
+}
+export type DriveWorkspaceFileLinkPage = { links: DriveWorkspaceFileLink[]; page: number; pageCount: number; total: number }

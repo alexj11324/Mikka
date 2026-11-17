@@ -15,7 +15,7 @@ import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, re
 import { createDriveVolume, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
 import { driveErrorResponse } from './http'
 import { listDriveSkills } from './skills'
-import { createDriveFileLink, listDriveFileLinks, readLinkedDriveFile, readOwnDriveFileLink, revokeDriveFileLink, updateDriveFileLink, type DriveFileBytes } from './file-links'
+import { createDriveFileLink, fileLinkProjectIds, listDriveFileLinks, listWorkspaceDriveFileLinks, readLinkedDriveFile, readOwnDriveFileLink, revokeDriveFileLink, updateDriveFileLink, type DriveFileBytes } from './file-links'
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 const digest = z.string().regex(/^[a-f0-9]{64}$/)
@@ -26,12 +26,17 @@ const write = z.object({ expectedDigest: digest, mutationId, changes: z.array(z.
   z.object({ op: z.literal('delete'), path: z.string().refine(isDrivePath) }).strict(),
 ])).min(1).max(DRIVE_MAX_CHANGES) }).strict()
 const restore = z.object({ versionId, expectedDigest: digest, mutationId }).strict()
-type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive' | 'links' | 'link'
+type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive' | 'links' | 'link' | 'workspaceLinks'
 type Params = { volumeId?: string; versionId?: string; shareId?: string }
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers })
 
 async function body(request: Request) {
   return JSON.parse(new TextDecoder().decode(await boundedDriveBytes(request.body, 16 * 1024 * 1024))) as unknown
+}
+
+function fileLinkPage(search: URLSearchParams) {
+  return { limit: z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50'),
+    after: search.has('after') ? z.uuid().parse(search.get('after')) : null }
 }
 
 /** First HTTP surface over the existing volume, CAS and object-store implementation. */
@@ -42,6 +47,17 @@ export async function driveResponse(request: Request, operation: Operation, para
   try {
     const search = new URL(request.url).searchParams
     const workspaceId = z.uuid().parse(search.get('workspaceId')).toLowerCase()
+    if (operation === 'workspaceLinks') {
+      if (search.has('driveScope') || search.has('projectId') || search.has('view') || search.has('after')) throw new DriveError('drive_write_invalid', 400)
+      const page = { number: z.coerce.number().int().min(1).max(2_147_483_647).parse(search.get('page') ?? '1'),
+        limit: z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50') }
+      return await withTaskWorkspace(session.user, workspaceId, async (workspace, tx) => {
+        if (workspace.kind !== 'team') throw new DriveError('drive_not_found', 404)
+        const candidates = await fileLinkProjectIds(pool, workspaceId, session.user.id)
+        const projects = candidates.size ? await accessibleProjectNames(session.user, workspaceId, tx, candidates) : []
+        return json(await listWorkspaceDriveFileLinks(pool, workspaceId, session.user.id, projects.map(project => project.id), page))
+      })
+    }
     const selection = search.get('driveScope')
     if (selection !== null && selection !== 'project' && selection !== 'team-workspace') return json({ error: 'drive_write_invalid' }, 400)
     const sharedProject = selection === 'project'
@@ -118,9 +134,7 @@ export async function driveResponse(request: Request, operation: Operation, para
           const path = z.string().refine(isDrivePath).parse(search.get('path'))
           return json({ link: await readOwnDriveFileLink(pool, volume.id, path, session.user.id) })
         }
-        const limit = z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50')
-        const after = search.has('after') ? z.uuid().parse(search.get('after')) : null
-        return json(await listDriveFileLinks(pool, volume.id, session.user.id, { limit, after }))
+        return json(await listDriveFileLinks(pool, volume.id, session.user.id, fileLinkPage(search)))
       }
       const linkId = operation === 'link' ? z.uuid().parse(params.shareId) : null
       if (linkId && request.method === 'PATCH') {

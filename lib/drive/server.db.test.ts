@@ -22,6 +22,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
   assert.equal(artifactStorage(), 'inline', 'this test must not use any external object storage')
   const scopes = await import('../../app/api/drive/scopes/route')
   const collection = await import('../../app/api/drive/volumes/route')
+  const workspaceLinks = await import('../../app/api/drive/shares/route')
   const detail = await import('../../app/api/drive/volumes/[volumeId]/route')
   const upload = await import('../../app/api/drive/volumes/[volumeId]/blobs/route')
   const entries = await import('../../app/api/drive/volumes/[volumeId]/entries/route')
@@ -42,7 +43,8 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
         headers: incoming.headers as Record<string, string>, ...(chunks.length ? { body: Buffer.concat(chunks) } : {}) })
       const segments = new URL(request.url).pathname.split('/').filter(Boolean).slice(3)
       const params = Promise.resolve({ volumeId: segments[0], versionId: segments[2], shareId: segments[2] })
-      const response = new URL(request.url).pathname === '/api/drive/scopes' ? await scopes.GET(request) : !segments.length
+      const pathname = new URL(request.url).pathname
+      const response = pathname === '/api/drive/shares' ? await workspaceLinks.GET(request) : pathname === '/api/drive/scopes' ? await scopes.GET(request) : !segments.length
         ? await (request.method === 'POST' ? collection.POST : collection.GET)(request)
         : segments.length === 1 ? await detail.GET(request, { params })
           : segments[1] === 'shares' ? segments.length === 2
@@ -605,6 +607,42 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     const onlyOwner = (await (await call(privateFile.collection, { ...mine, method: 'POST', body: { path: 'notes.txt' } })).json()).link
     assert.equal((await call(privateFile.collection + '/' + onlyOwner.id, { ...mine, method: 'PATCH', body: { visibility: 'org' } })).status, 422)
     assert.equal((await call(privateFile.collection + '/' + onlyOwner.id, { ...mine, token: peerToken })).status, 404)
+    await context.test('a Workspace link directory intersects creator visibility, active Project ACL and file location before pagination', async () => {
+      const myDirectory = (token: string, workspaceId: string = team.id, suffix = '') => fetch(
+        origin + '/api/drive/shares?workspaceId=' + workspaceId + suffix, { headers: { authorization: 'Bearer ' + token } })
+      const group = await seedTeam(fixture, team.id, owner)
+      const projectId = await seedProject(fixture, owner, [{ teamId: group.id, workspaceId: team.id }])
+      const shared = { ...mine, projectId, driveScope: 'project' }
+      const projectUser = { ...mine, projectId }
+      const makeLink = async (location: typeof mine, audience: 'private' | 'org') => {
+        const f = await makeFile(location)
+        const { link } = await (await call(f.collection, { ...location, method: 'POST', body: { path: 'notes.txt' } })).json()
+        if (audience === 'org') assert.equal((await call(f.collection + '/' + link.id, { ...location, method: 'PATCH', body: { visibility: audience } })).status, 200)
+        return link.id as string
+      }
+      const teamLink = await makeLink(teamDrive, 'org'), projectLink = await makeLink(shared, 'org')
+      const projectPrivate = await makeLink(projectUser, 'private')
+      const actual = async (token: string) => (await (await myDirectory(token)).json()).links as { id: string; driveScope: string; projectId: string | null; manageable: boolean }[]
+      const mineLinks = await actual(sharedToken)
+      assert.deepEqual(mineLinks.map(l => l.id).sort(), [onlyOwner.id, teamLink, projectLink, projectPrivate].sort())
+      assert.equal(mineLinks.find(l => l.id === projectPrivate)?.driveScope, 'project-user')
+      assert.equal(mineLinks.find(l => l.id === teamLink)?.projectId, null)
+      const received = await actual(peerToken)
+      assert.deepEqual(received.map(l => l.id).sort(), [teamLink, projectLink].sort())
+      assert.ok(received.every(l => !l.manageable))
+      const first = await (await myDirectory(peerToken, team.id, '&limit=1')).json()
+      const second = await (await myDirectory(peerToken, team.id, '&limit=1&page=2')).json()
+      assert.deepEqual([first.page, first.pageCount, first.total, second.page, second.pageCount, second.total], [1, 2, 2, 2, 2, 2])
+      const last = await (await myDirectory(peerToken, team.id, '&limit=1&page=8')).json()
+      assert.deepEqual(last, second)
+      assert.deepEqual([first.links[0].id, second.links[0].id], [teamLink, projectLink].sort())
+      await fixture.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [projectId])
+      assert.deepEqual((await actual(peerToken)).map(l => l.id), [teamLink])
+      await fixture.query('update workspace_projects set "archivedAt"=now() where id=$1', [projectId])
+      assert.deepEqual((await actual(sharedToken)).map(l => l.id).sort(), [onlyOwner.id, teamLink].sort())
+      assert.equal((await myDirectory(ownerToken, personal)).status, 404)
+    })
+
   })
 
   await fixture.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [team.id, owner])
