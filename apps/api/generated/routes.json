@@ -2077,6 +2077,15 @@
       "sourceHash": "c448977a637fd27c9f80e6b6c715bb43c85d94d7fb235d9e9846d03819cec945"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/projects/[projectId]/environment-variables/[name]/value",
+      "template": "/api/organizations/[organizationId]/projects/[projectId]/environment-variables/[name]/value",
+      "source": "app/api/organizations/[organizationId]/projects/[projectId]/environment-variables/[name]/value/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "69ade668769287c5de0934923b30088e3aaeebe8ae49012b57dd9326802100d2"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/workspaces",
       "template": "/api/organizations/[organizationId]/workspaces",
       "source": "app/api/organizations/[organizationId]/workspaces/route.ts",
