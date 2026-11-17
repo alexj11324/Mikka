@@ -357,10 +357,12 @@ export async function dispatchThroughCoordinator(client, record, { botId, profil
   const toolInput = { issueId: record.issueId, repo: REPOSITORY, target: deviceId ? { deviceId } : 'cloud', profileId,
     // The owned lease probe executes Python; read-only runs intentionally have
     // no native shell. Ordinary startup checks keep their read-only policy.
-    // A candidate computer also registers other harnesses, so the case names its
-    // Agent. A named Agent takes the first entry of 优先使用的模型 for its harness,
-    // which the acceptance workspace keeps on the subscription model this case proves.
-    ...(agentId ? { agentId } : {}), readOnly: !(leaseAudit || probe),
+    // A candidate computer also registers other harnesses. The person's message
+    // names its Agent with the computer (taskDestination below), so the host,
+    // not the model's tool input, fixes it. A named Agent takes the first entry
+    // of 优先使用的模型 for its harness, which the acceptance workspace keeps on
+    // the subscription model this case proves.
+    readOnly: !(leaseAudit || probe),
     note: probe?.instructions ?? `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
   const sponsored = record.taskProvider === 'cloudflare'
   const delivery = sponsored && probe?.sponsoredRepositoryDelivery === true
@@ -373,7 +375,7 @@ export async function dispatchThroughCoordinator(client, record, { botId, profil
   record.messageSubmittedAt = iso(now())
   record.phase = 'coordinator_submit'
   await client.rpc('coordinator.sendCoordinatorMessage', [text, null, botId, randomUUID(),
-    deviceId ? { kind: 'device', deviceId } : sponsored ? {kind:'cloud',provider:'cloudflare'} : { $mikka: 'undefined' },
+    deviceId ? { kind: 'device', deviceId, ...(agentId ? { agentId } : {}) } : sponsored ? {kind:'cloud',provider:'cloudflare'} : { $mikka: 'undefined' },
     null, [], { $mikka: 'undefined' }, profileId, ...(sponsored ? [scope.workspaceId, record.title] : [])],
   { headers: { traceparent: trace.traceparent } })
   record.phase = 'coordinator_stream'
