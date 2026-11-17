@@ -414,17 +414,23 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     }
   }
   const preparedCredentials = receivesRunCredentials ? Promise.allSettled([
+    // Each phase fails with its own code, so a refused claim names which
+    // credential failed and keeps the provider's own code as its cause.
     cloudStartupSpan('cloud.worker.claim.native_credentials', startupAttributes, async (): Promise<NativeLease | undefined> => {
       if (!subscription) return undefined
-      if (!leaseDevice(device, deviceId, caller.scopeDeviceId)) throw new Error('Run credential device unavailable')
-      const runtime = subscriptionRuntime(true, false, { exportAccessLease: true })
-      return runtime.nativeLease(await runtime.nativeRun(caller.userId, deviceId, runId), request.signal,
-        request.headers.get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER) === '1')
+      if (!leaseDevice(device, deviceId, caller.scopeDeviceId)) throw new CodedError('run_credentials_unavailable', { detail: 'device_unavailable' })
+      try {
+        const runtime = subscriptionRuntime(true, false, { exportAccessLease: true })
+        return await runtime.nativeLease(await runtime.nativeRun(caller.userId, deviceId, runId), request.signal,
+          request.headers.get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER) === '1')
+      } catch (error) { throw new CodedError('run_credentials_unavailable', { detail: 'native_credentials', cause: error }) }
     }),
     cloudStartupSpan('cloud.worker.claim.github_credentials', startupAttributes, async () => {
       if (!githubRepository || !await githubMachineConfigured(caller.userId)) return undefined
-      const issued = await githubMachineCredential(caller.userId, { remoteKey: repo.repoPath })
-      return { token: issued.token, expiresAt: issued.expiresAt?.toISOString() ?? null }
+      try {
+        const issued = await githubMachineCredential(caller.userId, { remoteKey: repo.repoPath })
+        return { token: issued.token, expiresAt: issued.expiresAt?.toISOString() ?? null }
+      } catch (error) { throw new CodedError('run_credentials_unavailable', { detail: 'github_credentials', cause: error }) }
     }),
   ] as const) : undefined
   // Tool provisioning is best effort, but it never authorizes the response.
@@ -512,14 +518,17 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     const [native, github] = await preparedCredentials
     const failures = [native, github].filter(result => result.status === 'rejected')
     if (failures.length) {
+      const reason = (failures[0] as PromiseRejectedResult).reason
+      const failure = reason instanceof CodedError && reason.code === 'run_credentials_unavailable' ? reason
+        : new CodedError('run_credentials_unavailable', { detail: 'native_credentials', cause: reason })
       // A credential failure must not strand an already claimed run. Complete
       // only this claim's still-preparing lease, never a concurrent stop/retry.
       console.warn(JSON.stringify({ msg: 'run_claim_credentials_failed', runId,
         failures: failures.map(result => causeFields((result as PromiseRejectedResult).reason)) }))
-      const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', failureDetails: serverRunFailure(runId, new Date(), new CodedError('run_failed', { cause: (failures[0] as PromiseRejectedResult).reason })), error: 'Run credentials unavailable.', finishedAt: new Date(), updatedAt: new Date() })
+      const failed = await db.update(agentRuns).set({ status: 'failed', stopReason: 'blocked', failureDetails: serverRunFailure(runId, new Date(), failure), error: 'Run credentials unavailable.', finishedAt: new Date(), updatedAt: new Date() })
         .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(agentRuns.status, 'preparing'), eq(agentRuns.leaseExpiresAt, new Date(leaseExpiresAt)), isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
       if (failed.length) { await runListChanged(db, runId); await runChanged(db, runId); await afterRunEnded(caller.userId, runId) }
-      return NextResponse.json({ error: 'Run credentials unavailable.' }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
+      return NextResponse.json({ error: 'Run credentials unavailable.', code: failure.code, ...(failure.detail ? { detail: failure.detail } : {}) }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
     }
     if (native.status === 'fulfilled') subscriptionLease = native.value
     if (github.status === 'fulfilled') githubCredential = github.value

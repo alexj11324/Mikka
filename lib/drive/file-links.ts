@@ -38,13 +38,13 @@ export async function readOwnDriveFileLink(database: Database, volumeId: string,
 /** The enclosing Drive read holds its normal ACL. An opaque link ID orders
  * the page and conveys no authority to open or manage another person's link. */
 export async function listDriveFileLinks(database: Database, volumeId: string, reader: string,
-  page: { after: string | null; limit: number }, location: DriveLocation): Promise<DriveFileLinkPage> {
+  page: { after: string | null; limit: number } | null, location: DriveLocation): Promise<DriveFileLinkPage> {
   const { rows } = await database.query<LinkRow>(`SELECT ${linkFields} FROM drive_file_links l JOIN drive_volumes v ON v.id=l."volumeId"
     WHERE l."volumeId"=$1 AND v."archivedAt" IS NULL AND ($3::uuid IS NULL OR l.id>$3)
       AND (l."createdBy"=$2 OR l.visibility='org' AND v."driveScope" IN ('project','team-workspace'))
-    ORDER BY l.id LIMIT $4`, [volumeId, reader, page.after, page.limit + 1])
-  const links = rows.slice(0, page.limit)
-  return { links: links.map(link => describeLink(link, location)), nextCursor: rows.length > page.limit ? links.at(-1)!.id : null }
+    ORDER BY l.id LIMIT $4`, [volumeId, reader, page?.after ?? null, page ? page.limit + 1 : null])
+  const links = page ? rows.slice(0, page.limit) : rows
+  return { links: links.map(link => describeLink(link, location)), nextCursor: page && rows.length > page.limit ? links.at(-1)!.id : null }
 }
 
 /** Only Projects containing a potentially visible link need a canonical row

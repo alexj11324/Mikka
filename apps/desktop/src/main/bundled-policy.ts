@@ -32,12 +32,13 @@ const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:restore|archive|unarchive)$`), ['POST']],
 ]
 const ORGANIZATION_DRIVE_RESTORE = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/restore$`)
+const ORGANIZATION_VOLUME_SHARES = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/shares$`)
 const ORGANIZATION_DRIVE_VERSIONS = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/versions(?:/${DRIVE_VERSION_ID})?$`)
 const ORGANIZATION_VERSION_FILE = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}/files/[a-f0-9]{64}$`)
 const ORGANIZATION_FILE_HISTORY = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/file-versions$`)
 const ORGANIZATION_FILE_SHARE = new RegExp(`^/api/organizations/${UUID}/drive-shares/${UUID}$`)
 const ORGANIZATION_OVERVIEW = new RegExp(`^/api/organizations/${UUID}$`)
-const ORGANIZATION_FILES = new RegExp(`^/api/organizations/${UUID}/(?:drive-shares|drive-scopes|drive)$`)
+const ORGANIZATION_FILES = new RegExp(`^/api/organizations/${UUID}/(?:drive-shares|drive-scopes|drive-skills|drive)$`)
 const ORGANIZATION_KEYS = new RegExp(`^/api/organizations/${UUID}/api-keys$`)
 const ORGANIZATION_WORKSPACES = new RegExp(`^/api/organizations/${UUID}/workspaces$`)
 const ORGANIZATION_POLICY = new RegExp(`^/api/organizations/${UUID}/policy$`)
@@ -103,6 +104,7 @@ export function normalizedRendererPath(value: string): string | null {
 }
 
 export function allowedApiPath(path: string, method: string): boolean {
+  if (ORGANIZATION_VOLUME_SHARES.test(path)) return method === 'GET' || method === 'POST'
   if (ORGANIZATION_DRIVE_RESTORE.test(path)) return method === 'POST'
   if (ORGANIZATION_DRIVE_VERSIONS.test(path) || ORGANIZATION_VERSION_FILE.test(path) || ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
   if (ORGANIZATION_FILE_SHARE.test(path)) return method === 'PATCH' || method === 'DELETE'

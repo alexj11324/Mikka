@@ -61,8 +61,8 @@ export async function driveResponse(request: Request, operation: Operation, para
     const viewId = operation === 'shareView' ? z.uuid().parse(params.shareId) : null
     if (viewId && (params.organizationId ? search.size !== 0 : [...search.keys()].some(key => key !== 'download'))) throw new DriveError('drive_write_invalid', 400)
     let located = viewId ? await findShareLocation(pool, viewId, session.user.id) : null
-    const organizationVersionOperation = params.organizationId && (operation === 'version' || operation === 'history' || operation === 'restore')
-    if (organizationVersionOperation && search.size) throw new DriveError('drive_write_invalid', 400)
+    const organizationVolumeOperation = params.organizationId && (operation === 'version' || operation === 'history' || operation === 'restore' || operation === 'links')
+    if (organizationVolumeOperation && search.size) throw new DriveError('drive_write_invalid', 400)
     const versionFile = operation === 'organizationVersionFile'
       ? { versionId: versionId.parse(params.versionId), sha256: digest.parse(params.sha256), organizationId: z.uuid().parse(params.organizationId) } : null
     if (versionFile && (search.size > 1 || search.size === 1 && !search.has('download'))) throw new DriveError('drive_write_invalid', 400)
@@ -71,7 +71,7 @@ export async function driveResponse(request: Request, operation: Operation, para
       if ([...search.keys()].some(key => key !== 'path') || search.getAll('path').length !== 1) throw new DriveError('drive_write_invalid', 400)
       historyPath = z.string().refine(isDrivePath).parse(search.get('path'))
     }
-    if (historyPath !== undefined || organizationVersionOperation || versionFile) located = await findDriveVolumeLocation(pool, z.string().refine(isVolumeId).parse(params.volumeId), session.user.id)
+    if (historyPath !== undefined || organizationVolumeOperation || versionFile) located = await findDriveVolumeLocation(pool, z.string().refine(isVolumeId).parse(params.volumeId), session.user.id)
     const workspaceId = located?.workspaceId ?? z.uuid().parse(search.get('workspaceId')).toLowerCase()
     if (located) {
       const selected = workspaceSelection(request.headers)
@@ -167,13 +167,15 @@ export async function driveResponse(request: Request, operation: Operation, para
       if (operation === 'links') {
         if (request.method === 'POST') {
           const { path } = z.object({ path: z.string().refine(isDrivePath) }).strict().parse(await body(request))
-          return json({ link: await createDriveFileLink(pool, volume.id, path, session.user.id, location) })
+          const link = await createDriveFileLink(pool, volume.id, path, session.user.id, location)
+          return json(params.organizationId ? link : { link })
         }
         if (search.has('path')) {
           const path = z.string().refine(isDrivePath).parse(search.get('path'))
           return json({ link: await readOwnDriveFileLink(pool, volume.id, path, session.user.id, location) })
         }
-        return json(await listDriveFileLinks(pool, volume.id, session.user.id, fileLinkPage(search), location))
+        const page = await listDriveFileLinks(pool, volume.id, session.user.id, params.organizationId ? null : fileLinkPage(search), location)
+        return json(params.organizationId ? page.links : page)
       }
       const linkId = viewId ?? (operation === 'link' ? z.uuid().parse(params.shareId) : null)
       if (linkId && request.method === 'PATCH') {

@@ -76,6 +76,13 @@
     "test": "lib/drive/organization-share.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/organizations/[organizationId]/drive/[volumeId]/shares/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An active Organization member reads current authorized links or creates their own private link to an existing file using the original volume writer and protected download address.",
+    "test": "lib/drive/organization-share.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/organizations/[organizationId]/drive/[volumeId]/versions/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -393,6 +400,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/organizations/[organizationId]/drive-skills/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read only declared Skill names and descriptions from the current immutable heads of authorized Organization Files and optionally the selected Project. Existing local or S3-compatible storage supplies the original bytes.",
+    "test": "lib/drive/organization-share.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/organizations/[organizationId]/drive-scopes/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -578,6 +592,13 @@
     "behavior": "Authorize current workspace, owner, run and human lease. The existing owner-configured task can accept the signed action. A missing or unavailable task fails without a replacement.",
     "test": "lib/coding-workspace/terminal/http.test.ts",
     "suite": "test:coding-workspace-review-runtime"
+  },
+  "app/api/organizations/[organizationId]/projects/[projectId]/environment-variables/[name]/value/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one ordinary value through the active Organization attachment, membership and the Project's current content access using the installation PostgreSQL databases.",
+    "test": "tests/project-resources.db.test.ts",
+    "suite": "test:project-resources-db"
   },
   "app/api/workspaces/[workspaceId]/projects/[projectId]/environment-variables/[name]/value/route.ts": {
     "mode": "built-in",
@@ -2311,6 +2332,16 @@
     "behavior": "After terminal run events, deliver the next pending conversation input using the same installation database.",
     "test": "tests/thread-continue.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "lib/schedules/standing-task.ts": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL",
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Recheck the schedule creator's Workspace membership, active Project relation and Task steering access before the normal thread writer continues a standing Task. The installation's Workspace and application PostgreSQL databases can be separate.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
   },
   "lib/schedules/contract.ts": {
     "mode": "built-in",

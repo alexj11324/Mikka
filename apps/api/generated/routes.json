@@ -1998,6 +1998,15 @@
       "sourceHash": "3b6c56ccec32fdfb5a07beec55c17975b3af1bd1833cd92974b8eba9fc9a0d3a"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive-skills",
+      "template": "/api/organizations/[organizationId]/drive-skills",
+      "source": "app/api/organizations/[organizationId]/drive-skills/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "2df18c63a0acb21dce9c2c86339808c096707ef2db53b81e0ce3b16f7e999a6b"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/file-versions",
       "template": "/api/organizations/[organizationId]/drive/[volumeId]/file-versions",
       "source": "app/api/organizations/[organizationId]/drive/[volumeId]/file-versions/route.ts",
@@ -2014,6 +2023,16 @@
         "POST"
       ],
       "sourceHash": "266128803776eaa42997585548d45141b42ba55d2cce78e36a800681bf1cdcb8"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/shares",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/shares",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/shares/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "9e66249e27367a1540d0d9023d8919cb2ecea59736c5d19e302254cbd0ea3202"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/versions",
@@ -2111,6 +2130,15 @@
         "PATCH"
       ],
       "sourceHash": "c448977a637fd27c9f80e6b6c715bb43c85d94d7fb235d9e9846d03819cec945"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/projects/[projectId]/environment-variables/[name]/value",
+      "template": "/api/organizations/[organizationId]/projects/[projectId]/environment-variables/[name]/value",
+      "source": "app/api/organizations/[organizationId]/projects/[projectId]/environment-variables/[name]/value/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "69ade668769287c5de0934923b30088e3aaeebe8ae49012b57dd9326802100d2"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/workspaces",
@@ -3283,7 +3311,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "6cca5862bbfa534cf662536336d6aee4ee0ced188bf41ee7d553817562336aaa"
+      "sourceHash": "ca9b08372f4a8b845405b654526c9a17b413876970d3c685e8103d57d767d63f"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",
