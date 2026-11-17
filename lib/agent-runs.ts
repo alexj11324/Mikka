@@ -561,7 +561,7 @@ export async function requestRunStop(userId: string, runId: string): Promise<{ s
   const stoppedRunIds: string[] = []
   for (const runId of target.runIds) {
     try {
-      if (await stopOwnedRun(db, userId, runId)) await afterRunEnded(userId, runId)
+      if (await stopOwnedRun(db, userId, runId, true)) await afterRunEnded(userId, runId)
       else {
         // A refused startup may have no lifecycle/daemon to acknowledge this
         // stop. Reuse the scoped host acknowledgement after the stop commits.

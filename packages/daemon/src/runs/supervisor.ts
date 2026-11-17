@@ -353,11 +353,18 @@ export class RunSupervisor {
    * Stops the runs the server says this device no longer holds. Runs without
    * a server lease (local dev runs) were never the server's to take back.
    */
-  revokeLeases(runIds: readonly string[]) {
+  revokeLeases(runIds: readonly string[], cancelled: readonly string[] = []) {
+    const explicitStops = new Set(cancelled)
     for (const runId of runIds) {
       const run = this.active.get(runId)
-      if (run && !run.forcedStop && this.leases.has(runId))
+      const lease = this.leases.get(runId)
+      if (!run || run.forcedStop || lease === undefined) continue
+      if (explicitStops.has(runId) && lease > Date.now()) {
+        // A later loss of authority must still win while cancellation is draining.
+        if (!run.cancelRequested) void this.requestCancel(runId, run)
+      } else {
         this.forceStop(runId, run, "device_lost")
+      }
     }
   }
 

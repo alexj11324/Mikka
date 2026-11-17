@@ -3285,7 +3285,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "b32fa96dd7fa77afca9900389f1a11266293eccfd7ce8b89e02d734a0de1395c"
+      "sourceHash": "7f6a8681e4d631694d7cac5116a802e3300fd8ba865cdb521390b192346cf13d"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/repos",

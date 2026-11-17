@@ -19,7 +19,7 @@ const dbTest = databaseUrl ? test : test.skip
 dbTest('a heartbeat re-checks execution identities only when the harnesses change or the device comes back, and renews the leases of the runs it reports', async t => {
   const next = await import('next/server')
   mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
-  const [{ createRequestDatabaseScope, pool }, { POST }] = await Promise.all([import('./db'), import('../app/v1/devices/[deviceId]/heartbeat/route')])
+  const [{ createRequestDatabaseScope, db, pool }, { POST }] = await Promise.all([import('./db'), import('../app/v1/devices/[deviceId]/heartbeat/route')])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-heartbeat-${randomUUID()}`
   const device = randomUUID(), run = randomUUID(), stranger = randomUUID()
@@ -43,7 +43,7 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
       body: JSON.stringify({ runs: [], worktreeDiskBytes: 0, ...body }),
     }), { params: Promise.resolve({ deviceId: device }) })
     assert.equal(response.status, 200)
-    return await response.json() as { leases: Record<string, string>; revoked?: string[] }
+    return await response.json() as { leases: Record<string, string>; revoked?: string[]; cancelled?: string[] }
   }
   await scope.run(async () => {
     await pool.query(`insert into "user" (id, name, email, "emailVerified", "createdAt", "updatedAt") values ($1, 'Heartbeat fixture', $1 || '@example.invalid', false, now(), now())`, [owner])
@@ -111,6 +111,40 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
     const [{ leaseExpiresAt }] = (await pool.query(`select "leaseExpiresAt" from agent_runs where id=$1`, [run])).rows
     assert.ok(leaseExpiresAt.getTime() > Date.now() + 60_000, 'the stored lease moved forward')
     assert.equal(new Date(leased.leases[run]).getTime(), leaseExpiresAt.getTime())
+
+    await t.test('explicit owner Stop revokes without renewing; an expired, legacy or policy stop still reports device loss', async () => {
+      const { stopOwnedRun } = await import('./run-control')
+      const reported = { harnesses: [claude], runs: [{ runId: run, lastProgressAt: new Date().toISOString() }] }
+      const snapshot = async () => (await pool.query('SELECT "stopRequestedAt","leaseExpiresAt" FROM agent_runs WHERE id=$1', [run])).rows[0]
+      assert.equal(await stopOwnedRun(db, owner, run, true), false)
+      const stopped = await snapshot()
+      assert.ok(stopped.stopRequestedAt)
+      for (let request = 0; request < 2; request++) {
+        await stopOwnedRun(db, owner, run, true)
+        const heartbeat = await beat(reported)
+        assert.deepEqual([heartbeat.leases, heartbeat.revoked, heartbeat.cancelled], [{}, [run], [run]])
+        assert.deepEqual(await snapshot(), stopped)
+      }
+      // Obsolete clients continue to receive the existing immediate revocation.
+      const old = await beat(reported, '0.0.329')
+      assert.deepEqual([old.leases, old.revoked, old.cancelled], [{}, [run], undefined])
+      await pool.query('UPDATE agent_runs SET "leaseExpiresAt"=now() WHERE id=$1', [run])
+      const expired = await beat(reported)
+      assert.deepEqual([expired.leases, expired.revoked, expired.cancelled], [{}, [run], undefined])
+      // An earlier policy stop has no owner attribution; a subsequent repeat cannot give it one.
+      await pool.query(`UPDATE agent_runs SET "explicitStopRequested"=false,"leaseExpiresAt"=now()+interval '90 seconds' WHERE id=$1`, [run])
+      await stopOwnedRun(db, owner, run, true)
+      const policy = await beat(reported)
+      assert.deepEqual([policy.leases, policy.revoked, policy.cancelled], [{}, [run], undefined])
+
+      // Rotation retires the original credential even if its Run lease is still current.
+      await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1', [run])
+      await stopOwnedRun(db, owner, run, true)
+      await pool.query('UPDATE device_tokens SET "revokedAt"=clock_timestamp() WHERE id=$1 AND "userId"=$2', [ownToken, owner])
+      const { renewRunLeases } = await import('./run-leases')
+      const retired = await renewRunLeases(device, [run], new Date(), ownToken)
+      assert.deepEqual([retired.leases, retired.revoked, retired.cancelled], [{}, [run], undefined])
+    })
   })
 })
 

@@ -91,7 +91,7 @@ async function handlePOST(request: Request, body: unknown, { params }: { params:
   const selected = runIds.length
     ? await skillAssignments.renewHeartbeat(caller.userId, deviceId, runIds, request.headers.get(SKILL_ARTIFACT_HEADER) === '1', request.headers.get(TEAM_SKILL_HEADER) === '1')
     : { legacy: [], leases: {}, revoked: [] }
-  const result = await renewRunLeases(deviceId, selected.legacy)
+  const result = await renewRunLeases(deviceId, selected.legacy, now, caller.tokenId)
   result.leases = { ...result.leases, ...selected.leases }
   result.revoked = [...new Set([...(result.revoked ?? []), ...selected.revoked])]
   const renewedSecrets = request.headers.get(TASK_SECRETS_HEADER) === TASK_SECRETS_VERSION
@@ -100,6 +100,10 @@ async function handlePOST(request: Request, body: unknown, { params }: { params:
     : { taskSecrets: {}, revoked: [] }
   for (const runId of renewedSecrets.revoked) delete result.leases[runId]
   result.revoked = [...new Set([...result.revoked, ...renewedSecrets.revoked])]
+  if (result.cancelled) {
+    const otherRevocations = new Set([...selected.revoked, ...renewedSecrets.revoked])
+    result.cancelled = result.cancelled.filter(id => !otherRevocations.has(id))
+  }
   const cloudCredential = caller.scopeDeviceId === deviceId && caller.scopeWorkspaceId
     ? await renewCloudDeviceToken(pool, { userId: caller.userId, workspaceId: caller.scopeWorkspaceId, deviceId, tokenId: caller.tokenId }).catch(() => null)
     : null
