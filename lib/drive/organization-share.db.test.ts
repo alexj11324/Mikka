@@ -151,6 +151,52 @@ test('organization share management holds the actual attachment, creator and cur
     assert.ok([403, 404].includes((await history(theirs, volumeId)).status))
     await database.query(`UPDATE mikka_organization_members SET status='active' WHERE "organizationId"=$1 AND "userId"=$2`, [organizationId, peer])
   })
+  await t.test('organization version file grants require the stored digest, exact version, original reader and current Project access', async () => {
+    const fileRoute = await import('../../app/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/files/[sha256]/route')
+    const team = await seedTeam(database, workspace.id, peer)
+    const projectId = await seedProject(database, peer, [{ teamId: team.id, workspaceId: workspace.id }])
+    const { volumeId } = await makeShare(projectId, 'Digest source')
+    const { rows: versions } = await database.query<{ id: string }>('SELECT id FROM drive_volume_versions WHERE "volumeId"=$1 ORDER BY seq', [volumeId])
+    const emptyVersion = versions[0].id, versionId = versions[1].id, sha256 = driveSha256(new TextEncoder().encode('selected bytes'))
+    const params = { organizationId, volumeId, versionId, sha256 }
+    const enter = (person: string, values = params, search = '') => fileRoute.GET(new Request(origin + '/api/organizations/' + values.organizationId
+      + '/drive/' + values.volumeId + '/versions/' + values.versionId + '/files/' + values.sha256 + search, { headers: { cookie: person } }),
+    { params: Promise.resolve(values) })
+    assert.equal((await enter(mine, { ...params, versionId: emptyVersion })).status, 404)
+    assert.equal((await enter(mine, { ...params, sha256: 'f'.repeat(64) })).status, 404)
+    assert.equal((await enter(mine, params, '?expiresAt=1')).status, 400)
+    const response = await enter(mine)
+    assert.equal(response.status, 200)
+    const grant = await response.json()
+    assert.equal(grant.type, 'url')
+    const address = new URL(grant.url, origin)
+    assert.ok(address.pathname.endsWith(`/drive/${volumeId}/versions/${versionId}/files/${sha256}`))
+    const proof = address.searchParams.get('download')!
+    assert.equal(new Date(Number(proof.split('.')[0])).toISOString(), grant.expiresAt)
+    const { requireCurrentDownload } = await import('./share-view')
+    const subject = JSON.stringify(['version-file', organizationId, volumeId, versionId])
+    assert.throws(() => requireCurrentDownload(proof, subject, creator, sha256, Date.parse(grant.expiresAt)), /drive_not_found/)
+    assert.equal((await enter(theirs, params, address.search)).status, 404)
+    assert.equal((await enter(mine, params, address.search + '0')).status, 404)
+    const original = await enter(mine, params, address.search)
+    assert.equal(original.status, 200)
+    assert.equal(original.headers.get('content-type'), 'application/octet-stream')
+    assert.equal(await original.text(), 'selected bytes')
+    const actor = { ownerId: `drive-project:${workspace.id}:${projectId}`, authorName: 'Drive creator' }
+    const { rows: [volume] } = await database.query<{ headDigest: string }>('SELECT "headDigest" FROM drive_volumes WHERE id=$1', [volumeId])
+    const another = await applyDriveWrite(database, { ownerId: actor.ownerId, volumeId, driveScope: 'project' }, actor, {
+      expectedDigest: volume.headDigest, mutationId: randomUUID(),
+      changes: [{ op: 'put', path: 'also-here.txt', mode: 0o644, sha256, sizeBytes: Buffer.byteLength('selected bytes') }],
+    })
+    const next = { ...params, versionId: another.headVersionId }
+    assert.equal((await enter(mine, next)).status, 200)
+    assert.equal((await enter(mine, next, address.search)).status, 404)
+
+    await database.query("UPDATE resource_access_policies SET visibility='private' WHERE kind='project' AND id=$1", [projectId])
+    assert.equal((await enter(mine, params, address.search)).status, 404)
+    assert.equal((await enter(mine)).status, 404)
+    assert.equal((await enter(theirs)).status, 200)
+  })
   await t.test('organization manifests identify their actual predecessor and complete history retains restored versions beyond the Workspace page', async () => {
     const manifestRoute = await import('../../app/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/route')
     const listRoute = await import('../../app/api/organizations/[organizationId]/drive/[volumeId]/versions/route')

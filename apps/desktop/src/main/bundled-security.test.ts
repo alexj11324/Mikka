@@ -81,6 +81,7 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/restore', ['POST']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions', ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000', ['GET']],
+    [`/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000/files/${'a'.repeat(64)}`, ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/file-versions', ['GET']],
     ['/api/drive/volumes', ['GET', 'POST']],
     [`/api/drive/volumes/${volume}`, ['GET']],

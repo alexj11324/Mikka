@@ -36,6 +36,12 @@ export function requireCurrentDownload(proof: string, id: string, reader: string
   }
 }
 
+export function issueDriveDownload(url: string, subject: string, reader: string, sha256: string): DriveShareView['file'] {
+  const expires = Date.now() + lifetime
+  const download = new URLSearchParams({ download: `${expires}.${signature(subject, reader, sha256, expires).toString('hex')}` })
+  return { type: 'url', url: `${url}?${download}`, expiresAt: new Date(expires).toISOString() }
+}
+
 /** Called while the original Workspace membership and any Project ACL are
  * held. APP selects the current entry and last change in one snapshot. WS
  * supplies the actual active Organization and membership through its own DB. */
@@ -64,14 +70,12 @@ export async function readShareView(database: Database, location: ShareLocation,
     FROM mikka_organization_workspaces w JOIN mikka_organizations o ON o.id=w."organizationId" AND o."archivedAt" IS NULL
     JOIN mikka_organization_members m ON (m."organizationId",m."userId")=(o.id,$2) AND m.status='active'
     WHERE w."workspaceId"=$1`, [location.workspaceId, reader])
-  const expires = Date.now() + lifetime
   const url = driveShareViewUrl(id)
-  const download = new URLSearchParams({ download: `${expires}.${signature(id, reader, entry.sha256, expires).toString('hex')}` })
   return {
     type: 'file', id, path: entry.path, visibility: entry.visibility, url, orgName: organization?.name ?? null,
     authorName: entry.authorName, member: organization
       ? { orgId: organization.id, manageable: entry.manageable, projectId: location.projectId, userId: entry.userId, automationId: null } : null,
     versionId: entry.versionId, versionCreatedAt: entry.versionCreatedAt.toISOString(), sizeBytes: entry.sizeBytes,
-    file: { type: 'url', url: `${url}?${download}`, expiresAt: new Date(expires).toISOString() },
+    file: issueDriveDownload(url, id, reader, entry.sha256),
   }
 }
