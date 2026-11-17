@@ -103,12 +103,10 @@ jobs:
         with:
           node-version: 24
       - name: Install real media readers
-        run: |
-          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
-          sudo apt-get update -qq
-          sudo apt-get install --no-install-recommends -y ffmpeg
-          ffmpeg -version
-          ffprobe -version
+        timeout-minutes: 5
+        uses: ./.github/actions/capture-tools
+        with:
+          github-token: ${{ github.token }}
       - name: Test acceptance guards and hostile evidence before credentials
         run: node --test scripts/acceptance/factory-visual-evidence.test.mjs
       - name: Recheck exact release, active window and previously successful native cases inside shared queue

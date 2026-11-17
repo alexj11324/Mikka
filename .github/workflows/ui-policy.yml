@@ -101,12 +101,9 @@ jobs:
           ffmpeg-github-token: ${{ github.token }}
       - name: Ensure FFmpeg for Factory evidence acceptance regressions
         timeout-minutes: 5
-        run: |
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
-            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y ffmpeg
-          fi
+        uses: ./.github/actions/capture-tools
+        with:
+          github-token: ${{ github.token }}
       - name: Run selected core tasks through Nx Core
         run: node scripts/ci/run-units.mjs core
         env:
@@ -134,12 +131,10 @@ jobs:
         with:
           ffmpeg-github-token: ${{ github.token }}
       - name: Ensure FFmpeg for real recording regressions
-        run: |
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
-            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y ffmpeg
-          fi
+        timeout-minutes: 5
+        uses: ./.github/actions/capture-tools
+        with:
+          github-token: ${{ github.token }}
       - name: Run selected integration tasks through Nx Core
         run: node scripts/ci/run-units.mjs integration
         env:
@@ -228,12 +223,10 @@ jobs:
         with:
           ffmpeg-github-token: ${{ github.token }}
       - name: Ensure FFmpeg for daemon recording regressions
-        run: |
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
-            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y ffmpeg
-          fi
+        timeout-minutes: 5
+        uses: ./.github/actions/capture-tools
+        with:
+          github-token: ${{ github.token }}
       - name: Daemon unit and transport regression tests
         run: pnpm --filter @mikka/daemon exec vitest run --no-cache --reporter=default --reporter=github-actions --reporter=json --outputFile.json="$RUNNER_TEMP/pr13-daemon-unit-results.json"
       - name: Existing mailbox CLI integration tests
@@ -407,20 +400,25 @@ jobs:
       # Read-only except on pushes to main, like the pnpm store.
       - name: Name the native dependency package cache
         id: native-debs-key
-        run: echo "key=native-debs-v2-$ImageOS-$ImageVersion-${{ runner.arch }}-bubblewrap-socat-ripgrep-ffmpeg" >> "$GITHUB_OUTPUT"
+        run: echo "key=native-debs-v2-$ImageOS-$ImageVersion-${{ runner.arch }}-bubblewrap-socat-ripgrep" >> "$GITHUB_OUTPUT"
       - name: Restore native dependency packages
         id: native-debs
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/native-debs
           key: ${{ steps.native-debs-key.outputs.key }}
+      - name: Pinned FFmpeg and ffprobe for the CLI approval database roundtrip
+        timeout-minutes: 5
+        uses: ./.github/actions/capture-tools
+        with:
+          github-token: ${{ github.token }}
       - name: Install native dependencies for the CLI approval database roundtrip
         # A stalled Ubuntu mirror once held apt for the rest of the job
         # (2026-11-01, run 41257416436). Fail this step instead of the job.
         timeout-minutes: 5
         run: |
-          packages=(bubblewrap socat ripgrep ffmpeg)
-          if compgen -G "$HOME/native-debs/*.deb" > /dev/null && sudo dpkg -i "$HOME"/native-debs/*.deb && command -v bwrap socat rg ffmpeg ffprobe > /dev/null; then
+          packages=(bubblewrap socat ripgrep)
+          if compgen -G "$HOME/native-debs/*.deb" > /dev/null && sudo dpkg -i "$HOME"/native-debs/*.deb && command -v bwrap socat rg > /dev/null; then
             echo "Installed ${packages[*]} from the cached packages"
             exit 0
           fi
@@ -430,7 +428,7 @@ jobs:
           sudo apt-get "${apt_options[@]}" update
           sudo apt-get clean
           sudo apt-get "${apt_options[@]}" install -y -f "${packages[@]}"
-          command -v bwrap socat rg ffmpeg ffprobe > /dev/null
+          command -v bwrap socat rg > /dev/null
           rm -rf "$HOME/native-debs" && mkdir -p "$HOME/native-debs"
           if compgen -G "/var/cache/apt/archives/*.deb" > /dev/null; then cp /var/cache/apt/archives/*.deb "$HOME/native-debs/"; fi
       - name: Save native dependency packages (main only)
