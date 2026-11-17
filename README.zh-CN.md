@@ -126,6 +126,12 @@ Mikka 的开发得到了 [Codex for Open Source](https://openai.com/form/codex-f
 
 Mikka 是独立开源项目，与 OpenAI 不存在隶属关系，也未获得 OpenAI 官方背书。OpenAI 名称及标志均为 OpenAI 的商标。
 
+<a href="https://neon.com">
+  <img src="docs/assets/neon-logo.svg" alt="Neon" width="160">
+</a>
+
+感谢 [Neon](https://neon.com) 通过 Neon Open Source Program 为 Mikka 提供 Postgres 和 AI Gateway 额度支持。
+
 ## 许可证
 
 Mikka 的版权归 Aspectly Labs 所有（© 2026），采用 [AGPL-3.0-only](LICENSE) 协议开源。第三方组件遵循各自的许可证，详见 [`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md)。

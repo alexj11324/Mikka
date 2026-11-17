@@ -126,6 +126,13 @@ A heartfelt thank-you to OpenAI and the Codex team for providing Mikka's maintai
 
 Mikka is an independent open-source project and is not affiliated with or endorsed by OpenAI. The OpenAI name and logo are trademarks of OpenAI.
 
+<a href="https://neon.com">
+  <img src="docs/assets/neon-logo.svg" alt="Neon" width="160">
+</a>
+
+Thanks to [Neon](https://neon.com) for supporting Mikka with Postgres and AI
+Gateway credits through the Neon Open Source Program.
+
 ## License
 
 Mikka is copyright © 2026 Aspectly Labs and licensed under
