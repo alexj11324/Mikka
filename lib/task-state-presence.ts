@@ -1,7 +1,4 @@
-import { deviceOnlineStates } from './device-presence'
-
-/** Reuse gateway presence: a sleeping socket may be online after its HTTP heartbeat expired. */
+/** Presence is already in `deviceOffline` (the device session columns); this only drops the retired column. */
 export async function withTaskDevicePresence<T extends { deviceOffline: boolean; offlineDevice: { id: string; lastSeenAt: string | null } | null }>(rows: T[]): Promise<Omit<T, 'offlineDevice'>[]> {
-  const online = await deviceOnlineStates(rows.flatMap(row => row.deviceOffline && row.offlineDevice ? [row.offlineDevice] : []))
-  return rows.map(({ offlineDevice, ...row }) => ({ ...row, deviceOffline: row.deviceOffline && !(offlineDevice && online.get(offlineDevice.id)) }))
+  return rows.map(({ offlineDevice: _offlineDevice, ...row }) => row)
 }

@@ -61,8 +61,8 @@ test('a local Factory question preserves the original Profile, worker definition
   const model = 'gpt-6-luna'
   const harnesses = [{ harness: 'codex', installed: true, subscriptionBroker: true,
     models: [model] }]
-  await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses)
-    VALUES ($1,$2,'Local question fixture','local','laptop',true,now(),$3)`, [deviceId, owner, JSON.stringify(harnesses)])
+  await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt")
+    VALUES ($1,$2,'Local question fixture','local','laptop',true,now(),$3,now())`, [deviceId, owner, JSON.stringify(harnesses)])
   await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name)
     VALUES ($1,$2,$3,'codex','Local question worker')`, [agentId, owner, deviceId])
   await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota)

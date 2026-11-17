@@ -31,7 +31,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
     if(await prepareLocalClaimBinding(client,runId,subscriptionBindingId)==='cloud-required'){await client.query('COMMIT');return 'cloud-required'}
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
     advanceTaskAfterRunStart(client, runId)
-    // The lease is due to be reclaimed at its expiry if no heartbeat renews it (#1212).
+    // The lease lasts as long as the device session; run recovery reclaims it once it ends (#1212).
     armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)
@@ -89,7 +89,7 @@ export async function claimCloudRun(pool: Pool, actor: { userId: string; workspa
     } else if (!(await client.query('SELECT 1 FROM model_api_key_runs WHERE "runId"=$1', [runId])).rowCount) { await client.query('COMMIT'); return null }
     await client.query('UPDATE agent_runs SET status=$2,"startedAt"=now(),"leaseExpiresAt"=$3,"updatedAt"=now() WHERE id=$1', [runId, 'preparing', leaseExpiresAt])
     advanceTaskAfterRunStart(client, runId)
-    // The lease is due to be reclaimed at its expiry if no heartbeat renews it (#1212).
+    // The lease lasts as long as the device session; run recovery reclaims it once it ends (#1212).
     armDueTimerAfterCommit(client, 'run-recovery')
     await runListChanged(client, runId)
     await runChanged(client, runId)

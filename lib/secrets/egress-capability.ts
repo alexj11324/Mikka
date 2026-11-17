@@ -1,15 +1,19 @@
-// A sealed, short-lived third-party grant. Only the trusted application opens it;
-// runners receive the opaque bearer, never the secret or the sealing key.
-// Revocation is bounded by expiry, not instantaneous: a copied bearer can remain
-// usable for at most 90 seconds. Renewal must re-check the persisted run lease.
+// A sealed third-party grant. Only the trusted application opens it; runners
+// receive the opaque bearer, never the secret or the sealing key. It expires
+// with the run's lease, which lasts as long as the device session (decision
+// 2026-11-17-2215). Revocation is checked at use, not bounded by expiry: every
+// request re-reads the run (lib/secrets/egress-binding.ts), so a copied bearer
+// stops working as soon as the run stops, its lease ends or its session closes.
 import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto'
 import { CodedError } from '@mikka/protocol/coded-error'
 import { TASK_SECRET_MAX_TOKEN_BYTES, type TaskSecretGrant } from '@mikka/protocol/task-secrets'
+import { SESSION_LEASE_MS } from '@mikka/protocol/device'
 import { z } from 'zod'
 import { secretsKey } from './crypto'
 import { secretHttpPolicy, type SecretHttpPolicy } from './delivery'
 
-export const EGRESS_CAPABILITY_TTL_MS = 90_000
+/** Upper bound of a capability's life: the run's session lease. */
+export const EGRESS_CAPABILITY_TTL_MS = SESSION_LEASE_MS
 const PREFIX = 'mikka-egress-v1.'
 const AAD = Buffer.from('mikka:task-secret-egress:capability:v1')
 const KEY_DOMAIN = 'mikka:task-secret-egress:encryption-key:v1'
@@ -74,7 +78,8 @@ function checkedClaims(value: unknown): EgressCapabilityClaims {
 }
 
 /** Call only after authorizing this exact run, credential, attempt and effective
- * secret scope. This pure function cannot perform those database checks. */
+ * secret scope. This pure function cannot perform those database checks. The
+ * capability expires with `leaseExpiresAt`, the run's lease. */
 export function issueEgressCapability(input: EgressCapabilityBinding & {
   name: string
   secretId?: string
@@ -102,8 +107,8 @@ export function issueEgressCapability(input: EgressCapabilityBinding & {
 }
 
 /** No database or network work. `expected` comes from trusted route/run context,
- * never from fields alongside the capability in an Agent's request. A bearer
- * stolen from a task still authorizes its original scope until its expiry. */
+ * never from fields alongside the capability in an Agent's request. The caller
+ * then checks the binding against the live run (egressBindingActive). */
 export function openEgressCapability(capability: string, expected?: Partial<EgressCapabilityBinding>,
   nowMs = Date.now(), env: Environment = process.env): EgressCapabilityClaims {
   if (typeof capability !== 'string' || capability.length > TASK_SECRET_MAX_TOKEN_BYTES || !capability.startsWith(PREFIX))

@@ -19,7 +19,7 @@ import { editMemory } from '@/lib/coordinator/store'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { db } from '@/lib/db'
 import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, runChunks, teamIssuePromotions } from '@/lib/db/schema'
-import { deviceOnlineStates } from '@/lib/device-presence'
+import { deviceIsOnline } from '@/lib/device-presence'
 import type { IssueLabel } from '@/lib/issue-metadata'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
@@ -213,13 +213,12 @@ export async function searchIssues(userId: string, input: { query: string; statu
 }
 
 export async function listAgents(userId: string) {
-  const rows = await db.select({ id: agents.id, harness: agents.harness, deviceId: devices.id, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses })
+  const rows = await db.select({ id: agents.id, harness: agents.harness, deviceId: devices.id, deviceName: devices.name, enabled: devices.enabled, sessionOpenedAt: devices.sessionOpenedAt, sessionClosedAt: devices.sessionClosedAt, harnesses: devices.harnesses })
     .from(agents).innerJoin(devices, eq(devices.id, agents.deviceId))
     .where(and(eq(agents.userId, userId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(asc(devices.name), asc(agents.harness))
-  const presence = await deviceOnlineStates(rows.map(row => ({ id: row.deviceId, lastSeenAt: row.lastSeenAt })))
   return rows.filter(row => localExecutionHarnesses(row.harnesses).includes(row.harness)).map(row => ({
     id: row.id, harness: row.harness, deviceId: row.deviceId, device: row.deviceName,
-    deviceOnline: Boolean(row.enabled && presence.get(row.deviceId)),
+    deviceOnline: Boolean(row.enabled && deviceIsOnline(row)),
   }))
 }
 

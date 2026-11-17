@@ -83,7 +83,7 @@ test('team single-MD review, tenant-bound assignment and withdrawal use the exis
   await t.test('the actual authenticated receipt route accepts current Team support and refuses an old consumer',async()=>{
     const{issueDeviceToken}=await import('../device-link'),{GET}=await import('../../app/v1/runs/[runId]/skill-receipt/route')
     const token=await issueDeviceToken(member)
-    const get=(team:boolean)=>GET(new Request(`http://localhost/mikka/v1/runs/${first.id}/skill-receipt?receiptId=${receiptId}`,{headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${token}`,[SKILL_ARTIFACT_HEADER]:'1',...(team?{[TEAM_SKILL_HEADER]:'1'}:{})}}),{params:Promise.resolve({runId:first.id})})
+    const get=(team:boolean)=>GET(new Request(`http://localhost/mikka/v1/runs/${first.id}/skill-receipt?receiptId=${receiptId}`,{headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${token}`,[SKILL_ARTIFACT_HEADER]:'1',...(team?{[TEAM_SKILL_HEADER]:'1'}:{})}}),{params:Promise.resolve({runId:first.id})})
     assert.equal((await get(true)).status,200)
     assert.equal((await get(false)).status,409)
   })
@@ -101,8 +101,6 @@ test('team single-MD review, tenant-bound assignment and withdrawal use the exis
     assert.equal(event.count,1)
     assert.equal(Boolean(await verifyRunToken(new Request('http://localhost/mikka/api/mcp'),issued.token)),false)
     await assert.rejects(assignments.revalidate(member,first.id,receiptId,true,true),{code:'runUnavailable'})
-    const renewed=await assignments.renewHeartbeat(member,first.deviceId,[first.id],true,true)
-    assert.deepEqual(renewed.revoked,[first.id]);assert.deepEqual(renewed.leases,{})
     const fresh=await run()
     await assert.rejects(assignments.selectTeam(member,fresh.id,artifact.versionId),{code:'runUnavailable'})
     assert.equal((await store.list(memberScope)).length,0)

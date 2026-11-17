@@ -297,11 +297,11 @@ export async function checkOrderQuota(query: Query, scope: OrderScope, connectio
  * A run not yet ended counts toward its device's load (pickDevice).
  */
 export async function poolDevices(query: Query, ownerId: string): Promise<(PoolDevice & { lastSeenAt: number | null })[]> {
-  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
-    `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d.harnesses,d."deviceType",d."createdAt",
+  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; sessionOpenedAt: Date | null; sessionClosedAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
+    `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d."sessionOpenedAt",d."sessionClosedAt",d.harnesses,d."deviceType",d."createdAt",
       (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns"
     FROM devices d WHERE d."ownerId"=$1 AND d.kind='local' AND d."removedAt" IS NULL ORDER BY d."lastSeenAt" DESC NULLS LAST,d.id`, [ownerId])
-  const presence = await deviceOnlineStates(rows)
+  const presence = deviceOnlineStates(rows)
   return rows.map(row => ({
     id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [],
     server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(), lastSeenAt: row.lastSeenAt?.getTime() ?? null,

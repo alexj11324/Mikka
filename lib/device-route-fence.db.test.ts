@@ -61,12 +61,16 @@ test('every device route refuses a token revoked after authentication before it 
         const handler = route[method] as ((request: Request, context: { params: Promise<Record<string, string>> }) => Promise<Response>) | undefined
         if (!handler) continue
         const path = file.replace(/^app/, '').replace(/\/route\.ts$/, '').replaceAll('[deviceId]', device).replace(/\[[^\]]+\]/g, () => randomUUID())
-        const request = new Request(`http://127.0.0.1/mikka${path}?deviceId=${device}`, {
-          method, headers: { authorization: 'Bearer revoked', 'content-type': 'application/json' },
+        const request = (session: boolean) => new Request(`http://127.0.0.1/mikka${path}?deviceId=${device}`, {
+          method, headers: { authorization: 'Bearer revoked', 'content-type': 'application/json', ...(session ? { 'x-mikka-device-session': '1' } : {}) },
           ...(method === 'GET' ? {} : { body: JSON.stringify({ deviceId: device }) }),
         })
-        const params = Promise.resolve({ deviceId: device, runId: randomUUID(), captureId: randomUUID(), requestId: randomUUID() })
-        const response = await deviceRequestCaller.run(caller, () => handler(request, { params }))
+        const params = () => Promise.resolve({ deviceId: device, runId: randomUUID(), captureId: randomUUID(), requestId: randomUUID() })
+        // Decision 2026-11-17-2215: without the device session header, every device route answers 426 first.
+        const unsessioned = await deviceRequestCaller.run(caller, () => handler(request(false), { params: params() }))
+        assert.equal(unsessioned.status, 426, `${method} ${file} answered ${unsessioned.status} without the device session header`)
+        assert.equal((await unsessioned.json()).code, 'daemonUpgradeRequired')
+        const response = await deviceRequestCaller.run(caller, () => handler(request(true), { params: params() }))
         assert.ok(response.status >= 400, `${method} ${file} answered ${response.status} for a revoked token`)
         fenced.push(`${method} ${file} ${response.status}`)
       }

@@ -51,7 +51,7 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   const agent = (await pool.query(`insert into agents (id,"userId",harness,name) values (gen_random_uuid(),$1,'codex','a') returning id`, [admin])).rows[0].id as string
   // Output writes belong to a claimed live run, including its active lease.
   const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId","deviceTokenId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,$4,$5,'running',now()+interval '10 minutes') returning id`, [agent, admin, device, ws.id, claimTokenId])).rows[0].id as string
-  const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'x-mikka-device-session': '1', 'content-type': 'application/json' }, body: JSON.stringify(body) })
   /** The row is committed before Next's `after()` (the wake-up) runs; outside a request it throws. */
   const afterOnly = (error: unknown) => { if (!String((error as Error)?.message).includes('outside a request scope')) throw error }
   const noPlain = (label: string, text: string) => {

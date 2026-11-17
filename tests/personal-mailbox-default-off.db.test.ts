@@ -34,7 +34,7 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
   let runToken: string | undefined
   let deviceTokenCreated = false
   const tokenHash = (value: string) => createHash('sha256').update(value).digest('hex')
-  const request = (path: string, token?: string, body: unknown = {}, capabilityHeaders: Record<string, string> = {}) => new Request(`http://127.0.0.1:3100/mikka${path}`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}), ...capabilityHeaders }, body: JSON.stringify(body) })
+  const request = (path: string, token?: string, body: unknown = {}, capabilityHeaders: Record<string, string> = {}) => new Request(`http://127.0.0.1:3100/mikka${path}`, { method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...(token ? { authorization: `Bearer ${token}` } : {}), ...capabilityHeaders }, body: JSON.stringify(body) })
   const claimRequest = () => request(`/v1/devices/${deviceId}/runs/${runId}/claim`, deviceToken, {}, { [REPO_ORIGIN_HEADER]: '1', [SKILL_ARTIFACT_HEADER]: '1' })
   try {
     await assertDatabaseIdentity(pool, environment)
@@ -50,7 +50,7 @@ test('default-off claim, MCP and Coordinator work on the tracked schema with the
     // Seven nonce-owned synthetic fixture rows. The only generated credential
     // is a CI-only device token hash; claim issues its normal short-lived run token.
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [owner, `${owner}@example.invalid`])
-    await pool.query('insert into devices(id,"ownerId",name,kind,enabled,"protocolVersion",harnesses) values($1,$2,$3,\'local\',true,$4,$5::jsonb)', [deviceId, owner, 'Mailbox default-off CI', DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'codex', installed: true }])])
+    await pool.query('insert into devices(id,"ownerId",name,kind,enabled,"protocolVersion",harnesses,"sessionOpenedAt") values($1,$2,$3,\'local\',true,$4,$5::jsonb,now())', [deviceId, owner, 'Mailbox default-off CI', DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents(id,"userId",harness,name,"deviceId") values($1,$2,\'codex\',$3,$4)', [agentId, owner, 'Mailbox default-off CI', deviceId])
     await pool.query('insert into device_repos(id,"deviceId","userId","repoPath","remoteUrl") values($1,$2,$3,$4,$5)', [repoId, deviceId, owner, repository.key, repository.remoteUrl])
     const coordinatorFixture = await seedCoordinator(owner)

@@ -17,6 +17,9 @@ import type { RunRecoverySweep } from '@/lib/run-recovery-due'
  */
 export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => unknown, only?: ReadonlySet<RunRecoverySweep>) {
   const runs = (sweep: RunRecoverySweep) => !only || only.has(sweep)
+  // Backstop for a lost `disconnected` report, in the cron sweep only (no `only`):
+  // its existing cadence, no poll of its own. Ended leases are reclaimed just below.
+  const sessions = only ? null : await (await import('./device-session')).closeLostDeviceSessions().catch(() => null)
   const leases = runs('leases') ? await sweepExpiredRunLeases() : null
   // Bot computers whose sandbox E2B no longer has stop claiming to run.
   const machines = runs('machines') ? await reconcileCloudMachines(pool).catch(() => null) : null
@@ -28,10 +31,10 @@ export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => 
   const taskMachines = runs('taskMachines') ? await reconcileDueThreadMachines(pool).catch(() => null) : null
   // Sandboxes of deleted workspaces whose kill did not go through are killed again.
   const sandboxKills = runs('sandboxKills') ? await retrySandboxKills(pool).catch(() => null) : null
-  // Durable task progress, independent of heartbeat or an open client.
+  // Durable task progress, independent of a device session or an open client.
   const tasks = runs('tasks') ? await (await import('@/lib/factory/watchdog')).sweepFactoryWatchdog(pool).catch(() => null) : null
   // Group turns left queued when their request ended: they no longer wait for someone to read the group.
   const started = Date.now()
   if (runs('groupTurns')) await groupTurns(() => resumePendingGroupTurns(started + 220000).catch(() => console.error('Group turn sweep failed')))
-  return { ...(leases ?? { owners: 0, failed: 0 }), machines, outcomes, reviewSessions, taskMachines, sandboxKills, tasks }
+  return { ...(leases ?? { owners: 0, failed: 0 }), sessions, machines, outcomes, reviewSessions, taskMachines, sandboxKills, tasks }
 }

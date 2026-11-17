@@ -35,7 +35,7 @@ export async function provisionCloudDevice(pool: Pool, actor: { userId: string; 
   } finally { client.release() }
 }
 
-/** Replace a near-expiry worker token over its authenticated heartbeat. The
+/** Replace a near-expiry worker token over its authenticated report (`rotateCloudCredential`). The
  * previous token remains valid until its own expiry so a lost response can
  * be retried without disconnecting a live task. */
 export async function renewCloudDeviceToken(pool: Pool, actor: { userId: string; workspaceId: string; deviceId: string; tokenId: string }) {

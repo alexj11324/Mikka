@@ -19,7 +19,7 @@ import { agents, agentRuns, bots, coordinatorEvents, deviceRepos, devices, issue
 import { ensureDeviceRepository } from '@/lib/device-repositories'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runWaitingDeviceId } from '@/lib/run-waiting-for'
-import { deviceOnlineStates } from '@/lib/device-presence'
+import { deviceSessionOpen } from '@/lib/device-presence'
 import { daemonTestMode, normalizeRepository } from '@mikka/protocol/repository'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { workspaceRunView } from '@/lib/run-visibility'
@@ -415,17 +415,15 @@ export async function visibleRuns(reader: IssueReader, input: RunListFilter & { 
   if (input.runIds && (!input.runIds.length || input.runIds.some(id => !z.uuid().safeParse(id).success))) return []
   const visible = await runVisibilityPredicate(reader)
   const rows = await db.select({ ...(input.brief ? runBriefViewColumns : runViewColumns),
-    failureDetails: input.brief ? runFailureBrief : sql<RunFailure | CompactRunFailure | null>`case when ${agentRuns.userId}=${userId} then ${agentRuns.failureDetails} else ${runFailureBrief} end`, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, lastSeenAt:devices.lastSeenAt, deviceEnabled:devices.enabled }).from(agentRuns)
+    failureDetails: input.brief ? runFailureBrief : sql<RunFailure | CompactRunFailure | null>`case when ${agentRuns.userId}=${userId} then ${agentRuns.failureDetails} else ${runFailureBrief} end`, ownerId: agentRuns.userId, waitDeviceId: agentRuns.deviceId, deviceOnline: sql<boolean>`coalesce(${deviceSessionOpen}, false)`, deviceEnabled:devices.enabled }).from(agentRuns)
     .innerJoin(agents, eq(agents.id, agentRuns.agentId)).leftJoin(issues, eq(issues.id, agentRuns.issueId)).leftJoin(devices,eq(devices.id,agentRuns.deviceId))
     .where(and(
       visible,
       runListFilter(input),
       input.runIds ? inArray(agentRuns.id, input.runIds) : undefined,
     )).orderBy(desc(agentRuns.createdAt), desc(agentRuns.id)).limit(Math.max(1, Math.min(input.limit ?? 20, 100)))
-  const presence = await deviceOnlineStates(rows.flatMap(row => row.ownerId === userId && row.status === 'queued' && row.waitDeviceId
-    ? [{ id: row.waitDeviceId, lastSeenAt: row.lastSeenAt }] : []))
-  return rows.map(({ ownerId, waitDeviceId, lastSeenAt, deviceEnabled, ...run }) => {
-    const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, lastSeenAt, deviceEnabled, deviceOnline: waitDeviceId ? presence.get(waitDeviceId) : undefined })
+  return rows.map(({ ownerId, waitDeviceId, deviceOnline, deviceEnabled, ...run }) => {
+    const waitFor = runWaitingDeviceId(userId, { ownerId, status: run.status, deviceId: waitDeviceId, deviceEnabled, deviceOnline })
     return ownerId === userId ? { ...run, failureDetails: input.brief ? readCompactRunFailure(run.failureDetails) : readRunFailure(run.failureDetails), ...(waitFor ? { waitFor } : {}) } : workspaceRunView(run)
   })
 }

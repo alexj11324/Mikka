@@ -12,7 +12,9 @@ export const PRESENCE_ONLINE_MS = 90_000
 const WATCH_ID = /^[a-zA-Z0-9_-]{1,64}$/
 
 /** The existing authorized read supplies only owned device ids and the state it
- * showed. A legacy heartbeat remains online until its already-known deadline. */
+ * showed. Presence is the device session (decision 2026-11-17-2215), so the
+ * third field, a retired heartbeat deadline, is always 0; it stays in the wire
+ * shape the gateway reads. */
 export type PresenceDevice = readonly [id: string, online: boolean, heartbeatUntil: number]
 export type PresenceGrant = { channel: string; home: string; expiresAt: number; devices: PresenceDevice[] }
 export type PresenceProof = { token: string; expiresAt: number }

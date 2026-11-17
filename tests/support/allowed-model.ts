@@ -24,7 +24,7 @@ export async function seedAllowedModel(pool: Pool, userId: string, options: { wo
     [connection, userId, workspaceId, `fixture-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: [ALLOWED_MODEL] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .1, resetsAt: null }] })])
   await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa',$5)`, [randomUUID(), userId, workspaceId, connection, ALLOWED_MODEL])
   for (const deviceId of options.deviceIds ?? []) {
-    await pool.query(`UPDATE devices SET harnesses=$2,enabled=true,"lastSeenAt"=coalesce("lastSeenAt",now()) WHERE id=$1`, [deviceId, JSON.stringify(codexWithModel)])
+    await pool.query(`UPDATE devices SET harnesses=$2,enabled=true,"lastSeenAt"=coalesce("lastSeenAt",now()),"sessionOpenedAt"=coalesce("sessionOpenedAt",now()) WHERE id=$1`, [deviceId, JSON.stringify(codexWithModel)])
   }
   return { workspaceId, connectionId: connection }
 }

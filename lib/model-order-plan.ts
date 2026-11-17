@@ -58,7 +58,7 @@ export interface PoolDevice {
   activeRuns: number
   /** When it joined (ms): the earlier goes first on a tie. */
   joinedAt: number
-  /** Last heartbeat; server reads normalize it to ms for the settings view. */
+  /** Last time the device was heard from (shown as "last seen"); server reads normalize it to ms. */
   lastSeenAt?: Date | string | number | null
   harnesses: readonly Pick<HarnessInfo, 'harness' | 'installed' | 'models' | 'modelSlots' | 'subscriptionBroker' | 'subscriptionModelCatalogue' | 'subscriptionPreflight'>[]
 }

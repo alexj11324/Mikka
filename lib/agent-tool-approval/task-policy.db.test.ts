@@ -128,7 +128,7 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
   await new Promise<void>(resolve => server!.listen(0, '127.0.0.1', resolve))
   const address = server.address() as { port: number }
   const checkHTTP = (policyRevision: string, runId = a.run) => fetch(`http://127.0.0.1:${address.port}/v1/runs/${runId}/tool-approval`, {
-    method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
     body: JSON.stringify({ operation: 'check', deviceId: device, policyRevision }),
   })
   await t.test('human settings retain same-origin, fresh-session and tenant checks for browser and native callers', async () => {
@@ -154,7 +154,7 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     assert.equal((await readSettings({})).status, 401)
   })
   await t.test('signed policy HTTP context and renewal bind the current run and retain final restrictions', async () => {
-    const issuer=`http://127.0.0.1:${address.port}`,url=`${issuer}/v1/runs/${a.run}/policy-snapshot`,auth={'x-mikka-client-version':'0.0.456',authorization:`Bearer ${token}`,'content-type':'application/json'}
+    const issuer=`http://127.0.0.1:${address.port}`,url=`${issuer}/v1/runs/${a.run}/policy-snapshot`,auth={'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${token}`,'content-type':'application/json'}
     const current=await read(a.run),context=policyDistributionContext(issuer,owner,device,a.run,current)
     const finalPolicy={...current.policy,readOnly:true,permissions:{...current.policy.permissions,computer_use:'deny' as const}}
     const expired=issuePolicySnapshot(context,finalPolicy,Date.now()-POLICY_SNAPSHOT_TTL_MS-1000)
@@ -178,7 +178,7 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     await pool.query(`INSERT INTO cloud_machines("workspaceId","ownerId","deviceId","operationId") VALUES($1,$2,$3,$4)`,[workspaceA,owner,device,randomUUID()])
     await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1,$2,$3,$4,$5,now()+interval '5 minutes')`,[scopedId,owner,createHash('sha256').update(scopedToken).digest('hex'),device,workspaceA])
     try {
-      const scoped={authorization:`Bearer ${scopedToken}`,'content-type':'application/json'}
+      const scoped={authorization:`Bearer ${scopedToken}`,'x-mikka-device-session':'1','content-type':'application/json'}
       assert.equal((await fetch(`${url}?deviceId=${device}`,{headers:scoped})).status,200)
       const cloudCurrent=await read(a.run),cloudContext=policyDistributionContext(issuer,owner,device,a.run,cloudCurrent)
       const cloudSnapshot=issuePolicySnapshot(cloudContext,{...cloudCurrent.policy,readOnly:true})
@@ -234,7 +234,7 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     await assert.rejects(capture(source.run, 'foreign-owner'), /agentPolicyUnavailable/)
     const finalPolicy = intersectRunPolicy({ ...current.policy, permissions: { ...current.policy.permissions, git_push: 'allow', computer_use: 'allow' } }, ceiling)
     const issuer = `http://127.0.0.1:${address.port}`, url = `${issuer}/v1/runs/${child.run}/policy-snapshot`
-    const auth = { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' }
+    const auth = { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' }
     const context = policyDistributionContext(issuer, owner, device, child.run, current)
     const expired = issuePolicySnapshot(context, finalPolicy, Date.now() - POLICY_SNAPSHOT_TTL_MS - 1000)
     const renew = () => fetch(url, { method: 'POST', headers: auth, body: JSON.stringify({ deviceId: device, snapshot: expired }) })
@@ -478,7 +478,7 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
       assert.notEqual(changed.revision,before.revision)
       assert.notEqual(issuePolicySnapshot(policyDistributionContext(origin,owner,device,subject.run,changed),changed.policy).payload.policyHash,snapshot.payload.policyHash)
       assert.equal(await store.check(actor,subject.run,before.revision),false)
-      assert.equal((await fetch(`${origin}/v1/runs/${subject.run}/policy-snapshot`,{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({deviceId:device,snapshot})})).status,409)
+      assert.equal((await fetch(`${origin}/v1/runs/${subject.run}/policy-snapshot`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${token}`,'content-type':'application/json'},body:JSON.stringify({deviceId:device,snapshot})})).status,409)
       const reverted=await publish(subject.run,'project',{defaults:projectDefaults})
       assert.notEqual(reverted.revision,before.revision)
       const readResponse=await fetch(`${origin}/api/agent-cli-policy`,{method:'POST',headers:{cookie:'owner=1',origin,'content-type':'application/json'},body:JSON.stringify({operation:'read',runId:subject.run})})

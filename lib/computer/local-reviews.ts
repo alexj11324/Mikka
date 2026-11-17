@@ -5,7 +5,10 @@ import { checkedLocalReview } from '@/lib/cua/local-review'
 import type { LocalComputerRequest } from '@mikka/protocol/computer'
 
 /** Local snapshots keep their audit rows; disappearing requests expire without
- * deleting history. This route never addresses a cloud desktop. */
+ * deleting history. This route never addresses a cloud desktop. A request stays
+ * open to a person's decision while the daemon still holds it (its last
+ * snapshot) and its device session is open (decision 2026-11-17-2215): the
+ * daemon syncs only on a change, a push or a new session, not on a timer. */
 export async function syncLocalComputerReviews(pool: Pool, deviceId: string, userId: string, snapshots: LocalComputerRequest[]) {
   const rows = snapshots.map(row => checkedLocalReview(row, Date.now()))
   if (rows.length > 20 || new Set(rows.map(row => row.id)).size !== rows.length || rows.some(row => row.display !== undefined)) throw new Error('Invalid local snapshot')
@@ -22,15 +25,15 @@ export async function syncLocalComputerReviews(pool: Pool, deviceId: string, use
         VALUES ($1,$2,$3,$4,$5,NULL,$6,$7,$8,now()) ON CONFLICT (id) DO UPDATE SET "seenAt"=now()
         WHERE local_computer_reviews."deviceId"=EXCLUDED."deviceId" AND local_computer_reviews."runId"=EXCLUDED."runId"
           AND local_computer_reviews."userId"=EXCLUDED."userId" AND local_computer_reviews.digest=EXCLUDED.digest
-          AND local_computer_reviews."seenAt">now()-interval '10 seconds' RETURNING id`,
+          AND local_computer_reviews."seenAt"<>'-infinity'::timestamptz RETURNING id`,
       [row.id, deviceId, row.runId, userId, row.target, JSON.stringify(row.call), row.digest, new Date(row.expiresAt)])
       if (!inserted.rowCount) throw new Error('Local review changed or expired')
     }
-    // Runs every second per daemon: only rows not yet expired, never the device's whole review history again.
+    // A request the daemon no longer holds is retired; only rows not yet expired, never the device's whole review history again.
     await client.query(`UPDATE local_computer_reviews SET "seenAt"='-infinity'::timestamptz
       WHERE "deviceId"=$1 AND "userId"=$2 AND display IS NULL AND "seenAt"<>'-infinity'::timestamptz AND NOT (id=ANY($3::uuid[]))`, [deviceId, userId, rows.map(row => row.id)])
     const result = await client.query(`SELECT id,digest,decision AS approve FROM local_computer_reviews WHERE "deviceId"=$1 AND "userId"=$2
-      AND id=ANY($3::uuid[]) AND decision IS NOT NULL AND "expiresAt">now() AND "seenAt">now()-interval '10 seconds'`, [deviceId, userId, rows.map(row => row.id)])
+      AND id=ANY($3::uuid[]) AND decision IS NOT NULL AND "expiresAt">now() AND "seenAt"<>'-infinity'::timestamptz`, [deviceId, userId, rows.map(row => row.id)])
     await client.query('COMMIT')
     return result.rows
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
@@ -47,7 +50,7 @@ export async function pendingLocalComputerReviews(pool: Pool, userId: string) {
     WHERE v."userId"=$1 AND d.kind='local' AND d.enabled=true AND v.display IS NULL
       AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id)
       AND coalesce(p.permission,'ask') IN ('allow','ask')
-      AND v.decision IS NULL AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds'
+      AND v.decision IS NULL AND v."expiresAt">now() AND v."seenAt"<>'-infinity'::timestamptz AND (d."sessionOpenedAt" IS NOT NULL AND (d."sessionClosedAt" IS NULL OR d."sessionClosedAt" < d."sessionOpenedAt"))
       AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()
       AND r.status=ANY($2::text[]) ORDER BY v."seenAt" LIMIT 20`,
   [userId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows
@@ -67,7 +70,7 @@ export async function decideLocalComputerReview(pool: Pool, userId: string, id: 
       WHERE v.id=$1 AND v.digest=$2 AND v."userId"=$3 AND d.kind='local' AND d.enabled=true
         AND v.display IS NULL AND NOT EXISTS (SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id)
         AND coalesce(p.permission,'ask') IN ('allow','ask')
-        AND v.decision IS NULL AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds'
+        AND v.decision IS NULL AND v."expiresAt">now() AND v."seenAt"<>'-infinity'::timestamptz AND (d."sessionOpenedAt" IS NOT NULL AND (d."sessionClosedAt" IS NULL OR d."sessionClosedAt" < d."sessionOpenedAt"))
         AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now() AND r.status=ANY($4::text[])
       FOR UPDATE OF r,d,v`, [id, digest, userId, ['running', 'preparing', 'waiting_input', 'finishing']])
     if (!found.rowCount) { await client.query('COMMIT'); return false }

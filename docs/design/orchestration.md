@@ -33,7 +33,7 @@
 | **Machine (电脑)** | Where an Agent runs: **Mikka Cloud** (a sandbox on the run owner's own E2B key) or a **device** (a personal computer running the desktop app, or a server running the daemon). Both are **runners** with one contract (§3). |
 | **Mikka Cloud** | The cloud machine. It is a **machine**, never a model. Mikka hosts no sandbox of its own. |
 | **Environment** | Where the task executes. Its own cloud VM can be retained across authorized attempts; local runs keep their task worktree (§5). |
-| **Lease** | A machine's time-limited claim on a run, renewed by heartbeat (ADR 0012). |
+| **Lease** | A machine's claim on a run. It lasts as long as the device session that claimed it and ends when that session closes (ADR 0012, [decision 2026-11-17-2215](decisions/2026-11-17-2215-device-session-no-heartbeat.md)). |
 
 Never write 「Mikka Cloud」 for the hosted model, and never write
 「Mikka 默认」 for the machine.
@@ -269,8 +269,8 @@ not block a person viewing or taking over their own Bot's desktop
 
 The server admits the run and freezes its model, credential, machine and
 payer. During machine preparation or the initial claim it delivers that
-assignment and the credentials the task needs. The runner executes directly,
-renews its scheduling lease through the existing heartbeat, and reports
+assignment and the credentials the task needs. The runner executes directly
+while it holds its device session, which keeps its scheduling lease, and reports
 completion. A persisted stop is delivered through the control channel; cloud
 reclamation is also available when the task must end.
 
@@ -284,8 +284,9 @@ reclamation is also available when the task must end.
 - **Concurrency.** Threads run in parallel. The runs of one thread run one at
   a time. There are no Mikka machine caps: the owner's own E2B account sets
   the limit.
-- **Leases.** A claimed run holds a lease that the heartbeat renews. When a
-  lease runs out because the machine is gone, the run is placed again by §4,
+- **Leases.** A claimed run holds a lease for as long as its device's gateway
+  session stays open; the gateway's `disconnected` report ends it. When a
+  lease ends because the machine is gone, the run is placed again by §4,
   keeping its frozen model and credential.
 - **No machine.** A run is created only once a machine is chosen; with none,
   the bot warns at once with the action card (§4).

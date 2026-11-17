@@ -161,7 +161,7 @@ test(
         [sessionId, `fixture-${randomUUID()}`],
       );
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,'owner','Fixture device',true,now(),'[{"harness":"codex","installed":true}]')`,
+        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,'owner','Fixture device',true,now(),'[{"harness":"codex","installed":true}]',now())`,
         [deviceId],
       );
       await pool.query(
@@ -183,7 +183,7 @@ test(
         // This fixture represents an online daemon. Refresh its heartbeat for
         // each case so earlier database cases cannot age it past the real
         // liveness window before a later continuation is claimed.
-        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId]);
+        await pool.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [deviceId]);
         const issueId = randomUUID(),
           eventId = randomUUID(),
           questionId = randomUUID();
@@ -366,7 +366,7 @@ test(
           const f = await fixture('context',true,async () => undefined,workspaceId);
           const botId=randomUUID(),childDevice=randomUUID(),childRepo=randomUUID(),connectionId=randomUUID(),credentialId=randomUUID();
           await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,'Cloud fixture')`,[botId,workspaceId,userId]);
-          await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,$2,'Task VM','cloud',now(),'[{"harness":"codex","installed":true}]')`,[childDevice,userId]);
+          await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,$2,'Task VM','cloud',now(),'[{"harness":"codex","installed":true}]',now())`,[childDevice,userId]);
           await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,'main')`,[childRepo,childDevice,userId,target.repoPath,target.remoteUrl]);
           await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",state,epoch,provider,"secretName","providerSubject","secretDigest") VALUES($1,$2,$3,'connected',2,'codex','synthetic-secret-reference-' || $1::uuid::text,'synthetic-subject',repeat('a',64))`,[connectionId,userId,workspaceId]);
           await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,$4,$5,2,'codex_cli','fixture-model')`,[credentialId,userId,workspaceId,agentId,connectionId]);
@@ -1046,20 +1046,21 @@ test(
         },
       );
       await t.test(
-        "answer and heartbeat share scope-before-run lock order",
+        "answer and Skill revalidation share scope-before-run lock order",
         { timeout: 15000 },
         async () => {
           const f = await fixture();
-          const [answer, heartbeat] = await Promise.all([
+          const [answer, revalidated] = await Promise.allSettled([
             questions.answer(orchestrator, facts(f)),
-            assignments.renewHeartbeat(userId, deviceId, [f.runId], true),
+            assignments.revalidate(userId, f.runId, randomUUID(), true),
           ]);
           assert.equal(await queued(f.issueId), 1);
-          assert.deepEqual(heartbeat.revoked, [f.runId]);
+          assert.equal(revalidated.status, "rejected");
+          assert.equal(answer.status, "fulfilled");
           const selection = (
             await pool.query(
               'SELECT * FROM improvement_skill_selections WHERE "runId"=$1',
-              [answer.continuationRunId],
+              [answer.status === "fulfilled" ? answer.value.continuationRunId : null],
             )
           ).rows[0];
           assert.equal(selection.versionId, BASELINE_ARTIFACT.versionId);

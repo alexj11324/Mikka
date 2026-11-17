@@ -49,7 +49,7 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
   await pool.query(await readFile(new URL('20261029044008_improvement_skill_assignments.sql',dir),'utf8'))
   const userId=`synthetic-${randomUUID()}`,issueId=randomUUID(),agentId=randomUUID(),deviceId=randomUUID(),repoId=randomUUID()
   await pool.query(`INSERT INTO issues(id,"userId","workspaceId",title,content,status,priority) VALUES($1,$2,$3,'Synthetic rehearsal','{}','todo','normal')`,[issueId,userId,await seedFixtureWorkspace(pool,userId)])
-  await pool.query(`INSERT INTO devices(id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES($1,$2,'Synthetic device',true,now(),'[{"harness":"codex","installed":true}]')`,[deviceId,userId])
+  await pool.query(`INSERT INTO devices(id,"ownerId",name,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,$2,'Synthetic device',true,now(),'[{"harness":"codex","installed":true}]',now())`,[deviceId,userId])
   await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,$2,'Synthetic agent','codex',$3)`,[agentId,userId,deviceId])
   await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","verifyCommand") VALUES($1,$2,$3,'/synthetic/mikka','node acceptance.mjs')`,[repoId,deviceId,userId])
   let allowed=true
@@ -170,22 +170,10 @@ test('PG17/HTTP assignment provenance and existing Factory gates', {skip:!databa
     const again=await Promise.all(Array.from({length:10},()=>assignments.recordClaim(userId,deviceId,firstRun,leaseExpiresAt,true)))
     assert.ok(again.every(item=>item.skillReceipt?.id===prepared.skillReceipt.id))
     assert.equal((await assignments.revalidate(userId,firstRun,firstReceiptId,true)).skillReceipt.id,firstReceiptId)
-    assert.deepEqual((await assignments.renewHeartbeat(userId,deviceId,[firstRun],false)).revoked,[firstRun])
-    assert.ok((await assignments.renewHeartbeat(userId,deviceId,[firstRun],true)).leases[firstRun])
+    await assert.rejects(assignments.revalidate(userId,firstRun,firstReceiptId,false),/workerCapabilityRequired/)
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1',[firstRun])
     await assert.rejects(assignments.revalidate(userId,firstRun,firstReceiptId,true),/runUnavailable/)
-    assert.deepEqual((await assignments.renewHeartbeat(userId,deviceId,[firstRun],true)).revoked,[firstRun])
     await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1',[firstRun])
-    let release!:()=>void,entered!:()=>void
-    const gate=new Promise<void>(resolve=>{release=resolve}),started=new Promise<void>(resolve=>{entered=resolve})
-    const guarded=createSkillAssignments(pool,async(u,i)=>{entered();await gate;return authorize(u,i)})
-    const pending=guarded.renewHeartbeat(userId,deviceId,[firstRun],true);await started
-    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=now() WHERE id=$1',[firstRun])
-    release();const stopped=await pending
-    assert.deepEqual(stopped.revoked,[firstRun]);assert.equal(stopped.leases[firstRun],undefined)
-    await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1',[firstRun])
-    const heartbeats=await Promise.all(Array.from({length:10},()=>assignments.renewHeartbeat(userId,deviceId,[firstRun],true)))
-    assert.ok(heartbeats.every(value=>Boolean(value.leases[firstRun])))
     verifySkillAssignment({runId:firstRun,issueId,deviceId,repoId,baseBranch:'main',harness:'codex',prompt:'fixture',leaseExpiresAt,...prepared})
     await assert.rejects(assignments.recordClaim(userId,deviceId,firstRun,leaseExpiresAt,false),/workerCapabilityRequired/)
     await assert.rejects(pool.query(`UPDATE improvement_skill_versions SET markdown='tampered'`),/immutable/)

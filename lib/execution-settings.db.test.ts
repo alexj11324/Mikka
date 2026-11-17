@@ -36,7 +36,7 @@ test(
         namedExports: { hostedPointsRefusal: async () => null, pointsFallback: async () => null, hostedPointsHere: async () => ({ points: 98 }) },
       });
       await pool.query(`CREATE TABLE "user" (id text PRIMARY KEY); INSERT INTO "user" VALUES ('alice'),('bob');
-      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
+      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,kind text,"removedAt" timestamptz,"lastSeenAt" timestamptz,"sessionOpenedAt" timestamptz,"sessionClosedAt" timestamptz,enabled boolean,"autoSchedule" boolean,"deviceType" text,name text,harnesses jsonb,"createdAt" timestamptz DEFAULT now());
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"archivedAt" timestamptz);
       CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,kind text NOT NULL DEFAULT 'team' CHECK (kind IN ('personal','team')));
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid,"userId" text,name text,status text);
@@ -103,7 +103,7 @@ test(
         binding = randomUUID(),
         connection = randomUUID();
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",kind,enabled,"autoSchedule","lastSeenAt",harnesses) VALUES ($1,'alice','local',true,true,now(),'[{"harness":"codex","installed":true,"models":["explicit-model"],"defaultModelSlot":"default","modelSlots":[{"slot":"default","model":"explicit-model","name":"Explicit model"}]}]'),($2,'bob','local',true,true,now(),'[]')`,
+        `INSERT INTO devices (id,"ownerId",kind,enabled,"autoSchedule","lastSeenAt","sessionOpenedAt",harnesses) VALUES ($1,'alice','local',true,true,now(),now(),'[{"harness":"codex","installed":true,"models":["explicit-model"],"defaultModelSlot":"default","modelSlots":[{"slot":"default","model":"explicit-model","name":"Explicit model"}]}]'),($2,'bob','local',true,true,now(),now(),'[]')`,
         [own, foreign],
       );
       await pool.query("INSERT INTO bots VALUES ($1,$2,$3)", [

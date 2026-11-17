@@ -85,7 +85,7 @@ test('a cloud run\'s subscription context read stays within its statement budget
   await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject",quota,"modelCatalog") VALUES ($1,$2,$3,'claude','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
     [connectionId, userId, workspaceId, `synthetic-${connectionId}`, 'a'.repeat(64), JSON.stringify(quota), JSON.stringify({ revision: '1', models: [model] })])
   const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), remote = `https://github.com/mikka-ci/route-queries-${randomUUID()}.git`
-  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Runner','cloud',true,$3,now(),$4)`, [deviceId, userId, DAEMON_PROTOCOL_VERSION, JSON.stringify(harnesses)])
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Runner','cloud',true,$3,now(),$4,now())`, [deviceId, userId, DAEMON_PROTOCOL_VERSION, JSON.stringify(harnesses)])
   await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'claude_code\',$4)', [agentId, userId, deviceId, `synthetic-${agentId}`])
   await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, userId, normalizeRepository(remote).key, remote])
   const sealed = sealSecret('synthetic-e2b-fixture', userE2bKeyAad(userId))
@@ -97,7 +97,7 @@ test('a cloud run\'s subscription context read stays within its statement budget
   await bindAgentToConnection(pool, { ownerId: userId, workspaceId }, agentId, 'claude_code', connectionId, model)
   const queued = await queueCloudRun(pool, { userId, workspaceId }, { botId, issueId, agentId, deviceRepoId: repoId, title: 'Read', body: '', model, readOnly: true })
   const worker = await threadMachines.start({ userId, workspaceId }, queued.runId)
-  const headers = { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${worker.token}` }
+  const headers = { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${worker.token}` }
   const params = { params: Promise.resolve({ deviceId: worker.deviceId, runId: queued.runId }) }
   const claim = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${worker.deviceId}/runs/${queued.runId}/claim`, { method: 'POST', headers: { ...headers, [REPO_ORIGIN_HEADER]: '1' } }), params)
   assert.equal(claim.status, 200, JSON.stringify(await claim.clone().json()))

@@ -83,13 +83,13 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
     await clear()
   })
 
-  await t.test('a queued retry is due when its device stops being seen, then re-checked each minute', async () => {
-    const device = randomUUID(), seen = new Date(Date.now() - 20_000)
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt") VALUES ($1,'owner','Device',$2)`, [device, seen])
+  await t.test('a queued retry is not due while its device holds a session, and due at once when the session closes', async () => {
+    const device = randomUUID()
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,"sessionOpenedAt") VALUES ($1,'owner','Device',now())`, [device])
     await run({ status: 'queued', retryOf: randomUUID(), deviceId: device })
-    assert.equal(await due(), seen.getTime() + 60_000 + 1)
-    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '5 minutes'`)
-    near(await due(), await dbNow() + 60_000)
+    assert.equal(await due(), null, 'no presence clock to wait for: the session report arms the timer')
+    await pool.query(`UPDATE devices SET "sessionClosedAt"=clock_timestamp()`)
+    near(await due(), await dbNow())
     await clear()
   })
 

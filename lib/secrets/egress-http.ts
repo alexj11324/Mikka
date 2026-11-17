@@ -1,5 +1,6 @@
-// Bounded HTTPS data plane for third-party secrets only. No DB, provider/GitHub
-// proxy, remote authorization preflight, cookie jar, or redirect following.
+// Bounded HTTPS data plane for third-party secrets only. One read of the live
+// run per request (lib/secrets/egress-binding.ts); no provider/GitHub proxy,
+// remote authorization preflight, cookie jar, or redirect following.
 import { lookup } from 'node:dns/promises'
 import { request as httpsRequest, type RequestOptions } from 'node:https'
 import { BlockList, isIP, type LookupFunction } from 'node:net'
@@ -61,7 +62,11 @@ export interface EgressHttpOptions {
   signal?: AbortSignal
   resolve?: (hostname: string) => Promise<LookupAddress[]>
   transport?: (target: EgressHttpTarget, signal: AbortSignal) => Promise<EgressUpstreamResponse>
+  /** Whether the capability's run still holds it; defaults to the database check. */
+  bindingActive?: (claims: EgressCapabilityClaims) => Promise<boolean>
 }
+
+const liveBinding = async (claims: EgressCapabilityClaims) => (await import('./egress-binding')).egressBindingActive(claims)
 
 function requestTarget(claims: EgressCapabilityClaims, input: EgressHttpRequest): Omit<EgressHttpTarget, 'address'> {
   if (!input || typeof input !== 'object' || Object.keys(input).some(key => !['capability', 'method', 'path', 'headers', 'bodyBase64'].includes(key))
@@ -225,6 +230,9 @@ export async function executeEgressRequest(input: EgressHttpRequest, expected: P
   const now = options.now ?? Date.now
   const claims = openEgressCapability(input.capability, expected, now(), options.env)
   const target = requestTarget(claims, input)
+  // Revocation is checked here, at use: a stopped run, an ended lease or a
+  // closed device session refuses the request before any upstream connection.
+  if (!await (options.bindingActive ?? liveBinding)(claims)) throw egressError('expired_capability')
   if (activeRequests >= MAX_CONCURRENT_REQUESTS) throw egressError('limit_exceeded')
   activeRequests++
   const controller = new AbortController()

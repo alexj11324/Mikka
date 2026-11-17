@@ -298,7 +298,7 @@ test('background Factory transactions use persisted tenants before the APP pool 
   })
 
   const deviceId = randomUUID()
-  await controls.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt") VALUES($1,$2,\'Background local fixture\',\'local\',true,3,now())', [deviceId, owner])
+  await controls.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt","sessionOpenedAt") VALUES($1,$2,\'Background local fixture\',\'local\',true,3,now(),now())', [deviceId, owner])
   const run = async (workspaceId: string | null) => {
     const id = randomUUID()
     await controls.query('INSERT INTO agent_runs(id,"userId","workspaceId","agentId","deviceId",status,prompt) VALUES($1,$2,$3,$4,$5,\'queued\',\'Synthetic claim; no executor\')', [id, owner, workspaceId, agentId, deviceId])

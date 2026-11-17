@@ -1,5 +1,5 @@
 // What happens to a run whose device went offline. The claim and every device
-// heartbeat give a run a lease (RUN_LEASE_MS); a run whose lease ran out has
+// device session give a run a lease (SESSION_LEASE_MS); a run whose lease ran out has
 // lost its machine. That is an infrastructure failure, so the run is queued
 // again as a new run, up to MAX_RUN_ATTEMPTS in all. A run the agent itself
 // ended (error, timeout, a failed verify) is never retried here: running it

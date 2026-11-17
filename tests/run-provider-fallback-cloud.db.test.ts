@@ -169,8 +169,8 @@ test('cloud provider recovery keeps the thread\'s Agent, preserves scope and use
     assert.equal(admitted.agentDefinition.allowLocalRecovery, undefined)
     // A usable local alternative makes staying in cloud a meaningful fence.
     const localDeviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt")
-      VALUES ($1,$2,'Available local fixture','local',true,$3,now())`, [localDeviceId, userId, JSON.stringify([workers[otherAgent ? 1 : 0]])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt","sessionOpenedAt")
+      VALUES ($1,$2,'Available local fixture','local',true,$3,now(),now())`, [localDeviceId, userId, JSON.stringify([workers[otherAgent ? 1 : 0]])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,'Local fixture')`, [randomUUID(), userId, localDeviceId, secondHarness])
     const local = await resolveModelDispatch(pool, scope, { harness: secondHarness, model: secondModel }, 'local')
     assert.ok(local.kind === 'device' && local.deviceId === localDeviceId && local.model === entries[1].model)
