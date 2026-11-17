@@ -2,39 +2,49 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { DriveError } from './store'
-import { driveFileLinkUrl, type DriveLocation } from './location'
-import type { DriveFileLink, DriveFileLinkPage, DriveFileLinkVisibility, DriveWorkspaceFileLinkPage } from './contract'
+import { driveFileLocation, driveFileLinkUrl, type DriveLocation } from './location'
+import type { DriveFileLinkDetails, DriveFileLinkPage, DriveFileLinkVisibility, DriveWorkspaceFileLinkPage } from './contract'
 
 type Database = Pick<PoolClient, 'query'>
+type LinkRow = Omit<DriveFileLinkDetails, 'url'>
 
-/** A retry by the same person keeps its original link and chosen visibility. */
-export async function createDriveFileLink(database: Database, volumeId: string, path: string, creator: string): Promise<DriveFileLink> {
-  const { rows: [link] } = await database.query<DriveFileLink>(`INSERT INTO drive_file_links(id,"volumeId",path,"createdBy")
-    SELECT $1,e."volumeId",e.path,$4 FROM drive_volume_entries e JOIN drive_volumes v ON v.id=e."volumeId"
-    WHERE e."volumeId"=$2 AND e.path=$3 AND v."archivedAt" IS NULL FOR SHARE OF e,v
-    ON CONFLICT ("volumeId",path,"createdBy") DO UPDATE SET "createdBy"=EXCLUDED."createdBy"
-    RETURNING id,path,visibility`, [randomUUID(), volumeId, path, creator])
-  if (!link) throw new DriveError('drive_not_found', 404)
-  return link
+// All file-level reads and writes return the same stored row. A missing
+// historical timestamp stays null, including after an idempotent create.
+const linkFields = `l.id,l."volumeId",l.path,l.visibility,l."createdBy"=$2 AS manageable,
+  (SELECT nullif(trim(u.name),'') FROM "user" u WHERE u.id=l."createdBy") AS "createdBy",
+  to_jsonb(l)->>'createdAt' AS "createdAt"`
+
+function describeLink(link: LinkRow, location: DriveLocation): DriveFileLinkDetails {
+  return { ...link, url: driveFileLinkUrl(location, link.volumeId, link.id) }
 }
 
-export async function readOwnDriveFileLink(database: Database, volumeId: string, path: string, creator: string): Promise<DriveFileLink | null> {
-  const { rows: [link] } = await database.query<DriveFileLink>(
-    'SELECT id,path,visibility FROM drive_file_links WHERE "volumeId"=$1 AND path=$2 AND "createdBy"=$3', [volumeId, path, creator])
-  return link ?? null
+/** A retry by the same person keeps its original link and chosen visibility. */
+export async function createDriveFileLink(database: Database, volumeId: string, path: string, creator: string, location: DriveLocation): Promise<DriveFileLinkDetails> {
+  const { rows: [link] } = await database.query<LinkRow>(`INSERT INTO drive_file_links AS l(id,"volumeId",path,"createdBy")
+    SELECT $4,e."volumeId",e.path,$2 FROM drive_volume_entries e JOIN drive_volumes v ON v.id=e."volumeId"
+    WHERE e."volumeId"=$1 AND e.path=$3 AND v."archivedAt" IS NULL FOR SHARE OF e,v
+    ON CONFLICT ("volumeId",path,"createdBy") DO UPDATE SET "createdBy"=EXCLUDED."createdBy"
+    RETURNING ${linkFields}`, [volumeId, creator, path, randomUUID()])
+  if (!link) throw new DriveError('drive_not_found', 404)
+  return describeLink(link, location)
+}
+
+export async function readOwnDriveFileLink(database: Database, volumeId: string, path: string, creator: string, location: DriveLocation): Promise<DriveFileLinkDetails | null> {
+  const { rows: [link] } = await database.query<LinkRow>(
+    `SELECT ${linkFields} FROM drive_file_links l WHERE l."volumeId"=$1 AND l."createdBy"=$2 AND l.path=$3`, [volumeId, creator, path])
+  return link ? describeLink(link, location) : null
 }
 
 /** The enclosing Drive read holds its normal ACL. An opaque link ID orders
  * the page and conveys no authority to open or manage another person's link. */
 export async function listDriveFileLinks(database: Database, volumeId: string, reader: string,
-  page: { after: string | null; limit: number }): Promise<DriveFileLinkPage> {
-  const { rows } = await database.query<DriveFileLinkPage['links'][number]>(`SELECT l.id,l.path,l.visibility,
-      l."createdBy"=$2 AS manageable FROM drive_file_links l JOIN drive_volumes v ON v.id=l."volumeId"
+  page: { after: string | null; limit: number }, location: DriveLocation): Promise<DriveFileLinkPage> {
+  const { rows } = await database.query<LinkRow>(`SELECT ${linkFields} FROM drive_file_links l JOIN drive_volumes v ON v.id=l."volumeId"
     WHERE l."volumeId"=$1 AND v."archivedAt" IS NULL AND ($3::uuid IS NULL OR l.id>$3)
       AND (l."createdBy"=$2 OR l.visibility='org' AND v."driveScope" IN ('project','team-workspace'))
     ORDER BY l.id LIMIT $4`, [volumeId, reader, page.after, page.limit + 1])
   const links = rows.slice(0, page.limit)
-  return { links, nextCursor: rows.length > page.limit ? links.at(-1)!.id : null }
+  return { links: links.map(link => describeLink(link, location)), nextCursor: rows.length > page.limit ? links.at(-1)!.id : null }
 }
 
 /** Only Projects containing a potentially visible link need a canonical row
@@ -93,19 +103,17 @@ export async function listWorkspaceDriveFileLinks(database: Database, workspaceI
     ) history ON true
   ),'[]'::jsonb) AS links FROM selected`, [workspaceId, reader, projects, page.number, page.limit])
   for (const link of result.links) {
-    let location: DriveLocation = workspaceId
-    if (link.driveScope === 'team-workspace') location = { workspaceId, driveScope: 'team-workspace' }
-    else if (link.projectId) location = { workspaceId, projectId: link.projectId, ...(link.driveScope === 'project' && { driveScope: 'project' }) }
+    const location = driveFileLocation(workspaceId, link.driveScope, link.projectId)
     link.url = driveFileLinkUrl(location, link.volumeId, link.id)
   }
   return result
 }
 
-export async function updateDriveFileLink(database: Database, volumeId: string, id: string, creator: string, visibility: DriveFileLinkVisibility) {
-  const { rows: [link] } = await database.query<DriveFileLink>(`UPDATE drive_file_links SET visibility=$4
-    WHERE "volumeId"=$1 AND id=$2 AND "createdBy"=$3 RETURNING id,path,visibility`, [volumeId, id, creator, visibility])
+export async function updateDriveFileLink(database: Database, volumeId: string, id: string, creator: string, visibility: DriveFileLinkVisibility, location: DriveLocation) {
+  const { rows: [link] } = await database.query<LinkRow>(`UPDATE drive_file_links AS l SET visibility=$4
+    WHERE l."volumeId"=$1 AND l."createdBy"=$2 AND l.id=$3 RETURNING ${linkFields}`, [volumeId, creator, id, visibility])
   if (!link) throw new DriveError('drive_not_found', 404)
-  return link
+  return describeLink(link, location)
 }
 
 export async function revokeDriveFileLink(database: Database, volumeId: string, id: string, creator: string) {
