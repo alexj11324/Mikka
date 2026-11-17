@@ -1518,6 +1518,8 @@ export const driveBlobs = pgTable('drive_blobs', {
 /** The head tree, one row per path, for a manifest read that needs no jsonb decode. */
 export const driveVolumeEntries = pgTable('drive_volume_entries', {
   volumeId: text('volumeId').notNull().references(() => driveVolumes.id, { onDelete: 'cascade' }),
+  // Older rows resolve their first observed change from the immutable version history.
+  changedAt: timestamp('changedAt', { withTimezone: true }).defaultNow(),
   /** Repeated from the volume, so a put can prove the blob is this owner's. */
   ownerId: text('ownerId').notNull(),
   path: text('path').notNull(),
@@ -1537,6 +1539,7 @@ export const driveFileLinks = pgTable('drive_file_links', {
   path: text('path').notNull(),
   createdBy: text('createdBy').notNull().references(() => users.id, { onDelete: 'cascade' }),
   visibility: text('visibility').$type<'private' | 'org'>().notNull().default('private'),
+  createdAt: timestamp('createdAt', { withTimezone: true }).defaultNow(),
 }, table => [
   foreignKey({ columns: [table.volumeId, table.path], foreignColumns: [driveVolumeEntries.volumeId, driveVolumeEntries.path] }).onDelete('cascade'),
   unique().on(table.volumeId, table.path, table.createdBy),

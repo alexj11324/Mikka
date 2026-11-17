@@ -607,7 +607,7 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     const onlyOwner = (await (await call(privateFile.collection, { ...mine, method: 'POST', body: { path: 'notes.txt' } })).json()).link
     assert.equal((await call(privateFile.collection + '/' + onlyOwner.id, { ...mine, method: 'PATCH', body: { visibility: 'org' } })).status, 422)
     assert.equal((await call(privateFile.collection + '/' + onlyOwner.id, { ...mine, token: peerToken })).status, 404)
-    await context.test('a Workspace link directory intersects creator visibility, active Project ACL and file location before pagination', async () => {
+    await context.test('a Workspace link directory intersects creator visibility, active Project ACL and file location before pagination', async directoryContext => {
       const myDirectory = (token: string, workspaceId: string = team.id, suffix = '') => fetch(
         origin + '/api/drive/shares?workspaceId=' + workspaceId + suffix, { headers: { authorization: 'Bearer ' + token } })
       const group = await seedTeam(fixture, team.id, owner)
@@ -636,6 +636,38 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       const last = await (await myDirectory(peerToken, team.id, '&limit=1&page=8')).json()
       assert.deepEqual(last, second)
       assert.deepEqual([first.links[0].id, second.links[0].id], [teamLink, projectLink].sort())
+      await directoryContext.test('shared file directory metadata follows its actual path change, stable creation and current signed-in address', async () => {
+        const link = () => myDirectory(peerToken).then(r => r.json()).then(page => page.links.find((item: {id: string}) => item.id === teamLink))
+        const original = await link()
+        const author = (await fixture.query('select name from "user" where id=$1', [owner])).rows[0].name
+        assert.equal(original.createdBy, author)
+        assert.ok(Number.isFinite(Date.parse(original.createdAt)))
+        assert.ok(Number.isFinite(Date.parse(original.changedAt)))
+        const signedInTarget = new URL(original.url, origin)
+        assert.equal(signedInTarget.origin, origin)
+        assert.equal(signedInTarget.searchParams.get('driveScope'), 'team-workspace')
+        assert.equal(await (await fetch(signedInTarget, { headers: { authorization: 'Bearer ' + peerToken } })).text(), 'selected file')
+        const volume = '/' + original.volumeId
+        const write = async (path: string, mode: number) => {
+          const head = (await (await call(volume, teamDrive)).json()).head
+          const entry = head.entries.find((item: {path: string}) => item.path === original.path)
+          return call(volume + '/entries', { ...teamDrive, method: 'PATCH', body: { expectedDigest: head.headDigest,
+            mutationId: randomUUID(), changes: [{ op: 'put', path, mode, sha256: entry.sha256, sizeBytes: entry.sizeBytes }] } })
+        }
+        assert.equal((await write('unrelated.txt', 0o644)).status, 200)
+        assert.equal((await link()).changedAt, original.changedAt)
+        assert.equal((await write(original.path, 0o755)).status, 200)
+        const modified = await link()
+        assert.ok(Date.parse(modified.changedAt) > Date.parse(original.changedAt))
+        assert.equal(modified.createdAt, original.createdAt)
+        // Fixture a pre-upgrade row: its link creation date is unknown but the
+        // current file's last change can be recovered from immutable history.
+        await fixture.query('update drive_file_links set "createdAt"=null where id=$1', [teamLink])
+        await fixture.query('update drive_volume_entries set "changedAt"=null where "volumeId"=$1 and path=$2', [original.volumeId, original.path])
+        const historic = await link()
+        assert.equal(historic.createdAt, null)
+        assert.equal(historic.changedAt, modified.changedAt)
+      })
       await fixture.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [projectId])
       assert.deepEqual((await actual(peerToken)).map(l => l.id), [teamLink])
       await fixture.query('update workspace_projects set "archivedAt"=now() where id=$1', [projectId])
