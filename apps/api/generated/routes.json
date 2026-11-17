@@ -2025,6 +2025,16 @@
       "sourceHash": "266128803776eaa42997585548d45141b42ba55d2cce78e36a800681bf1cdcb8"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/shares",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/shares",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/shares/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "9e66249e27367a1540d0d9023d8919cb2ecea59736c5d19e302254cbd0ea3202"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/versions",
       "template": "/api/organizations/[organizationId]/drive/[volumeId]/versions",
       "source": "app/api/organizations/[organizationId]/drive/[volumeId]/versions/route.ts",

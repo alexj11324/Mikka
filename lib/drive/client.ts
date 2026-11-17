@@ -110,6 +110,20 @@ function organizationShareUrl(organizationId: string, shareId: string) {
   return withBasePath(`/api/organizations/${encodeURIComponent(organizationId)}/drive-shares/${encodeURIComponent(shareId)}`)
 }
 
+function organizationVolumeShares(organizationId: string, volumeId: string) {
+  return withBasePath(`/api/organizations/${encodeURIComponent(organizationId)}/drive/${encodeURIComponent(volumeId)}/shares`)
+}
+
+export function readOrganizationVolumeFileLinks(organizationId: string, volumeId: string, send?: typeof fetch) {
+  return request<DriveFileLinkDetails[]>(organizationVolumeShares(organizationId, volumeId), {}, send)
+}
+
+export function createOrganizationVolumeFileLink(organizationId: string, volumeId: string, path: string, send?: typeof fetch) {
+  return request<DriveFileLinkDetails>(organizationVolumeShares(organizationId, volumeId), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }),
+  }, send)
+}
+
 export function updateOrganizationDriveFileLink(organizationId: string, shareId: string, visibility: DriveFileLinkVisibility, send?: typeof fetch) {
   return request<DriveFileLinkDetails>(organizationShareUrl(organizationId, shareId),
     { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visibility }) }, send)
