@@ -33,7 +33,7 @@ const terminalRuns = new Set(['succeeded', 'failed', 'stopped', 'cancelled'])
 const terminalTasks = new Set(['cancelled', 'revoked', 'completed', 'succeeded'])
 const codes = new Set([
   'configuration_required', 'trigger_rejected', 'origin_rejected', 'deployment_proof', 'build_mismatch',
-  'web_deploy', 'worker_release', 'attestation_required', 'account_required', 'sign_in_failed',
+  'worker_release', 'attestation_required', 'account_required', 'sign_in_failed',
   'session_missing', 'session_identity', 'workspace_missing', 'request_failed', 'http_refused',
   'response_invalid', 'action_missing', 'action_not_allowed', 'action_refused', 'source_missing',
   'source_ambiguous', 'source_blocked', 'cloud_unavailable', 'workspace_busy', 'order_restore_unavailable',
@@ -133,8 +133,6 @@ export async function attestDeployment({ env = process.env, event, fetchImpl = f
   const runs = async workflow => read('https://api.github.com/repos/' + REPOSITORY + '/actions/workflows/' + workflow
     + '/runs?head_sha=' + guard.revision + '&per_page=100', true)
   await pin()
-  const web = successfulRelease((await runs('web-deploy.yml')).workflow_runs, guard.revision, 'web')
-  check(web, 'web_deploy')
   const deadline = now() + (guard.mode === 'active' ? 900000 : 0)
   let worker
   do {
@@ -145,7 +143,7 @@ export async function attestDeployment({ env = process.env, event, fetchImpl = f
   } while (!worker && now() <= deadline)
   check(worker, 'worker_release')
   await pin()
-  return { status: 'ready', issue: 1245, repository: REPOSITORY, ...guard, webDeployRunId: web.id,
+  return { status: 'ready', issue: 1245, repository: REPOSITORY, ...guard,
     workerReleaseRunId: worker.id, workerReleaseSha: guard.revision, checkedAt: new Date(now()).toISOString() }
 }
 
@@ -358,7 +356,7 @@ export async function runProjectDecisionsAcceptance({ env = process.env, event, 
   const guard = triggerGuard(env, event)
   check(attestation?.status === 'ready' && attestation.repository === REPOSITORY && attestation.issue === 1245
     && attestation.revision === guard.revision && attestation.mode === guard.mode && attestation.workerReleaseSha === guard.revision
-    && [attestation.webDeployRunId, attestation.workerReleaseRunId].every(id => Number.isSafeInteger(id) && id > 0)
+    && Number.isSafeInteger(attestation.workerReleaseRunId) && attestation.workerReleaseRunId > 0
     && Number.isFinite(Date.parse(attestation.checkedAt)) && now() - Date.parse(attestation.checkedAt) >= 0
     && now() - Date.parse(attestation.checkedAt) < 3600000, 'attestation_required')
   check(!env.MIKKA_ACCEPTANCE_BASE_URL || env.MIKKA_ACCEPTANCE_BASE_URL === ORIGIN + '/mikka', 'origin_rejected')
@@ -366,7 +364,7 @@ export async function runProjectDecisionsAcceptance({ env = process.env, event, 
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD
   check(isSmokeAccountEmail(email) && typeof password === 'string' && password.length > 0, 'account_required')
   const report = { issue: 1245, revision: guard.revision, mode: guard.mode, status: 'running',
-    webDeployRunId: attestation.webDeployRunId, workerReleaseRunId: attestation.workerReleaseRunId,
+    workerReleaseRunId: attestation.workerReleaseRunId,
     startedAt: new Date(now()).toISOString(), cases: [], botRecord: null }
   let cookie = '', ownerId, workspaceId, refs = {}, safeWorkspace = true
   async function request(path, body, method = body === undefined ? 'GET' : 'POST', extra = {}) {

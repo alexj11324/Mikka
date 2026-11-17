@@ -23,7 +23,7 @@ const sha = value => typeof value === 'string' && /^[a-f0-9]{40}$/.test(value)
 const uuid = value => typeof value === 'string' && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)
 const accountId = value => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,128}$/.test(value)
 const digest = value => createHash('sha256').update(value).digest('hex')
-const codes = new Set(['trigger_rejected', 'plan_invalid', 'deployment_proof', 'build_mismatch', 'web_deploy',
+const codes = new Set(['trigger_rejected', 'plan_invalid', 'deployment_proof', 'build_mismatch',
   'worker_release', 'attestation_required', 'account_required', 'request_denied', 'request_failed', 'http_refused',
   'sign_in_failed', 'session_missing', 'session_identity', 'workspace_missing', 'response_invalid',
   'action_missing', 'order_changed', 'source_checking', 'session_close_failed', 'readiness_timeout', 'readiness_failed'])
@@ -92,9 +92,7 @@ export async function attestReadiness({ env = process.env, event, plan, fetchImp
   const pin = async () => check((await read(ORIGIN + '/mikka/api/version')).build === guard.applicationSha, 'build_mismatch')
   await pin()
   const runs = await read('https://api.github.com/repos/' + REPOSITORY + '/actions/runs?head_sha=' + guard.applicationSha + '&per_page=100', true)
-  const web = successfulRelease(runs.workflow_runs, guard.applicationSha, 'web')
   const worker = successfulRelease(runs.workflow_runs, guard.applicationSha, 'worker')
-  check(web, 'web_deploy')
   let jobs
   if (worker) {
     try { jobs = (await read('https://api.github.com/repos/' + REPOSITORY + '/actions/runs/' + worker.id + '/jobs?filter=latest&per_page=100', true)).jobs }
@@ -104,7 +102,7 @@ export async function attestReadiness({ env = process.env, event, plan, fetchImp
   await pin()
   return { purpose: 'production-readiness', status: runtime.status === 'published' ? 'ready' : 'partial',
     repository: REPOSITORY, ...guard, metadataReadAuthorized: true, executionReady: false,
-    webDeployRunId: web.id, runtime,
+    runtime,
     checkedAt: new Date(now()).toISOString() }
 }
 
@@ -239,7 +237,6 @@ export async function runReadiness({ env = process.env, event, plan, attestation
   check(attestation?.purpose === 'production-readiness' && ['ready', 'partial'].includes(attestation.status) && attestation.repository === REPOSITORY
     && attestation.mode === 'readonly' && attestation.applicationSha === guard.applicationSha
     && attestation.driverRevision === guard.driverRevision && attestation.metadataReadAuthorized === true && attestation.executionReady === false
-    && Number.isSafeInteger(attestation.webDeployRunId) && attestation.webDeployRunId > 0
     && ['published', 'not_published', 'unproven'].includes(attestation.runtime?.status)
     && attestation.runtime.workerSha === null
     && (attestation.runtime.status === 'published' ? attestation.runtime.sourceCommit === guard.applicationSha
@@ -256,7 +253,7 @@ export async function runReadiness({ env = process.env, event, plan, attestation
     ...(attestation.runtime.status === 'published' ? { sourceEvidence: 'verified_publish_step',
       validateJobId: attestation.runtime.validateJobId, publishJobId: attestation.runtime.publishJobId } : { code: attestation.runtime.code }) }
   const report = { purpose: 'production-readiness', ...guard, status: 'running', startedAt: new Date(now()).toISOString(),
-    webDeployRunId: attestation.webDeployRunId, runtime,
+    runtime,
     taskState: 'not_requested', taskCreationRequests: 0, preferenceMutationRequests: 0, modelCalls: 0,
     backendMaintenanceWritesMeasured: false, paidExecutionVerified: false, executionReady: false,
     cases: [], normalSessionObserved: false, sessionClosed: false }

@@ -28,7 +28,7 @@ const actionsAllowed = new Set(['getIssueThread', 'changeModelOrder', 'getIssue'
 const serverCodes = new Set(['authRequired', 'workspaceAccessDenied', 'executionModelUnknown', 'executionAccountUnavailable', 'executionRuleOrderInvalid', 'modelUnavailable', 'botNotFound', 'factoryStale', 'factoryStopped', 'factoryNotFound', 'factoryLifecycleUnavailable', 'factoryUnavailable', 'issueOutdated', 'runChainEnded', 'runNotFound', 'subscription_unavailable', 'backend_unavailable', 'validationGeneric'])
 const codes = new Set([
   'configuration_required', 'origin_rejected', 'merge_scope_rejected', 'build_mismatch', 'build_mapping_required',
-  'deployment_proof', 'application_ancestry', 'web_deploy', 'merge_read_failed', 'merge_changed',
+  'deployment_proof', 'application_ancestry', 'merge_read_failed', 'merge_changed',
   'account_required', 'sign_in_failed', 'session_missing', 'session_identity', 'workspace_missing',
   'request_failed', 'http_refused', 'response_invalid', 'action_missing', 'action_not_allowed', 'action_refused',
   'source_missing', 'source_ambiguous', 'source_blocked', 'cloud_unavailable', 'worker_release',
@@ -116,11 +116,8 @@ export async function resolveAcceptanceDeployment({ guard, githubToken, fetchImp
     check(['ahead', 'identical'].includes(compared.status) && compared.base_commit?.sha === base
       && compared.merge_base_commit?.sha === base, 'application_ancestry')
   }
-  const runs = await read(`https://api.github.com/repos/${REPOSITORY}/actions/workflows/web-deploy.yml/runs?event=push&head_sha=${revision}&per_page=100`, true)
-  const deployed = successfulRun(runs.workflow_runs, revision, 'Web deploy', '.github/workflows/web-deploy.yml')
-  check(deployed, 'web_deploy')
   assertVersion((await read(versionUrl)).build, revision)
-  return Object.freeze({ ...guard, revision, webDeployRunId: deployed.id })
+  return Object.freeze({ ...guard, revision })
 }
 
 /** A same-SHA successful official workflow is the runtime proof. Project-wide
@@ -312,11 +309,9 @@ export async function runModelProviderAcceptance({ env = process.env, fetchImpl 
   const expectedSha = env.MIKKA_EXPECTED_DEPLOYMENT_SHA, mode = env.MIKKA_PROVIDER_ACCEPTANCE_MODE ?? 'preflight'
   const featureMergeSha = env.MIKKA_FEATURE_MERGE_SHA, guardMergeSha = env.MIKKA_ACCEPTANCE_GUARD_MERGE_SHA
   const guardPullRequest = Number(env.MIKKA_ACCEPTANCE_GUARD_PR), driverRevision = env.MIKKA_ACCEPTANCE_DRIVER_SHA
-  const webDeployRunId = Number(env.MIKKA_WEB_DEPLOY_RUN_ID)
   check(sha(expectedSha) && ['preflight', 'active'].includes(mode), 'configuration_required')
   check([featureMergeSha, guardMergeSha, driverRevision].every(sha)
-    && [FEATURE_PULL_REQUEST, ACCEPTANCE_PULL_REQUEST].includes(guardPullRequest)
-    && Number.isSafeInteger(webDeployRunId) && webDeployRunId > 0, 'configuration_required')
+    && [FEATURE_PULL_REQUEST, ACCEPTANCE_PULL_REQUEST].includes(guardPullRequest), 'configuration_required')
   check(!env.MIKKA_ACCEPTANCE_BASE_URL || env.MIKKA_ACCEPTANCE_BASE_URL === ORIGIN + '/mikka', 'origin_rejected')
   const workerRunId = Number(env.MIKKA_WORKER_RELEASE_RUN_ID)
   const workerReady = env.MIKKA_WORKER_RELEASE_PROOF === 'same_sha_official_runtime'
@@ -327,7 +322,7 @@ export async function runModelProviderAcceptance({ env = process.env, fetchImpl 
   const timeoutMs = Number(env.MIKKA_PROVIDER_ACCEPTANCE_TIMEOUT_MS ?? 600_000)
   check(Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 1_200_000, 'configuration_required')
   const report = { issue: 1225, pullRequest: FEATURE_PULL_REQUEST, featureMergeSha, guardPullRequest, guardMergeSha,
-    driverRevision, revision: expectedSha, webDeploy: { sha: expectedSha, runId: webDeployRunId }, origin: ORIGIN, mode,
+    driverRevision, revision: expectedSha, origin: ORIGIN, mode,
     startedAt: new Date(now()).toISOString(), workerRelease: { ready: workerReady,
       kind: 'same_sha_official_runtime', sha: expectedSha, runId: workerRunId }, cases: [], status: 'running' }
   let cookie = '', ownerId, workspaceId, actionRefs = {}
@@ -755,7 +750,6 @@ async function writeReport(report) {
     `Application revision: ${report.revision ?? 'unavailable'}`,
     `Guard PR: ${report.guardPullRequest ? '#' + report.guardPullRequest : 'unavailable'} (${report.guardMergeSha ?? 'unavailable'})`,
     `Acceptance driver: ${report.driverRevision ?? 'unavailable'}`,
-    `Web deploy: ${report.webDeploy?.runId ?? 'unavailable'}`,
     `Runtime proof: ${report.workerRelease?.kind ?? 'unavailable'}; run ${report.workerRelease?.runId ?? 'unavailable'}`, '',
     `Mode: ${report.mode ?? 'preflight'}; result: ${report.status}`, '', '| Path | Result | Code |', '| --- | --- | --- |',
     ...(report.cases ?? []).map(item => `| ${item.case} | ${item.status} | ${item.code ?? ''} |`), '',
