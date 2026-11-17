@@ -47,6 +47,19 @@ test('custom origin is explicit; opaque, lookalike, embedded and resource frames
   assert.equal(isTrustedFrame('mikka://app/', RENDERER_URL), false)
 })
 
+test('Project checkout bookmarks forward only the three registered device/project methods', () => {
+  const id = '00000000-0000-4000-8000-000000000001'
+  const device = `/api/workspaces/${id}/devices/${id}/project-checkout`
+  const project = `/api/workspaces/${id}/projects/${id}/device-checkouts`
+  for (const path of [device, device + '/clear']) {
+    assert.equal(allowedApiPath(path, 'POST'), true)
+    for (const method of ['GET', 'PUT', 'DELETE']) assert.equal(allowedApiPath(path, method), false)
+  }
+  assert.equal(allowedApiPath(project, 'GET'), true)
+  assert.equal(allowedApiPath(project, 'POST'), false)
+  assert.equal(allowedApiPath(device + '/execute', 'POST'), false)
+})
+
 test('path policy rejects traversal, encoded delimiters, absolute targets and unknown API routes', () => {
   for (const path of ['/mikka/../secret', '/mikka/%2e%2e/secret', '/mikka/%252e%252e/secret', '/mikka/%2fapi/auth/token', '/mikka/a\\b', '//evil.test/api', '/mikka/a%00b']) assert.equal(normalizedRendererPath(path), null, path)
   assert.equal(rendererAssetPath('/safe/root', '/mikka/assets/file.js'), '/safe/root/assets/file.js')

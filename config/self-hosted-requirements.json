@@ -1,4 +1,25 @@
 {
+  "app/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Save a private checkout bookmark for an owned local device and a readable active Project. No filesystem access or execution is granted.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "app/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/clear/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Clear only the signed-in person’s checkout bookmark for the specified local device and active Project.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "app/api/workspaces/[workspaceId]/projects/[projectId]/device-checkouts/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read only the signed-in person’s local checkout bookmarks for an active, readable Project.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "app/api/workspaces/[workspaceId]/projects/[projectId]/setup/route.ts": {
     "mode": "built-in",
     "environment": [],
