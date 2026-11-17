@@ -7,11 +7,13 @@ export const CLOUD_WORKSPACE_CONTROL_ROOT = '/run/mikka-review-control'
 /** flock is held by a tiny child for the whole run, not per native command.
  * EOF/crash leaves an active receipt: acquiring an orphaned lock alone never
  * grants a shell. Only a confirmed native exit plus drained supervisor writes
- * produces idle. Fixed inodes live in a root-owned directory. */
+ * produces idle. Fixed inodes live in a root-owned directory. The daemon's
+ * group may only search it (0710), so the directory is held by O_PATH: a
+ * read-mode open is refused for the execution user. */
 const HOLD = String.raw`
 import fcntl,json,os,stat,sys
 root,run,device=sys.argv[1:]
-d=os.open(root,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+d=os.open(root,os.O_PATH|os.O_DIRECTORY|os.O_NOFOLLOW)
 info=os.fstat(d)
 if info.st_uid!=0 or info.st_mode&0o022:raise SystemExit(1)
 v=os.open('version',os.O_RDONLY|os.O_NOFOLLOW,dir_fd=d)
