@@ -3,11 +3,8 @@ import { z } from 'zod'
 // What the plugins page shows for a Composio connected account, and the few
 // rules around it, kept free of the SDK so they can be tested on their own.
 
-export const COMPOSIO_APP_IDS = ['gmail', 'googlecalendar', 'notion', 'slack'] as const
-export type ComposioAppId = (typeof COMPOSIO_APP_IDS)[number]
-/** Backend catalog. The legacy four-app UI keeps its own presentation list. */
-export const COMPOSIO_TOOLKIT_IDS = [...COMPOSIO_APP_IDS, 'googledrive'] as const
-export type ComposioToolkitId = (typeof COMPOSIO_TOOLKIT_IDS)[number]
+// Which apps exist is Composio's live toolkit list (lib/plugins/catalog.ts);
+// nothing here names the apps a person may list, connect, govern or call.
 
 /**
  * Composio statuses that are not an account the person has: a link that was
@@ -16,7 +13,7 @@ export type ComposioToolkitId = (typeof COMPOSIO_TOOLKIT_IDS)[number]
  */
 const HIDDEN_STATUSES = new Set(['INITIALIZING', 'INITIATED', 'REVOKED'])
 
-export type ConnectedAccountView<Toolkit extends string = ComposioAppId> = {
+export type ConnectedAccountView<Toolkit extends string = string> = {
   id: string
   toolkit: Toolkit
   /** Composio status: ACTIVE, INACTIVE, EXPIRED or FAILED once hidden ones are dropped. */
@@ -45,6 +42,8 @@ export const TOOLKIT_SLUG = /^[a-z][a-z0-9_]{0,63}$/
 export const isToolkitSlug = (value: unknown): value is string => typeof value === 'string' && TOOLKIT_SLUG.test(value)
 /** Mikka's own integrations. The store and account lists show ours, never a Composio copy of them. */
 export const OWN_INTEGRATIONS: ReadonlySet<string> = new Set(['github', 'linear', 'telegram'])
+/** Any Composio toolkit Mikka reaches through Composio: a well-formed slug that is not one of Mikka's own integrations. */
+export const isComposioToolkitSlug = (value: unknown): value is string => isToolkitSlug(value) && !OWN_INTEGRATIONS.has(value)
 
 /**
  * The account as the page shows it, or null when its toolkit is malformed or
@@ -122,12 +121,16 @@ function field(value: unknown, ...path: string[]): unknown {
   return current
 }
 
+export type ProviderIdentity = { endpoint: string; headers?: Record<string, string>; email: (data: unknown) => unknown }
+
 /**
- * Where each provider says who the account is, read through Composio's proxy
- * with the account's own token. Slack needs two calls: auth.test for the user
+ * Where a provider says who the account is, read through Composio's proxy
+ * with the account's own token. An optional enhancement for the apps below
+ * (the account list shows their email); every other toolkit connects and
+ * works the same without one. Slack needs two calls: auth.test for the user
  * id, then users.info for that user's email (needs users:read.email).
  */
-export const PROVIDER_IDENTITY: Record<ComposioToolkitId, { endpoint: string; headers?: Record<string, string>; email: (data: unknown) => unknown }> = {
+export const PROVIDER_IDENTITY: Readonly<Record<string, ProviderIdentity>> = {
   googledrive: { endpoint: 'https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', email: data => field(data, 'user', 'emailAddress') },
   gmail: { endpoint: 'https://gmail.googleapis.com/gmail/v1/users/me/profile', email: data => field(data, 'emailAddress') },
   // The primary calendar's id is the account's email address.
@@ -135,6 +138,9 @@ export const PROVIDER_IDENTITY: Record<ComposioToolkitId, { endpoint: string; he
   notion: { endpoint: 'https://api.notion.com/v1/users/me', headers: { 'Notion-Version': '2022-06-28' }, email: data => field(data, 'bot', 'owner', 'user', 'person', 'email') },
   slack: { endpoint: 'https://slack.com/api/auth.test', email: data => field(data, 'user_id') },
 }
+
+/** The provider's identity lookup for a toolkit, or null when Mikka has none for it. */
+export const providerIdentity = (toolkit: string): ProviderIdentity | null => Object.hasOwn(PROVIDER_IDENTITY, toolkit) ? PROVIDER_IDENTITY[toolkit] : null
 
 /** The provider could not give a final answer (429, 5xx, 401…); ask again later. */
 export class ComposioEmailLookupError extends Error {

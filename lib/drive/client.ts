@@ -1,7 +1,7 @@
 import { withBasePath } from '../base-path'
 import { driveFileLinkUrl, driveShareViewUrl, driveVolumeUrl as url, type DriveLocation } from './location'
 export { driveFileLinkUrl, type DriveLocation } from './location'
-import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileLink, type DriveFileLinkPage, type DriveShareView, type DriveWorkspaceFileLinkPage, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
+import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileLinkDetails, type DriveFileLinkPage, type DriveShareView, type DriveWorkspaceFileLinkPage, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
 import type { DriveVolumeSummary } from './volumes'
 import type { DriveVersionSummary } from './store'
 
@@ -83,16 +83,16 @@ export function readDriveFileLinks(location: DriveLocation, volumeId: string, af
 }
 
 export function readOwnDriveFileLink(location: DriveLocation, volumeId: string, path: string, send?: typeof fetch) {
-  return request<{ link: DriveFileLink | null }>(url(location, `/${encodeURIComponent(volumeId)}/shares`, { path }), {}, send)
+  return request<{ link: DriveFileLinkDetails | null }>(url(location, `/${encodeURIComponent(volumeId)}/shares`, { path }), {}, send)
 }
 
 export function createDriveFileLink(location: DriveLocation, volumeId: string, path: string, send?: typeof fetch) {
-  return request<{ link: DriveFileLink }>(url(location, `/${encodeURIComponent(volumeId)}/shares`),
+  return request<{ link: DriveFileLinkDetails }>(url(location, `/${encodeURIComponent(volumeId)}/shares`),
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path }) }, send)
 }
 
 export function updateDriveFileLink(location: DriveLocation, volumeId: string, linkId: string, visibility: DriveFileLinkVisibility, send?: typeof fetch) {
-  return request<{ link: DriveFileLink }>(driveFileLinkUrl(location, volumeId, linkId),
+  return request<{ link: DriveFileLinkDetails }>(driveFileLinkUrl(location, volumeId, linkId),
     { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visibility }) }, send)
 }
 

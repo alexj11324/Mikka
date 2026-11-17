@@ -159,11 +159,10 @@ export async function forget(userId: string, input: { text: string }, scope: Nat
 async function appBlockedForBot(botId: string | undefined, action: ComposioActionName) {
   if (!botId) return false
   const { botMayUseApp } = await import('@/lib/app-policy/store')
-  const { isPolicyApp } = await import('@/lib/app-policy/apps')
   // Loaded here, not at module top: steps.ts is imported by suites that stub 'ai', which composio-actions needs.
   const { COMPOSIO_ACTIONS } = await import('@/lib/composio-actions')
   const toolkit = COMPOSIO_ACTIONS[action]?.toolkit
-  return Boolean(toolkit && isPolicyApp(toolkit) && !(await botMayUseApp(botId, toolkit)))
+  return Boolean(toolkit && !(await botMayUseApp(botId, toolkit)))
 }
 
 export async function composioAction(userId: string, action: ComposioActionName, input: unknown, scope?: NativeToolScope, accountId?: string, botId?: string) {

@@ -2,16 +2,20 @@ import 'server-only'
 import { eq, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { userPreferences } from '@/lib/db/schema'
-import { COMPOSIO_APP_IDS, type ComposioAppId } from '@/lib/composio-accounts'
 
 // Which connected Composio apps feed 建议 and the daily briefing
 // (docs/settings-backend/prefs.md). Stored per person in
 // user_preferences."suggestionSources" as { app: false } for each app turned
 // off; every app is on by default. GitHub and Linear are not Composio apps and
 // are not switched here.
+//
+// These are the apps Mikka has a notification reader for (lib/suggestions:
+// triggers, first briefing, calendar): a per-app enhancement, not which apps
+// exist. Every other Composio toolkit is listed, connected and called the same
+// without one.
 
-export const SUGGESTION_SOURCE_APPS = COMPOSIO_APP_IDS
-export type SuggestionSourceApp = ComposioAppId
+export const SUGGESTION_SOURCE_APPS = ['gmail', 'googlecalendar', 'notion', 'slack'] as const
+export type SuggestionSourceApp = (typeof SUGGESTION_SOURCE_APPS)[number]
 
 export function isSuggestionSourceApp(value: unknown): value is SuggestionSourceApp {
   return typeof value === 'string' && (SUGGESTION_SOURCE_APPS as readonly string[]).includes(value)

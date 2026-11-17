@@ -1713,16 +1713,17 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "e47f35ac6342a3f2cd2c51dd435d3d5b77049ffb866166c0295bcce5fccf1051"
+      "sourceHash": "a04a7ef08d18463ef3767648d4add73d38bfbe1b3047e8af6f7b7da3110134e4"
     },
     {
       "path": "/mikka/api/mobile/push-tokens/[id]",
       "template": "/api/mobile/push-tokens/[id]",
       "source": "app/api/mobile/push-tokens/[id]/route.ts",
       "methods": [
+        "DELETE",
         "PATCH"
       ],
-      "sourceHash": "6bd6f4433a17e9b4cefaa7d3fefe3ff9316b39fcdd1cc3f461d3ede0235c3b56"
+      "sourceHash": "a29f923dfcabd9f72cd3aa0984442749ea32b92bb9089c238e8ff60f4b9a8f22"
     },
     {
       "path": "/mikka/api/mobile/push-tokens/[id]/test",
@@ -1751,7 +1752,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "e68c720d8a6863270898351f7e7fbb00047df1419b7174d5f972dbfe26f9f219"
+      "sourceHash": "4b197d81fd0183a0fb1898e8dfba9d755565d5cc364ab83f02268f12dae4ed3f"
     },
     {
       "path": "/mikka/api/mobile/task-presentations",
@@ -2009,6 +2010,15 @@
         "POST"
       ],
       "sourceHash": "8f11f7dff1244dc3bc4038219f01035b49bb3b7e6bd287c5ecf68849f9694ccb"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/members/[userId]/restore",
+      "template": "/api/organizations/[organizationId]/members/[userId]/restore",
+      "source": "app/api/organizations/[organizationId]/members/[userId]/restore/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "1aa00fe29b3434cc2dbab2420f31f9726cb2014daf03f9adfcaf8941eb42f8b1"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/policy",
@@ -2989,6 +2999,15 @@
         "GET"
       ],
       "sourceHash": "cf70f5251663a625f8d4d6277738f477662cf3982dbf88bc5cc066d3f6e1fb94"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/repos",
+      "template": "/api/workspaces/[workspaceId]/projects/[projectId]/repos",
+      "source": "app/api/workspaces/[workspaceId]/projects/[projectId]/repos/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "7f7e89c150b03f3805c1a7ab214f284aeb9faeed10c18c2d155d69b32ddcd2f8"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/service-identities",
