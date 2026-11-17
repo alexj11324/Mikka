@@ -9,7 +9,7 @@ import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { isActionErrorCode } from '@/lib/workspace-admin/action'
 import { WorkspaceError } from '@/lib/workspace-access'
 import { definitionSchema, ScheduleError, scheduleListInput, webhookBatchListInput, webhookBatchInput, type Command, type Definition } from '@/lib/schedules/contract'
-import type { AutomationHistory, AutomationList, AutomationUsage, AutomationView, CancelledAutomationRun, WebhookBatchPage } from '@/lib/schedules/automation-view'
+import type { AutomationHistory, AutomationList, AutomationUsage, AutomationView, CancelledAutomationRun, WebhookBatchClosure, WebhookBatchPage } from '@/lib/schedules/automation-view'
 
 /**
  * 自动化: the page's commands. Every one goes through the schedules' one writer, `executeScheduleCommand`, as the
@@ -80,14 +80,12 @@ export async function automationBatches(input: BatchListRequest, workspaceId?: s
   return command({ action: 'history', scheduleId, batches: { limit, cursor, status } }, workspaceId)
 }
 
-type BatchResult = {batchId: string; status: 'queued' | 'cancelled'; replayed: boolean}
-
-export async function flushAutomationBatch(input: z.infer<typeof webhookBatchInput>, workspaceId?: string): Promise<ActionResult<BatchResult>> {
+export async function flushAutomationBatch(input: z.infer<typeof webhookBatchInput>, workspaceId?: string): Promise<ActionResult<WebhookBatchClosure>> {
   const parsed = webhookBatchInput.safeParse(input)
   return parsed.success ? command({action:'flush_batch', ...parsed.data}, workspaceId) : {error:'validationGeneric'}
 }
 
-export async function cancelAutomationBatch(input: z.infer<typeof webhookBatchInput>, workspaceId?: string): Promise<ActionResult<BatchResult>> {
+export async function cancelAutomationBatch(input: z.infer<typeof webhookBatchInput>, workspaceId?: string): Promise<ActionResult<WebhookBatchClosure>> {
   const parsed = webhookBatchInput.safeParse(input)
   return parsed.success ? command({action:'cancel_batch', ...parsed.data}, workspaceId) : {error:'validationGeneric'}
 }

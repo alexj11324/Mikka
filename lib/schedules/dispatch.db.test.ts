@@ -6,6 +6,7 @@ import { Pool } from 'pg'
 import type { CancelledAutomationRun } from './automation-view'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import type { Command, Definition, GitHubEventTrigger } from './contract'
+import type { WebhookBatch, WebhookBatchClosure } from './automation-view'
 
 type Schedule = { id: string; version: number; status: string; owner_id?: string; bot_id?: string | null; source_event_id: string | null; next_at: Date | null }
 type Occurrence = { id: string; status: string; error: string | null; result: { id: string; title: string; identifier: string | null; eventId: string } | null }
@@ -422,18 +423,35 @@ test('dispatch_task automations run as their creator through the existing create
       return batches[0]!.id
     }
     const close = (action: 'flush_batch' | 'cancel_batch', batchId: string, who = owner, bot = chat) =>
-      page<{status:string; replayed:boolean}>(who, bot, {action, scheduleId:schedule.id, version:schedule.version, batchId})
+      page<WebhookBatchClosure>(who, bot, {action, scheduleId:schedule.id, version:schedule.version, batchId})
     const flushId = await openBatch('first alert', 'flush-1')
     await assert.rejects(close('flush_batch', flushId, member, memberChat), /scheduleAdminRequired/)
     const flushed = await Promise.all([close('flush_batch',flushId),close('flush_batch',flushId)])
     assert.deepEqual(flushed.map(b => b.replayed).sort(), [false,true])
+    const {batchId, replayed: _firstReplay, ...firstReceipt} = flushed[0]!
+    assert.equal(batchId, flushId)
+    assert.equal(firstReceipt.automationId, schedule.id)
+    assert.equal(firstReceipt.runId, flushId)
+    assert.equal(firstReceipt.failure, null)
+    assert.equal(firstReceipt.eventCount, 1)
+    assert.equal(firstReceipt.byteCount, Buffer.byteLength('first alert'))
+    assert.equal(firstReceipt.maxWaitSeconds, 300)
+    assert.ok(firstReceipt.closedAt)
+    assert.deepEqual(firstReceipt.closedAt, firstReceipt.dispatchAfter)
+    assert.equal(firstReceipt.reason, 'manual')
+    const {batches} = await page<{batches: WebhookBatch[]}>(owner, chat, {action:'history', scheduleId:schedule.id, batches:{}})
+    assert.deepEqual(firstReceipt, batches.find(batch => batch.id === flushId))
+    assert.deepEqual(flushed[1]!.closedAt, firstReceipt.closedAt)
     await assert.rejects(close('cancel_batch',flushId), /scheduleBatchClosed/)
     assert.equal((await occurrence(flushId)).status, 'pending')
     await tick()
     const dispatched = await occurrence(flushId)
     assert.equal(dispatched.status, 'succeeded')
     assert.ok(dispatched.result?.eventId)
-    assert.equal((await close('flush_batch',flushId)).replayed, true)
+    const afterDispatch = await close('flush_batch',flushId)
+    assert.equal(afterDispatch.replayed, true)
+    assert.equal(afterDispatch.runStatus, 'succeeded')
+    assert.deepEqual(afterDispatch.closedAt, firstReceipt.closedAt)
     const count = await fixture.query<{n:number}>(`SELECT count(*)::int n FROM coordinator_events WHERE payload#>>'{schedule,occurrenceId}'=$1`, [flushId])
     assert.equal(count.rows[0]!.n,1)
 
@@ -442,8 +460,15 @@ test('dispatch_task automations run as their creator through the existing create
     await assert.rejects(close('cancel_batch',cancelId,member,memberChat), /scheduleAdminRequired/)
     await assert.rejects(page(owner, chat, {action:'cancel_batch',scheduleId:schedule.id,version:schedule.version+1,batchId:cancelId}),/scheduleVersionConflict/)
     await assert.rejects(page(owner, chat, {action:'cancel_batch',scheduleId:(await create()).schedule.id,version:1,batchId:cancelId}),/scheduleBatchNotFound/)
-    assert.equal((await close('cancel_batch',cancelId)).status, 'cancelled')
-    assert.equal((await close('cancel_batch',cancelId)).replayed, true)
+    const cancellation = await close('cancel_batch',cancelId)
+    assert.equal(cancellation.status, 'cancelled')
+    assert.equal(cancellation.reason, 'cancelled')
+    assert.equal(cancellation.runId, null)
+    assert.equal(cancellation.eventCount, 2)
+    assert.equal(cancellation.byteCount, Buffer.byteLength('private event bodysecond private body'))
+    assert.ok(cancellation.closedAt)
+    assert.equal(/private|cancel-[12]/.test(JSON.stringify(cancellation)), false)
+    assert.deepEqual(await close('cancel_batch',cancelId), {...cancellation, replayed:true})
     await assert.rejects(close('flush_batch',cancelId), /scheduleBatchClosed/)
     const {rows:[cancelled]} = await fixture.query(`SELECT status,trigger,reported_at,result FROM schedule_occurrences WHERE id=$1`,[cancelId])
     assert.equal(cancelled.status, 'cancelled')
