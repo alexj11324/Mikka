@@ -352,7 +352,7 @@ async function recoverTaskFormReceipt(client, record, scope) {
 }
 
 /** A bounded NDJSON read, never a polling loop. Only safe identifiers/times leave. */
-export async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, timeoutMs, leaseAudit = false, probe, scope }, now) {
+export async function dispatchThroughCoordinator(client, record, { botId, profileId, deviceId, agentId, timeoutMs, leaseAudit = false, probe, scope }, now) {
   const marker = `STARTUP_OK_${record.sampleId}`
   const toolInput = { issueId: record.issueId, repo: REPOSITORY, target: deviceId ? { deviceId } : 'cloud', profileId,
     // The owned lease probe executes Python; read-only runs intentionally have
