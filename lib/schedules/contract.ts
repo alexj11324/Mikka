@@ -107,15 +107,17 @@ export const scheduleListInput = z.object({
   cursor: scheduleCursor.optional(),
 }).strict()
 
+const webhookBatchPageInput = scheduleListInput.pick({ limit: true, cursor: true }).extend({
+  status: z.enum(['collecting', 'queued', 'cancelled']).optional(),
+})
+
 /** With batches, read only webhook windows and return their metadata without request bodies. */
 export const scheduleHistoryInput = z.object({
   scheduleId: z.uuid(),
-  batches: scheduleListInput.pick({ limit: true, cursor: true }).extend({
-    status: z.enum(['collecting', 'queued', 'cancelled']).optional(),
-  }).optional(),
+  batches: webhookBatchPageInput.optional(),
 }).strict()
 
-export const webhookBatchListInput = scheduleListInput.pick({ scheduleId: true, cursor: true }).required({ scheduleId: true })
+export const webhookBatchListInput = webhookBatchPageInput.extend({ scheduleId: z.uuid() })
 export const webhookBatchInput = z.object({ scheduleId: z.uuid(), batchId: z.uuid(), version: z.number().int().positive() }).strict()
 
 export const commandSchema = z.discriminatedUnion('action', [

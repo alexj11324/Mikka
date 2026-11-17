@@ -71,10 +71,11 @@ export async function automationHistory(scheduleId: string, workspaceId?: string
   return command({ action: 'history', scheduleId }, workspaceId)
 }
 
-export async function automationBatches(input: { scheduleId: string; cursor?: string }, workspaceId?: string): Promise<ActionResult<WebhookBatchPage>> {
+export async function automationBatches(input: z.infer<typeof webhookBatchListInput>, workspaceId?: string): Promise<ActionResult<WebhookBatchPage>> {
   const parsed = webhookBatchListInput.safeParse(input)
   if (!parsed.success) return { error: 'validationGeneric' }
-  return command({ action: 'history', scheduleId: parsed.data.scheduleId, batches: { cursor: parsed.data.cursor, limit: 20 } }, workspaceId)
+  const { scheduleId, limit = 20, cursor, status } = parsed.data
+  return command({ action: 'history', scheduleId, batches: { limit, cursor, status } }, workspaceId)
 }
 
 type BatchResult = {batchId: string; status: 'queued' | 'cancelled'; replayed: boolean}

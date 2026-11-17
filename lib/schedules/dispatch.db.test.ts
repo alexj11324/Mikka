@@ -442,6 +442,7 @@ test('dispatch_task automations run as their creator through the existing create
     assert.ok(cancelled.reported_at)
     assert.ok(!/private|cancel-[12]/.test(JSON.stringify(cancelled.trigger)), 'bodies and sender request IDs are scrubbed')
     assert.equal(cancelled.trigger.webhook.requests.length, 2)
+    assert.equal(cancelled.trigger.webhook.byteCount, Buffer.byteLength('private event bodysecond private body'))
     assert.equal((await runtime.receiveAutomationWebhook(key, 'retry', 'cancel-2')).status, 'duplicate')
     await assert.rejects(close('flush_batch',randomUUID()), /scheduleBatchNotFound/)
 

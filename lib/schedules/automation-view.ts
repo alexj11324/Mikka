@@ -53,6 +53,10 @@ export type WebhookBatchPage = {
     created_at: string | Date
     due_at: string | Date
     requestCount: number
+    firstEventAt: string | null
+    lastEventAt: string | null
+    /** UTF-8 bytes of the accepted text; older canceled rows may have already erased it. */
+    byteCount: number | null
   }[]
   nextCursor: string | null
 }
