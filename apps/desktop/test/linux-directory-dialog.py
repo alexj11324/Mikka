@@ -1,86 +1,73 @@
-"""Choose a directory through the Linux Desktop smoke job's real GTK dialog."""
+"""Select a repository through the actual Linux Desktop smoke job's X11 dialog."""
+import csv
+import io
 import os
-import re
 import subprocess
 import sys
 import time
 
-import pyatspi as atspi
+
+def run(*args, data=None, timeout=8):
+    return subprocess.run(args, input=data, stdout=subprocess.PIPE,
+                          stderr=subprocess.DEVNULL, timeout=timeout, check=True).stdout
 
 
-def command(*args):
-    return subprocess.check_output(args, text=True, timeout=8).strip()
-
-
-def visible(node):
-    return node.getState().contains(atspi.STATE_SHOWING)
-
-
-def until(read, error):
-    deadline = time.monotonic() + 6
-    while time.monotonic() < deadline:
-        result = read()
-        if result is not None:
-            return result
-        time.sleep(0.1)
-    raise RuntimeError(error)
-
-
-def descend(node):
-    yield node
-    for child in node:
-        if child is not None and visible(child):
-            yield from descend(child)
+def xdo(*args):
+    return run("xdotool", *args).decode().strip()
 
 
 title = r"^(Open|Select|Choose)( (a |an )?(File|Folder|Directory))?$"
-window = command("xdotool", "search", "--sync", "--onlyvisible", "--name", title)
-if not window.isdecimal() or "_NET_WM_WINDOW_TYPE_DIALOG" not in command(
+window = xdo("search", "--sync", "--onlyvisible", "--name", title)
+if not window.isdecimal() or b"_NET_WM_WINDOW_TYPE_DIALOG" not in run(
     "xprop", "-id", window, "_NET_WM_WINDOW_TYPE"
 ):
     raise RuntimeError("NATIVE_FOLDER_DIALOG_AMBIGUOUS")
-command("xdotool", "windowfocus", "--sync", window)
+xdo("windowfocus", "--sync", window)
+
+# Electron's native picker need not be present in the renderer or AT-SPI tree.
+# Read only the foreground dialog's rendered labels. Its pixels and directory
+# entries stay in process memory and never enter an artifact or console log.
+def response_buttons():
+    image = run("import", "-silent", "-window", window, "png:-")
+    words = run("tesseract", "stdin", "stdout", "--psm", "11", "tsv", data=image)
+    labels = {"cancel": [], "accept": []}
+    for row in csv.DictReader(io.StringIO(words.decode()), delimiter="\t"):
+        word = (row.get("text") or "").strip().casefold()
+        if word not in {"cancel", "open", "choose", "select"}:
+            continue
+        x = int(row["left"]) + int(row["width"]) // 2
+        y = int(row["top"]) + int(row["height"]) // 2
+        labels["cancel" if word == "cancel" else "accept"].append((x, y))
+    for cancel in labels["cancel"]:
+        same_row = [pt for pt in labels["accept"] if pt[0] > cancel[0] and abs(pt[1] - cancel[1]) <= 8]
+        if same_row:
+            return cancel, max(same_row)
+    raise RuntimeError(f"NATIVE_FOLDER_RESPONSE_LABELS_MISSING(cancel={len(labels['cancel'])},accept={len(labels['accept'])})")
 
 
-def current_dialog():
-    matches = [window for app in atspi.Registry.getDesktop(0) for window in app
-               if re.fullmatch(title, window.name or "", re.IGNORECASE) and visible(window)]
-    if len(matches) > 1:
-        raise RuntimeError("NATIVE_FOLDER_DIALOG_AMBIGUOUS")
-    return matches[0] if matches else None
+def click(point):
+    xdo("mousemove", "--window", window, str(point[0]), str(point[1]), "click", "1")
 
 
-dialog = until(current_dialog, "NATIVE_FOLDER_DIALOG_ACCESSIBILITY_MISSING")
-if len(sys.argv) == 2:
-    selected = os.path.normpath(sys.argv[1])
-    command("xdotool", "key", "ctrl+l")
-
-    def location_entry():
-        for node in descend(dialog):
-            state = node.getState()
-            if state.contains(atspi.STATE_EDITABLE) and state.contains(atspi.STATE_FOCUSED):
-                return node
-        return None
-
-    entry = until(location_entry, "NATIVE_FOLDER_LOCATION_ENTRY_MISSING")
-    entry.queryEditableText().setTextContents(selected)
-    until(lambda: True if os.path.normpath(entry.queryText().getText(0, -1)) == selected else None,
-          "NATIVE_FOLDER_LOCATION_NOT_SET")
-    labels = {"open", "select", "choose", "select folder", "open folder"}
+if len(sys.argv) == 1:
+    cancel, _ = response_buttons()
+    click(cancel)
 else:
-    labels = {"cancel"}
-
-
-def action_button():
-    for node in descend(dialog):
-        if (node.getRole() == atspi.ROLE_PUSH_BUTTON and
-                (node.name or "").replace("_", "").strip().casefold() in labels and
-                node.getState().contains(atspi.STATE_SENSITIVE)):
-            return node
-    return None
-
-
-button = until(action_button, "NATIVE_FOLDER_RESPONSE_BUTTON_MISSING")
-bounds = button.queryComponent().getExtents(atspi.DESKTOP_COORDS)
-command("xdotool", "mousemove", str(bounds.x + bounds.width // 2),
-        str(bounds.y + bounds.height // 2), "click", "1")
+    selected = os.path.normpath(sys.argv[1])
+    xdo("key", "ctrl+l")
+    xdo("type", "--clearmodifiers", "--", selected)
+    xdo("key", "ctrl+a", "ctrl+c")
+    copied = run("xclip", "-selection", "clipboard", "-o").decode()
+    if os.path.normpath(copied) != selected:
+        raise RuntimeError("NATIVE_FOLDER_LOCATION_NOT_SET")
+    _, accept = response_buttons()
+    click(accept)
+    # Some native choosers enter the selected directory on the first accept.
+    # A second click targets only the same still-visible dialog's response.
+    time.sleep(0.5)
+    visible = subprocess.run(["xdotool", "search", "--onlyvisible", "--name", title],
+                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                             timeout=3, check=False).stdout.decode().splitlines()
+    if visible == [window]:
+        _, accept = response_buttons()
+        click(accept)
