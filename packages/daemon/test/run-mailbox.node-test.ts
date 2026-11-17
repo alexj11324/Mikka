@@ -18,6 +18,7 @@ import { HttpServerLink } from '../src/server-link-http'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
 import type { JournalEntry } from '../src/runs/journal'
 import type { StartOptions, AgentSession } from '../src/adapters/types'
+import { loseDeviceSession } from './helpers'
 import { getEventListeners } from 'node:events'
 
 // Synthetic process fixtures and retained local Git worktrees only.
@@ -126,7 +127,7 @@ for (const mode of ['stop', 'lease-expiry', 'default-off', 'close-failure']) tes
   const options = await h.options; await h.running
   if (mode === 'default-off') { assert.equal(options.mailbox, undefined); assert.equal(f.state.requests, 0) }
   else assert.ok(options.mailbox)
-  if (mode === 'lease-expiry') { h.supervisor.check(Date.now() + 120000); await h.supervisor.idle() }
+  if (mode === 'lease-expiry') { loseDeviceSession(h.supervisor); await h.supervisor.idle() }
   else if (mode === 'close-failure') { h.finish(); await h.supervisor.idle() }
   else await h.supervisor.cancel(f.assignment.runId)
   assert.deepEqual(h.supervisor.activeRunIds(), [])
@@ -145,7 +146,7 @@ for (const mode of ['stop', 'lease-expiry', 'shutdown']) test(`Supervisor handsh
   const h = await supervisorFixture(f, false, { pause: { entered, wait } })
   await ready
   const ending = mode === 'stop' ? h.supervisor.cancel(f.assignment.runId) : mode === 'shutdown' ? h.supervisor.stop() : undefined
-  if (mode === 'lease-expiry') h.supervisor.check(Date.now() + 120000)
+  if (mode === 'lease-expiry') loseDeviceSession(h.supervisor)
   release(); await ending; await h.supervisor.idle()
   assert.equal(h.state.starts, 0); assert.equal(h.state.closes, 1)
   assert.deepEqual(h.supervisor.activeRunIds(), [])
