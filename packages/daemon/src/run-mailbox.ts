@@ -22,8 +22,9 @@ const requestSchema = z.union([
   z.object({ operation: z.literal('call'), name: z.enum(Object.keys(mailboxInputs) as [MailboxToolName, ...MailboxToolName[]]), arguments: z.unknown() }).strict(),
 ])
 const unavailable = () => new Error('Run mailbox unavailable')
+/** `lease` is the run's local lease: Infinity while the device session is open, a deadline while it is down. */
 export function assertMailboxRunAuthority(input: { held: boolean; state?: RunState; stopped: boolean; lease?: number }) {
-  if (!input.held || !input.state || isTerminalRunState(input.state) || input.stopped || input.lease === undefined || !Number.isFinite(input.lease) || input.lease <= Date.now()) throw unavailable()
+  if (!input.held || !input.state || isTerminalRunState(input.state) || input.stopped || input.lease === undefined || Number.isNaN(input.lease) || input.lease <= Date.now()) throw unavailable()
 }
 const uncertain = { isError: true, content: [{ type: 'text' as const, text: 'Mailbox outcome unconfirmed or unavailable. Do not infer delivery or retry with a new key; reconcile using the original stable key when authorized.' }] }
 export interface RunMailbox {

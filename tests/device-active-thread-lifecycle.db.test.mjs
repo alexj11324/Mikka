@@ -120,7 +120,7 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
     daemon = await startDaemon({dataDir,flavor:'dev',link:new HttpServerLink(origin+'/mikka'),credential,
       harnesses:[{harness:'codex',installed:true,toolApproval:true,version:'fixture'}],
       harnessBinaries:{codex:resolve('packages/daemon/test/fakes/fake-codex.mjs')}, agentSandbox:new NoSandbox(),
-      modelProbe:false, quotaSource:null, retainResources:true, heartbeatMs:500, commandsWaitSeconds:1})
+      modelProbe:false, quotaSource:null, retainResources:true})
     await daemon.syncWithServer()
     const {deviceId,server:state} = daemon.status()
     assert.equal(state,'online')

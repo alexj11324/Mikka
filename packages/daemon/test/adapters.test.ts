@@ -42,7 +42,6 @@ async function boot(server: MemoryServer, dataDir: string) {
     flavor: "dev",
     link,
     credential: "cred",
-    heartbeatMs: 50,
     harnesses: (["claude_code", "codex", "cursor"] as const).map((harness) => ({
       harness,
       installed: true,

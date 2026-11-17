@@ -75,7 +75,6 @@ it("checks real SHA, blocks dirty/head replacement, and produces actual command/
     harnesses: [{ harness: "mock", installed: true, version: "fixture" }],
     mockSpeed: Infinity,
     quotaSource: null,
-    heartbeatMs: 50,
   }).start()
   daemons.push(daemon)
   const check = async (sha: string) => {

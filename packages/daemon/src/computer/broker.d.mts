@@ -31,6 +31,8 @@ export class ComputerBroker {
   request(token: string, value: unknown, signal?: AbortSignal): Promise<unknown>;
   captureRequest(token: string, value: unknown, signal?: AbortSignal): Promise<{ result: unknown } | { error: string; detail?: string }>;
   list(): PendingComputerRequest[];
+  /** Calls `listener` whenever a pending review appears or goes; returns the unsubscribe. */
+  onPendingChange(listener: () => void): () => void;
   revoke(token: string): void;
   decide(id: string, digest: string, approve: boolean): Promise<{ ok: true }>;
   suspend(): void;

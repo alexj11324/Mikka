@@ -168,7 +168,7 @@ it.each(['normal', 'project_settings', 'refuse_claim', 'normal_diagnostics', 'pr
   if (timing) cleanups.push(async () => { await timing.close({ cliExitObserved: true }); observation?.close() })
   const { spawn, execFileSync } = await import('node:child_process')
   const { stopGroup } = await import('../src/process-group')
-  const gate = new ToolApprovalGate(f.hint.runId, { isLive: () => !f.lifetime.signal.aborted }, 'push')
+  const gate = new ToolApprovalGate(f.hint.runId, { isLive: () => !f.lifetime.signal.aborted })
   const children: import('node:child_process').ChildProcess[] = []
   let replacementSpawns = 0
   const ledger: string[] = []
@@ -264,7 +264,7 @@ it.each([false, true, 'host'] as const)('the actual hosted runner adopts one boo
       modelId: f.hint.model, accessToken: 'fixture-token', expiresAt: new Date(Date.now() + 3600000).toISOString() },
   }
   if (hostOnly) expect(assignment.taskEnv).toBeUndefined()
-  const gate = new ToolApprovalGate(f.hint.runId, { isLive: () => !f.lifetime.signal.aborted }, 'push')
+  const gate = new ToolApprovalGate(f.hint.runId, { isLive: () => !f.lifetime.signal.aborted })
   const options = { runId: f.hint.runId, cwd: f.cwd, env: buildChildEnv({ runId: f.hint.runId }), model: f.hint.model, effort: f.hint.effort,
     policy: f.hint.policy, policyHash: policySnapshotHash(f.hint.policy), kind: 'implement' as const,
     toolApproval: gate, prompt: 'offline local task', mcp: { url: 'https://fixture.invalid/api/mcp',

@@ -166,15 +166,16 @@ describe("the device report", () => {
     const commandId = "10000000-0000-4000-8000-000000000002"
     let redetect = false
     const reports: { harnesses: { harness: string; models?: string[]; modelSlots?: { slot: string }[]; defaultModelSlot?: string }[]; completedDeviceCommands?: string[] }[] = []
-    const heartbeat = link.heartbeat.bind(link)
-    link.heartbeat = async (deviceId, status) => {
-      reports.push(status as never)
-      const result = await heartbeat(deviceId, status)
-      if (redetect) { redetect = false; return { ...result, deviceCommands: [{ id: commandId, kind: "redetect" }] } }
-      return result
+    const report = link.report.bind(link)
+    link.report = async (deviceId, sent) => { reports.push(sent as never); return report(deviceId, sent) }
+    // 重新检测 reaches the device on a push: the next commands read names it.
+    const read = link.fetchCommands.bind(link)
+    link.fetchCommands = async (deviceId, wait, options) => {
+      if (redetect) { redetect = false; options?.onUpdates?.({ deviceCommands: [{ id: commandId, kind: "redetect" }] }) }
+      return read(deviceId, wait, options)
     }
     const daemon = await new Daemon({
-      dataDir: tempDir(), flavor: "dev", link, credential: "cred", heartbeatMs: 50,
+      dataDir: tempDir(), flavor: "dev", link, credential: "cred",
       harnesses: [{ harness: "codex", installed: true, version: "fake" }, { harness: "claude_code", installed: true, version: "fake" }],
       agentSandbox: new NoSandbox(), harnessBinaries: { codex: codex.path, claude_code: claude.path }, modelProbe: true,
     }).start()
@@ -189,6 +190,7 @@ describe("the device report", () => {
     expect(claudeInfo.defaultModelSlot).toBe("default")
     const before = codex.homes().length
     redetect = true
+    server.pushWork("device-models")
     await waitFor(() => reports.some(report => report.completedDeviceCommands?.includes(commandId)))
     expect(codex.homes().length).toBeGreaterThan(before)
   }, 30_000)
@@ -202,9 +204,9 @@ describe("the device report", () => {
       nativeRequest: async () => { throw new Error("no run in this test") },
     })
     const reports: { harnesses: { harness: string; modelSlots?: { slot: string; model: string }[] }[] }[] = []
-    const heartbeat = link.heartbeat.bind(link)
-    link.heartbeat = async (deviceId, status) => { reports.push(status as never); return heartbeat(deviceId, status) }
-    const daemon = await new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "cred", heartbeatMs: 50, hostedSubscriptions: true,
+    const report = link.report.bind(link)
+    link.report = async (deviceId, sent) => { reports.push(sent as never); return report(deviceId, sent) }
+    const daemon = await new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "cred", hostedSubscriptions: true,
       harnessBinaries: { claude_code: claude.path }, quotaSource: null, modelProbe: true }).start()
     daemons.push(daemon)
     await waitFor(() => reports.some(report => report.harnesses.some(info => info.harness === "claude_code" && info.modelSlots?.length)))

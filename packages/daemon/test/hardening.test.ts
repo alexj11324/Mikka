@@ -41,7 +41,6 @@ async function boot(
     credential: "cred-1",
     harnesses: [{ harness: "mock", installed: true, version: "test" }],
     mockSpeed: Number.POSITIVE_INFINITY,
-    heartbeatMs: 50,
     quotaSource: null,
     ...options,
   }).start()

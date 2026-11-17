@@ -23,7 +23,7 @@ async function fixture(mode = 'normal', diagnostics = false) {
   const runId = randomUUID(), sessionId = randomUUID()
   const signal = new AbortController(), children: ChildProcess[] = [], events: Array<Record<string, unknown>> = []
   let live = true
-  const approval = new ToolApprovalGate(runId, { isLive: () => live }, 'push')
+  const approval = new ToolApprovalGate(runId, { isLive: () => live })
   const watchers = new Set<() => void>()
   const wait = (predicate: (event: Record<string, unknown>) => boolean) => new Promise<Record<string, unknown>>((done, reject) => {
     const check = () => { const value = events.find(predicate); if (value) { clearTimeout(timer); watchers.delete(check); done(value) } }

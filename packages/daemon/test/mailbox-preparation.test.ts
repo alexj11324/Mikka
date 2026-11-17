@@ -13,7 +13,7 @@ import { createRunMailbox } from '../src/run-mailbox'
 import { RunJournal } from '../src/runs/journal'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
 import { WorktreeManager } from '../src/worktrees'
-import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
+import { cleanupTempDirs, loseDeviceSession, makeRepo, tempDir } from './helpers'
 
 function deferred<T = void>() {
   let resolve!: (value: T) => void
@@ -224,7 +224,7 @@ it.each(['cancel', 'revoke', 'shutdown'] as const)('aborts a late mailbox handof
   await f.handoffEntered.promise
   const signal = f.prepareRunMailbox.mock.calls[0]![1]
   const stopping = mode === 'cancel' ? f.supervisor.cancel(f.assignment.runId)
-    : mode === 'shutdown' ? f.supervisor.stop() : Promise.resolve(f.supervisor.revokeLeases([f.assignment.runId]))
+    : mode === 'shutdown' ? f.supervisor.stop() : Promise.resolve(loseDeviceSession(f.supervisor))
   expect(signal.aborted).toBe(true)
   f.repositoryRelease.resolve()
   await nextTurn()

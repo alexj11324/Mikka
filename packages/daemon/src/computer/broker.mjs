@@ -7,13 +7,26 @@ import {
 import { chmodSync } from "node:fs";
 import { createServer } from "node:net";
 import { actionStep, normalizeCall, normalizeCaptureCall, executeDriver } from "./driver.mjs";
+// The pending reviews, telling listeners whenever one is added or removed, so
+// the web sync uploads on a change instead of checking on a timer.
+class PendingRequests extends Map {
+  constructor(changed) { super(); this.changed = changed; }
+  set(key, value) { super.set(key, value); this.changed?.(); return this; }
+  delete(key) { const had = super.delete(key); if (had) this.changed?.(); return had; }
+}
 export class ComputerBroker {
   grants = new Map();
   // runId → when its screen recording stops by itself; only set while one runs.
   recordingUntil = new Map();
   recordingSteps = new Map();
   recordingTimingFailed = new Set();
-  pending = new Map();
+  pendingListeners = new Set();
+  pending = new PendingRequests(() => { for (const listener of [...this.pendingListeners]) listener(); });
+  /** Calls `listener` whenever a pending review appears or goes; returns the unsubscribe. */
+  onPendingChange(listener) {
+    this.pendingListeners.add(listener);
+    return () => { this.pendingListeners.delete(listener); };
+  }
   sockets = new Set();
   suspended = false;
   constructor({

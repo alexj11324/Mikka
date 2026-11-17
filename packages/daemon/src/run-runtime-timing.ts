@@ -184,7 +184,7 @@ export class RunRuntimeObservation {
 }
 
 /** Keyed by the actual run in the transport path, so gateway-triggered work
- * outside the run's async context is still counted. Device heartbeats are
+ * outside the run's async context is still counted. Device reports are
  * explicitly shared and do not become per-operation permission checks. */
 export class RunRuntimeTimings {
   private readonly runs = new Map<string, RunRuntimeObservation>()
@@ -262,7 +262,7 @@ export class RunRuntimeTimings {
         if (!observation || observation.deviceHash !== runIdHash(decodeURIComponent(github[1]))) return NOOP
         return observation.request(this.refresh.getStore() === hash ? "github_credential_refresh" : "github_credential_lease", verb, false)
       }
-      const device = /^\/v1\/devices\/([^/]+)\/(heartbeat|gateway|commands|runs)$/.exec(clean)
+      const device = /^\/v1\/devices\/([^/]+)\/(report|gateway|commands|runs)$/.exec(clean)
       if (!device) return NOOP
       const hash = runIdHash(decodeURIComponent(device[1]))
       const pending = [...this.runs.values()].filter(observation => observation.deviceHash === hash)

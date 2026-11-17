@@ -34,10 +34,19 @@ export async function runServiceNpm(args: string[]): Promise<string> {
   return stdout.trim()
 }
 
-/** The server names the release (heartbeat, commands poll, refused claim); the daemon never asks npm which one is latest. */
+/**
+ * The server names the release (a report answer, a commands read, or the 426
+ * that refused this daemon). Only a daemon the server refused as too old,
+ * with no release named in the refusal, asks npm for `latest` itself: it can
+ * no longer ask the server (decision 2026-11-17-2215).
+ */
 export interface AutoUpdateRuntime {
   install(version: string): Promise<void>
+  /** The registry's `latest` stable release, through the service's own npm; undefined when unknown. */
+  latest?(): Promise<string | undefined>
 }
+
+const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/
 
 /** Only the public global npm CLI may replace its installation. Embedded/source entries stay out. */
 export async function managedAutoUpdateRuntime(entry: string, flavor: string, enabled: boolean): Promise<AutoUpdateRuntime | undefined> {
@@ -51,6 +60,10 @@ export async function managedAutoUpdateRuntime(entry: string, flavor: string, en
     if (realpathSync(join(globalRoot, PACKAGE)) !== root || file !== join(root, 'mikka.js')) return
     return {
       install: async version => { await runServiceNpm(['install', '--global', '--engine-strict', `${PACKAGE}@${version}`]) },
+      latest: async () => {
+        const version = await runServiceNpm(['view', `${PACKAGE}@latest`, 'version']).catch(() => '')
+        return STABLE_VERSION.test(version) ? version : undefined
+      },
     }
   } catch { return undefined }
 }
@@ -77,7 +90,7 @@ export function recordUpdateFailure(file: string, version: string, code: UpdateF
   writeJsonAtomic(file, { ...state, failure: { version, code, at: now, attempts } })
 }
 
-/** What the heartbeat reports: the failure of a version newer than the running one, else null. */
+/** What the device report carries: the failure of a version newer than the running one, else null. */
 export function reportedUpdateFailure(file: string, current: string): { version: string; code: UpdateFailureCode; at: string } | null {
   const failure = readState(file).failure
   return failure && newerStableVersion(failure.version, current) ? { version: failure.version, code: failure.code, at: new Date(failure.at).toISOString() } : null

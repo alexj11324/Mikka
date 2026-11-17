@@ -28,7 +28,7 @@ const server = new MemoryServer('package-device')
 const daemon = new Daemon({
   dataDir: join(temporary, 'data'), flavor: 'dev', link: server.link(),
   harnesses: [{ harness: 'mock', installed: true, version: 'package-test' }],
-  mockSpeed: Infinity, heartbeatMs: 25, commandsWaitSeconds: 1,
+  mockSpeed: Infinity,
   quotaSource: null, agentSandbox: null,
 })
 const waitFor = async check => {

@@ -249,7 +249,7 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
     const link: unknown = Reflect.construct(linkModule.HttpServerLink as Function, [`${origin}/mikka`])
     assert.ok(link && typeof link === 'object' && 'fetchCommands' in link && typeof link.fetchCommands === 'function')
     daemon = fixtureDaemon(await Reflect.apply(mainModule.startDaemon as Function, undefined, [{ dataDir, flavor: 'dev', link, credential,
-      harnesses: [], modelProbe: false, agentSandbox: null, quotaSource: null, retainResources: true, heartbeatMs: 60_000, commandsWaitSeconds: 25 }]))
+      harnesses: [], modelProbe: false, agentSandbox: null, quotaSource: null, retainResources: true }]))
     await daemon.syncWithServer()
     const status = daemonStatusSchema.parse(daemon.status())
     assert.equal(status.server, 'online', JSON.stringify(traffic))
@@ -860,7 +860,7 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
       const restartLink: unknown = Reflect.construct(linkModule.HttpServerLink as Function, [`${origin}/mikka`])
       daemon = fixtureDaemon(await Reflect.apply(mainModule.startDaemon as Function, undefined, [{ dataDir, flavor: 'dev',
         link: restartLink, credential, harnesses: [], modelProbe: false, agentSandbox: null, quotaSource: null,
-        retainResources: true, heartbeatMs: 60_000, commandsWaitSeconds: 25 }]))
+        retainResources: true }]))
       await daemon.syncWithServer()
       for (const attempt of attempts) {
         const request = await fetch(`${origin}/mikka/api/runs/${attempt.id}/workspace/files?${new URLSearchParams({ workspaceId, repoId, kind: 'file', path: 'src/example.ts' })}`, {

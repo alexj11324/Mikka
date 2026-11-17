@@ -28,10 +28,11 @@ it('starts computer review sync only for the registered device and cancels it on
   try {
     await daemon.syncWithServer()
     expect(await pending).toBe('approved')
-    expect(calls).toBe(1)
+    // The decided review leaves the broker: one cleanup sync follows the change, then nothing.
+    await waitFor(() => calls === 2)
     await daemon.stop()
     await new Promise(resolve => setTimeout(resolve, 20))
-    expect(calls).toBe(1)
+    expect(calls).toBe(2)
   } finally { await daemon.stop(); await broker.close() }
 })
 
