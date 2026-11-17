@@ -18,6 +18,23 @@ test('Project setup history restores only the recipe after fresh binding and aut
   const env = await store.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Setup history', configuration: {
     variables: { CURRENT_VALUE: 'old' }, setup: { copyFiles: ['fixture.txt'], command: 'node --version', approved: true },
   } })
+  await t.test('current Project setup follows its active default and returns only the approved state and recipe', async () => {
+    const selected = { workspaceId: workspace.id, projectId: await seedProject(database, member, [{ teamId: team.id, workspaceId: workspace.id }]) }
+    assert.equal(await store.readCurrentProjectSetup(member, selected), null)
+    const empty = await store.saveEnvironment(owner, { workspaceId: workspace.id, name: 'No setup', configuration: {} })
+    await store.setProjectDefaultEnvironment(owner, { ...selected, environmentId: empty.id, revision: 1 })
+    assert.deepEqual(await store.readCurrentProjectSetup(member, selected), { environmentId: empty.id, revision: 1, setup: null })
+    const setup = { command: 'node --version', copyFiles: ['fixture.txt'], approved: false }
+    const configured = await store.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Current setup', configuration: {
+      setup, variables: { CURRENT_VALUE: 'private test value' },
+    } })
+    await store.setProjectDefaultEnvironment(owner, { ...selected, environmentId: configured.id, revision: 2 })
+    assert.deepEqual(await store.readCurrentProjectSetup(member, selected), {
+      environmentId: configured.id, revision: 1, setup,
+    })
+    await store.setProjectDefaultEnvironment(owner, { ...selected, environmentId: null, revision: 3 })
+    assert.equal(await store.readCurrentProjectSetup(member, selected), null)
+  })
   const scope = { workspaceId: workspace.id, projectId, environmentId: env.id }
   await store.setProjectDefaultEnvironment(owner, { ...scope, revision: 1 })
   await store.saveEnvironment(owner, { workspaceId: workspace.id, id: env.id, revision: 1, name: 'Current name', configuration: {
@@ -48,6 +65,7 @@ test('Project setup history restores only the recipe after fresh binding and aut
   await assert.rejects(store.rollbackProjectSetup(owner, { ...request, bindingSnapshot: shared.bindingSnapshot }), { code: 'projectResourceConflict' })
   assert.equal((await database.query("select count(*)::integer count from workspace_resource_events where kind='environment.setup_restored' and \"resourceId\"=$1", [env.id])).rows[0].count, 1)
   await database.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [other])
+  await assert.rejects(store.readCurrentProjectSetup(owner, { workspaceId: workspace.id, projectId: other }), { code: 'projectNotFound' })
   await assert.rejects(store.listProjectSetupVersions(owner, { ...scope, projectId: other }))
   await database.query("update mikka_workspace_members set status='suspended' where \"workspaceId\"=$1 and \"userId\"=$2", [workspace.id, member])
   await assert.rejects(store.listProjectSetupVersions(member, scope))

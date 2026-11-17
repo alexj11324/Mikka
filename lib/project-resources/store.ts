@@ -193,6 +193,31 @@ export async function saveEnvironment(reader: Reader, raw: z.input<typeof saveEn
   })
 }
 
+const currentSetupScope = projectSetupScope.omit({ environmentId: true })
+
+function activeDefaultSetupBinding(workspaceId: string, projectId: string) {
+  return sql`from workspace_project_environments b
+    join workspace_projects p on p.id=b."projectId" and p."workspaceId"=b."workspaceId"
+    join workspace_environments e on e.id=b."environmentId" and e."workspaceId"=b."workspaceId"
+    where b."workspaceId"=${workspaceId} and b."projectId"=${projectId} and b."isDefault"
+      and p."archivedAt" is null and e."archivedAt" is null`
+}
+
+/** Read the current recipe without materializing the Environment's variables or secret IDs. */
+export async function readCurrentProjectSetup(reader: Reader, input: z.input<typeof currentSetupScope>) {
+  const { workspaceId, projectId } = currentSetupScope.parse(input)
+  return withConfiguredProject(reader, workspaceId, projectId, false, async (tx, project) => {
+    if (project.archivedAt) throw new ActionFailureError('projectNotFound')
+    const { rows: [current] } = await tx.execute<{ environmentId: string; revision: number; setup: unknown }>(sql`
+      select e.id as "environmentId", e.revision, e.configuration->'setup' as setup
+      ${activeDefaultSetupBinding(workspaceId, projectId)}`)
+    if (!current) return null
+    const setup = environmentConfiguration.shape.setup.nullable().safeParse(current.setup)
+    if (!setup.success) throw new ActionFailureError('projectEnvironmentUnavailable', undefined, undefined, { cause: setup.error })
+    return { environmentId: current.environmentId, revision: current.revision, setup: setup.data ?? null }
+  })
+}
+
 type SetupScope = z.infer<typeof projectSetupScope>
 async function withProjectSetup<T>(reader: Reader, scope: SetupScope, write: boolean, work: (tx: WorkspaceTransaction, environment: EnvironmentRow, projects: string[], bindingSnapshot: string) => Promise<T>) {
   const { withResourceAccess } = await import('@/lib/resource-access/store')
@@ -207,10 +232,7 @@ async function withProjectSetup<T>(reader: Reader, scope: SetupScope, write: boo
     }
     return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, write ? 'canSteer' : 'canReadContent', async () => {
       const environment = (await tx.execute<EnvironmentRow>(sql`select e.id,e."workspaceId",e.name,e.revision,e.configuration,e."archivedAt"
-        from workspace_project_environments b join workspace_projects p on p.id=b."projectId" and p."workspaceId"=b."workspaceId"
-        join workspace_environments e on e.id=b."environmentId" and e."workspaceId"=b."workspaceId"
-        where b."workspaceId"=${workspaceId} and b."projectId"=${projectId} and b."environmentId"=${environmentId}
-          and b."isDefault" and p."archivedAt" is null and e."archivedAt" is null`)).rows[0]
+        ${activeDefaultSetupBinding(workspaceId, projectId)} and b."environmentId"=${environmentId}`)).rows[0]
       if (!environment) throw new ActionFailureError('projectEnvironmentUnavailable')
       const bindings = await tx.execute<{ projectId: string }>(sql`select "projectId" from workspace_project_environments where "workspaceId"=${workspaceId} and "environmentId"=${environmentId}
         union select "projectId" from workspace_project_repositories where "workspaceId"=${workspaceId} and "environmentId"=${environmentId} order by 1`)

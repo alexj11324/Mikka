@@ -446,6 +446,13 @@
     "test": "lib/coding-workspace/terminal/http.test.ts",
     "suite": "test:coding-workspace-review-runtime"
   },
+  "app/api/workspaces/[workspaceId]/projects/[projectId]/setup/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads only the current default Environment setup and revision for a visible active Project in the selected Workspace. Reading never approves or runs a recipe.",
+    "test": "tests/project-setup-history.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "app/api/workspaces/[workspaceId]/service-identities/[identityId]/credential/route.ts": {
     "mode": "built-in",
     "environment": [],
