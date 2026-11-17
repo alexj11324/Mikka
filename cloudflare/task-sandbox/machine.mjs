@@ -1,7 +1,7 @@
 import { DurableObject, WorkerEntrypoint } from 'cloudflare:workers'
 import { Files } from '@cloudflare/sandbox'
 import { startTaskImage, TaskStartError } from './start.mjs'
-import { machineGrant, sameGrant, workspaceName, liveUntil, verifyCheckpoint, MAX_RUN_MS, CHECKPOINT_TIME_MS } from './grant.mjs'
+import { machineGrant, sameGrant, workspaceName, liveUntil, verifyCheckpoint, WORKSPACE_MACHINES, CHECKPOINT_TIME_MS } from './grant.mjs'
 import { TaskFiles } from './files.mjs'
 import { processOptions, taskProcess, stopTaskProcesses } from './process.mjs'
 import { TaskWorkspace } from './workspace.mjs'
@@ -28,13 +28,14 @@ export default class TaskMachines extends WorkerEntrypoint {
   writeFile(identity, path, bytes) { return this.#endpoint(identity).writeFile(identity, path, bytes) }
 }
 
-// Release the slot only after the dedicated compute has confirmed stop.
+// One object per workspace counts its running machines. Release the slot only
+// after the dedicated compute has confirmed stop.
 export class TaskCapacity extends DurableObject {
   acquire(task) {
     return this.ctx.storage.transaction(async tx => {
       const slots = await tx.list({ prefix: 'running:' })
       if (slots.has('running:' + task)) return true
-      if (slots.size >= 2) return false
+      if (slots.size >= WORKSPACE_MACHINES) return false
       await tx.put('running:' + task, true)
       return true
     })
@@ -65,14 +66,15 @@ export class TaskMachine extends DurableObject {
     this.queue = next.catch(() => {})
     return next
   }
-  idleLimit(run) { return Math.max(1, run.hardDeadline + CHECKPOINT_TIME_MS - Date.now()) }
-  admission() { return this.env.CAPACITY.getByName('product-task-machines') }
+  idleLimit(run) { return Math.max(1, run.expiresAt + CHECKPOINT_TIME_MS - Date.now()) }
+  admission(grant) { return this.env.CAPACITY.getByName('workspace:' + grant.workspaceId) }
   async startImage(run) {
     const container = this.ctx.container
     if (!container) throw new Error('Task container unavailable')
     await startTaskImage(container, { image: container.images.task, instance: 'standard-3',
       enableInternet: this.env.NATIVE_TASK_EGRESS === 'direct',
-      entrypoint: ['sleep', String(Math.max(1, Math.ceil(this.idleLimit(run) / 1000)))] }, this.idleLimit(run))
+      // The prepaid lease, renewed in place, decides when it stops; never a fixed run length.
+      entrypoint: ['sleep', 'infinity'] }, this.idleLimit(run))
   }
   async verifyScope(grant) {
     if (this.ctx.id.toString() !== this.env.TASKS.idFromName(workspaceName(grant)).toString()) {
@@ -98,18 +100,19 @@ export class TaskMachine extends DurableObject {
         if (prior.settledAt || prior.stoppedAt) throw new Error('Task machine run already settled')
         if (!this.ctx.container?.running || prior.state !== 'running') throw new Error('Task machine interrupted')
         // An expired lease cannot be revived even if its alarm is delayed.
-        liveUntil(prior, now, prior.hardDeadline)
-        const expiresAt = liveUntil(grant, now, prior.hardDeadline)
+        liveUntil(prior, now)
+        const expiresAt = liveUntil(grant, now)
         if (expiresAt > prior.expiresAt) {
-          await store.put('run', { ...prior, expiresAt })
+          const renewed = { ...prior, expiresAt }
+          await store.put('run', renewed)
           await store.setAlarm(expiresAt)
+          await this.ctx.container.setInactivityTimeout(this.idleLimit(renewed))
         }
         return { state: 'running', restored: prior.restored, instanceId: this.ctx.id.toString() }
       }
       if (prior && !prior.stoppedAt) throw new Error('Task machine already has a writer')
       // Old deployments fenced the entire run. Keep every existing tombstone.
-      // New runs can resume on a distinct API-authorized operation, retaining
-      // the compute already consumed across all prior operations of this run.
+      // New runs can resume on a distinct API-authorized operation.
       if (await store.get('closed:' + grant.runId) || await store.get('closed-operation:' + grant.operationId)) {
         throw new Error('Task machine run already settled')
       }
@@ -124,17 +127,15 @@ export class TaskMachine extends DurableObject {
             proof.witness.worktreePath !== review.worktreePath) throw Error('Original task review checkout unavailable')
         witness = proof.witness
       }
-      const consumed = await store.get('spent:' + grant.runId) ?? 0
-      const hardDeadline = now + Math.max(0, MAX_RUN_MS - consumed)
-      const expiresAt = liveUntil(grant, now, hardDeadline)
-      const run = { state: 'starting', grant, hardDeadline, expiresAt, admittedAt: now, consumed, ...(review ? {review} : {}) }
+      const expiresAt = liveUntil(grant, now)
+      const run = { state: 'starting', grant, expiresAt, admittedAt: now, ...(review ? {review} : {}) }
       await store.setAlarm(expiresAt)
       await store.put('run', run)
-      if (!await this.admission().acquire(this.ctx.id.toString())) {
+      if (!await this.admission(grant).acquire(this.ctx.id.toString())) {
         if (prior) await store.put('run', prior)
         else await store.delete('run')
         await store.deleteAlarm()
-        throw new Error('Product task machine capacity exhausted')
+        throw new Error('Workspace task machine capacity exhausted')
       }
       try {
         await this.startImage(run)
@@ -183,7 +184,7 @@ export class TaskMachine extends DurableObject {
     return this.exclusive(async () => {
       const run = await this.current(grant)
       if (run.review) throw Error('Task workspace has an exclusive human reviewer')
-      liveUntil(grant, Date.now(), Math.min(run.expiresAt, run.hardDeadline))
+      liveUntil({ expiresAt: Math.min(grant.expiresAt, run.expiresAt) }, Date.now())
       if (run.state !== 'running' || !this.ctx.container?.running) throw new Error('Task machine is not running')
       if (await this.ctx.storage.get('nativeWriter')) throw new Error('Task workspace has an active native writer')
       return operation(this.ctx.container, run)
@@ -269,11 +270,10 @@ export class TaskMachine extends DurableObject {
     if (container?.running) await container.destroy()
     if (container?.running) throw new Error('Task machine stop unconfirmed')
     await store.delete('nativeWriter')
-    await this.admission().release(this.ctx.id.toString())
+    await this.admission(run.grant).release(this.ctx.id.toString())
     const stopped = { ...run, state: 'stopped', stoppedAt: Date.now() }
-    // Commit the budget and fence atomically. A retried stop cannot double-count.
-    await store.put({ run: stopped, ['closed-operation:' + run.grant.operationId]: true,
-      ['spent:' + run.grant.runId]: (run.consumed ?? 0) + Math.max(0, stopped.stoppedAt - run.admittedAt) })
+    // Commit the stop and its operation fence atomically.
+    await store.put({ run: stopped, ['closed-operation:' + run.grant.operationId]: true })
     await this.workspace.prune()
     for (const [key, lease] of await store.list({prefix:'review-lease:'})) {
       if ((lease.discardAfter ?? lease.scope?.expiresAt ?? Infinity) >= Date.now()) continue

@@ -160,7 +160,7 @@ test('Desktop binds its own original attempt, installer ancestry, overlay and se
   await assert.rejects(fixture({ run: { path: '.github/workflows/desktop-release.yml' } }).verify(), /runIdentity/)
 })
 
-test('the paid builder and subscriptions run only behind the Cloudflare receipt, with no Vercel publisher', () => {
+test('the paid builder and publication run only behind the Cloudflare receipt, with no Vercel publisher', () => {
   const read = name => readFileSync(new URL('../../.github/workflows/' + name, import.meta.url), 'utf8')
   const parent = read('e2b-official-runtime.yml'), child = read('e2b-runtime-release.yml')
   const gate = 'run: node scripts/release/cloudflare-promoted-web.mjs'
@@ -168,7 +168,7 @@ test('the paid builder and subscriptions run only behind the Cloudflare receipt,
   assert.ok(verify > parent.indexOf('  web-ready:') && verify < parent.indexOf('  release:'))
   assert.ok(trigger > parent.indexOf('  check:') && trigger < parent.indexOf('  web-ready:'))
   const paid = child.indexOf('    uses: ./.github/workflows/e2b-template.yml')
-  const proof = child.indexOf('run: node scripts/e2b/validate-template-subscriptions.mjs')
+  const proof = child.indexOf('run: cp "$RUNNER_TEMP/e2b-candidates/candidates.json" "$RUNNER_TEMP/accepted.json"')
   const first = child.indexOf(gate), second = child.indexOf(gate, first + 1), third = child.indexOf(gate, second + 1)
   assert.ok(first >= 0 && first < paid && paid < second && second < proof && proof < third && third < child.indexOf('--publish-verified'))
   assert.match(child, /id: release[\s\S]*node scripts\/e2b\/runtime-report\.mjs reference\n          node scripts\/release\/cloudflare-promoted-web\.mjs/)

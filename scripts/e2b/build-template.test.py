@@ -725,34 +725,8 @@ with fixture.root_file_metadata():
         report = {'sourceCommit': 'a' * 40, 'workerSha': 'b' * 40, 'templates': {
             kind: {'templateId': 'tpl-' + kind, 'buildId': 'build-' + kind, 'baseTemplate': kind, 'preinstalled': True,
                    'conservation': conservation(kind)} for kind in bt.KINDS}}
-        with self.assertRaisesRegex(ValueError, 'release_subscription_acceptance_missing'):
-            bt.verify_release_evidence(report)
-        report['subscriptionAcceptance'] = {
-            kind: {'status': 'passed', 'templateId': 'tpl-' + kind, 'sourceCommit': report['sourceCommit'],
-                   'workerSha': report['workerSha'], 'harness': harness, 'model': model, 'credentialRoute': 'subscription',
-                   'officialBinarySha256': 'e' * 64, 'officialCliVersion': 'fixture-version',
-                   'bootstrapAcceptance': bootstrap_acceptance('run-' + kind, harness),
-                   'agentAcceptance': {'runIdHash': hashlib.sha256(('run-' + kind).encode()).hexdigest()[:16], 'harness': harness,
-                                       'kind': 'claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack', 'at': 1100, 'ms': 100},
-                   'runtimeAuthorization': {'source': 'http_server_link', 'scope': 'daemon_http_server_link_and_task_fetch',
-                                            'complete': True, 'truncated': False, 'extraRemoteCalls': 0,
-                                            'hostAuthorizationComplete': True, 'allFirstPartyHttpComplete': False,
-                                            'basis': 'host_authorization_census_and_closed_mcp_business_paths',
-                                            'mcpHttpTiming': mcp_timing('run-' + kind, harness), 'observedProviderEvents': 1,
-                                            'officialDelivery': 'best_effort_not_a_complete_call_count'},
-                   'replyVerifiedAfterTool': True, 'toolEvidence': {'toolCallHash': 'd' * 16, 'outcome': 'ok'},
-                   'replyVerified': True, 'runId': 'run-' + kind, 'deviceId': 'device-' + kind}
-            for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]}
+        # Build-time checks only: no subscription run is needed to publish (E2B runs on the user's own key).
         self.assertIs(bt.verify_release_evidence(report), report)
-        for field, value in [('bootstrapAcceptance', None), ('bootstrapAcceptance', bootstrap_acceptance('foreign', 'codex')), ('templateId', 'old-template'), ('sourceCommit', 'c' * 40), ('credentialRoute', 'api_key'), ('replyVerified', False), ('model', 'other'),
-                             ('replyVerifiedAfterTool', None), ('replyVerifiedAfterTool', False), ('toolEvidence', None),
-                             ('toolEvidence', {'toolCallHash': 'd' * 16, 'outcome': 'error'}),
-                             ('toolEvidence', {'toolCallHash': 'raw-id', 'outcome': 'ok'}),
-                             ('toolEvidence', {'toolCallHash': 'd' * 16, 'outcome': 'ok', 'providerText': 'must-not-pass'})]:
-            invalid = json.loads(json.dumps(report))
-            invalid['subscriptionAcceptance']['codex'][field] = value
-            with self.assertRaisesRegex(ValueError, 'release_subscription_acceptance_missing codex'):
-                bt.verify_release_evidence(invalid)
         invalid = json.loads(json.dumps(report))
         invalid['templates']['desktop']['conservation']['after']['sha256'] = 'e' * 64
         with self.assertRaisesRegex(ValueError, 'release_conservation_invalid desktop'):

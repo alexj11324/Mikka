@@ -21,10 +21,10 @@ test('task workspaces and fenced run ownership have independent lifetimes', () =
   assert.throws(() => machineGrant({ ...scope, taskId: '../other' }), /Invalid/)
 })
 
-test('only a live scoped execution lease can retain compute through its original hard deadline', () => {
-  assert.equal(liveUntil(scope, now, now + 60_000), now + 60_000)
-  assert.throws(() => liveUntil(scope, now, now - 1), /expired/)
-  assert.throws(() => liveUntil({ expiresAt: now - 1 }, now, now + 60_000), /expired/)
+test('only a live prepaid lease retains compute; there is no fixed run length', () => {
+  assert.equal(liveUntil(scope, now), scope.expiresAt)
+  assert.equal(liveUntil({ expiresAt: now + 6 * 3_600_000 }, now), now + 6 * 3_600_000)
+  assert.throws(() => liveUntil({ expiresAt: now - 1 }, now), /expired/)
 })
 
 test('a required recovery cannot silently open another instance, stale R2 data, or a fresh directory', () => {

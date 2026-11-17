@@ -893,7 +893,11 @@ def observed_bootstrap_adoption(value, run_id_hash, harness):
 
 
 def verify_release_evidence(report):
-    """Publishing cannot substitute a model-list probe for subscription execution."""
+    """Publish only built candidates of this source with their conservation receipts.
+
+    E2B runs on the user's own key: the release keeps build-time checks (the
+    template builds, both CLIs start, the fence opens) and no subscription run.
+    """
     if not re.fullmatch(r'[a-f0-9]{40}', report.get('sourceCommit', '')) or not re.fullmatch(r'[a-f0-9]{40}', report.get('workerSha', '')):
         raise ValueError('release_source_invalid')
     for kind in KINDS:
@@ -907,34 +911,6 @@ def verify_release_evidence(report):
             official_files_guard().validate_receipt(proof, kind)
         except (ValueError, KeyError, TypeError):
             raise ValueError(f'release_conservation_invalid {kind}') from None
-    subscriptions = report.get('subscriptionAcceptance', {})
-    for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]:
-        row = subscriptions.get(kind, {})
-        ack, authorization, tool = row.get('agentAcceptance', {}), row.get('runtimeAuthorization', {}), row.get('toolEvidence')
-        if (row.get('status') != 'passed' or row.get('templateId') != report['templates'][kind]['templateId']
-                or row.get('sourceCommit') != report['sourceCommit'] or row.get('workerSha') != report['workerSha']
-                or row.get('harness') != harness or row.get('model') != model
-                or row.get('credentialRoute') != 'subscription' or row.get('replyVerified') is not True
-                or row.get('replyVerifiedAfterTool') is not True or not isinstance(tool, dict)
-                or set(tool) != {'toolCallHash', 'outcome'} or tool.get('outcome') != 'ok'
-                or not isinstance(tool.get('toolCallHash'), str) or not re.fullmatch(r'[a-f0-9]{16}', tool['toolCallHash'])
-                or not re.fullmatch(r'[a-f0-9]{64}', row.get('officialBinarySha256', ''))
-                or not isinstance(row.get('officialCliVersion'), str) or not row['officialCliVersion']
-                or not row.get('runId') or not row.get('deviceId')
-                or ack.get('harness') != harness or ack.get('runIdHash') != hashlib.sha256(row['runId'].encode()).hexdigest()[:16]
-                or ack.get('kind') != ('claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack')
-                or type(ack.get('at')) is not int or ack['at'] <= 0
-                or type(ack.get('ms')) not in (int, float) or not math.isfinite(ack['ms']) or ack['ms'] < 0
-                or authorization.get('source') != 'http_server_link' or authorization.get('complete') is not True
-                or authorization.get('scope') != 'daemon_http_server_link_and_task_fetch'
-                or authorization.get('truncated') is not False or type(authorization.get('extraRemoteCalls')) is not int or authorization['extraRemoteCalls'] != 0
-                or authorization.get('hostAuthorizationComplete') is not True or authorization.get('allFirstPartyHttpComplete') is not False
-                or authorization.get('basis') != 'host_authorization_census_and_closed_mcp_business_paths'
-                or type(authorization.get('observedProviderEvents')) is not int or authorization['observedProviderEvents'] < 1
-                or authorization.get('officialDelivery') != 'best_effort_not_a_complete_call_count'
-                or not observed_mcp_business_evidence(authorization.get('mcpHttpTiming'), ack.get('runIdHash'), harness)
-                or not observed_bootstrap_adoption(row.get('bootstrapAcceptance'), ack.get('runIdHash'), harness)):
-            raise ValueError(f'release_subscription_acceptance_missing {kind}')
     return report
 
 def publish(template_id, build_id, api_key, opener=urllib.request.urlopen):
@@ -956,7 +932,7 @@ def main(argv=None):
     parser.add_argument('--name', help='Prefix for the new versioned template names (<prefix>-<kind>); do not reuse a production alias')
     parser.add_argument('--kind', action='append', choices=sorted(KINDS), help='Template to build; repeat for several (default: all)')
     parser.add_argument('--source-ref', default='HEAD', help='Git commit to package; defaults to HEAD')
-    parser.add_argument('--publish-verified', type=Path, help='Publish only a release report that includes conservation and both real subscription passes')
+    parser.add_argument('--publish-verified', type=Path, help='Publish only a release report of this source with both templates\' conservation receipts')
     parser.add_argument('--json', action='store_true', help='Print one JSON object on stdout; build logs go to stderr')
     parser.add_argument('--worker-hash', action='store_true', help='Only print the worker hash of --source-ref; builds nothing')
     args = parser.parse_args(argv)

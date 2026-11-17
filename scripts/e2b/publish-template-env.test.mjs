@@ -106,11 +106,6 @@ test('publication reads complete file evidence and retains independently bound m
   assert.throws(() => publicationInputFromFile(path, { ...expected, runAttempt: '3' }), /attempt_mismatch/)
   assert.throws(() => publicationInputFromFile(path, { ...expected, sha256: 'c'.repeat(64) }), /digest_mismatch/)
   assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, templates: { ...TEMPLATES, codex: 'other' } })), /template_invalid/)
-  delete evidence.subscriptionAcceptance.claude
-  const invalid = Buffer.from(JSON.stringify(evidence))
-  writeFileSync(path, invalid)
-  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /runtime_release_owner_scope_invalid claude/)
-  assert.throws(() => cloudflareRuntimeConfiguration(path, { ...expectedRelease, sha256: reportDigest(invalid) }), /runtime_release_owner_scope_invalid claude/)
 })
 
 test('the publisher CLI reports a closed parse error without printing the report cause', t => {
@@ -471,36 +466,8 @@ test('GitHub-only build timeline waits for source upload before the single runti
 })
 
 
-test('publication requires both real subscriptions on these exact candidates before any network request', async () => {
+test('publication requires these exact public candidates before any network request', async () => {
   for (const mutate of [
-    evidence => { delete evidence.acceptanceScope },
-    evidence => { evidence.acceptanceScope.account = 'owner_login' },
-    evidence => { evidence.acceptanceScope.workspaceRestored = false },
-    evidence => { evidence.subscriptionAcceptance.claude.ownerScope.payerHash = '2'.repeat(16) },
-    evidence => { evidence.subscriptionAcceptance.codex.ownerScope.access = 'workspace_share' },
-    value => { delete value.subscriptionAcceptance.codex },
-    value => { value.subscriptionAcceptance.claude.credentialRoute = 'api_key' },
-    value => { value.subscriptionAcceptance.codex.model = 'other-model' },
-    value => { value.subscriptionAcceptance.claude.workerSha = OTHER },
-    value => { delete value.subscriptionAcceptance.codex.officialBinarySha256 },
-    value => { value.subscriptionAcceptance.claude.agentAcceptance.kind = 'claude_system_init' },
-    value => { value.subscriptionAcceptance.codex.agentAcceptance.runIdHash = 'f'.repeat(16) },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.extraRemoteCalls = 1 },
-    value => { delete value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.runIdHash = 'f'.repeat(16) },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.remoteMcpServerCount = 1 },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.childLifecycleComplete = true },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.requests[0].sequence = 2 },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.mcpHttpTiming.requests[0].status = 503 },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.allFirstPartyHttpComplete = true },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.basis = 'all_mikka_http_sends_during_execution_counted' },
-    value => { value.subscriptionAcceptance.codex.runtimeAuthorization.observedProviderEvents = 0 },
-    value => { delete value.subscriptionAcceptance.codex.replyVerifiedAfterTool },
-    value => { value.subscriptionAcceptance.codex.replyVerifiedAfterTool = false },
-    value => { delete value.subscriptionAcceptance.claude.toolEvidence },
-    value => { value.subscriptionAcceptance.claude.toolEvidence.outcome = 'error' },
-    value => { value.subscriptionAcceptance.claude.toolEvidence.toolCallHash = 'raw-id' },
-    value => { value.subscriptionAcceptance.claude.toolEvidence.providerText = 'must-not-pass' },
     value => { value.templates.codex.models[0].models = ['unmeasured-model'] },
     value => { value.templates.desktop.conservation.after = { ...PROOF, sha256: 'e'.repeat(64) } },
     value => { value.templates.codex.public = false },
@@ -513,19 +480,3 @@ test('publication requires both real subscriptions on these exact candidates bef
   }
 })
 
-test('publication requires the same bounded bootstrap adoption proof after the native subscription passed', () => {
-  for (const mutate of [
-    row => { delete row.bootstrapAcceptance },
-    row => { row.bootstrapAcceptance.preparationTiming.source = 'prepared_agent_start' },
-    row => { row.bootstrapAcceptance.preparationTiming.claimAuthentication = 'ordinary_path' },
-    row => { row.bootstrapAcceptance.preparationTiming.observedAuthSource = 'oauth_descriptor' },
-    row => { row.bootstrapAcceptance.preparationTiming.phases.push({ ...row.bootstrapAcceptance.preparationTiming.phases[0] }) },
-    row => { row.bootstrapAcceptance.runIdHash = 'f'.repeat(16) },
-    row => { row.bootstrapAcceptance.hintSha256 = '' },
-    row => { row.bootstrapAcceptance.preparationTiming.phases[0].outcome = 'error' },
-  ]) {
-    const value = structuredClone(EVIDENCE); mutate(value.subscriptionAcceptance.claude)
-    assert.throws(() => assertReleaseEvidence({ sourceCommit: COMMIT, sourceSha: SHA, templates: TEMPLATES, models: MODELS,
-      releaseEvidence: value }), /runtime_release_subscription_missing claude/)
-  }
-})

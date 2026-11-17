@@ -93,3 +93,33 @@ test('an uncommitted first checkpoint is reclaimed without removing a committed 
   await workspace.prune()
   assert.deepEqual(objects, new Set([otherTask, note, committed]))
 })
+
+test('each workspace runs up to WORKSPACE_MACHINES machines at once, with no platform-wide cap', async () => {
+  const ports = {
+    'cloudflare:workers': 'export class DurableObject {} export class WorkerEntrypoint {} export class RpcTarget {}',
+    '@cloudflare/sandbox': 'export class DirectoryBackup {} export class DirectoryBackupGateway {} export class Files {} export class SandboxFileError {}',
+  }
+  const hooks = registerHooks({ resolve(specifier, context, next) {
+    return specifier in ports ? { shortCircuit: true, url: 'data:text/javascript,' + encodeURIComponent(ports[specifier]) } : next(specifier, context)
+  } })
+  let TaskCapacity, TaskMachine, WORKSPACE_MACHINES
+  try { ({ TaskCapacity, TaskMachine } = await import('./machine.mjs')); ({ WORKSPACE_MACHINES } = await import('./grant.mjs')) } finally { hooks.deregister() }
+  assert.equal(WORKSPACE_MACHINES, 25)
+  const objects = new Map()
+  const capacity = name => {
+    if (!objects.has(name)) {
+      const data = new Map()
+      const storage = { async list({ prefix }) { return new Map([...data].filter(([key]) => key.startsWith(prefix))) },
+        async put(key, value) { data.set(key, value) }, async delete(key) { return data.delete(key) } }
+      objects.set(name, Object.assign(Object.create(TaskCapacity.prototype), { ctx: { storage: { ...storage, transaction: operation => operation(storage) } } }))
+    }
+    return objects.get(name)
+  }
+  const machine = Object.assign(Object.create(TaskMachine.prototype), { env: { CAPACITY: { getByName: capacity } } })
+  const [one, two] = [randomUUID(), randomUUID()]
+  for (let i = 0; i < WORKSPACE_MACHINES; i++) assert.equal(await machine.admission({ workspaceId: one }).acquire('m' + i), true)
+  assert.equal(await machine.admission({ workspaceId: one }).acquire('extra'), false)
+  assert.equal(await machine.admission({ workspaceId: two }).acquire('other'), true, 'another workspace has its own machines')
+  await machine.admission({ workspaceId: one }).release('m0')
+  assert.equal(await machine.admission({ workspaceId: one }).acquire('extra'), true)
+})
