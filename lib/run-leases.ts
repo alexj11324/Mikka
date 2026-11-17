@@ -69,7 +69,7 @@ export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners:
  * runs it no longer holds come back as `revoked`, so the daemon stops them
  * before a retry of the same run starts.
  */
-export async function renewRunLeases(deviceId: string, runIds: readonly string[], now = new Date()): Promise<{ leases: Record<string, string>; revoked?: string[] }> {
+export async function renewRunLeases(deviceId: string, runIds: readonly string[], now = new Date(), claimTokenId?: string): Promise<{ leases: Record<string, string>; revoked?: string[]; cancelled?: string[] }> {
   if (!runIds.length) return { leases: {} }
   // Protocol IDs can be short strings, but agent_runs.id is a UUID. Such an ID
   // cannot be held here; revoke it without making PostgreSQL reject the whole beat.
@@ -77,27 +77,42 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
   const leaseExpiresAt = new Date(now.getTime() + RUN_LEASE_MS)
   const candidates = validRunIds.length ? await db.select().from(agentRuns).where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.id, validRunIds), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]))) : []
   const renewed: string[] = []
+  const cancelled: string[] = []
   for (const run of candidates) {
     try {
       // Historical runs may lack a frozen resource identity. That never
       // exempts their persisted tenant from current membership checks.
       if (!run.workspaceId || (run.agentDefinition?.executionIdentity?.workspaceId
         && run.agentDefinition.executionIdentity.workspaceId !== run.workspaceId)) throw new ExecutionIdentityError()
-      const held = await withTaskWorkspace(run.userId, run.workspaceId, async () => {
+      const outcome = await withTaskWorkspace(run.userId, run.workspaceId, async () => {
         await revalidateExecutionIdentity(pool, run)
-        // Membership stays pinned until this atomic application write finishes.
-        // Recheck mutable task deletion and Bot provenance in that same write.
-        return db.update(agentRuns).set({ leaseExpiresAt, updatedAt: now }).where(and(
+        // Reuse the same device, task and Bot fences for renewal and cancellation attribution.
+        const current = and(
           eq(agentRuns.id, run.id), eq(agentRuns.deviceId, deviceId),
-          eq(agentRuns.workspaceId, run.workspaceId!), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), isNull(agentRuns.stopRequestedAt),
+          eq(agentRuns.workspaceId, run.workspaceId!), inArray(agentRuns.status, [...LEASED_RUN_STATUSES]),
           sql`(${agentRuns.issueId} IS NULL OR EXISTS (SELECT 1 FROM issues task WHERE task.id=${agentRuns.issueId}
             AND task."workspaceId"=${agentRuns.workspaceId} AND task."ownershipState"='bound'
             AND coalesce(task.content->'attrs'->'mikka',task.content->'attrs'->'orvilo')->>'deletedAt' IS NULL))`,
           sql`(${agentRuns.botId} IS NULL OR EXISTS (SELECT 1 FROM bots bot WHERE bot.id=${agentRuns.botId}
             AND bot."workspaceId"=${agentRuns.workspaceId} AND bot."archivedAt" IS NULL))`,
-        )).returning({ id: agentRuns.id })
+        )
+        const held = await db.update(agentRuns).set({ leaseExpiresAt, updatedAt: now })
+          .where(and(current, isNull(agentRuns.stopRequestedAt))).returning({ id: agentRuns.id })
+        if (held.length || !claimTokenId) return { held, cancelledId: undefined }
+        // The explicit stop could have committed while renewal waited for the Run.
+        // No lease is returned for this result. Unknown or expired claims stay revoked.
+        const [stop] = await db.select({ id: agentRuns.id }).from(agentRuns)
+          .where(and(current, eq(agentRuns.explicitStopRequested, true), isNotNull(agentRuns.stopRequestedAt),
+            eq(agentRuns.deviceTokenId, claimTokenId), gt(agentRuns.leaseExpiresAt, sql`clock_timestamp()`),
+            sql`EXISTS (SELECT 1 FROM device_tokens t JOIN devices d ON d.id=${agentRuns.deviceId}
+              WHERE t.id=${agentRuns.deviceTokenId} AND t."userId"=${agentRuns.userId}
+                AND d."ownerId"=t."userId" AND d.kind='local' AND d."removedAt" IS NULL
+                AND t."revokedAt" IS NULL AND (t."expiresAt" IS NULL OR t."expiresAt">clock_timestamp())
+                AND NOT EXISTS (SELECT 1 FROM device_credential_revocations v WHERE v."tokenId"=t.id))`))
+        return { held, cancelledId: stop?.id }
       })
-      renewed.push(...held.map(row => row.id))
+      renewed.push(...outcome.held.map(row => row.id))
+      if (outcome.cancelledId) cancelled.push(outcome.cancelledId)
     }
     catch (error) {
       if (!(error instanceof ExecutionIdentityError) && !(error instanceof ActionFailureError && error.code === 'workspaceAccessDenied')) throw error
@@ -113,7 +128,7 @@ export async function renewRunLeases(deviceId: string, runIds: readonly string[]
   for (const run of stopped) { await runListChanged(db, run.id); await runChanged(db, run.id) }
   if (stopped.length) armDueTimerSoon('run-recovery')
   const revoked = runIds.filter(id => !held.has(id))
-  return { leases: Object.fromEntries([...held].map(id => [id, leaseExpiresAt.toISOString()])), ...(revoked.length ? { revoked } : {}) }
+  return { leases: Object.fromEntries([...held].map(id => [id, leaseExpiresAt.toISOString()])), ...(revoked.length ? { revoked } : {}), ...(cancelled.length ? { cancelled } : {}) }
 }
 
 /**

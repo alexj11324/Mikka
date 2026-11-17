@@ -472,6 +472,8 @@ export const agentRuns = pgTable('agent_runs', {
   /** On a thread's root run: the root of the thread that replaced it, when the person explicitly asked for a new one. */
   threadReplacedBy: uuid('threadReplacedBy').references((): AnyPgColumn => agentRuns.id, { onDelete: 'set null' }),
   stopRequestedAt: timestamp('stopRequestedAt', { withTimezone: true }),
+  /** Set with an explicit owner-scoped cancel request, never inferred from a policy or lease stop. */
+  explicitStopRequested: boolean('explicitStopRequested').notNull().default(false),
   startedAt: timestamp('startedAt', { withTimezone: true }),
   finishedAt: timestamp('finishedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),

@@ -123,6 +123,19 @@ describe("supervisor structured terminal failures", () => {
     expect(f.server.runs.get(f.runId)?.completion).toMatchObject({ stopReason: mode === "cancel" ? "cancelled" : "device_lost" })
     expect(f.server.runs.get(f.runId)?.completion?.failureDetails).toBeUndefined()
   })
+  it.each(["owner", "lost", "lost-after-owner"] as const)("immediately stops a revoked claim and keeps the %s cause", async mode => {
+    const f = await fixture({ outcome: "failed", error: "fixture exit" })
+    const collecting = deferred(), release = deferred()
+    vi.spyOn(f.worktrees, "changedFiles").mockImplementationOnce(async () => { collecting.resolve(); await release.promise; return [] })
+    f.supervisor.start(f.assignment)
+    await collecting.promise
+    const revoked = [f.runId]
+    if (mode !== "lost") f.supervisor.revokeLeases(revoked, revoked)
+    if (mode !== "owner") f.supervisor.revokeLeases(revoked)
+    release.resolve()
+    await f.supervisor.idle(); await f.outbox.flushAll()
+    expect(f.server.runs.get(f.runId)?.completion?.stopReason).toBe(mode === "owner" ? "cancelled" : "device_lost")
+  })
   it("does not accept failure details from a model handoff", async () => {
     const f = await fixture({ outcome: "failed", report: { summary: "Tool failed", failureDetails: failure } as unknown as ExitEvent["report"] })
     f.supervisor.start(f.assignment)
