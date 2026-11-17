@@ -3392,5 +3392,12 @@
     "behavior": "Read the retained id and name of archived Organizations for the current active owner through the existing governance directory.",
     "test": "lib/enterprise/governance.db.test.ts",
     "suite": "test:enterprise-db"
+  },
+  "lib/agent-no-model.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A cloud dispatch that names an Agent with no usable model is refused with agentNoModel, its message and a link to 模型与订阅, instead of agentProfileUnavailable.",
+    "test": "tests/cloud-runtime-auto.db.test.ts",
+    "suite": "test:bot-threads-db"
   }
 }
