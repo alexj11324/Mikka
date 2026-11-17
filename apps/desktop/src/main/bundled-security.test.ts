@@ -90,6 +90,9 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     ['/api/drive/shares', ['GET']],
     ['/api/drive/shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844', ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive-shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844', ['PATCH', 'DELETE']],
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions', ['GET']],
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000', ['GET']],
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/file-versions', ['GET']],
     ['/api/drive/volumes', ['GET', 'POST']],
     [`/api/drive/volumes/${volume}`, ['GET']],
     [`/api/drive/volumes/${volume}/files`, ['GET']],
@@ -184,6 +187,15 @@ test('resource policy and approval requests use only their own declared methods'
     assert.equal(allowedApiPath(root + '/approvals', method), ['POST', 'PATCH'].includes(method))
     assert.equal(allowedApiPath(root + '/approvals/all', method), false)
     assert.equal(allowedApiPath('/api/organizations/unknown/policy', method), false)
+  }
+})
+
+test('Organization Files forwards only a signed directory read', () => {
+  const path = '/api/organizations/' + identity.user.id + '/drive-shares'
+  for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowedApiPath(path, method), method === 'GET')
+    assert.equal(allowedApiPath(path + '/all', method), false)
+    assert.equal(allowedApiPath('/api/organizations/unknown/drive-shares', method), false)
   }
 })
 

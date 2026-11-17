@@ -2,12 +2,12 @@ import 'server-only'
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { workspacePool } from '@/lib/workspace-db'
-import { driveShareViewUrl } from './location'
-import type { DriveFileLinkVisibility, DriveScope, DriveShareView } from './contract'
+import { driveShareViewUrl, type DriveVolumeLocation } from './location'
+import type { DriveFileLinkVisibility, DriveShareView } from './contract'
 import { DriveError } from './store'
 
 type Database = Pick<PoolClient, 'query'>
-export type ShareLocation = { volumeId: string; workspaceId: string; driveScope: DriveScope; projectId: string | null }
+export type ShareLocation = DriveVolumeLocation
 
 /** This locator yields no file or account data. The caller must acquire the
  * normal Workspace/Project lease and admit this exact volume before reading. */

@@ -16,7 +16,7 @@ import { workspaceListChanged } from '@/lib/live/lists'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVolumeVersionId } from './contract'
 import { boundedDriveBytes, driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
 import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
-import { createDriveVolume, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
+import { createDriveVolume, findDriveVolumeLocation, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
 import { driveFileLocation } from './location'
 import { driveErrorResponse } from './http'
 import { listDriveSkills } from './skills'
@@ -31,7 +31,7 @@ const write = z.object({ expectedDigest: digest, mutationId, changes: z.array(z.
   z.object({ op: z.literal('delete'), path: z.string().refine(isDrivePath) }).strict(),
 ])).min(1).max(DRIVE_MAX_CHANGES) }).strict()
 const restore = z.object({ versionId, expectedDigest: digest, mutationId }).strict()
-type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive' | 'links' | 'link' | 'workspaceLinks' | 'shareView'
+type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive' | 'links' | 'link' | 'workspaceLinks' | 'shareView' | 'organizationFileHistory'
 type Params = { volumeId?: string; versionId?: string; shareId?: string; organizationId?: string }
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers })
 
@@ -53,7 +53,15 @@ export async function driveResponse(request: Request, operation: Operation, para
     const search = new URL(request.url).searchParams
     const viewId = operation === 'shareView' ? z.uuid().parse(params.shareId) : null
     if (viewId && (params.organizationId ? search.size !== 0 : [...search.keys()].some(key => key !== 'download'))) throw new DriveError('drive_write_invalid', 400)
-    const located = viewId ? await findShareLocation(pool, viewId, session.user.id) : null
+    let located = viewId ? await findShareLocation(pool, viewId, session.user.id) : null
+    const organizationVersionRead = params.organizationId && (operation === 'version' || operation === 'history')
+    if (organizationVersionRead && search.size) throw new DriveError('drive_write_invalid', 400)
+    let historyPath: string | undefined
+    if (operation === 'organizationFileHistory') {
+      if ([...search.keys()].some(key => key !== 'path') || search.getAll('path').length !== 1) throw new DriveError('drive_write_invalid', 400)
+      historyPath = z.string().refine(isDrivePath).parse(search.get('path'))
+    }
+    if (historyPath !== undefined || organizationVersionRead) located = await findDriveVolumeLocation(pool, z.string().refine(isVolumeId).parse(params.volumeId), session.user.id)
     const workspaceId = located?.workspaceId ?? z.uuid().parse(search.get('workspaceId')).toLowerCase()
     if (located) {
       const selected = workspaceSelection(request.headers)
@@ -139,6 +147,13 @@ export async function driveResponse(request: Request, operation: Operation, para
       }
       const volume = await readDriveVolume(pool, actor, located?.volumeId ?? params.volumeId)
       if (located && viewId && !params.organizationId && !search.has('download')) return json(await readShareView(pool, located, viewId, actor.ownerId, session.user.id))
+      if (historyPath !== undefined) {
+        const versions = await readDriveFileHistory(pool, actor, volume.id, historyPath, { limit: null })
+        return json(versions.flatMap(v => v.file ? [{
+          versionId: v.id, sha256: v.file.sha256, sizeBytes: v.file.sizeBytes, createdAt: v.createdAt,
+          threadTitle: v.threadTitle, authorName: v.authorName,
+        }] : []))
+      }
       if (operation === 'links') {
         if (request.method === 'POST') {
           const { path } = z.object({ path: z.string().refine(isDrivePath) }).strict().parse(await body(request))
@@ -168,6 +183,11 @@ export async function driveResponse(request: Request, operation: Operation, para
         return json({ volume, head: { headVersionId: version.id, headDigest: version.digest, entries: version.manifest } })
       }
       if (operation === 'history') {
+        if (params.organizationId) {
+          const versions = await readDriveHistory(pool, actor, volume.id, { limit: null })
+          return json(versions.map(({ id, kind, fileCount, totalBytes, createdAt, threadId, threadTitle, authorName }) =>
+            ({ id, volumeId: volume.id, kind, fileCount, totalBytes, createdAt, threadId, threadTitle, authorName })))
+        }
         const limit = z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50')
         const beforeId = search.has('before') ? versionId.parse(search.get('before')) : undefined
         const options = { limit: limit + 1, beforeId }
@@ -177,7 +197,11 @@ export async function driveResponse(request: Request, operation: Operation, para
         const page = versions.slice(0, limit)
         return json({ versions: page, nextCursor: versions.length > limit ? page.at(-1)!.id : null })
       }
-      if (operation === 'version') return json({ version: await readDriveVersion(pool, actor, volume.id, versionId.parse(params.versionId)) })
+      if (operation === 'version') {
+        const version = await readDriveVersion(pool, actor, volume.id, versionId.parse(params.versionId))
+        return params.organizationId ? json({ versionId: version.id, volumeId: volume.id, digest: version.digest,
+          parentDigest: version.parentDigest, entries: version.manifest, fileCount: version.fileCount, totalBytes: version.totalBytes }) : json({ version })
+      }
       if (operation === 'write') {
         const input = write.parse(await body(request))
         const digests = [...new Set(input.changes.flatMap(change => change.op === 'put' ? [change.sha256] : []))]

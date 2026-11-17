@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { DriveError } from './store'
 import { driveFileLocation, driveFileLinkUrl, type DriveLocation } from './location'
-import type { DriveFileLinkDetails, DriveFileLinkPage, DriveFileLinkVisibility, DriveWorkspaceFileLinkPage } from './contract'
+import type { DriveFileLinkDetails, DriveFileLinkPage, DriveFileLinkVisibility, DriveWorkspaceFileLink, DriveWorkspaceFileLinkPage } from './contract'
 
 type Database = Pick<PoolClient, 'query'>
 type LinkRow = Omit<DriveFileLinkDetails, 'url'>
@@ -61,13 +61,27 @@ export async function fileLinkProjectIds(database: Database, workspaceId: string
  * Recheck each Project's current ACL in the same APP statement as its link metadata. */
 export async function listWorkspaceDriveFileLinks(database: Database, workspaceId: string, reader: string, projects: string[],
   page: { number: number; limit: number }): Promise<DriveWorkspaceFileLinkPage> {
-  const { rows: [result] } = await database.query<DriveWorkspaceFileLinkPage>(`WITH visible AS MATERIALIZED (
+  const directory = await listReadableFileDirectory(database, [workspaceId], reader,
+    projects.map(id => ({ workspaceId, id })), page)
+  return { ...directory, links: directory.links.map(({ workspaceId: _workspaceId, userId: _userId, ...link }) => link) }
+}
+
+type FileDirectoryLink = DriveWorkspaceFileLink & { workspaceId: string; userId: string | null }
+
+/** Use the caller's held Workspace and canonical Project pairs. A Project from
+ * one Workspace cannot admit an identically scoped volume in another one. */
+export async function listReadableFileDirectory(database: Database, workspaces: string[], reader: string,
+  projects: { workspaceId: string; id: string }[], page: { number: number; limit: number }) {
+  const { rows: [result] } = await database.query<Omit<DriveWorkspaceFileLinkPage, 'links'> & { links: FileDirectoryLink[] }>(`WITH visible AS MATERIALIZED (
     SELECT l.id,l.path,l.visibility,
-      v.id AS "volumeId",v.name AS "volumeName",v."driveScope",p.id::text AS "projectId",l."createdBy"=$2 AS manageable,
+      v.id AS "volumeId",v.name AS "volumeName",v."workspaceId",v."driveScope",p.id::text AS "projectId",
+      CASE WHEN v."driveScope"='user' THEN v."ownerId" WHEN v."driveScope"='project-user' THEN v."scopeUserId" END AS "userId",
+      l."createdBy"=$2 AS manageable,
       l."createdBy" AS creator
     FROM drive_file_links l JOIN drive_volumes v ON v.id=l."volumeId"
-    LEFT JOIN unnest($3::uuid[]) AS p(id) ON v."driveScope" IN ('project','project-user') AND p.id::text=v."scopeId"
-    WHERE v."workspaceId"=$1::uuid AND v."archivedAt" IS NULL
+    LEFT JOIN unnest($3::uuid[],$6::uuid[]) AS p(id,workspace_id) ON v."driveScope" IN ('project','project-user')
+      AND p.id::text=v."scopeId" AND p.workspace_id=v."workspaceId"
+    WHERE v."workspaceId"=ANY($1::uuid[]) AND v."archivedAt" IS NULL
       AND (l."createdBy"=$2 OR l.visibility='org' AND v."driveScope" IN ('project','team-workspace'))
       AND (
         (v."driveScope"='user' AND v."ownerId"=$2 AND v."scopeId"=$2 AND v."scopeUserId" IS NULL)
@@ -101,9 +115,9 @@ export async function listWorkspaceDriveFileLinks(database: Database, workspaceI
         AND ver.manifest @> head_entry.entry AND NOT coalesce(prev.manifest @> head_entry.entry,false)
       ORDER BY ver.seq DESC LIMIT 1
     ) history ON true
-  ),'[]'::jsonb) AS links FROM selected`, [workspaceId, reader, projects, page.number, page.limit])
+  ),'[]'::jsonb) AS links FROM selected`, [workspaces, reader, projects.map(p => p.id), page.number, page.limit, projects.map(p => p.workspaceId)])
   for (const link of result.links) {
-    const location = driveFileLocation(workspaceId, link.driveScope, link.projectId)
+    const location = driveFileLocation(link.workspaceId, link.driveScope, link.projectId)
     link.url = driveFileLinkUrl(location, link.volumeId, link.id)
   }
   return result

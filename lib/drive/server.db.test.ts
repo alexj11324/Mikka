@@ -769,6 +769,57 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
         assert.equal(historic.createdAt, null)
         assert.equal(historic.changedAt, modified.changedAt)
       })
+      await directoryContext.test('organization directory pins attached Workspaces and active Projects before counting readable links', async () => {
+        const { listOrganizationFileLinks } = await import('./organization-file-links')
+        const organization = randomUUID()
+        await fixture.query('insert into mikka_organizations(id,name,"createdBy") values($1,$2,$3)', [organization, 'Files', owner])
+        await fixture.query(`insert into mikka_organization_members("organizationId","userId",role,name,email)
+          select $1,id,'member',name,email from "user" where id=any($2::text[])`, [organization, [owner, peer]])
+        await fixture.query('insert into mikka_organization_workspaces("workspaceId","organizationId") values($1,$2)', [team.id, organization])
+        try {
+          const list = () => listOrganizationFileLinks(organization, peer, 'drive-directory-unit-session', 1)
+          const directory = await list()
+          assert.equal(directory.total, 2)
+          assert.deepEqual(directory.items.map(item => item.id), [teamLink, projectLink].sort())
+          assert.ok(directory.items.every(item => !item.manageable && item.userId === null && item.automationId === null))
+          const projectItem = directory.items.find(item => item.id === projectLink)!
+          assert.equal(projectItem.projectId, projectId)
+          assert.equal(new URL(projectItem.url, origin).searchParams.get('workspaceId'), team.id)
+
+          // With the archive uncommitted the reader must wait at the canonical
+          // Project lock. The resumed directory excludes it from items and count.
+          const writer = await fixture.connect()
+          let commit = false
+          try {
+            await writer.query('begin')
+            await writer.query('update workspace_projects set "archivedAt"=now() where id=$1', [projectId])
+            const writerPid = (await writer.query('select pg_backend_pid() as pid')).rows[0].pid
+            const pending = list()
+            const deadline = Date.now() + 5000
+            let waiting = false
+            while (!waiting && Date.now() < deadline) {
+              const result = await fixture.query(`select exists(select 1 from pg_stat_activity
+                where $1::int=any(pg_blocking_pids(pid)) and query like '%FROM workspace_projects p%') as waiting`, [writerPid])
+              waiting = result.rows[0].waiting
+              if (!waiting) await new Promise(resolve => setTimeout(resolve, 20))
+            }
+            await writer.query('commit')
+            commit = true
+            const after = await pending
+            assert.equal(waiting, true)
+            assert.deepEqual(after.items.map(item => item.id), [teamLink])
+            assert.equal(after.total, 1)
+          } finally {
+            if (!commit) await writer.query('rollback')
+            writer.release()
+            await fixture.query('update workspace_projects set "archivedAt"=null where id=$1', [projectId])
+          }
+          await fixture.query('delete from mikka_organization_workspaces where "organizationId"=$1', [organization])
+          assert.equal((await list()).total, 0)
+        } finally {
+          await fixture.query('delete from mikka_organizations where id=$1', [organization])
+        }
+      })
       const peerDownload = (await (await view(projectLink, peerToken)).json()).file.url
       const ownerDownload = (await (await view(projectLink, sharedToken)).json()).file.url
       const redeem = (path: string, token: string) => fetch(new URL(path, origin), { headers: { authorization: 'Bearer ' + token } })

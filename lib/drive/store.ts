@@ -301,9 +301,9 @@ export async function readDriveHistory(
   database: Pick<Pool, 'query'>,
   actor: { ownerId: string },
   volumeId: string,
-  options: { limit?: number; beforeId?: string } = {},
+  options: { limit?: number | null; beforeId?: string } = {},
 ): Promise<DriveVersionSummary[]> {
-  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
+  const limit = options.limit === null ? null : Math.min(Math.max(options.limit ?? 50, 1), 200)
   const { rows: [volume] } = await database.query<{ ownerId: string }>('SELECT "ownerId" FROM drive_volumes WHERE id=$1 AND "archivedAt" IS NULL', [volumeId])
   if (!volume || volume.ownerId !== actor.ownerId) throw new DriveError('drive_not_found', 404)
   // The volume lock serializes sequence numbers. Independent writers can generate
@@ -313,10 +313,12 @@ export async function readDriveHistory(
     threadId: string | null; threadTitle: string | null; authorName: string; restoredFromVersionId: string | null; createdAt: Date
   }>(`SELECT id,seq,kind,"fileCount","totalBytes",digest,"threadId","threadTitle","authorName","restoredFromVersionId","createdAt"
       FROM drive_volume_versions
-      WHERE "volumeId"=$1 AND ($2::text IS NULL OR seq < (
+      WHERE "volumeId"=$1 AND EXISTS (
+        SELECT 1 FROM drive_volumes WHERE id=$1 AND "ownerId"=$4 AND "archivedAt" IS NULL
+      ) AND ($2::text IS NULL OR seq < (
         SELECT seq FROM drive_volume_versions WHERE "volumeId"=$1 AND id=$2
       ))
-      ORDER BY seq DESC LIMIT $3`, [volumeId, options.beforeId ?? null, limit])
+      ORDER BY seq DESC LIMIT $3`, [volumeId, options.beforeId ?? null, limit, actor.ownerId])
   return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
 }
 
@@ -328,7 +330,7 @@ export async function readDriveFileHistory(
   actor: { ownerId: string },
   volumeId: string,
   path: string,
-  options: { limit: number; beforeId?: string },
+  options: { limit: number | null; beforeId?: string },
 ): Promise<(DriveVersionSummary & { file: DriveManifestEntry | null })[]> {
   const { rows } = await database.query<DriveVersionSummary & { file: DriveManifestEntry | null }>(`
     SELECT v.id, v.seq, v.kind, v."fileCount", v."totalBytes", v.digest, v."threadId", v."threadTitle",
@@ -352,20 +354,21 @@ export async function readDriveVersion(
   actor: { ownerId: string },
   volumeId: string,
   versionId: string,
-): Promise<DriveVersionSummary & { manifest: DriveManifestEntry[] }> {
+): Promise<DriveVersionSummary & { manifest: DriveManifestEntry[]; parentDigest: string | null }> {
   const { rows: [version] } = await database.query<{
     id: string; volumeId: string; seq: number; kind: DriveVersionSummary['kind']; fileCount: number; totalBytes: string; digest: string
-    manifest: DriveManifestEntry[]; threadId: string | null; threadTitle: string | null; authorName: string
+    manifest: DriveManifestEntry[]; parentDigest: string | null; threadId: string | null; threadTitle: string | null; authorName: string
     restoredFromVersionId: string | null; createdAt: Date; ownerId: string
   }>(`SELECT v.id,v."volumeId",v.seq,v.kind,v."fileCount",v."totalBytes",v.digest,v.manifest,v."threadId",v."threadTitle",
-        v."authorName",v."restoredFromVersionId",v."createdAt",d."ownerId"
+        v."authorName",v."restoredFromVersionId",v."createdAt",d."ownerId",prev.digest AS "parentDigest"
       FROM drive_volume_versions v JOIN drive_volumes d ON d.id=v."volumeId"
-      WHERE v.id=$1 AND v."volumeId"=$2 AND d."archivedAt" IS NULL`, [versionId, volumeId])
+      LEFT JOIN drive_volume_versions prev ON prev."volumeId"=v."volumeId" AND prev.seq=v.seq-1
+      WHERE v.id=$1 AND v."volumeId"=$2 AND d."ownerId"=$3 AND d."archivedAt" IS NULL`, [versionId, volumeId, actor.ownerId])
   if (!version || version.ownerId !== actor.ownerId) throw new DriveError('drive_not_found', 404)
   return { id: version.id, seq: version.seq, kind: version.kind, fileCount: version.fileCount,
     totalBytes: Number(version.totalBytes), digest: version.digest, threadId: version.threadId,
     threadTitle: version.threadTitle, authorName: version.authorName,
-    restoredFromVersionId: version.restoredFromVersionId, createdAt: version.createdAt, manifest: version.manifest }
+    restoredFromVersionId: version.restoredFromVersionId, createdAt: version.createdAt, parentDigest: version.parentDigest, manifest: version.manifest }
 }
 
 /**

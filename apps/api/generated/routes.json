@@ -1961,6 +1961,15 @@
       "sourceHash": "a16a38b52e068af884022c5a10cf35201f68401aaf2d0450145618952bcc6e84"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive-shares",
+      "template": "/api/organizations/[organizationId]/drive-shares",
+      "source": "app/api/organizations/[organizationId]/drive-shares/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "e4c9a61235ec9c5e8559f4d531d980062c06baeded819633b67a5c95fa330fd4"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/drive-shares/[shareId]",
       "template": "/api/organizations/[organizationId]/drive-shares/[shareId]",
       "source": "app/api/organizations/[organizationId]/drive-shares/[shareId]/route.ts",
@@ -1969,6 +1978,33 @@
         "PATCH"
       ],
       "sourceHash": "3b6c56ccec32fdfb5a07beec55c17975b3af1bd1833cd92974b8eba9fc9a0d3a"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/file-versions",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/file-versions",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/file-versions/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "e0e00f06f901213b5d1ca5ecb242cd0a4b18897954e9760cb284a83db85c45f9"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/versions",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/versions",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/versions/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "cd9255e26f080915421e6414f95a3a5b933f0b5bd0ad1d3bf6ba6fb63efef0d1"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "b39f90be13c570dbacd79a2989ad3dca725515db9e2894d83cc21e3d341763b7"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/identity",
