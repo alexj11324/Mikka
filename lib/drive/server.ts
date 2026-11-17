@@ -55,13 +55,16 @@ export async function driveResponse(request: Request, operation: Operation, para
     if (viewId && (params.organizationId ? search.size !== 0 : [...search.keys()].some(key => key !== 'download'))) throw new DriveError('drive_write_invalid', 400)
     let located = viewId ? await findShareLocation(pool, viewId, session.user.id) : null
     const organizationArchive = !!params.organizationId && (operation === 'archive' || operation === 'unarchive')
-    if (organizationArchive && search.size) throw new DriveError('drive_write_invalid', 400)
+    const organizationVersionRead = !!params.organizationId && (operation === 'version' || operation === 'history')
+    if ((organizationArchive || organizationVersionRead) && search.size) throw new DriveError('drive_write_invalid', 400)
     let historyPath: string | undefined
     if (operation === 'organizationFileHistory') {
       if ([...search.keys()].some(key => key !== 'path') || search.getAll('path').length !== 1) throw new DriveError('drive_write_invalid', 400)
       historyPath = z.string().refine(isDrivePath).parse(search.get('path'))
     }
-    if (historyPath !== undefined || organizationArchive) located = await findDriveVolumeLocation(pool, z.string().refine(isVolumeId).parse(params.volumeId), session.user.id, organizationArchive)
+    if (historyPath !== undefined || organizationArchive || organizationVersionRead) {
+      located = await findDriveVolumeLocation(pool, z.string().refine(isVolumeId).parse(params.volumeId), session.user.id, organizationArchive)
+    }
     const workspaceId = located?.workspaceId ?? z.uuid().parse(search.get('workspaceId')).toLowerCase()
     if (located) {
       const selected = workspaceSelection(request.headers)
@@ -188,6 +191,11 @@ export async function driveResponse(request: Request, operation: Operation, para
         return json({ volume, head: { headVersionId: version.id, headDigest: version.digest, entries: version.manifest } })
       }
       if (operation === 'history') {
+        if (params.organizationId) {
+          const versions = await readDriveHistory(pool, actor, volume.id, { limit: null })
+          return json(versions.map(({ id, kind, fileCount, totalBytes, createdAt, threadId, threadTitle, authorName }) =>
+            ({ id, volumeId: volume.id, kind, fileCount, totalBytes, createdAt, threadId, threadTitle, authorName })))
+        }
         const limit = z.coerce.number().int().min(1).max(100).parse(search.get('limit') ?? '50')
         const beforeId = search.has('before') ? versionId.parse(search.get('before')) : undefined
         const options = { limit: limit + 1, beforeId }
@@ -197,7 +205,11 @@ export async function driveResponse(request: Request, operation: Operation, para
         const page = versions.slice(0, limit)
         return json({ versions: page, nextCursor: versions.length > limit ? page.at(-1)!.id : null })
       }
-      if (operation === 'version') return json({ version: await readDriveVersion(pool, actor, volume.id, versionId.parse(params.versionId)) })
+      if (operation === 'version') {
+        const version = await readDriveVersion(pool, actor, volume.id, versionId.parse(params.versionId))
+        return params.organizationId ? json({ versionId: version.id, volumeId: volume.id, digest: version.digest,
+          parentDigest: version.parentDigest, entries: version.manifest, fileCount: version.fileCount, totalBytes: version.totalBytes }) : json({ version })
+      }
       if (operation === 'write') {
         const input = write.parse(await body(request))
         const digests = [...new Set(input.changes.flatMap(change => change.op === 'put' ? [change.sha256] : []))]

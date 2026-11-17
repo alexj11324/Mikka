@@ -32,6 +32,7 @@ const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:restore|archive|unarchive)$`), ['POST']],
 ]
 const ORGANIZATION_DRIVE_ARCHIVE = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/(?:archive|unarchive)$`)
+const ORGANIZATION_DRIVE_VERSIONS = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/versions(?:/${DRIVE_VERSION_ID})?$`)
 const ORGANIZATION_FILE_HISTORY = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/file-versions$`)
 const ORGANIZATION_FILE_SHARE = new RegExp(`^/api/organizations/${UUID}/drive-shares/${UUID}$`)
 const ORGANIZATION_OVERVIEW = new RegExp(`^/api/organizations/${UUID}$`)
@@ -103,6 +104,7 @@ export function normalizedRendererPath(value: string): string | null {
 export function allowedApiPath(path: string, method: string): boolean {
   if (ORGANIZATION_DRIVE_ARCHIVE.test(path)) return method === 'POST'
   if (ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
+  if (ORGANIZATION_DRIVE_VERSIONS.test(path) || ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
   if (ORGANIZATION_FILE_SHARE.test(path)) return method === 'PATCH' || method === 'DELETE'
   if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
   if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
