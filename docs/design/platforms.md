@@ -66,22 +66,12 @@ ship a smaller surface without the UI claiming a feature it cannot perform.
 - `MIKKA_DESKTOP_RENDERER=hosted` retains the previous web-session renderer for
   explicit rollback during #1415. `Mikka Dev` uses a separate profile and never
   checks or installs production desktop updates.
-- On macOS the desktop window is translucent, as in Codex: the window uses the
-  `sidebar` vibrancy material (`apps/desktop/src/main/window-appearance.ts`), and
-  the preload sets `data-desktop-translucent` on `<html>`. Under that attribute
-  the frame chrome (window bar, rail) and the settings list paint no
-  background of their own, so the material shows untinted there. The bot list
-  lays `--shell-material` over it instead, a grey
-  veil (light 75 %, dark 82 % opaque): the rail stays clear and the list reads
-  darker, apart from both the rail and the content, as in the ChatGPT desktop
-  app. The content column and right panels stay opaque. Hover and current
-  fills there (`--sidebar-accent`, `--sidebar-item`) become a black (light) or
-  white (dark) overlay, and ghost buttons and the settings search field take
-  `--control` instead of the opaque `muted`.
-  `tests/e2e/desktop-translucent.spec.ts` records the earlier browser check.
-  Browser tests are retired from acceptance; use screenshots of the cloud
-  Linux local production build and applicable native evidence.
-  Reduce transparency, Windows and Linux keep the opaque window. The setting is
-  read at launch.
+- The desktop window is opaque on every platform, with no vibrancy material
+  ([decision](decisions/2026-11-17-1500-desktop-window-opaque.md)). On macOS
+  the window keeps the inset traffic lights over the page's own top bar
+  (`apps/desktop/src/main/window-appearance.ts`). Controls over a drag strip
+  are `-webkit-app-region: no-drag`, and a strip never extends under a control
+  that sits outside it (the official frame ends the window bar short of the
+  work area's open button), so only empty bar space moves the window.
 - Feature flags (PostHog) gate rollout; capabilities gate possibility. Compose
   them with `&&`, never substitute one for the other.

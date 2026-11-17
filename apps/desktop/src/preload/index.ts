@@ -23,12 +23,7 @@ const localPage = (decodedPath === '/mikka' || decodedPath.startsWith('/mikka/')
 if (appOrigin && window.top === window && (bundled ? localOrigin === appOrigin && localPage : window.location.origin === appOrigin)) {
   // Lets the page reserve room for the macOS traffic lights and draw its own drag region.
   // The preload runs before <html> exists, so wait for the document.
-  // A translucent window (macOS vibrancy) also marks the page, so only its rail and list go see-through.
-  const translucent = process.argv.includes('--mikka-translucent')
-  const markPlatform = () => {
-    document.documentElement.dataset.desktopPlatform = process.platform
-    if (translucent) document.documentElement.dataset.desktopTranslucent = ''
-  }
+  const markPlatform = () => { document.documentElement.dataset.desktopPlatform = process.platform }
   if (document.documentElement) markPlatform()
   else window.addEventListener('DOMContentLoaded', markPlatform, { once: true })
 
