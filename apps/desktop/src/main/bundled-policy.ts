@@ -31,10 +31,12 @@ const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:restore|archive|unarchive)$`), ['POST']],
 ]
+const ORGANIZATION_DRIVE_VERSIONS = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/versions(?:/${DRIVE_VERSION_ID})?$`)
 const ORGANIZATION_VERSION_FILE = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}/files/[a-f0-9]{64}$`)
 const ORGANIZATION_FILE_HISTORY = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/file-versions$`)
 const ORGANIZATION_FILE_SHARE = new RegExp(`^/api/organizations/${UUID}/drive-shares/${UUID}$`)
 const ORGANIZATION_OVERVIEW = new RegExp(`^/api/organizations/${UUID}$`)
+const ORGANIZATION_FILE_LINKS = new RegExp(`^/api/organizations/${UUID}/drive-shares$`)
 const ORGANIZATION_KEYS = new RegExp(`^/api/organizations/${UUID}/api-keys$`)
 const ORGANIZATION_WORKSPACES = new RegExp(`^/api/organizations/${UUID}/workspaces$`)
 const ORGANIZATION_POLICY = new RegExp(`^/api/organizations/${UUID}/policy$`)
@@ -100,7 +102,7 @@ export function normalizedRendererPath(value: string): string | null {
 }
 
 export function allowedApiPath(path: string, method: string): boolean {
-  if (ORGANIZATION_VERSION_FILE.test(path) || ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
+  if (ORGANIZATION_DRIVE_VERSIONS.test(path) || ORGANIZATION_VERSION_FILE.test(path) || ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
   if (ORGANIZATION_FILE_SHARE.test(path)) return method === 'PATCH' || method === 'DELETE'
   if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
   if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
@@ -111,7 +113,7 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (path.startsWith('/api/workspaces/') && path.includes('/service-identities')) {
     return SERVICE_IDENTITY_ROUTES.some(([route, mutation]) => route.test(path) && (method === 'GET' || method === mutation))
   }
-  if (WORKSPACE_GOVERNANCE.test(path) || ORGANIZATION_KEYS.test(path)) return method === 'GET'
+  if (WORKSPACE_GOVERNANCE.test(path) || ORGANIZATION_KEYS.test(path) || ORGANIZATION_FILE_LINKS.test(path)) return method === 'GET'
   if (path === '/api/organizations') return method === 'GET' || method === 'POST'
   if (ORGANIZATION_OVERVIEW.test(path)) return method === 'GET' || method === 'PATCH' || method === 'DELETE'
   if (ORGANIZATION_WORKSPACES.test(path)) return method === 'POST' || method === 'DELETE'

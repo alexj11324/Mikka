@@ -16,7 +16,14 @@ import { requireOrganizationAdmin } from './organizations'
 
 const publicDomains = new Set<string>(publicEmailDomains)
 const domainInput = z.object({ domain: z.string().trim().toLowerCase().max(253).pipe(z.hostname()) }).strict()
-const domainFields = { id: organizationJoinDomains.id, domain: organizationJoinDomains.domain }
+const domainFields = {
+  id: organizationJoinDomains.id,
+  domain: organizationJoinDomains.domain,
+  createdByUserId: organizationJoinDomains.createdByUserId,
+  createdAt: organizationJoinDomains.createdAt,
+  // Grants are immutable. Adding a removed domain creates a new grant.
+  updatedAt: organizationJoinDomains.createdAt,
+}
 type Account = { id: string; email: string }
 
 async function verifiedDomainUser(user: Account) {
@@ -47,8 +54,10 @@ export async function addAllowedDomain(organizationId: string, user: Account, in
     const [existing] = await tx.select(domainFields).from(organizationJoinDomains)
       .where(and(eq(organizationJoinDomains.organizationId, organizationId), eq(organizationJoinDomains.domain, domain)))
     if (existing) return { domain: existing }
-    const [created] = await tx.insert(organizationJoinDomains).values({ id: randomUUID(), organizationId, domain }).returning(domainFields)
-    await enqueueOrganizationAudit(tx, { organizationId, actorId: user.id, action: 'organization.join_domain_added', targetId: created.id })
+    const id = randomUUID()
+    await tx.insert(organizationJoinDomains).values({ id, organizationId, domain })
+    await enqueueOrganizationAudit(tx, { organizationId, actorId: user.id, action: 'organization.join_domain_added', targetId: id })
+    const [created] = await tx.select(domainFields).from(organizationJoinDomains).where(eq(organizationJoinDomains.id, id))
     return { domain: created }
   })
 }
@@ -59,9 +68,9 @@ export async function removeAllowedDomain(organizationId: string, domainId: stri
     await requireOrganizationAdmin(tx, organizationId, userId)
     const [removed] = await tx.delete(organizationJoinDomains)
       .where(and(eq(organizationJoinDomains.organizationId, organizationId), eq(organizationJoinDomains.id, domainId)))
-      .returning({ id: organizationJoinDomains.id })
+      .returning(domainFields)
     if (removed) await enqueueOrganizationAudit(tx, { organizationId, actorId: userId, action: 'organization.join_domain_removed', targetId: removed.id })
-    return { removed: true }
+    return { removed: true, domain: removed ?? null }
   })
 }
 

@@ -156,6 +156,42 @@ test('organization share management holds the actual attachment, creator and cur
     assert.equal((await enter(mine)).status, 404)
     assert.equal((await enter(theirs)).status, 200)
   })
+  await t.test('organization manifests identify their actual predecessor and complete history retains restored versions beyond the Workspace page', async () => {
+    const manifestRoute = await import('../../app/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/route')
+    const listRoute = await import('../../app/api/organizations/[organizationId]/drive/[volumeId]/versions/route')
+    const { restoreDriveVersion } = await import('./store')
+    const team = await seedTeam(database, workspace.id, peer)
+    const projectId = await seedProject(database, peer, [{ teamId: team.id, workspaceId: workspace.id }])
+    const { volumeId } = await makeShare(projectId, 'Immutable versions')
+    const { rows: [first, second] } = await database.query<{id: string; digest: string}>(
+      'SELECT id,digest FROM drive_volume_versions WHERE "volumeId"=$1 ORDER BY seq', [volumeId])
+    const addr = origin + '/api/organizations/' + organizationId + '/drive/' + volumeId + '/versions'
+    const getManifest = (versionId: string, cookie = mine) => manifestRoute.GET(new Request(addr + '/' + versionId, { headers: { cookie } }),
+      { params: Promise.resolve({ organizationId, volumeId, versionId }) })
+    const getVersions = (cookie = mine) => listRoute.GET(new Request(addr, { headers: { cookie } }), { params: Promise.resolve({ organizationId, volumeId }) })
+    assert.equal((await (await getManifest(first.id)).json()).parentDigest, null)
+    const manifest = await (await getManifest(second.id)).json()
+    assert.deepEqual(Object.keys(manifest).sort(), ['digest', 'entries', 'fileCount', 'parentDigest', 'totalBytes', 'versionId', 'volumeId'])
+    assert.deepEqual([manifest.parentDigest, manifest.digest, manifest.entries[0].path], [first.digest, second.digest, 'notes.txt'])
+    const actor = { ownerId: `drive-project:${workspace.id}:${projectId}`, authorName: 'Drive creator' }
+    let latest = second
+    for (let n = 0; n < 50; n++) {
+      const restored = await restoreDriveVersion(database, { ownerId: actor.ownerId, volumeId }, actor, {
+        expectedDigest: latest.digest, versionId: n % 2 ? second.id : first.id, mutationId: randomUUID(),
+      })
+      latest = { id: restored.headVersionId, digest: restored.headDigest }
+    }
+    const rows = await (await getVersions()).json()
+    assert.equal(rows.length, 52)
+    assert.deepEqual([rows[0].id, rows[0].kind, rows[0].volumeId, rows[0].authorName], [latest.id, 'restore', volumeId, actor.authorName])
+    assert.equal(rows.at(-1).id, first.id)
+    assert.deepEqual(Object.keys(rows[0]).sort(), ['authorName', 'createdAt', 'fileCount', 'id', 'kind', 'threadId', 'threadTitle', 'totalBytes', 'volumeId'])
+    assert.equal((await (await getManifest(latest.id)).json()).parentDigest, first.digest)
+    await database.query("UPDATE resource_access_policies SET visibility='private' WHERE kind='project' AND id=$1", [projectId])
+    assert.equal((await getManifest(first.id)).status, 404)
+    assert.equal((await getVersions()).status, 404)
+    assert.equal((await getManifest(first.id, theirs)).status, 200)
+  })
   const team = await seedTeam(database, workspace.id, peer)
   const projectId = await seedProject(database, peer, [{ teamId: team.id, workspaceId: workspace.id }])
   const projectShare = await makeShare(projectId)

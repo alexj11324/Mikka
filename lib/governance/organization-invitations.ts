@@ -27,7 +27,12 @@ async function verifiedInvitationRecipient(user: { id: string; email: string }) 
 export async function listReceivedOrganizationInvitations(user: { id: string; email: string }) {
   const recipient = await verifiedInvitationRecipient(user)
   const invitations = await workspaceDb.select({
-    id: organizationInvitations.id, organizationName: organizations.name, expiresAt: organizationInvitations.expiresAt,
+    id: organizationInvitations.id,
+    organizationId: organizations.id,
+    organizationName: organizations.name,
+    inviterName: organizationMembers.name,
+    invitedAt: organizationInvitations.createdAt,
+    expiresAt: organizationInvitations.expiresAt,
   }).from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
     .innerJoin(organizationMembers, and(eq(organizationMembers.organizationId, organizations.id),
