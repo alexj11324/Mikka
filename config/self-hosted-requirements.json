@@ -69,6 +69,20 @@
     "test": "lib/drive/organization-share.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/organizations/[organizationId]/drive/[volumeId]/versions/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the complete immutable version list under current Organization, Workspace and Project access, retaining true restore records.",
+    "test": "lib/drive/organization-share.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the original immutable entries, digest and actual predecessor digest for an authorized Drive volume version.",
+    "test": "lib/drive/organization-share.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/organizations/[organizationId]/drive-shares/[shareId]/route.ts": {
     "mode": "built-in",
     "environment": [],
