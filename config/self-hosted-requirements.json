@@ -3340,6 +3340,13 @@
     "test": "lib/daemon-authorization.test.ts",
     "suite": "test:auth-composio"
   },
+  "app/api/organizations/[organizationId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current Organization through its human session. Authorized administrators use the existing profile writer to rename it or change its icon. Archiving retains the existing owner check.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
   "app/api/organizations/deleted/route.ts": {
     "mode": "built-in",
     "environment": [],

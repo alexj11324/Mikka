@@ -1,5 +1,5 @@
 import { freshSessionRoute } from '@/lib/fresh-session'
-import { organizationSummary, updateOrganizationProfile, archiveOrganization } from '@/lib/governance/organizations'
+import { organizationSummary, renameOrganization, updateOrganizationProfile, archiveOrganization } from '@/lib/governance/organizations'
 import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { organizationSession } from '@/lib/enterprise/http'
 import { WORKSPACE_ICON_MAX_BYTES } from '@/lib/workspace-admin/icon'
@@ -11,6 +11,11 @@ export const GET = freshSessionRoute(async (request: Request, context: Context) 
   const { organizationId } = await context.params
   const session = await organizationSession(request, organizationId)
   return organizationSummary(organizationId, session.user.id)
+}))
+export const PUT = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
+  const { organizationId } = await context.params
+  const session = await organizationSession(request, organizationId)
+  return renameOrganization(organizationId, session.user.id, await governanceJson(request))
 }))
 export const PATCH = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
   const { organizationId } = await context.params

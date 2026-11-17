@@ -1898,9 +1898,10 @@
       "methods": [
         "DELETE",
         "GET",
-        "PATCH"
+        "PATCH",
+        "PUT"
       ],
-      "sourceHash": "4216e9e05aa5f78ab65fd2299d19f040d19d2978fa13259f5178926d3f01e3b2"
+      "sourceHash": "ac27be0f0b141a3cbb85f60da0fa950e101b38c46665ef3e087976fb3639cc7d"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/allowed-domains",
