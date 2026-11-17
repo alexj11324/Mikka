@@ -978,8 +978,8 @@
       "DATABASE_URL"
     ],
     "behavior": "Remove retired subscription share rows and clear Bot chat choices that name a teammate's subscription in the installation database; a subscription serves its owner only.",
-    "test": "lib/bot-model-menu.db.test.ts",
-    "suite": "test:execution-settings-db"
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
   },
   "drizzle/20261117093200_explicit_run_stop_request.sql": {
     "mode": "built-in",
