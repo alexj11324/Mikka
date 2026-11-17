@@ -1298,6 +1298,7 @@ export const mobilePushTokens = pgTable('mobile_push_tokens', {
   token: text('token').notNull(),
   platform: text('platform').notNull(),
   deviceName: text('deviceName'),
+  label: text('label'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('mobile_push_tokens_token_key').on(table.token), index('mobile_push_tokens_user_idx').on(table.userId)])

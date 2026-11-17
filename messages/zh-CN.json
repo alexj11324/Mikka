@@ -7782,6 +7782,9 @@
     "notifications": {
       "on": "开",
       "off": "关",
+      "renameDevice": "重命名设备",
+      "deviceLabel": "设备标签",
+      "renameFailed": "标签未保存，请重试。",
       "registeredDevices": "已注册的推送设备",
       "testDevice": "发送测试通知",
       "testSending": "正在发送…",

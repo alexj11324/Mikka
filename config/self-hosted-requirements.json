@@ -267,6 +267,20 @@
     "test": "tests/mobile-service-members.db.test.ts",
     "suite": "test:web-auth-db"
   },
+  "drizzle/20261116201620_mobile_push_installation_label.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds an optional personal display label to the current mobile installation and clears it when the row changes owners, including through older registration clients.",
+    "test": "tests/mobile-push-workspace.db.test.ts",
+    "suite": "test:visibility-db"
+  },
+  "app/api/mobile/push-tokens/[id]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The active native session can name its own installed phone using the local application database.",
+    "test": "tests/mobile-push-workspace.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/api/mobile/push-tokens/[id]/test/route.ts": {
     "mode": "operator-configured",
     "environment": [],

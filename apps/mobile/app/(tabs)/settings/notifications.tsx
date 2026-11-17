@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { View } from 'react-native'
+import { TextInput, View } from 'react-native'
+import { colors, font } from '@/lib/theme'
 import { Row, SettingsPage, ToggleRow } from '@/components/settings'
 import { Group } from '@/components/ui'
 import { Spinner } from '@/components/icons'
@@ -14,7 +15,41 @@ import { askForPush, usePushState } from '@/lib/push-state'
 import { useSettings } from '@/lib/settings'
 import type { Preferences } from '@/lib/types'
 
-type PushInstallation = { id: string; platform: 'ios' | 'android'; deviceName: string | null; currentSession: boolean; canTest?: boolean; updatedAt: string }
+type PushInstallation = { id: string; platform: 'ios' | 'android'; deviceName: string | null; label?: string | null; canRename?: boolean; currentSession: boolean; canTest?: boolean; updatedAt: string }
+
+function DeviceLabel({ device, reload }: { device: PushInstallation; reload: () => Promise<unknown> }) {
+  const copy = messages.MobileCore.notifications
+  const [draft, setDraft] = useState<string | null>(null)
+  const [status, setStatus] = useState<'idle' | 'saving' | 'failed'>('idle')
+  const inFlight = useRef(false)
+  const context = apiCache.context()
+  const label = draft?.trim()
+  async function save() {
+    if (!label || label.length > 80 || inFlight.current || apiCache.context() !== context) return
+    inFlight.current = true
+    setStatus('saving')
+    try {
+      const result = await api<{ id: string; label: string }>('/api/mobile/push-tokens/' + encodeURIComponent(device.id),
+        { method: 'PATCH', body: { label } }, apiConnection())
+      if (result?.id !== device.id || result.label !== label) throw new Error('unexpected installation')
+      apiCache.commit(context, () => { setStatus('idle'); setDraft(null); void reload() })
+    } catch (error) {
+      apiCache.commit(context, () => {
+        setStatus('failed')
+        if (error instanceof ApiError && error.status === 404) void reload()
+      })
+    } finally { inFlight.current = false }
+  }
+  if (draft === null) return <Row label={copy.renameDevice} onPress={() => setDraft(device.label ?? device.deviceName ?? '')} />
+  return <View>
+    <TextInput accessibilityLabel={copy.deviceLabel} value={draft} editable={status !== 'saving'}
+      maxLength={80} onChangeText={value => { setDraft(value); setStatus('idle') }} returnKeyType="done" onSubmitEditing={() => void save()}
+      style={{ minHeight: 48, paddingHorizontal: 16, fontFamily: font, fontSize: 16, color: colors.text, backgroundColor: colors.surface }} />
+    <Row label={messages.Common.save} detail={status === 'failed' ? copy.renameFailed : undefined}
+      disabled={!label || label.length > 80 || status === 'saving'} onPress={() => void save()} />
+    <Row label={messages.Common.cancel} disabled={status === 'saving'} onPress={() => { setDraft(null); setStatus('idle') }} />
+  </View>
+}
 
 function PushDevices() {
   const copy = messages.MobileCore.notifications
@@ -58,9 +93,10 @@ function PushDevices() {
       const status = current?.id === device.id ? current.state : null
       const feedback = status === 'accepted' ? copy.testAccepted : status === 'failed' ? copy.testFailed
         : status === 'limited' ? copy.testLimited : status === 'sending' ? copy.testSending : undefined
-      return <View key={device.id}>
-        <Row label={device.deviceName || platform} detail={device.deviceName ? `${platform} · ${date}` : date}
+      return <View key={context + '-' + device.id}>
+        <Row label={device.label || device.deviceName || platform} detail={device.label || device.deviceName ? `${platform} · ${date}` : date}
           value={device.currentSession ? messages.Settings.profile.currentSession : undefined} />
+        {device.currentSession && device.canRename === true ? <DeviceLabel device={device} reload={reloadAfterWrite} /> : null}
         {device.currentSession && device.canTest === true ? <Row label={copy.testDevice} detail={feedback}
           disabled={current?.state === 'sending'} onPress={() => void testDevice(device.id)} /> : null}
       </View>
