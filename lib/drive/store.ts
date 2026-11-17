@@ -328,7 +328,7 @@ export async function readDriveFileHistory(
   actor: { ownerId: string },
   volumeId: string,
   path: string,
-  options: { limit: number; beforeId?: string },
+  options: { limit: number | null; beforeId?: string },
 ): Promise<(DriveVersionSummary & { file: DriveManifestEntry | null })[]> {
   const { rows } = await database.query<DriveVersionSummary & { file: DriveManifestEntry | null }>(`
     SELECT v.id, v.seq, v.kind, v."fileCount", v."totalBytes", v.digest, v."threadId", v."threadTitle",

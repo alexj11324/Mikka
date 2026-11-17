@@ -1,6 +1,8 @@
 import type { DriveScope } from './contract'
 import { withBasePath } from '../base-path'
 
+export type DriveVolumeLocation = { volumeId: string; workspaceId: string; driveScope: DriveScope; projectId: string | null }
+
 export type DriveLocation = string | { workspaceId: string; projectId: string; driveScope?: 'project' }
   | { workspaceId: string; driveScope: 'team-workspace'; projectId?: never }
 
