@@ -47,6 +47,8 @@ export const organizationJoinDomains = pgTable('mikka_organization_join_domains'
   id: uuid('id').primaryKey(),
   organizationId: uuid('organizationId').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   domain: varchar('domain', { length: 253 }).notNull(),
+  createdByUserId: text('createdByUserId'),
+  createdAt: timestamp('createdAt', { withTimezone: true }),
 }, table => [
   unique('mikka_org_join_domain_unique').on(table.organizationId, table.domain),
   index('mikka_org_join_domain_idx').on(table.domain),
