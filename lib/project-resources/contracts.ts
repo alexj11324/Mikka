@@ -32,14 +32,29 @@ export const repositoryBindingInput = z.object({
   repositoryKey: projectRepositoryKey, baseBranch: projectBranch.nullable().default(null),
   environmentId: z.uuid().nullable().default(null), isPrimary: z.boolean().default(false),
 }).strict()
+export const maxProjectRepositories = 100
+const projectRepositoryAddition = z.object({
+  repoFullName: z.string().regex(/^[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9_.-]{1,100}$/i)
+    .refine(name => {
+      const repository = name.slice(name.indexOf('/') + 1)
+      return repository !== '.' && repository !== '..' && !repository.startsWith('-') && !repository.toLowerCase().endsWith('.git')
+    }),
+  baseBranch: z.union([z.literal(''), projectBranch]).optional(),
+  mode: z.enum(['primary', 'lazy']).optional(),
+}).strict()
+export const addProjectRepositoriesBody = z.object({ repos: z.array(projectRepositoryAddition).max(maxProjectRepositories) }).strict()
+
 export const projectResourcesInput = z.object({
   workspaceId: z.uuid(), projectId: z.uuid(), revision: z.number().int().positive(),
-  repositories: z.array(repositoryBindingInput).max(100),
+  repositories: z.array(repositoryBindingInput).max(maxProjectRepositories),
   environmentIds: z.array(z.uuid()).max(100), defaultEnvironmentId: z.uuid().nullable(),
 }).strict().refine(value => value.repositories.filter(item => item.isPrimary).length <= 1)
   .refine(value => new Set(value.repositories.map(item => item.repositoryKey)).size === value.repositories.length)
   .refine(value => !value.defaultEnvironmentId || value.environmentIds.includes(value.defaultEnvironmentId))
   .refine(value => value.repositories.every(item => !item.environmentId || value.environmentIds.includes(item.environmentId)))
+export const projectResourceMutation = projectResourcesInput.or(
+  addProjectRepositoriesBody.extend({ workspaceId: z.uuid(), projectId: z.uuid() }),
+)
 export const listDependencyRepositoriesInput = z.object({ workspaceId: z.uuid(), projectId: z.uuid() }).strict()
 export const projectEnvironmentVariableInput = z.object({ workspaceId: z.uuid(), projectId: z.uuid(), name: envName }).strict()
 export const projectPullAuthorInput = listDependencyRepositoriesInput.extend({

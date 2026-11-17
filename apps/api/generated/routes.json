@@ -2982,6 +2982,15 @@
       "sourceHash": "cf70f5251663a625f8d4d6277738f477662cf3982dbf88bc5cc066d3f6e1fb94"
     },
     {
+      "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/repos",
+      "template": "/api/workspaces/[workspaceId]/projects/[projectId]/repos",
+      "source": "app/api/workspaces/[workspaceId]/projects/[projectId]/repos/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "7f7e89c150b03f3805c1a7ab214f284aeb9faeed10c18c2d155d69b32ddcd2f8"
+    },
+    {
       "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/setup",
       "template": "/api/workspaces/[workspaceId]/projects/[projectId]/setup",
       "source": "app/api/workspaces/[workspaceId]/projects/[projectId]/setup/route.ts",
