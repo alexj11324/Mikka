@@ -12,7 +12,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import type { WorkspaceTransaction } from '@/lib/workspace-access'
 import { ActionFailureError } from '@/lib/action-error'
-import { environmentConfiguration, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, projectResourcesInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
+import { environmentConfiguration, projectEnvironmentVariableInput, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, projectResourcesInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
 
 type Reader = Parameters<typeof withTaskWorkspace>[0]
 const actorId = (reader: Reader) => typeof reader === 'string' ? reader : reader.id
@@ -136,6 +136,24 @@ export async function listProjectResources(reader: Reader, workspaceId: string, 
     : withTaskWorkspace(reader, workspaceId, (_workspace, tx) => read(tx))
 }
 
+function activeDefaultEnvironment(workspaceId: string, projectId: string) {
+  return sql`from workspace_project_environments b
+    join workspace_environments e on e.id=b."environmentId" and e."workspaceId"=b."workspaceId"
+    where b."workspaceId"=${workspaceId} and b."projectId"=${projectId} and b."isDefault"
+      and e."archivedAt" is null`
+}
+
+/** Read one ordinary variable from the Project's current default environment. */
+export async function readProjectEnvironmentVariable(reader: Reader, raw: z.input<typeof projectEnvironmentVariableInput>) {
+  const { workspaceId, projectId, name } = projectEnvironmentVariableInput.parse(raw)
+  return withConfiguredProject(reader, workspaceId, projectId, false, async tx => {
+    const { rows: [row] } = await tx.execute<{ value: string | null }>(sql`
+      SELECT e.configuration->'variables'->>${name}::text AS value
+      ${activeDefaultEnvironment(workspaceId, projectId)}`)
+    return row?.value == null ? null : { name, value: row.value }
+  })
+}
+
 /** Restricted + an empty list is an explicit deny-all policy; no row means inherit. */
 export async function saveWorkspaceRepositoryPolicy(reader: Reader, raw: z.input<typeof workspaceRepositoryPolicyInput>) {
   const input = workspaceRepositoryPolicyInput.parse(raw)
@@ -195,14 +213,6 @@ export async function saveEnvironment(reader: Reader, raw: z.input<typeof saveEn
 
 const currentSetupScope = projectSetupScope.omit({ environmentId: true })
 
-function activeDefaultSetupBinding(workspaceId: string, projectId: string) {
-  return sql`from workspace_project_environments b
-    join workspace_projects p on p.id=b."projectId" and p."workspaceId"=b."workspaceId"
-    join workspace_environments e on e.id=b."environmentId" and e."workspaceId"=b."workspaceId"
-    where b."workspaceId"=${workspaceId} and b."projectId"=${projectId} and b."isDefault"
-      and p."archivedAt" is null and e."archivedAt" is null`
-}
-
 /** Read the current recipe without materializing the Environment's variables or secret IDs. */
 export async function readCurrentProjectSetup(reader: Reader, input: z.input<typeof currentSetupScope>) {
   const { workspaceId, projectId } = currentSetupScope.parse(input)
@@ -210,7 +220,7 @@ export async function readCurrentProjectSetup(reader: Reader, input: z.input<typ
     if (project.archivedAt) throw new ActionFailureError('projectNotFound')
     const { rows: [current] } = await tx.execute<{ environmentId: string; revision: number; setup: unknown }>(sql`
       select e.id as "environmentId", e.revision, e.configuration->'setup' as setup
-      ${activeDefaultSetupBinding(workspaceId, projectId)}`)
+      ${activeDefaultEnvironment(workspaceId, projectId)}`)
     if (!current) return null
     const setup = environmentConfiguration.shape.setup.nullable().safeParse(current.setup)
     if (!setup.success) throw new ActionFailureError('projectEnvironmentUnavailable', undefined, undefined, { cause: setup.error })
@@ -232,7 +242,8 @@ async function withProjectSetup<T>(reader: Reader, scope: SetupScope, write: boo
     }
     return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, write ? 'canSteer' : 'canReadContent', async () => {
       const environment = (await tx.execute<EnvironmentRow>(sql`select e.id,e."workspaceId",e.name,e.revision,e.configuration,e."archivedAt"
-        ${activeDefaultSetupBinding(workspaceId, projectId)} and b."environmentId"=${environmentId}`)).rows[0]
+        ${activeDefaultEnvironment(workspaceId, projectId)} and b."environmentId"=${environmentId}
+        and exists (select 1 from workspace_projects p where p.id=b."projectId" and p."workspaceId"=b."workspaceId" and p."archivedAt" is null)`)).rows[0]
       if (!environment) throw new ActionFailureError('projectEnvironmentUnavailable')
       const bindings = await tx.execute<{ projectId: string }>(sql`select "projectId" from workspace_project_environments where "workspaceId"=${workspaceId} and "environmentId"=${environmentId}
         union select "projectId" from workspace_project_repositories where "workspaceId"=${workspaceId} and "environmentId"=${environmentId} order by 1`)

@@ -446,6 +446,13 @@
     "test": "lib/coding-workspace/terminal/http.test.ts",
     "suite": "test:coding-workspace-review-runtime"
   },
+  "app/api/workspaces/[workspaceId]/projects/[projectId]/environment-variables/[name]/value/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read a named ordinary variable from the accessible project's active default environment in the selected workspace using the installation PostgreSQL database.",
+    "test": "tests/project-resources.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "app/api/workspaces/[workspaceId]/projects/[projectId]/setup/route.ts": {
     "mode": "built-in",
     "environment": [],
