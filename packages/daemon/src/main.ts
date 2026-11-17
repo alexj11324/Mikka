@@ -1581,6 +1581,7 @@ export class Daemon {
       if (error instanceof DaemonUpgradeRequiredError) {
         this.enterUpdateRequired(error.latest)
       } else if (error instanceof SessionRejectedError) {
+        if (await this.collectUninstall(credential)) return undefined
         this.rejectDeviceSession(credential)
       } else if (!(error instanceof ServerUnreachableError)) {
         this.log.error({ err: error }, "server sync failed")
@@ -1592,6 +1593,27 @@ export class Daemon {
       rejectRepositories?.(new ServerUnreachableError("Initial repository sync unavailable"))
       if (this.initialRepositorySync?.ready === repositoriesReady) this.initialRepositorySync = undefined
     }
+  }
+
+  /**
+   * A removed device's credential reaches only its report, which carries its
+   * uninstall (decision 2026-11-17-2215). A push can arrive with nothing
+   * changed to report, so before giving the session up, ask the report once.
+   * True when an uninstall is now held: it runs here or, while runs drain,
+   * from the local timer.
+   */
+  private async collectUninstall(credential: string): Promise<boolean> {
+    const deviceId = this.device.deviceId
+    if (!deviceId || this.device.credential !== credential) return false
+    try {
+      this.reportOnOpen = true
+      await this.sendReport(deviceId, credential)
+    } catch {
+      return false
+    }
+    if (this.heldDeviceCommand?.kind !== "uninstall") return false
+    await this.runHeldDeviceCommand(deviceId, credential)
+    return true
   }
 
   /** A refused credential stops its local work as well as the session until

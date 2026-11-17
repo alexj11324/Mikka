@@ -418,6 +418,42 @@ it('a refused session waits for a new credential without dialing; signing in dia
   expect(daemon.status().session).toBe('open')
 })
 
+it('a device removed while connected asks its report once when the commands read refuses it, and uninstalls', async () => {
+  const uninstall = vi.spyOn(service, 'uninstallService').mockImplementation(async clear => { clear() })
+  const command = { id: '10000000-0000-4000-8000-0000000000ab', kind: 'uninstall' as const }
+  let removed = false
+  const reports: protocol.DeviceReport[] = []
+  const { start, daemon } = sessionDaemon({
+    // Nothing changed on the device, so the push itself sends no report.
+    report: async (_id, sent) => { reports.push(sent); return removed ? { deviceCommands: [command] } : {} },
+    fetchCommands: async () => { if (removed) throw new SessionRejectedError(); return [] },
+  })
+  start()
+  await vi.advanceTimersByTimeAsync(0)
+  expect(reports).toHaveLength(1)
+  removed = true
+  last().emit('message', { data: 'work' })
+  await vi.advanceTimersByTimeAsync(0)
+  vi.useRealTimers()
+  await new Promise<void>(resolve => setImmediate(resolve))
+  await daemon.stop()
+  expect(uninstall).toHaveBeenCalledOnce()
+  expect(reports.at(-1)?.completedDeviceCommands).toEqual([command.id])
+  expect(Reflect.get(daemon, 'device').credential).toBeUndefined()
+})
+
+it('a refused commands read with no uninstall waiting signs the device out', async () => {
+  let refused = false
+  const { start, daemon } = sessionDaemon({ fetchCommands: async () => { if (refused) throw new SessionRejectedError(); return [] } })
+  start()
+  await vi.advanceTimersByTimeAsync(0)
+  refused = true
+  last().emit('message', { data: 'work' })
+  await vi.advanceTimersByTimeAsync(0)
+  expect(Reflect.get(daemon, 'device').credential).toBeUndefined()
+  expect(daemon.status().session).toBe('signed_out')
+})
+
 it('an uninstall from the report runs before a commands read can refuse the removed device', async () => {
   const uninstall = vi.spyOn(service, 'uninstallService').mockImplementation(async clear => { clear() })
   const reports: protocol.DeviceReport[] = []
