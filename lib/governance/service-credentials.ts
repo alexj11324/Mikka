@@ -125,12 +125,13 @@ export async function readServiceCredentialProjects(header: string | null, read:
     }
     return writeTransaction(pool, async app => {
       if (link && !await serviceOrganizationAllowed(app, link.organizationId)) return null
-      const { rows } = await app.query<{ id: string; visibility: string }>(`SELECT p.id,p.visibility FROM resource_access_policies p
+      const grantPage = (after: string | null) => app.query<{ id: string; visibility: string }>(`SELECT p.id,p.visibility FROM resource_access_policies p
         JOIN resource_access_grants g ON g."resourceKind"=p.kind AND g."resourceId"=p.id
         WHERE p."workspaceId"=$1 AND p.kind='project' AND g."subjectKind"='service' AND g."subjectId"=$2
           AND ($3::uuid IS NULL OR p.id>$3::uuid) AND ($4::uuid IS NULL OR p.id=$4::uuid)
           AND mikka_resource_acl_allowed('service',$2,$1,'project',p.id,'canReadContent')
-        ORDER BY p.id LIMIT 101`, [workspaceId, id, cursor, projectId])
+        ORDER BY p.id LIMIT 101`, [workspaceId, id, after, projectId])
+      let { rows } = await grantPage(cursor)
       if (projectId) {
         if (!rows.length) throw new GovernanceError('not_found')
         const { rows: [project] } = await workspace.execute<{
@@ -155,10 +156,18 @@ export async function readServiceCredentialProjects(header: string | null, read:
           visibility: rows[0].visibility, repositories: publicRepositories,
         }
       }
-      const page = rows.slice(0, 100)
-      const { rows: projects } = await workspace.execute<{ id: string; name: string }>(sql`SELECT id,name FROM workspace_projects
-        WHERE "workspaceId"=${workspaceId}::uuid AND id=ANY(${sql.param(page.map(row => row.id))}::uuid[]) AND "archivedAt" IS NULL ORDER BY id`)
-      return { workspaceId, serviceIdentityId: id, projects, nextCursor: rows.length > 100 ? page[99].id : null }
+      const projects: { id: string; name: string }[] = []
+      // Grants are in APP, while archival is authoritative in the Workspace DB.
+      // Only visible active Projects count toward the page or its continuation.
+      while (rows.length) {
+        const active = await workspace.execute<{ id: string; name: string }>(sql`SELECT id,name FROM workspace_projects
+          WHERE "workspaceId"=${workspaceId}::uuid AND id=ANY(${sql.param(rows.map(row => row.id))}::uuid[])
+            AND "archivedAt" IS NULL ORDER BY id`)
+        projects.push(...active.rows)
+        if (projects.length > 100 || rows.length < 101) break
+        rows = (await grantPage(rows[rows.length - 1].id)).rows
+      }
+      return { workspaceId, serviceIdentityId: id, projects: projects.slice(0, 100), nextCursor: projects.length > 100 ? projects[99].id : null }
     })
   })
 }
