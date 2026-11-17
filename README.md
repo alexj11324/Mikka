@@ -126,7 +126,8 @@ Mikka is proudly developed with support from the [Codex for Open Source](https:/
   <img src="docs/assets/neon-logo.svg" alt="Neon" width="160">
 </a>
 
-Thanks to [Neon](https://neon.com) for supporting Mikka.
+Thanks to [Neon](https://neon.com) for supporting Mikka through the Neon Open
+Source Program.
 
 ## License
 
