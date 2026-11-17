@@ -969,7 +969,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "A dispatch to a named computer runs the Agent the request names, on that computer and matching its harness; without one it is refused with a coded error instead of falling back to another Agent.",
-    "test": "tests/model-order.db.test.ts",
+    "test": "tests/one-thread-per-task.db.test.ts",
     "suite": "test:bot-threads-db"
   },
   "drizzle/20261117140000_subscriptions_owner_only.sql": {
