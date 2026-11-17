@@ -58,6 +58,47 @@ test('organization share management holds the actual attachment, creator and cur
     return route[method](new Request(target, { method, headers: { cookie, origin: requestOrigin, 'content-type': 'application/json' },
       body: method === 'PATCH' ? JSON.stringify({ visibility }) : undefined }), { params: Promise.resolve({ organizationId: org, shareId }) })
   }
+  await t.test('organization volume shares list every admitted link and retry the original creator and path without widening visibility', async () => {
+    const links = await import('../../app/api/organizations/[organizationId]/drive/[volumeId]/shares/route')
+    const stored = await makeShare(undefined, 'Volume share listing')
+    const { volumeId } = stored
+    const operation = (method: 'GET' | 'POST', cookie: string, payload?: object, org = organizationId, query = '') => {
+      const uri = origin + '/api/organizations/' + org + '/drive/' + volumeId + '/shares' + query
+      const headers = { cookie, origin, 'content-type': 'application/json' }
+      const request = method === 'GET' ? new Request(uri, { headers }) : new Request(uri, { method: 'POST', headers, body: JSON.stringify(payload) })
+      return links[method](request, { params: Promise.resolve({ organizationId: org, volumeId }) })
+    }
+    const create = { path: 'notes.txt' }
+    const expected = await (await operation('POST', mine, create)).json()
+    assert.equal(expected.id, stored.id)
+    assert.deepEqual(expected, stored)
+    assert.deepEqual(await (await operation('POST', mine, create)).json(), expected)
+    assert.deepEqual(await (await operation('GET', theirs)).json(), [])
+    const own = await (await operation('POST', theirs, create)).json()
+    assert.notEqual(own.id, stored.id)
+    assert.deepEqual([own.visibility, own.manageable, own.createdBy], ['private', true, 'drive-share-peer'])
+    assert.equal((await operation('POST', theirs, { ...create, visibility: 'public' })).status, 400)
+    assert.equal((await operation('POST', theirs, { path: 'not-here.txt' })).status, 404)
+    assert.ok([403, 404].includes((await operation('GET', mine, undefined, randomUUID())).status))
+    assert.equal((await operation('GET', mine, undefined, organizationId, '?limit=1')).status, 400)
+    const actor = { ownerId: 'drive-team:' + workspace.id, authorName: 'Directory fixture' }
+    const location = { workspaceId: workspace.id, driveScope: 'team-workspace' as const }
+    const bytes = new TextEncoder().encode('selected bytes'), sha256 = driveSha256(bytes)
+    const paths = Array.from({ length: 52 }, (_, index) => 'file-' + index + '.txt')
+    const head = (await database.query('SELECT "headDigest" FROM drive_volumes WHERE id=$1', [volumeId])).rows[0].headDigest
+    await applyDriveWrite(database, { ownerId: actor.ownerId, volumeId, driveScope: location.driveScope }, actor, {
+      expectedDigest: head, mutationId: randomUUID(), changes: paths.map(path => ({ op: 'put' as const, path, mode: 0o644 as const, sha256, sizeBytes: bytes.length })),
+    })
+    for (const path of paths) await createDriveFileLink(database, volumeId, path, creator, location)
+    const page = await (await operation('GET', mine)).json()
+    assert.equal(page.length, 53)
+    assert.deepEqual(page.map((v: { path: string }) => v.path).sort(), [...paths, create.path].sort())
+    assert.deepEqual(await (await operation('GET', theirs)).json(), [own])
+    const { listDriveFileLinks } = await import('./file-links')
+    const older = await listDriveFileLinks(database, volumeId, creator, { after: null, limit: 50 }, location)
+    assert.equal(older.links.length, 50)
+    assert.ok(older.nextCursor)
+  })
   assert.equal((await run('PATCH', mine, organizationId, 'org', 'https://other.invalid')).status, 403)
   assert.equal((await run('PATCH', mine, organizationId, 'public')).status, 400)
   const updated = await run('PATCH', mine, organizationId, 'org')

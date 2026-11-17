@@ -73,6 +73,7 @@ test('path policy rejects traversal, encoded delimiters, absolute targets and un
 test('private Drive forwarding has exact identifiers, paths and HTTP methods', () => {
   const volume = 'vol_01ARZ3NDEKTSV4RRFFQ69G5FAV', version = 'vver_01ARZ3NDEKTSV4RRFFQ69G5FAW'
   const routes: [string, string[]][] = [
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/shares', ['GET', 'POST']],
     ['/api/drive/scopes', ['GET']],
     ['/api/drive/shares', ['GET']],
     ['/api/drive/shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844', ['GET']],
