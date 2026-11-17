@@ -1385,6 +1385,15 @@
       "sourceHash": "0eab86e939f6215b0c361e16b9769129208338ba55a7a4b71a2175ca26a77875"
     },
     {
+      "path": "/mikka/api/integrations/github/tools",
+      "template": "/api/integrations/github/tools",
+      "source": "app/api/integrations/github/tools/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "bb9a1de43538e83717aabb98d6b37a9311c4454a285a4e04cdabc952a6258b94"
+    },
+    {
       "path": "/mikka/api/integrations/google/callback",
       "template": "/api/integrations/google/callback",
       "source": "app/api/integrations/google/callback/route.ts",
