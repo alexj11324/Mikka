@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process'
 import { createServer } from 'node:http'
 import { chromium } from '@playwright/test'
 import { launchElectron } from './electron-launch.mjs'
+import { verifyLinuxRepositoryDialog } from './native-repository-picker.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { observeAccountRelease } from './account-release-observer.mjs'
@@ -101,6 +102,10 @@ try {
   }))
   assert.deepEqual(boundary, { require: 'undefined', process: 'undefined', cookies: '', flavor: 'dev', mainFrame: true })
   check('packaged local origin and isolated renderer')
+  if (process.env.MIKKA_TEST_X11_DIRECTORY_DIALOG === '1') {
+    await verifyLinuxRepositoryDialog(page, profile)
+    check('Linux system directory picker selects nested Git roots with origin and upstream, and cancels through native IPC')
+  }
 
   const csp = await page.evaluate(async () => (await fetch(location.href)).headers.get('content-security-policy'))
   assert.ok(csp?.includes("default-src 'none'"))
