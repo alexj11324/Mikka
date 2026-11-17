@@ -1,6 +1,5 @@
 import 'server-only'
 import { ActionFailureError } from '@/lib/action-error'
-import { pool, withDatabaseClient } from '@/lib/db'
 import { botListChanged, botRemovedChanged, groupListChanged } from '@/lib/live/lists'
 
 /**
@@ -14,8 +13,12 @@ import { botListChanged, botRemovedChanged, groupListChanged } from '@/lib/live/
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 type Owner = { ownerId: string; workspaceId: string }
 
+// The database loads on first use (as lib/thread-reads.ts does): the actions module that imports this stays light.
+const database = () => import('@/lib/db')
+
 export async function setOwnedBotArchived(owner: Owner, botId: string, archived: boolean) {
   if (!UUID.test(botId)) throw new ActionFailureError('botNotFound')
+  const { pool } = await database()
   const { rows } = await pool.query<{ id: string }>(
     `UPDATE bots SET "archivedAt"=CASE WHEN $4::boolean THEN COALESCE("archivedAt", now()) ELSE NULL END, "updatedAt"=now()
       WHERE id=$1::uuid AND "ownerId"=$2 AND "workspaceId"=$3::uuid
@@ -28,6 +31,7 @@ export async function setOwnedBotArchived(owner: Owner, botId: string, archived:
 
 export async function deleteOwnedBot(owner: Owner, botId: string) {
   if (!UUID.test(botId)) throw new ActionFailureError('botNotFound')
+  const { pool, withDatabaseClient } = await database()
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -66,6 +70,7 @@ export async function deleteOwnedBot(owner: Owner, botId: string) {
 
 /** The person's own archived bots in this workspace, newest archive first: the sidebar's 已归档 list. */
 export async function ownArchivedBots(owner: Owner) {
+  const { pool } = await database()
   const { rows } = await pool.query<{ id: string; name: string; color: string; shape: string }>(
     `SELECT id, name, color, shape FROM bots WHERE "ownerId"=$1 AND "workspaceId"=$2::uuid AND "archivedAt" IS NOT NULL
       ORDER BY "archivedAt" DESC, name`, [owner.ownerId, owner.workspaceId])
