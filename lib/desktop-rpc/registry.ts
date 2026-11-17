@@ -234,8 +234,6 @@ const functions = {
   'pending-actions.decidePendingAction': actions21.decidePendingAction,
   'personal-policy.getSharePolicy': actions22.getSharePolicy,
   'personal-policy.updateSharePolicy': actions22.updateSharePolicy,
-  'personal-policy.getSubscriptionShare': actions22.getSubscriptionShare,
-  'personal-policy.updateSubscriptionShare': actions22.updateSubscriptionShare,
   'personal-policy.getCreditShare': actions22.getCreditShare,
   'personal-policy.updateCreditShare': actions22.updateCreditShare,
   'personal-policy.getPaymentDesignation': actions22.getPaymentDesignation,

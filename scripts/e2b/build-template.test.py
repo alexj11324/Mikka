@@ -676,7 +676,7 @@ with fixture.root_file_metadata():
         cases = [(kind, None, 0) for kind in bt.KINDS]
         cases += [('claude', phase, code) for phase, code in (
             ('pid_file', 1), ('pid_read', 1), ('pid_alive', 1), ('worker_waiting', 1),
-            ('ingress_ready', 17), ('bootstrap_absent', 1), ('device_absent', 1), ('official_files', 31))]
+            ('ingress_ready', 17), ('control_fence', 23), ('bootstrap_absent', 1), ('device_absent', 1), ('official_files', 31))]
         cases += [('desktop', 'viewer_key_absent', 1), ('desktop', 'viewer_unauthorized', 1)]
         for kind, failure, code in cases:
             with self.subTest(kind=kind, failure=failure), tempfile.TemporaryDirectory(prefix='mikka-ready-stage-') as temp:
@@ -691,6 +691,9 @@ with fixture.root_file_metadata():
                 cmdline.write_bytes(b'worker\0' + (b'other' if failure == 'worker_waiting' else b'--wait-bootstrap') + b'\0')
                 guard.write_text('import sys\nassert sys.argv[1] == "ready"\nsys.exit(' + str(code if failure == 'ingress_ready' else 0) + ')\n')
                 official.write_text('import sys\nassert sys.argv[-1] == ' + repr(kind) + '\nsys.exit(' + str(code if failure == 'official_files' else 0) + ')\n')
+                fence = runtime / 'worker/packages/daemon/scripts/workspace-control-check.py'
+                fence.parent.mkdir(parents=True)
+                fence.write_text('import sys\nsys.exit(' + str(code if failure == 'control_fence' else 0) + ')\n')
                 if failure == 'bootstrap_absent': (home / 'bootstrap.json').write_text('{}')
                 if failure == 'device_absent': (home / 'worker/device.json').write_text('{}')
                 if failure == 'viewer_key_absent': (viewer / 'key').write_text('synthetic-viewer-key')
@@ -698,6 +701,9 @@ with fixture.root_file_metadata():
                 curl = binary / 'curl'
                 curl.write_text('#!/bin/sh\nprintf ' + ('403' if failure == 'viewer_unauthorized' else '401') + '\n')
                 curl.chmod(0o700)
+                runuser = binary / 'runuser'
+                runuser.write_text('#!/bin/sh\n[ "$1" = -u ] && [ "$2" = user ] && [ "$3" = -- ] || exit 97\nshift 3\nexec "$@"\n')
+                runuser.chmod(0o700)
                 command = bt.prebuilt_ready_command(kind).replace('/opt/mikka', str(runtime))
                 command = command.replace('/home/user/.mikka', str(home)).replace('/run/mikka-viewer', str(viewer))
                 command = command.replace('"/proc/$mikka_preloaded_pid/cmdline"', shlex.quote(str(cmdline)))

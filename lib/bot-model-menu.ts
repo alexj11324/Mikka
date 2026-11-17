@@ -43,14 +43,13 @@ export async function botModelScope(ownerId: string, botId: string | null, onlyW
  */
 export async function botModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding"> & Partial<Pick<ExecutionSettings, "pooledBindings" | "sharedChatBinding">>,
+  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding">,
   scope: ExecutionSettingsScope,
   botId: string | null,
   now = Date.now(),
   inspectPreference = false,
 ): Promise<BotModelMenu & { preferenceState?: "absent" | "present" }> {
   const rows = await settings.chatModels(scope);
-  const pooled = botId && settings.pooledBindings ? await settings.pooledBindings(scope) : [];
   // Claude first, then ChatGPT/Codex, as the resolver orders them (orchestration §2).
   const ordered = [
     ...rows.filter((row) => row.provider === "claude"),
@@ -76,18 +75,8 @@ export async function botModelMenu(
     key.models.map((model) => ({ id: apiKeyOptionId(key.id, model), modelId: model, provider: key.provider }));
   const keyLabel = (key: (typeof keys)[number]) => [key.name, key.last4 ? `····${key.last4}` : null].filter(Boolean).join(" ") || key.provider;
   const ownKeys = keys.filter((key) => key.mine);
-  const sharedOwners = [...new Set([...pooled.map(row => row.ownerId), ...keys.filter((key) => !key.mine).map((key) => key.ownerId)])];
+  const sharedOwners = [...new Set(keys.filter((key) => !key.mine).map((key) => key.ownerId))];
   const ownerNames = sharedOwners.length ? await memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
-  const sharedSubscriptions = new Map<string, BotModelMenuGroup>();
-  for (const row of pooled) {
-    if (!ownerNames.has(row.ownerId)) continue;
-    const group: BotModelMenuGroup = sharedSubscriptions.get(row.connectionId) ?? {
-      kind: "subscription" as const, provider: row.provider, owner: ownerNames.get(row.ownerId)!,
-      credentialLabel: ownerNames.get(row.ownerId)!, options: [],
-    };
-    group.options.push({ id: row.bindingId, modelId: row.modelId, provider: row.provider });
-    sharedSubscriptions.set(row.connectionId, group);
-  }
   // Mikka 额度: every catalogue model, listed whenever the source is on; the balance is checked when a message is sent
   // (decision 2026-11-15-1900). A self-hosted server lists the one model its own provider serves.
   const { hostedPointsHere } = await import("./points-fallback");
@@ -110,7 +99,6 @@ export async function botModelMenu(
     ...(catalogue.length ? [{ kind: "hosted" as const, ...(hostedSource ? { hostedSource } : { points }),
       options: catalogue.map((model) => creditsOption(model, local || featured.has(model.id))) }] : []),
     ...subscriptions.values(),
-    ...sharedSubscriptions.values(),
     ...ownKeys.map((key) => ({ kind: "apiKey" as const, credentialLabel: keyLabel(key), options: keyOptions(key) })),
     ...keys.filter((key) => !key.mine && ownerNames.has(key.ownerId)).map((key) => ({
       kind: "shared" as const, owner: ownerNames.get(key.ownerId)!, credentialLabel: keyLabel(key), options: keyOptions(key),
@@ -118,7 +106,7 @@ export async function botModelMenu(
   ];
   const preference = await botModelPreference(pool, scope, botId);
   const choice = await resolveBotModelChoice(pool, settings, scope, botId,
-    preference, { rows, pooled, keys, now });
+    preference, { rows, keys, now });
   const state = { chosen: choice.chosen, ...(choice.fallback ? { fallback: choice.fallback } : {}) };
   let current: BotModelCurrent;
   if (choice.kind === "none") {
@@ -135,22 +123,19 @@ export async function botModelMenu(
     };
   } else {
     const binding = choice.binding;
-    const option = (choice.sharedOwnerId ? pooled : rows).find(item => item.connectionId === binding.connectionId && item.modelId === binding.modelId);
+    const option = rows.find(item => item.connectionId === binding.connectionId && item.modelId === binding.modelId);
     const availability = subscriptionAvailability(binding.quota, binding.modelId, binding.provider === "codex" ? "codex" : "claude", now);
-    const sharedOwner = choice.sharedOwnerId ? ownerNames.get(choice.sharedOwnerId)
-      ?? (await memberNames(scope.workspaceId, [choice.sharedOwnerId])).get(choice.sharedOwnerId) : undefined;
     current = {
       id: option?.bindingId ?? binding.bindingId, modelId: binding.modelId, provider: binding.provider,
       kind: "subscription", ...state, available: availability.status === "available", availability: availability.status,
-      // A pooled subscription never exposes another member's private login.
-      credentialLabel: choice.sharedOwnerId ? sharedOwner : binding.accountLabel?.trim() || `…${String(binding.connectionId).slice(-6)}`,
-      ...(choice.quota && !choice.sharedOwnerId ? { quota: choice.quota } : {}),
+      credentialLabel: binding.accountLabel?.trim() || `…${String(binding.connectionId).slice(-6)}`,
+      ...(choice.quota ? { quota: choice.quota } : {}),
     };
   }
   return { groups, current, ...(inspectPreference ? { preferenceState: !preference.key && preference.selected === undefined ? "absent" as const : "present" as const } : {}) };
 }
 
-/** Active members' public names for shared subscriptions and keys. Never the credential. */
+/** Active members' public names for shared API keys. Never the credential. */
 async function memberNames(workspaceId: string, userIds: string[]) {
   const [{ workspaceDb }, { workspaceMembers }, { and, eq, inArray }] = await Promise.all([
     import("./workspace-db"), import("./db/workspace-schema"), import("drizzle-orm"),
@@ -168,7 +153,7 @@ async function memberNames(workspaceId: string, userIds: string[]) {
  */
 export async function refreshBotModelMenu(
   pool: Pick<Pool, "query">,
-  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding" | "refreshBotModels" | "connectedSubscriptions"> & Partial<Pick<ExecutionSettings, "pooledBindings" | "sharedChatBinding">>,
+  settings: Pick<ExecutionSettings, "chatModels" | "chatBinding" | "refreshBotModels" | "connectedSubscriptions">,
   scope: ExecutionSettingsScope,
   botId: string | null,
   timeoutMs = 8000,

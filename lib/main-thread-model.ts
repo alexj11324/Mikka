@@ -31,13 +31,11 @@ export async function mainThreadModel(pool: Query, scope: { ownerId: string; wor
       const { harnessFor } = await import('./model-catalog')
       return { harness: harnessFor(credits), model: credits }
     }
-    // The person's own choice row names the binding. A teammate's shared
-    // subscription is bound to this Bot under the subscription owner's id, so
-    // the binding is read by this workspace and Bot; the candidate below must
-    // still be one this person's 优先使用的模型 offers.
+    // The person's own choice row names their own binding: a subscription
+    // serves its owner only (decision 2026-11-17).
     const { rows: [binding] } = await pool.query<{ connectionId: string; modelId: string }>(
-      'SELECT "connectionId"::text AS "connectionId","modelId" FROM byos_bindings WHERE id=$1 AND "workspaceId"=$3 AND ("ownerId"=$2 OR "consumerId"=$4)',
-      [preference.selected, scope.ownerId, scope.workspaceId, botId ?? 'coordinator'])
+      'SELECT "connectionId"::text AS "connectionId","modelId" FROM byos_bindings WHERE id=$1 AND "ownerId"=$2',
+      [preference.selected, scope.ownerId])
     if (!binding) return null
     match = candidate => candidate.source.kind === 'subscription' && candidate.source.connectionId === binding.connectionId && candidate.model === binding.modelId
   }

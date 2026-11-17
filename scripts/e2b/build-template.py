@@ -58,7 +58,7 @@ ANONYMOUS_WORKER_READY = ' && '.join(command for _phase, command in ANONYMOUS_WO
 PREBUILT_START_PHASES = frozenset(('entry', 'preconditions_verified', 'guard_prepare', 'guard_prepared',
                                  'control_install', 'control_installed', 'worker_exec'))
 PREBUILT_READY_PHASES = frozenset((*[phase for phase, _command in ANONYMOUS_WORKER_CHECKS],
-                                 'ingress_ready', 'bootstrap_absent', 'device_absent',
+                                 'ingress_ready', 'control_fence', 'bootstrap_absent', 'device_absent',
                                  'viewer_key_absent', 'viewer_unauthorized', 'official_files'))
 
 
@@ -70,6 +70,8 @@ def prebuilt_ready_command(kind):
     """
     checks = [*ANONYMOUS_WORKER_CHECKS,
               ('ingress_ready', 'python3 /opt/mikka/runtime/ingress-v1/guard.py ready "$mikka_preloaded_pid" > /opt/mikka/ingress-ready.json'),
+              # The daemon's user must be able to take the execution fence, or every run would fail at claim.
+              ('control_fence', 'runuser -u user -- python3 -I /opt/mikka/worker/packages/daemon/scripts/workspace-control-check.py >/dev/null'),
               ('bootstrap_absent', 'test ! -e /home/user/.mikka/bootstrap.json'),
               ('device_absent', 'test ! -e /home/user/.mikka/worker/device.json')]
     if kind == 'desktop':

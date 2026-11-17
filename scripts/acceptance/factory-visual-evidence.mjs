@@ -18,7 +18,7 @@ import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { isDeepStrictEqual } from 'node:util'
 import { createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace,
-  chooseSharedChatModel, cleanupCase, sampledRequestTrace } from './cloud-startup.mjs'
+  chooseOwnChatModel, cleanupCase, sampledRequestTrace } from './cloud-startup.mjs'
 import { CASES, ORIGIN, openLive } from './run-observability.mjs'
 import { assertCurrentMain, waitForWebDeployment } from '../release/web-deploy.mjs'
 import { assertReleaseIdentity, selectRelease, REPOSITORY, RELEASE_NAME } from './thread-lifecycle-ci.mjs'
@@ -268,12 +268,12 @@ export function executionProof(evidence, { item, scope, profile, issueId, runId 
     && identity.workspaceId === scope.workspaceId && identity.personalResourcePolicy === 'requester_only'
     && devices.length === 1 && UUID.test(device?.id ?? '') && device.ownerId === scope.ownerId && device.access === 'owner'
     && runtime?.kind === 'e2b' && runtime.ownerId === scope.ownerId && runtime.resourceId === scope.ownerId
-    && subscriptions.length === 1 && UUID.test(subscription?.id ?? '') && subscription.ownerId === scope.adminId
-    && subscription.access === 'workspace_share' && /^(0|[1-9][0-9]*)$/.test(subscription.revision ?? '')
-    && payer?.kind === 'subscription' && payer.ownerId === scope.adminId && payer.resourceId === subscription.id, 'scope')
+    && subscriptions.length === 1 && UUID.test(subscription?.id ?? '') && subscription.ownerId === scope.ownerId
+    && subscription.access === 'owner' && /^(0|[1-9][0-9]*)$/.test(subscription.revision ?? '')
+    && payer?.kind === 'subscription' && payer.ownerId === scope.ownerId && payer.resourceId === subscription.id, 'scope')
   return { runId, status: run.status, harness: item.harness, model: item.model, credentialType: 'subscription',
     subscriptionRoute: run.subscriptionRoute, profileId: profile.id, profileVersion: profile.version, profileDigest: profile.digest,
-    profileSource: run.agentProfile.source, requesterHash: hash(scope.ownerId).slice(0, 16), payerHash: hash(scope.adminId).slice(0, 16),
+    profileSource: run.agentProfile.source, requesterHash: hash(scope.ownerId).slice(0, 16), payerHash: hash(scope.ownerId).slice(0, 16),
     workspaceHash: scope.evidence.teamWorkspaceHash, bindingHash: hash(subscription.id).slice(0, 16),
     subscriptionRevision: subscription.revision, sharedSubscription: true, ownCloudMachine: true }
 }
@@ -844,7 +844,7 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
       result.repositoryAccess = { repository: HANDOFF_REPOSITORY, source: 'current_owner_authorized_repositories', authorized: true }
     }
     const candidates = (order.candidates ?? []).filter(value => value.harness === item.harness && value.model === item.model
-      && value.source?.kind === 'subscription' && UUID.test(value.source.connectionId ?? '') && value.credentialOwnerId === scope.adminId)
+      && value.source?.kind === 'subscription' && UUID.test(value.source.connectionId ?? '') && value.credentialOwnerId === scope.ownerId)
     check(candidates.length === 1 && Array.isArray(profiles.profiles), 'subscription_unavailable')
     creditShare = ownCreditShare(client, scope.workspaceId, operation => lease.write(operation))
     result.creditShare = creditShare.state
@@ -876,7 +876,7 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
     const observedBot = await client.json(`/api/bots/${botId}`)
     check(observedBot.id === botId && observedBot.name === fixtureData.marker, 'bot')
     result.botId = botId; result.profileId = profile.id
-    await lease.write(() => chooseSharedChatModel(client, botId, item.harness))
+    await lease.write(() => chooseOwnChatModel(client, botId, item.harness))
     const issue = await lease.write(() => client.rpc('issues.saveIssue', [{ title: fixtureData.marker, status: 'todo', priority: 'low', content: { type: 'doc', content: [
       { type: 'paragraph', content: [{ type: 'text', text: fixtureData.initial }] },
     ] } }]))

@@ -372,7 +372,7 @@ function caseReport(sample) {
   const safeFailure = CODES.has(proof?.failure) ? proof.failure : sample.status === 'failed' ? 'execution_unproved' : 'acceptance_failed'
   const cleanup = sample.cleanup
   const passed = sample.status === 'execution_proved_awaiting_server_timing' && sample.replyVerifiedAfterTool === true
-    && sample.execution?.credentialType === 'subscription' && (sample.execution?.sharedScope?.verified === true
+    && sample.execution?.credentialType === 'subscription' && (sample.execution?.ownerScope?.verified === true
       || sample.workspaceKind === 'personal' && sample.execution?.personalScope?.verified === true)
     && sample.execution?.harness === sample.harness && sample.execution?.model === MODELS[sample.harness]
     && proof?.status === 'passed' && cleanup?.status === 'passed' && cleanup.taskDeleted === true

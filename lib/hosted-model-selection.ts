@@ -6,7 +6,7 @@ export const hostedSubscriptionSnapshotSchema = z.strictObject({
   coordinator: z.literal(true).optional(),
   type: z.literal('subscription'), bindingId: z.uuid(), ownerId: z.string().min(1),
   consumerId: z.uuid(), workspaceId: z.uuid(), connectionId: z.uuid(),
-  /** Set when the bot runs on another member's shared subscription (allowOthers): the run's owner. `ownerId` is the subscription's. */
+  /** Retired (decision 2026-11-17: a subscription serves its owner only). Parsed for old snapshots, which are refused. */
   runOwnerId: z.string().min(1).optional(),
   connectionRevision: z.number().int().positive(), modelId: z.string().min(1).max(128),
   route: z.enum(['codex_cpa', 'claude_cpa', 'openai_siwc']),

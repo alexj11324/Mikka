@@ -18,19 +18,19 @@ function cancelled(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Model resolution cancelled', 'AbortError')
 }
 function checkScope(scope: HostedModelScope, value: HostedSubscriptionSnapshot) {
-  if (scope.ownerId !== (value.runOwnerId ?? value.ownerId) || value.runOwnerId === value.ownerId || (value.runOwnerId !== undefined && scope.botId === null) || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
+  // A subscription serves its owner only (decision 2026-11-17): a snapshot frozen on a teammate's subscription is refused.
+  if (scope.ownerId !== value.ownerId || value.runOwnerId !== undefined || (scope.botId === null ? value.coordinator !== true : scope.botId !== value.consumerId || value.coordinator === true) || scope.workspaceId !== value.workspaceId) throw refuse()
 }
 /** Called only inside first execution reservation, never before replay lookup. */
-export async function freezeHostedModelSelection(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, selection: unknown, dependencies: HostedModelDependencies, subscriptionOwnerId = scope.ownerId): Promise<HostedRuntimeSnapshot & { modelSelection?: HostedSubscriptionSnapshot }> {
+export async function freezeHostedModelSelection(scope: HostedModelScope, runtime: HostedRuntimeSnapshot, selection: unknown, dependencies: HostedModelDependencies): Promise<HostedRuntimeSnapshot & { modelSelection?: HostedSubscriptionSnapshot }> {
   if (selection === undefined) return { harness: runtime.harness, model: runtime.model }
   if (runtime.harness !== 'ai_sdk' || !scope.workspaceId) throw refuse()
   const requested = agentModelSourceSchema.safeParse(selection)
   if (!requested.success) throw refuse()
   const service = dependencies.service()
-  const binding = await service.repository.binding(subscriptionOwnerId, requested.data.bindingId)
+  const binding = await service.repository.binding(scope.ownerId, requested.data.bindingId)
   const value = hostedSubscriptionSnapshotSchema.parse({
     ...(scope.botId === null ? {coordinator:true} : {}),
-    ...(subscriptionOwnerId !== scope.ownerId ? { runOwnerId: scope.ownerId } : {}),
     type: 'subscription', bindingId: binding.id, ownerId: binding.ownerId,
     consumerId: binding.consumerId, workspaceId: binding.workspaceId,
     connectionId: binding.connectionId, connectionRevision: binding.connectionRevision,

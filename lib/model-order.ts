@@ -86,14 +86,7 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
   const { usableApiKeys } = await import('./model-api-keys')
   const settings = new ExecutionSettings(query as Pool)
   const rows = await settings.modelCandidates(scope, query)
-  const { pooledOwners } = await import('./personal-policy')
-  const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
-  // Sharing grants use in this workspace, never ownership of the account. Both parties must still
-  // be active members; the owner is derived from server records, never an EntrySource supplied by a client.
-  for (const ownerId of await pooledOwners(query, scope.ownerId, scope.workspaceId)) {
-    try { await authorizeSubscriptionWorkspace(ownerId, scope.workspaceId) } catch { continue }
-    rows.push(...await settings.modelCandidates({ ...scope, ownerId }, query))
-  }
+  // A subscription serves its owner only (decision 2026-11-17): no teammate's account is a candidate.
   // Each account's models in the order the account listed them (its catalogue): the default takes the first Codex model.
   const connectionIds = [...new Set(rows.map(row => String(row.connectionId)))]
   const listed = new Map((connectionIds.length ? (await query.query<{ id: string; models: unknown }>(
@@ -189,7 +182,7 @@ const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, con
   const service = (await import('./subscription-runtime')).subscriptionRuntime()
   await service.member(scope.ownerId, scope.workspaceId)
   await service.workspace(credentialOwnerId, scope.workspaceId)
-  if (credentialOwnerId !== scope.ownerId && !(await (await import('./personal-policy')).othersMayUse(query, credentialOwnerId, scope.workspaceId))) throw new ActionFailureError('executionAccountUnavailable')
+  if (credentialOwnerId !== scope.ownerId) throw new ActionFailureError('executionAccountUnavailable')
   await service.allowance(credentialOwnerId, connectionId, signal)
 }
 
@@ -215,7 +208,7 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
     ? [[candidate.source.keyId, candidate.credentialOwnerId ?? scope.ownerId] as const] : []))
   const readConnections = async () => {
     const authorized = [] as [string, string][]
-    for (const [id, owner] of owners) if (owner === scope.ownerId || await (await import('./personal-policy')).othersMayUse(query, owner, scope.workspaceId)) authorized.push([id, owner])
+    for (const [id, owner] of owners) if (owner === scope.ownerId) authorized.push([id, owner])
     return new Map((authorized.length ? (await query.query<{ id: string; ownerId: string; state: string; paused: boolean; quota: unknown; provider: 'claude' | 'codex'; epoch: string; removed: boolean }>(
       'SELECT c.id::text AS id,c."ownerId",c.state,c.paused,c.quota,c.provider,c.epoch::text AS epoch,c."removedAt" IS NOT NULL AS removed FROM byos_connections c JOIN unnest($1::text[],$2::text[]) AS authorized(id,owner) ON c.id::text=authorized.id AND c."ownerId"=authorized.owner', [authorized.map(([id]) => id), authorized.map(([, owner]) => owner)])).rows : []).map(row => [row.id, row]))
   }

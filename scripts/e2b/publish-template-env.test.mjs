@@ -18,7 +18,7 @@ const MODELS = { desktop: [report('claude_code'), report('codex')], claude: [rep
 const TEMPLATES = { desktop: 'tpl-desktop', claude: 'tpl-claude', codex: 'tpl-codex' }
 const PROOF = { entries: 100, sha256: 'd'.repeat(64) }
 const POLICY_SHA = createHash('sha256').update(readFileSync(new URL('./e2b-finalization-files.json', import.meta.url))).digest('hex')
-const SHARED = { verified: true, access: 'workspace_share', requesterHash: '1'.repeat(16), payerHash: '2'.repeat(16), workspaceHash: '3'.repeat(64),
+const OWNER = { verified: true, access: 'owner', requesterHash: '1'.repeat(16), payerHash: '1'.repeat(16), workspaceHash: '3'.repeat(64),
   connectionHash: '4'.repeat(16), bindingHash: '5'.repeat(16), connectionRevision: '2', profileVersion: 1, profileDigest: '6'.repeat(64) }
 const conservation = kind => ({ before: PROOF, after: PROOF, finalization: {
   kind, policySha256: POLICY_SHA, before: PROOF, after: PROOF, originalBefore: PROOF, originalAfter: PROOF, providerChanges: [],
@@ -50,9 +50,9 @@ const bootstrapAcceptance = (runId, harness) => {
       phases: [{ name: 'daemon.adapter.cli_init.prewarm', startMs: 0, endMs: 300, ms: 300, outcome: 'ok' },
         { name: 'daemon.adapter.cli_init', startMs: 490, endMs: 500, ms: 10, outcome: 'ok' }] } }
 }
-const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { account: 'shared_smoke', workspaceRestored: true,
-  requesterHash: SHARED.requesterHash, payerHash: SHARED.payerHash,
-  team: { teamWorkspaceConfirmed: true, teamAdminMembershipVerified: true, teamWorkspaceHash: SHARED.workspaceHash } },
+const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { account: 'smoke_owner', workspaceRestored: true,
+  requesterHash: OWNER.requesterHash, payerHash: OWNER.payerHash,
+  personal: { personalWorkspaceConfirmed: true, personalWorkspaceHash: OWNER.workspaceHash } },
   templates: Object.fromEntries(Object.entries(TEMPLATES).map(([kind, templateId]) => [kind, {
   templateId, buildId: `build-${kind}`, baseTemplate: kind, preinstalled: true, public: true, buildStatus: 'ready',
   conservation: conservation(kind), models: MODELS[kind],
@@ -67,7 +67,7 @@ const EVIDENCE = { sourceCommit: COMMIT, workerSha: SHA, acceptanceScope: { acco
   runtimeAuthorization: { source: 'http_server_link', scope: 'daemon_http_server_link_and_task_fetch', complete: true, truncated: false, extraRemoteCalls: 0,
     hostAuthorizationComplete: true, basis: 'host_authorization_census_and_closed_mcp_business_paths', allFirstPartyHttpComplete: false,
     mcpHttpTiming: mcpTiming(`run-${kind}`, harness), observedProviderEvents: 1, officialDelivery: 'best_effort_not_a_complete_call_count' },
-  sharedScope: { ...SHARED },
+  ownerScope: { ...OWNER },
 }])) }
 const STORED = Object.fromEntries(pairEnv({ templates: TEMPLATES, sourceSha: SHA, sourceCommit: COMMIT, models: MODELS }).map(row => [row.key, row.value]))
 STORED.MIKKA_CLOUD_WORKER_SOURCE_COMMIT = COMMIT
@@ -109,8 +109,8 @@ test('publication reads complete file evidence and retains independently bound m
   delete evidence.subscriptionAcceptance.claude
   const invalid = Buffer.from(JSON.stringify(evidence))
   writeFileSync(path, invalid)
-  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /runtime_release_shared_scope_invalid claude/)
-  assert.throws(() => cloudflareRuntimeConfiguration(path, { ...expectedRelease, sha256: reportDigest(invalid) }), /runtime_release_shared_scope_invalid claude/)
+  assert.throws(() => assertReleaseEvidence(publicationInputFromFile(path, { ...expected, sha256: reportDigest(invalid) })), /runtime_release_owner_scope_invalid claude/)
+  assert.throws(() => cloudflareRuntimeConfiguration(path, { ...expectedRelease, sha256: reportDigest(invalid) }), /runtime_release_owner_scope_invalid claude/)
 })
 
 test('the publisher CLI reports a closed parse error without printing the report cause', t => {
@@ -476,8 +476,8 @@ test('publication requires both real subscriptions on these exact candidates bef
     evidence => { delete evidence.acceptanceScope },
     evidence => { evidence.acceptanceScope.account = 'owner_login' },
     evidence => { evidence.acceptanceScope.workspaceRestored = false },
-    evidence => { evidence.subscriptionAcceptance.claude.sharedScope.payerHash = SHARED.requesterHash },
-    evidence => { evidence.subscriptionAcceptance.codex.sharedScope.access = 'owner' },
+    evidence => { evidence.subscriptionAcceptance.claude.ownerScope.payerHash = '2'.repeat(16) },
+    evidence => { evidence.subscriptionAcceptance.codex.ownerScope.access = 'workspace_share' },
     value => { delete value.subscriptionAcceptance.codex },
     value => { value.subscriptionAcceptance.claude.credentialRoute = 'api_key' },
     value => { value.subscriptionAcceptance.codex.model = 'other-model' },

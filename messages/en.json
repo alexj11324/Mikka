@@ -1311,6 +1311,7 @@
     "deviceNameTooLong": "The name is too long.",
     "deviceNotFound": "This device does not exist.",
     "agentHarnessMissing": "The selected Agent is not installed on this computer.",
+    "agentRequired": "This computer runs more than one Agent. Name the Agent that should run this task.",
     "agentDuplicateName": "This name is already in use. Choose another name.",
     "botDuplicateName": "A bot with this name already exists. Choose another name.",
     "botNameTooLong": "A bot name can be at most 60 characters.",
@@ -2956,29 +2957,12 @@
       }
     },
     "subscriptionShare": {
-      "heading": "Team sharing",
-      "blocked": "An admin doesn’t allow sharing subscriptions",
-      "others": "Share my subscriptions with team members",
+      "others": "Share with team members",
       "othersTitle": "Share {name} with team members?",
-      "othersUsage": "Team members can use it to run their own bots. Usage counts against your subscription quota.",
       "othersRuntime": "While a task runs, the credential is placed temporarily on the computer running it, which may be a member's own computer. It is deleted when the task ends.",
       "othersTrust": "Share only with people you trust. Some providers' terms don't allow account sharing; check them yourself.",
       "othersConfirm": "Share",
-      "othersOn": "{names} subscription shared · When members run tasks, the credential is placed on their computer for the run",
-      "subscriptionName": "{provider} subscription",
-      "ownFallback": "my subscriptions",
-      "listSeparator": ", ",
-      "cancel": "Cancel",
-      "available": "{provider} subscription shared by {name}",
-      "availableState": "Your tasks can use it",
-      "provider": {
-        "claude": "Claude",
-        "codex": "ChatGPT"
-      },
-      "othersHint": "Members of {workspace} can also run tasks on your {names} subscription; usage counts against your quota",
-      "othersHintAny": "Members of {workspace} can also run tasks on your subscriptions; usage counts against your quota",
-      "othersOnAny": "Your subscriptions are shared · When members run tasks, the credential is placed on their computer for the run",
-      "thisWorkspace": "this workspace"
+      "cancel": "Cancel"
     },
     "archivedBots": {
       "heading": "Paused bots",
@@ -6353,7 +6337,7 @@
     "run_provider_error": {
       "default": "The model provider could not complete this request. Try again."
     },
-    "run_credentials_unavailable": {"default":"The task's credentials are unavailable.","device_unavailable":"This computer cannot receive the task's credentials right now.","native_credentials":"The subscription credential is unavailable.","github_credentials":"The GitHub credential is unavailable."},
+    "run_credentials_unavailable": {"default":"The task's credentials are unavailable.","device_unavailable":"This computer cannot receive the task's credentials right now.","credential_missing":"This task's subscription is not connected for its owner. Connect it in Settings and try again.","credential_expired":"The owner's subscription sign-in has expired. Sign in to it again and try again.","quota_exhausted":"The owner's subscription has used up its quota.","native_credentials":"The subscription credential is unavailable.","github_credentials":"The GitHub credential is unavailable."},
     "run_failed": {
       "default": "The task could not be completed. Check the error details or try again."
     },

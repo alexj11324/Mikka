@@ -48,11 +48,8 @@ section), the machine (§4) and concurrency (§5).
 flowchart TD
   start([New run: bot B, owner O, workspace W]) --> own{One of O's credentials<br/>valid, and allowed in W?}
   own -- yes --> mine[Use O's credential]
-  own -- no --> share{Another member's credential<br/>shared in W with 分享给团队成员?<br/>Claude first}
-  share -- yes --> other[Use that share]
-  share -- no --> hosted[Mikka 默认<br/>W's credits]
+  own -- no --> hosted[Mikka 默认<br/>W's credits]
   mine --> freeze[[Frozen for the whole run]]
-  other --> freeze
   hosted --> freeze
 ```
 
@@ -61,9 +58,9 @@ flowchart TD
    belongs to, with no switch and no admin limit ([2026-11-01-2240-own-credentials-always-usable](decisions/2026-11-01-2240-own-credentials-always-usable.md)). If several qualify, the bot's saved choice wins;
    after that a subscription comes before an API key, and Claude comes before
    ChatGPT/Codex.
-2. **Otherwise another member's credential** shared in this workspace with
-   「分享给团队成员」 ticked, Claude first.
-3. **Otherwise Mikka 默认**, through the usual hosted admission (§7).
+2. **Otherwise Mikka 默认**, through the usual hosted admission (§7). A
+   subscription serves its owner only; no other member's subscription is ever
+   used ([2026-11-17-1400-subscriptions-owner-only](decisions/2026-11-17-1400-subscriptions-owner-only.md)).
 
 Rules that hold everywhere:
 
@@ -71,8 +68,7 @@ Rules that hold everywhere:
   credential gets Mikka 默认.
 - **No switch mid-run.** A run frozen on a credential that disappears stops,
   with the subscription line and 重试. A credential disappears when it is
-  disconnected, revoked, paused, its share is withdrawn (for other members'
-  bots), its owner leaves, or the admin turns 「分享给团队成员」 off there.
+  disconnected, revoked or paused, or its owner leaves the workspace.
 - **Quota exhausted.** The run that hit the limit stops; it never switches.
   - When 「订阅额度用完后，自动改用 API Key」 is on (the default) and the owner has
     a compatible API key for the same frozen model, the next run uses that API key. The chat says so
@@ -454,7 +450,7 @@ external bill.
 | MVP | Later |
 | --- | --- |
 | A personal workspace for everyone; team workspaces beside it | — |
-| Account-level subscriptions, API keys and custom providers on 「模型与订阅」; own credentials usable in every workspace with no switch; 「分享给团队成员」, which an admin can switch off | Per-member spend caps |
+| Account-level subscriptions, API keys and custom providers on 「模型与订阅」; own credentials usable in every workspace with no switch; subscriptions serve their owner only (2026-11-17); 「分享给团队成员」 for API keys, which an admin can switch off | Per-member spend caps |
 | Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完后，自动改用 API Key」; a popup when nothing is left | — |
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |

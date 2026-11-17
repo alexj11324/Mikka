@@ -455,6 +455,19 @@ async function personNamed(userId: string, botId: string, sourceEventId: string 
 }
 
 /** Where a new run goes and on which model (decision 2026-11-02-1400): a named computer, else 运行位置; the model by the same rule either way. */
+/**
+ * The Agent a run on a named computer uses. A computer registers one Agent per
+ * installed CLI, so the choice is explicit or unambiguous, never a default:
+ * agentRequired when several remain, agentHarnessMissing when the named Agent
+ * (or the model's harness) is not one of this computer's installed Agents.
+ */
+async function namedDeviceAgent(userId: string, deviceId: string, agentId: string | undefined, harness: string | undefined): Promise<{ id: string } | { error: 'agentRequired' | 'agentHarnessMissing' }> {
+  const { rows: [device] } = await pool.query<{ harnesses: { harness: string; installed?: boolean }[] | null }>('SELECT harnesses FROM devices WHERE id=$1 AND "ownerId"=$2', [deviceId, userId])
+  const installed = new Set((device?.harnesses ?? []).filter(item => item.installed).map(item => item.harness))
+  const { rows } = await pool.query<{ id: string; harness: string }>('SELECT id,harness FROM agents WHERE "userId"=$1 AND "deviceId"=$2 ORDER BY "createdAt",id', [userId, deviceId])
+  return (await import('@/lib/dispatch-target')).chooseDeviceAgent(rows, installed, agentId, harness)
+}
+
 async function dispatchByRules(userId: string, { followed, ...input }: { threadRunId?: string; issueId: string; profileId?: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; origin?: RunOrigin; originRef?: RunOriginRef | null; model?: { harness: 'claude_code' | 'codex'; model?: string }; followed?: true }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
   if (!input.threadRunId) input = { ...input, needsSpec: await (await import('@/lib/factory/task-dispatch')).factoryTaskNeedsSpec(pool, userId, { issueId: input.issueId, botId, needsSpec: input.needsSpec }) }
   const stage = input.needsSpec ? 'spec' : 'execute'
@@ -468,6 +481,12 @@ async function dispatchByRules(userId: string, { followed, ...input }: { threadR
     // The named computer fixes where; the model is chosen as for any run (the thread's own, else 优先使用的模型 in order), among what this computer runs.
     const { issueForUser } = await import('@/lib/issue-access')
     if (!await issueForUser(userId, input.issueId)) throw new ActionFailureError('issueNotFound')
+    // Which of the computer's Agents runs it is decided here, never by a default:
+    // the named Agent, the model's own Agent, or the computer's only one. A
+    // computer with several Agents and nothing naming one refuses at once.
+    const agentId = await namedDeviceAgent(userId, device.deviceId, input.agentId, input.model?.harness)
+    if ('error' in agentId) return { error: agentId.error, issueId: input.issueId }
+    input = { ...input, agentId: agentId.id }
     const { executionWorkspace } = await import('@/lib/execution-settings')
     const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
     const { target, agentProfile, selectionMode } = await resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { issueId: input.issueId, stage, note: input.note, profileId: input.profileId, asked: input.model, location: 'local', deviceId: device.deviceId, agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) })

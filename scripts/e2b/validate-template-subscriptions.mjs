@@ -5,9 +5,10 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
-import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace, acceptanceBot,
+import { runCloudStartup, createSessionClient, smokeAcceptanceAccount, restoreAcceptanceWorkspace, acceptanceBot,
   STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, bootstrapAdoptionEvidence, bootstrapAdoptionDiagnostics } from '../acceptance/cloud-startup.mjs'
 import { readRuntimeTiming, runtimeEvidence } from '../acceptance/cloud-startup-evidence.mjs'
+import { selectAcceptancePersonal } from '../acceptance/personal-workspace.mjs'
 import { ACTION_ERROR_CODES } from '../../lib/action-result.ts'
 import { RUN_INVALID_REASONS } from '../../lib/run-invalid-reason.ts'
 
@@ -23,7 +24,7 @@ const GATE_CODES = new Set([
   'bootstrap_projection_invalid', 'bootstrap_publication_failed', 'bootstrap_proof_invalid', 'bootstrap_adoption_missing',
   'registered_agent_missing', 'execution_failed', 'execution_evidence_invalid', 'official_agent_acceptance_missing', 'tool_reply_evidence_missing',
   'device_cleanup_failed', 'sandbox_cleanup_failed', 'application_build_changed', 'sign_out_failed',
-  'subscription_or_cleanup_failed', 'subscriptions_missing', 'paths_required', 'workspace_restore_failed', 'shared_scope_evidence_invalid',
+  'subscription_or_cleanup_failed', 'subscriptions_missing', 'paths_required', 'workspace_restore_failed', 'owner_scope_evidence_invalid', 'personal_workspace_missing',
 ].map(code => `template_gate_${code}`))
 const STARTUP_CODES = new Set(STARTUP_FAILURE_CODES)
 const FAILURE_PHASES = new Set(STARTUP_FAILURE_PHASES)
@@ -283,17 +284,18 @@ export function candidateReceipt(report, kind, proof, acceptance, expectedScope)
     && sample.execution?.deviceId === proof.deviceId && sample.execution?.credentialType === 'subscription'
     && sample.credentialRoute === 'subscription' && sample.replyVerified === true
     && sample.sourceCommit === report.sourceCommit && UUID.test(sample.runId ?? ''), 'execution_evidence_invalid')
-  const scope = sample.execution.sharedScope
-  check(scope?.verified === true && scope.access === 'workspace_share' && acceptance.team?.teamWorkspaceConfirmed === true
-    && acceptance.team.teamAdminMembershipVerified === true && acceptance.cleanup.workspaceRestored === true
-    && /^[a-f0-9]{64}$/.test(scope.workspaceHash ?? '') && scope.workspaceHash === acceptance.team.teamWorkspaceHash
+  // A subscription serves its owner only (decision 2026-11-17): the smoke
+  // account runs its own subscription in its own personal workspace.
+  const scope = sample.execution.personalScope
+  check(scope?.verified === true && scope.access === 'owner' && acceptance.personal?.personalWorkspaceConfirmed === true
+    && acceptance.cleanup.workspaceRestored === true
+    && /^[a-f0-9]{64}$/.test(scope.workspaceHash ?? '') && scope.workspaceHash === acceptance.personal.personalWorkspaceHash
     && ['requesterHash', 'payerHash', 'connectionHash', 'bindingHash'].every(key => /^[a-f0-9]{16}$/.test(scope[key] ?? ''))
-    && scope.requesterHash === acceptance.accountHash && scope.requesterHash !== scope.payerHash
+    && scope.requesterHash === acceptance.accountHash && scope.requesterHash === scope.payerHash
     && /^(0|[1-9][0-9]*)$/.test(scope.connectionRevision ?? '')
     && Number.isInteger(scope.profileVersion) && scope.profileVersion > 0 && /^[a-f0-9]{64}$/.test(scope.profileDigest ?? '')
-    && (!expectedScope || scope.workspaceHash === expectedScope.evidence.teamWorkspaceHash
-      && scope.requesterHash === createHash('sha256').update(expectedScope.ownerId).digest('hex').slice(0, 16)
-      && scope.payerHash === createHash('sha256').update(expectedScope.adminId).digest('hex').slice(0, 16)), 'shared_scope_evidence_invalid')
+    && (!expectedScope || scope.workspaceHash === expectedScope.evidence.personalWorkspaceHash
+      && scope.requesterHash === createHash('sha256').update(expectedScope.ownerId).digest('hex').slice(0, 16)), 'owner_scope_evidence_invalid')
   const tool = Array.isArray(sample.toolCalls) && sample.toolCalls.find(row => row?.outcome === 'ok' && /^[a-f0-9]{16}$/.test(row.toolCallHash ?? ''))
   check(sample.minToolCalls === 1 && sample.requireReplyAfterTool === true && sample.replyVerifiedAfterTool === true && tool, 'tool_reply_evidence_missing')
   const runIdHash = createHash('sha256').update(sample.runId).digest('hex').slice(0, 16)
@@ -319,7 +321,7 @@ export function candidateReceipt(report, kind, proof, acceptance, expectedScope)
     runId: sample.runId, deviceId: proof.deviceId, officialBinarySha256: proof.binarySha256,
     officialCliVersion: proof.version,
     bootstrapAcceptance: { ...adoption, bootstrapSha256: bootstrap.bootstrapSha256, hintSha256: bootstrap.hintSha256 },
-    sharedScope: { verified: true, access: 'workspace_share', requesterHash: scope.requesterHash, payerHash: scope.payerHash,
+    ownerScope: { verified: true, access: 'owner', requesterHash: scope.requesterHash, payerHash: scope.payerHash,
       workspaceHash: scope.workspaceHash, connectionHash: scope.connectionHash, bindingHash: scope.bindingHash,
       connectionRevision: scope.connectionRevision, profileVersion: scope.profileVersion, profileDigest: scope.profileDigest },
     agentAcceptance: { runIdHash, harness, ...runtime.agentAccepted },
@@ -354,7 +356,11 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
     const identity = await client.json('/api/auth/get-session')
     check(identity.user?.email?.toLowerCase() === account.email.toLowerCase() && typeof identity.user.id === 'string' && identity.user.id.length > 0, 'account_mismatch')
     ownerId = identity.user.id
-    scope = await selectAcceptanceTeam(client, { ownerId, workspace: env.MIKKA_ACCEPTANCE_WORKSPACE_ID }, value => { originalWorkspaceId = value })
+    // The smoke account's own personal workspace, where only its own subscriptions run.
+    const choices = (await client.json('/api/workspace')).choices
+    const personal = Array.isArray(choices) ? choices.filter(choice => choice?.kind === 'personal') : []
+    check(personal.length === 1 && UUID.test(personal[0].id ?? '') && (!env.MIKKA_ACCEPTANCE_WORKSPACE_ID || env.MIKKA_ACCEPTANCE_WORKSPACE_ID === personal[0].id), 'personal_workspace_missing')
+    scope = await selectAcceptancePersonal(client, { ownerId, workspace: personal[0].id }, value => { originalWorkspaceId = value })
     bot = await acceptanceBot(client, env.MIKKA_ACCEPTANCE_BOT_ID, randomUUID())
     for (const [kind, harness] of KINDS) {
       let sandbox, deviceId, acceptance, diagnosticError, registeredProof, bootstrapChecks, vmProbe, enrollmentIssued = false, stage = 'candidate'
@@ -425,7 +431,7 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
               hintSha256: createHash('sha256').update(JSON.stringify(projected.hint)).digest('hex') }
             return publication
           }
-          acceptance = await runAcceptance({ origin, workspace: scope.workspaceId,
+          acceptance = await runAcceptance({ origin, workspace: scope.workspaceId, workspaceKind: 'personal', operation: 'execute',
             botId: bot.botId, mode: 'candidate', strategy: 'derived', runs: 1, harness,
             deviceId, agentId: matching[0].id, revision: report.sourceCommit, expectedBuild: version.build,
             timeoutMs: 240000, maxStartupMs: 5000, minToolCalls: 1,
@@ -503,7 +509,7 @@ export async function validateTemplateSubscriptions(report, { env = process.env,
   if (fatal) throw fatal
   if (failures.length) fail('subscription_or_cleanup_failed', new AggregateError(failures.map(row => row.error)))
   check(KINDS.every(([kind]) => passed[kind]), 'subscriptions_missing')
-  return { ...report, acceptanceScope: { account: 'shared_smoke', team: scope.evidence, workspaceRestored,
+  return { ...report, acceptanceScope: { account: 'smoke_owner', personal: scope.evidence, workspaceRestored,
     requesterHash: createHash('sha256').update(scope.ownerId).digest('hex').slice(0, 16),
     payerHash: createHash('sha256').update(scope.adminId).digest('hex').slice(0, 16),
     botRetention: bot.retention, createdBotCount: Number(bot.created) }, subscriptionAcceptance: passed }

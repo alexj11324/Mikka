@@ -12,17 +12,18 @@ const DEVICE = '10000000-0000-4000-8000-000000000001', RUN = '10000000-0000-4000
 const TEAM = '10000000-0000-4000-8000-000000000003', PERSONAL = '10000000-0000-4000-8000-000000000004'
 const OWNER = 'fixture-smoke-owner', ADMIN = 'fixture-shared-admin', EMAIL = 'acceptance+mikka-smoke@example.invalid'
 const hash = value => createHash('sha256').update(value).digest('hex')
-const team = { teamWorkspaceConfirmed: true, teamWorkspaceHash: hash('team-workspace\0' + TEAM), teamAdminMembershipVerified: true }
-const sharedScope = { verified: true, access: 'workspace_share', requesterHash: hash(OWNER).slice(0, 16), payerHash: hash(ADMIN).slice(0, 16),
-  workspaceHash: team.teamWorkspaceHash, connectionHash: 'e'.repeat(16), bindingHash: 'f'.repeat(16), connectionRevision: '2', profileVersion: 1, profileDigest: 'e'.repeat(64) }
+const personal = { personalWorkspaceConfirmed: true, personalWorkspaceHash: hash('personal-workspace\0' + PERSONAL),
+  personalSelectionBasis: 'explicit-owned-personal-workspace' }
+const ownerScope = { verified: true, access: 'owner', requesterHash: hash(OWNER).slice(0, 16), payerHash: hash(OWNER).slice(0, 16),
+  workspaceHash: personal.personalWorkspaceHash, connectionHash: 'e'.repeat(16), bindingHash: 'f'.repeat(16), connectionRevision: '2', profileVersion: 1, profileDigest: 'e'.repeat(64) }
 const report = { sourceCommit: COMMIT, workerSha: WORKER, templates: Object.fromEntries(['claude', 'codex'].map(kind => [kind, {
   templateId: `candidate-${kind}`, baseTemplate: kind, preinstalled: true,
 }])) }
-const candidateProjection = harness => ({ version: 1, authority: 'none', deviceId: DEVICE, workspaceId: TEAM, harness,
+const candidateProjection = harness => ({ version: 1, authority: 'none', deviceId: DEVICE, workspaceId: PERSONAL, harness,
   hint: { runId: RUN, bootstrapSha256: '1'.repeat(64), diagnostics: true, model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5' } })
 const bootstrapReceipt = harness => ({ version: 1, runId: RUN, harness, bootstrapSha256: '1'.repeat(64),
   hintSha256: hash(JSON.stringify(candidateProjection(harness).hint)) })
-const proof = { deviceId: DEVICE, workspaceId: TEAM, binarySha256: 'c'.repeat(64), version: '0.163.0',
+const proof = { deviceId: DEVICE, workspaceId: PERSONAL, binarySha256: 'c'.repeat(64), version: '0.163.0',
   bootstrapSha256: '1'.repeat(64), registrationMode: 'cloud_worker_bootstrap' }
 const bootstrapTiming = harness => {
   const base = { version: 1, runIdHash: hash(RUN).slice(0, 16), harness, truncated: false, outcome: 'ok' }
@@ -37,10 +38,10 @@ const bootstrapTiming = harness => {
         { name: 'daemon.adapter.cli_init', startMs: 490, endMs: 500, ms: 10, outcome: 'ok' }] },
   }
 }
-const accepted = harness => ({ mode: 'candidate', status: 'candidate_subscription_proved', accountHash: hash(OWNER).slice(0, 16), team,
+const accepted = harness => ({ mode: 'candidate', status: 'candidate_subscription_proved', accountHash: hash(OWNER).slice(0, 16), personal,
   cleanup: { errors: [], workspaceRestored: true }, officialTiming: { enabled: true, cleaned: true }, samples: [{
   status: 'execution_proved_awaiting_server_timing', sourceCommit: COMMIT, harness, runId: RUN, ...bootstrapTiming(harness),
-  execution: { harness, model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', deviceId: DEVICE, credentialType: 'subscription', sharedScope: { ...sharedScope } },
+  execution: { harness, model: harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', deviceId: DEVICE, credentialType: 'subscription', personalScope: { ...ownerScope } },
   credentialRoute: 'subscription', replyVerified: true, cleanup: { status: 'passed' },
   minToolCalls: 1, requireReplyAfterTool: true, replyVerifiedAfterTool: true, toolCalls: [{ toolCallHash: 'd'.repeat(16), outcome: 'ok' }],
   requireAgentAcceptance: true, requireRuntimeReceipt: true, requireOfficialTiming: true,
@@ -87,7 +88,7 @@ test('a release receipt names the actual candidate, revision, model and register
     harness: 'codex', model: 'gpt-6-luna', credentialRoute: 'subscription', replyVerified: true, runId: RUN,
     replyVerifiedAfterTool: true, toolEvidence: { toolCallHash: 'd'.repeat(16), outcome: 'ok' },
     deviceId: DEVICE, officialBinarySha256: proof.binarySha256, officialCliVersion: proof.version,
-    sharedScope,
+    ownerScope,
     bootstrapAcceptance: { ...bootstrapAdoptionEvidence({ ...accepted('codex').samples[0], runIdHash: hash(RUN).slice(0, 16) }),
       bootstrapSha256: proof.bootstrapSha256, hintSha256: bootstrapReceipt('codex').hintSha256 },
     agentAcceptance: { runIdHash: createHash('sha256').update(RUN).digest('hex').slice(0, 16), harness: 'codex', kind: 'codex_turn_start_ack', at: 1100, ms: 100 },
@@ -111,10 +112,11 @@ test('a release receipt names the actual candidate, revision, model and register
     sample => { sample.minToolCalls = 0 }, sample => { sample.toolCalls = [] },
     sample => { sample.toolCalls[0].outcome = 'error' }, sample => { sample.toolCalls[0].toolCallHash = 'raw-tool-id' },
     sample => { sample.replyVerifiedAfterTool = false }, sample => { sample.requireReplyAfterTool = false },
-    sample => { sample.execution.sharedScope.verified = false }, sample => { sample.execution.sharedScope.access = 'owner' },
-    sample => { sample.execution.sharedScope.payerHash = sample.execution.sharedScope.requesterHash },
-    sample => { sample.execution.sharedScope.workspaceHash = 'f'.repeat(64) },
-    sample => { sample.execution.sharedScope.connectionRevision = 'private-response' },
+    sample => { sample.execution.personalScope.verified = false }, sample => { sample.execution.personalScope.access = 'workspace_share' },
+    sample => { sample.execution.personalScope.payerHash = hash(ADMIN).slice(0, 16) },
+    sample => { sample.execution.personalScope.workspaceHash = 'f'.repeat(64) },
+    sample => { sample.execution.personalScope.connectionRevision = 'private-response' },
+    sample => { sample.execution.sharedScope = sample.execution.personalScope; delete sample.execution.personalScope },
   ]) {
     const value = accepted('codex'); mutate(value.samples[0])
     assert.throws(() => candidateReceipt(report, 'codex', proof, value), /template_gate_/)
@@ -134,23 +136,24 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false, 
     if (path.endsWith('/api/auth/sign-out')) { events.push('signed-out'); return Response.json({}) }
     assert.ok(init.headers.cookie.includes('session=fixture'))
     if (path.endsWith('/api/workspace')) {
-      const selected = url.searchParams.get('workspace') ?? (/mikka-workspace=([^;]+)/.exec(init.headers.cookie)?.[1] ?? PERSONAL)
+      const selected = url.searchParams.get('workspace') ?? (/mikka-workspace=([^;]+)/.exec(init.headers.cookie)?.[1] ?? TEAM)
       return Response.json({ currentUserId: OWNER, workspace: { id: selected, kind: selected === TEAM ? 'team' : 'personal' },
         role: selected === TEAM ? 'member' : 'admin', choices: [{ id: PERSONAL, kind: 'personal' }, { id: TEAM, kind: 'team' }],
-        members: selected === TEAM ? [{ userId: ADMIN, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] : [] })
+        members: selected === TEAM ? [{ userId: ADMIN, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }]
+          : [{ userId: OWNER, email: EMAIL, role: 'admin', status: 'active' }] })
     }
     if (path.endsWith('/api/bots/' + RUN)) return Response.json({ id: RUN, name: '测试1505 candidate fixture' })
     if (path.endsWith('/api/devices/enrollment')) return Response.json({ token: 'fixture-one-use' })
     if (path.endsWith('/api/runs/' + RUN + '/evidence')) {
       assert.equal(url.searchParams.get('bootstrap'), '1')
       assert.equal(url.searchParams.get('deviceId'), DEVICE)
-      assert.equal(url.searchParams.get('workspaceId'), TEAM)
+      assert.equal(url.searchParams.get('workspaceId'), PERSONAL)
       assert.equal(url.searchParams.get('bootstrapSha256'), proof.bootstrapSha256)
       return Response.json({ bootstrap: candidateProjection(devices.at(-1)) })
     }
     const { action, args } = JSON.parse(init.body)
     if (action === 'workspace.switchWorkspace') {
-      if (args[0] === PERSONAL) {
+      if (args[0] === TEAM) {
         events.push('restored-workspace')
         if (failRestore) throw Error('private restore failure')
       }
@@ -204,12 +207,12 @@ function candidateFixture(runAcceptance, cleanupFailure, { failRestore = false, 
     env: { GITHUB_SHA: COMMIT, SMOKE_OWNER_EMAIL: EMAIL, SMOKE_OWNER_PASSWORD: 'fixture' },
     runAcceptance: async (options, dependencies) => {
       assert.equal(options.minToolCalls, 1)
-      assert.equal(options.workspace, TEAM); assert.equal(options.botId, RUN)
+      assert.equal(options.workspace, PERSONAL); assert.equal(options.workspaceKind, 'personal'); assert.equal(options.botId, RUN)
       assert.equal(options.runtimeEvidence, 'required')
       assert.equal(options.officialTiming, 'enabled')
       if (queueRun(options.harness)) {
         const published = await dependencies.onCandidateRunQueued({ runId: RUN, issueId: RUN, deviceId: DEVICE,
-          agentId: RUN, workspaceId: TEAM, harness: options.harness,
+          agentId: RUN, workspaceId: PERSONAL, harness: options.harness,
           model: options.harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5' })
         assert.deepEqual(published, bootstrapReceipt(options.harness))
       }
