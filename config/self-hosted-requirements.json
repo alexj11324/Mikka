@@ -733,7 +733,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Store bounded action durations with their capture timestamps in PostgreSQL and preserve existing rows with no duration.",
-    "test": "lib/captures/video-evidence.db.test.ts",
+    "test": "lib/captures/store.db.test.ts",
     "suite": "test:captures-db"
   },
   "drizzle/20261112030502_task_attachments.sql": {
