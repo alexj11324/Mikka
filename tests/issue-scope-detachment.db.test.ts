@@ -104,7 +104,6 @@ test('provider policy preserves task tenancy and independent membership gates on
   const { issueForUser } = await import('../lib/issue-access')
   const { readRun, queueRun, visibleRuns } = await import('../lib/agent-runs')
   const { issueRunToken, verifyRunToken } = await import('../lib/mcp/worker')
-  const { renewRunLeases } = await import('../lib/run-leases')
   const { completeRunForDevice, dispatchCompletedIssue } = await import('../lib/run-completion')
   const { persistRunCompletion, prepareRunPublication, publishRunResult } = await import('../lib/run-publications')
   const { authorizedClaimResponse } = await import('../lib/run-claim-response')
@@ -399,7 +398,6 @@ test('provider policy preserves task tenancy and independent membership gates on
     assert.ok(await readRun(member,memberRun))
     assert.ok((await visibleRuns(member,{issueId:issue})).some(run=>run.id===memberRun))
     assert.ok(await verifyRunToken(new Request('http://127.0.0.1/'),memberToken))
-    assert.ok((await renewRunLeases(device,[memberRun])).leases[memberRun])
     const generation=(await pool.query('select "scopeVersion" from issues where id=$1',[issue])).rows[0].scopeVersion
     await setMembership(member,'suspended')
     try {
@@ -410,12 +408,8 @@ test('provider policy preserves task tenancy and independent membership gates on
       assert.ok(await readRun(owner,ownerRun))
       assert.equal(Boolean(await verifyRunToken(new Request('http://127.0.0.1/'),memberToken)),false)
       assert.ok(await verifyRunToken(new Request('http://127.0.0.1/'),ownerToken))
-      const renewal = await renewRunLeases(device,[memberRun])
-      assert.deepEqual(renewal.revoked,[memberRun])
-      assert.ok((await renewRunLeases(ownerDevice,[ownerRun])).leases[ownerRun])
-      const row = (await pool.query('select status,"leaseExpiresAt","stopRequestedAt","workspaceId" from agent_runs where id=$1',[memberRun])).rows[0]
-      assert.equal(row.status,'preparing'); assert.ok(row.stopRequestedAt);assert.equal(row.workspaceId,workspace)
-      assert.ok(new Date(row.leaseExpiresAt).getTime()<=Date.now())
+      // There is no lease renewal to revoke at (decision 2026-11-17-2215): the
+      // membership writer (lib/workspace-admin/members.ts) stops the runs it affects.
       const runCount=(await pool.query('select count(*)::int n from agent_runs where "issueId"=$1',[issue])).rows[0].n
       await assert.rejects(queueRun(member,{issueId:issue,agentId:agent,repo:'https://github.com/mikka-ci/scope-fixture.git',model:'fixture-model'}),/issueNotFound/)
       await assert.rejects(issueRunToken({id:memberRun,userId:member}))
@@ -440,7 +434,6 @@ test('provider policy preserves task tenancy and independent membership gates on
       assert.equal(await issueForUser(owner,issue),null)
       assert.equal(await readRun(owner,ownerRun),null)
       assert.equal(Boolean(await verifyRunToken(new Request('http://127.0.0.1/'),ownerToken)),false)
-      assert.deepEqual((await renewRunLeases(ownerDevice,[ownerRun])).revoked,[ownerRun])
       await assert.rejects(issueRunToken({id:ownerRun,userId:owner}))
       assert.ok(await issueForUser(member,issue),'another active member keeps the shared task')
     } finally { await setMembership(owner,'active') }

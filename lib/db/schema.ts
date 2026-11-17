@@ -298,7 +298,7 @@ export const linearSyncInbox = pgTable('linear_sync_inbox', {
 //
 // The daemon owns detection and execution; the server stores what it reports.
 // `devices.harnesses` is exactly the daemon's `HarnessInfo[]` from its latest
-// heartbeat, so the UI never guesses what a machine has installed.
+// report, so the UI never guesses what a machine has installed.
 
 /** Harnesses this app drives. Cursor and mock stay out until we support them. */
 export const SUPPORTED_HARNESSES = ['claude_code', 'codex', 'cursor'] as const
@@ -330,7 +330,7 @@ export const devices = pgTable('devices', {
   /**
    * The device session (decision 2026-11-17-2215): the gateway socket that
    * opened last, and when it closed. Online while opened and not closed since
-   * (`isDeviceOnline`, `DEVICE_SESSION_OPEN_SQL`); written only by lib/device-session.ts.
+   * (`isDeviceOnline`, `deviceSessionOpenSql` in lib/device-presence.ts); written only by lib/device-session.ts.
    */
   sessionOpenedAt: timestamp('sessionOpenedAt', { withTimezone: true }),
   sessionClosedAt: timestamp('sessionClosedAt', { withTimezone: true }),

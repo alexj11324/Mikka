@@ -24,7 +24,7 @@ export async function ensureDeviceAgents(pool: Pool, ownerId: string, deviceId: 
   const rows = (await pool.query(query, [ownerId, deviceId])).rows
   if (!rows.length || rows[0].kind !== 'local') return
   const actual = rows.flatMap(row => row.harness ? [row.harness] : [])
-  // Normal 15-second heartbeats do one read, without opening a transaction
+  // A report with unchanged harnesses does one read, without opening a transaction
   // or acquiring an advisory lock.
   if (actual.length === desired.length && actual.every((harness, i) => harness === desired[i])) return
   const client = await pool.connect()
@@ -33,7 +33,7 @@ export async function ensureDeviceAgents(pool: Pool, ownerId: string, deviceId: 
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('device-agents:' || $1,0))", [deviceId])
     const device = (await client.query(`SELECT harnesses FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' FOR UPDATE`, [deviceId, ownerId])).rows[0]
     if (device) {
-      // A newer registration/heartbeat may have won while this one waited.
+      // A newer registration/report may have won while this one waited.
       const current = reported ? desired : localExecutionHarnesses(device.harnesses)
       for (const harness of current) {
         await client.query(`INSERT INTO agents (id,"userId",harness,name,"deviceId") VALUES ($1,$2,$3,$4,$5)

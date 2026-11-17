@@ -20,7 +20,9 @@ const key = (...parts: (string | null)[]) => JSON.stringify(parts)
 /**
  * Called inside the secret write transaction. Stop already-admitted consumers and expire
  * their lease; the existing control push and recovery timer handle acknowledgement/offline
- * devices. Claim and heartbeat compare the frozen secret revision to cover concurrent claims.
+ * devices. Claim compares the frozen secret revision to cover concurrent claims, and
+ * every egress use re-reads the run (lib/secrets/egress-binding.ts), so a stopped run's
+ * capability is refused at once.
  * No plaintext is read and no provider request adds a database/auth round-trip.
  */
 export async function stopRunsForSecretChanges(tx: SecretsTx, changes: readonly SecretChange[]): Promise<number> {

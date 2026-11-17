@@ -690,10 +690,10 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const accepted = await claim(p.deviceId, next, p.token)
     assert.equal(accepted.status, 200, await accepted.text())
 
-    // The heartbeat answer names the releases; a failed automatic update is kept until the daemon clears it.
-    const heartbeatRoute = await import('../app/v1/devices/[deviceId]/heartbeat/route')
-    const beat = (body: Record<string, unknown>) => heartbeatRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/heartbeat`, {
-      method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${p.token}` }, body: JSON.stringify({ harnesses: [], runs: [], worktreeDiskBytes: 0, ...body }),
+    // The report answer names the releases; a failed automatic update is kept until the daemon clears it.
+    const reportRoute = await import('../app/v1/devices/[deviceId]/report/route')
+    const beat = (body: Record<string, unknown>) => reportRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/report`, {
+      method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${p.token}` }, body: JSON.stringify({ harnesses: [], ...body }),
     }), { params: Promise.resolve({ deviceId: p.deviceId }) })
     const stored = async () => (await pool.query('SELECT "updateFailure" FROM devices WHERE id=$1', [p.deviceId])).rows[0].updateFailure
     const failure = { version: '0.0.331', code: 'install_failed', at: '2026-11-02T21:00:00.000Z' }

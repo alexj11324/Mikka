@@ -226,6 +226,8 @@ export async function withDatabaseClient(client,operation){
 `
 const sources = new Map([
   ['/lib/device-route.ts', 'export const withDeviceRoute=handler=>handler'],
+  // The claim transaction's session check (decision 2026-11-17-2215) reads the probe's device.
+  ['/lib/device-session.ts', 'export async function deviceSessionHeld(tx,deviceId){const p=globalThis.claimResponseProbe;if(typeof tx?.query!=="function"||deviceId!==p.device.id)throw new Error("unexpected session check");return Boolean(p.device.sessionOpenedAt)&&!p.device.sessionClosedAt}'],
   ['/lib/project-resources/run-lease.ts', projectExecutionSource],
   ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
   ['/lib/db/index.ts', dbSource],

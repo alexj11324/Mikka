@@ -27,7 +27,7 @@ const ok = (): EgressUpstreamResponse => ({ status: 200, headers: [['content-typ
 function fixture(overrides: EgressHttpOptions = {}) {
   const targets: EgressHttpTarget[] = [], hosts: string[] = []
   const options: EgressHttpOptions = {
-    env, now: () => now,
+    env, now: () => now, bindingActive: async () => true,
     resolve: async hostname => { hosts.push(hostname); return [{ address: '93.184.216.34', family: 4 }] },
     transport: async target => { targets.push(target); return ok() },
     ...overrides,
@@ -52,6 +52,14 @@ test('the trusted boundary injects only its sealed credential and preserves supp
   assert.deepEqual(target.address, { address: '93.184.216.34', family: 4 })
   assert.deepEqual(result, { status: 201, headers: { 'content-type': 'application/json', 'retry-after': '2' }, bodyBase64: Buffer.from('{"id":"new"}').toString('base64') })
   assert.ok(!JSON.stringify(result).includes(secret))
+})
+
+test('a run that no longer holds the capability is refused at use, before DNS or upstream work', async () => {
+  const seen: unknown[] = []
+  const f = fixture({ bindingActive: async claims => { seen.push(claims.runId); return false } })
+  await assert.rejects(f.run(), reason('expired_capability'))
+  assert.deepEqual(seen, ['run-a'], 'the live run is read once, for the bound run')
+  assert.deepEqual(f.hosts, []); assert.deepEqual(f.targets, [])
 })
 
 test('route run binding and expiry fail before DNS or upstream work', async () => {
@@ -206,7 +214,7 @@ test('expiry during DNS prevents credential injection; cancellation and deadline
   const started = Date.now()
   const short = issueEgressCapability({ ...grantInput, leaseExpiresAt: started + 150 }, started, env)
   await assert.rejects(executeEgressRequest({ ...request, capability: short.capability }, { runId: 'run-a' }, {
-    env, resolve: async () => [{ address: '93.184.216.34', family: 4 }], transport: () => new Promise(() => {}),
+    env, bindingActive: async () => true, resolve: async () => [{ address: '93.184.216.34', family: 4 }], transport: () => new Promise(() => {}),
   }), reason('upstream_unavailable'))
   assert.ok(Date.now() - started < 2_000)
 })

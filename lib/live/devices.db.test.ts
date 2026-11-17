@@ -73,23 +73,26 @@ test('the device list key reaches only the owner home, after real device writers
     await database.query(`INSERT INTO device_tokens(id,"userId","tokenHash") VALUES ($1,'owner',$2)`, [randomUUID(), createHash('sha256').update(token).digest('hex')])
     const ownerHome = [{ scope: { ownerId: 'owner', workspaceId: home }, events: [{ kind: 'device_list', id: home }] }]
 
-    await t.test('a heartbeat pushes only when the device comes back online or its harnesses change', async () => {
-      const { POST } = await import('../../app/v1/devices/[deviceId]/heartbeat/route')
-      const beat = async (harnesses: unknown[]) => {
-        const response = await scope.run(() => POST(new Request(`http://127.0.0.1/v1/devices/${device}/heartbeat`, {
+    await t.test('a session that opens or closes, or a harness change, pushes the device list; an unchanged report does not', async () => {
+      const [{ POST }, { applyDeviceSessionReport }] = await Promise.all([import('../../app/v1/devices/[deviceId]/report/route'), import('../device-session')])
+      const report = async (harnesses: unknown[]) => {
+        const response = await scope.run(() => POST(new Request(`http://127.0.0.1/v1/devices/${device}/report`, {
           method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-          body: JSON.stringify({ runs: [], worktreeDiskBytes: 0, harnesses }),
+          body: JSON.stringify({ harnesses }),
         }), { params: Promise.resolve({ deviceId: device }) }))
         assert.equal(response.status, 200)
       }
-      await beat([codex])
-      assert.deepEqual(await deliveries(), [], 'an ordinary beat from an online device is not a list change')
-      await database.query(`UPDATE devices SET "lastSeenAt"=now()-interval '10 minutes',"sessionClosedAt"=clock_timestamp() WHERE id=$1`, [device])
-      await beat([codex])
-      assert.deepEqual(await deliveries(), ownerHome, 'offline to online is one push to the owner home')
-      await beat([codex])
-      assert.deepEqual(await deliveries(), [])
-      await beat([codex, claude])
+      const session = (state: 'connected' | 'disconnected', socketId: string) => scope.run(() => applyDeviceSessionReport(device, { state, at: new Date().toISOString(), socketId }))
+      const deviceLists = async () => (await deliveries()).filter(delivery => delivery.events.some(event => event.kind === 'device_list'))
+      await report([codex])
+      assert.deepEqual(await deliveries(), [], 'an unchanged report is not a list change')
+      assert.deepEqual((await session('disconnected', 'socket-unknown0')).applied, false)
+      assert.deepEqual(await deliveries(), [], 'a report for another socket changes nothing')
+      await session('connected', 'socket-livedev01')
+      assert.deepEqual(await deviceLists(), ownerHome, 'a session that opens is one device-list push to the owner home')
+      await session('disconnected', 'socket-livedev01')
+      assert.deepEqual(await deviceLists(), ownerHome, 'a session that closes is one too')
+      await report([codex, claude])
       assert.deepEqual(await deliveries(), ownerHome, 'a new harness shows in the list')
     })
 

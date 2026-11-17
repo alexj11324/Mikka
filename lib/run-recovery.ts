@@ -31,7 +31,7 @@ export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => 
   const taskMachines = runs('taskMachines') ? await reconcileDueThreadMachines(pool).catch(() => null) : null
   // Sandboxes of deleted workspaces whose kill did not go through are killed again.
   const sandboxKills = runs('sandboxKills') ? await retrySandboxKills(pool).catch(() => null) : null
-  // Durable task progress, independent of heartbeat or an open client.
+  // Durable task progress, independent of a device session or an open client.
   const tasks = runs('tasks') ? await (await import('@/lib/factory/watchdog')).sweepFactoryWatchdog(pool).catch(() => null) : null
   // Group turns left queued when their request ended: they no longer wait for someone to read the group.
   const started = Date.now()

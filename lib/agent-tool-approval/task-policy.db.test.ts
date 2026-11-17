@@ -178,7 +178,7 @@ test('task workspace policy applies to Coordinator and tenant-bound Bot runs', {
     await pool.query(`INSERT INTO cloud_machines("workspaceId","ownerId","deviceId","operationId") VALUES($1,$2,$3,$4)`,[workspaceA,owner,device,randomUUID()])
     await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1,$2,$3,$4,$5,now()+interval '5 minutes')`,[scopedId,owner,createHash('sha256').update(scopedToken).digest('hex'),device,workspaceA])
     try {
-      const scoped={authorization:`Bearer ${scopedToken}`,'content-type':'application/json'}
+      const scoped={authorization:`Bearer ${scopedToken}`,'x-mikka-device-session':'1','content-type':'application/json'}
       assert.equal((await fetch(`${url}?deviceId=${device}`,{headers:scoped})).status,200)
       const cloudCurrent=await read(a.run),cloudContext=policyDistributionContext(issuer,owner,device,a.run,cloudCurrent)
       const cloudSnapshot=issuePolicySnapshot(cloudContext,{...cloudCurrent.policy,readOnly:true})

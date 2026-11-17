@@ -49,8 +49,12 @@ Device-dependent live reads negotiate `presence=1`, then register the short-live
 grant issued by the ordinary authenticated read. The gateway acknowledges only
 that grant's device ids and home channel, until the earlier of its expiry and the
 socket ticket's expiry. Online/offline transitions push the existing device-list
-and thread-list keys; pings perform no SQL. A known legacy heartbeat has one
-in-memory deadline. Closing, replacing or expiring a watch releases its observers.
+and thread-list keys; pings perform no SQL. Presence is the device session: the
+gateway reports each device socket that opens or closes to the application
+(`POST /mikka/v1/internal/device-sessions/<deviceId>`, authenticated with the
+gateway push secret), which records it on the device and extends or ends the
+leases of its runs. There is no device heartbeat. Closing, replacing or expiring
+a watch releases its observers.
 
 Cross-replica observers also watch the publishing PostgreSQL session's advisory
 lock. In addition to its one `LISTEN` session, each app replica uses at most 32

@@ -25,8 +25,9 @@ cadences must not be restored. The daemon rows remain separate source contracts.
 | Settings, including the legacy initial settings entry | Zero background task/thread/board/chat reads over 36 seconds, including focus and online events | Same browser spec |
 | Return from settings | Exactly one immediate refresh for each action, then the normal 60-second budget | Same browser spec |
 | Leave the workspace document | Zero further workspace reads over 30 seconds | Same browser spec |
-| Idle device with the push gateway | No command poll and no database heartbeat while no run is held; one command read on connect and on each `work` signal; the 30-second `ping` is answered by the Durable Object | `packages/daemon/test/device-gateway.node-test.ts`, `cloudflare/device-gateway/src/route.test.ts` |
-| Empty command long-poll (fallback without a gateway) | One requested cycle in total, normally 25 seconds; early responses wait only the remainder; configured zero has a one-second minimum | `packages/daemon/test/commands-polling.test.ts` |
+| Idle device holding its session | No timed request at all: no heartbeat, no command poll; one report and one command read after the socket opens and a command read on each `work` signal; the 10-second `ping` is answered by the gateway without a database write | `packages/daemon/test/device-gateway.node-test.ts`, `cloudflare/device-gateway/src/route.test.ts` |
+| Device session open or close | One `devices` update per report from the gateway, plus the lease extension (open) or lease end (close) of that device's live runs | `lib/device-session.db.test.ts` |
+| Socket down | Only redials of the socket, 0.5 to 30 seconds with jitter; no long poll and no claims | Daemon tests |
 | Queued commands | Process immediately; command acknowledgments do not wait for an idle cycle | Same daemon tests |
 | Consecutive transport failures | Existing exponential waits of 1, 2, 4, 8, 16, 30 seconds, capped at 30; success resets the backoff | Same daemon tests |
 | Stop or disconnect | Cancel idle/retry waits; ignore late command results on shutdown; no next request or server queue query after cancellation | Daemon tests and `app/v1/devices/[deviceId]/commands/route.test.ts` |
@@ -39,18 +40,22 @@ scheduling around completed requests; lower bounds catch a broken refresh path.
 Settings' own reads are outside the background workspace budget. These are
 bounded regression checks, not a global request throttle.
 
-The daemon learns about new work from the device gateway
-(`cloudflare/device-gateway`, one Durable Object per device over a hibernating
-WebSocket). The server posts an empty signal (`lib/device-gateway-notify.ts`)
-after it commits the work; the daemon then reads it through
-`GET /v1/devices/:deviceId/commands`. `GET /v1/devices/:deviceId/gateway` gives
-the daemon its socket ticket. When `DEVICE_GATEWAY_URL` or
-`DEVICE_GATEWAY_PUSH_SECRET` is unset, or the socket does not open, the daemon
-falls back to the command long-poll. The current server route subscribes to
-PostgreSQL notifications before its initial read and waits through
-`deviceWorkSubscription`. A lost or unavailable subscription uses the bounded
-`longPollIdleCheck` fallback. The route performs a final read at its deadline. See the
-[decision](../design/decisions/2026-11-03-2030-device-push-gateway.md).
+A daemon is usable only while it holds its device gateway socket
+(`cloudflare/device-gateway`, one Durable Object per device, or the self-hosted
+built-in gateway); the open socket is the device session. The gateway reports
+`connected` and `disconnected` to `POST /v1/internal/device-sessions/:deviceId`
+(`lib/device-session.ts`), which records presence on `devices` and extends or
+ends the leases of the device's runs. The server posts an empty `work` signal
+(`lib/device-gateway-notify.ts`) after it commits work; the daemon then reads it
+through `GET /v1/devices/:deviceId/commands`, which answers at once and never
+waits. Changes on the device go once to `POST /v1/devices/:deviceId/report`,
+which renews nothing. `GET /v1/devices/:deviceId/gateway` gives the daemon its
+socket ticket; a server without a gateway answers 503 `deviceGatewayRequired`
+and has no devices. There is no heartbeat and no long-poll fallback. The
+run-recovery cron (every 15 minutes) asks the gateway about devices that hold
+leased runs while the database still holds their session open, so a lost
+`disconnected` report cannot keep a run alive. See the
+[decision](../design/decisions/2026-11-17-2215-device-session-no-heartbeat.md).
 
 Current daemons no longer poll `GET /v1/devices/:deviceId/fs/requests`. The
 route still answers an authenticated empty list for older daemons. Existing

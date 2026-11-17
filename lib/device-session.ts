@@ -68,7 +68,7 @@ async function sessionDisconnected(deviceId: string, report: DeviceSessionReport
       RETURNING "ownerId"`, [deviceId, report.at, report.socketId])
     if (!device) { await client.query('COMMIT'); return { applied: false } }
     ownerId = device.ownerId
-    // Run recovery retries these elsewhere or fails them (lib/run-leases.ts reclaimLostRuns).
+    // The run-recovery sweep (lib/run-leases.ts) retries these elsewhere or fails them.
     const runs = await client.query<{ id: string }>(`UPDATE agent_runs SET "leaseExpiresAt"=LEAST("leaseExpiresAt",clock_timestamp()), "updatedAt"=clock_timestamp()
       WHERE "deviceId"=$1 AND status=ANY($2::text[]) AND "leaseExpiresAt">clock_timestamp() RETURNING id`, [deviceId, [...LEASED_RUN_STATUSES]])
     ended = runs.rows.map(row => row.id)
