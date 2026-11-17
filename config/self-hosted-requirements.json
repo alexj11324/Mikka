@@ -365,6 +365,13 @@
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "app/api/organizations/[organizationId]/drive-shares/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An active organization member reads the current shared Files directory across accessible attached team Workspaces with original Drive and Project permissions applied before pagination.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/organizations/[organizationId]/invitations/route.ts": {
     "mode": "built-in",
     "environment": [],

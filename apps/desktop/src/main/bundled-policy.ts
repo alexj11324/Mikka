@@ -31,6 +31,7 @@ const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:restore|archive|unarchive)$`), ['POST']],
 ]
 const ORGANIZATION_OVERVIEW = new RegExp(`^/api/organizations/${UUID}$`)
+const ORGANIZATION_FILE_LINKS = new RegExp(`^/api/organizations/${UUID}/drive-shares$`)
 const ORGANIZATION_KEYS = new RegExp(`^/api/organizations/${UUID}/api-keys$`)
 const ORGANIZATION_WORKSPACES = new RegExp(`^/api/organizations/${UUID}/workspaces$`)
 const ORGANIZATION_POLICY = new RegExp(`^/api/organizations/${UUID}/policy$`)
@@ -105,7 +106,7 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (path.startsWith('/api/workspaces/') && path.includes('/service-identities')) {
     return SERVICE_IDENTITY_ROUTES.some(([route, mutation]) => route.test(path) && (method === 'GET' || method === mutation))
   }
-  if (WORKSPACE_GOVERNANCE.test(path) || ORGANIZATION_KEYS.test(path)) return method === 'GET'
+  if (WORKSPACE_GOVERNANCE.test(path) || ORGANIZATION_KEYS.test(path) || ORGANIZATION_FILE_LINKS.test(path)) return method === 'GET'
   if (path === '/api/organizations') return method === 'GET' || method === 'POST'
   if (ORGANIZATION_OVERVIEW.test(path)) return method === 'GET' || method === 'PATCH' || method === 'DELETE'
   if (ORGANIZATION_WORKSPACES.test(path)) return method === 'POST' || method === 'DELETE'

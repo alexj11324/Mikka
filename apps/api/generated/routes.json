@@ -1952,6 +1952,15 @@
       "sourceHash": "a16a38b52e068af884022c5a10cf35201f68401aaf2d0450145618952bcc6e84"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive-shares",
+      "template": "/api/organizations/[organizationId]/drive-shares",
+      "source": "app/api/organizations/[organizationId]/drive-shares/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "e4c9a61235ec9c5e8559f4d531d980062c06baeded819633b67a5c95fa330fd4"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/identity",
       "template": "/api/organizations/[organizationId]/identity",
       "source": "app/api/organizations/[organizationId]/identity/route.ts",

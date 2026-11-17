@@ -172,6 +172,15 @@ test('resource policy and approval requests use only their own declared methods'
   }
 })
 
+test('Organization Files forwards only a signed directory read', () => {
+  const path = '/api/organizations/' + identity.user.id + '/drive-shares'
+  for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
+    assert.equal(allowedApiPath(path, method), method === 'GET')
+    assert.equal(allowedApiPath(path + '/all', method), false)
+    assert.equal(allowedApiPath('/api/organizations/unknown/drive-shares', method), false)
+  }
+})
+
 test('Organization domain discovery and admission forward only the declared routes and methods', () => {
   const org = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
   const domain = 'ebb7878e-6918-4b68-9300-d956761b5011'
