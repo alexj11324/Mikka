@@ -1998,6 +1998,15 @@
       "sourceHash": "3b6c56ccec32fdfb5a07beec55c17975b3af1bd1833cd92974b8eba9fc9a0d3a"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/archive",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/archive",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/archive/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "4a60164a9bc0886878215991da1673c8ac3eb7396e0651c3ca98ca1c67cd6697"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/file-versions",
       "template": "/api/organizations/[organizationId]/drive/[volumeId]/file-versions",
       "source": "app/api/organizations/[organizationId]/drive/[volumeId]/file-versions/route.ts",
@@ -2005,6 +2014,15 @@
         "GET"
       ],
       "sourceHash": "e0e00f06f901213b5d1ca5ecb242cd0a4b18897954e9760cb284a83db85c45f9"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/unarchive",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/unarchive",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/unarchive/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "fe8d407ae3dbeb7e0353cdf26c14b4563abe040beb5e98d2d73d5a09e7e0a0dd"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/identity",
