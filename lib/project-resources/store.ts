@@ -4,6 +4,8 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, eq, inArray, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { db } from '@/lib/db'
+import { workspacePool } from '@/lib/workspace-db'
+import { memberProjectOrganization } from '@/lib/resource-access/project-creation-default'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { inDatabaseTransaction } from '@/lib/db/request-scope'
 import { currentTransactionBoundary } from '@/lib/db/transaction-boundary'
@@ -162,6 +164,22 @@ export async function readProjectEnvironmentVariable(reader: Reader, raw: z.inpu
       SELECT e.configuration->'variables'->>${name}::text AS value
       ${activeDefaultEnvironment(workspaceId, projectId)}`)
     return row?.value == null ? null : { name, value: row.value }
+  })
+}
+
+const organizationVariableInput = projectEnvironmentVariableInput.omit({ workspaceId: true }).extend({ organizationId: z.uuid() })
+
+export async function readOrganizationProjectEnvironmentVariable(reader: Reader, raw: z.input<typeof organizationVariableInput>) {
+  const { organizationId, projectId, name } = organizationVariableInput.parse(raw)
+  // Discovery selects only a candidate. The Workspace lease pins its attachment
+  // while the current membership, Project ACL and default Environment are read.
+  const { rows: [project] } = await workspacePool.query<{ workspaceId: string }>(`SELECT p."workspaceId"
+    FROM workspace_projects p JOIN mikka_organization_workspaces a ON a."workspaceId"=p."workspaceId"
+    WHERE p.id=$1 AND a."organizationId"=$2 AND p."archivedAt" IS NULL`, [projectId, organizationId])
+  if (!project) throw new GovernanceError('not_found')
+  return withTaskWorkspace(reader, project.workspaceId, async (workspace, tx) => {
+    if (await memberProjectOrganization(tx, workspace, actorId(reader)) !== organizationId) throw new GovernanceError('not_found')
+    return readProjectEnvironmentVariable(reader, { workspaceId: workspace.id, projectId, name })
   })
 }
 

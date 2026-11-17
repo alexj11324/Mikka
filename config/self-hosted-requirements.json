@@ -572,6 +572,13 @@
     "test": "lib/coding-workspace/terminal/http.test.ts",
     "suite": "test:coding-workspace-review-runtime"
   },
+  "app/api/organizations/[organizationId]/projects/[projectId]/environment-variables/[name]/value/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one ordinary value through the active Organization attachment, membership and the Project's current content access using the installation PostgreSQL databases.",
+    "test": "tests/project-resources.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "app/api/workspaces/[workspaceId]/projects/[projectId]/environment-variables/[name]/value/route.ts": {
     "mode": "built-in",
     "environment": [],
