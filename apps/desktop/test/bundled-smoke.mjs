@@ -7,6 +7,7 @@ import { execFileSync } from 'node:child_process'
 import { createServer } from 'node:http'
 import { chromium } from '@playwright/test'
 import { launchElectron } from './electron-launch.mjs'
+import { prepareLinuxRepositoryDialog, verifyLinuxRepositoryDialog } from './native-repository-picker.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
 import { captureNativeResources } from './native-resources.mjs'
 import { observeAccountRelease } from './account-release-observer.mjs'
@@ -80,11 +81,12 @@ try {
   releaseObserver = await observeAccountRelease(scope)
   generatedWorkspaceName = await captureGeneratedWorkspaceName(scope)
   nativeResources = await captureNativeResources(scope)
+  const picker = process.env.MIKKA_TEST_X11_DIRECTORY_DIALOG === '1' ? await prepareLinuxRepositoryDialog(profile) : null
   application = await launchElectron({
     ...(process.env.MIKKA_DESKTOP_EXECUTABLE ? { executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE } : {}),
     args: process.env.MIKKA_DESKTOP_EXECUTABLE ? [] : [join(root, 'apps/desktop')],
     cwd: root,
-    env: { ...process.env, MIKKA_DESKTOP_RENDERER: 'bundled', MIKKA_USER_DATA_DIR: profile },
+    env: { ...process.env, ...(picker ? { XDG_CONFIG_HOME: picker.config } : {}), MIKKA_DESKTOP_RENDERER: 'bundled', MIKKA_USER_DATA_DIR: profile },
     timeout: 90_000,
   })
   const page = await application.firstWindow({ timeout: 90_000 })
@@ -101,6 +103,10 @@ try {
   }))
   assert.deepEqual(boundary, { require: 'undefined', process: 'undefined', cookies: '', flavor: 'dev', mainFrame: true })
   check('packaged local origin and isolated renderer')
+  if (picker) {
+    await verifyLinuxRepositoryDialog(page, picker)
+    check('Linux system directory picker selects nested Git roots with origin and upstream, and cancels through native IPC')
+  }
 
   const csp = await page.evaluate(async () => (await fetch(location.href)).headers.get('content-security-policy'))
   assert.ok(csp?.includes("default-src 'none'"))

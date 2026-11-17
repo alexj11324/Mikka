@@ -42,6 +42,7 @@ test('an electron bridge reports every subsystem it exposes', () => {
     'notifications.badge': true,
     'device.localIdentity': true,
     'device.pickRepo': true,
+    'device.agentLogins': false,
     'quota.snapshot': true,
     'preview.scheme': true,
     'settings.local': true,
