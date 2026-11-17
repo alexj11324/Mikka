@@ -117,10 +117,11 @@ test('an offline watch observes a future claim and a silent device deadline with
   await producer.open(devicePeer.socket, daemon()); await flush()
   assert.equal(invalidations(browser).length, 2)
   const beforePing = network.messages.length
-  t.mock.timers.tick(80_000)
+  t.mock.timers.tick(35_000)
   await producer.message(devicePeer.socket, 'ping')
   assert.equal(network.messages.length, beforePing)
-  t.mock.timers.tick(89_999); await flush()
+  // Online until 40 s after the last ping: the daemon's 30 s silence limit plus one 10 s ping.
+  t.mock.timers.tick(39_999); await flush()
   assert.equal(invalidations(browser).length, 2)
   t.mock.timers.tick(1); await flush()
   assert.equal(invalidations(browser).length, 4)

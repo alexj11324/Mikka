@@ -5,13 +5,13 @@ import { connect, event, status } from './runtime.test.mjs'
 
 // Optional wall-clock acceptance probe, deliberately separate from the fast
 // CI suite. Run: node --test cloudflare/device-gateway/test/presence-expiry.mjs
-test('an open socket expires after 90 seconds without pings and recovers on auto-pong', { timeout: 105_000 }, async () => {
+test('an open socket expires after 40 seconds without pings and recovers on auto-pong', { timeout: 60_000 }, async () => {
   const socket = connect()
   await event(socket, 'open')
   const initial = await status()
   assert.equal(initial.online, true)
 
-  await delay(95_000)
+  await delay(45_000)
   assert.equal(socket.readyState, WebSocket.OPEN)
   const expired = await status()
   assert.equal(expired.online, false)

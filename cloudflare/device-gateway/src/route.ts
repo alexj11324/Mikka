@@ -16,7 +16,15 @@ export interface DeviceSessionStub {
 
 export interface GatewayEnv {
   DEVICE_SESSION: { getByName(name: string): DeviceSessionStub }
+  /** Secret. Bearer for the application's push/status calls and for session reports. */
   GATEWAY_PUSH_SECRET?: string
+  /**
+   * Plain var: the application's session report endpoint up to
+   * `/v1/internal/device-sessions` (the device id is appended), for example
+   * `https://app.example.com/mikka/v1/internal/device-sessions`. Without it
+   * the gateway reports no sessions and the application sees no device online.
+   */
+  DEVICE_SESSION_REPORT_URL?: string
 }
 
 const DEVICE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
