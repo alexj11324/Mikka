@@ -21,7 +21,7 @@ import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigati
 import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
 import { UpdateGate, gateCopy, gateView, type GateState } from './launch-update'
 import { meetsMinimumVersion } from '@mikka/protocol/version'
-import { TRANSLUCENT_ARGUMENT, windowAppearance } from './window-appearance'
+import { windowAppearance } from './window-appearance'
 import { RENDERER_ORIGIN, RENDERER_URL } from './bundled-policy'
 import { bundledProtocol } from './bundled-protocol'
 import { BundledAuth } from './bundled-auth'
@@ -300,8 +300,7 @@ function reloadApp(): void {
 
 function createMainWindow(): void {
   markStartup('main.window.start')
-  // Read once at launch; a changed Reduce transparency setting applies from the next launch.
-  const appearance = windowAppearance(process.platform, { dark: nativeTheme.shouldUseDarkColors, reduceTransparency: nativeTheme.prefersReducedTransparency })
+  const appearance = windowAppearance(process.platform, { dark: nativeTheme.shouldUseDarkColors })
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -309,7 +308,7 @@ function createMainWindow(): void {
     minHeight: 600,
     show: false,
     // The page paints its own top bar, so the native one must not show as a separate band.
-    ...appearance.options,
+    ...appearance,
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
@@ -324,7 +323,7 @@ function createMainWindow(): void {
       experimentalFeatures: false,
       devTools: !app.isPackaged,
       partition: PARTITION,
-      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`, ...(appearance.translucent ? [TRANSLUCENT_ARGUMENT] : [])],
+      additionalArguments: [`--mikka-app-origin=${PAGE_ORIGIN}`],
     },
   })
   markStartup('main.window.created')

@@ -371,6 +371,12 @@
   scrollbar-width: thin;
   scrollbar-color: color-mix(in oklab, var(--foreground) 22%, transparent) transparent;
 }
+/* macOS desktop: a drag strip (window bar, a frame header) must never swallow
+   a control's click, including a control drawn over a strip it is not inside.
+   Every control is no-drag, so only empty bar space moves the window. */
+[data-desktop-platform='darwin'] :is(button, a, input, select, textarea, [role='button'], [role='combobox'], [role='tab'], [role='menuitem'], [role='switch'], [contenteditable='true']) {
+  -webkit-app-region: no-drag;
+}
 html {
   scrollbar-gutter: stable;
   /* As Comma: regular is 450, no faux bold or italic, kerning and ligatures on. */
