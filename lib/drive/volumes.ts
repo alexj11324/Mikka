@@ -5,6 +5,7 @@ import {
   type DriveManifestEntry, type DriveScope,
 } from './contract'
 import { createUlidFactory } from './ulid'
+import type { DriveVolumeLocation } from './location'
 
 /**
  * Creating and reading a volume: the container the CAS writes into.
@@ -128,6 +129,17 @@ export async function listDriveVolumes(
       ORDER BY ${page ? 'id DESC' : '"updatedAt" DESC, id DESC'} LIMIT $7`,
   [actor.ownerId, scope.driveScope, scope.scopeId, scope.scopeUserId ?? null, scope.workspaceId ?? null, page?.beforeId ?? null, page?.limit ?? null, page?.archived ?? false])
   return rows.map(row => ({ ...row, totalBytes: Number(row.totalBytes) }))
+}
+
+/** Resolve only the location. Workspace admission, Organization attachment,
+ * and the original volume and Project authorization still precede any data. */
+export async function findDriveVolumeLocation(database: Pick<PoolClient, 'query'>, volumeId: string, reader: string): Promise<DriveVolumeLocation> {
+  const { rows: [location] } = await database.query<DriveVolumeLocation>(`SELECT id AS "volumeId","workspaceId","driveScope",
+      CASE WHEN "driveScope" IN ('project','project-user') THEN "scopeId" END AS "projectId"
+    FROM drive_volumes WHERE id=$1 AND "workspaceId" IS NOT NULL AND "archivedAt" IS NULL
+      AND ("driveScope" IN ('team-workspace','project') OR "ownerId"=$2 AND "driveScope" IN ('user','project-user'))`, [volumeId, reader])
+  if (!location) throw new DriveVolumeError('drive_not_found', 404)
+  return location
 }
 
 type VolumeReader = { ownerId: string; workspaceId?: string; driveScope?: DriveScope; scopeId?: string; scopeUserId?: string }
