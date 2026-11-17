@@ -104,6 +104,20 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "drizzle/20261116204507_drive_link_directory_metadata.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores actual link creation and file-specific modification timestamps in installation PostgreSQL. Existing links retain unknown creation dates and existing files use immutable version history.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/drive/location.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Builds the same authenticated file link for the Workspace directory and the public Drive client with the installation base path and existing tenant scope.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "drizzle/20261116190048_drive_file_links.sql": {
     "mode": "built-in",
     "environment": [],
