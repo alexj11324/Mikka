@@ -200,7 +200,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "f3f229bfca6912770e1626a85576979a46732b6e8a125ec23169a5192bba0c1d"
+      "sourceHash": "da4f65e5f2a2ef8c3d85405a0fb3b53b548665d144b0da9e926187f38e22be97"
     },
     {
       "path": "/mikka/api/bots/[botId]/app-tools",
@@ -1579,7 +1579,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "2b70b87ea6014206eae99d4ae132f174f9d4012912f21aa94056278ec19bcfb3"
+      "sourceHash": "1e02dd3091a567f02c8a8671f67a69a936e3c12066df56628750df1899e98b82"
     },
     {
       "path": "/mikka/api/mobile/bots/[id]",

@@ -45,8 +45,10 @@ test('rejects malformed identities, modes and client-supplied ownership', async 
 })
 test('uses server-derived ownership and the shared request contract', async () => {
   const f = fixture()
-  assert.equal((await f.handle(request('POST', { name: ' Bot ' }))).status, 201)
-  assert.deepEqual(f.calls.pop(), [actor, 'Bot'])
+  assert.equal((await f.handle(request('POST', { name: ' Bot ', agent: 'codex' }))).status, 201)
+  assert.deepEqual(f.calls.pop(), [actor, 'Bot', 'codex'])
+  // A Bot names its Agent: no default (decision 2026-11-17).
+  assert.equal((await f.handle(request('POST', { name: 'Bot' }))).status, 400)
   assert.equal((await f.handle(request('POST', { mode: 'view' }), botId, 'viewer')).status, 200)
   assert.deepEqual(f.calls.pop(), [actor, botId, 'viewer', 'view'])
   assert.equal((await f.handle(request(), botId, 'wake')).status, 202)

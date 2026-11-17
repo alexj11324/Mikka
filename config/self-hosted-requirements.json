@@ -972,6 +972,24 @@
     "test": "tests/one-thread-per-task.db.test.ts",
     "suite": "test:bot-threads-db"
   },
+  "app/actions/bots.ts": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Read and save the Agent a Bot names from the installation database; creating a Bot requires one and nothing is preselected.",
+    "test": "tests/workspace-settings-actions.test.ts",
+    "suite": "test:workspace-settings"
+  },
+  "lib/bot-agent.ts": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Read a Bot's Agent from the installation database; a Bot without one dispatches nothing and gets the card that opens its settings.",
+    "test": "tests/bot-update.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
   "drizzle/20261117190000_bot_agent.sql": {
     "mode": "built-in",
     "environment": [
