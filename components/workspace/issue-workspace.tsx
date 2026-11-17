@@ -81,6 +81,8 @@ import { listProjectTeams } from '@/app/actions/team-relations'
 import { WorkspaceOverview } from './workspace-overview'
 import { GroupChatView } from './group-chat-view'
 import { GroupLeaveAction } from './group-leave-action'
+import { DeleteBotDialog } from '@/components/nav/delete-bot-dialog'
+import { archiveBot, deleteBot, listArchivedOwnBots } from '@/app/actions/bots'
 import type { GroupSummary } from '@/lib/group-messages'
 import { forgetGroupReads, useGroupMembershipLoss } from './group-membership-cache'
 import { WorkspaceContentLoading, WorkspaceLoading } from './workspace-loading'
@@ -631,7 +633,39 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // The same rows as the bot list, for a frame that draws its own navigation (RailProps.chats).
   // 退出群聊 from a group row's right-click menu asks with the same confirmation as the group's page.
   const [leavingGroup, setLeavingGroup] = useState<GroupSummary | null>(null)
-  const { entries: chatNav, reloadGroups, referenceGroups } = useChatNav({ bots, workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items, onLeaveGroup: setLeavingGroup })
+  // 归档 / 删除 a bot from its row (lib/bot-lifecycle.ts, decision 2026-11-17-2040). The archived ones list under 已归档;
+  // the bot list's own live key re-reads both lists after either write.
+  const navWorkspaceId = workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null
+  const archivedKey = navWorkspaceId ? ['archived-own-bots', user.id, navWorkspaceId] as const : null
+  const { data: archivedBots = [], mutate: refreshArchivedBots } = useSWR(archivedKey, async ([, , workspaceId]) => {
+    const result = await listArchivedOwnBots(workspaceId)
+    if (result.error) throw new Error(result.error)
+    return result.bots
+  }, { revalidateOnFocus: false })
+  useLiveKey('bot_list', navWorkspaceId, archivedKey ? [unstable_serialize(archivedKey)] : [], navWorkspaceId)
+  const [deletingBot, setDeletingBot] = useState<BotView | null>(null)
+  const botMenuText = useTranslations('Nav.botMenu')
+  const afterBotLeft = (botId: string) => {
+    void refreshBotList(); void refreshArchivedBots()
+    if (activeBotId === botId) openChat({ kind: 'coordinator' })
+  }
+  const setBotArchived = async (bot: BotView, archived: boolean) => {
+    const result = await archiveBot(bot.id, archived, navWorkspaceId ?? undefined)
+    if (result.error) { toast.error(botMenuText('failed')); return false }
+    toast.success(botMenuText(archived ? 'archivedToast' : 'unarchivedToast', { name: bot.name }))
+    if (archived) afterBotLeft(bot.id)
+    else { void refreshBotList(); void refreshArchivedBots() }
+    return true
+  }
+  const removeBot = async (bot: BotView) => {
+    const result = await deleteBot(bot.id, navWorkspaceId ?? undefined)
+    if (result.error) { toast.error(botMenuText('failed')); return false }
+    toast.success(botMenuText('deletedToast', { name: bot.name }))
+    afterBotLeft(bot.id)
+    return true
+  }
+  const { entries: chatNav, archived: archivedNav, reloadGroups, referenceGroups } = useChatNav({ bots, archivedBots, workspaceId: navWorkspaceId, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items, onLeaveGroup: setLeavingGroup,
+    lifecycle: { archive: (bot, archived) => { void setBotArchived(bot, archived) }, askDelete: setDeletingBot } })
   const referenceTitles = useMemo(() => conversationReferenceTitles(user.id, listWorkspaceId, threadsError ? undefined : threadList, referenceGroups), [user.id, listWorkspaceId, threadList, threadsError, referenceGroups])
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
   const openSettings = (href = '/settings') => { if (!boardBusy && !leaving.current) void leave(() => { if (!pushSettingsHistory(href)) router.push(href) }) }
@@ -749,6 +783,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
         openChat({ kind: 'group', ...group })
       }}
       onNewBot={() => { closeComposer(); setCreatingBot(true) }} onReviewGroups={() => { closeComposer(); if (creation === 'conversation') navigateSection('conversations'); void reloadGroups().catch(() => {}) }} />}
+    {deletingBot && <DeleteBotDialog key={deletingBot.id} name={deletingBot.name} onClose={() => setDeletingBot(null)}
+      onDelete={() => removeBot(deletingBot)} onArchive={() => setBotArchived(deletingBot, true)} />}
     {leavingGroup && <GroupLeaveAction key={leavingGroup.id} group={leavingGroup} userId={user.id} open onOpenChange={open => { if (!open) setLeavingGroup(null) }}
       onLeft={() => { const id = leavingGroup.id; setLeavingGroup(null); notifyOtherGroupTabs(); leftGroup(id) }} />}
     {creationWorkspace && <NewBotDialog key={creationWorkspace} workspaceId={creationWorkspace} open={creatingBot} onOpenChange={setCreatingBot} onCreated={bot => { setCreatingBot(false); openChat({ kind: 'bot', botId: bot.id }, bot) }} />}
@@ -804,7 +840,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser('column') } else showBrowser(rightTaken ? 'closed' : 'column') }} /></>} />}
-    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, entries: chatNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreation('group'), onNewConversation: () => setCreation('conversation') }} onSearch={searchFromBar} inboxCount={inboxCounts?.count ?? 0} />}>
+    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null, entries: chatNav, archived: archivedNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreation('group'), onNewConversation: () => setCreation('conversation') }} onSearch={searchFromBar} inboxCount={inboxCounts?.count ?? 0} />}>
     {settingsShown ? settingsContent
       : <>
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it; every other page keeps the phone header and its list button. */}
