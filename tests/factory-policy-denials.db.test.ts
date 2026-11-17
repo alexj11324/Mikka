@@ -45,7 +45,7 @@ test('Factory task denials preserve public errors before policy and execution si
   })
   for (const id of [owner, other]) await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [id, `${id}@example.invalid`])
   const remoteUrl = `https://github.com/mikka-ci/factory-policy-${repoId}.git`
-  await pool.query('INSERT INTO devices (id,"ownerId",name,"protocolVersion",harnesses) VALUES ($1,$2,\'Factory policy fixture\',$3,$4)', [deviceId, owner, DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'codex', installed: true, toolApproval: true }])])
+  await pool.query('INSERT INTO devices (id,"ownerId",name,"protocolVersion",harnesses,"sessionOpenedAt") VALUES ($1,$2,\'Factory policy fixture\',$3,$4,now())', [deviceId, owner, DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'codex', installed: true, toolApproval: true }])])
   await pool.query('INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)', [tokenId, owner, createHash('sha256').update(token).digest('hex')])
   await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, owner, remoteKey(remoteUrl), remoteUrl])
   await pool.query('INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,\'Factory policy fixture\',\'codex\',$3)', [agentId, owner, deviceId])

@@ -68,10 +68,17 @@ export function deviceSessionSupported(request: Request): boolean {
   return value !== undefined && /^[0-9]{1,6}$/.test(value) && Number(value) >= DEVICE_SESSION_VERSION
 }
 
-/** Public upgrade metadata only; never wait for npm on a refused request. */
-export function daemonUpgradeResponse(): Response {
+/**
+ * Public upgrade metadata only. It names the `latest` release when this server
+ * instance already knows it, so a refused daemon can install it without any
+ * other request; it never waits for npm. A missing or stale cache starts one
+ * background refresh for the next refusal.
+ */
+export function daemonUpgradeResponse(now = Date.now(), read: () => Promise<string | undefined> = defaultRead): Response {
+  if (!cached || now - cached.at >= CACHE_MS) void daemonVersions(now, read).catch(() => undefined)
+  const latest = cached?.latest
   return Response.json({ error: 'update_required', code: 'daemonUpgradeRequired', minVersion: MIN_DAEMON_VERSION,
-    daemonVersions: { min: MIN_DAEMON_VERSION }, message: 'Update the Mikka daemon and sign in again.' },
+    daemonVersions: { min: MIN_DAEMON_VERSION, ...(latest ? { latest } : {}) }, message: 'Update the Mikka daemon and sign in again.' },
   { status: UPDATE_REQUIRED_STATUS, headers: { 'Cache-Control': 'private, no-store' } })
 }
 

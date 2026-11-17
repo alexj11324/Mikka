@@ -828,6 +828,9 @@ test('the actual claim response carries an opaque sealed task grant bound to the
   assert.deepEqual(opened.http, secret.delivery.http)
   assert.ok(opened.expiresAt - opened.issuedAt <= EGRESS_CAPABILITY_TTL_MS)
   assert.ok(opened.expiresAt <= new Date(probe.run.leaseExpiresAt!).getTime())
+  // Nothing renews a grant (decision 2026-11-17-2215): it expires exactly with the session lease of the claim.
+  assert.equal(grant.expiresAt, new Date(probe.run.leaseExpiresAt!).toISOString())
+  assert.equal(opened.expiresAt, new Date(probe.run.leaseExpiresAt!).getTime())
   for (const mismatch of [{ ownerId: 'other' }, { workspaceId: 'other' }, { repository: 'other/repo' }, { runId: 'other' },
     { deviceId: 'other' }, { deviceTokenId: 'other' }, { attempt: 2 }]) {
     assert.throws(() => openEgressCapability(grant.capability, { ...binding, ...mismatch }), { code: 'task_secret_unavailable', detail: 'binding_mismatch' })

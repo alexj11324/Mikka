@@ -1,7 +1,7 @@
 import { runMessagePrompt } from './run-message-prompt'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { and, asc, eq, sql, getTableColumns, inArray, isNull } from 'drizzle-orm'
+import { and, asc, eq, or, sql, getTableColumns, inArray, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
 import { z } from 'zod'
@@ -19,6 +19,18 @@ export const WORKSPACE_ID = '00000000-0000-4000-8000-000000000001'
 
 /** Run states where the daemon may still be working: not terminal. */
 const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
+
+/**
+ * A run the server took back from this device: its lease ended (a closed
+ * session, a revocation) and it is still leased or was reclaimed as lost.
+ * A daemon that reconnects within its local grace still holds such a run;
+ * the commands read hands it a `stop` (decision 2026-11-17-2215, which
+ * replaced the heartbeat's `revoked` list). Bounded to recent lease ends: a
+ * daemon past its local grace has stopped the run itself.
+ */
+export const TAKEN_BACK_WINDOW = '10 minutes'
+const takenBackSql = (alias: string) => `(${alias}."leaseExpiresAt"<=now() AND ${alias}."leaseExpiresAt">now()-interval '${TAKEN_BACK_WINDOW}'
+  AND (${alias}.status IN ('preparing','running','paused','waiting_input','finishing') OR ${alias}."stopReason"='device_lost'))`
 
 export function newDeviceToken(): string {
   return `orv_${randomBytes(32).toString('base64url')}`
@@ -163,8 +175,9 @@ export async function linkDeviceToken(caller: Pick<DeviceCaller, 'userId' | 'tok
 export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { activeTurnSteer?: boolean; mailboxNotices?: boolean; queued?: boolean; skipDeviceCommands?: readonly string[] } = {}): Promise<{ work: boolean; deviceCommand: { id: string; kind: DeviceCommandKind } | null }> {
   const uuid = (id: string) => z.uuid().safeParse(id).success
   const { readUnderDeviceAuthority } = await import('@/lib/db')
-  const [work, deviceCommand] = await readUnderDeviceAuthority<[boolean, { id: string; kind: DeviceCommandKind } | null]>(`json_build_array(EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=$1 AND r.status = ANY($2::text[]) AND NOT (r.id = ANY($3::uuid[]))
-    AND (r."stopRequestedAt" IS NOT NULL OR ($4 AND r.status='queued')
+  const [work, deviceCommand] = await readUnderDeviceAuthority<[boolean, { id: string; kind: DeviceCommandKind } | null]>(`json_build_array(EXISTS (SELECT 1 FROM agent_runs r WHERE r."deviceId"=$1 AND NOT (r.id = ANY($3::uuid[]))
+    AND (r.status = ANY($2::text[]) OR ${takenBackSql('r')})
+    AND (r."stopRequestedAt" IS NOT NULL OR ${takenBackSql('r')} OR ($4 AND r.status='queued')
       OR ($5 AND r.status IN ('preparing','running','waiting_input'))
       OR EXISTS (SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."deliveredAt" IS NULL AND m.failure IS NULL
         AND ($8 OR NOT EXISTS (SELECT 1 FROM coordinator_events e WHERE e.id=m.id AND e."userId"=m."userId" AND e.payload#>>'{threadSubmission,delivery}'='steer'))))),
@@ -182,14 +195,16 @@ export async function deviceMayHaveWork(deviceId: string, skip: readonly string[
  * Runs in `skip` (already handed over) are left out.
  */
 export async function deviceWork(deviceId: string, skip: readonly string[], options: { activeTurnSteer?: boolean; mailboxNotices?: boolean; queued?: boolean } = {}): Promise<{ commands: RunCommand[]; queuedRuns: string[] }> {
-  const runs = await db
-    .select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt })
+  const rows = await db
+    .select({ id: agentRuns.id, status: agentRuns.status, stopRequestedAt: agentRuns.stopRequestedAt, takenBack: sql<boolean>`${sql.raw(takenBackSql('"agent_runs"'))}` })
     .from(agentRuns)
-    .where(and(eq(agentRuns.deviceId, deviceId), inArray(agentRuns.status, [...LIVE_RUN_STATUSES])))
+    .where(and(eq(agentRuns.deviceId, deviceId), or(inArray(agentRuns.status, [...LIVE_RUN_STATUSES]), sql.raw(takenBackSql('"agent_runs"')))))
   const skipped = new Set(skip)
+  const takenBack = rows.filter(run => run.takenBack && !run.stopRequestedAt && !skipped.has(run.id)).map(run => ({ kind: 'stop' as const, runId: run.id }))
+  const runs = rows.filter(run => (LIVE_RUN_STATUSES as readonly string[]).includes(run.status) && !run.takenBack)
   const live = runs.filter(run => !skipped.has(run.id))
   const queuedRuns = options.queued ? live.filter(run => run.status === 'queued').map(run => run.id).slice(0, 100) : []
-  if (live.length === 0) return { commands: [], queuedRuns }
+  if (live.length === 0) return { commands: takenBack.slice(0, 500), queuedRuns }
   const messages = await db
     .select({ id: runMessages.id, runId: runMessages.runId, text: runMessages.text, origin: runMessages.origin,
       steer: sql<boolean>`EXISTS (SELECT 1 FROM coordinator_events e WHERE e.id=${runMessages.id} AND e."userId"=${runMessages.userId} AND e.payload#>>'{threadSubmission,delivery}'='steer')` })
@@ -201,7 +216,7 @@ export async function deviceWork(deviceId: string, skip: readonly string[], opti
   const inputs: RunCommand[] = messages.flatMap(({ id, runId, text, origin, steer }) => runId && (!steer || options.activeTurnSteer) ? [{ kind: steer ? 'steer' as const : 'input' as const, runId, messageId: id, text: runMessagePrompt({ id, runId, origin, text }) }] : [])
   const stops: RunCommand[] = live.filter(run => run.stopRequestedAt).map(run => ({ kind: 'stop', runId: run.id }))
   const notices = options.mailboxNotices ? await pendingMailboxNotices(deviceId, live.filter(run => !run.stopRequestedAt).map(run => run.id)) : []
-  return { commands: [...stops, ...notices, ...inputs].slice(0, 500), queuedRuns }
+  return { commands: [...stops, ...takenBack, ...notices, ...inputs].slice(0, 500), queuedRuns }
 }
 
 /** Marks messages the agent now holds; called by the daemon's ack. */

@@ -109,7 +109,7 @@ test('real PG: computer changes publish committed owner state without heartbeat 
       CREATE TABLE session (id text PRIMARY KEY,"userId" text NOT NULL REFERENCES "user"(id),"expiresAt" timestamptz NOT NULL,
         "enterpriseOrganizationId" uuid,"enterpriseProviderId" text,"enterpriseDirectoryUserId" text,"enterpriseIdentityId" text);
       CREATE TABLE workspace_computer_policies ("workspaceId" uuid PRIMARY KEY,permission text,version integer NOT NULL DEFAULT 0,"updatedAt" timestamptz);
-      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean NOT NULL DEFAULT true);
+      CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,enabled boolean NOT NULL DEFAULT true,"sessionOpenedAt" timestamptz,"sessionClosedAt" timestamptz);
       CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text,"deviceId" uuid,status text,"leaseExpiresAt" timestamptz,
         "stopRequestedAt" timestamptz,"updatedAt" timestamptz,"finishedAt" timestamptz,"resumeStatus" text,"pauseReason" text,
         "botId" uuid,"machineAuthority" boolean NOT NULL DEFAULT false,cli_policy_hierarchy jsonb,"workspaceId" uuid);
@@ -125,7 +125,7 @@ test('real PG: computer changes publish committed owner state without heartbeat 
       [actor.workspaceId, actor.userId, peer.userId, other.workspaceId])
     await database.query('INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,\'Owner\'),($4,$2,$5,\'Peer\'),($6,$7,$3,\'Other\')',
       [botId, actor.workspaceId, actor.userId, peerBot, peer.userId, otherBot, other.workspaceId])
-    await database.query('INSERT INTO devices(id,"ownerId") VALUES ($1,$2)', [deviceId, actor.userId])
+    await database.query('INSERT INTO devices(id,"ownerId","sessionOpenedAt") VALUES ($1,$2,now())', [deviceId, actor.userId])
     await database.query('INSERT INTO agent_runs(id,"userId","deviceId",status,"leaseExpiresAt","workspaceId") VALUES($1,$2,$3,\'running\',now()+interval \'1 hour\',$4)', [runId, actor.userId, deviceId, actor.workspaceId])
     await database.query('INSERT INTO computer_run_bindings("runId","botId","ownerId","workspaceId") VALUES($1,$2,$3,$4)', [runId, botId, actor.userId, actor.workspaceId])
 
@@ -171,20 +171,20 @@ test('real PG: computer changes publish committed owner state without heartbeat 
       assert.equal((await database.query('SELECT permission FROM workspace_computer_policies WHERE "workspaceId"=$1', [actor.workspaceId])).rowCount, 0)
     })
 
-    await t.test('new and reappearing cloud approvals notify; unchanged seenAt heartbeats do not', async () => {
+    await t.test('new and reappearing cloud approvals notify; an unchanged snapshot does not', async () => {
       await clear()
       const request = snapshot()
       await syncComputerReviews(database, deviceId, actor.userId, [request]); await drain()
       assert.equal(received.length, 1); assert.equal(received[0].events[0].id, botId)
       const state = await store.state(actor, botId)
       assert.equal(state.pendingApproval?.id, request.id)
-      const observed = (await database.query('SELECT "seenAt"+interval \'10 seconds\' AS expires FROM local_computer_reviews WHERE id=$1', [request.id])).rows[0].expires
+      // No 10-second freshness: the approval stays until it expires or the run's lease ends.
+      const observed = (await database.query(`SELECT LEAST(v."expiresAt",r."leaseExpiresAt") AS expires FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" WHERE v.id=$1`, [request.id])).rows[0].expires
       assert.equal(state.live?.deadline?.at, observed.toISOString())
-      assert.ok(state.live!.deadline!.afterMs > 8_000 && state.live!.deadline!.afterMs <= 10_000)
       await clear()
       await syncComputerReviews(database, deviceId, actor.userId, [request]); await drain()
-      assert.equal(received.length, 0, 'a one-second freshness heartbeat does not cause a page read')
-      await database.query('UPDATE local_computer_reviews SET "seenAt"=now()-interval \'11 seconds\' WHERE id=$1', [request.id])
+      assert.equal(received.length, 0, 'an unchanged snapshot does not cause a page read')
+      await syncComputerReviews(database, deviceId, actor.userId, []); await drain(); await clear()
       await syncComputerReviews(database, deviceId, actor.userId, [request]); await drain()
       assert.equal(received.length, 1)
     })

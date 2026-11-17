@@ -4,7 +4,7 @@ export { MailboxError } from './mailbox-error'
 import { personalPeerText, presentPersonalInboxRow } from './personal-mailbox-presentation'
 import { PERSONAL_MESSAGE_INSTRUCTIONS } from './personal-agent-message'
 import type { Pool, PoolClient } from 'pg'
-import { DEVICE_WORK_CHANNEL } from './db/listen'
+import { notifyDeviceWork } from './device-gateway-notify'
 import type { MailboxFence } from './personal-mailbox-fence'
 import { waitForMailboxGuard, type MailboxTransactionGuard, type MailboxTransactionLease } from './mailbox-transaction-guard'
 import { cancelMailboxBackend } from './mailbox-pg-cancel'
@@ -252,7 +252,8 @@ export class SessionMailbox {
     return { lock: `retry:${root.id}`, senders }
   }
   private async sendEnvelope(actor: MailboxActor, input: { to: string; key: string; text: string; replyTo?: string }, owner: boolean): Promise<MailboxReceipt> {
-    return this.transaction<MailboxReceipt>(async client => {
+    let wake: string | undefined
+    const receipt = await this.transaction<MailboxReceipt>(async client => {
       const box = await this.authorize(client, actor, false)
       let scope = await this.sendScope(client, actor, box)
       // Serialize this logical sender/key before selecting a recipient. The unique
@@ -281,8 +282,8 @@ export class SessionMailbox {
       const wakeDepth = owner ? 0 : outgoingMailboxDepth(actor.notificationDepth)
       const inserted = await client.query('insert into run_messages (id,"userId",text,"mailboxId","senderMailboxId","dedupeKey","replyTo",origin,"mailboxWakeDepth") values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning "createdAt"', [id, actor.userId, input.text, target.id, actor.mailboxId, input.key, input.replyTo ?? null, owner ? 'owner' : 'peer', wakeDepth])
       if (target.disabled) await client.query('update run_messages set failure=$1 where id=$2', ['recipient_disabled', id])
-      // A run's daemon on the commands long poll picks up the mailbox notice on COMMIT (lib/db/listen.ts).
-      if (target.kind === 'run' && !target.disabled && target.latestRunId) await client.query('select pg_notify($1, r."deviceId"::text) from agent_runs r where r.id=$2 and r."deviceId" is not null', [DEVICE_WORK_CHANNEL, target.latestRunId])
+      // The run's daemon reads the mailbox notice on the work signal sent after COMMIT.
+      if (target.kind === 'run' && !target.disabled && target.latestRunId) wake = (await client.query<{ deviceId: string }>('select r."deviceId" from agent_runs r where r.id=$1 and r."deviceId" is not null', [target.latestRunId])).rows[0]?.deviceId
       if (target.kind === 'coordinator' && !target.disabled && wakeDepth < MAILBOX_NOTIFICATION_LIMIT) {
         // The owner's own message is delivered as theirs; a peer's report gets no preset tier, so triage (the Decisions API) classifies it.
         await client.query(`insert into coordinator_events (id,"userId",kind,"dedupeKey","runId",payload,tier) values ($1,$2,$3,$4,$5,$6,$7)`, [randomUUID(), actor.userId, owner ? 'user_message' : 'run_report', `mailbox:${id}`, actor.runId ?? null, JSON.stringify({ text: owner ? input.text : personalPeerText({ id, senderMailboxId: actor.mailboxId, text: input.text, sourceRunId: actor.runId, createdAt: inserted.rows[0]?.createdAt }), mailboxWakeDepth: wakeDepth }), owner ? 'result' : null])
@@ -300,6 +301,8 @@ export class SessionMailbox {
       }
       return { id, queued: true, duplicate: false, failure: target.disabled ? 'recipient_disabled' : null }
     }, client => this.authorize(client, actor))
+    if (wake && !receipt.duplicate) notifyDeviceWork(wake)
+    return receipt
   }
   async inbox(actor: MailboxActor) {
     return this.transaction(async client => {

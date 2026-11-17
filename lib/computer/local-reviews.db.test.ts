@@ -18,7 +18,7 @@ test('local decisions bind owner, device, live run and exact digest, and cannot 
   const [device, run, id] = [randomUUID(), randomUUID(), randomUUID()]
   const digest = createHash('sha256').update('fixture').digest('hex')
   try {
-    await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text NOT NULL,name text NOT NULL,kind text NOT NULL,enabled boolean NOT NULL);
+    await pool.query(`CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text NOT NULL,name text NOT NULL,kind text NOT NULL,enabled boolean NOT NULL,"sessionOpenedAt" timestamptz DEFAULT now(),"sessionClosedAt" timestamptz);
       CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
       CREATE TABLE workspace_computer_policies ("workspaceId" uuid PRIMARY KEY,permission text,version int);
       CREATE TABLE agent_runs (id uuid PRIMARY KEY,"deviceId" uuid,"userId" text,status text,"stopRequestedAt" timestamptz,"leaseExpiresAt" timestamptz,"botId" uuid);
@@ -45,19 +45,24 @@ test('local decisions bind owner, device, live run and exact digest, and cannot 
     assert.equal((await pendingLocalComputerReviews(pool, 'owner')).length, 1)
     assert.equal(await decideLocalComputerReview(pool, 'other', id, digest, true), false)
     assert.equal(await decideLocalComputerReview(pool, 'owner', id, 'f'.repeat(64), true), false)
+    // A request the daemon synced a minute ago is still open while its session is.
+    await pool.query('UPDATE local_computer_reviews SET "seenAt"=now()-interval \'1 minute\'')
+    assert.equal((await pendingLocalComputerReviews(pool, 'owner')).length, 1)
     for (const update of [
       "UPDATE agent_runs SET \"userId\"='other'",
       `UPDATE agent_runs SET "deviceId"='${randomUUID()}'`,
       'UPDATE agent_runs SET "stopRequestedAt"=now()',
       'UPDATE agent_runs SET "leaseExpiresAt"=now()-interval \'1 second\'',
       'UPDATE devices SET enabled=false',
-      'UPDATE local_computer_reviews SET "seenAt"=now()-interval \'11 seconds\'',
+      // No freshness window (decision 2026-11-17-2215): the daemon's session and its last snapshot decide.
+      'UPDATE devices SET "sessionClosedAt"=clock_timestamp()',
+      'UPDATE local_computer_reviews SET "seenAt"=\'-infinity\'::timestamptz',
       'UPDATE local_computer_reviews SET "expiresAt"=now()-interval \'1 second\'',
       'UPDATE devices SET kind=\'cloud\'',
     ]) {
       await pool.query(update)
       assert.equal(await decideLocalComputerReview(pool, 'owner', id, digest, true), false)
-      await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()+interval '1 minute',"userId"='owner',"deviceId"='${device}'; UPDATE devices SET enabled=true,kind='local'; UPDATE local_computer_reviews SET "seenAt"=now(),"expiresAt"=now()+interval '1 minute'`)
+      await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()+interval '1 minute',"userId"='owner',"deviceId"='${device}'; UPDATE devices SET enabled=true,kind='local',"sessionClosedAt"=NULL,"sessionOpenedAt"=clock_timestamp(); UPDATE local_computer_reviews SET "seenAt"=now(),"expiresAt"=now()+interval '1 minute'`)
     }
     const results = await Promise.all([decideLocalComputerReview(pool, 'owner', id, digest, true), decideLocalComputerReview(pool, 'owner', id, digest, true)])
     assert.equal(results.filter(Boolean).length, 1)
@@ -66,7 +71,7 @@ test('local decisions bind owner, device, live run and exact digest, and cannot 
     await pool.query(`INSERT INTO local_computer_reviews VALUES ($1,$2,$3,'owner','target',NULL,'{"name":"click"}',$4,now()+interval '1 minute',now(),NULL)`, [otherReview, device, run, digest])
     await pool.query('INSERT INTO computer_run_bindings VALUES ($1)', [run])
     assert.equal(await decideLocalComputerReview(pool, 'owner', otherReview, digest, true), false)
-    // The daemon syncs every second: a snapshot without a review expires it once; rows already expired are not written again.
+    // A snapshot without a review expires it once; rows already expired are not written again.
     const version = async () => (await pool.query('SELECT id,"seenAt"=\'-infinity\'::timestamptz AS expired,xmin::text AS xmin FROM local_computer_reviews ORDER BY id')).rows
     await syncLocalComputerReviews(pool, device, 'owner', [])
     const expired = await version()

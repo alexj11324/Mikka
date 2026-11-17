@@ -201,10 +201,10 @@ test('provider policy preserves task tenancy and independent membership gates on
   const claimHarnesses = JSON.stringify([{harness:'codex',installed:true,toolApproval:true}])
   const memberRemote = `https://github.com/mikka-ci/scope-member-${device}.git`
   const ownerRemote = `https://github.com/mikka-ci/scope-owner-${ownerDevice}.git`
-  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses) values ($1,$2,\'Synthetic\',$3,$4)', [device,member,DAEMON_PROTOCOL_VERSION,claimHarnesses])
+  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses,"sessionOpenedAt") values ($1,$2,\'Synthetic\',$3,$4,now())', [device,member,DAEMON_PROTOCOL_VERSION,claimHarnesses])
   await pool.query('insert into agents (id,"userId",harness,name,"deviceId") values ($1,$2,\'codex\',\'Synthetic\',$3)', [agent,member,device])
   await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,\'main\')', [repo,device,member,remoteKey(memberRemote),memberRemote])
-  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses) values ($1,$2,\'Synthetic owner\',$3,$4)', [ownerDevice,owner,DAEMON_PROTOCOL_VERSION,claimHarnesses])
+  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses,"sessionOpenedAt") values ($1,$2,\'Synthetic owner\',$3,$4,now())', [ownerDevice,owner,DAEMON_PROTOCOL_VERSION,claimHarnesses])
   await pool.query('insert into agents (id,"userId",harness,name,"deviceId") values ($1,$2,\'codex\',\'Synthetic owner\',$3)', [ownerAgent,owner,ownerDevice])
   await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl") values ($1,$2,$3,$4,$5)', [ownerRepo,ownerDevice,owner,remoteKey(ownerRemote),ownerRemote])
   const deviceToken = `synthetic-${randomUUID()}`
