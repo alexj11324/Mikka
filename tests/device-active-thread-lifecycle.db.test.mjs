@@ -26,7 +26,7 @@ else if (process.env.REQUIRE_DB === '1') assert.fail(E2E_DB_RULE)
 test('a paired daemon runs the owner’s retried Task and its active directory follows the stable thread until stop', {skip: !adminUrl, timeout: 180_000}, async t => {
   const admin = new Pool({connectionString: adminUrl, max: 1})
   const name = 'device_directory_' + randomUUID().replaceAll('-', '') + '_e2e'
-  await createTestDatabase(admin, name, 'template0')
+  const ownership = await createTestDatabase(admin, name, 'template0')
   const url = new URL(adminUrl)
   url.pathname = '/' + name
   const pool = new Pool({connectionString: url.href})
@@ -70,8 +70,11 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
     workspacePool = (await import('../lib/workspace-db.ts')).workspacePool
     const environment = await bootstrapEnvironment({connectionString:url.href,origin,deploymentSha:revision,
       id:'device-directory-'+randomUUID(), outputFile:join(root,'environment.json'), authorizeDatabase:async db=>{
-        const {rows:[r]} = await db.query('select current_database() as name, host(inet_server_addr()) as host, current_setting(\'server_version_num\')::int as version')
-        assert.equal(r.name,name); assert.equal(r.host,'127.0.0.1'); assert.equal(Math.floor(r.version/10000),17)
+        // The runner reaches a Docker service over loopback; PostgreSQL can see
+        // its container interface. Compare the immutable marker from our CREATE.
+        const {rows:[target]} = await db.query(`select datname as name, shobj_description(oid,'pg_database') as ownership,
+          current_setting('server_version_num')::int as version from pg_database where datname=current_database()`)
+        assert.equal(target.name,name); assert.equal(target.ownership,ownership); assert.equal(Math.floor(target.version/10000),17)
       }})
     accounts = new TestAccountPool(pool, environment)
     await accounts.prepare({pairs:1})
