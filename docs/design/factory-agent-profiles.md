@@ -4,7 +4,7 @@
 - **GitHub:** [#1284](https://github.com/alexj11324/Mikka/issues/1284)
 - **Layout precedent:** existing Settings › Models and subscriptions, New task, and the thread's execution identity dialog. No new accepted Figma frame is claimed.
 - **Product authority:** [Factory flow decision](decisions/2026-11-04-2200-factory-flow-like-warp.md).
-- **Current behaviour:** [2026-11-15-1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md) (content only, no automatic selection, model follows the dispatching chat).
+- **Current behaviour:** [2026-11-15-1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md) (content only, no automatic selection) and [2026-11-17-1800](decisions/2026-11-17-1800-one-agent-per-thread.md) (every dispatch names its Agent; a thread keeps it for life).
 
 ## What the person does
 
@@ -14,7 +14,7 @@ Three rules, which the UI and the Coordinator's instructions repeat:
 
 1. An Agent 配置 is content only: name, description, instructions, Skills.
 2. A task uses one only when someone names it: the person in New task, or the Coordinator by id from `list_factory_agent_profiles`. A task-form choice always wins. Nothing is chosen automatically, and stage dispatch (review, verify, the first implementation after a plan) runs without one.
-3. The model and the machine come from the task. The person's explicit choice wins; otherwise a new task follows the dispatching chat's own model when a thread can run it, else 优先使用的模型, and is placed by 运行位置.
+3. The Agent, model and machine come from the task. Every dispatch names its Agent (none named: `agentRequired`); the person's explicit model wins, else that Agent's 优先使用的模型 in order, and it is placed by 运行位置. A thread never switches Agent.
 
 A Profile is owned by the current person in the current workspace. It is not a Bot, physical Agent installation, credential, machine or task.
 

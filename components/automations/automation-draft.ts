@@ -2,6 +2,7 @@ import { dailyTimeRepeats, resolveLocal } from '@/lib/schedules/wall-time'
 import type { Definition, DispatchTask, EventTrigger, GitHubTriggerEvent, LinearTriggerEvent, SlackTriggerEvent } from '@/lib/schedules/contract'
 import { slackUserId } from '@/lib/slack/user-id'
 import type { TaskDestination } from '@/lib/task-destination'
+import type { TaskAgent } from '@/lib/task-create-command'
 
 export type ScheduleKind = 'once' | 'interval' | 'daily' | 'cron'
 /** One GitHub event trigger as the editor holds it; lists are comma-separated text. */
@@ -19,6 +20,8 @@ export type AutomationDraft = {
   machine: string
   /** 'auto' leaves the Agent profile to the dispatch. */
   profileId: string
+  /** The Agent each run's task runs on; none chosen, the automation cannot save (decision 2026-11-17-1800). */
+  agent: TaskAgent | null
   timezone: string
   scheduleOn: boolean
   scheduleKind: ScheduleKind
@@ -73,7 +76,7 @@ export function instant(wall: string, zone: string): string | null {
 export function emptyDraft(timezone: string, now = new Date()): AutomationDraft {
   const soon = new Date(Math.ceil((now.getTime() + 3600_000) / 3600_000) * 3600_000)
   return {
-    title: '', botId: null, machine: 'auto', profileId: 'auto', timezone,
+    title: '', botId: null, machine: 'auto', profileId: 'auto', agent: null, timezone,
     scheduleOn: true, scheduleKind: 'daily', onceAt: wallTime(soon, timezone), intervalStart: wallTime(soon, timezone),
     intervalValue: 1, intervalUnit: 'hours', dailyTime: '09:00', fold: null, cron: '0 9 * * 1-5',
     prompt: '', taskTitle: '', misfire: 'skip', lateness: 30, concurrent: 1, perDay: 0, eachRun: 'new_task', github: [], linear: [], slack: [], notify: null, webhook: null, otherTask: null,
@@ -92,6 +95,7 @@ export function draftFrom(definition: Definition, now = new Date()): AutomationD
     botId: task.kind === 'dispatch_task' ? task.botId : null,
     machine: !destination ? 'auto' : destination.kind === 'device' ? destination.deviceId : destination.provider === 'cloudflare' ? 'cloudflare' : 'cloud',
     profileId: task.kind === 'dispatch_task' ? task.profileId ?? 'auto' : 'auto',
+    agent: task.kind === 'dispatch_task' ? task.agent ?? null : null,
     scheduleOn: timing.kind !== 'manual',
     scheduleKind: timing.kind === 'manual' ? draft.scheduleKind : timing.kind,
     onceAt: timing.kind === 'once' ? wallTime(timing.at, definition.timezone) : draft.onceAt,
@@ -147,10 +151,11 @@ export function foldNeeded(draft: Pick<AutomationDraft, 'scheduleOn' | 'schedule
 }
 
 /** The definition to save, or the first field that keeps it from saving. */
-export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'time' | 'fold' | 'interval' | 'cron' | 'repository' | 'team' | 'channel' | 'slackAuthors' } {
+export function definitionFrom(draft: AutomationDraft, now = new Date()): { definition: Definition } | { missing: 'title' | 'prompt' | 'agent' | 'time' | 'fold' | 'interval' | 'cron' | 'repository' | 'team' | 'channel' | 'slackAuthors' } {
   const title = draft.title.trim()
   if (!title) return { missing: 'title' }
   if (!draft.otherTask && !draft.prompt.trim()) return { missing: 'prompt' }
+  if (!draft.otherTask && !draft.agent) return { missing: 'agent' }
   if (draft.github.some(trigger => !trigger.repositories.length)) return { missing: 'repository' }
   if (draft.linear.some(trigger => !trigger.teams.length)) return { missing: 'team' }
   if (draft.slack.some(trigger => !trigger.channels.length)) return { missing: 'channel' }
@@ -185,6 +190,7 @@ export function definitionFrom(draft: AutomationDraft, now = new Date()): { defi
     ...(draft.taskTitle.trim() ? { title: draft.taskTitle.trim() } : {}),
     ...(destination ? { destination } : {}),
     ...(draft.profileId !== 'auto' ? { profileId: draft.profileId } : {}),
+    ...(draft.agent ? { agent: draft.agent } : {}),
   }
   const events = draft.otherTask ? [] : [...draft.github.map(eventTrigger), ...draft.linear.map(linearTrigger), ...draft.slack.map(slackTrigger)]
   return { definition: { title, timezone: draft.timezone, timing, task, misfire: draft.misfire, maxLatenessMinutes: Math.round(draft.lateness), maxConcurrent: Math.round(draft.concurrent), ...(draft.perDay > 0 ? { maxRunsPerDay: Math.round(draft.perDay) } : {}), ...(!draft.otherTask && draft.eachRun === 'same_task' ? { eachRun: 'same_task' as const } : {}), ...(events.length ? { events } : {}), ...(!draft.otherTask && draft.webhook !== null ? { webhook: { batchMinutes: Math.round(draft.webhook) } } : {}), ...(!draft.otherTask && draft.notify ? { notify: { slack: draft.notify } } : {}) } }

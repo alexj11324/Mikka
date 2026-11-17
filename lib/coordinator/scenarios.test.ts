@@ -81,7 +81,7 @@ async function play(userText: string, turn: Recorded[], options: { computerEnabl
 test('「在 Mikka_test 里加 README」: the account is known, the bare name goes to dispatch, nobody is asked which account', async () => {
   const { system, reply } = await play('在 Mikka_test 里加一个 README', [
     { tool: 'get_issue', input: { issueId: ISSUE } },
-    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'Mikka_test' } },
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'Mikka_test', model: { harness: 'claude_code' } } },
     { text: '已经派给 Agent 在 Alex 的 MacBook 上做了。' },
   ])
   assert.match(system, /connected GitHub account is @alexj11324/)
@@ -92,7 +92,7 @@ test('「在 Mikka_test 里加 README」: the account is known, the bare name go
 })
 
 test('Mikka 默认 out of points: the model is told, threads never claim to run on it, and dispatch rules point at the card', async () => {
-  const { system, tools } = await play('帮我修一下类型错误', [{ tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/Mikka' } }])
+  const { system, tools } = await play('帮我修一下类型错误', [{ tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/Mikka', model: { harness: 'claude_code' } } }])
   assert.match(system, /Mikka 默认 \(the model for Bot chats\) cannot answer right now: points_exhausted/)
   assert.doesNotMatch(system, /the run uses Mikka's default model/, 'the rule decision 2026-11-02-1400 replaced is gone')
   assert.match(system, /Threads never run on Mikka 默认/)
@@ -107,6 +107,10 @@ test('「派给 Codex」: the Agent alone is a valid choice; no model id is aske
   const schema = registry.createCoordinatorRegistry(OWNER, COORDINATOR_BOT, undefined, { coordinator: true }).dispatch_run.inputSchema as unknown as { safeParse: (value: unknown) => { success: boolean } }
   assert.equal(schema.safeParse({ issueId: ISSUE, repo: 'x', model: { harness: 'codex' } }).success, true)
   assert.equal(schema.safeParse({ issueId: ISSUE, repo: 'x', model: { harness: 'gemini' } }).success, false)
+  // Decision 2026-11-17-1800: the Agent is a required parameter, so the model must name it.
+  assert.equal(schema.safeParse({ issueId: ISSUE, repo: 'x' }).success, false, 'a dispatch without an Agent is refused')
+  assert.match(system, /when they named none, ask which Agent should run it before dispatching, and never choose one yourself/)
+  assert.match(system, /a retry or more work never moves to the other Agent/)
 })
 
 test('work that needs a screen goes to the Bot computer; everything else to an Agent, without asking which', async () => {
@@ -121,7 +125,7 @@ test('work that needs a screen goes to the Bot computer; everything else to an A
   assert.deepEqual(calls.map(call => call.step), ['wakeComputerBot', 'dispatchComputerThread'])
 
   calls.length = 0
-  await play('修复 lib/foo.ts 的类型错误', [{ tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/Mikka' } }], { computerEnabled: true })
+  await play('修复 lib/foo.ts 的类型错误', [{ tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/Mikka', model: { harness: 'claude_code' } } }], { computerEnabled: true })
   assert.deepEqual(calls.map(call => call.step), ['dispatchRun'])
 })
 
@@ -167,12 +171,12 @@ test('how to draw a card is said once, in the prompt; tools and events only poin
 })
 
 test('more work on a task goes to its thread; a new thread only when the person asked for one', async () => {
-  const { system, tools } = await play('README 里再加一节安装说明', [{ tool: 'get_issue', input: { issueId: ISSUE } }, { tool: 'dispatch_run', input: { issueId: ISSUE, note: '再加一节安装说明' } }])
+  const { system, tools } = await play('README 里再加一节安装说明', [{ tool: 'get_issue', input: { issueId: ISSUE } }, { tool: 'dispatch_run', input: { issueId: ISSUE, note: '再加一节安装说明', model: { harness: 'claude_code' } } }])
   assert.match(system, /To retry a task, or to give its thread more information, call dispatch_run .* for the same task again: it goes to the existing thread/)
   assert.match(system, /Never dispatch a second thread for it\. A new thread is needed when the person explicitly asked, in their own words/)
   assert.match(String(tools.dispatch_run.description), /A task has one thread at a time\. When the task already has one, this goes to that thread/)
   assert.match(system, /When it shows a thread, more work for the task goes to that thread: call dispatch_run without repo .* the thread keeps its repository, as long as the person has not named another one/)
-  assert.match(String(tools.get_issue.description), /its thread \(runId, status, repository\)/)
+  assert.match(String(tools.get_issue.description), /its thread \(runId, status, repository, agent: the Agent it keeps for life\)/)
   assert.deepEqual(calls.map(call => call.step), ['getIssue', 'dispatchRun'], 'no repository lookup for a task with a thread')
   const followUp = calls[1].input as { repo?: string; newThread?: boolean; note?: string }
   assert.deepEqual([followUp.repo, followUp.newThread, followUp.note], [undefined, undefined, '再加一节安装说明'], 'no repo and no new thread: the host keeps the thread and its repository')
@@ -195,7 +199,7 @@ test(`「${MIKKA_SITE}」: every Mikka repository comes back described; the site
   results.findRepository = { match: 'several', candidates: acmeCandidates, card: { title: '多个仓库匹配 Mikka site', options: acmeCandidates.map(item => ({ value: item.fullName, label: item.fullName })) } }
   const { system, tools } = await play(MIKKA_SITE, [
     { tool: 'find_repository', input: { name: 'Mikka site' } },
-    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/mikka-web' } },
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'alexj11324/mikka-web', model: { harness: 'claude_code' } } },
   ])
   assert.match(system, /every word as they said it \(e\.g\. acme_tools, the Acme docs\)/)
   assert.match(system, /Choose by judging them against the person's own words \(a site, an app, a page or a product they named\), each repository's description and homepage, and the task/)
@@ -223,7 +227,7 @@ test('「It\'s in the mikka-web repo」 on a thread working in alexj11324/Mikka:
   results.dispatchRun = { runId: 'run-new', thread: 'new', threadId: 'run-new', replacedThreadId: 'run-old', placement: { kind: 'cloud' } }
   const { system, tools } = await play("It's in the mikka-web repo", [
     { tool: 'get_issue', input: { issueId: ISSUE } },
-    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'mikka-web' } },
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'mikka-web', model: { harness: 'claude_code' } } },
     { text: '旧线程在 alexj11324/Mikka 上，已经停掉；改在 mikka-web 上开了新线程。' },
   ])
   assert.match(system, /and also when the repository or the Agent they name for the work is not the thread's own/)
@@ -265,7 +269,7 @@ test('「Octo 官网的导航栏在手机上错位了」 with the authorized lis
   assert.match(instructions, /Choose by the person's own words, each description and homepage and the task, asking which one only when that does not settle it/)
   assert.match(listed, /^- octo\/octo-web · "The public marketing website" · homepage "https:\/\/octo\.example"$/m)
   const { system, reply } = await play('Octo 官网的导航栏在手机上错位了，修一下', [
-    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'octo/octo-web' } },
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'octo/octo-web', model: { harness: 'claude_code' } } },
     { text: '已经派给 Agent 在 octo/octo-web 上修。' },
   ], { githubContext: listed })
   assert.ok(system.includes(listed), 'the supplied repository facts reach the actual model system prompt')
@@ -292,7 +296,7 @@ test('「Octo 官网的导航栏在手机上错位了」 without repository fact
   ] }
   const { system, reply } = await play('Octo 官网的导航栏在手机上错位了，修一下', [
     { tool: 'find_repository', input: {} },
-    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'octo/octo-web' } },
+    { tool: 'dispatch_run', input: { issueId: ISSUE, repo: 'octo/octo-web', model: { harness: 'claude_code' } } },
     { text: '已经派给 Agent 在 octo/octo-web 上修。' },
   ], { githubContext: context })
   assert.ok(system.includes(context), 'the real lazy context reaches the actual model system prompt')
