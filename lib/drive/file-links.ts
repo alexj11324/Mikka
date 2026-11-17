@@ -2,6 +2,7 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { DriveError } from './store'
+import { driveFileLinkUrl, type DriveLocation } from './location'
 import type { DriveFileLink, DriveFileLinkPage, DriveFileLinkVisibility, DriveWorkspaceFileLinkPage } from './contract'
 
 type Database = Pick<PoolClient, 'query'>
@@ -52,7 +53,8 @@ export async function listWorkspaceDriveFileLinks(database: Database, workspaceI
   page: { number: number; limit: number }): Promise<DriveWorkspaceFileLinkPage> {
   const { rows: [result] } = await database.query<DriveWorkspaceFileLinkPage>(`WITH visible AS MATERIALIZED (
     SELECT l.id,l.path,l.visibility,
-      v.id AS "volumeId",v.name AS "volumeName",v."driveScope",p.id::text AS "projectId",l."createdBy"=$2 AS manageable
+      v.id AS "volumeId",v.name AS "volumeName",v."driveScope",p.id::text AS "projectId",l."createdBy"=$2 AS manageable,
+      l."createdBy" AS creator
     FROM drive_file_links l JOIN drive_volumes v ON v.id=l."volumeId"
     LEFT JOIN unnest($3::uuid[]) AS p(id) ON v."driveScope" IN ('project','project-user') AND p.id::text=v."scopeId"
     WHERE v."workspaceId"=$1::uuid AND v."archivedAt" IS NULL
@@ -69,10 +71,33 @@ export async function listWorkspaceDriveFileLinks(database: Database, workspaceI
     SELECT count(*)::integer AS total, greatest(1,ceil(count(*)::numeric/$5::integer)::integer) AS "pageCount" FROM visible
   ), selected AS (
     SELECT total,"pageCount",least($4::integer,"pageCount") AS page FROM tally
-  )
-  SELECT total,page,"pageCount",coalesce((SELECT jsonb_agg(to_jsonb(batch) ORDER BY batch.id) FROM (
+  ), batch AS (
     SELECT * FROM visible ORDER BY id LIMIT $5 OFFSET (SELECT (page-1)::bigint*$5 FROM selected)
-  ) AS batch),'[]'::jsonb) AS links FROM selected`, [workspaceId, reader, projects, page.number, page.limit])
+  )
+  SELECT total,page,"pageCount",coalesce((
+    SELECT jsonb_agg((to_jsonb(batch)-'creator') || jsonb_build_object(
+      'createdBy',nullif(trim(u.name),''),'createdAt',to_jsonb(l)->'createdAt',
+      'changedAt',coalesce((to_jsonb(e)->>'changedAt')::timestamptz,history."createdAt")) ORDER BY batch.id)
+    FROM batch JOIN "user" u ON u.id=batch.creator
+    JOIN drive_file_links l ON l.id=batch.id
+    JOIN drive_volume_entries e ON (e."volumeId",e.path)=(batch."volumeId",batch.path)
+    LEFT JOIN LATERAL (
+      -- Prior-version entries have no timestamp column. The latest transition to
+      -- the current path, mode and bytes is its actual most recent change.
+      SELECT ver."createdAt" FROM drive_volume_versions ver
+      LEFT JOIN drive_volume_versions prev ON prev."volumeId"=ver."volumeId" AND prev.seq=ver.seq-1
+      CROSS JOIN LATERAL (SELECT jsonb_build_array(jsonb_build_object('path',e.path,'mode',e.mode,'sha256',e.sha256,'sizeBytes',e."sizeBytes")) AS entry) head_entry
+      WHERE to_jsonb(e)->>'changedAt' IS NULL AND ver."volumeId"=e."volumeId"
+        AND ver.manifest @> head_entry.entry AND NOT coalesce(prev.manifest @> head_entry.entry,false)
+      ORDER BY ver.seq DESC LIMIT 1
+    ) history ON true
+  ),'[]'::jsonb) AS links FROM selected`, [workspaceId, reader, projects, page.number, page.limit])
+  for (const link of result.links) {
+    let location: DriveLocation = workspaceId
+    if (link.driveScope === 'team-workspace') location = { workspaceId, driveScope: 'team-workspace' }
+    else if (link.projectId) location = { workspaceId, projectId: link.projectId, ...(link.driveScope === 'project' && { driveScope: 'project' }) }
+    link.url = driveFileLinkUrl(location, link.volumeId, link.id)
+  }
   return result
 }
 
