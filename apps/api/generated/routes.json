@@ -1993,6 +1993,15 @@
       "sourceHash": "8f11f7dff1244dc3bc4038219f01035b49bb3b7e6bd287c5ecf68849f9694ccb"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/members/[userId]/restore",
+      "template": "/api/organizations/[organizationId]/members/[userId]/restore",
+      "source": "app/api/organizations/[organizationId]/members/[userId]/restore/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "1aa00fe29b3434cc2dbab2420f31f9726cb2014daf03f9adfcaf8941eb42f8b1"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/policy",
       "template": "/api/organizations/[organizationId]/policy",
       "source": "app/api/organizations/[organizationId]/policy/route.ts",

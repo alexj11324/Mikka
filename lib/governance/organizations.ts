@@ -173,26 +173,59 @@ export async function renameOrganization(organizationId: string, actorId: string
   return updateOrganizationProfile(organizationId, actorId, { name })
 }
 
+const organizationMemberRole = z.enum(['owner', 'admin', 'member'])
+const organizationMemberUserId = z.string().min(1).max(200)
+const admissionInput = z.object({ userId: organizationMemberUserId, role: organizationMemberRole.default('member') }).strict()
+const restorationInput = z.object({ accessLevel: organizationMemberRole }).strict()
+
 /** Existing accounts are explicitly selected by ID; neither an email match nor an Org role grants workspace access. */
 export async function addOrganizationMember(organizationId: string, actorId: string, input: unknown) {
-  const { userId, role } = z.object({ userId: z.string().min(1).max(200), role: z.enum(['owner', 'admin', 'member']).default('member') }).strict().parse(input)
+  const { member } = await admitOrganizationMember(organizationId, actorId, admissionInput.parse(input), 'add')
+  return { member }
+}
+
+export async function restoreOrganizationMember(organizationId: string, actorId: string, userId: string, input: unknown) {
+  const { accessLevel } = restorationInput.parse(input)
+  const { member, image } = await admitOrganizationMember(organizationId, actorId, {
+    userId: organizationMemberUserId.parse(userId), role: accessLevel,
+  }, 'restore')
+  return {
+    userId: member.userId, email: member.email, firstName: null, lastName: null, imageUrl: image,
+    accessLevel: member.role, disabled: member.status !== 'active', createdAt: member.createdAt, githubLogin: null,
+  }
+}
+
+async function admitOrganizationMember(organizationId: string, actorId: string, { userId, role }: z.output<typeof admissionInput>, operation: 'add' | 'restore') {
   return workspaceDb.transaction(async tx => {
     await assertOrganizationAccountWritable(tx, userId)
     const actor = await requireOrganizationAdmin(tx, organizationId, actorId)
-    if (role === 'owner' && actor.membership.role !== 'owner') throw new GovernanceError('access_denied')
-    const { rows: [user] } = await pool.query<{ name: string; email: string }>('select name,email from "user" where id=$1', [userId])
-    if (!user) throw new GovernanceError('not_found')
-    const [member] = await tx.insert(organizationMembers).values({ organizationId, userId, role, ...user }).onConflictDoNothing().returning()
+    if (role === 'owner' && (operation === 'restore' || actor.membership.role !== 'owner')) throw new GovernanceError('access_denied')
+    if (operation === 'restore') {
+      // A removal deletes the membership row. Only a retained removal for this
+      // exact Organization and identity establishes eligibility for restoration.
+      const [removal] = await tx.select({ id: organizationAuditEvents.id }).from(organizationAuditEvents).where(and(
+        eq(organizationAuditEvents.organizationId, organizationId), eq(organizationAuditEvents.targetId, userId),
+        eq(organizationAuditEvents.action, 'organization.member_removed'),
+      )).limit(1)
+      if (!removal) throw new GovernanceError('invalid_request')
+      // A linked directory owns its subject's lifecycle, including delayed
+      // suspension delivery. Manual readmission cannot take over that subject.
+      const managed = await pool.query('select 1 from enterprise_scim_user where "organizationId"=$1 and "userId"=$2 limit 1', [organizationId, userId])
+      if (managed.rowCount) throw new GovernanceError('access_denied')
+    }
+    const { rows: [user] } = await pool.query<{ name: string; email: string; image: string | null }>('select name,email,image from "user" where id=$1', [userId])
+    if (!user) throw new GovernanceError(operation === 'restore' ? 'invalid_request' : 'not_found')
+    const [member] = await tx.insert(organizationMembers).values({ organizationId, userId, role, name: user.name, email: user.email }).onConflictDoNothing().returning()
     if (!member) {
       const [existing] = await tx.select().from(organizationMembers).where(and(
         eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId),
         eq(organizationMembers.role, role), eq(organizationMembers.status, 'active'),
       )).for('share').limit(1)
       if (!existing) throw new GovernanceError('invalid_request')
-      return { member: existing }
+      return { member: existing, image: user.image }
     }
     await enqueueOrganizationAudit(tx, { organizationId, actorId, action: 'organization.member_changed', targetId: userId, metadata: { role, status: 'active' } })
-    return { member }
+    return { member, image: user.image }
   })
 }
 
