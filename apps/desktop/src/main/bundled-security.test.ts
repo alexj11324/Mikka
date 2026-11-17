@@ -186,6 +186,16 @@ test('Organization Files forwards only a signed directory read', () => {
   }
 })
 
+test('Organization Drive catalogs allow GET for the exact Organization path', () => {
+  for (const resource of ['drive', 'drive-scopes']) {
+    const path = '/api/organizations/' + identity.user.id + '/' + resource
+    for (const method of ['GET', 'POST', 'PATCH', 'DELETE']) {
+      assert.equal(allowedApiPath(path, method), method === 'GET')
+      assert.equal(allowedApiPath(path + '/all', method), false)
+    }
+  }
+})
+
 test('Organization domain discovery and admission forward only the declared routes and methods', () => {
   const org = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
   const domain = 'ebb7878e-6918-4b68-9300-d956761b5011'
