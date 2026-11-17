@@ -147,15 +147,20 @@ export async function listProjectResources(reader: Reader, workspaceId: string, 
     : withTaskWorkspace(reader, workspaceId, (_workspace, tx) => read(tx))
 }
 
+function activeDefaultEnvironment(workspaceId: string, projectId: string) {
+  return sql`from workspace_project_environments b
+    join workspace_environments e on e.id=b."environmentId" and e."workspaceId"=b."workspaceId"
+    where b."workspaceId"=${workspaceId} and b."projectId"=${projectId} and b."isDefault"
+      and e."archivedAt" is null`
+}
+
 /** Read one ordinary variable from the Project's current default environment. */
 export async function readProjectEnvironmentVariable(reader: Reader, raw: z.input<typeof projectEnvironmentVariableInput>) {
   const { workspaceId, projectId, name } = projectEnvironmentVariableInput.parse(raw)
   return withConfiguredProject(reader, workspaceId, projectId, false, async tx => {
     const { rows: [row] } = await tx.execute<{ value: string | null }>(sql`
       SELECT e.configuration->'variables'->>${name}::text AS value
-      FROM workspace_project_environments AS b
-      JOIN workspace_environments AS e ON e.id=b."environmentId" AND e."workspaceId"=b."workspaceId"
-      WHERE b."workspaceId"=${workspaceId} AND b."projectId"=${projectId} AND b."isDefault" AND e."archivedAt" IS NULL`)
+      ${activeDefaultEnvironment(workspaceId, projectId)}`)
     return row?.value == null ? null : { name, value: row.value }
   })
 }
@@ -217,6 +222,47 @@ export async function saveEnvironment(reader: Reader, raw: z.input<typeof saveEn
   })
 }
 
+const currentSetupScope = projectSetupScope.omit({ environmentId: true })
+
+type SelectedProjectRepository = Pick<ProjectRepositoryBinding, 'repositoryKey' | 'baseBranch' | 'environmentId'> & { selectedEnvironmentId: string | null }
+
+/** The Run admission and current setup view resolve the same Project repository overrides and default. */
+async function configuredProjectBindings(tx: WorkspaceTransaction, workspaceId: string, projectId: string) {
+  const { rows } = await tx.execute<{ repositoryKey: string | null; baseBranch: string | null; environmentId: string | null; defaultEnvironmentId: string | null }>(sql`
+    select r."repositoryKey", r."baseBranch", r."environmentId", d."environmentId" as "defaultEnvironmentId"
+    from (values (${workspaceId}::uuid, ${projectId}::uuid)) as scope(workspace_id, project_id)
+    left join workspace_project_environments d on d."workspaceId"=scope.workspace_id and d."projectId"=scope.project_id and d."isDefault"
+    left join workspace_project_repositories r on r."workspaceId"=scope.workspace_id and r."projectId"=scope.project_id
+    order by r."repositoryKey"`)
+  const repositories: SelectedProjectRepository[] = []
+  for (const { repositoryKey, baseBranch, environmentId, defaultEnvironmentId } of rows) {
+    if (repositoryKey !== null) repositories.push({ repositoryKey, baseBranch, environmentId, selectedEnvironmentId: environmentId ?? defaultEnvironmentId })
+  }
+  return { repositories, defaultEnvironmentId: rows[0]?.defaultEnvironmentId ?? null }
+}
+
+/** An explicit repository selection survives archival. Such an Environment has no readable current recipe. */
+export async function readCurrentProjectSetup(reader: Reader, input: z.input<typeof currentSetupScope>) {
+  const { workspaceId, projectId } = currentSetupScope.parse(input)
+  return withConfiguredProject(reader, workspaceId, projectId, false, async (tx, project) => {
+    if (project.archivedAt) throw new ActionFailureError('projectNotFound')
+    const { repositories, defaultEnvironmentId } = await configuredProjectBindings(tx, workspaceId, projectId)
+    const ids = new Set(repositories.flatMap(repo => repo.environmentId ? [repo.environmentId] : []))
+    if (defaultEnvironmentId) ids.add(defaultEnvironmentId)
+    const rows = ids.size ? (await tx.execute<{ id: string; revision: number; setup: unknown }>(sql`
+      select id, revision, configuration->'setup' as setup from workspace_environments
+      where "workspaceId"=${workspaceId} and "archivedAt" is null
+        and id in (${sql.join([...ids].map(id => sql`${id}::uuid`), sql`, `)})
+      order by id`)).rows : []
+    const environments = rows.map(row => {
+      const setup = environmentConfiguration.shape.setup.nullable().safeParse(row.setup)
+      if (!setup.success) throw new ActionFailureError('projectEnvironmentUnavailable', undefined, undefined, { cause: setup.error })
+      return { id: row.id, revision: row.revision, setup: setup.data ?? null }
+    })
+    return { defaultEnvironmentId, repositories, environments }
+  })
+}
+
 type SetupScope = z.infer<typeof projectSetupScope>
 async function withProjectSetup<T>(reader: Reader, scope: SetupScope, write: boolean, work: (tx: WorkspaceTransaction, environment: EnvironmentRow, projects: string[], bindingSnapshot: string) => Promise<T>) {
   const { withResourceAccess } = await import('@/lib/resource-access/store')
@@ -231,10 +277,8 @@ async function withProjectSetup<T>(reader: Reader, scope: SetupScope, write: boo
     }
     return withResourceAccess(reader, { kind: 'project', id: projectId, workspaceId }, write ? 'canSteer' : 'canReadContent', async () => {
       const environment = (await tx.execute<EnvironmentRow>(sql`select e.id,e."workspaceId",e.name,e.revision,e.configuration,e."archivedAt"
-        from workspace_project_environments b join workspace_projects p on p.id=b."projectId" and p."workspaceId"=b."workspaceId"
-        join workspace_environments e on e.id=b."environmentId" and e."workspaceId"=b."workspaceId"
-        where b."workspaceId"=${workspaceId} and b."projectId"=${projectId} and b."environmentId"=${environmentId}
-          and b."isDefault" and p."archivedAt" is null and e."archivedAt" is null`)).rows[0]
+        ${activeDefaultEnvironment(workspaceId, projectId)} and b."environmentId"=${environmentId}
+        and exists (select 1 from workspace_projects p where p.id=b."projectId" and p."workspaceId"=b."workspaceId" and p."archivedAt" is null)`)).rows[0]
       if (!environment) throw new ActionFailureError('projectEnvironmentUnavailable')
       const bindings = await tx.execute<{ projectId: string }>(sql`select "projectId" from workspace_project_environments where "workspaceId"=${workspaceId} and "environmentId"=${environmentId}
         union select "projectId" from workspace_project_repositories where "workspaceId"=${workspaceId} and "environmentId"=${environmentId} order by 1`)
@@ -370,15 +414,11 @@ export async function withProjectExecution<T>(input: ProjectExecutionInput, oper
     let environmentId: string | null = null
     let baseBranch = input.baseBranch
     if (selected) {
-      const repositories = await tx.execute<{ repositoryKey: string; baseBranch: string | null; environmentId: string | null }>(sql`select "repositoryKey","baseBranch","environmentId" from workspace_project_repositories where "projectId"=${selected.id} and "workspaceId"=${input.workspaceId}`)
-      const binding = repositories.rows.find(repo => repo.repositoryKey === input.repositoryKey)
-      if (input.repositoryKey && repositories.rowCount && !binding) throw new ActionFailureError('projectRepositoryDenied')
+      const { repositories, defaultEnvironmentId } = await configuredProjectBindings(tx, input.workspaceId, selected.id)
+      const binding = repositories.find(repo => repo.repositoryKey === input.repositoryKey)
+      if (input.repositoryKey && repositories.length && !binding) throw new ActionFailureError('projectRepositoryDenied')
       baseBranch = binding?.baseBranch ?? input.baseBranch
-      environmentId = binding?.environmentId ?? null
-      if (!environmentId) {
-        const defaults = await tx.execute<{ environmentId: string }>(sql`select "environmentId" from workspace_project_environments where "projectId"=${selected.id} and "workspaceId"=${input.workspaceId} and "isDefault"`)
-        environmentId = defaults.rows[0]?.environmentId ?? null
-      }
+      environmentId = binding?.selectedEnvironmentId ?? defaultEnvironmentId
     }
     let environment: ProjectExecutionSnapshot['environment'] = null
     if (environmentId) {

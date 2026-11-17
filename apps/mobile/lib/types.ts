@@ -290,7 +290,8 @@ export interface Settings {
   workspaces: Workspace[]
   preferences: Preferences
   memory: string
-  apps: { app: Source; connected: boolean; account: string | null }[]
+  /** Every app with an active account (any Composio toolkit), and Linear. */
+  apps: { app: string; connected: boolean; account: string | null }[]
 }
 
 /** A run as people name it on a card or a chip: its task's title, never the task's key (#1386). */
@@ -314,6 +315,8 @@ export interface StoreCatalog {
   apps: { id: string; name: string; description: string; iconUrl: string | null }[]
   popular: string[]
   latest: string[]
+  /** Composio's categories, largest first, each with its apps in usage order; absent on older servers. */
+  categories?: { id: string; name: string; apps: string[] }[]
 }
 
 /** The person's connected accounts (GET /api/integrations/composio). */

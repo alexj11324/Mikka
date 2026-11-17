@@ -13,6 +13,7 @@ import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, isVolumeId, isVol
 import { boundedDriveBytes, driveBytes, driveSha256, readDriveBlobObject, recordDriveBlob, storeDriveBlob } from './blobs'
 import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
 import { createDriveVolume, listDriveVolumes, readDriveVolume, setPersonalDriveArchive } from './volumes'
+import { driveFileLocation } from './location'
 import { driveErrorResponse } from './http'
 import { listDriveSkills } from './skills'
 import { createDriveFileLink, fileLinkProjectIds, listDriveFileLinks, listWorkspaceDriveFileLinks, readLinkedDriveFile, readOwnDriveFileLink, revokeDriveFileLink, updateDriveFileLink, type DriveFileBytes } from './file-links'
@@ -93,6 +94,7 @@ export async function driveResponse(request: Request, operation: Operation, para
       ? { driveScope: 'project-user' as const, scopeId: projectId, scopeUserId: session.user.id }
       : { driveScope: 'user' as const, scopeId: session.user.id }
     const actor = { ownerId: storageOwner, authorName: session.user.name, workspaceId, ...scope }
+    const location = driveFileLocation(workspaceId, scope.driveScope, projectId)
     const serve = async () => {
       if (view === 'skills') {
         if (search.has('threadId')) return json({ error: 'drive_write_invalid' }, 400)
@@ -128,19 +130,19 @@ export async function driveResponse(request: Request, operation: Operation, para
       if (operation === 'links') {
         if (request.method === 'POST') {
           const { path } = z.object({ path: z.string().refine(isDrivePath) }).strict().parse(await body(request))
-          return json({ link: await createDriveFileLink(pool, volume.id, path, session.user.id) })
+          return json({ link: await createDriveFileLink(pool, volume.id, path, session.user.id, location) })
         }
         if (search.has('path')) {
           const path = z.string().refine(isDrivePath).parse(search.get('path'))
-          return json({ link: await readOwnDriveFileLink(pool, volume.id, path, session.user.id) })
+          return json({ link: await readOwnDriveFileLink(pool, volume.id, path, session.user.id, location) })
         }
-        return json(await listDriveFileLinks(pool, volume.id, session.user.id, fileLinkPage(search)))
+        return json(await listDriveFileLinks(pool, volume.id, session.user.id, fileLinkPage(search), location))
       }
       const linkId = operation === 'link' ? z.uuid().parse(params.shareId) : null
       if (linkId && request.method === 'PATCH') {
         const { visibility } = z.object({ visibility: z.enum(['private', 'org']) }).strict().parse(await body(request))
         if (visibility === 'org' && !sharedProject && !teamFiles) throw new DriveError('drive_scope_invalid', 422)
-        return json({ link: await updateDriveFileLink(pool, volume.id, linkId, session.user.id, visibility) })
+        return json({ link: await updateDriveFileLink(pool, volume.id, linkId, session.user.id, visibility, location) })
       }
       if (linkId && request.method === 'DELETE') {
         await revokeDriveFileLink(pool, volume.id, linkId, session.user.id)

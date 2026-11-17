@@ -1,3 +1,4 @@
+import type { WebhookBatchPage } from './automation-view'
 import { isDeepStrictEqual } from 'node:util'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
@@ -49,6 +50,10 @@ export type Schedule = { id: string; owner_id: string; workspace_id: string | nu
 export type Occurrence = { id: string; schedule_id: string; operation_id: string; event_id: string | null; definition: Definition; version: number; due_at: Date; status: string; attempts: number; lease_token: string | null; lease_until: Date; error: string | null; execution_decision: 'execute' | 'skip'; trigger: OccurrenceTrigger | null; report_next_at: Date; report_attempts: number; started_at: Date | null; created_at: Date }
 // The newest admitted batch supersedes older windows, even after someone closes it early.
 const WEBHOOK_BATCH = `trigger ? 'webhook' AND (definition#>>'{webhook,batchMinutes}')::int > 0 AND NOT (status='skipped' AND attempts=0)`
+// Canceled historical batches may have already erased their payloads. Their byte count is unknown.
+const WEBHOOK_BODY_BYTES = `(SELECT CASE WHEN count(item->>'body')=count(*)
+  THEN COALESCE(sum(octet_length(item->>'body')),0)::int END
+  FROM jsonb_array_elements(trigger#>'{webhook,requests}') AS item)`
 const OPEN_WEBHOOK_WINDOW = `FROM schedule_occurrences
   WHERE id=(SELECT id FROM schedule_occurrences WHERE schedule_id=$1 AND version=$2 AND ${WEBHOOK_BATCH}
     ORDER BY due_at DESC,id DESC LIMIT 1)
@@ -193,10 +198,10 @@ export class ScheduleStore {
           if (!privileged) throw new ScheduleError('scheduleAdminRequired', 403)
           const { status, limit = SCHEDULE_PAGE_MAX, cursor } = cmd.batches
           const [at, id] = cursor?.split('/') ?? []
-          const { rows } = await tx.query<{
-            id: string; status: string; runStatus: string; created_at: Date; due_at: Date; requestCount: number; page_cursor: string
-          }>(`WITH batches AS (
+          const { rows } = await tx.query<WebhookBatchPage['batches'][number] & { page_cursor: string }>(`WITH batches AS (
               SELECT id, created_at, due_at, status AS "runStatus", jsonb_array_length(trigger->'webhook'->'requests') AS "requestCount",
+                trigger#>>'{webhook,requests,0,at}' AS "firstEventAt", trigger#>>'{webhook,requests,-1,at}' AS "lastEventAt",
+                COALESCE((trigger#>>'{webhook,byteCount}')::int, ${WEBHOOK_BODY_BYTES}) AS "byteCount",
                 CASE WHEN status='cancelled' THEN 'cancelled'
                   WHEN id = (${COLLECTING_WINDOW}) THEN 'collecting'
                   ELSE 'queued' END AS status
@@ -342,9 +347,9 @@ export class ScheduleStore {
       await tx.query(`UPDATE schedule_occurrences SET next_retry_at=clock_timestamp(),
         trigger=jsonb_set(trigger,'{webhook,closedBy}','"flush_batch"') WHERE id=$1`, [batchId])
     } else {
-      // Keep timestamps and hashed request IDs for deduplication after cancellation; discard every request body.
+      // Retain the aggregate payload size, timestamps and deduplication hashes while erasing every body.
       await tx.query(`UPDATE schedule_occurrences SET status='cancelled',finished_at=now(),reported_at=now(),
-        trigger=jsonb_build_object('webhook',jsonb_build_object('closedBy','cancel_batch','requests',(
+        trigger=jsonb_build_object('webhook',jsonb_build_object('closedBy','cancel_batch','byteCount',${WEBHOOK_BODY_BYTES},'requests',(
           SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object('at',r->'at','keyHash',
             encode(sha256(convert_to(r->>'key','UTF8')),'hex'))) ORDER BY n)
           FROM jsonb_array_elements(trigger->'webhook'->'requests') WITH ORDINALITY AS requests(r,n)

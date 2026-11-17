@@ -1,8 +1,10 @@
 import 'server-only'
-import { pool, withDatabaseClient } from '@/lib/db'
+import { and, eq } from 'drizzle-orm'
+import { db, pool, withDatabaseClient } from '@/lib/db'
+import { mobilePushTokens } from '@/lib/db/schema'
 import { getApiSession } from '@/lib/api-auth'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
-import { unauthorized } from '@/lib/mobile-api'
+import { json, unauthorized } from '@/lib/mobile-api'
 
 type PushSession = { userId: string; sessionId: string }
 
@@ -33,4 +35,17 @@ export async function withPushSession<T>(session: PushSession, action: () => Pro
       throw error
     }
   } finally { client.release() }
+}
+
+/** Session ownership is checked again in the DELETE so a re-bound installation survives a stale sign-out. */
+export function removePushBinding(session: PushSession, selector: { id: string } | { token: string }) {
+  return withPushSession(session, async () => {
+    const byId = 'id' in selector
+    const rows = await db.delete(mobilePushTokens).where(and(
+      byId ? eq(mobilePushTokens.id, selector.id) : eq(mobilePushTokens.token, selector.token),
+      eq(mobilePushTokens.userId, session.userId), eq(mobilePushTokens.sessionId, session.sessionId),
+    )).returning({ id: mobilePushTokens.id })
+    if (byId && !rows.length) return json({ error: 'installationUnavailable' }, 404)
+    return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } })
+  })
 }

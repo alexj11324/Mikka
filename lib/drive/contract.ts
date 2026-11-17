@@ -306,16 +306,18 @@ export interface DriveSkillPage { skills: DriveSkillMetadata[]; nextCursor: Driv
 /** A signed-in link may narrow its underlying Drive audience, never expand it. */
 export type DriveFileLinkVisibility = 'private' | 'org'
 export type DriveFileLink = { id: string; path: string; visibility: DriveFileLinkVisibility }
-export type DriveFileLinkPage = { links: (DriveFileLink & { manageable: boolean })[]; nextCursor: string | null }
-export type DriveWorkspaceFileLink = DriveFileLink & {
+export type DriveFileLinkDetails = DriveFileLink & {
+  volumeId: string
+  url: string
   createdBy: string | null
   createdAt: string | null
-  changedAt: string | null
-  url: string
-  volumeId: string
-  volumeName: string
-  driveScope: 'user' | 'project-user' | 'project' | 'team-workspace'
-  projectId: string | null
   manageable: boolean
+}
+export type DriveFileLinkPage = { links: DriveFileLinkDetails[]; nextCursor: string | null }
+export type DriveWorkspaceFileLink = DriveFileLinkDetails & {
+  changedAt: string | null
+  volumeName: string
+  driveScope: DriveScope
+  projectId: string | null
 }
 export type DriveWorkspaceFileLinkPage = { links: DriveWorkspaceFileLink[]; page: number; pageCount: number; total: number }

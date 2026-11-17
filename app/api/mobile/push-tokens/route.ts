@@ -1,9 +1,8 @@
-import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { withRequestLog, noteLogUser } from '@/lib/request-log'
 import { db, pool } from '@/lib/db'
 import { mobilePushTokens } from '@/lib/db/schema'
-import { pushSession, withPushSession } from '@/lib/mobile-push-session'
+import { pushSession, removePushBinding, withPushSession } from '@/lib/mobile-push-session'
 import { forbiddenOrigin, json, unauthorized, writeAllowed } from '@/lib/mobile-api'
 
 export const dynamic = 'force-dynamic'
@@ -43,9 +42,9 @@ async function handlePOST(request: Request) {
   return withPushSession(session, async () => {
     const values = { userId: session.userId, sessionId: session.sessionId, platform: body.data.platform,
       deviceName: body.data.deviceName ?? null, updatedAt: new Date() }
-    await db.insert(mobilePushTokens).values({ id: crypto.randomUUID(), token: body.data.token, ...values })
-      .onConflictDoUpdate({ target: mobilePushTokens.token, set: values })
-    return json({ registered: true })
+    const [binding] = await db.insert(mobilePushTokens).values({ id: crypto.randomUUID(), token: body.data.token, ...values })
+      .onConflictDoUpdate({ target: mobilePushTokens.token, set: values }).returning({ id: mobilePushTokens.id })
+    return json({ registered: true, id: binding.id })
   })
 }
 
@@ -57,11 +56,7 @@ async function handleDELETE(request: Request) {
   if (!writeAllowed(request)) return forbiddenOrigin()
   const body = z.object({ token: EXPO_TOKEN }).strict().safeParse(await request.json().catch(() => null))
   if (!body.success) return json({ error: 'invalidPushToken' }, 400)
-  return withPushSession(session, async () => {
-    await db.delete(mobilePushTokens).where(and(eq(mobilePushTokens.token, body.data.token),
-      eq(mobilePushTokens.userId, session.userId), eq(mobilePushTokens.sessionId, session.sessionId)))
-    return new Response(null, { status: 204, headers: { 'Cache-Control': 'no-store' } })
-  })
+  return removePushBinding(session, body.data)
 }
 
 export const GET = withRequestLog('/api/mobile/push-tokens', handleGET)

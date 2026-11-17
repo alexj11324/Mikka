@@ -575,6 +575,26 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
     assert.deepEqual((await (await create()).json()).link, { ...created, visibility: 'org' })
     assert.equal(await (await call(address, member)).text(), 'selected file')
     assert.equal((await visibility(member, 'private')).status, 404)
+    await context.test('create, update and volume listing return the same stored share metadata under the existing reader access', async () => {
+      const id = collection.split('/')[1]
+      const { rows: [expected] } = await fixture.query('SELECT l."createdAt",u.name FROM drive_file_links l JOIN "user" u ON u.id=l."createdBy" WHERE l.id=$1', [created.id])
+      assert.equal(created.volumeId, id)
+      assert.equal(created.manageable, true)
+      assert.equal(created.createdBy, expected.name)
+      assert.equal(Date.parse(created.createdAt), expected.createdAt.getTime())
+      const canonical = new URL(created.url, origin)
+      assert.equal(canonical.origin, origin)
+      assert.equal(canonical.pathname, '/api/drive/volumes' + address)
+      assert.equal(canonical.searchParams.get('workspaceId'), team.id)
+      assert.equal(canonical.searchParams.get('driveScope'), 'team-workspace')
+      assert.equal(await (await fetch(canonical, { headers: { authorization: 'Bearer ' + peerToken } })).text(), 'selected file')
+      const changed = (await (await visibility(teamDrive, 'org')).json()).link
+      assert.deepEqual(changed, { ...created, visibility: 'org' })
+      const received = (await (await call(collection, member)).json()).links
+      assert.deepEqual(received, [{ ...changed, manageable: false }])
+      const own = (await (await call(collection + '?path=notes.txt', teamDrive)).json()).link
+      assert.deepEqual(own, changed)
+    })
     await context.test('a paged Drive link directory lists only readable links with their real manager', async () => {
       const other = (await (await call(collection, { ...member, method: 'POST', body: { path: 'notes.txt' } })).json()).link
       const ownerDirectory = await (await call(collection, teamDrive)).json()
@@ -588,6 +608,10 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
       assert.deepEqual(links.map(link => link.id), [created.id, other.id].sort())
       assert.equal(links.find(link => link.id === other.id)?.manageable, true)
       assert.equal(links.find(link => link.id === created.id)?.manageable, false)
+      // Links created before the timestamp migration keep their unknown date.
+      await fixture.query('UPDATE drive_file_links SET "createdAt"=NULL WHERE id=$1', [other.id])
+      const retried = (await (await call(collection, { ...member, method: 'POST', body: { path: 'notes.txt' } })).json()).link
+      assert.deepEqual(retried, { ...other, createdAt: null })
       await call(collection + '/' + other.id, { ...member, method: 'DELETE' })
       assert.deepEqual((await (await call(collection, member)).json()).links, [{ ...created, visibility: 'org', manageable: false }])
     })

@@ -1704,16 +1704,17 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "e47f35ac6342a3f2cd2c51dd435d3d5b77049ffb866166c0295bcce5fccf1051"
+      "sourceHash": "a04a7ef08d18463ef3767648d4add73d38bfbe1b3047e8af6f7b7da3110134e4"
     },
     {
       "path": "/mikka/api/mobile/push-tokens/[id]",
       "template": "/api/mobile/push-tokens/[id]",
       "source": "app/api/mobile/push-tokens/[id]/route.ts",
       "methods": [
+        "DELETE",
         "PATCH"
       ],
-      "sourceHash": "6bd6f4433a17e9b4cefaa7d3fefe3ff9316b39fcdd1cc3f461d3ede0235c3b56"
+      "sourceHash": "a29f923dfcabd9f72cd3aa0984442749ea32b92bb9089c238e8ff60f4b9a8f22"
     },
     {
       "path": "/mikka/api/mobile/push-tokens/[id]/test",
@@ -1742,7 +1743,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "e68c720d8a6863270898351f7e7fbb00047df1419b7174d5f972dbfe26f9f219"
+      "sourceHash": "4b197d81fd0183a0fb1898e8dfba9d755565d5cc364ab83f02268f12dae4ed3f"
     },
     {
       "path": "/mikka/api/mobile/task-presentations",
@@ -2998,6 +2999,15 @@
         "POST"
       ],
       "sourceHash": "7f7e89c150b03f3805c1a7ab214f284aeb9faeed10c18c2d155d69b32ddcd2f8"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/setup",
+      "template": "/api/workspaces/[workspaceId]/projects/[projectId]/setup",
+      "source": "app/api/workspaces/[workspaceId]/projects/[projectId]/setup/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "68727c25bbfeb271d632c81d0b0a6975a1b8366a1095de2ef843e5369bd443ee"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/service-identities",
