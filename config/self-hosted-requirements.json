@@ -69,6 +69,13 @@
     "test": "lib/drive/organization-share.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/files/[sha256]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Issue and redeem an identity-bound download for a digest stored in the selected immutable Drive version under its current Organization, Workspace and Project access.",
+    "test": "lib/drive/organization-share.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/organizations/[organizationId]/drive-shares/[shareId]/route.ts": {
     "mode": "built-in",
     "environment": [],

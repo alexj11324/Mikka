@@ -1980,6 +1980,15 @@
       "sourceHash": "e0e00f06f901213b5d1ca5ecb242cd0a4b18897954e9760cb284a83db85c45f9"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/files/[sha256]",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/files/[sha256]",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/versions/[versionId]/files/[sha256]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "f47fddf4c539b7a2056d51dd811ed6e9ae523deea8cd74e3156552c982d6ae6f"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/identity",
       "template": "/api/organizations/[organizationId]/identity",
       "source": "app/api/organizations/[organizationId]/identity/route.ts",

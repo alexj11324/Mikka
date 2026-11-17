@@ -1,5 +1,5 @@
 import { withBasePath } from '../base-path'
-import { driveFileLinkUrl, driveShareViewUrl, driveVolumeUrl as url, type DriveLocation } from './location'
+import { driveFileLinkUrl, driveShareViewUrl, organizationDriveVersionFileUrl, driveVolumeUrl as url, type DriveLocation } from './location'
 export { driveFileLinkUrl, type DriveLocation } from './location'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileVersion, type DriveFileLinkDetails, type DriveFileLinkPage, type DriveShareView, type DriveWorkspaceFileLinkPage, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
 import type { DriveVolumeSummary } from './volumes'
@@ -142,6 +142,10 @@ export function readDriveHistory(location: DriveLocation, volumeId: string, befo
 export function readOrganizationDriveFileHistory(organizationId: string, volumeId: string, path: string, send?: typeof fetch) {
   const target = `/api/organizations/${encodeURIComponent(organizationId)}/drive/${encodeURIComponent(volumeId)}/file-versions`
   return request<DriveFileVersion[]>(withBasePath(`${target}?${new URLSearchParams({ path })}`), {}, send)
+}
+
+export function readOrganizationDriveVersionFile(organizationId: string, volumeId: string, versionId: string, sha256: string, send?: typeof fetch) {
+  return request<DriveShareView['file']>(organizationDriveVersionFileUrl(organizationId, volumeId, versionId, sha256), {}, send)
 }
 
 export function readDriveFileHistory(location: DriveLocation, volumeId: string, path: string, before?: string, send?: typeof fetch) {
