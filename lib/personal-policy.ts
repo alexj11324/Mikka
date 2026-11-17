@@ -54,8 +54,8 @@ export async function stopRunsUsingSubscriptions(query: Query, scope: { ownerId?
  * owner only): may the credential owner's subscription serve the run owner's
  * run? Only when they are the same person. Membership lives in the workspace
  * database, so callers still check it there (authorizeSubscriptionWorkspace).
- * The workspace argument is kept for the callers' shape; sharing no longer
- * depends on it.
  */
-export const runMayUseCredentialSql = (credentialOwner: string, runOwner: string, _workspace?: string) =>
-  `(${credentialOwner}=${runOwner})`
+export const runMayUseCredentialSql = (credentialOwner: string, runOwner: string, workspace: string) =>
+  // The workspace expression stays referenced (and typed) so a caller's bound
+  // parameter for it remains inferable; it no longer widens the grant.
+  `(${credentialOwner}=${runOwner} AND ((${workspace})::text IS NULL OR true))`

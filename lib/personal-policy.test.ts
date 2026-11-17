@@ -49,18 +49,6 @@ mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: 
 const { memberSubscriptionsAllowed } = await import('./personal-policy')
 const { usableApiKeys } = await import('./model-api-keys')
 
-function reader(results: { allowOthers: boolean }[][], error?: Error) {
-  const calls: { sql: string; values: unknown[] }[] = []
-  const query = { async query(sql: string, values: unknown[]) {
-    calls.push({ sql, values })
-    assert.match(sql, /^SELECT /)
-    assert.deepEqual(values, ['payor', 'workspace'])
-    if (error) throw error
-    assert.ok(calls.length <= results.length, 'one fresh read per permission check')
-    return { rows: results[calls.length - 1] }
-  } } as unknown as Pick<Pool, 'query'>
-  return { query, calls }
-}
 
 const workspace = '10000000-0000-4000-8000-000000000001'
 const owner = 'policy-fixture-owner'
