@@ -11,6 +11,7 @@ import { isE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { ScheduleStore, SCHEDULE_LEASE_MS, type WorkspaceGuard } from './store'
 import { ScheduleError, scheduleHistoryInput, scheduleListInput, type Actor, type Definition } from './contract'
 import { scheduleTools } from './tools'
+import type { WebhookBatchPage } from './automation-view'
 
 const target=process.env.E2E_DATABASE_URL
 const valid=isE2eTarget(target)&&target===process.env.MIKKA_DATABASE_URL&&target===process.env.DATABASE_URL
@@ -157,7 +158,7 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     const schedule = await create()
     t.after(async () => { await pool.query('DELETE FROM user_schedules WHERE id=$1', [schedule.id]) })
     const batched = { ...def(), webhook: { batchMinutes: 5 }, task: { kind: 'dispatch_task', botId: null, prompt: 'Summarize alerts' } }
-    const trigger = { webhook: { requests: [{ body: 'first private body' }, { body: 'second private body' }] } }
+    const trigger = { webhook: { requests: [{ at: '2030-01-01T01:02:01.000Z', body: '首次' }, { at: '2030-01-01T01:02:02.000Z', body: 'second body' }] } }
     const insert = async (status: 'pending' | 'succeeded' | 'cancelled' | 'skipped', definition: unknown, event: unknown, due: number) =>
       (await pool.query<{id: string}>(`INSERT INTO schedule_occurrences
         (id,schedule_id,version,due_at,created_at,definition,status,execution_decision,operation_id,next_retry_at,trigger)
@@ -165,7 +166,8 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
       [schedule.id,due,definition,status,event])).rows[0]!.id
     const finished = (await Promise.all([insert('succeeded', batched, trigger, 1), insert('succeeded', batched, trigger, 2)])).sort().reverse()
     const gathering = await insert('pending', batched, trigger, 8)
-    const cancelled = await insert('cancelled', batched, trigger, 4)
+    const previouslyScrubbed = { webhook: { requests: trigger.webhook.requests.map(({ at }) => ({ at })) } }
+    const cancelled = await insert('cancelled', batched, previouslyScrubbed, 4)
     await insert('skipped', batched, trigger, 5)
     await insert('pending', { ...batched, webhook: { batchMinutes: 0 } }, trigger, -5)
     await insert('pending', batched, null, 7)
@@ -173,21 +175,24 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     const tools = scheduleTools(command => store().command(actor, command))
     const read = async (batches: { status?: 'collecting' | 'queued' | 'cancelled'; limit?: number; cursor?: string }) => {
       const input = scheduleHistoryInput.parse({ scheduleId: schedule.id, batches })
-      return await tools.schedule_history.execute!(input, {toolCallId:randomUUID(),messages:[],context:{}}) as {
-        batches: {id: string; requestCount: number; status: string; runStatus: string; due_at: Date; created_at: Date}[]
-        nextCursor: string | null
-      }
+      return await tools.schedule_history.execute!(input, {toolCallId:randomUUID(),messages:[],context:{}}) as WebhookBatchPage
     }
     const first = await read({status: 'queued', limit: 1})
     assert.deepEqual(first.batches.map(b => b.id), finished.slice(0,1))
     assert.equal(first.batches[0]?.requestCount, 2)
-    assert.deepEqual(Object.keys(first.batches[0]!).sort(), ['created_at','due_at','id','requestCount','runStatus','status'])
+    assert.equal(first.batches[0]?.firstEventAt, trigger.webhook.requests[0]!.at)
+    assert.equal(first.batches[0]?.lastEventAt, trigger.webhook.requests[1]!.at)
+    assert.equal(first.batches[0]?.byteCount, Buffer.byteLength('首次second body'))
+    assert.deepEqual(Object.keys(first.batches[0]!).sort(), ['byteCount','created_at','due_at','firstEventAt','id','lastEventAt','requestCount','runStatus','status'])
     assert.ok(first.nextCursor)
     const next = await read({status: 'queued', limit: 1, cursor: first.nextCursor})
     assert.deepEqual(next.batches.map(b => b.id), finished.slice(1))
     assert.equal(next.nextCursor, null)
     assert.deepEqual((await read({status:'collecting'})).batches.map(b => [b.id, b.runStatus]), [[gathering, 'pending']])
-    assert.deepEqual((await read({status:'cancelled'})).batches.map(b => b.id), [cancelled])
+    const archived = (await read({status:'cancelled'})).batches
+    assert.deepEqual(archived.map(b => b.id), [cancelled])
+    assert.equal(archived[0]?.byteCount, null)
+    assert.equal(archived[0]?.lastEventAt, trigger.webhook.requests[1]!.at)
     assert.deepEqual((await read({})).batches.map(b => b.id).sort(), [...finished, gathering, cancelled].sort())
     await assert.rejects(store().command(memberActor, {action:'history',scheduleId:schedule.id,batches:{}}), /scheduleAdminRequired/)
     assert.equal((await history(schedule.id)).length, 7, 'the original history still includes unbatched runs')

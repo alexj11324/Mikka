@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { definitionSchema } from './contract'
+import { definitionSchema, webhookBatchListInput } from './contract'
 
 const base = {
   title: 'Cron contract',
@@ -45,4 +45,14 @@ test('manual timing has no schedule of its own and run_now needs a request ident
   const scheduleId = '12340000-0000-4000-8000-000000000002'
   assert.equal(commandSchema.safeParse({ action: 'run_now', scheduleId, version: 1, requestId: '12340000-0000-4000-8000-000000000003' }).success, true)
   assert.equal(commandSchema.safeParse({ action: 'run_now', scheduleId, version: 1 }).success, false)
+})
+
+test('the signed webhook batch list accepts the same status and bounded page size as history', () => {
+  const scheduleId = '12340000-0000-4000-8000-000000000003'
+  for (const status of ['collecting', 'queued', 'cancelled']) {
+    assert.deepEqual(webhookBatchListInput.parse({ scheduleId, status, limit: 1 }), { scheduleId, status, limit: 1 })
+  }
+  assert.equal(webhookBatchListInput.safeParse({ scheduleId, status: 'pending' }).success, false)
+  assert.equal(webhookBatchListInput.safeParse({ scheduleId, limit: 0 }).success, false)
+  assert.equal(webhookBatchListInput.safeParse({ scheduleId, limit: 101 }).success, false)
 })
