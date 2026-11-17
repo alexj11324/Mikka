@@ -291,7 +291,7 @@
   "app/api/mobile/push-tokens/[id]/route.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "The active native session can name its own installed phone using the local application database.",
+    "behavior": "The active native session can name or unregister its own push installation by ID using the local application database.",
     "test": "tests/mobile-push-workspace.db.test.ts",
     "suite": "test:visibility-db"
   },
