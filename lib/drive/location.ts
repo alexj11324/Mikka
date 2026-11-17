@@ -21,3 +21,7 @@ export function driveVolumeUrl(location: DriveLocation, suffix = '', query: Reco
 export function driveFileLinkUrl(location: DriveLocation, volumeId: string, linkId: string) {
   return driveVolumeUrl(location, `/${encodeURIComponent(volumeId)}/shares/${encodeURIComponent(linkId)}`)
 }
+
+export function driveShareViewUrl(shareId: string) {
+  return withBasePath(`/api/drive/shares/${encodeURIComponent(shareId)}`)
+}

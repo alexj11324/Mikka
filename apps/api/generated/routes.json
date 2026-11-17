@@ -901,6 +901,15 @@
       "sourceHash": "5992f2e33e26e70d712186c9cf23a7a10927208622571d42f081b6aa7ab9daef"
     },
     {
+      "path": "/mikka/api/drive/shares/[shareId]",
+      "template": "/api/drive/shares/[shareId]",
+      "source": "app/api/drive/shares/[shareId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "c4e42ef8270379962b81d39ee9fe7dceba847f270b2a811559ceb2789068fa5f"
+    },
+    {
       "path": "/mikka/api/drive/volumes",
       "template": "/api/drive/volumes",
       "source": "app/api/drive/volumes/route.ts",
