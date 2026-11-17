@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { after, beforeEach, mock, test } from 'node:test'
 import type { Pool } from 'pg'
-import { CLOSED_TASK_RETENTION_MS, THREAD_MACHINE_BUDGET_MS, THREAD_MACHINE_IDLE_MS, THREAD_MACHINE_RESTORE_MS, THREAD_MACHINE_RETENTION_MS,
-  reconcileThreadMachine, threadMachineExecutionDeadline, threadMachineLifecycleDecision, type ThreadLifecycleRow } from './thread-lifecycle'
+import { CLOSED_TASK_RETENTION_MS, THREAD_MACHINE_IDLE_MS, THREAD_MACHINE_RESTORE_MS, THREAD_MACHINE_RETENTION_MS,
+  reconcileThreadMachine, threadMachineLifecycleDecision, type ThreadLifecycleRow } from './thread-lifecycle'
 import { threadLifecycleErrorKind, threadLifecycleLogFields } from './thread-lifecycle-log'
 
 // This suite simulates the SQL store, so it cannot inherit a configured live
@@ -82,8 +82,7 @@ test('a bounded human review lease keeps a safely ended VM until its absolute de
 test('review cannot defeat stop, cancellation, closure, lost execution or an unproved native exit', () => {
   const reviewed = row({ status: 'succeeded', safeExit: true, reviewExpiresAt: now + 60_000 })
   for (const patch of [{ stopRequestedAt: now }, { status: 'stopped' }, { status: 'cancelled' },
-    { taskClosed: true }, { stopReason: 'device_lost' }, { safeExit: false },
-    { computeSeconds: THREAD_MACHINE_BUDGET_MS / 1_000 }]) {
+    { taskClosed: true }, { stopReason: 'device_lost' }, { safeExit: false }]) {
     assert.equal(threadMachineLifecycleDecision({ ...reviewed, ...patch }, running, now).action, 'pause', JSON.stringify(patch))
   }
   assert.equal(threadMachineLifecycleDecision({ ...reviewed, status: 'running', leaseExpiresAt: now - 1 }, running, now).reason,
@@ -129,12 +128,9 @@ test('stage handoff keeps the same VM for the admitted successor for 45 seconds,
   assert.equal(threadMachineLifecycleDecision({ ...handoff, taskClosed: true }, running, now).action, 'pause')
 })
 
-test('the execution budget counts running time and requests a stop without suspending a live process', () => {
-  const exhausted = row({ status: 'running', computeSeconds: THREAD_MACHINE_BUDGET_MS / 1_000, leaseExpiresAt: now + 90_000 })
-  assert.equal(threadMachineLifecycleDecision(exhausted, running, now).action, 'stop')
-  assert.equal(threadMachineLifecycleDecision({ ...exhausted, stopRequestedAt: now }, running, now).action, 'keep')
-  const resumed = row({ runningSince: now, computeSeconds: 120, lifecycle: { executionDeadline: now - 7 * 24 * 60 * 60_000 } })
-  assert.equal(threadMachineExecutionDeadline(resumed, now), now + THREAD_MACHINE_BUDGET_MS - 120_000)
+test('E2B runs on the user\'s own key: Mikka never stops a live run for its running time', () => {
+  const long = row({ status: 'running', computeSeconds: 7 * 24 * 60 * 60, leaseExpiresAt: now + 90_000 })
+  assert.deepEqual(threadMachineLifecycleDecision(long, running, now), { action: 'keep', at: now + 5 * 60_000, reason: 'active_run' })
 })
 
 test('closed task retirement needs both an hour of retention and a matching uploaded checkpoint', () => {
@@ -488,13 +484,13 @@ test('an old epoch cannot pause or overwrite a sandbox transferred to the next r
   assert.equal(f.machine.lifecycle.phase, undefined)
 })
 
-test('a live offline CLI gets a static timeout renewal and preserves its execution deadline', async () => {
+test('a live offline CLI gets a static timeout renewal', async () => {
   const f = fixture(row({ status: 'running', leaseExpiresAt: now + 90_000 }))
   assert.equal(await reconcileThreadMachine(f.pool, actor, 'run', f.deps), now + 5 * 60_000)
   assert.equal(f.counts().keepAliveCalls, 1)
   assert.equal(f.counts().pauseCalls, 0)
   assert.equal(f.machine.lifecycle.phase, 'active')
-  assert.equal(f.machine.lifecycle.executionDeadline, now + THREAD_MACHINE_BUDGET_MS - THREAD_MACHINE_IDLE_MS)
+  assert.equal(f.machine.lifecycle.executionDeadline, undefined)
 })
 
 test('lost execution leases request recovery and stop; a broken worker is suspended after a bounded grace', async () => {

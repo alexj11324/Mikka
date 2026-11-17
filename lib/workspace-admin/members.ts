@@ -80,9 +80,9 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
 
 /**
  * §8.3 (decision 2026-10-31-2225): when someone leaves a team or is suspended,
- * their subscription share, API key shares, Skill shares and credit share leave
+ * their API key shares, Skill shares and credit share leave
  * with them and their bots there pause until an
- * admin takes one over. Runs on that subscription are stopped at once, and
+ * admin takes one over. Runs on their subscriptions there are stopped at once, and
  * the machine receives a stop through its control channel. New admissions and
  * background credential renewals check the current share and membership.
  */
@@ -93,7 +93,6 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
   // A card they designated keeps paying through its grace period; admins see when it stops (计费).
   await releasePaymentDesignation(workspaceId, userId)
   await db.transaction(async main => {
-    await main.execute(sql`delete from workspace_subscription_shares where "ownerId" = ${userId} and "workspaceId" = ${workspaceId}`)
     await main.execute(sql`delete from personal_mcp_workspace_shares g using personal_mcp_servers s where g.server_id=s.id and s.user_id=${userId} and g.workspace_id=${workspaceId}`)
     await main.execute(sql`delete from personal_skill_workspace_shares g using personal_skills s where g.skill_id=s.id and s.user_id=${userId} and g.workspace_id=${workspaceId}`)
     // Their credits stop paying for the team at once (lib/credit-shares.ts).

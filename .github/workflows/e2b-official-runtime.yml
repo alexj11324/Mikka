@@ -1,5 +1,5 @@
 name: E2B additive runtime release
-# Build private candidates, preserve official files, prove both subscriptions,
+# Build private candidates, preserve official files and pass build-time checks,
 # then publish them for the Cloudflare release that serves this exact commit.
 # A push only reports changed runtime inputs. The release starts by itself when
 # the Cloudflare deployment workflow's gateway observation shows current main
@@ -29,7 +29,6 @@ on:
       - '.github/workflows/e2b-official-runtime.yml'
       - '.github/workflows/e2b-template.yml'
       - '.github/workflows/e2b-runtime-release.yml'
-      - 'scripts/e2b/validate-template-subscriptions.mjs'
       - 'scripts/e2b/cleanup-template-candidates.py'
       - 'scripts/e2b/runtime-report.mjs'
       - 'scripts/e2b/acceptance-daemon.mts'
@@ -95,7 +94,7 @@ jobs:
           ln -s "$RUNNER_TEMP/runtime-gate-tests/node_modules" node_modules
           mkdir -p node_modules/@mikka
           ln -s "$GITHUB_WORKSPACE/packages/protocol" node_modules/@mikka/protocol
-      - run: node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/release/cloudflare-promoted-web.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
+      - run: node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/release/cloudflare-promoted-web.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
       - run: python3 packages/daemon/scripts/prepare-worker-install.test.py
       - run: python3 scripts/e2b/official-files.test.py

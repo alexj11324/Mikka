@@ -52,3 +52,21 @@ export function movesThread(target: DispatchTarget | undefined, placement: RunPl
   if (!target || !placement) return false
   return target === 'cloud' ? placement.kind !== 'cloud' : placement.kind !== 'device' || placement.deviceId !== target.deviceId
 }
+
+/**
+ * The Agent a run on a named computer uses (fail fast, no default): the named
+ * one, else the only installed Agent of the model's harness, else the
+ * computer's only installed Agent. Several left: agentRequired. None that fits:
+ * agentHarnessMissing.
+ */
+export function chooseDeviceAgent(agents: readonly { id: string; harness: string }[], installed: ReadonlySet<string>, agentId?: string, harness?: string):
+  { id: string } | { error: 'agentRequired' | 'agentHarnessMissing' } {
+  const usable = agents.filter(agent => installed.has(agent.harness))
+  if (agentId) {
+    const agent = usable.find(item => item.id === agentId)
+    return agent && (!harness || agent.harness === harness) ? { id: agent.id } : { error: 'agentHarnessMissing' }
+  }
+  const matching = harness ? usable.filter(agent => agent.harness === harness) : usable
+  const harnesses = new Set(matching.map(agent => agent.harness))
+  return harnesses.size === 1 ? { id: matching[0].id } : { error: harnesses.size ? 'agentRequired' : 'agentHarnessMissing' }
+}

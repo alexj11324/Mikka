@@ -310,8 +310,6 @@ export const desktopActionSchemas = {
   'pending-actions.decidePendingAction': tuple(uuid, bool),
   'personal-policy.getSharePolicy': inWorkspace,
   'personal-policy.updateSharePolicy': tuple(bool, workspace),
-  'personal-policy.getSubscriptionShare': inWorkspace,
-  'personal-policy.updateSubscriptionShare': tuple(object({ shared: bool, allowOthers: bool.optional() }), workspace),
   'personal-policy.getCreditShare': inWorkspace,
   'personal-policy.updateCreditShare': tuple(bool, workspace),
   'personal-policy.getPaymentDesignation': inWorkspace,

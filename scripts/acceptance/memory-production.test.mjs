@@ -57,8 +57,8 @@ function fixture(options = {}) {
   const choice = (bot, override = {}) => ({ id: id(bot.harness === 'codex' ? 21 : 20), provider: bot.harness === 'codex' ? 'codex' : 'claude',
     modelId: bot.harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', kind: 'subscription', chosen: true, available: true, ...override })
   const menu = bot => ({ groups: [
-    { kind: 'subscription', provider: 'claude', owner: 'shared owner private canary', options: [{ id: id(20), provider: 'claude', modelId: 'claude-haiku-5-5' }] },
-    { kind: 'subscription', provider: 'codex', owner: 'shared owner private canary', options: [{ id: id(21), provider: 'codex', modelId: 'gpt-6-luna' }] },
+    { kind: 'subscription', provider: 'claude', options: [{ id: id(20), provider: 'claude', modelId: 'claude-haiku-5-5' }] },
+    { kind: 'subscription', provider: 'codex', options: [{ id: id(21), provider: 'codex', modelId: 'gpt-6-luna' }] },
   ], current: bot.harness ? choice(bot, options.fallbackHarness === bot.harness ? { fallback: 'quota', kind: 'apiKey' } : {}) : { kind: 'hosted' } })
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), path = url.pathname.replace(/^\/mikka/, ''), method = init.method ?? 'GET'

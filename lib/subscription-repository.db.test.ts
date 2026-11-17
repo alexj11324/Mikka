@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { mock, test } from 'node:test'
+import { test } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
 import { SubscriptionRepository } from './subscription-repository'
@@ -9,64 +9,55 @@ const databaseURL = process.env.E2E_DATABASE_URL
 const disposable = disposableDatabase(process.env, databaseURL)
 if (process.env.REQUIRE_DB === '1' && !disposable) throw new Error('Subscription selection tests require an isolated local database')
 
-test('native execution joins current binding authority after shared membership without falling back', { skip: !disposable }, async t => {
+test('native execution re-reads the owner\'s own binding and never falls back', { skip: !disposable }, async t => {
   const admin = new Pool({ connectionString: databaseURL })
   const schema = `native_binding_${randomUUID().replaceAll('-', '')}`
   await admin.query(`CREATE SCHEMA ${schema}`)
   const pool = new Pool({ connectionString: databaseURL, options: `-c search_path=${schema}` })
   const workspaceId = randomUUID(), agentId = randomUUID(), connectionId = randomUUID(), bindingId = randomUUID(), olderId = randomUUID()
-  const members: string[] = []
-  let afterMembership: (() => Promise<void>) | undefined
-  const membership = mock.module(new URL('./subscription-runtime.ts', import.meta.url).href, { namedExports: {
-    authorizeSubscriptionWorkspace: async (owner: string, workspace: string) => {
-      assert.equal(workspace, workspaceId); members.push(owner)
-      if (members.length === 2) await afterMembership?.()
-    },
-  } })
+  let afterFirstRead: (() => Promise<void>) | undefined
   try {
     await pool.query(`CREATE TABLE agents (id uuid PRIMARY KEY,"userId" text);
       CREATE TABLE byos_connections (id uuid PRIMARY KEY,"ownerId" text,provider text,state text,epoch bigint,paused boolean);
-      CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,route text,"modelId" text,"createdAt" timestamptz DEFAULT now());
-      CREATE TABLE workspace_subscription_shares ("ownerId" text,"workspaceId" uuid,"allowOthers" boolean);
-      CREATE TABLE workspace_personal_policies ("workspaceId" uuid,subscriptions boolean)`)
-    await pool.query(`INSERT INTO agents VALUES ($1,'requester')`, [agentId])
-    await pool.query(`INSERT INTO byos_connections VALUES ($1,'payor','codex','connected',7,false)`, [connectionId])
+      CREATE TABLE byos_bindings (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" text,"consumerId" text,"connectionId" uuid,"connectionRevision" bigint,route text,"modelId" text,"createdAt" timestamptz DEFAULT now())`)
+    await pool.query(`INSERT INTO agents VALUES ($1,'owner')`, [agentId])
+    await pool.query(`INSERT INTO byos_connections VALUES ($1,'owner','codex','connected',7,false)`, [connectionId])
     const reset = async () => {
-      await pool.query(`UPDATE agents SET "userId"='requester'; UPDATE byos_connections SET state='connected',paused=false,epoch=7;
-        DELETE FROM workspace_subscription_shares; DELETE FROM workspace_personal_policies; DELETE FROM byos_bindings`)
-      await pool.query('INSERT INTO workspace_subscription_shares VALUES (\'payor\',$1,true)', [workspaceId])
+      await pool.query(`UPDATE agents SET "userId"='owner'; UPDATE byos_connections SET state='connected',paused=false,epoch=7,"ownerId"='owner';
+        DELETE FROM byos_bindings`)
       await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId","createdAt")
-        VALUES ($1,'payor',$2,$3,$4,7,'codex_cli','fixture-model',now()),($5,'payor',$2,$3,$4,8,'codex_cli','older-model',now()-interval '1 day')`,
+        VALUES ($1,'owner',$2,$3,$4,7,'codex_cli','fixture-model',now()),($5,'owner',$2,$3,$4,8,'codex_cli','older-model',now()-interval '1 day')`,
       [bindingId, workspaceId, agentId, connectionId, olderId])
-      members.length = 0
     }
     let reads = 0
-    const query = ((sql: string, params?: unknown[]) => { reads++; return pool.query(sql, params) }) as Pool['query']
+    const query = (async (sql: string, params?: unknown[]) => {
+      const result = await pool.query(sql, params)
+      if (++reads === 1) await afterFirstRead?.()
+      return result
+    }) as unknown as Pool['query']
     const { nativeRunBinding } = await import('./computer/native-run-binding')
-    await reset()
-    const selected = await nativeRunBinding({ query }, 'requester', agentId, 'codex', workspaceId)
+    await reset(); afterFirstRead = undefined
+    const selected = await nativeRunBinding({ query }, 'owner', agentId, 'codex', workspaceId)
     assert.equal(selected?.id, bindingId)
-    assert.equal(selected?.ownerId, 'payor')
+    assert.equal(selected?.ownerId, 'owner')
     assert.equal(reads, 2)
-    assert.deepEqual(members, ['requester', 'payor'])
+    reads = 0
+    await pool.query(`UPDATE byos_bindings SET "ownerId"='someone-else'; UPDATE byos_connections SET "ownerId"='someone-else'`)
+    assert.equal(await nativeRunBinding({ query }, 'owner', agentId, 'codex', workspaceId), null, 'another person\'s subscription is never used')
     const mutations = {
-      share: 'DELETE FROM workspace_subscription_shares',
-      policy: `INSERT INTO workspace_personal_policies VALUES ('${workspaceId}',false)`,
       agent: `UPDATE agents SET "userId"='foreign-owner'`,
       scope: `UPDATE byos_bindings SET "workspaceId"='${randomUUID()}' WHERE id='${bindingId}'`,
       pause: 'UPDATE byos_connections SET paused=true',
       epoch: 'UPDATE byos_connections SET epoch=8',
       deleted: `DELETE FROM byos_bindings WHERE id='${bindingId}'`,
     }
-    for (const [kind, sql] of Object.entries(mutations)) await t.test(`refuses ${kind} changed while membership was awaited`, async () => {
+    for (const [kind, sql] of Object.entries(mutations)) await t.test(`refuses ${kind} changed between reads`, async () => {
       await reset(); reads = 0
-      afterMembership = async () => { await pool.query(sql) }
-      assert.equal(await nativeRunBinding({ query }, 'requester', agentId, 'codex', workspaceId), null)
+      afterFirstRead = async () => { await pool.query(sql) }
+      assert.equal(await nativeRunBinding({ query }, 'owner', agentId, 'codex', workspaceId), null)
       assert.equal(reads, 2)
-      assert.deepEqual(members, ['requester', 'payor'])
     })
   } finally {
-    membership.restore()
     await pool.end()
     await admin.query(`DROP SCHEMA ${schema} CASCADE`)
     await admin.end()

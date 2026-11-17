@@ -174,10 +174,10 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation, prod
         agentProfile: { profileId, version: 1, digest, source: 'explicit' },
         executionIdentity: { version: 1, requester: ownerId, executionPrincipal: ownerId, botId, botOwner: ownerId,
           outputOwner: ownerId, workspaceId, personalResourcePolicy: 'requester_only',
-          billingAccount: { model: { kind: 'subscription', ownerId: adminId, resourceId: connectionId },
+          billingAccount: { model: { kind: 'subscription', ownerId, resourceId: connectionId },
             runtime: { kind: 'e2b', ownerId, resourceId: ownerId } },
           resourceBindings: [{ kind: 'device', id: deviceId, ownerId, access: 'owner' },
-            { kind: 'subscription', id: connectionId, ownerId: adminId, access: 'workspace_share', revision: '1' }] },
+            { kind: 'subscription', id: connectionId, ownerId, access: 'owner', revision: '1' }] },
       } }
       if (path === `/api/factory/tasks?issueId=${issueId}`) return { issueId, tasks: [] }
       if (path === `/api/threads/${actualRunId}/machine`) {
@@ -189,10 +189,10 @@ async function normalCloudCase(changeDetail = () => {}, releaseAttestation, prod
     async rpc(name, args) {
       calls.push(name)
       if (['task-runs.pollThreads', 'task-runs.pollTaskRuns'].includes(name)) return { items: [] }
-      if (name === 'model-order.getModelOrder') return { candidates: [{ harness: 'codex', model, source, credentialOwnerId: adminId }] }
+      if (name === 'model-order.getModelOrder') return { candidates: [{ harness: 'codex', model, source, credentialOwnerId: ownerId }] }
       if (name === 'bots.createBot') { bot = { ...args[0], id: botId }; return bot }
       const selected = { id: connectionId, provider: 'codex', modelId: model }
-      if (name === 'execution-settings.getBotModelMenu') return { groups: [{ kind: 'subscription', provider: 'codex', owner: adminId, options: [selected] }] }
+      if (name === 'execution-settings.getBotModelMenu') return { groups: [{ kind: 'subscription', provider: 'codex', options: [selected] }] }
       if (name === 'execution-settings.chooseBotModel') return { current: { ...selected, kind: 'subscription', chosen: true, available: true } }
       if (name === 'issues.saveIssue') { issue = { ...args[0], id: issueId, revision: 1 }; return { issue } }
       if (name === 'coordinator.sendCoordinatorMessage') { dispatchInput = JSON.parse(args[0].match(/参数：(.*)。使用/)[1]); active = true; return {} }

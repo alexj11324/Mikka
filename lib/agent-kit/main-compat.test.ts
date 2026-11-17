@@ -44,12 +44,10 @@ function identityFixtureQuery(raw: string, args: unknown[]) {
  if(sql==='SELECT "ownerId",kind,enabled FROM devices WHERE id=$1') {
   assert.deepEqual(args, [deviceId]); return fixtureRows([{ ownerId: owner, kind: 'cloud', enabled: true }])
  }
- if(sql===compactSql(`SELECT b."ownerId",b."workspaceId",b."connectionRevision"::text AS revision,b."modelId",b.route,
-      EXISTS (SELECT 1 FROM workspace_subscription_shares s WHERE s."ownerId"=b."ownerId" AND s."workspaceId"=$2 AND s."allowOthers"
-      AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"=$2 AND NOT p.subscriptions)) AS shared
+ if(sql===compactSql(`SELECT b."ownerId",b."workspaceId",b."connectionRevision"::text AS revision,b."modelId",b.route
       FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
       AND c.state='connected' AND NOT c.paused AND c.epoch=b."connectionRevision" WHERE b.id=$1`)) {
-  assert.deepEqual(args, [binding.id, workspace]); return fixtureRows([{ ownerId: owner, workspaceId: workspace, revision: String(binding.connectionRevision), modelId: binding.modelId, route: binding.route, shared: false }])
+  assert.deepEqual(args, [binding.id]); return fixtureRows([{ ownerId: owner, workspaceId: workspace, revision: String(binding.connectionRevision), modelId: binding.modelId, route: binding.route }])
  }
  if(sql==='SELECT 1 FROM user_e2b_keys WHERE "userId"=$1 UNION ALL SELECT 1 FROM workspace_e2b_keys WHERE "createdBy"=$1 LIMIT 1') {
   assert.deepEqual(args, [owner]); return fixtureRows([{}])

@@ -1311,6 +1311,7 @@
     "deviceNameTooLong": "设备名称过长。",
     "deviceNotFound": "设备不存在。",
     "agentHarnessMissing": "这台电脑尚未安装所选 Agent。",
+    "agentRequired": "这台电脑上有多个 Agent，请指定由哪个 Agent 运行这个任务。",
     "agentDuplicateName": "名称重复，请换一个名称。",
     "botDuplicateName": "已有同名 Bot，请换一个名字。",
     "botNameTooLong": "Bot 名字最多 60 个字。",
@@ -2956,29 +2957,12 @@
       }
     },
     "subscriptionShare": {
-      "heading": "团队共享",
-      "blocked": "管理员不允许分享订阅",
-      "others": "分享我的订阅给团队成员",
+      "others": "分享给团队成员",
       "othersTitle": "分享 {name} 给团队成员？",
-      "othersUsage": "团队成员可以用它跑自己的 Bot，用量算在你的订阅额度上。",
       "othersRuntime": "任务运行时，凭据会临时放到跑任务的那台电脑上，可能是成员自己的电脑；任务结束后删除。",
       "othersTrust": "只分享给你信任的人。部分服务商的条款不允许共享账号，请自行确认。",
       "othersConfirm": "分享",
-      "othersOn": "已分享 {names} 订阅 · 成员跑任务时凭据会临时放到他们的电脑上",
-      "subscriptionName": "{provider} 订阅",
-      "ownFallback": "我的订阅",
-      "listSeparator": "、",
-      "cancel": "取消",
-      "available": "{name} 分享的 {provider} 订阅",
-      "availableState": "你的任务也能用",
-      "provider": {
-        "claude": "Claude",
-        "codex": "ChatGPT"
-      },
-      "othersHint": "{workspace}的成员也能用你的 {names} 订阅跑任务，用量算在你的额度上",
-      "othersHintAny": "{workspace}的成员也能用你的订阅跑任务，用量算在你的额度上",
-      "othersOnAny": "已分享你的订阅 · 成员跑任务时凭据会临时放到他们的电脑上",
-      "thisWorkspace": "这个工作区"
+      "cancel": "取消"
     },
     "archivedBots": {
       "heading": "已暂停的 Bot",
@@ -2998,7 +2982,7 @@
     "sharePolicy": {
       "loading": "正在加载分享设置",
       "heading": "订阅与 API Key",
-      "label": "成员把自己的订阅和 API Key 分享给队友",
+      "label": "成员把自己的 API Key 分享给队友",
       "detail": "禁止后只停用分享给别人的部分，每个人自己照常能用"
     },
     "appPolicy": {
@@ -4079,7 +4063,6 @@
       "noMatch": "没有匹配的模型",
       "source": {
         "subscription": "用你的 {service} 订阅",
-        "sharedSubscription": "用 {name} 共享的 {service} 订阅",
         "apiKey": "用 {vendor} API Key（尾号 {last4}），不扣 Mikka 额度",
         "apiKeyPlain": "用 {vendor} API Key，不扣 Mikka 额度",
         "sharedKey": "用 {name} 共享的 {vendor} API Key，不扣 Mikka 额度",
@@ -6353,7 +6336,7 @@
     "run_provider_error": {
       "default": "模型服务商未能完成这次请求，请重试。"
     },
-    "run_credentials_unavailable": {"default":"任务凭据暂不可用。","device_unavailable":"这台电脑暂时不能领取该任务的凭据。","native_credentials":"订阅凭据暂不可用。","github_credentials":"GitHub 凭据暂不可用。"},
+    "run_credentials_unavailable": {"default":"任务凭据暂不可用。","device_unavailable":"这台电脑暂时不能领取该任务的凭据。","credential_missing":"任务所有者没有连接这项订阅。请在模型与订阅里连接后重试。","credential_expired":"任务所有者的订阅登录已过期。请重新登录后重试。","quota_exhausted":"任务所有者的订阅额度已用完。","native_credentials":"订阅凭据暂不可用。","github_credentials":"GitHub 凭据暂不可用。"},
     "run_failed": {
       "default": "任务未能完成，请查看错误详情或重试。"
     },
@@ -7017,11 +7000,11 @@
     },
     "policy": {
       "title": "资源共享策略",
-      "description": "决定成员能否把自己的模型凭证、订阅和 MCP 共享到组织工作区。共享仍需要资源原有的授权；策略只能进一步收紧。",
+      "description": "决定成员能否把自己的 API Key 和 MCP 共享到组织工作区（订阅只给主人自己用，不能共享）。共享仍需要资源原有的授权；策略只能进一步收紧。",
       "needsEnterprise": "资源策略需要 Enterprise。",
       "modelCredentialSharing": {
-        "label": "模型凭证与订阅",
-        "note": "成员共享 API 密钥或模型订阅。"
+        "label": "模型凭证",
+        "note": "成员共享 API Key。订阅只给主人自己用。"
       },
       "mcpSharing": {
         "label": "MCP 服务",
@@ -7063,7 +7046,7 @@
         "title": "共享审批",
         "description": "「需审批」时，成员共享资源会在这里等待审批。拒绝会撤回该资源在工作区中的共享；批准不会绕过资源原有的授权。",
         "empty": "没有共享审批请求",
-        "emptyNote": "成员在组织工作区共享模型凭证、订阅或 MCP 时会出现在这里。",
+        "emptyNote": "成员在组织工作区共享 API Key 或 MCP 时会出现在这里。",
         "approvedDone": "已批准。",
         "deniedDone": "已拒绝，共享已撤回。",
         "kinds": {

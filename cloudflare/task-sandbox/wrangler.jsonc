@@ -18,6 +18,7 @@
     "name": "mikka-task-sandbox",
     "class_name": "TaskMachine",
     "scheduling_policy": "durable_object",
+    "max_instances": 1000,
     "images": { "task": { "dockerfile": "./Dockerfile", "build_context": "../.." } }
   }]
 }

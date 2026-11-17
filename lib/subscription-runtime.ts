@@ -1,7 +1,6 @@
 import 'server-only'
 import type { SubscriptionModelRequestPolicy } from './subscription-service-tier'
 import { deploymentSwitch } from '@/lib/deployment-switches'
-import { othersMayUse } from './personal-policy'
 import { z } from 'zod'
 import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
 import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/subscription'
@@ -31,17 +30,17 @@ export async function authorizeSubscriptionWorkspace(userId: string, workspaceId
     .where(and(eq(workspaces.id, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
     .for('share').limit(1)
   if (!row) throw new WorkspaceError('workspaceAccessDenied')
-  if (borrowerId && borrowerId !== userId && !(await othersMayUse(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
+  // A subscription serves its owner only (decision 2026-11-17).
+  if (borrowerId && borrowerId !== userId) throw new SubscriptionRefusal('account_unavailable')
 }
-/** A subscription runs its owner's own bots in every workspace the owner belongs to (decision 2026-11-01-2240);
- * another member's bot only while the owner shares it there with 分享给团队成员 and the admin allows it. */
+/** A subscription runs its owner's own bots in every workspace the owner belongs to (decision 2026-11-01-2240),
+ * and never another member's bot (decision 2026-11-17). */
 export async function authorizeSubscriptionUse(userId: string, workspaceId: string, consumerId?: string) {
   await authorizeSubscriptionWorkspace(userId, workspaceId)
-  // Another member's bot needs 分享给团队成员 on, checked on every call: un-sharing or leaving stops it at once.
   if (consumerId && z.uuid().safeParse(consumerId).success) {
     const { rows: [bot] } = await pool.query<{ ownerId: string | null }>('SELECT "ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2', [consumerId, workspaceId])
     // A bot awaiting takeover (null owner) runs on nobody's subscription.
-    if (bot && (bot.ownerId === null || (bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))))) throw new SubscriptionRefusal('account_unavailable')
+    if (bot && bot.ownerId !== userId) throw new SubscriptionRefusal('account_unavailable')
   }
 }
 export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean; accountDeletionGrant?: string; modelRequestPolicy?: SubscriptionModelRequestPolicy } = {}): SubscriptionService {

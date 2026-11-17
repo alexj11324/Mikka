@@ -55,7 +55,9 @@ Changed template inputs require Cloudflare to serve the exact current main
 commit before the E2B release takes its lock or allocates builders. A push only
 reports changed inputs in its run summary and builds nothing; the paused Vercel
 publisher is never awaited. The release rechecks the live version after
-building and validates both official subscriptions before publishing template IDs.
+building and publishes template IDs that passed the build-time checks (the template
+builds, both CLIs start, the execution fence opens). E2B runs on the user's own
+key, so there is no subscription run before publication.
 
 The release starts by itself. When a run of the Cloudflare application
 deployment workflow finishes with a serving-release observation

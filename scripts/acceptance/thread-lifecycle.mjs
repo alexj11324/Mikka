@@ -15,7 +15,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
-import { acceptanceBot, chooseSharedChatModel, createSessionClient, restoreAcceptanceWorkspace, selectAcceptanceTeam,
+import { acceptanceBot, chooseOwnChatModel, createSessionClient, restoreAcceptanceWorkspace, selectAcceptanceTeam,
   smokeAcceptanceAccount, subscriptionProof, watchRun } from './cloud-startup.mjs'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
@@ -611,8 +611,8 @@ export async function runThreadLifecycle(options, { env = process.env, fetchImpl
         continue
       }
       const candidates = (order.candidates ?? []).filter(item => item.harness === harness && item.model === model
-        && item.source?.kind === 'subscription' && UUID.test(item.source.connectionId ?? '') && item.credentialOwnerId === scope.adminId)
-      const unavailable = candidates.length !== 1 ? 'shared_subscription_missing_or_ambiguous'
+        && item.source?.kind === 'subscription' && UUID.test(item.source.connectionId ?? '') && item.credentialOwnerId === scope.ownerId)
+      const unavailable = candidates.length !== 1 ? 'own_subscription_missing_or_ambiguous'
         : !keyStatus.configured || !keyStatus.byoEnabled ? 'owner_cloud_key_not_configured' : null
       if (unavailable) {
         report.cases.push({ harness, model, status: 'blocked', error: `lifecycle_${unavailable}`, subscription: { available: candidates.length === 1 },
@@ -632,7 +632,7 @@ export async function runThreadLifecycle(options, { env = process.env, fetchImpl
         setupPhase = 'new_bot_model_choice'
         await pin()
         phase = 'chat_model_selection'
-        await chooseSharedChatModel(client, fixture.botId, harness)
+        await chooseOwnChatModel(client, fixture.botId, harness)
         // This is the new Bot's ordinary Coordinator preference. The coding
         // leg itself is separately pinned and proved by its frozen Profile.
         await pin()

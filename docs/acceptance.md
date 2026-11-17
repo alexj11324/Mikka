@@ -21,8 +21,8 @@ disposable database use `acquireTestAccounts` in
 `scripts/test-accounts/session.mjs` and `pool.mjs`. Those harnesses provision
 owner/peer fixtures through normal email sign-up/sign-in and verify the real
 session. Follow their lease renewal, release and evidence auditing. Their
-results establish the isolated fixture path, while shared-team subscriptions
-require the shared-account check.
+results establish the isolated fixture path. Subscriptions serve their owner
+only (decision 2026-11-17-1400), so subscription checks use the account's own.
 
 The shared adapter implements `isolated-ci` for loopback application targets
 and `isolated-docker` for the separately bound Docker environment. Both keep

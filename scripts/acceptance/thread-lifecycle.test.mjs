@@ -255,10 +255,10 @@ function mainClient({ configured = true, errorOnArchive = false, loseFirstProfil
     rpc: async (action, args) => {
       calls.push({ action, args })
       if (action === 'model-order.getModelOrder') return { candidates: Object.entries(MODELS).map(([harness, model], index) => ({
-        harness, model, credentialOwnerId: ADMIN, source: { kind: 'subscription', connectionId: id(50 + index) } })) }
+        harness, model, credentialOwnerId: OWNER, source: { kind: 'subscription', connectionId: id(50 + index) } })) }
       if (action === 'workspace-secrets.getE2BKeyCapability') return { canEdit: true, configured, byoEnabled: true, lastErrorCode: null, lastErrorAt: null }
       if (action === 'execution-settings.getBotModelMenu') return { groups: Object.entries(MODELS).map(([harness, modelId], index) => ({
-        kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: 'Shared member', options: [{ id: id(70 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] })) }
+        kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', options: [{ id: id(70 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] })) }
       if (action === 'execution-settings.chooseBotModel') {
         const codex = args[1] === id(71)
         assert.ok(botNames.has(args[0]), 'only a Bot created by this case may receive a preference')
@@ -540,8 +540,8 @@ function lifecycleClient({ providerBlocked = false, changedSession = false, drif
   const frozenEvidence = runId => ({ run: { id: runId, issueId: fixed.issueId, harness: 'claude_code', model: MODELS.claude_code,
     credentialType: 'subscription', subscriptionRoute: 'claude_code_cli', agentProfile: { profileId: profile.id, version: 1, digest: DIGEST, source: 'explicit' },
     executionIdentity: { version: 1, requester: OWNER, executionPrincipal: OWNER, botId, botOwner: OWNER, outputOwner: OWNER, workspaceId,
-      personalResourcePolicy: 'requester_only', billingAccount: { model: { kind: 'subscription', ownerId: ADMIN, resourceId: id(61) }, runtime: { kind: 'e2b', ownerId: OWNER, resourceId: OWNER } },
-      resourceBindings: [{ kind: 'device', id: id(60), ownerId: OWNER, access: 'owner' }, { kind: 'subscription', id: id(61), ownerId: ADMIN, access: 'workspace_share', revision: '1' }] } } })
+      personalResourcePolicy: 'requester_only', billingAccount: { model: { kind: 'subscription', ownerId: OWNER, resourceId: id(61) }, runtime: { kind: 'e2b', ownerId: OWNER, resourceId: OWNER } },
+      resourceBindings: [{ kind: 'device', id: id(60), ownerId: OWNER, access: 'owner' }, { kind: 'subscription', id: id(61), ownerId: OWNER, access: 'owner', revision: '1' }] } } })
   const client = {
     rpc: async (action, args) => {
       actions.push({ action, args })

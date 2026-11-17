@@ -72,6 +72,7 @@ export const ACTION_ERROR_CODES = [
   'deviceNameTooLong',
   'deviceNotFound',
   'agentHarnessMissing',
+  'agentRequired',
   'agentDuplicateName',
   'botDuplicateName',
   'botNameTooLong',
