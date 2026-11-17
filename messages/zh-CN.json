@@ -217,7 +217,21 @@
     "archivedConversation": "历史：{title}",
     "suggestions": "建议",
     "artifacts": "Artifact",
-    "cardPreview": "[卡片]"
+    "cardPreview": "[卡片]",
+    "botMenu": {
+      "archive": "归档",
+      "unarchive": "取消归档",
+      "delete": "删除",
+      "archived": "已归档",
+      "archivedToast": "已归档「{name}」",
+      "unarchivedToast": "已取消归档「{name}」",
+      "deletedToast": "已删除「{name}」",
+      "deleteTitle": "删除「{name}」？",
+      "deletePermanent": "它的聊天记录会被永久删除。",
+      "deleteKeeps": "它派出的任务和线程会保留。",
+      "archiveInstead": "改为归档",
+      "failed": "没有完成，请重试。"
+    }
   },
   "Plugins": {
     "ownDescription": {

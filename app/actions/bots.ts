@@ -9,6 +9,7 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { updateOwnedBot } from '@/lib/bot-update'
 import { createOwnedBot } from '@/lib/bot-create'
+import { deleteOwnedBot, ownArchivedBots, setOwnedBotArchived } from '@/lib/bot-lifecycle'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { botDefaultOptions, listBotThreadsFor, saveBotDefaults, workspaceBots, type BotDefaultOptions, type BotDefaults, type BotThreadPage, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
@@ -63,6 +64,21 @@ export async function createBot(input: { name: string; color: string; shape: str
  */
 export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string }, workspaceId?: string): Promise<ActionResult<BotView>> {
   return workspaceAction(async () => updateOwnedBot(await getOwner(workspaceId), input))
+}
+
+/** 归档 / 取消归档 one of the person's own bots (not the Coordinator), from its sidebar row (lib/bot-lifecycle.ts). */
+export async function archiveBot(botId: string, archived: boolean, workspaceId?: string): Promise<ActionResult<{ id: string; archived: boolean }>> {
+  return workspaceAction(async () => setOwnedBotArchived(await getOwner(workspaceId), botId, archived))
+}
+
+/** 删除 one of the person's own bots (not the Coordinator): its chat goes; the tasks and runs it dispatched stay. */
+export async function deleteBot(botId: string, workspaceId?: string): Promise<ActionResult<{ id: string; deleted: true }>> {
+  return workspaceAction(async () => deleteOwnedBot(await getOwner(workspaceId), botId))
+}
+
+/** The person's own archived bots here: the sidebar's 已归档 list. */
+export async function listArchivedOwnBots(workspaceId?: string): Promise<ActionResult<{ bots: { id: string; name: string; color: string; shape: string }[] }>> {
+  return workspaceAction(async () => ({ bots: await ownArchivedBots(await getOwner(workspaceId)) }))
 }
 
 /** 设置 › 工作区 › Bot: the defaults a new bot starts with, and the choices. Any member may read. */

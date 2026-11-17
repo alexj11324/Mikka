@@ -137,6 +137,11 @@ export const issueListChanged = async (executor: object, issueId: string, titleC
   await (await import('./project-map')).projectMapIssueChanged(executor, issueId)
 }
 export const botListChanged = (executor: object, botId: string) => changed(executor, `bot:${botId}`, (db, workspace) => botListTargets(db, workspace, botId))
+/** A deleted bot has no row to read its scope from: the same lists as botListChanged, from its owner and workspace. */
+export const botRemovedChanged = (executor: object, ownerId: string, workspaceId: string) => changed(executor, `bot-removed:${ownerId}:${workspaceId}`, async (_db, workspace) => mergeTargets([
+  ...(await workspaceScopes(workspace, workspaceId, [ownerId])).map(scope => target(scope, ['bot_list', 'thread_list', 'task_run_list'])),
+  ...await ownerListTargets(workspace, ownerId, ['bot_chat_list']),
+]))
 export const groupListChanged = (executor: object, conversationId: string, removedUserId: string | null = null) => changed(executor, `group:${conversationId}:${removedUserId ?? ''}`, (db, workspace) => groupListTargets(db, workspace, conversationId, removedUserId))
 export const groupListReadChanged = (executor: object, conversationId: string, ownerId: string) => changed(executor, `group-read:${conversationId}:${ownerId}`, async (db, workspace) => (await groupListTargets(db, workspace, conversationId)).filter(value => value.scope.ownerId === ownerId))
 /** Only the reader's channel in the selected workspace consumes this receipt. */
