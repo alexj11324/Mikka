@@ -1,14 +1,14 @@
-"""Select a repository through the actual Linux Desktop smoke job's X11 dialog."""
+"""Choose a visible child folder in the smoke job's real, isolated X11 dialog."""
 import csv
 import io
-import os
 import subprocess
 import sys
+import time
 
 
-def run(*args, data=None, timeout=8):
+def run(*args, data=None):
     return subprocess.run(args, input=data, stdout=subprocess.PIPE,
-                          stderr=subprocess.DEVNULL, timeout=timeout, check=True).stdout
+                          stderr=subprocess.DEVNULL, timeout=8, check=True).stdout
 
 
 def xdo(*args):
@@ -23,41 +23,65 @@ if not window.isdecimal() or b"_NET_WM_WINDOW_TYPE_DIALOG" not in run(
     raise RuntimeError("NATIVE_FOLDER_DIALOG_AMBIGUOUS")
 xdo("windowfocus", "--sync", window)
 
-# Electron's native picker need not be present in the renderer or AT-SPI tree.
-# Read only the foreground dialog's rendered labels. Its pixels and directory
-# entries stay in process memory and never enter an artifact or console log.
-def response_buttons():
-    image = run("import", "-silent", "-window", window, "png:-")
+# Only fixed test/control words leave this process. Unknown directory names,
+# paths, whole frames and clipboard content never enter evidence.
+allowed = {"fixture", "source", "cancel", "open", "choose", "select",
+           "error", "ok", "location", "search", "folder", "recent", "name"}
+
+
+def read_labels():
+    image = run("import", "-silent", "-window", window, "-resize", "200%", "png:-")
     words = run("tesseract", "stdin", "stdout", "--psm", "11", "tsv", data=image)
-    labels = {"cancel": [], "accept": []}
+    labels = {}
     for row in csv.DictReader(io.StringIO(words.decode()), delimiter="\t"):
-        word = (row.get("text") or "").strip().casefold()
-        if word not in {"cancel", "open", "choose", "select"}:
-            continue
-        x = int(row["left"]) + int(row["width"]) // 2
-        y = int(row["top"]) + int(row["height"]) // 2
-        labels["cancel" if word == "cancel" else "accept"].append((x, y))
-    for cancel in labels["cancel"]:
-        same_row = [pt for pt in labels["accept"] if pt[0] > cancel[0] and abs(pt[1] - cancel[1]) <= 8]
-        if same_row:
-            return cancel, max(same_row)
-    raise RuntimeError(f"NATIVE_FOLDER_RESPONSE_LABELS_MISSING(cancel={len(labels['cancel'])},accept={len(labels['accept'])})")
+        word = (row.get("text") or "").strip(" _|[]").casefold()
+        if word in allowed:
+            x = (int(row["left"]) + int(row["width"]) // 2) // 2
+            y = (int(row["top"]) + int(row["height"]) // 2) // 2
+            labels.setdefault(word, []).append((x, y))
+    return labels
+
+
+def wait_for(label):
+    deadline = time.monotonic() + 6
+    while True:
+        observed = read_labels()
+        if label in observed:
+            return observed
+        if time.monotonic() >= deadline:
+            raise RuntimeError(f"NATIVE_FOLDER_{label.upper()}_MISSING {observed}")
+        time.sleep(0.15)
 
 
 def click(point):
     xdo("mousemove", "--window", window, str(point[0]), str(point[1]), "click", "1")
 
 
-if len(sys.argv) == 1:
-    cancel, _ = response_buttons()
-    click(cancel)
+if sys.argv[1] == "choose":
+    entries = wait_for("fixture")
+    # The bookmark is the left sidebar item, even if the current folder name
+    # also appears in the location bar.
+    click(min(entries["fixture"]))
+    entries = wait_for("source")
+    click(max(entries["source"], key=lambda p: p[1]))
+    print("selected visible Source row in Fixture", flush=True)
+
+labels = wait_for("cancel")
+for cancel in labels["cancel"]:
+    accept = [pt for name in ("open", "choose", "select") for pt in labels.get(name, [])
+              if pt[0] > cancel[0] and abs(pt[1] - cancel[1]) <= 8]
+    if accept:
+        click(cancel if sys.argv[1] == "cancel" else max(accept))
+        print("clicked", "cancel" if sys.argv[1] == "cancel" else "affirmative", flush=True)
+        break
 else:
-    selected = os.path.normpath(sys.argv[1])
-    xdo("key", "ctrl+l")
-    xdo("type", "--clearmodifiers", "--", selected)
-    xdo("key", "ctrl+a", "ctrl+c")
-    copied = run("xclip", "-selection", "clipboard", "-o").decode()
-    if os.path.normpath(copied) != selected:
-        raise RuntimeError("NATIVE_FOLDER_LOCATION_NOT_SET")
-    _, accept = response_buttons()
-    click(accept)
+    raise RuntimeError(f"NATIVE_FOLDER_RESPONSE_LABELS_MISSING {labels}")
+
+# The Electron renderer is the authority for the result. If the modeless X11
+# window remains mapped, report the new controls without taking another action.
+time.sleep(0.6)
+try:
+    if window in xdo("search", "--onlyvisible", "--name", title).splitlines():
+        print("after click", read_labels(), flush=True)
+except subprocess.CalledProcessError:
+    pass
