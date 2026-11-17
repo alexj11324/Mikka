@@ -344,6 +344,34 @@
     "test": "tests/mobile-push-workspace.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/drive/organization-read.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pins active Organization, Workspace and Project membership for all Organization Files listings.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "lib/drive/organization-volumes.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read only the current person’s authorized volume scopes and stored volume metadata and totals.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/organizations/[organizationId]/drive/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List existing volumes in the admitted Organization and selected scope.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
+  "app/api/organizations/[organizationId]/drive-scopes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Page through the existing personal and shared scopes in the admitted Organization with live file counts and head metadata.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "lib/drive/organization-file-links.ts": {
     "mode": "built-in",
     "environment": [],
