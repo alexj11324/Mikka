@@ -30,7 +30,7 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
   const key = join(home, 'id_ed25519')
   const deviceId = randomUUID(), workspaceId = randomUUID()
   const credential = `orv_${'t'.repeat(43)}`
-  let enrollments = 0, registrations = 0, reports = 0, tickets = 0, commandReads = 0
+  let enrollments = 0, registrations = 0, reports = 0, tickets = 0, commandReads = 0, deviceRequests = 0
   let reportedVersion = '', latestVersion = '1.0.0', registryQueries = 0, downloads = 0, failedDownloads = 0, pollsAskingForReleases = 0
   let updateFailure: unknown = null
   // The server names the release; the daemon never asks the registry which one is latest.
@@ -74,6 +74,7 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     }
     if (route.endsWith('/enroll')) { enrollments++; response.end(JSON.stringify({ credential })); return }
     if (request.headers.authorization !== `Bearer ${credential}`) { response.writeHead(401).end('{}'); return }
+    deviceRequests++
     // A removed device's credential reaches only its report, which carries the uninstall.
     if (revoked || (removed && !route.endsWith('/report'))) { response.writeHead(401).end('{}'); return }
     if (route.endsWith('/gateway')) {
@@ -162,6 +163,7 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     assert.equal(installer.state()?.deviceId, deviceId)
     assert.equal(enrollments, 1)
     assert.ok(registrations >= 1 && tickets >= 1 && reports >= 1)
+    const ticketsBeforeReinstall = tickets
     const pidBefore = await runProcess('docker', ['exec', container, 'systemctl', '--user', '--machine=root@.host', 'show', 'mikka-daemon.service', '--property=MainPID', '--value'])
     // Reinstallation must replace an already-running service, including its server flags.
     await runProcess('ssh', ['-F', config, '-oBatchMode=yes', '-oStrictHostKeyChecking=yes', `-oUserKnownHostsFile=${join(home, '.ssh/known_hosts')}`, 'fixture', "mikka daemon service install --server 'http://127.0.0.1:34991/mikka' --device-type server"])
@@ -173,12 +175,16 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     const savedDevice = await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/device.json'])
     const savedUnit = await runProcess('docker', ['exec', container, 'cat', '/root/.config/systemd/user/mikka-daemon.service'])
     assert.equal(reportedVersion, '1.0.0')
+    // The reinstalled daemon opens its own session, reports and reads once.
     // Already the release the server names: no registry read, no install.
-    await waitUntil(() => pollsAskingForReleases > 0, 40_000)
-    // An idle session sends nothing on a timer: no report and no read without a push.
-    const idleReports = reports, idleReads = commandReads
-    await new Promise(resolve => setTimeout(resolve, 20_000))
-    assert.deepEqual({ reports, commandReads }, { reports: idleReports, commandReads: idleReads }, 'an idle device makes no requests')
+    await waitUntil(() => tickets > ticketsBeforeReinstall && pollsAskingForReleases > 0, 60_000)
+    // Its startup reports (a harness or model change found after start) end
+    // once it settles. From then on an idle session sends nothing on a
+    // timer: no report, no read and no ticket without a push.
+    await settled(() => deviceRequests, 10_000, 120_000)
+    const idleRequests = deviceRequests, idleCounts = { reports, commandReads, tickets }
+    await new Promise(resolve => setTimeout(resolve, 30_000))
+    assert.deepEqual({ requests: deviceRequests, reports, commandReads, tickets }, { requests: idleRequests, ...idleCounts }, 'an idle device makes no requests')
     assert.equal(registryQueries, 0, 'the daemon never asks the registry on its own')
     assert.equal(downloads, 0)
     // The server names 1.0.1 and pushes; the idle daemon reads it and installs exactly that version.
@@ -260,6 +266,16 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     await rm(home, { recursive: true, force: true })
   }
 })
+/** Waits until the value has not changed for `quiet` milliseconds. */
+async function settled(value: () => number, quiet: number, timeout: number) {
+  const deadline = Date.now() + timeout
+  let last = value(), since = Date.now()
+  while (Date.now() - since < quiet) {
+    if (Date.now() > deadline) throw new Error('SSH acceptance did not settle')
+    await new Promise(resolve => setTimeout(resolve, 200))
+    if (value() !== last) { last = value(); since = Date.now() }
+  }
+}
 async function waitUntil(check: () => boolean | Promise<boolean>, timeout: number) {
   const deadline = Date.now() + timeout
   while (!await check()) {
