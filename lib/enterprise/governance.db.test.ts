@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { Pool } from 'pg'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { verifyAuditExport } from '../audit/integrity'
-import { identityTokenHash } from './scim-store'
+import { identityTokenHash, type DirectoryUser } from './scim-store'
 
 const target = process.env.E2E_DATABASE_URL
 if (target) { assertE2eTarget(target); assert.equal(process.env.MIKKA_DATABASE_URL, target); assert.equal(process.env.DATABASE_URL, target) }
@@ -46,6 +46,70 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Workspace ACL fixture\',\'team\')', [id, owner.id])
     for (const [user, role] of [[owner, 'admin'], [member, 'member']] as const) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role) values ($1,$2,$3,$4,$5)', [id, user.id, user.name, user.email, role])
   }
+  await t.test('restore requires prior removal in the same Organization and leaves directory, Workspace and ownership authority intact', async t => {
+    const restorationOrg = await org.createOrganization(owner, { name: 'Former membership' })
+    const id = restorationOrg.id
+    const workspaceId = randomUUID()
+    const connection = randomUUID(), provider = 'enterprise-' + randomUUID()
+    t.after(async () => {
+      await pool.query('delete from enterprise_scim_user where "connectionId"=$1', [connection])
+      await pool.query('delete from enterprise_scim_connection where id=$1', [connection])
+      await pool.query('delete from enterprise_sso_provider where "providerId"=$1', [provider])
+      await pool.query('delete from mikka_organizations where id=$1', [id])
+      await pool.query('delete from mikka_workspaces where id=$1', [workspaceId])
+    })
+    await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Former Workspace','team')`, [workspaceId, owner.id])
+    await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$3,$4,'member')`, [workspaceId, member.id, member.name, member.email])
+    await pool.query('insert into mikka_organization_workspaces("organizationId","workspaceId") values ($1,$2)', [id, workspaceId])
+    await org.addOrganizationMember(id, owner.id, { userId: member.id, role: 'admin' })
+    const restore = (actor: string, accessLevel: string) => org.restoreOrganizationMember(id, actor, member.id, { accessLevel })
+    await assert.rejects(restore(owner.id, 'member'), { detail: 'invalid_request' })
+    await org.removeOrganizationMember(id, owner.id, member.id)
+    await assert.rejects(restore(member.id, 'member'), { detail: 'access_denied' })
+    await assert.rejects(restore(owner.id, 'owner'), { detail: 'access_denied' })
+    await assert.rejects(org.restoreOrganizationMember(organizationId, owner.id, member.id, { accessLevel: 'member' }), { detail: 'invalid_request' })
+    const [restored, replay] = await Promise.all([restore(owner.id, 'member'), restore(owner.id, 'member')])
+    assert.deepEqual(restored, replay)
+    assert.equal(restored.userId, member.id)
+    assert.equal(restored.email, member.email)
+    assert.equal(restored.accessLevel, 'member')
+    assert.equal(restored.disabled, false)
+    await assert.rejects(restore(owner.id, 'admin'), { detail: 'invalid_request' })
+    const readState = async () => (await pool.query(`select
+      (select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2) as workspace,
+      (select count(*)::int from mikka_organization_invitations where "organizationId"=$3) as invitations,
+      (select count(*)::int from mikka_organization_audit_events where "organizationId"=$3 and "targetId"=$2 and action='organization.member_changed') as changes`, [workspaceId, member.id, id])).rows[0]
+    assert.deepEqual(await readState(), { workspace: 'suspended', invitations: 0, changes: 2 })
+    await org.removeOrganizationMember(id, owner.id, member.id)
+    await pool.query(`insert into enterprise_sso_provider(id,"providerId","organizationScopeId",issuer,domain,"domainVerified","domainTokenHash","oidcConfig")
+      values($1,$1,$2,'https://fixture.example.invalid',$3,true,$4,'{}')`, [provider, id, provider + '.example.invalid', identityTokenHash(randomUUID())])
+    await pool.query('insert into enterprise_scim_connection(id,"organizationId","providerId","tokenHash") values($1,$2,$3,$4)', [connection, id, provider, identityTokenHash(randomUUID())])
+    // The identity store commits independently of Workspace delivery. Hold its
+    // new directory link open while another connection restores the removed row.
+    const identity = await pool.connect()
+    try {
+      await identity.query('begin')
+      const { rows: [directoryUser] } = await identity.query<DirectoryUser>(`insert into enterprise_scim_user(id,"connectionId","organizationId","externalId","userName","userId",active,document)
+        values($1,$2,$3,$4,$5,$4,false,$6::jsonb) returning *`, [randomUUID(), connection, id, member.id, member.email,
+        JSON.stringify({ userName: member.email, displayName: member.name, active: false })])
+      assert.equal((await restore(owner.id, 'member')).disabled, false)
+      await identity.query('commit')
+      const { requireEnterpriseOrganization } = await import('./access')
+      await assert.rejects(requireEnterpriseOrganization(member.id, id, randomUUID()), { code: 'workspaceAccessDenied' })
+      await assert.rejects(restore(owner.id, 'member'), { detail: 'access_denied' })
+      await org.removeOrganizationMember(id, owner.id, member.id)
+      await assert.rejects(restore(owner.id, 'member'), { detail: 'access_denied' })
+      assert.equal((await pool.query('select 1 from mikka_organization_members where "organizationId"=$1 and "userId"=$2', [id, member.id])).rowCount, 0)
+      const { synchronizeDirectoryUser } = await import('./lifecycle')
+      await synchronizeDirectoryUser({ connection: { id: connection, organizationId: id, providerId: provider }, user: directoryUser, action: 'suspended' })
+      assert.deepEqual((await pool.query('select status,role from mikka_organization_members where "organizationId"=$1 and "userId"=$2', [id, member.id])).rows[0],
+        { status: 'suspended', role: 'member' })
+      assert.deepEqual(await readState(), { workspace: 'suspended', invitations: 0, changes: 3 })
+    } finally {
+      await identity.query('rollback')
+      identity.release()
+    }
+  })
   await t.test('the Organization directory filters suspended members and retains the full administrative summary', async () => {
     const directory = (userId: string, includeDisabled: boolean) => org.listOrganizationMembers(organizationId, userId, includeDisabled)
     for (const actor of [member, outsider]) await assert.rejects(directory(actor.id, true), /access_denied/)

@@ -358,6 +358,13 @@
     "test": "tests/organization-invitations.db.test.ts",
     "suite": "test:organization-invitations-db"
   },
+  "app/api/organizations/[organizationId]/members/[userId]/restore/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Restores a previously removed local Organization member through the existing membership writer. Directory subjects stay with their provider and no Workspace grant or invitation is created.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
+  },
   "app/api/organizations/[organizationId]/members/route.ts": {
     "mode": "built-in",
     "environment": [],
