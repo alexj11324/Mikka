@@ -344,6 +344,13 @@
     "test": "tests/mobile-push-workspace.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/drive/organization-file-links.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads current organization and workspace membership, attachment and project source rows in the Workspace database, then filters shared Files metadata with the installation database in a read-only snapshot.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "lib/mobile-push-session.ts": {
     "mode": "operator-configured",
     "environment": [],
@@ -392,6 +399,13 @@
     "behavior": "List a page of key metadata for attached team Workspaces the signed-in Organization administrator also administers.",
     "test": "tests/workspace-service-identities.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "app/api/organizations/[organizationId]/drive-shares/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An active organization member reads the current shared Files directory across accessible attached team Workspaces with original Drive and Project permissions applied before pagination.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
   },
   "app/api/organizations/[organizationId]/invitations/route.ts": {
     "mode": "built-in",
