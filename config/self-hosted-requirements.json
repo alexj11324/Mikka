@@ -90,6 +90,13 @@
     "test": "lib/drive/organization-share.db.test.ts",
     "suite": "test:drive-db"
   },
+  "app/api/organizations/[organizationId]/drive/[volumeId]/shares/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An active Organization member reads current authorized links or creates their own private link to an existing file using the original volume writer and protected download address.",
+    "test": "lib/drive/organization-share.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "app/api/organizations/[organizationId]/drive/[volumeId]/versions/route.ts": {
     "mode": "built-in",
     "environment": [],

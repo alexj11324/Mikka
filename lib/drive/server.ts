@@ -62,14 +62,14 @@ export async function driveResponse(request: Request, operation: Operation, para
     if (viewId && (params.organizationId ? search.size !== 0 : [...search.keys()].some(key => key !== 'download'))) throw new DriveError('drive_write_invalid', 400)
     let located = viewId ? await findShareLocation(pool, viewId, session.user.id) : null
     const organizationArchive = !!params.organizationId && (operation === 'archive' || operation === 'unarchive')
-    const organizationVersionOperation = params.organizationId && (operation === 'version' || operation === 'history' || operation === 'restore')
-    if ((organizationArchive || organizationVersionOperation) && search.size) throw new DriveError('drive_write_invalid', 400)
+    const organizationVolumeOperation = params.organizationId && (operation === 'version' || operation === 'history' || operation === 'restore' || operation === 'links')
+    if ((organizationArchive || organizationVolumeOperation) && search.size) throw new DriveError('drive_write_invalid', 400)
     let historyPath: string | undefined
     if (operation === 'organizationFileHistory') {
       if ([...search.keys()].some(key => key !== 'path') || search.getAll('path').length !== 1) throw new DriveError('drive_write_invalid', 400)
       historyPath = z.string().refine(isDrivePath).parse(search.get('path'))
     }
-    if (historyPath !== undefined || organizationArchive || organizationVersionOperation) {
+    if (historyPath !== undefined || organizationArchive || organizationVolumeOperation) {
       located = await findDriveVolumeLocation(pool, z.string().refine(isVolumeId).parse(params.volumeId), session.user.id, organizationArchive)
     }
     const workspaceId = located?.workspaceId ?? z.uuid().parse(search.get('workspaceId')).toLowerCase()
@@ -172,13 +172,15 @@ export async function driveResponse(request: Request, operation: Operation, para
       if (operation === 'links') {
         if (request.method === 'POST') {
           const { path } = z.object({ path: z.string().refine(isDrivePath) }).strict().parse(await body(request))
-          return json({ link: await createDriveFileLink(pool, volume.id, path, session.user.id, location) })
+          const link = await createDriveFileLink(pool, volume.id, path, session.user.id, location)
+          return json(params.organizationId ? link : { link })
         }
         if (search.has('path')) {
           const path = z.string().refine(isDrivePath).parse(search.get('path'))
           return json({ link: await readOwnDriveFileLink(pool, volume.id, path, session.user.id, location) })
         }
-        return json(await listDriveFileLinks(pool, volume.id, session.user.id, fileLinkPage(search), location))
+        const page = await listDriveFileLinks(pool, volume.id, session.user.id, params.organizationId ? null : fileLinkPage(search), location)
+        return json(params.organizationId ? page.links : page)
       }
       const linkId = viewId ?? (operation === 'link' ? z.uuid().parse(params.shareId) : null)
       if (linkId && request.method === 'PATCH') {

@@ -90,6 +90,7 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     [`/api/drive/volumes/${volume}/versions`, ['GET']],
     [`/api/drive/volumes/${volume}/versions/${version}`, ['GET']],
     [`/api/drive/volumes/${volume}/shares`, ['GET', 'POST']],
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/shares', ['GET', 'POST']],
     [`/api/drive/volumes/${volume}/shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844`, ['GET', 'PATCH', 'DELETE']],
     [`/api/drive/volumes/${volume}/blobs`, ['POST']],
     [`/api/drive/volumes/${volume}/entries`, ['PATCH']],
