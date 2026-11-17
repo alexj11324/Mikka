@@ -66,7 +66,7 @@ export function detectHarnesses(store: HarnessStore): HarnessInfo[] {
   ]
 }
 
-/** Changes when an install finishes, so the next heartbeat reports it. */
+/** Changes when an install finishes, so the next device report carries it. */
 export function harnessFingerprint(store: HarnessStore): string {
   return managedHarnessReport(store).map(({ harness, state, version }) => `${harness}:${version}:${state}`).join("|")
 }

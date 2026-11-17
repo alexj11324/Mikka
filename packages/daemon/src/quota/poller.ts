@@ -1,5 +1,5 @@
 // Polls a QuotaSource and keeps the last report. Vendor calls stay on this
-// timer, never on the 15s device heartbeat (ADR 0027).
+// timer, never on the device session (ADR 0027).
 import {
   quotaSnapshotReportSchema,
   unknownQuotaReport,

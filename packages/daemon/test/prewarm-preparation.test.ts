@@ -21,7 +21,7 @@ import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
 import { runDiagnosticsEnabled } from '../src/run-runtime-timing'
 import { runIdHash } from '../src/tracing'
 import { WorktreeManager } from '../src/worktrees'
-import { cleanupTempDirs, makeRepo, tempDir } from './helpers'
+import { cleanupTempDirs, loseDeviceSession, makeRepo, tempDir } from './helpers'
 
 function deferred<T = void>() {
   let resolve!: (value: T) => void
@@ -94,7 +94,7 @@ async function fixture(options: { cloneFailure?: boolean; legacyCatalogue?: bool
     },
     prepareRunToolApproval: async (claimed, signal, check) => new ToolApprovalGate(claimed.runId, {
       isLive: () => { if (signal.aborted) return false; try { check(); return true } catch { return false } },
-    }, 'push'),
+    }),
     prepareRunMailbox: async (claimed, signal, check) => {
       mailboxEntered.resolve()
       if (options.pendingMailbox) await new Promise<void>((_done, reject) => {
@@ -168,7 +168,7 @@ it('aborts the mailbox dependency before draining a preparation that has not rea
 it.each(['cancel', 'revoke', 'shutdown'] as const)('a %s during clone drains the real native spare without releasing task input', async mode => {
   const f = await fixture(); f.supervisor.start(f.assignment); await f.parked.promise
   const stopping = mode === 'cancel' ? f.supervisor.cancel(f.assignment.runId)
-    : mode === 'shutdown' ? f.supervisor.stop() : Promise.resolve(f.supervisor.revokeLeases([f.assignment.runId]))
+    : mode === 'shutdown' ? f.supervisor.stop() : Promise.resolve(loseDeviceSession(f.supervisor))
   f.cloneRelease.resolve(); await stopping; await f.supervisor.idle()
   expect(f.events.filter(event => event.event === 'user')).toHaveLength(0)
   expect(f.children.every(child => child.exitCode !== null || child.signalCode !== null)).toBe(true)

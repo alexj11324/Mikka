@@ -10,6 +10,13 @@ import { Outbox } from "../outbox"
 import { MemoryServer } from "../server-link"
 import { createLogger } from "../log"
 import { cleanupTempDirs, makeRepo, tempDir } from "../../test/helpers"
+import { DEVICE_SESSION_LOCAL_GRACE_MS } from "@mikka/protocol"
+
+/** The device session socket stayed down past the local grace: the next check stops held runs. */
+function loseSession(supervisor: RunSupervisor) {
+  supervisor.sessionClosed(Date.now() - DEVICE_SESSION_LOCAL_GRACE_MS - 1)
+  supervisor.check()
+}
 
 const resources: { supervisor: RunSupervisor; outbox: Outbox }[] = []
 afterEach(async () => {
@@ -36,6 +43,32 @@ async function fixture(exit: Omit<ExitEvent, "type">, overrides: Partial<Supervi
   resources.push({ supervisor, outbox })
   return { root, server, link, log, runId, assignment, supervisor, adapter, journal, outbox, outboxDir, worktrees }
 }
+it('a held run survives a session drop shorter than the local grace and stops as device_lost after it', async () => {
+  let ended!: () => void
+  const f = await fixture({ outcome: 'succeeded' }, { stallMs: 24 * 60 * 60_000 })
+  vi.mocked(f.adapter.start).mockResolvedValueOnce({
+    sessionId: 'held', send: async () => {}, cancel: async () => { ended() },
+    async *events() { await new Promise<void>(resolve => { ended = resolve }); yield { type: 'exit', outcome: 'cancelled' } },
+  })
+  f.supervisor.start(f.assignment)
+  await vi.waitFor(() => expect(f.supervisor.get(f.runId).state).toBe('running'))
+  const dropped = Date.now()
+  f.supervisor.sessionClosed(dropped)
+  expect(f.supervisor.get(f.runId).leaseExpiresAt).toBe(new Date(dropped + DEVICE_SESSION_LOCAL_GRACE_MS).toISOString())
+  f.supervisor.check(dropped + DEVICE_SESSION_LOCAL_GRACE_MS - 1)
+  // The socket is back in time: the deadline goes, and an hour later the run still holds.
+  f.supervisor.sessionOpened()
+  f.supervisor.check(dropped + 60 * 60_000)
+  expect(f.supervisor.get(f.runId).state).toBe('running')
+  const again = Date.now()
+  f.supervisor.sessionClosed(again)
+  // A second drop never extends the first deadline.
+  f.supervisor.sessionClosed(again + 30_000)
+  f.supervisor.check(again + DEVICE_SESSION_LOCAL_GRACE_MS + 1)
+  await f.supervisor.idle(); await f.outbox.flushAll()
+  expect(f.server.runs.get(f.runId)?.completion?.stopReason).toBe('device_lost')
+})
+
 const failure = captureRunFailure({ provider: "openai", status: 429, error: { code: "insufficient_quota", message: "Account exhausted. opaque-task-secret" } }, { runId: "original", appVersion: "1.2.3", occurredAt: "2026-11-01T00:00:00.000Z" })
 
 it('persists measured tool durations before outbox batching and keeps task secrets masked', async () => {
@@ -117,7 +150,7 @@ describe("supervisor structured terminal failures", () => {
     vi.spyOn(f.worktrees, "changedFiles").mockImplementationOnce(async () => { collecting.resolve(); await release.promise; return [] })
     f.supervisor.start(f.assignment)
     await collecting.promise
-    const cancelled = mode === "cancel" ? f.supervisor.cancel(f.runId) : (f.supervisor.check(Date.now() + 3_600_000), Promise.resolve())
+    const cancelled = mode === "cancel" ? f.supervisor.cancel(f.runId) : (loseSession(f.supervisor), Promise.resolve())
     release.resolve()
     await cancelled; await f.supervisor.idle(); await f.outbox.flushAll()
     expect(f.server.runs.get(f.runId)?.completion).toMatchObject({ stopReason: mode === "cancel" ? "cancelled" : "device_lost" })
@@ -129,9 +162,9 @@ describe("supervisor structured terminal failures", () => {
     vi.spyOn(f.worktrees, "changedFiles").mockImplementationOnce(async () => { collecting.resolve(); await release.promise; return [] })
     f.supervisor.start(f.assignment)
     await collecting.promise
-    const revoked = [f.runId]
-    if (mode !== "lost") f.supervisor.revokeLeases(revoked, revoked)
-    if (mode !== "owner") f.supervisor.revokeLeases(revoked)
+    // The owner's stop arrives as a pushed command; a lost session ends the local lease.
+    if (mode !== "lost") void f.supervisor.cancel(f.runId)
+    if (mode !== "owner") loseSession(f.supervisor)
     release.resolve()
     await f.supervisor.idle(); await f.outbox.flushAll()
     const terminalReason = f.server.runs.get(f.runId)?.completion?.stopReason

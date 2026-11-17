@@ -219,7 +219,7 @@ describe('task Secret bridge over real loopback HTTP', () => {
     expect(response.body.toString('utf8')).not.toContain('expired-provider-response')
   })
 
-  it('uses each heartbeat replacement token without restarting the SDK endpoint', async () => {
+  it('uses each replacement token without restarting the SDK endpoint', async () => {
     const state = await fixture()
     expect((await localRequest(`${state.endpoint}/v1/first`)).status).toBe(200)
     const renewed = `renewed-opaque-lease-${randomBytes(32).toString('base64url')}`

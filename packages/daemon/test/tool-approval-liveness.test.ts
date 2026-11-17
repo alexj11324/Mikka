@@ -1,6 +1,6 @@
 // A run's machine-local gate, end to end through the real HttpServerLink and
 // Claude SDK protocol. Policy/owner changes stop the run through existing
-// run-control commands or heartbeat leases, never an operation-time auth RPC.
+// pushed run-control commands or the session lease, never an operation-time auth RPC.
 import { chmodSync, existsSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
@@ -12,7 +12,7 @@ import { ToolApprovalGate } from "../src/agents/tool-approval"
 import { Daemon } from "../src/main"
 import { MemoryServer } from "../src/server-link"
 import { HttpServerLink } from "../src/server-link-http"
-import { cleanupTempDirs, makeRepo, tempDir, waitFor } from "./helpers"
+import { cleanupTempDirs, loseDeviceSession, makeRepo, tempDir, waitFor } from "./helpers"
 
 const CLAUDE = join(resolve(import.meta.dirname, "fakes"), "fake-claude.mjs")
 chmodSync(CLAUDE, 0o755)
@@ -44,7 +44,7 @@ async function boot(answer: (body: { policyRevision: string }) => Response | Pro
     return gate
   }
   const daemon = await new Daemon({
-    dataDir: tempDir(), flavor: "dev", link, credential: "cred", heartbeatMs: 50,
+    dataDir: tempDir(), flavor: "dev", link, credential: "cred",
     harnesses: [{ harness: "claude_code", installed: true, version: "fake" }],
     agentSandbox: new NoSandbox(), harnessBinaries: { claude_code: CLAUDE },
   }).start()
@@ -123,12 +123,11 @@ it("ends a running run through an existing stop command without querying remote 
   expect(checks).toEqual([])
 }, 20_000)
 
-it("records heartbeat lease revocation before the native Claude process exits 143", async () => {
+it("records the session lease loss before the native Claude process exits 143", async () => {
   const exited = join(tempDir(), 'sigterm-exit')
-  const { daemon, runId, server, checks } = await boot(() => json({ live: true }), `HANG SIGTERM_EXIT_143:${exited}`)
+  const { daemon, runId, checks } = await boot(() => json({ live: true }), `HANG SIGTERM_EXIT_143:${exited}`)
   await waitFor(() => existsSync(`${exited}.ready`))
-  server.runs.get(runId)!.state = 'failed'
-  await daemon.syncWithServer()
+  loseDeviceSession(daemon.supervisor)
   await daemon.supervisor.idle()
   expect(readFileSync(exited, 'utf8')).toBe('143\n')
   expect(daemon.supervisor.get(runId)).toMatchObject({ state: 'failed', stopReason: 'device_lost' })

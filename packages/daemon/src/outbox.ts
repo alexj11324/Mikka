@@ -26,9 +26,12 @@ import { join } from "node:path"
 import type { RunCompletion } from "@mikka/protocol"
 
 import type { RunChunk } from "./chunks"
-import { isNonRetryable, ServerUnreachableError } from "./errors"
+import { DaemonUpgradeRequiredError, isNonRetryable, ServerUnreachableError } from "./errors"
 import { readJson, writeJsonAtomic } from "./fs-util"
 import { assertSafeId, isSafeId } from "./ids"
+
+/** The longest wait between delivery retries while the server cannot be reached. */
+const RETRY_MAX_MS = 30_000
 import type { Logger } from "./log"
 import type { RunPatch, ServerLink } from "./server-link"
 import type { RunTraceContext } from "@mikka/protocol/trace-context"
@@ -59,6 +62,8 @@ interface Parsed {
 export class Outbox {
   private chains = new Map<string, Promise<void>>()
   private retryTimer: NodeJS.Timeout | null = null
+  /** Failed deliveries in a row: each retry waits twice as long, up to RETRY_MAX_MS. */
+  private failures = 0
   private closed = false
   /** Runs whose file was checked for a torn tail since this process started. */
   private repaired = new Set<string>()
@@ -256,12 +261,15 @@ export class Outbox {
         writeJsonAtomic(this.ackFile(runId), ack)
       }
     } catch (error) {
+      // Kept for the updated daemon; this one may not send it (decision 2026-11-17-2215).
+      if (error instanceof DaemonUpgradeRequiredError) return
       if (!(error instanceof ServerUnreachableError)) {
         this.log.error({ run_id: runId, err: error }, "outbox delivery failed")
       }
       this.scheduleRetry()
       return
     }
+    this.failures = 0
     // The completion is the run's last item: once it is through, the run's
     // outbox is done, even if it was delivered after a network cut.
     if (!parsed.torn && items.at(-1)?.kind === "complete") this.remove(runId)
@@ -273,12 +281,15 @@ export class Outbox {
     rmSync(this.ackFile(runId), { force: true })
   }
 
+  /** A failed delivery retries after `retryMs`, doubling up to RETRY_MAX_MS while it keeps failing. */
   private scheduleRetry() {
     if (this.retryTimer || this.closed) return
+    const delay = Math.min(RETRY_MAX_MS, this.retryMs * 2 ** this.failures)
+    this.failures = Math.min(this.failures + 1, 16)
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null
       void this.flushAll()
-    }, this.retryMs)
+    }, delay)
     this.retryTimer.unref()
   }
 

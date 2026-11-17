@@ -138,7 +138,7 @@ describe("daemon subscription capability", () => {
     const approval = vi.fn(async () => { throw new Error("preflight must not start a run") })
     link.nativeLease = lease
     link.prepareRunToolApproval = approval
-    const daemon = new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "fixture", heartbeatMs: 60_000,
+    const daemon = new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "fixture",
       harnesses: [{ harness: "codex", installed: true, version: "unchecked", subscriptionBroker: true, subscriptionPreflight: "env_not_clean" }],
       agentSandbox: new NoSandbox(), harnessBinaries: { codex: binary }, modelProbe: false, log: createLogger({ level: "silent" }) })
     daemons.push(daemon)
@@ -173,11 +173,11 @@ describe("daemon subscription capability", () => {
     expect(cli.calls()).toHaveLength(3)
   })
 
-  it("a completed background install rechecks the broker without waiting for another heartbeat", async () => {
+  it("a completed background install rechecks the broker without waiting for anything else", async () => {
     const link = new MemoryServer().link()
     link.nativeLease = vi.fn(async () => { throw new Error("no subscription login in preflight") })
     link.prepareRunToolApproval = vi.fn(async () => { throw new Error("no run in preflight") })
-    const daemon = new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "fixture", heartbeatMs: 60_000,
+    const daemon = new Daemon({ dataDir: tempDir(), flavor: "dev", link, credential: "fixture",
       agentSandbox: new NoSandbox(), modelProbe: false, log: createLogger({ level: "silent" }) })
     daemons.push(daemon)
     await daemon.start()

@@ -39,7 +39,7 @@ async function run(exit: Record<string, unknown>, afterStart?: (daemon: Daemon, 
   const daemon = await new Daemon({
     dataDir: tempDir(), flavor: "dev", agentSandbox: null, link, credential: "cred",
     harnesses: [{ harness: "mock", installed: true, version: "test" }], mockSpeed: Infinity,
-    heartbeatMs: 50, quotaSource: null, fixturesDir,
+   quotaSource: null, fixturesDir,
   }).start()
   daemons.push(daemon)
   await daemon.syncWithServer()
@@ -214,7 +214,7 @@ it("marks a failed final upload unavailable and continues only with the retained
   expect(server.runs.get(continuationId)?.completion?.report.providerCheckpoint).toBe("ready")
 })
 
-it("waits for an in-flight heartbeat before saving the final tree", async () => {
+it("waits for an in-flight periodic checkpoint before saving the final tree", async () => {
   const paused = pauseAdapterStart()
   const uploading = deferred(), releaseUpload = deferred()
   let link!: ServerLink
