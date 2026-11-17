@@ -395,8 +395,8 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
   // The thread's next run keeps the thread's own Agent, never the other one.
   const byRules = (note: string | undefined, place: import('@/lib/dispatch-target').DispatchTarget | undefined, named: string | null | undefined, previous?: { id: string; harness: string | null }) => {
     if (!named?.trim()) return Promise.resolve({ error: 'repositoryRequired' as const, issueId: request.issueId })
-    const own = previous?.harness === 'claude_code' || previous?.harness === 'codex' ? { harness: previous.harness } : undefined
-    const model = previous ? request.model ?? own : request.model
+    const own: { harness: 'claude_code' | 'codex' } | undefined = previous?.harness === 'claude_code' || previous?.harness === 'codex' ? { harness: previous.harness } : undefined
+    const model: { harness: 'claude_code' | 'codex'; model?: string } | undefined = previous ? request.model ?? own : request.model
     if (!model && !request.agentId) return Promise.resolve({ error: 'agentRequired' as const, issueId: request.issueId })
     return withResolvedRepository(userId, request.issueId, named, repo => dispatchByRules(userId, { ...request, ...(model ? { model } : {}), repo, note, threadRunId: previous?.id }, scope, botId, execution, requestEventId, place))
   }

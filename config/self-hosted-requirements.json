@@ -1615,6 +1615,13 @@
     "test": "lib/coordinator/native-decision.test.ts",
     "suite": "test:coordinator-events"
   },
+  "lib/coordinator/group-factory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Group Factory tasks run on the Agent the group message names, from the installation database; none named, nothing is dispatched.",
+    "test": "lib/coordinator/group-factory.db.test.ts",
+    "suite": "test:group-turns"
+  },
   "lib/coordinator/issue-input.ts": {
     "mode": "built-in",
     "environment": [],
