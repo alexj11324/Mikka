@@ -316,6 +316,13 @@
     "test": "tests/mobile-push-workspace.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/drive/organization-file-links.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads current organization and workspace membership, attachment and project source rows in the Workspace database, then filters shared Files metadata with the installation database in a read-only snapshot.",
+    "test": "lib/drive/server.db.test.ts",
+    "suite": "test:drive-db"
+  },
   "lib/mobile-push-session.ts": {
     "mode": "operator-configured",
     "environment": [],
