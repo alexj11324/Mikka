@@ -3001,6 +3001,15 @@
       "sourceHash": "7f7e89c150b03f3805c1a7ab214f284aeb9faeed10c18c2d155d69b32ddcd2f8"
     },
     {
+      "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/setup",
+      "template": "/api/workspaces/[workspaceId]/projects/[projectId]/setup",
+      "source": "app/api/workspaces/[workspaceId]/projects/[projectId]/setup/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "68727c25bbfeb271d632c81d0b0a6975a1b8366a1095de2ef843e5369bd443ee"
+    },
+    {
       "path": "/mikka/api/workspaces/[workspaceId]/service-identities",
       "template": "/api/workspaces/[workspaceId]/service-identities",
       "source": "app/api/workspaces/[workspaceId]/service-identities/route.ts",
