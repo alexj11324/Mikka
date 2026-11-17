@@ -203,7 +203,7 @@ for (const change of ['pause', 'key_share'] as const) test(`the original post-lo
   reset()
   const run = async (full: boolean) => {
     const f = fixture(), entry = f.source(change === 'key_share' ? 'api_key' : 'subscription', change !== 'pause'), selected = f.selection(entry)
-    f.afterLock(() => { if (change === 'pause') f.connections[0].paused = true; else if (change === 'share') f.shares.delete('payor'); else f.keyShares.clear() })
+    f.afterLock(() => { if (change === 'pause') f.connections[0].paused = true; else f.keyShares.clear() })
     return result(() => full ? assertFrozenModelTarget(f.query, scope, entry) : assertProfileTarget(f.query, scope, selected))
   }
   const baseline = await run(true)
