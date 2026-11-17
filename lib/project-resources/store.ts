@@ -2,7 +2,7 @@ import 'server-only'
 import { createHash, randomUUID } from 'node:crypto'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { and, eq, inArray, sql } from 'drizzle-orm'
-import type { z } from 'zod'
+import { z } from 'zod'
 import { db } from '@/lib/db'
 import { workspaceListChanged } from '@/lib/live/lists'
 import { inDatabaseTransaction } from '@/lib/db/request-scope'
@@ -12,7 +12,10 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import type { WorkspaceTransaction } from '@/lib/workspace-access'
 import { ActionFailureError } from '@/lib/action-error'
-import { environmentConfiguration, projectEnvironmentVariableInput, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, projectResourcesInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
+import { normalizeRepository } from '@mikka/protocol/repository'
+import { GovernanceError } from '@/lib/governance/errors'
+import { accessibleProjects } from '@/lib/project-access'
+import { environmentConfiguration, projectEnvironmentVariableInput, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, maxProjectRepositories, projectResourceMutation, repositoryBindingInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
 
 type Reader = Parameters<typeof withTaskWorkspace>[0]
 const actorId = (reader: Reader) => typeof reader === 'string' ? reader : reader.id
@@ -123,14 +126,22 @@ async function withConfiguredProject<T>(reader: Reader, workspaceId: string, pro
   })
 }
 
+type ProjectRepositoryBinding = z.output<typeof repositoryBindingInput>
+
+async function projectRepositoryBindings(tx: WorkspaceTransaction, workspaceId: string, projectId: string) {
+  const result = await tx.execute<ProjectRepositoryBinding>(sql`select "repositoryKey","baseBranch","environmentId","isPrimary" from workspace_project_repositories
+    where "projectId"=${projectId} and "workspaceId"=${workspaceId} order by "repositoryKey"`)
+  return result.rows
+}
+
 /** Workspace configuration stays tenant-scoped. Project bindings also require current Project content access. */
 export async function listProjectResources(reader: Reader, workspaceId: string, projectId?: string) {
   const read = async (tx: WorkspaceTransaction) => {
     const policy = await tx.execute(sql`select mode,"repositoryKeys",revision from workspace_repository_policies where "workspaceId"=${workspaceId}`)
     const environments = await tx.execute<EnvironmentRow>(sql`select id,"workspaceId",name,configuration,revision,"archivedAt" from workspace_environments where "workspaceId"=${workspaceId} order by name,id`)
-    const repositories = projectId ? await tx.execute(sql`select "repositoryKey","baseBranch","environmentId","isPrimary" from workspace_project_repositories where "projectId"=${projectId} and "workspaceId"=${workspaceId} order by "repositoryKey"`) : { rows: [] }
+    const repositories = projectId ? await projectRepositoryBindings(tx, workspaceId, projectId) : []
     const bindings = projectId ? await tx.execute(sql`select "environmentId","isDefault" from workspace_project_environments where "projectId"=${projectId} and "workspaceId"=${workspaceId} order by "environmentId"`) : { rows: [] }
-    return { policy: policy.rows[0] ?? { mode: 'inherit', repositoryKeys: [], revision: 0 }, environments: environments.rows, repositories: repositories.rows, environmentBindings: bindings.rows }
+    return { policy: policy.rows[0] ?? { mode: 'inherit', repositoryKeys: [], revision: 0 }, environments: environments.rows, repositories, environmentBindings: bindings.rows }
   }
   return projectId ? withConfiguredProject(reader, workspaceId, projectId, false, read)
     : withTaskWorkspace(reader, workspaceId, (_workspace, tx) => read(tx))
@@ -262,24 +273,65 @@ export async function rollbackProjectSetup(reader: Reader, raw: z.input<typeof r
   })
 }
 
-export async function saveProjectResources(reader: Reader, raw: z.input<typeof projectResourcesInput>) {
-  const input = projectResourcesInput.parse(raw)
+export async function saveProjectResources(reader: Reader, raw: z.input<typeof projectResourceMutation>) {
+  const input = projectResourceMutation.parse(raw)
   return withConfiguredProject(reader, input.workspaceId, input.projectId, true, async (tx, project) => {
-    if (project.revision !== input.revision) throw new ActionFailureError('projectResourceConflict')
-    const ids = [...new Set(input.environmentIds)]
-    for (const id of ids) {
-      const environment = await tx.execute(sql`select id from workspace_environments where id=${id} and "workspaceId"=${input.workspaceId} and "archivedAt" is null`)
-      if (!environment.rowCount) throw new ActionFailureError('projectEnvironmentUnavailable')
+    let bindings: ProjectRepositoryBinding[]
+    let counts: { repositoryCount: number; environmentCount?: number }
+    if ('repos' in input) {
+      // The current provisioning path cannot promise lazy clones.
+      if (input.repos.some(repo => repo.mode === 'lazy')) throw new GovernanceError('feature_unavailable')
+      const existing = await projectRepositoryBindings(tx, input.workspaceId, input.projectId)
+      const byKey = new Map(existing.map(row => [row.repositoryKey, row]))
+      let primary = existing.find(row => row.isPrimary)?.repositoryKey
+      bindings = []
+      for (const item of input.repos) {
+        const repositoryKey = normalizeRepository(item.repoFullName).key
+        const previous = byKey.get(repositoryKey)
+        if (previous) {
+          if ((item.baseBranch !== undefined && (item.baseBranch || null) !== previous.baseBranch)
+            || (item.mode === 'primary' && !previous.isPrimary)) throw new ActionFailureError('projectResourceConflict')
+          continue
+        }
+        const isPrimary = item.mode === 'primary'
+        if (isPrimary && primary) throw new ActionFailureError('projectResourceConflict')
+        if (isPrimary) primary = repositoryKey
+        const binding = repositoryBindingInput.parse({ repositoryKey, baseBranch: item.baseBranch || null, isPrimary })
+        bindings.push(binding)
+        byKey.set(repositoryKey, binding)
+      }
+      z.number().max(maxProjectRepositories).parse(byKey.size)
+      counts = { repositoryCount: byKey.size }
+    } else {
+      if (project.revision !== input.revision) throw new ActionFailureError('projectResourceConflict')
+      const ids = [...new Set(input.environmentIds)]
+      for (const id of ids) {
+        const environment = await tx.execute(sql`select id from workspace_environments where id=${id} and "workspaceId"=${input.workspaceId} and "archivedAt" is null`)
+        if (!environment.rowCount) throw new ActionFailureError('projectEnvironmentUnavailable')
+      }
+      await tx.execute(sql`delete from workspace_project_repositories where "projectId"=${input.projectId}`)
+      await tx.execute(sql`delete from workspace_project_environments where "projectId"=${input.projectId}`)
+      for (const id of ids) await tx.execute(sql`insert into workspace_project_environments("projectId","workspaceId","environmentId","isDefault") values(${input.projectId},${input.workspaceId},${id},${id === input.defaultEnvironmentId})`)
+      bindings = input.repositories
+      counts = { repositoryCount: bindings.length, environmentCount: ids.length }
     }
-    await tx.execute(sql`delete from workspace_project_repositories where "projectId"=${input.projectId}`)
-    await tx.execute(sql`delete from workspace_project_environments where "projectId"=${input.projectId}`)
-    for (const id of ids) await tx.execute(sql`insert into workspace_project_environments("projectId","workspaceId","environmentId","isDefault") values(${input.projectId},${input.workspaceId},${id},${id === input.defaultEnvironmentId})`)
-    for (const repo of input.repositories) await tx.execute(sql`insert into workspace_project_repositories("projectId","workspaceId","repositoryKey","baseBranch","environmentId","isPrimary") values(${input.projectId},${input.workspaceId},${repo.repositoryKey},${repo.baseBranch},${repo.environmentId},${repo.isPrimary})`)
-    await tx.execute(sql`update workspace_projects set revision=revision+1,"updatedAt"=now() where id=${input.projectId}`)
-    await audit(tx, reader, input.workspaceId, 'project_resources.changed', input.projectId, { revision: input.revision + 1, repositoryCount: input.repositories.length, environmentCount: ids.length })
-    await (await import('@/lib/live/project-map')).projectMapChanged(tx, input.projectId)
-    await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
-    return { revision: input.revision + 1 }
+    let revision = project.revision
+    if (bindings.length || !('repos' in input)) {
+      for (const repo of bindings) await tx.execute(sql`insert into workspace_project_repositories("projectId","workspaceId","repositoryKey","baseBranch","environmentId","isPrimary") values(${input.projectId},${input.workspaceId},${repo.repositoryKey},${repo.baseBranch},${repo.environmentId},${repo.isPrimary})`)
+      revision += 1
+      await tx.execute(sql`update workspace_projects set revision=${revision},"updatedAt"=now() where id=${input.projectId} and "workspaceId"=${input.workspaceId}`)
+      await audit(tx, reader, input.workspaceId, 'project_resources.changed', input.projectId, { revision, ...counts })
+      await (await import('@/lib/live/project-map')).projectMapChanged(tx, input.projectId)
+      await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
+    }
+    if (!('repos' in input)) return { revision }
+    const [view] = await accessibleProjects(reader, tx, input.workspaceId, input.projectId)
+    if (!view) throw new ActionFailureError('projectNotFound')
+    const repositories = await projectRepositoryBindings(tx, input.workspaceId, input.projectId)
+    return { ...view, repos: repositories.map(binding => ({
+      ...binding,
+      repoFullName: binding.repositoryKey.startsWith('v2/github.com/') ? binding.repositoryKey.slice('v2/github.com/'.length) : null,
+    })) }
   })
 }
 
