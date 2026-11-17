@@ -188,7 +188,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           const input = JSON.parse(args[0].match(/参数如下：(.*)。使用/)[1])
           assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, !leaseAudit)
           assert.deepEqual(input.target, candidate ? { deviceId } : 'cloud')
-          assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
+          assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId, agentId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
           assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
           current.dispatchInput = input; current.harness = chosenModel?.provider === 'codex' ? 'codex' : 'claude_code'; current.profileId = input.profileId
           assert.equal(input.model, undefined)

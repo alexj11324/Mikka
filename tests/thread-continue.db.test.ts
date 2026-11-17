@@ -54,7 +54,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query('DELETE FROM account WHERE "userId" = ANY($1)', [users])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
-  const person = async () => {
+  const person = async (registerTask = false) => {
     const id = await seedUser(pool, 'thread-continue')
     users.push(id)
     const githubAccountId = String(++githubAccount)
@@ -69,7 +69,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
       [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
-    const issueId = await seedIssue(pool, id, ws.id)
+    const issueId = await seedIssue(pool, id, ws.id, { registered: registerTask })
     await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 2000 + users.length } } })])
     // A computer that takes part (参与调度) and runs gpt-5.
     const deviceId = randomUUID()
@@ -1093,4 +1093,19 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`UPDATE agent_runs SET "threadReplacedBy"=$1 WHERE id=$2`, [newer, old.runId])
     await assert.rejects(sendThreadMessage(b.id, old.runId, 'Again.'), { code: 'threadReplaced' })
   })
+  await t.test('a scheduled occurrence resumes its completed standing thread once and replays the same Run', async () => {
+    const owner = await person(true)
+    const original = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    await end(original.runId, 'succeeded')
+    await observeFixtureAllowance(owner)
+    const { continueStandingTask } = await import('../lib/schedules/standing-task')
+    const occurrence = randomUUID()
+    const send = () => continueStandingTask(owner.id, owner.ws.id, owner.issueId, 'Continue the completed standing Task.', occurrence)
+    const first = await send()
+    assert.notEqual(first.runId, original.runId)
+    assert.deepEqual(await send(), first)
+    const { rows } = await pool.query('SELECT id,status,"continuesRunId" FROM agent_runs WHERE "issueId"=$1 AND "continuesRunId"=$2', [owner.issueId, original.runId])
+    assert.deepEqual(rows, [{ id: first.runId, status: 'queued', continuesRunId: original.runId }])
+  })
+
 })

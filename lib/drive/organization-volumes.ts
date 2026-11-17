@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { withOrganizationDriveRead, type OrganizationDriveProject } from './organization-read'
 import type { DriveScope } from './contract'
+import { listOrganizationVolumeSkills } from './skills'
 import { organizationVolumeSelect, serializeOrganizationVolume, type OrganizationVolumeRow } from './volumes'
 export type { OrganizationDriveVolume } from './volumes'
 
@@ -67,6 +68,18 @@ export function listOrganizationDriveVolumes(organizationId: string, reader: str
       const result = await app.query<OrganizationVolumeRow>(`${scopedVolumes} SELECT * FROM volumes ORDER BY "headUpdatedAt" DESC,id`,
         scopeParams(workspaces, reader, projects, filters.projectId, filters.userId, !!filters.exactScope, filters.archived === 'true'))
       return result.rows.map(serializeOrganizationVolume)
+    })
+}
+
+/** The skills selector uses the same authorized active volumes as the Files
+ * catalog and returns only the declared Markdown metadata. */
+export function listOrganizationDriveSkills(organizationId: string, reader: string, sessionId: string, search: URLSearchParams, signal: AbortSignal) {
+  const { projectId } = z.object({ projectId: z.uuid().optional() }).strict().parse(query(search))
+  return withOrganizationDriveRead(organizationId, reader, sessionId,
+    (workspaces, actor) => readableProjects(workspaces, actor, projectId),
+    async (app, workspaces, projects) => {
+      const volumes = await app.query<{ id: string }>(`${scopedVolumes} SELECT id FROM volumes`, scopeParams(workspaces, reader, projects, projectId))
+      return listOrganizationVolumeSkills(app, volumes.rows.map(v => v.id), signal)
     })
 }
 

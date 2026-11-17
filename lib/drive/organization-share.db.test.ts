@@ -208,6 +208,42 @@ test('organization share management holds the actual attachment, creator and cur
   assert.equal((await history(mine, projectShare.volumeId)).status, 404)
   await database.query('UPDATE workspace_projects SET "archivedAt"=NULL WHERE id=$1', [projectId])
   assert.equal((await manageProjectShare('DELETE')).status, 204)
+  await t.test('organization skill metadata uses each admitted current volume and fully pages a selected Project without disclosing instructions', async () => {
+    const skills = await import('../../app/api/organizations/[organizationId]/drive-skills/route')
+    const volume = await makeShare(projectId, 'Skills')
+    const namespace = 'drive-project:' + workspace.id + ':' + projectId
+    const actor = { ownerId: namespace, authorName: 'Skill author' }
+    const bytes = new TextEncoder().encode('---\nname: example\ndescription: Visible summary\n---\nPrivate instructions')
+    const sha256 = driveSha256(bytes)
+    await recordDriveBlob(database, { ownerId: namespace, sha256, sizeBytes: bytes.length, shared: { workspaceId: workspace.id, projectId } }, bytes)
+    const head = (await database.query('SELECT "headDigest" FROM drive_volumes WHERE id=$1', [volume.volumeId])).rows[0].headDigest
+    const names = Array.from({ length: 27 }, (_, i) => 'skill-' + String(i).padStart(2, '0'))
+    const scope = { ownerId: namespace, volumeId: volume.volumeId, driveScope: 'project' as const }
+    const written = await applyDriveWrite(database, scope, actor, {
+      expectedDigest: head, mutationId: randomUUID(), changes: names.map(name => ({
+        op: 'put' as const, path: 'skills/' + name + '/SKILL.md', mode: 0o644 as const, sha256, sizeBytes: bytes.length,
+      })),
+    })
+    const read = (cookie: string, query = '') => skills.GET(new Request(origin + '/api/organizations/' + organizationId + '/drive-skills?' + query,
+      { headers: { cookie } }), { params: Promise.resolve({ organizationId }) })
+    const filter = 'projectId=' + projectId
+    const response = await read(mine, filter)
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), names.map(name => ({ name, description: 'Visible summary' })))
+    assert.equal((await read(theirs, filter + '&' + filter)).status, 400)
+    assert.equal((await read(theirs, 'threadId=' + randomUUID())).status, 400)
+    assert.deepEqual(await (await read(mine, 'projectId=' + randomUUID())).json(), [])
+    await applyDriveWrite(database, scope, actor, { expectedDigest: written.headDigest, mutationId: randomUUID(),
+      changes: [{ op: 'delete', path: 'skills/' + names[0] + '/SKILL.md' }] })
+    assert.deepEqual(await (await read(theirs, filter)).json(), names.slice(1).map(name => ({ name, description: 'Visible summary' })))
+    await database.query("UPDATE resource_access_policies SET visibility='private' WHERE kind='project' AND id=$1", [projectId])
+    assert.deepEqual(await (await read(mine, filter)).json(), [])
+    assert.deepEqual(await (await read(mine)).json(), [])
+    assert.equal((await (await read(theirs, filter)).json()).length, 26)
+    await database.query('UPDATE drive_volumes SET "archivedAt"=now() WHERE id=$1', [volume.volumeId])
+    assert.deepEqual(await (await read(theirs, filter)).json(), [])
+    await database.query("UPDATE resource_access_policies SET visibility='shared' WHERE kind='project' AND id=$1", [projectId])
+  })
   await t.test('organization archive and unarchive return the committed volume and recheck its actual Project writer on every retry', async () => {
     const archive = await import('../../app/api/organizations/[organizationId]/drive/[volumeId]/archive/route')
     const unarchive = await import('../../app/api/organizations/[organizationId]/drive/[volumeId]/unarchive/route')
