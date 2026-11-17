@@ -1,4 +1,11 @@
 {
+  "lib/project-resources/device-checkouts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installation database under the existing active Project content lease to list, set or clear only the signed-in person's local-device Git directory bookmarks.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "drizzle/20261117062300_device_project_checkouts.sql": {
     "mode": "built-in",
     "environment": [],
