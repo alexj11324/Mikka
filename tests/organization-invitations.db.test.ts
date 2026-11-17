@@ -145,7 +145,12 @@ test('Organization invitations grant only a verified Member without inheriting W
     const received = (await invite.listReceivedOrganizationInvitations(invitee)).invitations
     assert.deepEqual(received.map(row => row.id), [first.id])
     assert.equal(received[0].organizationName, 'Member-only invitation test')
-    assert.deepEqual(Object.keys(received[0]).sort(), ['expiresAt', 'id', 'organizationName'])
+    assert.equal(received[0].organizationId, organizationId)
+    assert.equal(received[0].inviterName, sender.name)
+    const [stored] = await workspaceDb.select({ createdAt: organizationInvitations.createdAt })
+      .from(organizationInvitations).where(eq(organizationInvitations.id, first.id))
+    assert.deepEqual(received[0].invitedAt, stored.createdAt)
+    assert.deepEqual(Object.keys(received[0]).sort(), ['expiresAt', 'id', 'invitedAt', 'inviterName', 'organizationId', 'organizationName'])
     assert.deepEqual((await invite.listReceivedOrganizationInvitations(outsider)).invitations, [])
     await assert.rejects(invite.listReceivedOrganizationInvitations({ ...outsider, email: invitee.email }), { detail: 'access_denied' })
     await assert.rejects(invite.acceptOrganizationInvitation({ invitationId: first.id }, outsider), { detail: 'invalid_request' })
