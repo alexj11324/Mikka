@@ -183,7 +183,7 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     assert.equal(first.batches[0]?.firstEventAt, trigger.webhook.requests[0]!.at)
     assert.equal(first.batches[0]?.lastEventAt, trigger.webhook.requests[1]!.at)
     assert.equal(first.batches[0]?.byteCount, Buffer.byteLength('首次second body'))
-    assert.deepEqual(Object.keys(first.batches[0]!).sort(), ['byteCount','created_at','due_at','firstEventAt','id','lastEventAt','requestCount','runStatus','status'])
+    assert.deepEqual(Object.keys(first.batches[0]!).sort(), ['automationId','byteCount','closedAt','created_at','dispatchAfter','due_at','eventCount','failure','firstEventAt','group','id','lastEventAt','maxEvents','maxWaitSeconds','quietPeriodSeconds','reason','requestCount','runId','runStatus','status'])
     assert.ok(first.nextCursor)
     const next = await read({status: 'queued', limit: 1, cursor: first.nextCursor})
     assert.deepEqual(next.batches.map(b => b.id), finished.slice(1))
@@ -192,10 +192,24 @@ test('actual PostgreSQL schedules: lifecycle, concurrent due work, authority and
     const archived = (await read({status:'cancelled'})).batches
     assert.deepEqual(archived.map(b => b.id), [cancelled])
     assert.equal(archived[0]?.byteCount, null)
+    assert.equal(archived[0]?.closedAt, null)
+    assert.equal(archived[0]?.reason, null)
     assert.equal(archived[0]?.lastEventAt, trigger.webhook.requests[1]!.at)
     assert.deepEqual((await read({})).batches.map(b => b.id).sort(), [...finished, gathering, cancelled].sort())
     await assert.rejects(store().command(memberActor, {action:'history',scheduleId:schedule.id,batches:{}}), /scheduleAdminRequired/)
     assert.equal((await history(schedule.id)).length, 7, 'the original history still includes unbatched runs')
+    await pool.query(`UPDATE schedule_occurrences SET status='failed',attempts=1,
+      error=CASE WHEN id=$1 THEN 'scheduleDispatchUnavailable' ELSE 'unstructured private detail' END,
+      trigger=jsonb_set(trigger, '{webhook,closedBy}', '"flush_batch"') WHERE id=ANY($2::uuid[])`, [finished[0], finished])
+    const legacy = (await read({status:'queued'})).batches
+    assert.equal(legacy.find(batch => batch.id === finished[0])?.failure, 'scheduleDispatchUnavailable')
+    assert.equal(legacy.find(batch => batch.id === finished[1])?.failure, null)
+    for (const batch of legacy) {
+      assert.equal(batch.runId, batch.id)
+      assert.equal(batch.reason, 'manual')
+      assert.equal(batch.closedAt, null)
+      assert.equal(batch.dispatchAfter, null)
+    }
   })
   await t.test('ten create retries and ten scans produce one occurrence, one chat result and stable operation',async()=>{
    const d=def(),requestId=randomUUID(),tools=scheduleTools(command=>store().command(actor,command))

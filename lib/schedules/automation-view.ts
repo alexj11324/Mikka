@@ -45,21 +45,39 @@ export type AutomationRun = {
     | { event: { source: 'linear'; event: string; identifier: string | null; title: string | null; url: string | null } }
     | { event: { source: 'slack'; event: string; channel: string; reaction: string | null } } | { webhook: { requests: { at: string }[] } } | null
 }
-export type WebhookBatchPage = {
-  batches: {
-    id: string
-    status: 'collecting' | 'queued' | 'cancelled'
-    runStatus: AutomationRun['status']
-    created_at: string | Date
-    due_at: string | Date
-    requestCount: number
-    firstEventAt: string | null
-    lastEventAt: string | null
-    /** UTF-8 bytes of the accepted text; older canceled rows may have already erased it. */
-    byteCount: number | null
-  }[]
-  nextCursor: string | null
+/** Public batch metadata shared by history and the two closure actions. */
+export type WebhookBatch = {
+  id: string
+  automationId: string
+  status: 'collecting' | 'queued' | 'cancelled'
+  runStatus: AutomationRun['status']
+  /** The same ID as the run in automation history once this batch has flushed or started. */
+  runId: string | null
+  failure: string | null
+  created_at: string | Date
+  due_at: string | Date
+  requestCount: number
+  eventCount: number
+  firstEventAt: string | null
+  lastEventAt: string | null
+  /** UTF-8 bytes of the accepted text. Older cancelled batches can already have erased it. */
+  byteCount: number | null
+  /** This webhook groups all admissions into a single window without a quiet-period timer. */
+  group: []
+  quietPeriodSeconds: null
+  maxEvents: number
+  maxWaitSeconds: number
+  /** The admission deadline, or the recorded early flush time. An older early flush has no recorded time. */
+  dispatchAfter: string | Date | null
+  closedAt: string | Date | null
+  reason: 'manual' | 'cancelled' | null
 }
+export type WebhookBatchClosure = WebhookBatch & {
+  batchId: string
+  status: 'queued' | 'cancelled'
+  replayed: boolean
+}
+export type WebhookBatchPage = { batches: WebhookBatch[]; nextCursor: string | null }
 export type AutomationHistory = { occurrences: AutomationRun[] }
 export type AutomationUsageDay = { day: string; runs: number; skipped: number; tasks: number; costMicroUsd: number | null }
 export type AutomationUsage = { timezone: string; maxRunsPerDay: number | null; days: AutomationUsageDay[] }
