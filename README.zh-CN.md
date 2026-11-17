@@ -126,7 +126,7 @@ Mikka 的开发得到了 [Codex for Open Source](https://openai.com/form/codex-f
   <img src="docs/assets/neon-logo.svg" alt="Neon" width="160">
 </a>
 
-感谢 [Neon](https://neon.com) 通过 Neon Open Source Program 为 Mikka 提供 Postgres 和 AI Gateway 额度支持。
+感谢 [Neon](https://neon.com) 为 Mikka 提供支持。
 
 ## 许可证
 
