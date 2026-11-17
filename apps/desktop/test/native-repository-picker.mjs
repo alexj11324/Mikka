@@ -1,32 +1,71 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
+import { execFile, execFileSync } from 'node:child_process'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { setTimeout as delay } from 'node:timers/promises'
+import { promisify } from 'node:util'
 
-// The fixture supplies only the OS selection. The renderer, IPC, native
-// process and Git all use the actual checkout and the packaged implementation.
+const execute = promisify(execFile)
+
+// This is the existing cross-platform acceptance fixture for Git and IPC.
 export async function verifyPickedRepository(application, page, directory) {
   const repo = await mkdtemp(join(directory, 'picked-repository-'))
+  return verifyRepositoryChoices(repo, 'src', async path => {
+    await application.evaluate(({ dialog }, selected) => {
+      const original = dialog.showOpenDialog
+      dialog.showOpenDialog = async () => {
+        dialog.showOpenDialog = original
+        return selected ? { canceled: false, filePaths: [selected] } : { canceled: true, filePaths: [] }
+      }
+    }, path)
+    return page.evaluate(() => window.mikka.device.pickRepo())
+  })
+}
+
+// The bookmark is ordinary GTK configuration in this disposable profile. It
+// opens the parent in the native chooser; a separate child row must be selected.
+export async function prepareLinuxRepositoryDialog(profile) {
+  await mkdir(profile, { recursive: true })
+  const repo = await mkdtemp(join(profile, 'picked-repository-'))
+  const config = await mkdtemp(join(profile, 'picker-xdg-'))
+  for (const version of ['gtk-3.0', 'gtk-4.0']) {
+    const settings = join(config, version)
+    await mkdir(settings)
+    await writeFile(join(settings, 'bookmarks'), pathToFileURL(repo).href + ' Fixture\n')
+  }
+  return { repo, config }
+}
+
+export function verifyLinuxRepositoryDialog(page, fixture) {
+  const driver = fileURLToPath(new URL('./linux-directory-dialog.py', import.meta.url))
+  return verifyRepositoryChoices(fixture.repo, 'Source', async (path, step) => {
+    const timeout = new AbortController()
+    // The driver emits only fixed control labels and pixel coordinates.
+    const input = execute('/usr/bin/python3', [driver, path ? 'choose' : 'cancel'], { timeout: 25_000 })
+      .then(({ stdout }) => console.log('Native repository ' + step + ': ' + stdout.trim()))
+    try {
+      const [result] = await Promise.race([
+        Promise.all([page.evaluate(() => window.mikka.device.pickRepo()), input]),
+        delay(28_000, undefined, { signal: timeout.signal }).then(() => { throw new Error('NATIVE_DIRECTORY_DIALOG_TIMEOUT_' + step) }),
+      ])
+      console.log('Native repository ' + step + ' result: ' + result.status)
+      return result
+    } finally { timeout.abort() }
+  })
+}
+
+async function verifyRepositoryChoices(repo, childName, selectFolder) {
   try {
-    const child = join(repo, 'src')
+    const child = join(repo, childName)
     await mkdir(child)
     execFileSync('git', ['init', '--quiet', repo])
     execFileSync('git', ['-C', repo, 'remote', 'add', 'origin', 'https://example.invalid/review.git'])
     const expected = { status: 'picked', repo: { path: await realpath(repo), name: basename(repo), remoteUrl: 'https://example.invalid/review.git' } }
-    async function selectFolder(path) {
-      await application.evaluate(({ dialog }, selected) => {
-        const original = dialog.showOpenDialog
-        dialog.showOpenDialog = async () => {
-          dialog.showOpenDialog = original
-          return selected ? { canceled: false, filePaths: [selected] } : { canceled: true, filePaths: [] }
-        }
-      }, path)
-      return page.evaluate(() => window.mikka.device.pickRepo())
-    }
-    assert.deepEqual(await selectFolder(child), expected)
+    assert.deepEqual(await selectFolder(child, 'origin'), expected)
     execFileSync('git', ['-C', repo, 'remote', 'rename', 'origin', 'upstream'])
-    assert.deepEqual(await selectFolder(child), expected)
-    assert.deepEqual(await selectFolder(null), { status: 'cancelled' })
+    assert.deepEqual(await selectFolder(child, 'upstream'), expected)
+    assert.deepEqual(await selectFolder(null, 'cancel'), { status: 'cancelled' })
   } finally {
     await rm(repo, { recursive: true, force: true })
   }

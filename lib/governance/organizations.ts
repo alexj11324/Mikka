@@ -32,8 +32,15 @@ export async function getOrganizationWorkspaceIds(tx: WorkspaceTransaction, orga
   return rows.map(row => row.workspaceId)
 }
 
+const organizationDirectoryFields = {
+  id: organizations.id,
+  name: organizations.name,
+  createdAt: organizations.createdAt,
+  updatedAt: organizations.updatedAt,
+}
+
 export async function listOrganizations(userId: string, organizationId?: string) {
-  return workspaceDb.select({ id: organizations.id, name: organizations.name, role: organizationMembers.role }).from(organizations)
+  return workspaceDb.select({ ...organizationDirectoryFields, role: organizationMembers.role }).from(organizations)
     .innerJoin(organizationMembers, eq(organizationMembers.organizationId, organizations.id))
     .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.status, 'active'), isNull(organizations.archivedAt),
       organizationId === undefined ? undefined : eq(organizations.id, organizationId))).orderBy(asc(organizations.createdAt))
@@ -53,11 +60,12 @@ export async function createOrganization(user: { id: string; name: string; email
   return workspaceDb.transaction(async tx => {
     await assertOrganizationAccountWritable(tx, user.id)
     const id = randomUUID()
-    await tx.insert(organizations).values({ id, name, createdBy: user.id })
+    const [organization] = await tx.insert(organizations).values({ id, name, createdBy: user.id })
+      .returning(organizationDirectoryFields)
     await tx.insert(organizationMembers).values({ organizationId: id, userId: user.id, role: 'owner', name: user.name, email: user.email.toLowerCase() })
     await tx.insert(organizationEntitlements).values({ organizationId: id })
     await enqueueOrganizationAudit(tx, { organizationId: id, actorId: user.id, action: 'organization.created' })
-    return { id, name, role: 'owner' as const }
+    return { ...organization, role: 'owner' as const }
   })
 }
 

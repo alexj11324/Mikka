@@ -34,7 +34,7 @@ const PREPARATION_PHASES = new Set([...STARTUP_PHASES, 'daemon.adapter.cli_init.
 const sha = value => createHash('sha256').update(value).digest('hex')
 const fail = (code, cause) => { throw new Error(`startup_${code}`, cause ? { cause } : undefined) }
 export const STARTUP_FAILURE_PHASES = Object.freeze(['unknown', 'build_pin', 'sign_in', 'session_identity', 'workspace_identity',
-  'team_selection', 'workspace_selection', 'personal_selection', 'personal_readiness', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'profile_create', 'profile_validation',
+  'team_selection', 'workspace_selection', 'personal_selection', 'personal_readiness', 'bot_create', 'bot_identity', 'timing_configuration', 'profile_selection', 'model_order', 'profile_create', 'profile_validation',
   'chat_model_selection', 'issue_create', 'coordinator_submit', 'coordinator_stream', 'thread_lookup', 'coordinator_stop',
   'subscription_proof', 'bootstrap_publication', 'execution_watch', 'execution_receipt', 'task_review', 'cleanup'])
 // These are driver-owned codes, never a prefix rule accepting arbitrary error
@@ -357,16 +357,16 @@ export async function dispatchThroughCoordinator(client, record, { botId, profil
   const toolInput = { issueId: record.issueId, repo: REPOSITORY, target: deviceId ? { deviceId } : 'cloud', profileId,
     // The owned lease probe executes Python; read-only runs intentionally have
     // no native shell. Ordinary startup checks keep their read-only policy.
-    // agentId is deprecated in dispatch_run: naming the Agent stops a new thread
-    // from following the chat's model (decision 2026-11-15-1630), which is the
-    // subscription model this case proves. The named computer still fixes where.
-    readOnly: !(leaseAudit || probe),
+    // A candidate computer also registers other harnesses, so the case names its
+    // Agent. A named Agent takes the first entry of 优先使用的模型 for its harness,
+    // which the acceptance workspace keeps on the subscription model this case proves.
+    ...(agentId ? { agentId } : {}), readOnly: !(leaseAudit || probe),
     note: probe?.instructions ?? `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
   const sponsored = record.taskProvider === 'cloudflare'
   const delivery = sponsored && probe?.sponsoredRepositoryDelivery === true
   const text = sponsored
     ? `请用当前来源事件创建一个标题为「${record.title}」的测试任务，再调用一次 dispatch_run。issueId 必须是刚创建的任务，其余参数为 ${JSON.stringify(toolInput)}。使用该固定 Profile 与所选订阅。${delivery ? '按 note 原样派发唯一的仓库交付夹具，只允许指定文件、任务分支与 PR，禁止合并及创建额外任务。' : '工作仅限读取该仓库的 README，返回 ' + marker + '。不要推送、发布、对外发消息或创建额外任务。'}`
-    : `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用指定 Profile，模型跟随本对话，不另传 model 或 agentId，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
+    : `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用指定 Profile，模型跟随本对话，不另传 model，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
   const trace = sampledRequestTrace()
   record.requestTraceId = trace.traceId
   record.requestTraceScope = 'submission_http_only_workflow_may_use_another_trace'
@@ -1248,6 +1248,22 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
         assert(candidates.length === 1 && candidates[0].credentialOwnerId === (personal || owned ? scope.ownerId : scope.adminId),
           personal ? 'personal_model_missing_or_ambiguous' : owned ? 'owned_subscription_model_missing_or_ambiguous' : 'shared_subscription_model_missing_or_ambiguous')
         const candidate = candidates[0]
+        // A candidate dispatch names its computer's Agent, and a named Agent takes
+        // the first 优先使用的模型 entry for its harness: keep this case's
+        // subscription model there (decision 2026-11-15-1630 made profiles content-only).
+        if (options.deviceId) {
+          phase = 'model_order'
+          const first = list => (list.entries ?? []).find(entry => entry.harness === harness)
+          const proven = entry => entry?.model === MODELS[harness] && entry.source?.kind === 'subscription'
+            && entry.source.connectionId === candidate.source.connectionId
+          if (!proven(first(order))) {
+            const existing = (order.entries ?? []).find(proven)
+            const change = existing
+              ? { kind: 'reorder', ids: [existing.id, ...order.entries.filter(entry => entry.id !== existing.id).map(entry => entry.id)] }
+              : { kind: 'add', entries: [{ harness, model: MODELS[harness], source: { kind: 'subscription', connectionId: candidate.source.connectionId } }], at: 0 }
+            assert(proven(first(await client.rpc('model-order.changeModelOrder', [change, scope.workspaceId]))), 'model_invalid')
+          }
+        }
         phase = 'profile_create'
         // An Agent 配置 holds content only (decision 2026-11-15-1630): the run
         // follows the test chat's model, which runSubscriptionCase sets to this

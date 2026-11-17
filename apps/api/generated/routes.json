@@ -1970,6 +1970,16 @@
       "sourceHash": "e4c9a61235ec9c5e8559f4d531d980062c06baeded819633b67a5c95fa330fd4"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive-shares/[shareId]",
+      "template": "/api/organizations/[organizationId]/drive-shares/[shareId]",
+      "source": "app/api/organizations/[organizationId]/drive-shares/[shareId]/route.ts",
+      "methods": [
+        "DELETE",
+        "PATCH"
+      ],
+      "sourceHash": "3b6c56ccec32fdfb5a07beec55c17975b3af1bd1833cd92974b8eba9fc9a0d3a"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/identity",
       "template": "/api/organizations/[organizationId]/identity",
       "source": "app/api/organizations/[organizationId]/identity/route.ts",
