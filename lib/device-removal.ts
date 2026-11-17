@@ -107,7 +107,6 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
       RETURNING "tokenId"
     ) SELECT id FROM changed`, [target, userId, Boolean(online), new Date(Date.now() + DEVICE_UNINSTALL_GRACE_MS)])
     await client.query(`UPDATE agents SET "deviceId"=NULL,"updatedAt"=now() WHERE "deviceId"=$1 AND "userId"=$2`, [target, userId])
-    await client.query('DELETE FROM device_project_checkouts WHERE "deviceId"=$1 AND "ownerId"=$2', [target, userId])
     await client.query(`UPDATE devices SET "removedAt"=now(),enabled=false,"updatedAt"=now() WHERE id=$1`, [target])
     // A commands long poll for this device re-checks on COMMIT (lib/db/listen.ts).
     await notifyChannel(client, DEVICE_WORK_CHANNEL, [target])

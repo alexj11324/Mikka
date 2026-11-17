@@ -1,4 +1,11 @@
 {
+  "drizzle/20261117062300_device_project_checkouts.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store private Git directory bookmarks scoped to their account, local device and Project. Device removal and Project or account deletion erase the associated bookmarks.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "app/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/route.ts": {
     "mode": "built-in",
     "environment": [],
