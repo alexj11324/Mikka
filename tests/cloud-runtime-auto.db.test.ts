@@ -437,6 +437,10 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const { coordinatorBot } = await import('../lib/coordinator/coordinator-bot')
     // Dispatched from the web in c's workspace: that workspace's Coordinator.
     const coordinator = (await coordinatorBot(c.id, c.workspaceId)).botId
+    // The Coordinator names its Agent like any Bot; until it does, it dispatches nothing (decision 2026-11-17).
+    const refused = await steps.dispatchRun(c.id, { issueId: c.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator) as unknown as { error: string; reason: string }
+    assert.deepEqual([refused.error, refused.reason], ['machineUnavailable', 'botAgentRequired'])
+    await pool.query(`UPDATE bots SET agent='codex' WHERE id=$1`, [coordinator])
     const dispatchAsCoordinator = (issueId = c.issueId) => steps.dispatchRun(c.id, { issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, coordinator)
     const first = await dispatchAsCoordinator() as unknown as { runId: string; status: string }
     assert.equal(first.status, 'queued', JSON.stringify(first))

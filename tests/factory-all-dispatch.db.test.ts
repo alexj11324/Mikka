@@ -28,7 +28,13 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   const steps = await import('../workflows/coordinator/steps')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
+  const { chatBotId: coordinatorChat } = await import('../lib/coordinator/coordinator-bot')
+  // The Coordinator is a Bot and names its Agent (decision 2026-11-17).
+  const chatBotId = async (...args: Parameters<typeof coordinatorChat>) => {
+    const id = await coordinatorChat(...args)
+    await pool.query("UPDATE bots SET agent=COALESCE(agent,'codex') WHERE id=$1", [id])
+    return id
+  }
   const github = githubAppStub()
   github.install(REPO, { contents: 'write', pull_requests: 'write' })
   t.after(async () => {

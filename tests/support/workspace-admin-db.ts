@@ -29,9 +29,10 @@ export async function seedWorkspace(pool: Pool, ownerId: string, members: Array<
   return { id, name, slug }
 }
 
-export async function seedBot(pool: Pool, workspaceId: string, ownerId: string, name = `Bot ${randomUUID().slice(0, 6)}`) {
+/** A Bot names its Agent (decision 2026-11-17); pass `null` for one made before the choice existed. */
+export async function seedBot(pool: Pool, workspaceId: string, ownerId: string, name = `Bot ${randomUUID().slice(0, 6)}`, agent: 'claude_code' | 'codex' | null = 'codex') {
   const id = randomUUID()
-  await pool.query('insert into bots (id,"ownerId","workspaceId",name) values ($1,$2,$3,$4)', [id, ownerId, workspaceId, name])
+  await pool.query('insert into bots (id,"ownerId","workspaceId",name,agent) values ($1,$2,$3,$4,$5)', [id, ownerId, workspaceId, name, agent])
   return id
 }
 

@@ -29,6 +29,7 @@ let permission: string | undefined, awake = true, credentialAvailable = true, sw
 let moveDevice = false, replaceAgent = false, revokeDuringWake = false, revokeWorkspaceDuringWake = false
 let selectedSource: 'subscription' | 'api_key' = 'subscription'
 let selectedHarness: 'codex' | 'claude_code' = 'codex'
+let botWithoutAgent = false
 let selectedModel = model
 let deviceId = 'device', repoId = 'repo'
 let previous: { id: string; status: string; stopRequestedAt: null; agentId: string; readOnly: boolean } | null = null
@@ -73,6 +74,8 @@ async function query(sql: string, values: unknown[] = []) {
   if (sql.includes('FROM factory_tasks')) { factoryReadCalls++; return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) } }
   // The dispatching chat saved no model, so the task keeps its own placement (decision 2026-11-15-1630).
   if (sql.includes('FROM bot_model_choices')) return { rows: [], rowCount: 0 }
+  // The dispatching Bot names its Agent (decision 2026-11-17).
+  if (sql === 'SELECT agent FROM bots WHERE id=$1') return { rows: [{ agent: botWithoutAgent ? null : selectedHarness }], rowCount: 1 }
   if (sql.includes('FROM bots') || sql.includes('FROM bot_cloud_runtimes')) return { rows: present && values[0] === botId && values[1] === owner ? [target()] : [], rowCount: Number(present) }
   throw new Error(`Unexpected query in startup fixture: ${sql}`)
 }
@@ -499,4 +502,17 @@ test('a working thread receives its message without waking or reselecting anythi
   assert.equal(credentialReads, 0)
   assert.equal(modelResolutions, 0)
   assert.equal(queued.size, 0)
+})
+
+test('a Bot without an Agent dispatches nothing and gets the card that opens its settings', async () => {
+  botWithoutAgent = true
+  try {
+    const before = modelResolutions
+    const result = await dispatchThread(owner, { botId, issueId, harness: 'codex', model }, 'no-agent-call') as { error: string; reason: string; card: { options: { value: string; action: string }[] } }
+    assert.equal(result.error, 'machineUnavailable')
+    assert.equal(result.reason, 'botAgentRequired')
+    assert.deepEqual(result.card.options.map(option => [option.value, option.action]), [[botId, 'botSettings']])
+    assert.equal(queued.size, 0)
+    assert.equal(modelResolutions, before, 'no model is chosen for it')
+  } finally { botWithoutAgent = false }
 })

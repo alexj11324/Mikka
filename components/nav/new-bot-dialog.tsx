@@ -16,6 +16,7 @@ import { NO_REPOSITORY, type NewBotChoice, type NewBotDetail } from '@/component
 import { NewBot } from '@ui-slot/new-bot'
 
 const NAME_LENGTH = 60
+type BotAgentChoice = 'claude_code' | 'codex'
 
 /**
  * 新建 Bot, with Capy's new Captain details beside the look: the model its runs use and the repository it works in.
@@ -33,8 +34,10 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
   // Undefined until the person picks: the Bot then takes what it would get anyway.
   const [model, setModel] = useState<string | undefined>()
   const [repository, setRepository] = useState<string | undefined>()
+  // The Agent has no default (decision 2026-11-17): null until the person picks one.
+  const [agent, setAgent] = useState<BotAgentChoice | null>(null)
   const [saving, setSaving] = useState(false)
-  useEffect(() => { if (!open) { setName(''); setColor(DEFAULT_BOT_COLOR); setShape(DEFAULT_BOT_SHAPE); setModel(undefined); setRepository(undefined) } }, [open])
+  useEffect(() => { if (!open) { setName(''); setColor(DEFAULT_BOT_COLOR); setShape(DEFAULT_BOT_SHAPE); setAgent(null); setModel(undefined); setRepository(undefined) } }, [open])
 
   // Read once when the window opens; nothing here refreshes on its own.
   const menu = useSWR<BotModelMenu | null>(open ? [...botModelMenuKey(null), workspaceId] : null, () => getBotModelMenu(null, workspaceId), { shouldRetryOnError: false, revalidateOnFocus: false })
@@ -61,6 +64,13 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
     onChange: setModel, disabled: saving || modelChoices.length === 0,
   }
 
+  const tPanel = useTranslations('Shell.panel')
+  const agentChoices: NewBotChoice[] = [{ value: 'claude_code', label: tPanel('agentClaudeCode') }, { value: 'codex', label: tPanel('agentCodex') }]
+  const agentDetail: NewBotDetail = {
+    choices: agentChoices, value: agent, label: agentChoices.find(choice => choice.value === agent)?.label ?? t('agentPlaceholder'),
+    onChange: value => setAgent(value === 'codex' ? 'codex' : 'claude_code'), disabled: saving,
+  }
+
   const repositories = defaults.data?.repositories ?? []
   const repositoryValue = repository ?? (defaults.data ? defaults.data.defaultRepository ?? NO_REPOSITORY : null)
   const repositoryChoices: NewBotChoice[] = [{ value: NO_REPOSITORY, label: t('noRepository') }, ...repositories.map(item => ({ value: item, label: item }))]
@@ -74,9 +84,10 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
   async function submit() {
     const trimmed = name.trim()
     if (!trimmed || saving) return
+    if (!agent) { toast.error(t('agentRequired')); return }
     setSaving(true)
     try {
-      const bot = await createBot({ name: trimmed, color, shape, ...(repository === undefined ? {} : { repository: repository === NO_REPOSITORY ? null : repository }) }, workspaceId)
+      const bot = await createBot({ name: trimmed, color, shape, agent, ...(repository === undefined ? {} : { repository: repository === NO_REPOSITORY ? null : repository }) }, workspaceId)
       // The menu is the Coordinator's: its row shows the Coordinator's model. A new Bot has no saved choice and would
       // follow the default instead, so save what the row shows whenever it is a pick (the person's, or the Coordinator's
       // own choice); an unchosen default is what the new Bot resolves to anyway.
@@ -97,5 +108,5 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
   }
 
   return open ? <NewBot onClose={() => onOpenChange(false)} name={name} onName={setName} maxLength={NAME_LENGTH} color={color} shape={shape}
-    onColor={setColor} onShape={setShape} model={modelDetail} repository={repositoryDetail} saving={saving} onSubmit={() => { void submit() }} /> : null
+    onColor={setColor} onShape={setShape} agent={agentDetail} model={modelDetail} repository={repositoryDetail} saving={saving} onSubmit={() => { void submit() }} /> : null
 }

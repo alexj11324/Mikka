@@ -18,6 +18,7 @@ import { usePresence } from '@/lib/use-presence'
 import { DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotShape } from './bot-avatar'
 import { BotLookPicker } from './bot-look-picker'
 import { useBotPublicRole } from './bot-public-role-editor'
+import { getBotAgent, type BotView } from '@/app/actions/bots'
 import { useSaveBot } from './use-save-bot'
 import { BotOverview } from '@ui-slot/bot-overview'
 import type { BotOverviewItem, BotOverviewProps, BotOverviewTab } from '@/components/slots/bot-overview-contract'
@@ -72,6 +73,30 @@ function useBotEdits(botId: string, workspaceId?: string, color?: string, shape?
     look,
     picker: ({ onError }) => <BotLookPicker color={tone} shape={form}
       onColor={next => { void look({ color: next }).then(onError) }} onShape={next => { void look({ shape: next }).then(onError) }} />,
+  }
+}
+
+/** The Agent a bot's tasks run on, read and saved here (decision 2026-11-17: required, no default). */
+function useBotAgent(botId: string | null, workspaceId: string | undefined, visible: boolean): BotOverviewProps['agent'] {
+  const t = useTranslations('Shell.panel')
+  const actionError = useActionError()
+  const saveBot = useSaveBot(workspaceId)
+  const [saving, setSaving] = useState(false)
+  const read = useSWR(botId && visible ? ['bot-agent', botId, workspaceId ?? null] : null, async () => {
+    const result = await getBotAgent(botId!, workspaceId)
+    if (result.error) throw new Error(result.error)
+    return result.agent
+  })
+  if (!botId) return null
+  return {
+    value: read.data ?? null, loaded: read.data !== undefined, saving,
+    choices: [{ value: 'claude_code', label: t('agentClaudeCode') }, { value: 'codex', label: t('agentCodex') }],
+    async onChange(agent: NonNullable<BotView['agent']>) {
+      setSaving(true)
+      try { await saveBot(botId, { agent }); await read.mutate(agent, { revalidate: false }); return null }
+      catch (failure) { return actionError(failure instanceof Error ? failure.message : null) }
+      finally { setSaving(false) }
+    },
   }
 }
 
@@ -148,8 +173,10 @@ export function BotOverviewBody({ conversation, tabs, tab, onTab, query, onQuery
     }).filter(group => group.rows.length),
   }
   const glance = botGlance(threads, issues)
+  // The chat's bot row, the Coordinator's included, names its Agent.
+  const agent = useBotAgent(botId ?? (conversation.kind === 'coordinator' ? conversation.id ?? null : null), workspaceId, tab === 'details')
   const draw = (role: BotOverviewProps['details']['role'], edit: BotOverviewProps['edit']) => <BotOverview conversation={conversation} tabs={tabs} tab={tab} onTab={onTab} query={query} onQuery={onQuery}
-    edit={edit} details={{ role, routines: [], library }} glance={glance} tasks={tasks} pullRequests={pullRequests} computer={computer} dialogs={dialogs} />
+    edit={edit} agent={agent} details={{ role, routines: [], library }} glance={glance} tasks={tasks} pullRequests={pullRequests} computer={computer} dialogs={dialogs} />
   if (!botId) return draw(null, null)
   return <RoleOf key={botId} botId={botId} workspaceId={workspaceId} visible={tab === 'details'}>{role =>
     <EditsOf botId={botId} workspaceId={workspaceId} color={conversation.color} shape={conversation.shape}>{edit => draw(role, edit)}</EditsOf>}</RoleOf>

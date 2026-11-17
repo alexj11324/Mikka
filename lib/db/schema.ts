@@ -160,6 +160,11 @@ export const bots = pgTable('bots', {
   model: text('model').$type<WorkspaceBotModel | null>(),
   /** GitHub repository (owner/repo remote key) a new bot starts with; copied from workspace_settings. */
   repository: text('repository'),
+  /**
+   * The Agent the Bot's tasks run on (drizzle/20261117190000). Required when a Bot is made or edited, never
+   * defaulted; a Bot made before it has none, and its next dispatch is refused with botAgentRequired.
+   */
+  agent: text('agent').$type<BotAgent | null>(),
   /** Monthly credit cap for this bot; null uses workspace_settings.botMonthlyCreditLimit. */
   monthlyCreditLimit: integer('monthlyCreditLimit'),
   /** Set when the owner left or was suspended; the bot stays paused until an admin takes it over (§8.3). */
@@ -1364,6 +1369,9 @@ export const accountDataExports = pgTable('account_data_exports', {
 }, table => [uniqueIndex('account_data_exports_token_key').on(table.tokenHash), index('account_data_exports_user_created_idx').on(table.userId, table.createdAt)])
 export const WORKSPACE_BOT_MODELS = ['mikka', 'codex', 'claude'] as const
 export type WorkspaceBotModel = (typeof WORKSPACE_BOT_MODELS)[number]
+/** The Agents a Bot can name, as harness ids: Claude Code and Codex. */
+export const BOT_AGENTS = ['claude_code', 'codex'] as const
+export type BotAgent = (typeof BOT_AGENTS)[number]
 
 /** Workspace-level defaults and usage limits (settings › Bots, Usage). Null means unset / unlimited. */
 export const workspaceSettings = pgTable('workspace_settings', {

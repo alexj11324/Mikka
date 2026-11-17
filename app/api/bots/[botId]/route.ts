@@ -9,7 +9,7 @@ import { updateOwnedBot } from '@/lib/bot-update'
 import { ActionFailureError } from '@/lib/action-error'
 
 export const dynamic='force-dynamic'
-const patch=z.object({name:z.string().optional(),color:z.string().optional(),shape:z.string().optional(),publicRole:z.string().max(2000).optional()}).strict()
+const patch=z.object({name:z.string().optional(),color:z.string().optional(),shape:z.string().optional(),publicRole:z.string().max(2000).optional(),agent:z.string().optional()}).strict()
 const response=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}})
 
 async function handle(request:Request,{params}:{params:Promise<{botId:string}>}) {
@@ -30,7 +30,7 @@ async function handle(request:Request,{params}:{params:Promise<{botId:string}>})
   const {workspace}=context
   if (!apiWorkspaceAllowed(session,workspace.id)) return response({error:'botNotFound'},404)
   if (request.method==='GET') {
-    const [bot]=await db.select({id:bots.id,name:bots.name,color:bots.color,shape:bots.shape,publicRole:bots.publicRole}).from(bots).where(and(eq(bots.id,botId),eq(bots.ownerId,session.user.id),eq(bots.workspaceId,workspace.id))).limit(1)
+    const [bot]=await db.select({id:bots.id,name:bots.name,color:bots.color,shape:bots.shape,publicRole:bots.publicRole,agent:bots.agent}).from(bots).where(and(eq(bots.id,botId),eq(bots.ownerId,session.user.id),eq(bots.workspaceId,workspace.id))).limit(1)
     return bot ? response(bot) : response({error:'botNotFound'},404)
   }
   const body=patch.safeParse(await request.json().catch(()=>null))

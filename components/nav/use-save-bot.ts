@@ -5,7 +5,7 @@ import { updateBot, type BotView } from '@/app/actions/bots'
 import { isBotListKey } from '@/lib/live/list-read'
 import { botKeys } from '@/lib/swr/keys'
 
-export type BotPatch = Partial<Pick<BotView, 'name' | 'color' | 'shape'>>
+export type BotPatch = Partial<Pick<BotView, 'name' | 'color' | 'shape'>> & { agent?: NonNullable<BotView['agent']> }
 
 /**
  * Saves a bot's name or look. The change shows at once wherever `bots` is read
@@ -23,8 +23,8 @@ export function useSaveBot(workspaceId?: string) {
         throw new Error('generic', { cause })
       }
       if (result.error) throw new Error(result.error)
-      const saved = { id: result.id, name: result.name, color: result.color, shape: result.shape }
-      return (current ?? []).map(bot => bot.id === botId ? saved : bot)
+      const saved = { id: result.id, name: result.name, color: result.color, shape: result.shape, agent: result.agent }
+      return (current ?? []).map(bot => bot.id === botId ? { ...bot, ...saved } : bot)
     }, {
       optimisticData: current => (current ?? []).map(bot => bot.id === botId ? { ...bot, ...patch } : bot),
       rollbackOnError: true,

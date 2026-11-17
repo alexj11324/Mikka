@@ -75,6 +75,8 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
   const [mood, setMood] = useState<BotMood>('idle')
   const [bot, setBot] = useState<BotView | null>(null)
   const [name, setName] = useState('')
+  const [agent, setAgent] = useState<'claude_code' | 'codex' | null>(null)
+  const tPanel = useTranslations('Shell.panel')
   const [color, setColor] = useState<BotColor>(DEFAULT_BOT_COLOR)
   const [shape, setShape] = useState<BotShape>(DEFAULT_BOT_SHAPE)
   const [busy, setBusy] = useState(false)
@@ -186,7 +188,8 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
     if (!trimmed || busy) return
     setBusy(true); setError('')
     try {
-      const created = await createBot({ name: trimmed, color, shape }, workspaceId)
+      if (!agent) { setError(tPanel('agentRequired')); return }
+      const created = await createBot({ name: trimmed, color, shape, agent }, workspaceId)
       void mutate(isBotListKey)
       setBot(created)
       setCard(null)
@@ -361,9 +364,14 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
                 {error && <FieldError>{error}</FieldError>}
               </Field>
               <BotLookPicker color={color} shape={shape} disabled={busy} onColor={next => { setColor(next); hop(4) }} onShape={next => { setShape(next); hop(4) }} />
+              {/* The Agent its tasks run on: required, nothing preselected (decision 2026-11-17). */}
+              <div role="group" aria-label={tPanel('agent')} className="flex gap-2">
+                {(['claude_code', 'codex'] as const).map(value => <Button key={value} type="button" variant={agent === value ? 'default' : 'outline'} aria-pressed={agent === value} disabled={busy}
+                  onClick={() => { setAgent(value); setError('') }}>{tPanel(value === 'codex' ? 'agentCodex' : 'agentClaudeCode')}</Button>)}
+              </div>
             </FieldGroup>
             <div className="flex justify-end">
-              <Button type="submit" disabled={!name.trim() || busy}>{busy && <Spinner data-icon="inline-start" />}{t('confirm')}</Button>
+              <Button type="submit" disabled={!name.trim() || !agent || busy}>{busy && <Spinner data-icon="inline-start" />}{t('confirm')}</Button>
             </div>
           </form>}
 

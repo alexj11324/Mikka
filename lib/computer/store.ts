@@ -24,8 +24,8 @@ type Desktop = { botId: string; ownerId: string; display: number; epoch: number;
 export class ComputerStore {
   constructor(private pool: Pool, private runtime = provider) {}
 
-  async createBot(actor: Actor, name: string) {
-    const { rows } = await this.pool.query<Bot>('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4) RETURNING id,name,"workspaceId","ownerId"', [randomUUID(), actor.workspaceId, actor.userId, name])
+  async createBot(actor: Actor, name: string, agent: 'claude_code' | 'codex') {
+    const { rows } = await this.pool.query<Bot>('INSERT INTO bots (id,"workspaceId","ownerId",name,agent) VALUES ($1,$2,$3,$4,$5) RETURNING id,name,"workspaceId","ownerId"', [randomUUID(), actor.workspaceId, actor.userId, name, agent])
     if (rows[0]) await botListChanged(this.pool, rows[0].id)
     return rows[0]
   }

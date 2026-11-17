@@ -414,8 +414,8 @@ async function accept(device) {
   })
   if (only.includes('4')) await check('item4-agent-communication', 240_000, async signal => {
     const workspace = (await json(accounts.owner, '/api/workspace')).workspace.id
-    const first = await json(accounts.owner, '/api/mobile/bots', { name: `Sender ${runId.slice(0, 8)}`, color: 'bleu', shape: 'cercle' })
-    const second = await json(accounts.owner, '/api/mobile/bots', { name: `Receiver ${runId.slice(0, 8)}`, color: 'vert', shape: 'cercle' })
+    const first = await json(accounts.owner, '/api/mobile/bots', { name: `Sender ${runId.slice(0, 8)}`, color: 'bleu', shape: 'cercle', agent: 'claude_code' })
+    const second = await json(accounts.owner, '/api/mobile/bots', { name: `Receiver ${runId.slice(0, 8)}`, color: 'vert', shape: 'cercle', agent: 'claude_code' })
     const refreshed = await fetch('http://127.0.0.1:3191/refresh', { method: 'POST', signal })
     assert.ok(refreshed.ok, 'Could not seed the new bots with the real DeepSeek selection')
     const group = await json(accounts.owner, '/api/conversations', { workspaceId: workspace, title: `Communication ${runId}`, leadBotId: first.id, members: [first, second].map(bot => ({ memberType: 'bot', memberId: bot.id })) })

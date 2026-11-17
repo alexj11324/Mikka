@@ -32,7 +32,13 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
   const { readRunChain } = await import('../lib/run-chain')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
-  const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
+  const { chatBotId: coordinatorChat } = await import('../lib/coordinator/coordinator-bot')
+  // The Coordinator is a Bot and names its Agent (decision 2026-11-17).
+  const chatBotId = async (...args: Parameters<typeof coordinatorChat>) => {
+    const id = await coordinatorChat(...args)
+    await pool.query("UPDATE bots SET agent=COALESCE(agent,'codex') WHERE id=$1", [id])
+    return id
+  }
   const users: string[] = []
   // Push is what the person granted on GitHub: the synthetic App is installed on octo/repo with contents: write.
   const github = githubAppStub()

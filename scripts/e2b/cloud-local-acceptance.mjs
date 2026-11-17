@@ -72,7 +72,7 @@ async function main() {
   metric.accountLeaseSource = ownsAccounts ? 'independent-helper' : 'owning-driver'
   stage = 'actor-fixture'
   actor = { userId: accounts.owner.userId, workspaceId: (await api('/api/workspace')).workspace.id }
-  botId = (await api('/api/mobile/bots', { name: `Cloud acceptance ${id.slice(0, 8)}`, color: 'bleu', shape: 'cercle' })).id
+  botId = (await api('/api/mobile/bots', { name: `Cloud acceptance ${id.slice(0, 8)}`, color: 'bleu', shape: 'cercle', agent: 'claude_code' })).id
   stage = 'source-sandbox'
   const source = await Sandbox.create(parentTemplate, { ...connection, timeoutMs: 900_000, metadata: { purpose: 'isolated-cloud-source', acceptance: id } })
   sourceSandboxId = source.sandboxId

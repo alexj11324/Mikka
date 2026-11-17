@@ -6,6 +6,7 @@ import { defaultAgentCopy } from './agent-copy'
 import messages from '@/messages/zh-CN.json'
 import type { SubscriptionPreflightFailure } from '@mikka/protocol/harness'
 import { cloudReady } from './rule-dispatch'
+import type { botAgentRequiredCard } from './bot-agent'
 import { credentialStates, dispatchOrder, orderCandidates, selectedOrderCandidates, poolDevices, readOrder, type OrderScope, type RefreshOrderQuota } from './model-order'
 import { entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReason, type OrderEntry, type RunLocation, type SkippedEntry } from './model-order-plan'
 
@@ -24,11 +25,11 @@ import { entryKey, planDispatch, whyNoDevice, type NoDeviceWhy, type NothingReas
  * can run: the card says what it lacks; no other Agent is put in its place.
  */
 /** Why nothing runs: the list's reasons, or the model the thread named (decision 2026-11-02-1400). */
-export type DispatchNothingReason = NothingReason | 'cloudTemporarilyUnavailable' | 'notOffered' | 'namedDevice' | 'pickedNoDevice' | 'pickedUnavailable'
+export type DispatchNothingReason = NothingReason | 'cloudTemporarilyUnavailable' | 'notOffered' | 'namedDevice' | 'pickedNoDevice' | 'pickedUnavailable' | 'botAgentRequired'
 export type ModelDispatch =
   | { kind: 'device'; deviceId: string; agentId: string; model: string; entry: OrderEntry; subscriptionBindingId?: string; quotaCheckPending?: true }
   | { kind: 'cloud'; harness: OrderEntry['harness']; model: string; entry: OrderEntry; apiKey: boolean; quotaCheckPending?: true }
-  | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard>; skipped?: SkippedEntry[] }
+  | { kind: 'none'; reason: DispatchNothingReason; card: ReturnType<typeof modelUnavailableCard> | ReturnType<typeof botAgentRequiredCard>; skipped?: SkippedEntry[] }
 
 /**
  * The Agent or model a Bot passed for a new thread must be one of 优先使用的模型: the same list its prompt shows
@@ -197,6 +198,7 @@ export function modelUnavailableCard(reason: DispatchNothingReason, named?: { ag
     // Installed but nothing it can run: a subscription model on a Mikka too old to take a subscription run.
     notOffered: copy.needsModelNotOffered, namedDevice: named?.installed ? copy.needsModelDeviceUpdate : copy.needsModelDeviceAgent,
     pickedNoDevice: copy.needsModelPickedNoDevice, pickedUnavailable: copy.needsModelPickedUnavailable,
+    botAgentRequired: copy.botAgentDescription,
   }[reason]
   const detail = named?.detail ?? (named?.device?.why === 'subscriptionRuntimeUnavailable' ? named.device.detail : undefined)
   const description = (detail ? messages.RunErrors.subscription_local_runtime_unavailable[detail]

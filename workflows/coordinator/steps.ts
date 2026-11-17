@@ -469,6 +469,10 @@ async function namedDeviceAgent(userId: string, deviceId: string, agentId: strin
 }
 
 async function dispatchByRules(userId: string, { followed, ...input }: { threadRunId?: string; issueId: string; profileId?: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; origin?: RunOrigin; originRef?: RunOriginRef | null; model?: { harness: 'claude_code' | 'codex'; model?: string }; followed?: true }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
+  // The Bot names the Agent its tasks run on (decision 2026-11-17); a Bot without one dispatches nothing.
+  const { botAgent, botAgentRequired } = await import('@/lib/bot-agent')
+  const agent = await botAgent(pool, botId)
+  if (!agent) return botAgentRequired(botId, input.issueId)
   if (!input.threadRunId) input = { ...input, needsSpec: await (await import('@/lib/factory/task-dispatch')).factoryTaskNeedsSpec(pool, userId, { issueId: input.issueId, botId, needsSpec: input.needsSpec }) }
   const stage = input.needsSpec ? 'spec' : 'execute'
   // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
@@ -484,13 +488,13 @@ async function dispatchByRules(userId: string, { followed, ...input }: { threadR
     // Which of the computer's Agents runs it is decided here, never by a default:
     // the named Agent, the model's own Agent, or the computer's only one. A
     // computer with several Agents and nothing naming one refuses at once.
-    const agentId = await namedDeviceAgent(userId, device.deviceId, input.agentId, input.model?.harness)
+    const agentId = await namedDeviceAgent(userId, device.deviceId, input.agentId, input.model?.harness ?? agent)
     // A computer that lacks the asked harness keeps its own card (这台电脑没装 …) from the planner below.
     if ('error' in agentId && (agentId.error === 'agentRequired' || input.agentId)) return { error: agentId.error, issueId: input.issueId }
     if (!('error' in agentId)) input = { ...input, agentId: agentId.id }
     const { executionWorkspace } = await import('@/lib/execution-settings')
     const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
-    const { target, agentProfile, selectionMode } = await resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { issueId: input.issueId, stage, note: input.note, profileId: input.profileId, asked: input.model, location: 'local', deviceId: device.deviceId, agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) })
+    const { target, agentProfile, selectionMode } = await resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { issueId: input.issueId, stage, note: input.note, profileId: input.profileId, asked: input.model, defaultHarness: agent, location: 'local', deviceId: device.deviceId, agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) })
     if (target.kind !== 'device') return { error: 'machineUnavailable' as const, issueId: input.issueId, ...(target.kind === 'none' ? { reason: target.reason, card: target.card } : {}) }
     const modelDispatch: WorkerModelDispatch = { mode: selectionMode ?? (input.model ? 'picked' : 'preference'), location: 'local', entry: target.entry, ...(followed ? { followed } : {}) }
     const result = await queueTaskRun(userId, { ...input, agentId: target.agentId, model: target.model, modelDispatch, agentProfile, pinnedDeviceId: target.deviceId, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}), ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }, botId, execution, requestEventId, { origin: input.origin ?? 'web', originRef: input.originRef ?? null })
@@ -525,7 +529,7 @@ async function dispatchByRules(userId: string, { followed, ...input }: { threadR
         sponsored = destination.data.provider === 'cloudflare'
       }
     }
-    const { target, agentProfile, selectionMode } = await timedPhase('resolveModelDispatch', () => resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId, botId }, { issueId: input.issueId, stage, note: input.note, profileId: input.profileId, asked: input.model, location: place === 'cloud' ? 'cloud' : undefined, ...(sponsored ? {cloudPurpose:'cloudflare_task' as const}:{}), agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) }))
+    const { target, agentProfile, selectionMode } = await timedPhase('resolveModelDispatch', () => resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId, botId }, { issueId: input.issueId, stage, note: input.note, profileId: input.profileId, asked: input.model, defaultHarness: agent, location: place === 'cloud' ? 'cloud' : undefined, ...(sponsored ? {cloudPurpose:'cloudflare_task' as const}:{}), agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) }))
     if (target.kind === 'none') {
       if (target.reason === 'cloudNotConfigured' && !sponsored) {
         const { cloudDispatchFailureReason } = await import('@/lib/cloud-dispatch-failure')
@@ -563,7 +567,7 @@ async function dispatchByRules(userId: string, { followed, ...input }: { threadR
       const pinnedHarness = profileHarness(agentProfile)
       const fallback = await resolveModelDispatch(pool, { ownerId: userId, workspaceId, botId }, input.model ?? null, undefined, undefined, {
         withoutCloud: true, agentId: input.agentId,
-        ...(exact ? { exactEntry: target.entry, harness: target.entry.harness } : pinnedHarness ? { harness: pinnedHarness } : {}),
+        ...(exact ? { exactEntry: target.entry, harness: target.entry.harness } : { harness: pinnedHarness ?? target.entry.harness }),
       })
       // An admitted but unclaimed startup failure is the same Factory intent.
       // Its server-confirmed failed run supplies ancestry for the normal retry.
@@ -595,7 +599,7 @@ export async function listComputerWorkspaces(userId: string, scope?: NativeToolS
 }
 
 /** The tool call id makes a retried Bot creation idempotent. */
-export async function createComputerBot(userId: string, input: { workspaceId: string; name: string }, toolCallId: string, scope?: NativeToolScope) {
+export async function createComputerBot(userId: string, input: { workspaceId: string; name: string; agent: 'claude_code' | 'codex' }, toolCallId: string, scope?: NativeToolScope) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (!cloudComputerRunsEnabled() || !toolCallId || toolCallId.length > 200) return { error: 'cloudComputerUnavailable' }
@@ -603,7 +607,8 @@ export async function createComputerBot(userId: string, input: { workspaceId: st
     await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, input.workspaceId)
     const hash = createHash('sha256').update(JSON.stringify(['create-bot', userId, toolCallId])).digest('hex')
     const botId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
-    await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4) ON CONFLICT (id) DO NOTHING', [botId, input.workspaceId, userId, input.name])
+    if (input.agent !== 'claude_code' && input.agent !== 'codex') return { error: 'botAgentRequired' }
+    await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name,agent) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (id) DO NOTHING', [botId, input.workspaceId, userId, input.name, input.agent])
     const found = await pool.query('SELECT id,name FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "ownerId"=$3 AND name=$4', [botId, input.workspaceId, userId, input.name])
     return found.rows[0] ?? { error: 'cloudComputerUnavailable' }
   } catch { return { error: 'cloudComputerUnavailable' } }
@@ -637,6 +642,12 @@ export async function dispatchComputerThread(userId: string, input: { botId: str
   if (!bot) return { error: 'cloudComputerUnavailable' as const }
   try { await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, bot.workspaceId) } catch { return { error: 'cloudComputerUnavailable' as const } }
   if (!await issueForUser(userId, request.issueId)) return { error: 'issueNotFound' as const }
+  // The computer Bot names its Agent (decision 2026-11-17): no Agent, nothing queued; another Agent is refused.
+  const { botAgent, botAgentRequired } = await import('@/lib/bot-agent')
+  const agent = await botAgent(pool, request.botId)
+  if (!agent) return botAgentRequired(request.botId, request.issueId)
+  if (request.harness && request.harness !== agent) return { error: 'agentHarnessMissing' as const, issueId: request.issueId }
+  request.harness = agent
   try { request.profileId = await (await import('@/lib/factory/profile-request')).requestedAgentProfile(pool, { ownerId: userId, workspaceId: bot.workspaceId, botId: chatBotId ?? request.botId }, sourceEventId, request.profileId) } catch (error) { if (error instanceof AgentProfileError) return { error: error.code }; throw error }
   // A model the Bot named must be one of 优先使用的模型 of the computer Bot's workspace, the list its prompt shows; otherwise nothing is queued.
   if (asked) {

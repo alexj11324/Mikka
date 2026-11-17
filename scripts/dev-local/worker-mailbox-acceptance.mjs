@@ -36,7 +36,7 @@ export async function verifyWorkerMailbox({ accounts, pool, progress = async () 
       await delay(250, undefined, { signal })
     }
   }
-  const bot = await json('/api/mobile/bots', { name: `Worker mail sender ${marker.slice(-8)}`, color: 'bleu', shape: 'cercle' })
+  const bot = await json('/api/mobile/bots', { name: `Worker mail sender ${marker.slice(-8)}`, color: 'bleu', shape: 'cercle', agent: 'claude_code' })
   const current = await json(`/api/bots/${bot.id}/definition`)
   const saved = await json(`/api/bots/${bot.id}/definition`, { action: 'save', expectedVersion: current.version, requestId: randomUUID(),
     definition: { ...current.definition, tools,

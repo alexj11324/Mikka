@@ -86,7 +86,13 @@ test('run machine fallback: 本地 a computer that takes part, 云端 own E2B, e
     return deviceId
   }
   // No bot named: the Coordinator of the person's own workspace (each person here has one), as the app resolves it.
-  const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
+  const { chatBotId: coordinatorChat } = await import('../lib/coordinator/coordinator-bot')
+  // The Coordinator is a Bot and names its Agent (decision 2026-11-17).
+  const chatBotId = async (...args: Parameters<typeof coordinatorChat>) => {
+    const id = await coordinatorChat(...args)
+    await pool.query("UPDATE bots SET agent=COALESCE(agent,'codex') WHERE id=$1", [id])
+    return id
+  }
   // The workspace the person was seeded with: the first Coordinator lookup also creates their personal workspace, so "any membership" is not it.
   const ownWorkspace = async (userId: string) => {
     const workspaceId = seeded.get(userId)

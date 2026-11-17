@@ -16,13 +16,13 @@ test('update a bot', { skip: !dbUrl }, async t => {
   const owner = await seedUser(pool, 'owner'), member = await seedUser(pool, 'member'), outsider = await seedUser(pool, 'outsider')
   const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
   const other = await seedWorkspace(pool, outsider, [{ userId: outsider, role: 'admin' }, { userId: owner, role: 'member' }])
-  const bot = await seedBot(pool, ws.id, owner, 'Reviewer')
+  const bot = await seedBot(pool, ws.id, owner, 'Reviewer', null)
   await seedBot(pool, ws.id, owner, 'Writer')
   const me = { ownerId: owner, workspaceId: ws.id }
 
   await t.test('renames, trims, and changes shape and colour', async () => {
-    assert.deepEqual(await updateOwnedBot(me, { botId: bot, name: '  Release notes  ' }), { id: bot, name: 'Release notes', color: 'encre', shape: 'cercle',publicRole:'' })
-    assert.deepEqual(await updateOwnedBot(me, { botId: bot, color: 'vert', shape: 'hexagone' }), { id: bot, name: 'Release notes', color: 'vert', shape: 'hexagone',publicRole:'' })
+    assert.deepEqual(await updateOwnedBot(me, { botId: bot, name: '  Release notes  ' }), { id: bot, name: 'Release notes', color: 'encre', shape: 'cercle',publicRole:'', agent: null })
+    assert.deepEqual(await updateOwnedBot(me, { botId: bot, color: 'vert', shape: 'hexagone' }), { id: bot, name: 'Release notes', color: 'vert', shape: 'hexagone',publicRole:'', agent: null })
     assert.deepEqual(await nameOf(bot), { name: 'Release notes', color: 'vert', shape: 'hexagone' })
     // Its own name in another case is not a clash with itself.
     assert.equal((await updateOwnedBot(me, { botId: bot, name: 'RELEASE NOTES' })).name, 'RELEASE NOTES')
@@ -55,5 +55,15 @@ test('update a bot', { skip: !dbUrl }, async t => {
     await rejects(updateOwnedBot({ownerId:owner,workspaceId:other.id},{botId:bot,publicRole:'Other workspace'}),'botNotFound')
     await rejects(updateOwnedBot(me,{botId:bot,publicRole:'x'.repeat(2001)}),'validationGeneric')
     assert.equal((await updateOwnedBot(me,{botId:bot,publicRole:''})).publicRole,'')
+  })
+  await t.test('a Bot made before the Agent choice has none; its owner picks one, never clears it', async () => {
+    const { botAgent } = await import('../lib/bot-agent')
+    assert.equal(await botAgent(pool, bot), null)
+    assert.equal((await updateOwnedBot(me, { botId: bot, agent: 'codex' })).agent, 'codex')
+    assert.equal(await botAgent(pool, bot), 'codex')
+    await rejects(updateOwnedBot(me, { botId: bot, agent: 'gpt' }), 'botAgentRequired')
+    await rejects(updateOwnedBot({ ownerId: member, workspaceId: ws.id }, { botId: bot, agent: 'claude_code' }), 'botNotFound')
+    await assert.rejects(pool.query("UPDATE bots SET agent='mikka' WHERE id=$1", [bot]))
+    assert.equal(await botAgent(pool, bot), 'codex')
   })
 })

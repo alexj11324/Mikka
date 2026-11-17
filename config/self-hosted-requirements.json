@@ -972,6 +972,15 @@
     "test": "tests/one-thread-per-task.db.test.ts",
     "suite": "test:bot-threads-db"
   },
+  "drizzle/20261117190000_bot_agent.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "A Bot names the Agent its tasks run on (Claude Code or Codex) in the installation database; existing Bots keep none and their next dispatch asks for one.",
+    "test": "tests/bot-update.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
   "drizzle/20261117140000_subscriptions_owner_only.sql": {
     "mode": "built-in",
     "environment": [

@@ -32,7 +32,13 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const { withProjectResourceLease } = await import('../lib/project-resources/store')
-  const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
+  const { chatBotId: coordinatorChat } = await import('../lib/coordinator/coordinator-bot')
+  // The Coordinator is a Bot and names its Agent (decision 2026-11-17).
+  const chatBotId = async (...args: Parameters<typeof coordinatorChat>) => {
+    const id = await coordinatorChat(...args)
+    await pool.query("UPDATE bots SET agent=COALESCE(agent,'codex') WHERE id=$1", [id])
+    return id
+  }
   const users: string[] = []
   const github = githubAppStub()
   github.install('octo/repo', { contents: 'write', pull_requests: 'write' })

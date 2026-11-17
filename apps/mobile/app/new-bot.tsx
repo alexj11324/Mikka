@@ -29,14 +29,16 @@ export default function NewBot() {
   const [name, setName] = useState('')
   const [shape, setShape] = useState<string>('cercle')
   const [color, setColor] = useState('encre')
+  // The Agent its tasks run on: required, nothing preselected (decision 2026-11-17).
+  const [agent, setAgent] = useState<'claude_code' | 'codex' | null>(null)
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const create = async () => {
-    if (!name.trim() || busy) return
+    if (!name.trim() || !agent || busy) return
     setBusy(true)
     setProblem(null)
     try {
-      const bot = await api<{ id: string }>('/api/mobile/bots', { method: 'POST', body: { name: name.trim(), color, shape } })
+      const bot = await api<{ id: string }>('/api/mobile/bots', { method: 'POST', body: { name: name.trim(), color, shape, agent } })
       tap()
       await home.reload()
       openChat(chatPath(bot.id))
@@ -50,7 +52,7 @@ export default function NewBot() {
     <>
       <NavBar fade={false} title="新建 Bot"
         left={{ icon: 'xmark', label: '取消', disabled: busy, web: <X size={20} color={colors.ink} />, onPress: () => router.back() }}
-        right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !name.trim() || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
+        right={{ icon: 'checkmark', label: busy ? '创建中' : '创建', disabled: !name.trim() || !agent || busy, busy, prominent: true, web: <Check size={20} color={colors.accent} strokeWidth={2.4} />, onPress: () => void create() }} />
       <ScrollView style={styles.screen} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.body}>
         <View style={styles.hero}><BotAvatar color={color} shape={shape} size={96} /></View>
         <Field style={styles.field}>
@@ -58,6 +60,15 @@ export default function NewBot() {
             returnKeyType="done" onSubmitEditing={() => void create()} style={styles.input} accessibilityLabel="名字" />
         </Field>
         {problem ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.problem}>{problem}</Text> : null}
+        <Text style={styles.label}>Agent</Text>
+        <View accessibilityRole="radiogroup" accessibilityLabel="Agent" style={styles.panel}>
+          {([['claude_code', 'Claude Code'], ['codex', 'Codex']] as const).map(([value, label]) => (
+            <Pressable key={value} accessibilityRole="radio" accessibilityState={{ checked: agent === value, disabled: busy }} aria-checked={Platform.OS === 'web' ? agent === value : undefined} aria-disabled={Platform.OS === 'web' ? busy : undefined} accessibilityLabel={label} disabled={busy} onPress={() => { tap(); setAgent(value) }}
+              style={[styles.choice, styles.agent, agent === value && styles.chosen]}>
+              <Text>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
         <Text style={styles.label}>形状</Text>
         <View accessibilityRole="radiogroup" accessibilityLabel="形状" style={styles.panel}>
           {BOT_PICKER_SHAPES.map(item => (
@@ -92,6 +103,7 @@ const styles = StyleSheet.create({
   problem: { color: colors.danger, fontSize: 14, marginTop: -8, marginLeft: 4 },
   choice: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   chosen: { borderColor: colors.accent },
+  agent: { width: 'auto', paddingHorizontal: 14 },
   swatchRing: { width: 48, height: 48, borderRadius: 24, borderWidth: 2.5, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   swatch: { width: 36, height: 36, borderRadius: 18 },
 })

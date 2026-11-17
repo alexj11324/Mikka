@@ -22,7 +22,8 @@ export const computerStateSchema = z.object({
 export const viewerModeSchema = z.enum(['view', 'control'])
 export const viewerRequestSchema = z.object({ mode: viewerModeSchema }).strict()
 export const viewerGrantSchema = z.object({ url: z.url({ protocol: /^wss$/ }), expiresAt: z.iso.datetime() })
-export const createBotSchema = z.object({ name: z.string().trim().min(1).max(120) }).strict()
+/** A Bot names the Agent its tasks run on (decision 2026-11-17): required, no default. */
+export const createBotSchema = z.object({ name: z.string().trim().min(1).max(120), agent: z.enum(['claude_code', 'codex']) }).strict()
 export const botViewSchema = z.object({ id: z.uuid(), name: z.string().min(1).max(120) })
 export const approvalDecisionSchema = z.object({ digest: z.string(), decision: z.enum(['approve', 'deny']), scope: z.enum(['once', 'run']) }).strict()
 export const computerTaskStateSchema = z.enum(['working', 'approval', 'done', 'failed'])

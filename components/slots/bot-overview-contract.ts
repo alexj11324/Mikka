@@ -25,6 +25,18 @@ export type BotOverviewProps = {
     /** The look picker (shapes and colours), as 新建 Bot draws it. */
     picker: (props: { onError: (error: string | null) => void }) => ReactNode
   }
+  /**
+   * 详情: the Agent the bot's tasks run on (Claude Code or Codex), the Coordinator's included; null for an older chat
+   * without a bot. `value` null: none chosen yet (a Bot made before the choice), so it dispatches nothing until one is.
+   * There is no default. `onChange` saves at once and resolves to an error to show, or null once saved.
+   */
+  agent?: null | {
+    value: 'claude_code' | 'codex' | null
+    choices: { value: 'claude_code' | 'codex'; label: string }[]
+    loaded: boolean
+    saving: boolean
+    onChange: (value: 'claude_code' | 'codex') => Promise<string | null>
+  }
   /** 详情: the bot's public role (an ordinary bot only), its routines and its library. */
   details: {
     role: null | {

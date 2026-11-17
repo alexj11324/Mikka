@@ -27,6 +27,11 @@ export type NewBotProps = {
   shape: BotShape
   onColor: (color: BotColor) => void
   onShape: (shape: BotShape) => void
+  /**
+   * The Agent the Bot's tasks run on: Claude Code or Codex. Required, with no preselected choice: `value` stays null
+   * until the person picks, and Create refuses without one.
+   */
+  agent: NewBotDetail
   /** The model the Bot's runs use (the model picker's menu); saved after the Bot is created. */
   model: NewBotDetail
   /** The repository the Bot works in; `NO_REPOSITORY` for none (the Bot works on Mikka Cloud). */

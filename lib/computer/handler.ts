@@ -12,8 +12,8 @@ export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'c
       if (request.method !== 'GET' && request.headers.get('origin') !== new URL(request.url).origin) return response({ error: 'Invalid origin' }, 403)
       if (!botId) {
         if (request.method === 'GET') return response(await store.listBots(actor))
-        const { name } = createBotSchema.parse(await request.json())
-        return response(await store.createBot(actor, name), 201)
+        const { name, agent } = createBotSchema.parse(await request.json())
+        return response(await store.createBot(actor, name, agent), 201)
       }
       z.uuid().parse(botId)
       if (!action) return response(await store.state(actor, botId))

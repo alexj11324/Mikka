@@ -38,7 +38,7 @@ before(async () => {
     headers: async () => new Headers(),
   } })
   mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError, requireWorkspace: async () => { throw new Error('unexpected') }, loadWorkspaceContext: async (workspaceId?: string) => { workspaceContextCalls.push(workspaceId); return { workspace: { id: workspaceId ?? actor.workspaceId } } } } })
-  mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { listOwnerBots: async (ownerId: string, workspaceId: string) => { calls.push(['listOwnerBots', ownerId, workspaceId]); return [{ id: 'bot-in-shown-workspace', name: 'Bot', color: 'encre', shape: 'cercle', coordinator: true }] } } })
+  mock.module('@/lib/coordinator/coordinator-bot', { namedExports: { listOwnerBots: async (ownerId: string, workspaceId: string) => { calls.push(['listOwnerBots', ownerId, workspaceId]); return [{ id: 'bot-in-shown-workspace', name: 'Bot', color: 'encre', shape: 'cercle', agent: 'claude_code', coordinator: true }] } } })
   mock.module('@/lib/workspace-admin/current', { namedExports: { currentWorkspaceActor: async (workspaceId?: string) => { calls.push(['currentWorkspaceActor', workspaceId]); return workspaceId ? { ...actor, workspaceId } : actor } } })
   mock.module('@/lib/audit/record', { namedExports: { auditRequestContext: () => ({ ip: null, geoCity: null, geoCountry: null, geoRegion: null }) } })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name, [tokenWorkspace]: tokenWorkspaceId }) } })
@@ -191,25 +191,25 @@ test('team lifecycle actions refuse a PAT bound to a different workspace before 
 
 test('createBot uses the workspace defaults only for omitted fields', async () => {
   reset(); inserted.length = 0
-  await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle' })
+  await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle', agent: 'claude_code' })
   assert.equal(inserted[0].model, 'codex')
   assert.equal(inserted[0].repository, 'acme/app')
   assert.equal(inserted[0].workspaceId, actor.workspaceId)
-  await botActions.createBot({ name: 'Scout 2', color: 'encre', shape: 'cercle', model: 'mikka', repository: null })
+  await botActions.createBot({ name: 'Scout 2', color: 'encre', shape: 'cercle', agent: 'claude_code', model: 'mikka', repository: null })
   assert.equal(inserted[1].model, 'mikka')
   assert.equal(inserted[1].repository, null)
   assert.equal(calls.filter(call => call[0] === 'workspaceBotDefaults').length, 1, 'explicit values skip the defaults read')
   defaults = { defaultModel: null, defaultRepository: null }
-  await botActions.createBot({ name: 'Scout 3', color: 'encre', shape: 'cercle' })
+  await botActions.createBot({ name: 'Scout 3', color: 'encre', shape: 'cercle', agent: 'claude_code' })
   assert.equal(inserted[2].model, null)
-  await assert.rejects(botActions.createBot({ name: 'Bad', color: 'encre', shape: 'cercle', model: 'gpt-x' }), /validationGeneric/)
+  await assert.rejects(botActions.createBot({ name: 'Bad', color: 'encre', shape: 'cercle', agent: 'claude_code', model: 'gpt-x' }), /validationGeneric/)
 })
 
 test('createBot refuses a repository the workspace has not installed', async () => {
   reset(); inserted.length = 0
-  await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle', repository: 'acme/app' })
+  await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle', agent: 'claude_code', repository: 'acme/app' })
   assert.equal(inserted[0].repository, 'acme/app')
-  await assert.rejects(botActions.createBot({ name: 'Elsewhere', color: 'encre', shape: 'cercle', repository: 'other/secret' }), /botDefaultRepositoryUnavailable/)
+  await assert.rejects(botActions.createBot({ name: 'Elsewhere', color: 'encre', shape: 'cercle', agent: 'claude_code', repository: 'other/secret' }), /botDefaultRepositoryUnavailable/)
   assert.equal(inserted.length, 1)
   assert.deepEqual(calls.filter(call => call[0] === 'repositoryAvailable').map(call => call[2]), ['acme/app', 'other/secret'])
 })
@@ -217,7 +217,7 @@ test('createBot refuses a repository the workspace has not installed', async () 
 test('the Bot list for a shown workspace is read from that workspace, not the session active one', async () => {
   reset()
   const shown = '33333333-3333-4333-8333-333333333333'
-  assert.deepEqual(await botActions.listBotsForWorkspace(shown), [{ id: 'bot-in-shown-workspace', name: 'Bot', color: 'encre', shape: 'cercle', coordinator: true }])
+  assert.deepEqual(await botActions.listBotsForWorkspace(shown), [{ id: 'bot-in-shown-workspace', name: 'Bot', color: 'encre', shape: 'cercle', agent: 'claude_code', coordinator: true }])
   assert.deepEqual(workspaceContextCalls, [shown])
   assert.deepEqual(relevant(), [['listOwnerBots', actor.userId, shown]])
 })
@@ -240,4 +240,13 @@ test('transferWorkspace passes the shown workspace and audit context to its tran
   assert.deepEqual(relevant(), [['workspaceTransferTargets', actor.userId, other], ['transferWorkspaceOwnership', actor.userId, other, 'm-1', auditContext]])
   failure = new WorkspaceError('workspaceTransferTargetInvalid')
   assert.deepEqual(await actions.transferWorkspace('m-1', other), { error: 'workspaceTransferTargetInvalid', params: undefined })
+})
+
+test('createBot refuses a Bot without an Agent: there is no default', async () => {
+  reset(); inserted.length = 0
+  await assert.rejects(botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle', agent: null }), /botAgentRequired/)
+  await assert.rejects(botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle', agent: 'gpt' as never }), /botAgentRequired/)
+  assert.equal(inserted.length, 0)
+  await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle', agent: 'codex' })
+  assert.equal(inserted[0].agent, 'codex')
 })

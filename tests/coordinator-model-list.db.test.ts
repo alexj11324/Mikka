@@ -17,7 +17,13 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   const steps = await import('../workflows/coordinator/steps')
   const { composeEveInstructions } = await import('../lib/coordinator/product-instructions')
   const order = await import('../lib/model-order')
-  const { chatBotId } = await import('../lib/coordinator/coordinator-bot')
+  const { chatBotId: coordinatorChat } = await import('../lib/coordinator/coordinator-bot')
+  // The Coordinator is a Bot and names its Agent (decision 2026-11-17).
+  const chatBotId = async (...args: Parameters<typeof coordinatorChat>) => {
+    const id = await coordinatorChat(...args)
+    await pool.query("UPDATE bots SET agent=COALESCE(agent,'codex') WHERE id=$1", [id])
+    return id
+  }
   const github = githubAppStub()
   github.install('octo/repo', { contents: 'write', pull_requests: 'write' })
   const users: string[] = []

@@ -129,7 +129,7 @@ export async function listOwnerBots(ownerId: string, workspaceId: string) {
   const [{ db }, { bots }, { and, asc, desc, eq, sql }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm')])
   const { botId } = await coordinatorBot(ownerId, workspaceId)
   const isCoordinator = sql<boolean>`${bots.id} = ${botId}`
-  return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator }).from(bots)
+  return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator, agent: bots.agent }).from(bots)
     .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId)))
     .orderBy(desc(isCoordinator), asc(bots.createdAt))
 }

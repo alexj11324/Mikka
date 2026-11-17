@@ -55,7 +55,7 @@ export async function verifyMailbox({ accounts, pool, progress = async () => {},
     return waitTools(account, botId, since, expected)
   }
   const create = async (account, name, instructions) => {
-    const bot = await json(account, '/api/mobile/bots', { name: `${name} ${marker.slice(-8)}`, color: 'bleu', shape: 'cercle' })
+    const bot = await json(account, '/api/mobile/bots', { name: `${name} ${marker.slice(-8)}`, color: 'bleu', shape: 'cercle', agent: 'claude_code' })
     const current = await json(account, `/api/bots/${bot.id}/definition`)
     const definition = { ...current.definition, instructions, tools }
     const saved = await json(account, `/api/bots/${bot.id}/definition`, { action: 'save', definition, expectedVersion: current.version, requestId: randomUUID() })

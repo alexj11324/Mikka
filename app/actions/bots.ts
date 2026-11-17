@@ -5,6 +5,7 @@ import { listOwnerBots } from '@/lib/coordinator/coordinator-bot'
 import { ActionFailureError } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
+import type { BotAgent } from '@/lib/db/schema'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { workspaceAction } from '@/lib/workspace-admin/action'
 import { updateOwnedBot } from '@/lib/bot-update'
@@ -21,6 +22,8 @@ export interface BotView {
   shape: string
   /** The person's Coordinator (coordinator_bots): the left column draws it as the Coordinator, pinned on top. */
   coordinator?: boolean
+  /** The Agent its tasks run on; null for a Bot made before the choice existed, which must pick one before it dispatches. */
+  agent?: BotAgent | null
 }
 
 
@@ -50,10 +53,10 @@ export async function pollBots(workspaceId?: string) {
 }
 
 /**
- * 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick.
+ * 新建 Bot: a name, a colour, a shape and the Agent its tasks run on (required, no default).
  * `model` and `repository` default to the workspace's 新 Bot 默认值 when omitted.
  */
-export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }, workspaceId?: string): Promise<BotView> {
+export async function createBot(input: { name: string; color: string; shape: string; agent: BotAgent | null; model?: string | null; repository?: string | null }, workspaceId?: string): Promise<BotView> {
   return createOwnedBot(await getOwner(workspaceId), input)
 }
 
@@ -61,8 +64,19 @@ export async function createBot(input: { name: string; color: string; shape: str
  * Rename a bot or change its shape and colour, from the right panel. Same rules
  * as createBot. The Coordinator keeps its name and look (the left column draws it).
  */
-export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string }, workspaceId?: string): Promise<ActionResult<BotView>> {
+export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string; agent?: BotAgent }, workspaceId?: string): Promise<ActionResult<BotView>> {
   return workspaceAction(async () => updateOwnedBot(await getOwner(workspaceId), input))
+}
+
+/** The Agent a Bot (the Coordinator's included) runs its tasks on; null when none is chosen yet. Its owner only. */
+export async function getBotAgent(botId: string, workspaceId?: string): Promise<ActionResult<{ agent: BotAgent | null }>> {
+  return workspaceAction(async () => {
+    const { ownerId, workspaceId: shown } = await getOwner(workspaceId)
+    const { pool } = await import('@/lib/db')
+    const { rows: [row] } = await pool.query<{ agent: BotAgent | null }>('SELECT agent FROM bots WHERE id::text=$1 AND "ownerId"=$2 AND "workspaceId"=$3', [botId, ownerId, shown])
+    if (!row) throw new ActionFailureError('botNotFound')
+    return { agent: row.agent }
+  })
 }
 
 /** 设置 › 工作区 › Bot: the defaults a new bot starts with, and the choices. Any member may read. */

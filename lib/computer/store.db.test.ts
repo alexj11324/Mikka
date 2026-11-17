@@ -51,6 +51,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const migration = await readFile(new URL('../../drizzle/20261027164501_cloud_computers.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
     await pool.query('ALTER TABLE bots ADD COLUMN IF NOT EXISTS "archivedAt" timestamptz')
+    await pool.query('ALTER TABLE bots ADD COLUMN IF NOT EXISTS agent text')
     await createFixtureWorkspaceTables(pool)
     // Replace the helper's empty non-Org link shape with the full production
     // Org schema before any tenant is seeded; keep its real FK/check constraints.
@@ -107,7 +108,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       await pool.query(sql);await pool.query(sql)
     }
     const store = new ComputerStore(pool, runtime)
-    const bot = await store.createBot(actor, 'Desktop')
+    const bot = await store.createBot(actor, 'Desktop', 'claude_code')
     async function stateView() {
       const { live, ...view } = await store.state(actor, bot.id)
       assert.equal(live?.workspaceId, actor.workspaceId, 'freshness metadata keeps the authorized workspace')
@@ -214,7 +215,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
         assert.ok(renewedUnderFence, 'the renewal succeeds while the requesting token is held FOR SHARE')
       } finally { await fence.query('ROLLBACK'); fence.release(); await fenced.end() }
     }
-    const bobBot = await store.createBot(bob, 'Other owner')
+    const bobBot = await store.createBot(bob, 'Other owner', 'claude_code')
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [worker.deviceId, JSON.stringify([{ harness: 'codex', installed: true, computerBroker: true, subscriptionBroker: true }, { harness: 'claude_code', installed: true, computerBroker: true, subscriptionBroker: true }])])
     let repoSetupCalls = 0
     const botSandbox = { sandboxId: 'sandbox-test', commands: { run: async (_command: string, options: { user: string }) => { assert.equal(options.user, 'user'); repoSetupCalls++ } } } as unknown as import('e2b').Sandbox
@@ -372,7 +373,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const bindings = await pool.query('SELECT "botId" FROM computer_run_bindings WHERE "runId" IN ($1,$2)', [runId, secondRunId])
     assert.equal(bindings.rowCount, 2)
     assert.ok(bindings.rows.every(row => row.botId === bot.id), 'multiple runs share the same Bot desktop')
-    const another = await store.createBot(actor, 'Another bot')
+    const another = await store.createBot(actor, 'Another bot', 'claude_code')
     await assert.rejects(bindComputerRun(pool, actor, runId, another.id), { status: 409 })
     const localRun = randomUUID()
     await pool.query('INSERT INTO agent_runs (id,"userId",status,"deviceId","workspaceId") VALUES ($1,$2,$3,$4,$5)', [localRun, actor.userId, 'queued', deviceId, actor.workspaceId])
@@ -562,11 +563,11 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.ok(epoch > failedEpoch, 'failed synchronization cannot reuse an old generation')
     assert.equal((await restarted.state(actor, bot.id)).machine, 'sleeping', 'provider pause is reflected')
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM bot_desktops')).rows[0].n, 2)
-    const interrupted = await store.createBot(actor, 'Interrupted start')
+    const interrupted = await store.createBot(actor, 'Interrupted start', 'claude_code')
     failStart = true
     await assert.rejects(store.operate(actor, interrupted.id, 'wake'))
     failStart = false
-    const later = await store.createBot(actor, 'Later bot')
+    const later = await store.createBot(actor, 'Later bot', 'claude_code')
     await store.operate(actor, later.id, 'wake')
     const displays = (await pool.query(`SELECT display FROM bot_desktops WHERE "ownerId"='alice' ORDER BY display`)).rows.map(row => row.display)
     assert.deepEqual(displays, [1, 2, 3], 'uncertain start keeps its binding rather than leaking its desktop to a later bot')

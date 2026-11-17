@@ -35,7 +35,7 @@ async function main() {
     await pool.query(await readFile(new URL('../../drizzle/20261027164515_workspace_computer_policy.sql', import.meta.url), 'utf8'))
     const store = new ComputerStore(pool)
     const actor = { userId: 'acceptance-owner', workspaceId: randomUUID() }
-    const bot = await store.createBot(actor, 'E2B acceptance')
+    const bot = await store.createBot(actor, 'E2B acceptance', 'claude_code')
     await store.operate(actor, bot.id, 'wake')
     console.log('live stage: provisioned')
     const id = (await pool.query('SELECT "sandboxId" FROM cloud_machines')).rows[0].sandboxId

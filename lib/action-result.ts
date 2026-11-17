@@ -76,6 +76,7 @@ export const ACTION_ERROR_CODES = [
   'agentDuplicateName',
   'botDuplicateName',
   'botNameTooLong',
+  'botAgentRequired',
   'agentInvalidInput',
   'agentAddFailed',
   'agentSaveFailed',

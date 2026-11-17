@@ -3,8 +3,9 @@ import { createBotSchema, viewerGrantSchema, viewerRequestSchema, computerEventS
 
 describe('computer wire contract', () => {
   it('rejects ownership injection when creating a Bot or requesting a viewer', () => {
-    expect(createBotSchema.parse({ name: ' Bot ' })).toEqual({ name: 'Bot' })
-    expect(createBotSchema.safeParse({ name: 'Bot', ownerId: 'other' }).success).toBe(false)
+    expect(createBotSchema.parse({ name: ' Bot ', agent: 'codex' })).toEqual({ name: 'Bot', agent: 'codex' })
+    expect(createBotSchema.safeParse({ name: 'Bot' }).success).toBe(false)
+    expect(createBotSchema.safeParse({ name: 'Bot', agent: 'codex', ownerId: 'other' }).success).toBe(false)
     expect(viewerRequestSchema.safeParse({ mode: 'control', userId: 'other' }).success).toBe(false)
   })
   it('requires an encrypted WebSocket grant with an expiration', () => {

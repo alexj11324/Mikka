@@ -40,7 +40,7 @@ async function main() {
     await pool.query(await readFile(new URL('../../drizzle/20261027164515_workspace_computer_policy.sql', import.meta.url), 'utf8'))
     const actor = { userId: 'synthetic-owner', workspaceId: randomUUID() }
     const store = new ComputerStore(pool)
-    const bot = await store.createBot(actor, 'Synthetic Bot')
+    const bot = await store.createBot(actor, 'Synthetic Bot', 'claude_code')
     stage = 'provision'
     await store.operate(actor, bot.id, 'wake')
     stage = 'connect'
