@@ -2,7 +2,7 @@ import { writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
-export function ingressConfig({ release, image, origin, taskMachine, eveService, businessWorld, credentialIdentityService, credentialBrokerService, workersAi = false }) {
+export function ingressConfig({ release, image, origin, taskMachine, eveService, businessWorld, credentialIdentityService, credentialBrokerService, liteLlmService, workersAi = false }) {
   const account = image.split('/')[1]
   const services = [
     { binding: 'TASK_MACHINE', service: taskMachine },
@@ -10,6 +10,7 @@ export function ingressConfig({ release, image, origin, taskMachine, eveService,
     { binding: 'BUSINESS_WORLD', service: businessWorld, entrypoint: 'BusinessWorldService' },
     { binding: 'CREDENTIAL_IDENTITY', service: credentialIdentityService, entrypoint: 'AppIdentity' },
     { binding: 'CREDENTIAL_BROKER', service: credentialBrokerService, entrypoint: 'CredentialBroker' },
+    { binding: 'LITELLM', service: liteLlmService },
   ].filter(item => item.service !== undefined)
   return {
     ...(services.length ? { services } : {}),

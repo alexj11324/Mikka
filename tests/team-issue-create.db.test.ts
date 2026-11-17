@@ -224,6 +224,18 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       }
       assert.equal((await request(editor, 'POST', fileId, new Uint8Array([1]))).status, 409)
       assert.deepEqual(await (await request(member)).json(), { files: [file], canEdit: true })
+      const { ensureTaskIdentifiers } = await import('../lib/task-identity-store')
+      const code = (await ensureTaskIdentifiers([{ id: taskId, ownerId: owner }])).get(taskId)
+      assert.ok(code)
+      const lookup = endpoint.replace(taskId, encodeURIComponent(code)) + `?id=${fileId}&format=url&fresh=1`
+      const metadata = await request(member, 'GET', '', data, lookup)
+      assert.equal(metadata.status, 200)
+      assert.equal(metadata.headers.get('cache-control'), 'private, no-store')
+      const link = await metadata.json()
+      assert.equal(link.expiresAt, null)
+      const resolved = new URL(link.url).href
+      assert.equal(resolved, `${endpoint}?id=${fileId}`)
+      assert.deepEqual(new Uint8Array(await (await request(member, 'GET', '', data, resolved)).arrayBuffer()), data)
       const download = await request(member, 'GET', fileId)
       assert.equal(download.status, 200)
       assert.match(download.headers.get('content-disposition')!, /^attachment;/)
@@ -232,6 +244,8 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await request(editor, 'GET', fileId, data, endpoint.replace(taskId, otherId))).status, 404)
       await app.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='task' AND id=$1`, [taskId])
       assert.equal((await request(member)).status, 404)
+      assert.equal((await request(member, 'GET', '', data, lookup)).status, 404)
+      assert.equal((await request(member, 'GET', '', data, resolved)).status, 404)
       await app.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
         VALUES('task',$1,'account',$2,ARRAY['canReadContent'])`, [taskId, racer])
       assert.deepEqual(await (await request(member)).json(), { files: [file], canEdit: false })
@@ -244,6 +258,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       assert.equal((await request(editor, 'DELETE', fileId)).status, 204)
       assert.deepEqual(await (await request(editor)).json(), { files: [], canEdit: true })
       assert.equal((await request(editor, 'GET', fileId)).status, 404)
+      assert.equal((await request(editor, 'GET', '', data, lookup)).status, 404)
       // One more upload at the count boundary wins; declined uploads do not add rows.
       for (let n = 0; n < 9; n++) assert.equal((await request(editor, 'POST', randomUUID())).status, 200)
       const concurrent = await Promise.all([request(editor, 'POST', randomUUID()), request(editor, 'POST', randomUUID())])

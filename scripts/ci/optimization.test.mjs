@@ -124,13 +124,16 @@ test('Eve migration and maintenance check out the Eve publication source and oth
     const application = 'a'.repeat(40), eve = 'b'.repeat(40)
     await writeFile(join(directory, 'docs/operations/releases/hosted-api-staging.json'), JSON.stringify({ publicSource: application }))
     await writeFile(join(directory, 'docs/operations/releases/eve-runtime-production.json'), JSON.stringify({ maintenancePublication: { publicSource: eve } }))
-    for (const phase of ['production-eve-postgres', 'production-eve-maintenance', 'production-api', 'stage-all']) {
+    const service = 'c'.repeat(40)
+    await writeFile(join(directory, 'docs/operations/releases/service-release.json'), JSON.stringify({ service: 'litellm', publicSource: service }))
+    for (const phase of ['production-eve-postgres', 'production-eve-maintenance', 'production-api', 'stage-all', 'service-stage', 'service-production']) {
       const output = join(directory, 'output')
       await writeFile(output, '')
       const child = spawnSync(process.execPath, ['--input-type=module'], { input: script, cwd: directory,
         env: { PATH: process.env.PATH, MIKKA_DEPLOYMENT_PHASE: phase, GITHUB_OUTPUT: output }, encoding: 'utf8' })
       assert.equal(child.status, 0, child.stderr)
-      assert.equal(await readFile(output, 'utf8'), 'source=' + (['production-eve-postgres', 'production-eve-maintenance'].includes(phase) ? eve : application) + '\n')
+      assert.equal(await readFile(output, 'utf8'), 'source=' + (['production-eve-postgres', 'production-eve-maintenance'].includes(phase) ? eve
+        : phase.startsWith('service-') ? service : application) + '\n')
     }
   } finally { await rm(directory, { recursive: true, force: true }) }
 })

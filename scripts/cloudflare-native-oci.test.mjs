@@ -30,6 +30,7 @@ const workerBundles = {
   apiIngress: { path: 'ingress.mjs', sha256: 'c'.repeat(64), bytes: 120 },
   eveRuntime: { path: 'workers/eve-runtime.mjs', sha256: 'd'.repeat(64), bytes: 220 },
   taskSandbox: { path: 'workers/task-sandbox.mjs', sha256: 'e'.repeat(64), bytes: 320 },
+  liteLlm: { path: 'workers/litellm.mjs', sha256: 'e'.repeat(64), bytes: 320 },
   web: { path: 'workers/web.mjs', sha256: 'f'.repeat(64), bytes: 420 },
   credentialIdentity: { path: 'workers/credential-identity.mjs', sha256: '1'.repeat(64), bytes: 520 },
   credentialBroker: { path: 'workers/credential-broker.mjs', sha256: '2'.repeat(64), bytes: 620 },

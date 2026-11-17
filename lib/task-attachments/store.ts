@@ -44,6 +44,13 @@ export function listTaskFiles(actor: Actor): Promise<TaskFileList> {
   })
 }
 
+export function requireTaskFileDownload(actor: Actor, fileId: string) {
+  return withFiles(actor, false, async tx => {
+    const { rowCount } = await tx.execute(sql`SELECT 1 FROM task_attachments WHERE "taskId"=${actor.taskId} AND id=${fileId}`)
+    if (!rowCount) throw new TaskFileError('notFound')
+  })
+}
+
 export function readTaskFile(actor: Actor, id: string, signal: AbortSignal) {
   return withFiles(actor, false, async tx => {
     const { rows: [file] } = await tx.execute<{ name: string; size: number; storageKey: string | null; inlineData: Buffer | null }>(

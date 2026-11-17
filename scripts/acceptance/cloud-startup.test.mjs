@@ -191,7 +191,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           assert.equal(input.model, undefined)
           assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
           assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
-          current.dispatchInput = input; current.harness = profiles.get(input.profileId).harness; current.profileId = input.profileId
+          current.dispatchInput = input; current.harness = chosenModel?.provider === 'codex' ? 'codex' : 'claude_code'; current.profileId = input.profileId
           assert.equal(chosenModel?.modelId, models[current.harness], 'the coordinator must use the same explicitly chosen small subscription model')
           current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
           assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
@@ -219,9 +219,11 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         assert.fail(`unexpected RPC ${action}`)
       }
       if (path === '/api/factory/agent-profiles') {
-        const body = JSON.parse(init.body), profile = { ...body.profile, id: id(500 + ++profileCount), version: 1, digest: 'e'.repeat(64) }
+        const body = JSON.parse(init.body)
+        // The product saves an Agent 配置 as content only (decision 2026-11-15-1630).
         assert.equal(body.workspaceId, caseWorkspace)
-        assert.equal(profile.model.source.kind, 'subscription'); assert.equal(profile.model.model, models[profile.harness])
+        assert.equal(body.profile.model, undefined); assert.equal(body.profile.harness, undefined)
+        const profile = { ...body.profile, roles: [], harness: 'auto', model: { mode: 'inherit' }, id: id(500 + ++profileCount), version: 1, digest: 'e'.repeat(64) }
         profiles.set(profile.id, profile); return json({ profile })
       }
       if (path.startsWith('/api/factory/agent-profiles/')) { assert.equal(init.method, 'DELETE'); return json({ archived: true }) }
@@ -480,7 +482,7 @@ test('profile validation and pre-sample build pin keep their own stage instead o
     return Response.json(value)
   }
   const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
-  assert.deepEqual(report.samples[0].failure, { phase: 'profile_validation', code: 'startup_profile_source_mismatch' })
+  assert.deepEqual(report.samples[0].failure, { phase: 'profile_validation', code: 'startup_profile_not_content_only' })
   assert.equal(io.samples.length, 0)
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_INVALID_PROFILE/)
   const pinned = await runCloudStartup({ ...oneCodexCandidate(), expectedBuild: 'EXPECTED_DIFFERENT_BUILD' }, { env, ...fixture({ candidate: true }) })

@@ -49,7 +49,7 @@ export const STARTUP_FAILURE_CODES = Object.freeze([
   'live_capability_missing', 'live_disconnected', 'live_origin_invalid', 'live_scope_missing', 'live_ticket_expired', 'live_ticket_invalid',
   'mode_invalid', 'model_invalid', 'multiple_dispatches', 'node_websocket_required', 'observation_aborted',
   'official_agent_acceptance_missing', 'official_timing_invalid', 'option_invalid', 'origin_invalid', 'placement_mismatch',
-  'profile_create_failed', 'profile_source_mismatch', 'request_failed', 'response_invalid', 'rpc_refused', 'runs_invalid',
+  'profile_create_failed', 'profile_not_content_only', 'profile_source_mismatch', 'request_failed', 'response_invalid', 'rpc_refused', 'runs_invalid',
   'runtime_evidence_failed', 'runtime_evidence_invalid', 'runtime_evidence_required', 'sample_id_invalid', 'session_identity_mismatch',
   'shared_chat_model_ambiguous', 'shared_chat_model_unavailable', 'shared_scope_required', 'shared_subscription_identity_mismatch',
   'shared_subscription_model_missing_or_ambiguous', 'sign_in_failed', 'sign_out_failed', 'smoke_account_required', 'strategy_invalid',
@@ -363,7 +363,7 @@ export async function dispatchThroughCoordinator(client, record, { botId, profil
   const delivery = sponsored && probe?.sponsoredRepositoryDelivery === true
   const text = sponsored
     ? `请用当前来源事件创建一个标题为「${record.title}」的测试任务，再调用一次 dispatch_run。issueId 必须是刚创建的任务，其余参数为 ${JSON.stringify(toolInput)}。使用该固定 Profile 与所选订阅。${delivery ? '按 note 原样派发唯一的仓库交付夹具，只允许指定文件、任务分支与 PR，禁止合并及创建额外任务。' : '工作仅限读取该仓库的 README，返回 ' + marker + '。不要推送、发布、对外发消息或创建额外任务。'}`
-    : `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用已固定模型的指定 Profile，不另传 model，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
+    : `执行已有测试任务 ${record.issueId}，不要创建另一项任务。请调用一次 dispatch_run，参数如下：${JSON.stringify(toolInput)}。使用指定 Profile，模型跟随本对话，不另传 model，不换 Profile、订阅或电脑。派发完成后只汇报 runId。`
   const trace = sampledRequestTrace()
   record.requestTraceId = trace.traceId
   record.requestTraceScope = 'submission_http_only_workflow_may_use_another_trace'
@@ -821,8 +821,10 @@ export async function subscriptionProof(client, record, scope, profile, { profil
   assert(['explicit', 'decision'].includes(profileSource), 'profile_source_mismatch')
   const personal = scope.workspaceKind === 'personal', owned = scope.actor === OWNED_CODEX_ACTOR
   const payerId = personal || owned ? scope.ownerId : scope.adminId, access = personal || owned ? 'owner' : 'workspace_share'
+  // The subscription the case chose: kept beside a content-only Agent 配置, or a legacy fixed profile's source.
+  const source = profile.subscriptionSource ?? profile.model?.source
   const evidence = await client.json(`/api/runs/${record.runId}/evidence`), run = evidence.run
-  assert(run?.id === record.runId && run.issueId === record.issueId && run.harness === record.harness
+  assert(UUID.test(source?.connectionId ?? '') && run?.id === record.runId && run.issueId === record.issueId && run.harness === record.harness
     && run.model === MODELS[record.harness] && run.credentialType === 'subscription'
     && run.subscriptionRoute === ROUTES[record.harness] && run.agentProfile?.profileId === record.profileId,
   'subscription_provenance_mismatch')
@@ -853,7 +855,7 @@ export async function subscriptionProof(client, record, scope, profile, { profil
   record.execution = { harness: run.harness, model: run.model, credentialType: run.credentialType,
     deviceId: device.id, subscriptionRoute: run.subscriptionRoute, identity: safeIdentity(identity),
     [personal ? 'personalScope' : owned ? 'ownedScope' : 'sharedScope']: { verified: true, requesterHash: sha(scope.ownerId).slice(0, 16), payerHash: sha(payerId).slice(0, 16),
-      workspaceHash: personal ? scope.evidence.personalWorkspaceHash : owned ? scope.evidence.workspaceHash : scope.evidence.teamWorkspaceHash, connectionHash: sha(profile.model.source.connectionId).slice(0, 16),
+      workspaceHash: personal ? scope.evidence.personalWorkspaceHash : owned ? scope.evidence.workspaceHash : scope.evidence.teamWorkspaceHash, connectionHash: sha(source.connectionId).slice(0, 16),
       bindingHash: sha(subscription.id).slice(0, 16), connectionRevision: subscription.revision,
       profileVersion: profile.version, profileDigest: profile.digest, access } }
 }
@@ -1244,18 +1246,18 @@ export async function runCloudStartup(options, { env = process.env, fetchImpl = 
           personal ? 'personal_model_missing_or_ambiguous' : owned ? 'owned_subscription_model_missing_or_ambiguous' : 'shared_subscription_model_missing_or_ambiguous')
         const candidate = candidates[0]
         phase = 'profile_create'
+        // An Agent 配置 holds content only (decision 2026-11-15-1630): the run
+        // follows the test chat's model, which runSubscriptionCase sets to this
+        // subscription model; the run's evidence proves the subscription was used.
         const created = await client.json('/api/factory/agent-profiles', post({ workspaceId: scope.workspaceId, requestId: randomUUID(), profile: {
           name: `测试1505 ${fixtureId.slice(0, 8)} ${harness}`, description: 'Temporary startup measurement', enabled: true,
-          harness, model: { mode: 'fixed', harness, model: MODELS[harness], source: candidate.source }, effort: 'low', roles: [],
           instructions: caseProfileInstructions ?? 'This is a read-only startup test. Do not modify files, commit, push, create a PR, send external messages, or spawn agents.', skills: [],
         } }))
         phase = 'profile_validation'
         assert(UUID.test(created.profile?.id ?? '') && Number.isInteger(created.profile.version) && created.profile.version > 0, 'profile_create_failed')
-        profiles.set(harness, created.profile)
+        profiles.set(harness, { ...created.profile, subscriptionSource: candidate.source })
         await onFixture?.({ kind: 'profile', id: created.profile.id, harness, workspaceId: scope.workspaceId })
-        assert(/^[a-f0-9]{64}$/.test(created.profile.digest ?? '') && created.profile.harness === harness
-          && created.profile.model?.mode === 'fixed' && created.profile.model.harness === harness && created.profile.model.model === MODELS[harness]
-          && created.profile.model.source?.kind === 'subscription' && created.profile.model.source.connectionId === candidate.source.connectionId, 'profile_source_mismatch')
+        assert(/^[a-f0-9]{64}$/.test(created.profile.digest ?? '') && created.profile.model?.mode === 'inherit', 'profile_not_content_only')
       } catch (error) {
         const failure = startupFailure(error, phase)
         profiles.set(harness, { ...profiles.get(harness), error: failure.code, failure })

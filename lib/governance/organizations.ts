@@ -61,11 +61,17 @@ export async function createOrganization(user: { id: string; name: string; email
   })
 }
 
-function organizationMemberRows(tx: WorkspaceTransaction, organizationId: string, includeDisabled: boolean) {
-  return tx.select().from(organizationMembers).where(and(
+async function organizationMemberRows(tx: WorkspaceTransaction, organizationId: string, includeDisabled: boolean) {
+  const members = await tx.select().from(organizationMembers).where(and(
     eq(organizationMembers.organizationId, organizationId),
     includeDisabled ? undefined : eq(organizationMembers.status, 'active'),
   )).orderBy(asc(organizationMembers.createdAt), asc(organizationMembers.userId))
+  // Auth profiles live in the application database. Restrict the lookup to this authorized roster.
+  const ids = members.map(member => member.userId)
+  const pictures = ids.length ? (await pool.query<{ id: string; image: string | null }>(
+    'select id, image from "user" where id=any($1::text[])', [ids])).rows : []
+  const images = new Map(pictures.map(profile => [profile.id, profile.image]))
+  return members.map(member => ({ ...member, image: images.get(member.userId) ?? null }))
 }
 
 export async function listOrganizationMembers(organizationId: string, actorId: string, includeDisabled: boolean) {
@@ -177,7 +183,14 @@ export async function addOrganizationMember(organizationId: string, actorId: str
     const { rows: [user] } = await pool.query<{ name: string; email: string }>('select name,email from "user" where id=$1', [userId])
     if (!user) throw new GovernanceError('not_found')
     const [member] = await tx.insert(organizationMembers).values({ organizationId, userId, role, ...user }).onConflictDoNothing().returning()
-    if (!member) throw new GovernanceError('invalid_request')
+    if (!member) {
+      const [existing] = await tx.select().from(organizationMembers).where(and(
+        eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId),
+        eq(organizationMembers.role, role), eq(organizationMembers.status, 'active'),
+      )).for('share').limit(1)
+      if (!existing) throw new GovernanceError('invalid_request')
+      return { member: existing }
+    }
     await enqueueOrganizationAudit(tx, { organizationId, actorId, action: 'organization.member_changed', targetId: userId, metadata: { role, status: 'active' } })
     return { member }
   })
