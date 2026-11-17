@@ -74,7 +74,7 @@ test('the polled routes read with a fixed number of queries, whatever the number
     }
     await pool.query(`insert into model_api_keys (id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models) values ($1,$2,'deepseek','openai','c','i',1,'abcd','["deepseek-flash"]')`, [randomUUID(), owner])
     const device = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"deviceType") VALUES ($1,$2,'Laptop','local',true,now(),$3,'laptop')`,
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"deviceType","sessionOpenedAt") VALUES ($1,$2,'Laptop','local',true,now(),$3,'laptop',now())`,
       [device, owner, JSON.stringify([{ harness: 'claude_code', installed: true, subscriptionBroker: true, models: ['claude-opus-5-5'] }, { harness: 'codex', installed: true, subscriptionBroker: true, models: ['gpt-6'] }])])
     for (const harness of ['claude_code', 'codex']) await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)', [randomUUID(), owner, device, harness, `${harness} on Laptop`])
 

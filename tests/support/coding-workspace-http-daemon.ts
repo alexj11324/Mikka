@@ -97,7 +97,8 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
     const route = (template: string, methods: string[], load: ApiRoute['load']): ApiRoute => ({ path: `/mikka${template}`, template, source: `app${template}/route.ts`, methods, load })
     const routes: ApiRoute[] = [
       route('/v1/devices/register', ['POST'], () => import('../../app/v1/devices/register/route')),
-      route('/v1/devices/[deviceId]/heartbeat', ['POST'], () => import('../../app/v1/devices/[deviceId]/heartbeat/route')),
+      route('/v1/devices/[deviceId]/report', ['POST'], () => import('../../app/v1/devices/[deviceId]/report/route')),
+      route('/v1/internal/device-sessions/[deviceId]', ['POST'], () => import('../../app/v1/internal/device-sessions/[deviceId]/route')),
       route('/v1/devices/[deviceId]/repos', ['GET'], () => import('../../app/v1/devices/[deviceId]/repos/route')),
       route('/v1/devices/[deviceId]/runs', ['GET'], () => import('../../app/v1/devices/[deviceId]/runs/route')),
       route('/v1/devices/[deviceId]/gateway', ['GET'], () => import('../../app/v1/devices/[deviceId]/gateway/route')),

@@ -1,7 +1,6 @@
 import { runMessagePrompt } from './run-message-prompt'
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
-import { setTimeout as delay } from 'node:timers/promises'
 import { and, asc, eq, sql, getTableColumns, inArray, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { cloudDeviceScopeAllows } from '@/lib/device-token-scope'
@@ -11,17 +10,12 @@ import type { RunCommand } from '@mikka/protocol/device'
 import type { DeviceCommandKind } from '@/lib/device-management'
 import { deviceRequestCaller } from '@/lib/device-request-context'
 import { ackMailboxNotices, pendingMailboxNotices } from '@/lib/device-mailbox-notices'
-import { DEVICE_WORK_CHANNEL, subscribeShared } from '@/lib/db/listen'
-import { deviceGatewayEndpoint } from '@/lib/device-gateway-client'
 
 /**
  * The single workspace this MVP serves. The protocol's register answer
  * carries a workspace id; the app itself has no workspaces yet.
  */
 export const WORKSPACE_ID = '00000000-0000-4000-8000-000000000001'
-
-/** How long after its last heartbeat a device still counts as online. */
-export const DEVICE_ONLINE_WINDOW_MS = 60_000
 
 /** Run states where the daemon may still be working: not terminal. */
 const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
@@ -76,10 +70,11 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
     const removed = await pool.query<{ id: string }>(`SELECT d.id FROM device_token_devices t JOIN devices d ON d.id=t."deviceId"
       WHERE t."tokenId"=$1 AND d."ownerId"=$2 AND d."removedAt" IS NOT NULL`, [row.id, row.userId])
     if (removed.rowCount) {
+      // Only the device's report can deliver its uninstall receipt (app/v1/devices/[deviceId]/report).
       const path = new URL(request.url).pathname.replace(/^\/mikka(?=\/)/, '')
-      const heartbeat = /^\/v1\/devices\/([^/]+)\/heartbeat$/.exec(path)
-      if (request.method !== 'POST' || !heartbeat || !removed.rows.some(device => device.id === heartbeat[1])) return null
-      removingDeviceId = heartbeat[1]
+      const report = /^\/v1\/devices\/([^/]+)\/report$/.exec(path)
+      if (request.method !== 'POST' || !report || !removed.rows.some(device => device.id === report[1])) return null
+      removingDeviceId = report[1]
     }
   }
   if (row.boundDeviceId || row.boundWorkspaceId) {
@@ -93,8 +88,7 @@ export async function authenticateDevice(request: Request): Promise<DeviceCaller
     })
     if (!allowed) return null
   }
-  // A daemon polls every few seconds; one write a minute is enough to show
-  // that a token is still in use.
+  // One write a minute is enough to show that a token is still in use.
   if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > 60_000) {
     await db.update(deviceTokens).set({ lastUsedAt: new Date() }).where(and(eq(deviceTokens.id, row.id), isNull(deviceTokens.revokedAt)))
   }
@@ -156,49 +150,15 @@ export async function linkDeviceToken(caller: Pick<DeviceCaller, 'userId' | 'tok
 }
 
 /**
- * How often a waiting long-poll (app/v1/devices/[deviceId]/commands) checks
- * for new work and for a revoked credential. Production never changes it;
- * lib/device-revocation.db.test.ts shortens it so the revocation bound is
- * asserted without waiting the full 5 s.
- */
-export const longPollIdleCheck = { ms: 5_000 }
-
-/**
- * LISTEN for this device's work and for its credential's revocation, on one
- * shared session per process (#1212). Only with the gateway configured: then
- * every write that gives a device work calls notifyDeviceWork, which also
- * NOTIFYs here. Null without it, or when LISTEN is unavailable; the long poll
- * then keeps its longPollIdleCheck timer.
- */
-export async function deviceWorkSubscription(deviceId: string, tokenId: string) {
-  if (!deviceGatewayEndpoint(deviceId, 'push')) return null
-  return subscribeShared(pool, DEVICE_WORK_CHANNEL, [deviceId, `token:${tokenId}`]).catch(() => null)
-}
-
-export async function sleep(ms: number, signal?: AbortSignal): Promise<void> {
-  try { await delay(ms, undefined, { signal }) }
-  catch (error) {
-    if (!(signal?.aborted && error instanceof Error && error.name === 'AbortError')) throw error
-  }
-}
-
-/** `?wait=<seconds>`, clamped to the protocol's maximum. */
-export function waitSeconds(request: Request, max: number): number {
-  const raw = Number(new URL(request.url).searchParams.get('wait') ?? '0')
-  if (!Number.isFinite(raw) || raw <= 0) return 0
-  return Math.min(Math.floor(raw), max)
-}
-
-/**
  * Whether `deviceWork` could find anything: one statement, one round trip,
  * with the credential check inside it (a revoked or expired credential
- * throws, as any fenced query does). A long-poll asks this between full
- * reads, which stay fenced and are the only path that hands over message
+ * throws, as any fenced query does). The commands read asks this before the
+ * full read, which stays fenced and is the only path that hands over message
  * text or queued runs. Mailbox notices are not modelled: with them on, a live
  * run always counts as possible work and the full read decides.
  * With `skipDeviceCommands` (a daemon that reads them from the poll), the same
  * statement also returns the oldest pending device command outside that list:
- * only its id and kind, which the heartbeat hands over too.
+ * only its id and kind, which the report hands over too.
  */
 export async function deviceMayHaveWork(deviceId: string, skip: readonly string[], options: { activeTurnSteer?: boolean; mailboxNotices?: boolean; queued?: boolean; skipDeviceCommands?: readonly string[] } = {}): Promise<{ work: boolean; deviceCommand: { id: string; kind: DeviceCommandKind } | null }> {
   const uuid = (id: string) => z.uuid().safeParse(id).success
@@ -215,26 +175,11 @@ export async function deviceMayHaveWork(deviceId: string, skip: readonly string[
 }
 
 /**
- * The oldest update or restart still waiting, for a daemon too old to take
- * device commands from `deviceMayHaveWork`. Same unlocked credential snapshot:
- * an idle poll must not lock the device row, and a revoked credential returns
- * nothing before the command id is handed over.
- */
-export async function deviceUpdateNotice(deviceId: string): Promise<{ id: string; kind: DeviceCommandKind } | null> {
-  const { readUnderDeviceAuthority } = await import('@/lib/db')
-  return readUnderDeviceAuthority<{ id: string; kind: DeviceCommandKind } | null>(
-    `(SELECT json_build_object('id', c.id, 'kind', c.kind) FROM device_management_commands c
-      WHERE c."deviceId"=$1 AND c."completedAt" IS NULL AND c.kind = ANY($2::text[])
-      ORDER BY c."createdAt" LIMIT 1)`,
-    [deviceId, ['update', 'restart']])
-}
-
-/**
  * What a device has waiting, read with one query of its runs per poll:
  * - `commands`: a person's message to a running agent (repeats until acked)
  *   and a stop someone asked for (repeats until the run ends);
  * - `queuedRuns`: runs waiting for it to claim them (only with `queued`).
- * Runs in `skip` are left out so a long-poll can wait for new ones.
+ * Runs in `skip` (already handed over) are left out.
  */
 export async function deviceWork(deviceId: string, skip: readonly string[], options: { activeTurnSteer?: boolean; mailboxNotices?: boolean; queued?: boolean } = {}): Promise<{ commands: RunCommand[]; queuedRuns: string[] }> {
   const runs = await db

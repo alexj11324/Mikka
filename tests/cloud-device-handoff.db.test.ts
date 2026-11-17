@@ -64,7 +64,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [workspaceId, userId, `${userId}@example.invalid`])
       await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Cloud handoff Bot\')', [botId, userId, workspaceId])
       for (const [device, agent, kind] of [[parentDevice, agentId, 'cloud'], [deviceB, agentB, 'local']]) {
-        await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,harnesses,"protocolVersion","lastSeenAt") VALUES($1,$2,$3,$4,true,$5,3,now())', [device, userId, kind, kind, JSON.stringify(harnesses)])
+        await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,harnesses,"protocolVersion","lastSeenAt","sessionOpenedAt") VALUES($1,$2,$3,$4,true,$5,3,now(),now())', [device, userId, kind, kind, JSON.stringify(harnesses)])
         await pool.query('INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,\'codex\',$4)', [agent, userId, device, kind])
       }
       await pool.query('INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,\'main\')', [repoId, userId, parentDevice, remoteKey, remoteUrl])
@@ -86,7 +86,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       const physical = await machines!.start(actor, runId)
       const now = new Date()
       await pool.query('UPDATE agent_runs SET status=\'running\',"startedAt"=$2,"leaseExpiresAt"=$3,"sessionId"=\'cloud-native-session\' WHERE id=$1', [runId, new Date(now.getTime() - 180_000), new Date(now.getTime() - 1_000)])
-      await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [physical.deviceId, new Date(now.getTime() - 120_000)])
+      await pool.query('UPDATE devices SET "lastSeenAt"=$2,"sessionClosedAt"=clock_timestamp() WHERE id=$1', [physical.deviceId, new Date(now.getTime() - 120_000)])
       await pool.query('INSERT INTO run_checkpoints("runId","baseCommit",patch,files,"updatedAt","userId","takenAt") VALUES($1,$2,$3,1,$4,$5,$4)', [runId, 'a'.repeat(40), gzipSync('diff --git a/current.txt b/current.txt\n'), now, userId])
       const source = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
       const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [runId])).rows[0]

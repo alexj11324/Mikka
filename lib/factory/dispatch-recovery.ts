@@ -1,17 +1,16 @@
 import type { Pool, PoolClient } from 'pg';
 import { isDeviceOnline } from '@mikka/protocol/device';
-import { deviceIsOnline } from '../device-presence';
 import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit';
 
 /** Why a Factory run cannot start on its assigned device. Frontend (#453) keys copy on these codes. */
 export const FACTORY_DISPATCH_FAILURE_REASONS = ['deviceOffline', 'deviceDisabled', 'harnessUnavailable', 'e2bKeyNotConfigured'] as const;
 export type FactoryDispatchFailureReason = (typeof FACTORY_DISPATCH_FAILURE_REASONS)[number];
 
-export interface FactoryDispatchDevice { id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: unknown; online?: boolean }
+export interface FactoryDispatchDevice { id: string; name: string; enabled: boolean; lastSeenAt: Date | null; sessionOpenedAt: Date | null; sessionClosedAt: Date | null; harnesses: unknown; online?: boolean }
 
-/** Same rule as lib/mcp/actions.ts deviceOnline: enabled and seen within DEVICE_ONLINE_WINDOW_MS. */
-export function factoryDeviceOnline(device: Pick<FactoryDispatchDevice, 'enabled' | 'lastSeenAt' | 'online'>, now = Date.now()) {
-  return device.enabled && (device.online ?? isDeviceOnline(device.lastSeenAt, now));
+/** Same rule as lib/mcp/actions.ts deviceOnline: enabled and its device session open. */
+export function factoryDeviceOnline(device: Pick<FactoryDispatchDevice, 'enabled' | 'sessionOpenedAt' | 'sessionClosedAt' | 'online'>) {
+  return device.enabled && (device.online ?? isDeviceOnline(device));
 }
 
 function harnessInstalled(harnesses: unknown, harness: string) {
@@ -19,9 +18,9 @@ function harnessInstalled(harnesses: unknown, harness: string) {
 }
 
 /** Null when the device can take the run now. Order: disabled, offline, harness. */
-export function factoryDispatchFailureReason(device: FactoryDispatchDevice, harness: string | null, now = Date.now()): FactoryDispatchFailureReason | null {
+export function factoryDispatchFailureReason(device: FactoryDispatchDevice, harness: string | null): FactoryDispatchFailureReason | null {
   if (!device.enabled) return 'deviceDisabled';
-  if (!factoryDeviceOnline(device, now)) return 'deviceOffline';
+  if (!factoryDeviceOnline(device)) return 'deviceOffline';
   if (harness && !harnessInstalled(device.harnesses, harness)) return 'harnessUnavailable';
   return null;
 }
@@ -68,7 +67,7 @@ export type CloudKeyConfigured = (tx: PoolClient, userId: string) => Promise<boo
 export const noByoCloudKey: CloudKeyConfigured = async () => false;
 
 const taskRunSql = `SELECT t.id AS "taskId", t."botId", t."issueId", a."runId", r.status AS "runStatus", r."deviceId", ag.harness,
-    d.id AS "dId", d.name, d.enabled, d."lastSeenAt", d.harnesses
+    d.id AS "dId", d.name, d.enabled, d."lastSeenAt", d."sessionOpenedAt", d."sessionClosedAt", d.harnesses
   FROM factory_tasks t
   JOIN factory_attempts a ON a.id=t."attemptId" AND a."taskId"=t.id
   LEFT JOIN agent_runs r ON r.id=a."runId" AND r."userId"=t."userId"
@@ -88,38 +87,35 @@ async function insertEvent(tx: PoolClient, row: { userId: string; botId: string 
  * Write path: called in the transaction that queues a Factory run. When the target device cannot
  * take it right now, records one `run_dispatch_failed:<runId>:<reasonCode>`. Returns the reason or null.
  */
-export async function recordFactoryDispatchFailure(tx: PoolClient, userId: string, runId: string, attemptId: string | null = null, at?: number): Promise<FactoryDispatchFailureReason | null> {
-  const { rows: [row] } = await tx.query(`SELECT r.status, r."issueId", r."botId", ag.harness, d.id AS "dId", d.name, d.enabled, d."lastSeenAt", d.harnesses,
+export async function recordFactoryDispatchFailure(tx: PoolClient, userId: string, runId: string, attemptId: string | null = null): Promise<FactoryDispatchFailureReason | null> {
+  const { rows: [row] } = await tx.query(`SELECT r.status, r."issueId", r."botId", ag.harness, d.id AS "dId", d.name, d.enabled, d."lastSeenAt", d."sessionOpenedAt", d."sessionClosedAt", d.harnesses,
       (SELECT a."taskId" FROM factory_attempts a WHERE a.id=$3) AS "taskId"
     FROM agent_runs r
     LEFT JOIN agents ag ON ag.id=r."agentId" AND ag."userId"=r."userId"
     JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=r."userId"
     WHERE r.id=$1 AND r."userId"=$2`, [runId, userId, attemptId]);
   if (!row || row.status !== 'queued') return null;
-  // A heartbeat can commit while this query waits. Observe it after the read.
-  at ??= Date.now();
-  const online = row.enabled && await deviceIsOnline({ id: row.dId, lastSeenAt: row.lastSeenAt }, at);
-  const reason = factoryDispatchFailureReason({ id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt, harnesses: row.harnesses, online }, row.harness, at);
+  const reason = factoryDispatchFailureReason({ id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt,
+    sessionOpenedAt: row.sessionOpenedAt, sessionClosedAt: row.sessionClosedAt, harnesses: row.harnesses }, row.harness);
   if (reason) await insertEvent(tx, { userId, botId: row.botId, kind: 'run_dispatch_failed', dedupeKey: `run_dispatch_failed:${runId}:${reason}`, issueId: row.issueId, runId,
     payload: { taskId: row.taskId ?? null, deviceId: row.dId, reasonCode: reason } });
   return reason;
 }
 
-export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: CloudKeyConfigured = noByoCloudKey, now: () => number = Date.now) {
+export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: CloudKeyConfigured = noByoCloudKey) {
   /** Strictly read-only (BE-16): failure.reasonCode is computed from the device state right now; nothing is written. */
   async function status(userId: string, taskId: string): Promise<FactoryDispatchStatus | null> {
     const { rows: [row] } = await pool.query(taskRunSql, [taskId, userId]);
     if (!row) return null;
-    const device = row.dId ? { id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt, harnesses: row.harnesses } as FactoryDispatchDevice : null;
-    const at = now();
-    if (device) device.online = device.enabled && await deviceIsOnline(device, at);
-    const reason = device && row.runStatus === 'queued' ? factoryDispatchFailureReason(device, row.harness, at) : null;
+    const device = row.dId ? { id: row.dId, name: row.name, enabled: row.enabled, lastSeenAt: row.lastSeenAt,
+      sessionOpenedAt: row.sessionOpenedAt, sessionClosedAt: row.sessionClosedAt, harnesses: row.harnesses } as FactoryDispatchDevice : null;
+    const reason = device && row.runStatus === 'queued' ? factoryDispatchFailureReason(device, row.harness) : null;
     const client = reason ? await pool.connect() : null;
     try {
       return {
         cloudDispatchAvailable: FACTORY_CLOUD_DISPATCH_AVAILABLE,
         taskId, runId: row.runId ?? null, runStatus: row.runStatus ?? null,
-        device: device ? { id: device.id, name: device.name, online: factoryDeviceOnline(device, at), lastSeenAt: device.lastSeenAt?.toISOString() ?? null } : null,
+        device: device ? { id: device.id, name: device.name, online: factoryDeviceOnline(device), lastSeenAt: device.lastSeenAt?.toISOString() ?? null } : null,
         failure: reason ? { reasonCode: reason } : null,
         clarification: reason && client ? factoryDispatchClarification(taskId, row.runId, reason, await cloudKeyConfigured(client, userId)) : null,
       };
@@ -128,20 +124,20 @@ export function createFactoryDispatchRecovery(pool: Pool, cloudKeyConfigured: Cl
 
   /**
    * The device is online again: every still-queued Factory run on it that could not be dispatched
-   * just before this heartbeat (`wasUnavailable`) or that recorded `run_dispatch_failed` gets exactly
+   * just before this session opened (`wasUnavailable`) or that recorded `run_dispatch_failed` gets exactly
    * one `run_redispatched` event (dedupe key per run).
    * The run row stays queued, so the daemon's next claim starts it; nothing is queued twice.
    *
    * Single-dispatch guarantee: `ON CONFLICT ("dedupeKey") DO NOTHING` in insertEvent, and only a
    * caller whose insert actually wrote a row (rowCount 1) counts the run as resumed. `FOR UPDATE OF r`
-   * and `SKIP LOCKED` only reduce contention between concurrent heartbeats.
+   * and `SKIP LOCKED` only reduce contention between concurrent session reports.
    */
   async function deviceOnline(userId: string, deviceId: string, wasUnavailable = false): Promise<string[]> {
     const tx = await pool.connect();
     try {
       await tx.query('BEGIN');
-      const { rows: [device] } = await tx.query('SELECT id,name,enabled,"lastSeenAt",harnesses FROM devices WHERE id=$1 AND "ownerId"=$2', [deviceId, userId]);
-      if (!device || !factoryDeviceOnline(device, now())) { await tx.query('COMMIT'); return []; }
+      const { rows: [device] } = await tx.query('SELECT id,name,enabled,"sessionOpenedAt","sessionClosedAt",harnesses FROM devices WHERE id=$1 AND "ownerId"=$2', [deviceId, userId]);
+      if (!device || !factoryDeviceOnline(device)) { await tx.query('COMMIT'); return []; }
       const { rows } = await tx.query(`SELECT r.id AS "runId", r."issueId", r."botId", t.id AS "taskId"
         FROM agent_runs r
         JOIN factory_attempts a ON a."runId"=r.id

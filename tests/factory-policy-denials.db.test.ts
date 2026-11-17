@@ -105,7 +105,7 @@ test('Factory task denials preserve public errors before policy and execution si
     for (const workspace of [false, true]) {
       const f = await fixture(false, workspace)
       await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [f.workspaceId, owner])
-      const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${deviceId}/runs/${f.runId}/claim`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', [SKILL_ARTIFACT_HEADER]: '1' } }), { params: Promise.resolve({ deviceId, runId: f.runId }) })
+      const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${deviceId}/runs/${f.runId}/claim`, { method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', [SKILL_ARTIFACT_HEADER]: '1' } }), { params: Promise.resolve({ deviceId, runId: f.runId }) })
       assert.equal(response.status, 409)
       assert.deepEqual(await response.json(), { error: 'The task is no longer available to this thread.', code: 'issue_unavailable' }, workspace ? 'shared workspace membership revoked' : 'personal workspace membership revoked')
       assert.deepEqual((await pool.query('SELECT status,"leaseExpiresAt" FROM agent_runs WHERE id=$1', [f.runId])).rows[0], { status: 'queued', leaseExpiresAt: null })

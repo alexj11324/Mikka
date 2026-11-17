@@ -18,7 +18,7 @@ import { createFactoryReconciler } from './reconcile';
 export async function lifecycleCases(t:TestContext,pool:Pool,authorize:FactoryAuthorize,fixture:()=>Promise<FactoryRoute>) {
   const denies=(fn:()=>Promise<unknown>,code:string)=>assert.rejects(fn,e=>e instanceof FactoryError&&e.code===code);
   const deviceId=randomUUID(),agentId=randomUUID(),repoId=randomUUID();
-  await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Disposable lifecycle',now(),'[{"harness":"codex","installed":true}]')`,[deviceId]);
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,'owner','Disposable lifecycle',now(),'[{"harness":"codex","installed":true}]',now())`,[deviceId]);
   await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Fixture','codex',$2)`,[agentId,deviceId]);
   await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,'owner','/fixture/repo')`,[repoId,deviceId]);
   const store=createFactoryStore(pool,authorize,null,{});

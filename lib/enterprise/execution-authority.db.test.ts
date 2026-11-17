@@ -129,8 +129,8 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
   const beta = (await seedWorkspace(control, userId, [{ userId, role: 'admin' }])).id
   const alphaBot = await seedBot(control, alpha, userId), betaBot = await seedBot(control, beta, userId)
   const agentId = await seedAgent(control, userId), deviceId = randomUUID()
-  await control.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt")
-    VALUES($1,$2,'Enterprise device fixture','local',true,3,now())`, [deviceId, userId])
+  await control.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt","sessionOpenedAt")
+    VALUES($1,$2,'Enterprise device fixture','local',true,3,now(),now())`, [deviceId, userId])
   const organizationId = randomUUID()
   await control.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,$2,$3)', [organizationId, 'Execution fixture', userId])
   for (const workspaceId of [alpha, beta]) await control.query('INSERT INTO mikka_organization_workspaces("workspaceId","organizationId") VALUES($1,$2)', [workspaceId, organizationId])
@@ -187,7 +187,7 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
       catch (error) { if (denied(error)) return Response.json({ error: 'workspaceAccessDenied' }, { status: 403 }); throw error }
     })
     const request = new Request('http://localhost:3100/v1/devices/' + (options.deviceId ?? deviceId) + '/runs/' + (options.runId ?? randomUUID()) + '/claim', {
-      method: 'POST', headers: { authorization: 'Bearer ' + (options.token ?? deviceToken), [CLIENT_VERSION_HEADER]: '999.0.0' },
+      method: 'POST', headers: { authorization: 'Bearer ' + (options.token ?? deviceToken), 'x-mikka-device-session': '1', [CLIENT_VERSION_HEADER]: '999.0.0' },
     })
     return requestScope(request, handler)
   }

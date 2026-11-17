@@ -88,7 +88,7 @@ test('run-recovery due times match what each sweep selects', { skip: !valid }, a
     await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt") VALUES ($1,'owner','Device',$2)`, [device, seen])
     await run({ status: 'queued', retryOf: randomUUID(), deviceId: device })
     assert.equal(await due(), seen.getTime() + 60_000 + 1)
-    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '5 minutes'`)
+    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '5 minutes',"sessionClosedAt"=clock_timestamp()`)
     near(await due(), await dbNow() + 60_000)
     await clear()
   })

@@ -165,7 +165,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       assert.ok(!command.includes('orv_'), 'credential must not enter a shell command')
       if (command.includes('bin/cloud-worker.ts')) {
         assert.ok(handoff)
-        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [handoff.deviceId])
+        await pool.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [handoff.deviceId])
         await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1', [createHash('sha256').update(handoff.credential).digest('hex')])
       }
     } } } as unknown as import('e2b').Sandbox

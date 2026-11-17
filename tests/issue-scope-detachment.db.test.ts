@@ -249,7 +249,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   const ownerToken = (await issueRunToken({id:ownerRun,userId:owner})).token
   async function withClaimServer(check: (origin: string)=>Promise<void>, runId = memberRun) {
     const server = createServer(async (incoming,outgoing) => {
-      const request = new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{'x-mikka-client-version':incoming.headers['x-mikka-client-version']?.toString()??'',authorization:incoming.headers.authorization??'',[REPO_ORIGIN_HEADER]:incoming.headers[REPO_ORIGIN_HEADER]?.toString()??''}})
+      const request = new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':incoming.headers['x-mikka-client-version']?.toString()??'',authorization:incoming.headers.authorization??'',[REPO_ORIGIN_HEADER]:incoming.headers[REPO_ORIGIN_HEADER]?.toString()??''}})
       try {
         const response = await claim.POST(request,{params:Promise.resolve({deviceId:device,runId})})
         outgoing.writeHead(response.status,Object.fromEntries(response.headers));outgoing.end(await response.text())
@@ -306,7 +306,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   })
   await scopeSubtest(t, 'the same native claim route succeeds while workspace access is still active', async () => {
     await withClaimServer(async origin=>{
-      const response=await fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
+      const response=await fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
       assert.equal(response.status,200,await response.clone().text())
       const claimed=await response.json()
       assert.equal(claimed.runId,memberRun)
@@ -330,7 +330,7 @@ test('provider policy preserves task tenancy and independent membership gates on
       const pid=(await blocker.query('select pg_backend_pid() pid')).rows[0].pid
       await withClaimServer(async origin=>{
         try {
-          responsePromise=fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
+          responsePromise=fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
           await waitFor(async()=>Boolean((await pool.query("select 1 from pg_stat_activity a where a.wait_event_type='Lock' and $1=any(pg_blocking_pids(a.pid))",[pid])).rowCount),'claim did not pause before token issuance')
           assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'preparing')
           const preview=await inWorkspace(owner,()=>previewIssuePersonalScope(id))
@@ -428,7 +428,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     try {
       await withClaimServer(async origin=>{
         assert.equal((await fetch(`${origin}/claim`,{method:'POST'})).status,401)
-        const response=await fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`}})
+        const response=await fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`}})
         assert.equal(response.status,409)
         assert.equal((await response.text()).includes('prompt'),false)
       })
@@ -538,7 +538,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     const server=createServer(async(incoming,outgoing)=>{
       const chunks:Buffer[]=[];for await(const chunk of incoming) chunks.push(Buffer.from(chunk))
       const body=Buffer.concat(chunks).toString()
-      const request=new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{'x-mikka-client-version':incoming.headers['x-mikka-client-version']?.toString()??'',authorization:incoming.headers.authorization??''},body})
+      const request=new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':incoming.headers['x-mikka-client-version']?.toString()??'',authorization:incoming.headers.authorization??''},body})
       request.json=async()=>{prepared.resolve();await release.promise;return JSON.parse(body)}
       try {const response=await withRequestContext(()=>complete.POST(request,{params:Promise.resolve({runId:run})}));outgoing.writeHead(response.status);outgoing.end(await response.text())}
       catch(error) {handlerErrors.push(error);outgoing.writeHead(500);outgoing.end('Completion failed')}
@@ -548,7 +548,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     try {
       const origin=`http://127.0.0.1:${(server.address() as {port:number}).port}`
       const report={summary:'Synthetic verified completion',filesChanged:[],verify:{status:'passed'},openQuestions:[],nextStep:null}
-      responsePromise=fetch(`${origin}/complete`,{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,'content-type':'application/json'},body:JSON.stringify({stopReason:'submitted',report})})
+      responsePromise=fetch(`${origin}/complete`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,'content-type':'application/json'},body:JSON.stringify({stopReason:'submitted',report})})
       await prepared.promise
       const changed=await inWorkspace(localOwner,()=>setIssueScope({id,revision:1,scope:'personal'}))
       assert.ok('issue' in changed)
@@ -875,7 +875,7 @@ test('provider policy preserves task tenancy and independent membership gates on
       assert.equal(Boolean(await verifyRunToken(new Request('http://127.0.0.1/'),token)),false)
       assert.equal(await completeRunForDevice(control.actor,{id:fixture.run,issueId:fixture.id},{stopReason:'error'}),null)
       assert.equal((await pool.query('select count(*)::int n from coordinator_events where "runId"=$1',[fixture.run])).rows[0].n,1)
-      if(control.actor===member) assert.equal((await complete.POST(new Request('http://127.0.0.1/complete',{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`},body:'invalid-json'}),{params:Promise.resolve({runId:fixture.run})})).status,204)
+      if(control.actor===member) assert.equal((await complete.POST(new Request('http://127.0.0.1/complete',{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`},body:'invalid-json'}),{params:Promise.resolve({runId:fixture.run})})).status,204)
     }
     const orphan=await completionFixture(owner,owner,'personal','implement',false)
     const completed=await completeRunForDevice(owner,{id:orphan.run,issueId:null},{stopReason:'error'})

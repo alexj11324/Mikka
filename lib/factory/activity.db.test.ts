@@ -248,8 +248,8 @@ test('Factory activity: one owner-scoped SQL read model for every run, computer 
     await t.test('canonical publication retry refuses missing producer media after a real approval and failed publication', async () => application.run(async () => {
       const f = await fixture(), localDevice = randomUUID(), localAgent = randomUUID(), repo = randomUUID(), sha = 'e'.repeat(40)
       const repository = 'https://github.com/acme/visual-retry-fixture.git'
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses)
-        VALUES($1,$2,'Publication retry fixture',now(),'[{"harness":"codex","installed":true}]')`, [localDevice,owner])
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt")
+        VALUES($1,$2,'Publication retry fixture',now(),'[{"harness":"codex","installed":true}]',now())`, [localDevice,owner])
       await pool.query(`INSERT INTO agents(id,"userId","deviceId",name,harness) VALUES($1,$2,$3,'Publication retry fixture','codex')`, [localAgent,owner,localDevice])
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","verifyCommand") VALUES($1,$2,$3,'/fixture/visual-retry',$4,'node --version')`, [repo,localDevice,owner,repository])
       const canonical = createFactoryStore(pool,authorize,bot,{independent:factoryCheckIndependent,

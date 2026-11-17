@@ -756,7 +756,7 @@ test('real PG: question receipts preserve one execution without opening a repair
       // The continuation message uses this same receipt-bound reader and the
       // citation sources frozen by real check dispatch, not the old empty prompt.
       const checkDevice = randomUUID(), checkAgent = randomUUID(), checkRepo = randomUUID()
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,'owner','Independent check','cloud',now(),$2)`,
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,'owner','Independent check','cloud',now(),$2,now())`,
         [checkDevice, JSON.stringify([{ harness, installed: true }])])
       await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,'owner',$2,$3,$4)`, [checkAgent, checkDevice, harness, `Independent checker ${checkAgent}`])
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/tmp/fixture')`, [checkRepo, checkDevice])

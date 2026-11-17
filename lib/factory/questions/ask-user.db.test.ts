@@ -42,7 +42,7 @@ test("pending Factory questions list by task and by run in AskUserQuestion shape
     const fixture: Record<string, { deviceId: string; agentId: string; repoId: string }> = {};
     for (const user of ["owner", "intruder"]) {
       const f = (fixture[user] = { deviceId: randomUUID(), agentId: randomUUID(), repoId: randomUUID() });
-      await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,$2,'Disposable',now(),'[{"harness":"codex","installed":true}]')`, [f.deviceId, user]);
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Disposable',now(),'[{"harness":"codex","installed":true}]',now())`, [f.deviceId, user]);
       await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,'Fixture','codex',$3)`, [f.agentId, user, f.deviceId]);
       await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/fixture/repo')`, [f.repoId, f.deviceId, user]);
     }

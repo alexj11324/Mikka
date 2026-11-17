@@ -213,7 +213,7 @@ dbTest('activity merges the three sources newest first, owner-only, with stable 
 })
 
 async function daemonCall(path: string, token: string, body: unknown, deviceId?: string) {
-  const request = new Request(`http://localhost${path}`, { method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const request = new Request(`http://localhost${path}`, { method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) })
   if (!deviceId) return (await import('../app/v1/devices/register/route')).POST(request)
   return (await import('../app/v1/devices/[deviceId]/heartbeat/route')).POST(request, { params: Promise.resolve({ deviceId }) })
 }
@@ -255,7 +255,7 @@ dbTest('devices: rename is owner-only and survives re-register; removal waits fo
   assert.deepEqual(await deviceActions.removeDevice(deviceId), { error: 'deviceHasActiveRuns', params: undefined })
   assert.equal((await daemonCall(`/v1/devices/${deviceId}/heartbeat`, token, {}, deviceId)).status, 400, 'still authorized while refused (invalid body only)')
   await pool.query(`UPDATE agent_runs SET status='stopped' WHERE "deviceId"=$1 AND status='running'`, [deviceId])
-  await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes' WHERE id=$1`, [deviceId])
+  await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes',"sessionClosedAt"=clock_timestamp() WHERE id=$1`, [deviceId])
 
   assert.deepEqual(await deviceActions.removeDevice(deviceId), { id: deviceId, revokedTokens: 1, uninstall: 'not_possible' })
   assert.deepEqual(await deviceActions.removeDevice(deviceId), { error: 'deviceNotFound', params: undefined })
@@ -264,7 +264,7 @@ dbTest('devices: rename is owner-only and survives re-register; removal waits fo
   assert.equal((await daemonCall(`/v1/devices/${deviceId}/heartbeat`, token, { harnesses: [], runs: [] }, deviceId)).status, 401)
   assert.equal((await daemonCall('/v1/devices/register', token, registration(deviceId))).status, 401)
   const commands = await import('../app/v1/devices/[deviceId]/commands/route')
-  const poll = await commands.GET(new Request(`http://localhost/v1/devices/${deviceId}/commands`, { headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}` } }), { params: Promise.resolve({ deviceId }) })
+  const poll = await commands.GET(new Request(`http://localhost/v1/devices/${deviceId}/commands`, { headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}` } }), { params: Promise.resolve({ deviceId }) })
   assert.equal(poll.status, 401)
 
   // History stays intact; the device is gone from settings and gets no work.

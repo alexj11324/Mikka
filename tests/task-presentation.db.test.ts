@@ -522,7 +522,7 @@ test('Task presentation batches keep current tenant authority and one Factory pr
         await compare({ runStatus: 'paused', state, reason, needsAction, blockedReason, group: 'pending' })
       }
       const device = randomUUID()
-      await application.query('INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt") VALUES($1,$2,\'Presentation device\',\'local\',now())', [device, owner])
+      await application.query('INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt","sessionOpenedAt") VALUES($1,$2,\'Presentation device\',\'local\',now(),now())', [device, owner])
       await application.query('UPDATE agent_runs SET status=\'running\',"pauseReason"=NULL,"deviceId"=$2 WHERE id=$1', [run, device])
       const approval = randomUUID()
       await application.query(`INSERT INTO agent_tool_approvals(id,"runId","userId","deviceId","requestId",harness,method,input,digest,status,"expiresAt")
@@ -540,9 +540,9 @@ test('Task presentation batches keep current tenant authority and one Factory pr
       await application.query('UPDATE local_computer_reviews SET decision=true WHERE id=$1', [computerApproval])
       await compare({ runStatus: 'running', state: 'running', group: 'running' })
       await application.query('UPDATE agent_runs SET status=\'queued\' WHERE id=$1', [run])
-      await application.query('UPDATE devices SET "lastSeenAt"=now()-interval \'1 day\' WHERE id=$1', [device])
+      await application.query('UPDATE devices SET "lastSeenAt"=now()-interval \'1 day\',"sessionClosedAt"=clock_timestamp() WHERE id=$1', [device])
       await compare({ runStatus: 'queued', state: 'blocked', reason: 'offline', needsAction: 'blocked', blockedReason: 'run', group: 'pending' })
-      await application.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [device])
+      await application.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [device])
       await compare({ runStatus: 'queued', state: 'queued', group: 'running' })
       for (const category of ['subscription', 'api_key', 'access_denied', 'quota']) {
         await application.query('UPDATE agent_runs SET status=\'failed\',"failureDetails"=$2 WHERE id=$1', [run,

@@ -3,19 +3,7 @@ import { afterJob } from '@/lib/background'
 import { setTimeout as delay } from 'node:timers/promises'
 import { deviceGatewayEndpoint } from './device-gateway-client'
 import { afterDatabaseCommit } from './db/commit-effects'
-import { DEVICE_WORK_CHANNEL, notifyChannel } from './db/listen'
 import { gatewayConfig } from './builtin-gateway/config'
-
-/** Wakes this device's waiting commands long poll (the gateway-down fallback).
- * Sent with each gateway wake: with the gateway configured, every write that
- * gives a device work reaches notifyDeviceWork, so the long poll may wait on
- * LISTEN (lib/device-link.ts deviceWorkSubscription). */
-async function notifyLongPoll(deviceId: string) {
-  try {
-    const { pool, withoutDatabaseClient } = await import('./db/request-scope')
-    await withoutDatabaseClient(() => notifyChannel(pool, DEVICE_WORK_CHANNEL, [deviceId]))
-  } catch { console.warn('[device-gateway] long poll notification failed', { deviceId }) }
-}
 
 /** A wake is idempotent; retry transient failures without dropping committed work. */
 async function sendWake(deviceId: string, endpoint: NonNullable<ReturnType<typeof deviceGatewayEndpoint>>) {
@@ -49,12 +37,12 @@ export function notifyDeviceWork(deviceId: string | null | undefined) {
   if (!deviceId) return
   const endpoint = deviceGatewayEndpoint(deviceId, 'push')
   if (!endpoint) return
-  afterJob('after:device-wake', async () => { await Promise.all([sendWake(deviceId, endpoint), notifyLongPoll(deviceId)]) }, { orRun: true })
+  afterJob('after:device-wake', () => sendWake(deviceId, endpoint), { orRun: true })
 }
 
 /** A read RPC waits for its device response before returning. Deferring its
  * wake with after() would deadlock an idle push-only daemon. The request's
- * transaction has already committed (and sent the ordinary PG notification). */
+ * transaction has already committed. */
 export async function wakeDeviceWorkNow(deviceId: string) {
   const endpoint = deviceGatewayEndpoint(deviceId, 'push')
   if (endpoint) await sendWake(deviceId, endpoint)

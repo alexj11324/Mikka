@@ -274,7 +274,7 @@ async function removableDevice(online: boolean) {
   await pool.query(`INSERT INTO devices(id,"ownerId","lastSeenAt") VALUES($1,'owner-a',now()-$2::interval)`, [id, online ? '1 second' : '2 minutes'])
   await pool.query(`INSERT INTO device_tokens(id,"userId","tokenHash") VALUES($1,'owner-a',$2)`, [tokenId, hashDeviceToken(credential)])
   await pool.query(`INSERT INTO device_token_devices VALUES($1,$2,'owner-a')`, [tokenId, id])
-  const request = (path: string, method = 'POST') => new Request(`http://localhost/mikka${path}`, { method, headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${credential}` } })
+  const request = (path: string, method = 'POST') => new Request(`http://localhost/mikka${path}`, { method, headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${credential}` } })
   return { id, tokenId, request }
 }
 
@@ -385,7 +385,7 @@ test('a fresh login cannot admit an old daemon, and updating cannot revive a rev
   let invoked = 0
   const handler = withDeviceRoute(async () => { await pool.query('SELECT 1'); invoked++; return Response.json({ ok: true }) })
   const request = (version: string | null, path = '/v1/devices/fixture/repos') => new Request(`http://localhost/mikka${path}`, {
-    headers: { authorization: `Bearer ${credential}`, ...(version === null ? {} : { 'x-mikka-client-version': version }) },
+    headers: { authorization: `Bearer ${credential}`, ...(version === null ? {} : { 'x-mikka-device-session': '1', 'x-mikka-client-version': version }) },
   })
   for (const version of ['0.0.329', '0.0.374', null]) {
     const response = await handler(request(version))
@@ -404,7 +404,7 @@ test('a fresh login cannot admit an old daemon, and updating cannot revive a rev
   assert.equal((await handler(request('0.0.329', `/v1/runs/${randomUUID()}/events`))).status, 426, 'another run cannot borrow the lease')
   assert.equal((await handler(request('0.0.329', `/v1/runs/${claimedRun}/events`))).status, 200)
   const fresh = await consumeDeviceEnrollment(await mintDeviceEnrollment('version-owner'))
-  const freshRequest = new Request(request('0.0.329', `/v1/runs/${claimedRun}/events`), { headers: { authorization: `Bearer ${fresh}`, 'x-mikka-client-version': '0.0.329' } })
+  const freshRequest = new Request(request('0.0.329', `/v1/runs/${claimedRun}/events`), { headers: { authorization: `Bearer ${fresh}`, 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.329' } })
   assert.equal((await handler(freshRequest)).status, 426)
   await pool.query('UPDATE device_tokens SET "revokedAt"=now() WHERE id=$1', [tokenId])
   assert.equal((await handler(request(MIN_DAEMON_VERSION))).status, 401, 'new binary plus revoked old session is still unauthorized')
@@ -416,7 +416,7 @@ test('registration metadata cannot disguise an old daemon behind a current heade
   const { MIN_DAEMON_VERSION } = await import('@mikka/protocol/device')
   const credential = await consumeDeviceEnrollment(await mintDeviceEnrollment('body-version-owner'))
   const response = await POST(new Request('http://localhost/mikka/v1/devices/register', {
-    method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': MIN_DAEMON_VERSION, 'content-type': 'application/json' },
+    method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-mikka-device-session': '1', 'x-mikka-client-version': MIN_DAEMON_VERSION, 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'version fixture', platform: 'linux', arch: 'x64', daemonVersion: '0.0.329', protocolVersion: 1, harnesses: [] }),
   }))
   assert.equal(response.status, 426)

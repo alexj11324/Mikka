@@ -65,9 +65,9 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
   const device = async (ownerId: string, harnesses: object[], enabled = true, over: { name?: string; online?: boolean; server?: boolean; joinedMinutesAgo?: number } = {}) => {
     const id = randomUUID()
     const report = harnesses.map(info => ({ subscriptionBroker: true, ...info }))
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"deviceType","createdAt") VALUES ($1,$2,$5,'local',$3,$6,$4,$7,$8)`,
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"deviceType","createdAt","sessionOpenedAt") VALUES ($1,$2,$5,'local',$3,$6,$4,$7,$8,CASE WHEN $9::boolean THEN $6::timestamptz END)`,
       [id, ownerId, enabled, JSON.stringify(report), over.name ?? 'Laptop', over.online === false ? new Date(Date.now() - 3_600_000) : new Date(),
-        over.server ? 'server' : 'laptop', new Date(Date.now() - (over.joinedMinutesAgo ?? 0) * 60_000)])
+        over.server ? 'server' : 'laptop', new Date(Date.now() - (over.joinedMinutesAgo ?? 0) * 60_000), over.online !== false])
     const agents: Record<string, string> = {}
     for (const info of harnesses as { harness: string }[]) {
       agents[info.harness] = randomUUID()
@@ -530,7 +530,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const next = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([firstName(view), next.kind === 'device' && next.deviceId], ['instance-b', later.id])
     // Both servers offline: the computer.
-    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '1 hour' WHERE id = ANY($1)`, [[server.id, later.id]])
+    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '1 hour',"sessionClosedAt"=clock_timestamp() WHERE id = ANY($1)`, [[server.id, later.id]])
     view = await order.orderView(pool, scope)
     const fallback = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([firstName(view), fallback.kind === 'device' && fallback.deviceId], ['Mac', mac.id])

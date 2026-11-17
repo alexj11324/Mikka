@@ -245,7 +245,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   const harnesses = [{ harness: 'claude_code' as const, installed: true, version: '2.1.0', toolApproval: true as const }]
   const device = async (userId: string) => {
     const id = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), token = 'synthetic-' + randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"daemonVersion","protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Local fixture','local',true,$3,$4,now(),$5)`,
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"daemonVersion","protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Local fixture','local',true,$3,$4,now(),$5,now())`,
       [id, userId, MIN_DAEMON_VERSION, DAEMON_PROTOCOL_VERSION, JSON.stringify(harnesses)])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'claude_code',$4)`, [agentId, userId, id, `fixture-${agentId}`])
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, id, userId, normalizeRepository(remote).key, remote])
@@ -261,7 +261,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   const { runId } = await queueRun(owner, { issueId, agentId: a.agentId, repo: remote, model: 'fixture-model',
     modelDispatch: { mode: 'preference', routing: { version: 1, difficulty: 'hard', model: 'fixture-model', harness: 'claude_code', tier: 'standard', effort: 'high', reason: 'difficulty_fit' } } }, botId)
   const claimStatus = async (token: string, deviceId: string) => {
-    const response = await fetch(`${base}/v1/devices/${deviceId}/runs/${runId}/claim`, { method: 'POST', headers: { authorization: `Bearer ${token}`, [CLIENT_VERSION_HEADER]: MIN_DAEMON_VERSION } })
+    const response = await fetch(`${base}/v1/devices/${deviceId}/runs/${runId}/claim`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'x-mikka-device-session': '1', [CLIENT_VERSION_HEADER]: MIN_DAEMON_VERSION } })
     await response.arrayBuffer()
     return response.status
   }
@@ -326,7 +326,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
     assert.equal(receipt?.runId, runId)
     // Controlled liveness input on this test's rows; the recovery and admission
     // decisions, new retryOf row and claim all come from production functions.
-    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '10 minutes' WHERE id=$1 AND "ownerId"=$2`, [a.id, owner])
+    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '10 minutes',"sessionClosedAt"=clock_timestamp() WHERE id=$1 AND "ownerId"=$2`, [a.id, owner])
     await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1 AND "userId"=$2`, [runId, owner])
     await reclaimLostRuns(owner)
     const rows = (await pool.query<{ id: string; deviceId: string; attempt: number }>('SELECT id,"deviceId",attempt FROM agent_runs WHERE "retryOf"=$1 AND "userId"=$2', [runId, owner])).rows

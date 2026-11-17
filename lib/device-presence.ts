@@ -1,46 +1,56 @@
-import { isDeviceOnline } from '@mikka/protocol/device'
+import { isDeviceOnline, type DeviceSessionState } from '@mikka/protocol/device'
+import { sql, type SQL } from 'drizzle-orm'
+import { devices } from './db/schema'
 import { deviceGatewayEndpoint } from './device-gateway-client'
 
-type DevicePresence = { id: string; lastSeenAt: string | number | Date | null }
-const GATEWAY_ONLINE_WINDOW_MS = 90_000
+/**
+ * Presence is the device session (decision 2026-11-17-2215): a device is
+ * online while the gateway socket it opened last is open. The gateway reports
+ * `connected` and `disconnected` (lib/device-session.ts); reading presence is
+ * a column read, never a call to the gateway. This is availability, not
+ * authority: callers still check owner/enabled.
+ */
+export type DevicePresence = { id: string } & DeviceSessionState
+
+/** SQL form of `isDeviceOnline` for a `devices` row under `alias`. */
+export function deviceSessionOpenSql(alias = 'd'): string {
+  return `(${alias}."sessionOpenedAt" IS NOT NULL AND (${alias}."sessionClosedAt" IS NULL OR ${alias}."sessionClosedAt" < ${alias}."sessionOpenedAt"))`
+}
+
+/** Drizzle form of `deviceSessionOpenSql` for the `devices` table. */
+export const deviceSessionOpen: SQL<boolean> = sql<boolean>`(${devices.sessionOpenedAt} IS NOT NULL AND (${devices.sessionClosedAt} IS NULL OR ${devices.sessionClosedAt} < ${devices.sessionOpenedAt}))`
+
+export function deviceIsOnline(device: DeviceSessionState): boolean {
+  return isDeviceOnline(device)
+}
+
+/** Presence of a page's devices, by id. */
+export function deviceOnlineStates(rows: readonly DevicePresence[]): Map<string, boolean> {
+  return new Map(rows.map(device => [device.id, isDeviceOnline(device)] as const))
+}
 
 /**
- * An idle gateway daemon stops HTTP heartbeats. Read its hibernating socket's
- * last auto-response only when somebody needs presence, never on a timer or by
- * writing synthetic heartbeats to Neon. Old daemons retain their 60s heartbeat
- * rule. This is availability, not authority: callers still check owner/enabled.
+ * What the gateway itself says about a device's socket. Only the run-recovery
+ * backstop asks (lib/device-session.ts), for a device whose session the
+ * database still holds open while it has leased runs: a lost `disconnected`
+ * report cannot keep a run alive. Null when the gateway cannot answer.
  */
-export async function deviceIsOnline(device: DevicePresence, now?: number): Promise<boolean> {
-  const startedAt = Date.now()
-  const observedAt = now ?? startedAt
-  const seen = device.lastSeenAt instanceof Date ? device.lastSeenAt.getTime() : typeof device.lastSeenAt === 'number' ? device.lastSeenAt : Date.parse(device.lastSeenAt ?? '')
-  // A future stored heartbeat is invalid, even when a gateway happens to answer.
-  if (seen > observedAt) return false
-  if (isDeviceOnline(device.lastSeenAt, observedAt)) return true
-  const endpoint = deviceGatewayEndpoint(device.id, 'status')
-  if (!endpoint) return false
+export async function gatewayDeviceOnline(deviceId: string): Promise<boolean | null> {
+  const endpoint = deviceGatewayEndpoint(deviceId, 'status')
+  if (!endpoint) return null
   try {
     if (endpoint.mode === 'builtin') {
       const { builtinGateway } = await import('./builtin-gateway/runtime')
-      return (await builtinGateway()?.hub.status(device.id))?.online === true
+      const status = await builtinGateway()?.hub.status(deviceId)
+      return status ? status.online === true : null
     }
     const response = await fetch(endpoint.url, {
       headers: { authorization: `Bearer ${endpoint.secret}` },
-      cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(2_000),
+      cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(5_000),
     })
-    if (!response.ok) return false
+    if (!response.ok) return null
     const status: unknown = await response.json()
-    if (!status || typeof status !== 'object' || !('online' in status) || status.online !== true
-      || !('lastSeenAt' in status) || typeof status.lastSeenAt !== 'string') return false
-    const seen = Date.parse(status.lastSeenAt)
-    // Future timestamps never prove a device is present.
-    const receivedAt = now === undefined ? Date.now() : now + Date.now() - startedAt
-    return Number.isFinite(seen) && seen <= receivedAt && receivedAt - seen <= GATEWAY_ONLINE_WINDOW_MS
-  } catch { return false }
-}
-
-/** Deduplicate a page's devices; parallel reads have one bounded timeout. */
-export async function deviceOnlineStates(devices: readonly DevicePresence[], now?: number): Promise<Map<string, boolean>> {
-  const unique = new Map(devices.map(device => [device.id, device]))
-  return new Map(await Promise.all([...unique.values()].map(async device => [device.id, await deviceIsOnline(device, now)] as const)))
+    if (!status || typeof status !== 'object' || !('online' in status) || typeof status.online !== 'boolean') return null
+    return status.online
+  } catch { return null }
 }

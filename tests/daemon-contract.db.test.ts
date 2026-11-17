@@ -63,7 +63,7 @@ test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device rout
   await recordPushGrant(pool, owner, normalizeRepository(remote).key)
   const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
   const harnesses = [{ harness: 'claude_code', installed: true, version: '2.1.0', toolApproval: true }]
-  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"daemonVersion","protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Laptop','local',true,$3,$4,now(),$5)`,
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"daemonVersion","protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Laptop','local',true,$3,$4,now(),$5,now())`,
     [deviceId, owner, MIN_DAEMON_VERSION, DAEMON_PROTOCOL_VERSION, JSON.stringify(harnesses)])
   await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'claude_code\',$4)', [agentId, owner, deviceId, `claude_code-${agentId.slice(0, 8)}`])
   await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, deviceId, owner, normalizeRepository(remote).key, remote])

@@ -87,12 +87,12 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     await client.query(`SELECT id FROM agents WHERE "deviceId"=$1 AND "userId"=$2 FOR UPDATE`, [target, userId])
     // Run admission reads this row FOR SHARE and requires enabled, so no run
     // can be admitted between the check below and the commit.
-    const device = await client.query(`SELECT id,"lastSeenAt" FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE`, [target, userId])
+    const device = await client.query(`SELECT id,"sessionOpenedAt","sessionClosedAt" FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE`, [target, userId])
     if (!device.rowCount) throw new ActionFailureError('deviceNotFound')
     const live = await client.query(`SELECT 1 FROM agent_runs WHERE "deviceId"=$1 AND status = ANY($2::text[]) LIMIT 1`, [target, [...LIVE_RUN_STATUSES]])
     if (live.rowCount) throw new ActionFailureError('deviceHasActiveRuns')
     const row = device.rows[0]
-    const online = await deviceIsOnline(row)
+    const online = deviceIsOnline(row)
     if (online) await enqueueDeviceCommand(userId, target, 'uninstall', client, { notify: false })
     const revoked = await client.query(`WITH changed AS (
       UPDATE device_tokens SET "revokedAt"=CASE WHEN $3::boolean THEN NULL ELSE now() END,

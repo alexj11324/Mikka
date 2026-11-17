@@ -101,8 +101,8 @@ test('provider failure continues the same task through its own Agent\'s authoriz
     const remote = `https://github.com/mikka-ci/provider-fallback-${randomUUID()}.git`
     await recordPushGrant(pool, id, normalizeRepository(remote).key)
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses)
-      VALUES ($1,$2,'Laptop','local',true,$3,now(),$4)`, [deviceId, id, DAEMON_PROTOCOL_VERSION, harnesses(['claude_code', 'codex'])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt")
+      VALUES ($1,$2,'Laptop','local',true,$3,now(),$4,now())`, [deviceId, id, DAEMON_PROTOCOL_VERSION, harnesses(['claude_code', 'codex'])])
     const agents: Record<Harness, string> = { claude_code: randomUUID(), codex: randomUUID() }
     for (const [harness, agentId] of Object.entries(agents))
       await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)', [agentId, id, deviceId, harness, `${harness}-${agentId.slice(0, 8)}`])
@@ -163,7 +163,7 @@ test('provider failure continues the same task through its own Agent\'s authoriz
   })
   const claim = async (p: Person, runId: string, options: { snapshot?: boolean } = {}) => {
     const response = await claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
-      method: 'POST', headers: { 'x-mikka-client-version': MIN_DAEMON_VERSION, authorization: `Bearer ${p.token}`,
+      method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': MIN_DAEMON_VERSION, authorization: `Bearer ${p.token}`,
         [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [PROJECT_ENVIRONMENT_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1',
         ...(options.snapshot ? { [POLICY_SNAPSHOT_HEADER]: POLICY_SNAPSHOT_VERSION } : {}) },
     }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
@@ -564,8 +564,8 @@ test('provider failure continues the same task through its own Agent\'s authoriz
     const { p, second } = await twoModels('provider-pinned')
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [p.deviceId, harnesses(['claude_code'])])
     const deviceId = randomUUID(), agentId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses)
-      VALUES ($1,$2,'Other laptop','local',true,$3,now(),$4)`, [deviceId, p.id, DAEMON_PROTOCOL_VERSION, harnesses(['codex'])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt")
+      VALUES ($1,$2,'Other laptop','local',true,$3,now(),$4,now())`, [deviceId, p.id, DAEMON_PROTOCOL_VERSION, harnesses(['codex'])])
     await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Other Codex\')', [agentId, p.id, deviceId])
     const runId = await running(p, 'claude_code', { pinned: true })
     await end(p, runId, balance)
@@ -660,8 +660,8 @@ test('provider failure continues the same task through its own Agent\'s authoriz
     const { p: second } = await twoModels('provider-checkpoint-remote')
     await pool.query('UPDATE devices SET harnesses=$2 WHERE id=$1', [second.deviceId, harnesses(['claude_code'])])
     const deviceId = randomUUID(), agentId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses)
-      VALUES ($1,$2,'Other laptop','local',true,$3,now(),$4)`, [deviceId, second.id, DAEMON_PROTOCOL_VERSION, harnesses(['codex'])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt")
+      VALUES ($1,$2,'Other laptop','local',true,$3,now(),$4,now())`, [deviceId, second.id, DAEMON_PROTOCOL_VERSION, harnesses(['codex'])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Checkpoint Codex')`, [agentId, second.id, deviceId])
     const otherRun = await running(second)
     await persistRunCompletion(second.id, otherRun, { stopReason: 'provider_failure', report: {
