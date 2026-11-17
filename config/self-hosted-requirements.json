@@ -2312,6 +2312,16 @@
     "test": "tests/thread-continue.db.test.ts",
     "suite": "test:bot-threads-db"
   },
+  "lib/schedules/standing-task.ts": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL",
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Recheck the schedule creator's Workspace membership, active Project relation and Task steering access before the normal thread writer continues a standing Task. The installation's Workspace and application PostgreSQL databases can be separate.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
   "lib/schedules/contract.ts": {
     "mode": "built-in",
     "environment": [
