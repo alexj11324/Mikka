@@ -16,7 +16,7 @@ test('GitHub pages follow the cursor, count read-only tools and keep the caller 
       assert.equal(userId, 'caller')
       cursors.push(cursor)
       return cursor === undefined
-        ? { tools: [{ name: 'list_issues', displayName: 'List issues', readOnly: true }, { name: 'create_issue' }, null, {}], nextCursor: 'next' }
+        ? { tools: [{ name: 'list_issues', displayName: 'List issues', readOnly: true, description: 'List issues in a repository.' }, { name: 'create_issue', description: '' }, null, {}], nextCursor: 'next' }
         : { tools: [{ name: 'merge_pull_request', displayName: 'Merge pull request', readOnly: false }], nextCursor: null }
     },
   })
@@ -25,7 +25,8 @@ test('GitHub pages follow the cursor, count read-only tools and keep the caller 
   assert.equal(catalogue.count, 3)
   assert.equal(catalogue.readOnlyCount, 1)
   assert.equal(catalogue.truncated, false)
-  assert.deepEqual(catalogue.tools[0], { name: 'list_issues', displayName: 'List issues', readOnly: true })
+  // GitHub's own description is kept; an empty one is left out.
+  assert.deepEqual(catalogue.tools[0], { name: 'list_issues', displayName: 'List issues', readOnly: true, description: 'List issues in a repository.' })
   // A tool without a display name falls back to its name; a missing readOnly is a write.
   assert.deepEqual(catalogue.tools[1], { name: 'create_issue', displayName: 'create_issue', readOnly: false })
 })

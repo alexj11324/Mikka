@@ -5,8 +5,8 @@ import { githubTokenForUser } from '@/lib/github/user-access'
 import { getComposio } from '@/lib/composio'
 import { OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 
-/** The real catalogue an app offers, as names and read/write marks. */
-export type AppToolSummary = { name: string; displayName: string; readOnly: boolean }
+/** The real catalogue an app offers, as names, the provider's own description and read/write marks. */
+export type AppToolSummary = { name: string; displayName: string; readOnly: boolean; description?: string }
 export type AppToolCatalogue = {
   app: string
   count: number
@@ -44,10 +44,11 @@ async function githubCatalogue(userId: string, listPage: (userId: string, cursor
     if (!Array.isArray(result.tools)) return { tools, truncated: true, error: 'githubToolCatalogueInvalid' }
     for (const entry of result.tools) {
       if (!entry || typeof entry !== 'object') continue
-      const tool = entry as { name?: unknown; displayName?: unknown; readOnly?: unknown }
+      const tool = entry as { name?: unknown; displayName?: unknown; readOnly?: unknown; description?: unknown }
       if (typeof tool.name !== 'string' || tool.name.length === 0) continue
       if (tools.length >= MAX_TOOLS) { truncated = true; break }
-      tools.push({ name: tool.name, displayName: typeof tool.displayName === 'string' ? tool.displayName : tool.name, readOnly: tool.readOnly === true })
+      tools.push({ name: tool.name, displayName: typeof tool.displayName === 'string' ? tool.displayName : tool.name, readOnly: tool.readOnly === true,
+        ...(typeof tool.description === 'string' && tool.description ? { description: tool.description } : {}) })
     }
     cursor = typeof result.nextCursor === 'string' && result.nextCursor.length > 0 ? result.nextCursor : undefined
     if (tools.length >= MAX_TOOLS) {
