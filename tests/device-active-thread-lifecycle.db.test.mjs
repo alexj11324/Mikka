@@ -23,7 +23,7 @@ else if (process.env.REQUIRE_DB === '1') assert.fail(E2E_DB_RULE)
 
 // Run the same writers as the person in the application. Only the previous
 // completed transcript and the isolated agent executable are fixtures.
-test('a paired daemon runs the owner’s retried Task and its active directory follows the stable thread until stop', {skip: !adminUrl, timeout: 180_000}, async () => {
+test('a paired daemon runs the owner’s retried Task and its active directory follows the stable thread until stop', {skip: !adminUrl, timeout: 180_000}, async t => {
   const admin = new Pool({connectionString: adminUrl, max: 1})
   const name = 'device_directory_' + randomUUID().replaceAll('-', '') + '_e2e'
   await createTestDatabase(admin, name, 'template0')
@@ -40,7 +40,7 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
     return next(alias ? pathToFileURL(alias).href : specifier, context)
   }})
   try {
-    for (const key of ['E2E_DATABASE_URL','DATABASE_URL','MIKKA_DATABASE_URL','ORVILO_DATABASE_URL','MIKKA_WORKSPACE_DATABASE_URL']) process.env[key] = url.href
+    for (const key of ['E2E_DATABASE_URL','DATABASE_URL','MIKKA_DATABASE_URL','ORVILO_DATABASE_URL']) process.env[key] = url.href
     Object.assign(process.env, {NODE_ENV:'test', MIKKA_EDITION:'community', MIKKA_BASE_PATH:'/mikka', MIKKA_TEST_MODE:'1',
       BETTER_AUTH_SECRET:randomBytes(32).toString('hex'), MIKKA_LOCAL_TEST_ACCOUNTS:'1', HOME:home,
       GIT_CONFIG_GLOBAL:join(home,'.gitconfig'), GIT_CONFIG_NOSYSTEM:'1', GIT_ALLOW_PROTOCOL:'file'})
@@ -128,14 +128,15 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
       return response.json()
     }
     assert.deepEqual(await directory(),{threads:[],cursor:null})
+    t.diagnostic('Paired daemon online. Owner and peer have separate leased password sessions.')
     const {taskId} = await rpc('issues.createTaskOnly',[{version:1,intent:'create_only',requestId:randomUUID(),
       workspaceId:owner.workspace,title:'Paired device Task',content:{type:'doc',content:[]},status:'todo',priority:'normal'}])
     const {rows:[agent]} = await pool.query('select id from agents where "userId"=$1 and "deviceId"=$2 and harness=\'codex\'',[owner.id,deviceId])
     const {ensureDeviceRepository} = await import('../lib/device-repositories.ts')
     const repo = await ensureDeviceRepository(owner.id,deviceId,remote)
     const original = randomUUID(), anchor = randomUUID()
-    await pool.query(`insert into agent_runs(id,"userId","workspaceId","issueId","agentId","deviceId","deviceRepoId",title,status,"startedAt","finishedAt","lastReply",prompt,"agentDefinition")
-      values($1,$2,$3,$4,$5,$6,$7,'Recorded history','succeeded',now()-interval '5 min',now()-interval '1 min','Earlier answer','Read local fixture',$8)`,
+    await pool.query(`insert into agent_runs(id,"userId","workspaceId","issueId","agentId","deviceId","deviceRepoId",title,"titleSource",status,"startedAt","finishedAt","lastReply",prompt,"agentDefinition")
+      values($1,$2,$3,$4,$5,$6,$7,'Recorded history','manual','succeeded',now()-interval '5 min',now()-interval '1 min','Earlier answer','Read local fixture',$8)`,
       [original,owner.id,owner.workspace,taskId,agent.id,deviceId,repo.id,{harness:'codex',model:'selfhost-ci',modelSource:'native-default',readOnly:true}])
     await pool.query(`insert into run_messages(id,"runId","userId",text,origin,"deliveredAt","createdAt") values($1,$2,$3,'WAIT','owner',now()-interval '4 min',now()-interval '4 min')`,[randomUUID(),original,owner.id])
     await pool.query(`insert into run_chunks(id,"runId",seq,chunk,"createdAt") values($1,$2,1,$3,now()-interval '3 min')`,[randomUUID(),original,{type:'text-delta',id:anchor,delta:'Earlier answer'}])
@@ -144,14 +145,15 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
     assert.ok(runId && runId!==original)
     async function waitForStatus(status) {
       const end = Date.now()+45_000
-      let last
+      let latest
       while (Date.now()<end) {
-        last = (await pool.query('select status from agent_runs where id=$1',[runId])).rows[0]?.status
-        if (last===status) return
-        assert.ok(!['failed','succeeded','stopped'].includes(last),'unexpected terminal status: '+last)
+        latest = (await pool.query('select status,"stopReason" from agent_runs where id=$1',[runId])).rows[0]
+        if (latest?.status===status) return
+        assert.ok(!['failed','succeeded','stopped','cancelled'].includes(latest?.status),
+          'unexpected terminal status '+latest?.status+', reason '+latest?.stopReason)
         await delay(100)
       }
-      assert.fail('expected '+status+', last persisted status '+last)
+      assert.fail('expected '+status+', last persisted status '+latest?.status)
     }
     await waitForStatus('running')
     assert.deepEqual(await directory(),{threads:[{id:original,status:'running'}],cursor:null})
@@ -159,11 +161,18 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
     const {rows:[active]} = await pool.query(`select r."worktreePath" as checkout from agent_runs r join device_tokens t on t.id=r."deviceTokenId"
       where r.id=$1 and r."userId"=$2 and r."workspaceId"=$3 and r."issueId"=$4 and r."continuesRunId"=$5 and r."deviceId"=$6
       and t."userId"=r."userId" and r."startedAt" is not null`,[runId,owner.id,owner.workspace,taskId,original,deviceId])
-    assert.ok(active)
-    assert.equal(execFileSync('git',['-C',join(dataDir,'worktrees',runId),'rev-parse','HEAD'],{encoding:'utf8'}).trim(),base)
+    assert.equal(active?.checkout,join(dataDir,'worktrees',runId))
+    assert.equal(execFileSync('git',['-C',active.checkout,'rev-parse','HEAD'],{encoding:'utf8'}).trim(),base)
+    t.diagnostic('The signed directory returned the stable root as running. Device token, Task, new Run and local Git HEAD matched. Peer received 404.')
     assert.ok((await rpc('agents.stopRun',[runId])).stoppedRunIds.includes(runId))
-    await waitForStatus('stopped')
+    await waitForStatus('cancelled')
     assert.deepEqual(await directory(),{threads:[],cursor:null})
+    const tokens = (await (await owner.request('device-tokens')).json()).tokens
+    assert.equal(tokens.length,1)
+    const revoked = await owner.request('device-tokens/'+tokens[0].id+'/revoke','POST')
+    assert.equal((await revoked.json()).revokedBy,owner.id)
+    assert.equal((await rpc('agents.removeDevice',[deviceId])).id,deviceId)
+    t.diagnostic('Owner stop was acknowledged by the daemon. The task left the directory and its device credential was revoked.')
   } finally {
     try {
       await daemon?.stop()
