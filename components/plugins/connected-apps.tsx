@@ -23,7 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appState, needsReconnect } from '@/lib/composio-account-state'
-import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type ConnectedAccountView as AccountView } from '@/lib/composio-accounts'
+import { composioConnectRedirect, type ConnectedAccountView as AccountView } from '@/lib/composio-accounts'
 import type { StoreApp, StoreCatalog } from '@/lib/plugins/catalog'
 import type { AppDetail, AppTool } from '@/lib/plugins/app-detail'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
@@ -64,8 +64,9 @@ export type OwnAppId = typeof OWN_APPS[number]
 export const isOwnApp = (value: string | null): value is OwnAppId => value !== null && (OWN_APPS as readonly string[]).includes(value)
 
 /**
- * An app's name and icon anywhere on the page: ours and the first four apps
- * from messages, every other store app from Composio's catalog.
+ * An app's name and icon anywhere on the page: ours from messages, every
+ * Composio app from Composio's live catalog (a message for its id stands in
+ * only while the catalog has not been read, then the toolkit slug).
  */
 export function useAppInfo() {
   const t = useTranslations('Settings.integrations')
@@ -75,7 +76,7 @@ export function useAppInfo() {
   const byId = new Map<string, StoreApp>((data?.apps ?? []).map(app => [app.id, app]))
   return (id: string) => {
     const store = byId.get(id)
-    const name = id === 'linear' ? tLinear('title') : id === 'telegram' ? tTelegram('title') : id === 'github' || isComposioAppId(id) ? t(id) : store?.name ?? id
+    const name = id === 'linear' ? tLinear('title') : id === 'telegram' ? tTelegram('title') : id === 'github' ? t(id) : store?.name ?? (t.has(id as never) ? t(id as never) : id)
     return { name, iconUrl: store?.iconUrl ?? null, description: isOwnApp(id) ? '' : store?.description ?? '' }
   }
 }
@@ -92,16 +93,12 @@ export async function readConnectedApps(): Promise<IntegrationState> {
   return await response.json() as IntegrationState
 }
 
-/** Facts for 关于: who makes the app and where it lives. */
-const APP_ABOUT: Record<ComposioAppId, { developer: string; website: string }> = {
+/** Facts for 关于 that Composio does not give: who makes a few apps and where they live. Optional; any app has a page without one. */
+const APP_ABOUT: Readonly<Record<string, { developer: string; website: string }>> = {
   gmail: { developer: 'Google', website: 'https://mail.google.com' },
   googlecalendar: { developer: 'Google', website: 'https://calendar.google.com' },
   notion: { developer: 'Notion Labs', website: 'https://www.notion.com' },
   slack: { developer: 'Slack', website: 'https://slack.com' },
-}
-
-export function isComposioAppId(value: string | null): value is ComposioAppId {
-  return value !== null && (COMPOSIO_APP_IDS as readonly string[]).includes(value)
 }
 
 
@@ -437,7 +434,7 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   // Composio's own page data, for everyone, connected or not.
   const detail = useAppDetail(app)
   // 开发者 only where Mikka already knows it; Composio does not say.
-  const about = isComposioAppId(app) ? APP_ABOUT[app] : null
+  const about = Object.hasOwn(APP_ABOUT, app) ? APP_ABOUT[app] : null
   const website = detail.data?.website ?? about?.website ?? null
   const busy = Boolean(apps.pending)
   const accountName = useAccountName()

@@ -3007,12 +3007,6 @@
       "access": {
         "allow": "Allow",
         "deny": "Block"
-      },
-      "apps": {
-        "gmail": "Gmail",
-        "googlecalendar": "Google Calendar",
-        "slack": "Slack",
-        "notion": "Notion"
       }
     },
     "usage": {

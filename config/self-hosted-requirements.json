@@ -104,6 +104,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "drizzle/20261117025303_workspace_app_policies_any_toolkit.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lets the workspace app policy store a choice for any Composio toolkit slug instead of a fixed five apps, while still refusing GitHub, Linear and Telegram.",
+    "test": "tests/app-policy.db.test.ts",
+    "suite": "test:workspace-admin-db"
+  },
   "drizzle/20261116204507_drive_link_directory_metadata.sql": {
     "mode": "built-in",
     "environment": [],
@@ -915,6 +922,13 @@
     "test": "tests/resource-access.db.test.ts",
     "suite": "test:visibility-db"
   },
+  "lib/plugins/catalog.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Onboarding suggests Composio's most used one-click apps from the live store catalogue, plus apps the person already connected.",
+    "test": "lib/plugins/live-apps.test.ts",
+    "suite": "test:plugins"
+  },
   "lib/plugins/skill-metadata.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1008,6 +1022,13 @@
     "behavior": "Read messages for already-authorized runs from PostgreSQL. Retry identities are projected only from the reader's own stored submission events.",
     "test": "tests/team-visibility.db.test.ts",
     "suite": "test:visibility-db"
+  },
+  "lib/app-policy/apps.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The workspace app policy accepts and lists any Composio toolkit slug from stored choices and members' connected apps; GitHub, Linear and Telegram are refused.",
+    "test": "lib/plugins/live-apps.test.ts",
+    "suite": "test:plugins"
   },
   "lib/artifacts/storage.ts": {
     "mode": "operator-configured",
@@ -1265,6 +1286,13 @@
     "behavior": "Project stored account status and enabled switches locally; expired accounts require reconnection and an enabled usable account keeps its toolkit active.",
     "test": "tests/mobile-plugin-connections.test.ts",
     "suite": "test:mobile"
+  },
+  "lib/composio-accounts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Any Composio toolkit is a connectable app without a fixed list; a provider identity lookup is an optional extra for a few apps.",
+    "test": "lib/plugins/live-apps.test.ts",
+    "suite": "test:plugins"
   },
   "lib/computer/anonymous-startup-hint.ts": {
     "mode": "built-in",

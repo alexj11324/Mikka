@@ -88,6 +88,8 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       { title: '已连接', items: mine },
       { title: '热门', items: [...OWN, ...entries(catalog.data?.popular ?? [])].filter(app => !connected.has(app.id)) },
       { title: '新品推荐', items: entries(catalog.data?.latest ?? []).filter(app => !connected.has(app.id)) },
+      // Every other app, in Composio's own categories (as the web store): the whole live catalogue, not only its top.
+      ...(catalog.data?.categories ?? []).map(category => ({ title: category.name, items: entries(category.apps).filter(app => !connected.has(app.id)) })),
     ].filter(section => section.items.length)
   }, [needle, catalog.data, connected])
 
