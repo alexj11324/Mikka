@@ -453,6 +453,13 @@
     "test": "tests/project-resources.db.test.ts",
     "suite": "test:project-resources-db"
   },
+  "app/api/workspaces/[workspaceId]/projects/[projectId]/repos/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An authorized Workspace administrator adds normalized repository keys to an accessible Project using the installation PostgreSQL database.",
+    "test": "tests/project-resources.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "app/api/workspaces/[workspaceId]/service-identities/[identityId]/credential/route.ts": {
     "mode": "built-in",
     "environment": [],

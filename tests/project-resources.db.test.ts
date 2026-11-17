@@ -65,6 +65,35 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
     await rejects(resources.withProjectExecution({ ...request, runtime: 'cloud' }, async value => value), 'projectEnvironmentUnavailable')
     await rejects(resources.withProjectExecution({ ...request, harness: 'claude_code' }, async value => value), 'projectEnvironmentUnavailable')
   })
+  await t.test('incremental repository adds keep existing metadata and serialize without duplicate revisions or audits', async () => {
+    const id = randomUUID()
+    await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)
+      values($1,$2,$3,'Add repositories','','','planned','none','','','','','[]',1)`, [id, owner, workspace.id])
+    await registerProjectAccess(owner, id, workspace.id)
+    const scope = { workspaceId: workspace.id, projectId: id }
+    await resources.saveProjectResources(owner, { ...scope, revision: 1,
+      repositories: [{ repositoryKey: repoA, isPrimary: true, baseBranch: 'release', environmentId }],
+      environmentIds: [environmentId], defaultEnvironmentId: environmentId })
+    const before = await resources.listProjectResources(owner, workspace.id, id)
+    const add = (repos: string[]) => resources.saveProjectResources(owner, { ...scope, repos })
+    const revisions = await Promise.all([add([repoA, repoB]), add([repoC])])
+    assert.deepEqual(revisions.map(result => result.revision).sort(), [3, 4])
+    assert.deepEqual(await add([repoB.toUpperCase(), repoB, repoC]), { revision: 4 })
+    assert.deepEqual(await add([]), { revision: 4 })
+    const updated = await resources.listProjectResources(owner, workspace.id, id)
+    assert.deepEqual(updated.environmentBindings, before.environmentBindings)
+    assert.deepEqual(updated.policy, before.policy)
+    assert.deepEqual(updated.repositories.find(row => row.repositoryKey === repoA), before.repositories[0])
+    assert.deepEqual(updated.repositories.map(row => row.repositoryKey).sort(), [repoA, repoB, repoC].sort())
+    const extra = Array.from({ length: 98 }, (_, index) => 'v2/github.com/acme/extra-' + index)
+    await assert.rejects(add(extra), { name: 'ZodError' })
+    const { rows: [row] } = await connection.query(`select revision,
+      (select count(*)::int from workspace_resource_events where "resourceId"=$1 and kind='project_resources.changed') as audits
+      from workspace_projects where id=$1`, [id])
+    assert.deepEqual(row, { revision: 4, audits: 3 })
+    assert.deepEqual((await resources.listProjectResources(owner, workspace.id, id)).repositories, updated.repositories)
+  })
+
   await t.test('two Projects in one Workspace select the same repository independently across a binding change', async () => {
     const issueA = await seedIssue(connection, owner, workspace.id), issueB = await seedIssue(connection, owner, workspace.id)
     const projectA = randomUUID(), projectB = randomUUID()

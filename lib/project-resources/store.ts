@@ -12,7 +12,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import type { WorkspaceTransaction } from '@/lib/workspace-access'
 import { ActionFailureError } from '@/lib/action-error'
-import { environmentConfiguration, projectEnvironmentVariableInput, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, projectResourcesInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
+import { environmentConfiguration, projectEnvironmentVariableInput, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, projectRepositoryKeys, projectResourceMutation, repositoryBindingInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
 
 type Reader = Parameters<typeof withTaskWorkspace>[0]
 const actorId = (reader: Reader) => typeof reader === 'string' ? reader : reader.id
@@ -262,24 +262,41 @@ export async function rollbackProjectSetup(reader: Reader, raw: z.input<typeof r
   })
 }
 
-export async function saveProjectResources(reader: Reader, raw: z.input<typeof projectResourcesInput>) {
-  const input = projectResourcesInput.parse(raw)
+export async function saveProjectResources(reader: Reader, raw: z.input<typeof projectResourceMutation>) {
+  const input = projectResourceMutation.parse(raw)
   return withConfiguredProject(reader, input.workspaceId, input.projectId, true, async (tx, project) => {
-    if (project.revision !== input.revision) throw new ActionFailureError('projectResourceConflict')
-    const ids = [...new Set(input.environmentIds)]
-    for (const id of ids) {
-      const environment = await tx.execute(sql`select id from workspace_environments where id=${id} and "workspaceId"=${input.workspaceId} and "archivedAt" is null`)
-      if (!environment.rowCount) throw new ActionFailureError('projectEnvironmentUnavailable')
+    let bindings: z.output<typeof repositoryBindingInput>[]
+    let counts: { repositoryCount: number; environmentCount?: number }
+    if ('repos' in input) {
+      const existing = await tx.execute<{ repositoryKey: string }>(sql`select "repositoryKey" from workspace_project_repositories
+        where "projectId"=${input.projectId} and "workspaceId"=${input.workspaceId}`)
+      const keys = new Set(existing.rows.map(row => row.repositoryKey))
+      const additions = [...new Set(input.repos)].filter(key => !keys.has(key))
+      if (!additions.length) return { revision: project.revision }
+      // Apply the same total limit as a full replacement, under the locked Project row.
+      projectRepositoryKeys.parse([...keys, ...additions])
+      bindings = additions.map(repositoryKey => repositoryBindingInput.parse({ repositoryKey }))
+      counts = { repositoryCount: keys.size + additions.length }
+    } else {
+      if (project.revision !== input.revision) throw new ActionFailureError('projectResourceConflict')
+      const ids = [...new Set(input.environmentIds)]
+      for (const id of ids) {
+        const environment = await tx.execute(sql`select id from workspace_environments where id=${id} and "workspaceId"=${input.workspaceId} and "archivedAt" is null`)
+        if (!environment.rowCount) throw new ActionFailureError('projectEnvironmentUnavailable')
+      }
+      await tx.execute(sql`delete from workspace_project_repositories where "projectId"=${input.projectId}`)
+      await tx.execute(sql`delete from workspace_project_environments where "projectId"=${input.projectId}`)
+      for (const id of ids) await tx.execute(sql`insert into workspace_project_environments("projectId","workspaceId","environmentId","isDefault") values(${input.projectId},${input.workspaceId},${id},${id === input.defaultEnvironmentId})`)
+      bindings = input.repositories
+      counts = { repositoryCount: bindings.length, environmentCount: ids.length }
     }
-    await tx.execute(sql`delete from workspace_project_repositories where "projectId"=${input.projectId}`)
-    await tx.execute(sql`delete from workspace_project_environments where "projectId"=${input.projectId}`)
-    for (const id of ids) await tx.execute(sql`insert into workspace_project_environments("projectId","workspaceId","environmentId","isDefault") values(${input.projectId},${input.workspaceId},${id},${id === input.defaultEnvironmentId})`)
-    for (const repo of input.repositories) await tx.execute(sql`insert into workspace_project_repositories("projectId","workspaceId","repositoryKey","baseBranch","environmentId","isPrimary") values(${input.projectId},${input.workspaceId},${repo.repositoryKey},${repo.baseBranch},${repo.environmentId},${repo.isPrimary})`)
-    await tx.execute(sql`update workspace_projects set revision=revision+1,"updatedAt"=now() where id=${input.projectId}`)
-    await audit(tx, reader, input.workspaceId, 'project_resources.changed', input.projectId, { revision: input.revision + 1, repositoryCount: input.repositories.length, environmentCount: ids.length })
+    for (const repo of bindings) await tx.execute(sql`insert into workspace_project_repositories("projectId","workspaceId","repositoryKey","baseBranch","environmentId","isPrimary") values(${input.projectId},${input.workspaceId},${repo.repositoryKey},${repo.baseBranch},${repo.environmentId},${repo.isPrimary})`)
+    const revision = project.revision + 1
+    await tx.execute(sql`update workspace_projects set revision=${revision},"updatedAt"=now() where id=${input.projectId} and "workspaceId"=${input.workspaceId}`)
+    await audit(tx, reader, input.workspaceId, 'project_resources.changed', input.projectId, { revision, ...counts })
     await (await import('@/lib/live/project-map')).projectMapChanged(tx, input.projectId)
     await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
-    return { revision: input.revision + 1 }
+    return { revision }
   })
 }
 

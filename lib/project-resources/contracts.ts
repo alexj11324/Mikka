@@ -32,14 +32,21 @@ export const repositoryBindingInput = z.object({
   repositoryKey: projectRepositoryKey, baseBranch: projectBranch.nullable().default(null),
   environmentId: z.uuid().nullable().default(null), isPrimary: z.boolean().default(false),
 }).strict()
+const maxProjectRepositories = 100
+export const projectRepositoryKeys = z.array(projectRepositoryKey).max(maxProjectRepositories)
+export const addProjectRepositoriesBody = z.object({ repos: projectRepositoryKeys }).strict()
+
 export const projectResourcesInput = z.object({
   workspaceId: z.uuid(), projectId: z.uuid(), revision: z.number().int().positive(),
-  repositories: z.array(repositoryBindingInput).max(100),
+  repositories: z.array(repositoryBindingInput).max(maxProjectRepositories),
   environmentIds: z.array(z.uuid()).max(100), defaultEnvironmentId: z.uuid().nullable(),
 }).strict().refine(value => value.repositories.filter(item => item.isPrimary).length <= 1)
   .refine(value => new Set(value.repositories.map(item => item.repositoryKey)).size === value.repositories.length)
   .refine(value => !value.defaultEnvironmentId || value.environmentIds.includes(value.defaultEnvironmentId))
   .refine(value => value.repositories.every(item => !item.environmentId || value.environmentIds.includes(item.environmentId)))
+export const projectResourceMutation = projectResourcesInput.or(
+  addProjectRepositoriesBody.extend({ workspaceId: z.uuid(), projectId: z.uuid() }),
+)
 export const listDependencyRepositoriesInput = z.object({ workspaceId: z.uuid(), projectId: z.uuid() }).strict()
 export const projectEnvironmentVariableInput = z.object({ workspaceId: z.uuid(), projectId: z.uuid(), name: envName }).strict()
 export const projectPullAuthorInput = listDependencyRepositoriesInput.extend({

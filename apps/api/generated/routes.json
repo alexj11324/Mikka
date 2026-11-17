@@ -2973,6 +2973,15 @@
       "sourceHash": "cf70f5251663a625f8d4d6277738f477662cf3982dbf88bc5cc066d3f6e1fb94"
     },
     {
+      "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/repos",
+      "template": "/api/workspaces/[workspaceId]/projects/[projectId]/repos",
+      "source": "app/api/workspaces/[workspaceId]/projects/[projectId]/repos/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "93a5ef76097ef52f09bfe646c268a5979d3bf1a8d72a1c0795e93386884fdc74"
+    },
+    {
       "path": "/mikka/api/workspaces/[workspaceId]/service-identities",
       "template": "/api/workspaces/[workspaceId]/service-identities",
       "source": "app/api/workspaces/[workspaceId]/service-identities/route.ts",
