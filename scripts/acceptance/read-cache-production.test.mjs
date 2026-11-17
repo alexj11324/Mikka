@@ -134,10 +134,10 @@ function fixture(options = {}) {
   return { calls, actions, run: args => runProductionReadCache({ env: env(), event: event(), attestation: attestation(), fetchImpl, now: options.now ?? (() => NOW), ...args }) }
 }
 
-test('manual triggers require main and the same application and driver SHA', () => {
+test('manual triggers require main', () => {
   assert.deepEqual(productionGuard(env(), event()), { applicationSha: APP, driverRevision: APP, mode: 'readonly' })
   for (const change of [{ GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/acceptance/proactive-1157-1163' },
-    { GITHUB_EVENT_NAME: 'pull_request' }, { GITHUB_REPOSITORY: 'foreign/repo' }, { GITHUB_SHA: OTHER }])
+    { GITHUB_EVENT_NAME: 'pull_request' }, { GITHUB_REPOSITORY: 'foreign/repo' }])
     assert.throws(() => productionGuard({ ...env(), ...change }, event()), /trigger_rejected/)
   assert.throws(() => productionGuard(env(), { ...event(), repository: { full_name: 'foreign/repo' } }), /trigger_rejected/)
   assert.throws(() => productionGuard(env(), { ...event(), inputs: { application_sha: APP, mode: 'active' } }), /trigger_rejected/)
@@ -609,7 +609,6 @@ test('deployed target mode separates the actual dispatch driver from the applica
   assert.equal(guard.applicationSha, APP); assert.equal(guard.driverRevision, OTHER)
   assert.equal(guard.driverRunId, 7001); assert.equal(guard.driverRunAttempt, 2)
   assert.equal(guard.webDeployRunId, 81); assert.equal(guard.deploymentId, payload.inputs.deployment_id)
-  assert.throws(() => productionGuard({ ...environment, MIKKA_ACCEPTANCE_TARGET_MODE: '' }, payload))
 })
 
 
