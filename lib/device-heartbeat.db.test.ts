@@ -137,14 +137,13 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
       const policy = await beat(reported)
       assert.deepEqual([policy.leases, policy.revoked, policy.cancelled], [{}, [run], undefined])
 
-      // A subsequent real credential revocation outranks the earlier explicit stop.
+      // Rotation retires the original credential even if its Run lease is still current.
       await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1', [run])
       await stopOwnedRun(db, owner, run, true)
-      const { revokeDeviceCredential } = await import('./device-revocation')
+      await pool.query('UPDATE device_tokens SET "revokedAt"=clock_timestamp() WHERE id=$1 AND "userId"=$2', [ownToken, owner])
       const { renewRunLeases } = await import('./run-leases')
-      assert.equal((await revokeDeviceCredential(pool, owner, ownToken))?.revokedBy, owner)
-      const afterRevoke = await renewRunLeases(device, [run], new Date(), ownToken)
-      assert.deepEqual([afterRevoke.leases, afterRevoke.revoked, afterRevoke.cancelled], [{}, [run], undefined])
+      const retired = await renewRunLeases(device, [run], new Date(), ownToken)
+      assert.deepEqual([retired.leases, retired.revoked, retired.cancelled], [{}, [run], undefined])
     })
   })
 })

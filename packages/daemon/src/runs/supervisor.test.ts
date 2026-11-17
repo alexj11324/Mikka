@@ -134,7 +134,9 @@ describe("supervisor structured terminal failures", () => {
     if (mode !== "owner") f.supervisor.revokeLeases(revoked)
     release.resolve()
     await f.supervisor.idle(); await f.outbox.flushAll()
-    expect(f.server.runs.get(f.runId)?.completion?.stopReason).toBe(mode === "owner" ? "cancelled" : "device_lost")
+    const terminalReason = f.server.runs.get(f.runId)?.completion?.stopReason
+    expect(terminalReason).toBe(mode === "owner" ? "cancelled" : "device_lost")
+    console.info("Revoked Run completion", { mode, terminalReason })
   })
   it("does not accept failure details from a model handoff", async () => {
     const f = await fixture({ outcome: "failed", report: { summary: "Tool failed", failureDetails: failure } as unknown as ExitEvent["report"] })
