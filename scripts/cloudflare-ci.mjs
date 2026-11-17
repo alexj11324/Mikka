@@ -59,7 +59,9 @@ export async function withOverlayKey(env, action) {
     const key = join(directory, 'key')
     const hosts = join(directory, 'known_hosts')
     await writeFile(key, env.HOSTED_UI_READ_KEY.trim() + '\n', { mode: 0o600 })
-    const response = await fetch('https://api.github.com/meta', { redirect: 'error', signal: AbortSignal.timeout(20000) })
+    // Anonymous API reads share the runner IP's 60 an hour; the job's own read-only token lifts that limit.
+    const response = await fetch('https://api.github.com/meta', { redirect: 'error', signal: AbortSignal.timeout(20000),
+      ...(env.GITHUB_TOKEN ? { headers: { authorization: 'Bearer ' + env.GITHUB_TOKEN } } : {}) })
     if (!response.ok) fail('CI_GITHUB_HOST_KEYS_UNAVAILABLE')
     const keys = (await response.json()).ssh_keys
     if (!Array.isArray(keys) || !keys.length || keys.some(value => !/^(?:ssh-ed25519|ecdsa-sha2-nistp256|ssh-rsa) [A-Za-z0-9+/=]+$/.test(value))) fail('CI_GITHUB_HOST_KEYS_INVALID')
