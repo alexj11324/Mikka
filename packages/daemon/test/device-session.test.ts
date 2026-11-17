@@ -418,6 +418,26 @@ it('a refused session waits for a new credential without dialing; signing in dia
   expect(daemon.status().session).toBe('open')
 })
 
+it('a failed automatic update is reported once, when it fails, without waiting for a push', async () => {
+  const reports: protocol.DeviceReport[] = []
+  let named = false
+  const install = vi.fn(async () => { throw new Error('npm install failed') })
+  const { start } = sessionDaemon({
+    // The first report's answer names a newer release; the daemon installs it when idle.
+    report: async (_id, sent) => { reports.push(sent); if (named) return {}; named = true; return { daemonVersions: { min: '0.0.1', latest: '9.9.9' } } },
+  }, { autoUpdate: { install } })
+  start()
+  await vi.advanceTimersByTimeAsync(0)
+  await vi.advanceTimersByTimeAsync(10_000)
+  expect(install).toHaveBeenCalledWith('9.9.9')
+  const failed = reports.filter(report => report.updateFailure)
+  expect(failed).toHaveLength(1)
+  expect(failed[0].updateFailure).toMatchObject({ version: '9.9.9', code: 'install_failed' })
+  const sent = reports.length
+  await vi.advanceTimersByTimeAsync(60_000)
+  expect(reports).toHaveLength(sent)
+})
+
 it('a device removed while connected asks its report once when the commands read refuses it, and uninstalls', async () => {
   const uninstall = vi.spyOn(service, 'uninstallService').mockImplementation(async clear => { clear() })
   const command = { id: '10000000-0000-4000-8000-0000000000ab', kind: 'uninstall' as const }

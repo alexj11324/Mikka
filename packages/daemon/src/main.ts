@@ -2008,7 +2008,11 @@ export class Daemon {
       if (this.stopped) return
       code = 'restart_failed'
       await restartService(false, () => {}, undefined, () => !this.stopped)
-    }, () => { recordUpdateFailure(this.updateStateFile, version, code) })
+    }, () => {
+      recordUpdateFailure(this.updateStateFile, version, code)
+      // Nothing beats any more: tell the server once, now that it changed.
+      void this.reportNow()
+    })
   }
 
   /**
