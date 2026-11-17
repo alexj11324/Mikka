@@ -4,7 +4,6 @@ import io
 import os
 import subprocess
 import sys
-import time
 
 
 def run(*args, data=None, timeout=8):
@@ -62,12 +61,3 @@ else:
         raise RuntimeError("NATIVE_FOLDER_LOCATION_NOT_SET")
     _, accept = response_buttons()
     click(accept)
-    # Some native choosers enter the selected directory on the first accept.
-    # A second click targets only the same still-visible dialog's response.
-    time.sleep(0.5)
-    visible = subprocess.run(["xdotool", "search", "--onlyvisible", "--name", title],
-                             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                             timeout=3, check=False).stdout.decode().splitlines()
-    if visible == [window]:
-        _, accept = response_buttons()
-        click(accept)
