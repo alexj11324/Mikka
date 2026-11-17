@@ -224,7 +224,7 @@ export async function saveEnvironment(reader: Reader, raw: z.input<typeof saveEn
 
 const currentSetupScope = projectSetupScope.omit({ environmentId: true })
 
-type ProjectRepositoryBinding = { repositoryKey: string; baseBranch: string | null; environmentId: string | null; selectedEnvironmentId: string | null }
+type SelectedProjectRepository = Pick<ProjectRepositoryBinding, 'repositoryKey' | 'baseBranch' | 'environmentId'> & { selectedEnvironmentId: string | null }
 
 /** The Run admission and current setup view resolve the same Project repository overrides and default. */
 async function configuredProjectBindings(tx: WorkspaceTransaction, workspaceId: string, projectId: string) {
@@ -234,7 +234,7 @@ async function configuredProjectBindings(tx: WorkspaceTransaction, workspaceId: 
     left join workspace_project_environments d on d."workspaceId"=scope.workspace_id and d."projectId"=scope.project_id and d."isDefault"
     left join workspace_project_repositories r on r."workspaceId"=scope.workspace_id and r."projectId"=scope.project_id
     order by r."repositoryKey"`)
-  const repositories: ProjectRepositoryBinding[] = []
+  const repositories: SelectedProjectRepository[] = []
   for (const { repositoryKey, baseBranch, environmentId, defaultEnvironmentId } of rows) {
     if (repositoryKey !== null) repositories.push({ repositoryKey, baseBranch, environmentId, selectedEnvironmentId: environmentId ?? defaultEnvironmentId })
   }
