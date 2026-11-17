@@ -87,7 +87,7 @@ jobs:
         run: |
           node --test scripts/acceptance/model-provider-fallback.test.mjs
           node scripts/assert-test-model.mjs deepseek-flash
-      - name: Bind the actual production descendant and its successful Web deploy
+      - name: Bind the actual production descendant
         id: application
         if: steps.merge.outputs.eligible == 'true'
         env:
@@ -113,8 +113,8 @@ jobs:
             if (guard.driverRevision !== process.env.EXPECTED_DRIVER_SHA) throw new AcceptanceError('merge_changed')
             const bound = await resolveAcceptanceDeployment({ guard, githubToken: process.env.GH_TOKEN })
             writeFileSync('model-provider-fallback-report/attestation.json', JSON.stringify({ issue: 1225, ...bound, status: 'awaiting_runtime' }, null, 2) + '\n')
-            appendFileSync(process.env.GITHUB_OUTPUT, `sha=${bound.revision}\nfeature-sha=${bound.featureMergeSha}\nguard-pr=${bound.guardPullRequest}\nguard-sha=${bound.guardMergeSha}\nweb-run-id=${bound.webDeployRunId}\n`)
-            console.log(`Feature merge ${bound.featureMergeSha}; application ${bound.revision}; guard PR #${bound.guardPullRequest}; Web deploy ${bound.webDeployRunId}.`)
+            appendFileSync(process.env.GITHUB_OUTPUT, `sha=${bound.revision}\nfeature-sha=${bound.featureMergeSha}\nguard-pr=${bound.guardPullRequest}\nguard-sha=${bound.guardMergeSha}\n`)
+            console.log(`Feature merge ${bound.featureMergeSha}; application ${bound.revision}; guard PR #${bound.guardPullRequest}.`)
           } catch (error) {
             const failure = publicFailure(error)
             writeFileSync('model-provider-fallback-report/attestation.json', JSON.stringify({ issue: 1225, ...failure }, null, 2) + '\n')
@@ -186,7 +186,6 @@ jobs:
           MIKKA_ACCEPTANCE_GUARD_PR: ${{ steps.application.outputs.guard-pr }}
           MIKKA_ACCEPTANCE_GUARD_MERGE_SHA: ${{ steps.application.outputs.guard-sha }}
           MIKKA_ACCEPTANCE_DRIVER_SHA: ${{ steps.merge.outputs.driver-sha }}
-          MIKKA_WEB_DEPLOY_RUN_ID: ${{ steps.application.outputs.web-run-id }}
           MIKKA_WORKER_RELEASE_PROOF: ${{ steps.worker.outputs.proof }}
           MIKKA_WORKER_RELEASE_SHA: ${{ steps.worker.outputs.sha }}
           MIKKA_WORKER_RELEASE_RUN_ID: ${{ steps.worker.outputs.run-id }}
