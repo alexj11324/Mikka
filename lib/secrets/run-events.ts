@@ -31,6 +31,16 @@ async function recordLastReply(tx: Tx, runId: string, chunks: Record<string, unk
   await tx.update(agentRuns).set({ ...next, lastReplyAt: new Date() }).where(eq(agentRuns.id, runId))
 }
 
+// Older daemons can report agent output before the explicit running PATCH.
+// Framing also wraps repository preparation, so it cannot establish execution.
+function reportsExecution(chunk: Record<string, unknown>): boolean {
+  if (chunk.type === 'data-run-state') {
+    const state = chunk.data
+    return typeof state === 'object' && state !== null && 'state' in state && state.state === 'running'
+  }
+  return chunk.type !== 'data-run-stage' && chunk.type !== 'start' && chunk.type !== 'finish'
+}
+
 export async function persistRunEventBatch(runId: string, fromSeq: number, input: Record<string, unknown>[], mask: Masker) {
   await db.transaction(async tx => {
     // A tool may read binary data (for example .git/index). JSON accepts NUL
@@ -50,12 +60,14 @@ export async function persistRunEventBatch(runId: string, fromSeq: number, input
     // Only chunks stored now count, so a re-sent batch never appends its text twice.
     const fresh = freshChunks(chunks, fromSeq, inserted.map(row => row.seq))
     await recordLastReply(tx, runId, fresh, mask)
-    const started = await tx.update(agentRuns).set({ status: 'running', updatedAt: new Date() })
-      .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing'))).returning({ id: agentRuns.id })
-    if (started.length) {
-      await runListChanged(tx, runId)
-      await runChanged(tx, runId)
-      taskActivityChanged(tx, runId)
+    if (fresh.some(reportsExecution)) {
+      const started = await tx.update(agentRuns).set({ status: 'running', updatedAt: new Date() })
+        .where(and(eq(agentRuns.id, runId), eq(agentRuns.status, 'preparing'))).returning({ id: agentRuns.id })
+      if (started.length) {
+        await runListChanged(tx, runId)
+        await runChanged(tx, runId)
+        taskActivityChanged(tx, runId)
+      }
     }
     if (inserted.length) await threadChanged(tx, runId)
     // The list displays completed reply previews. Individual text tokens stay
