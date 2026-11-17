@@ -530,6 +530,8 @@ export interface BotChatSummary {
   /** The latest reply or message, with cited threads and tasks written as their names; null before the first. */
   line: string | null
   at: string | null
+  /** The latest message's id: what 标为已读 acknowledges (POST /api/conversations/bot:<id>/read); absent before the first. */
+  messageId?: string
   /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
 }
@@ -577,13 +579,13 @@ export async function botChatSnapshot(reader: IssueReader) {
     // A failed welcome is no message from the Bot: no preview line and no time to count as unread.
     if (item?.welcome) return []
     // An event's stored text is the model's (English, ids): the preview leaves it out (C1).
-    return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
+    return [{ botId: row.botId, messageId: row.id, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })
   // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
   const sources = await citationNames(reader, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
   for (const line of lines) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
-    result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }
+    result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at, messageId: line.messageId }
   }
   for (const [botId, count] of await botUnreadCounts(pool, userId, botIds)) {
     if (count) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), unreadCount: count }
