@@ -46,6 +46,25 @@ test('Organization CRUD, resource approvals and audit export retain Workspace au
     await pool.query('insert into mikka_workspaces (id,"userId",name,kind) values ($1,$2,\'Workspace ACL fixture\',\'team\')', [id, owner.id])
     for (const [user, role] of [[owner, 'admin'], [member, 'member']] as const) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role) values ($1,$2,$3,$4,$5)', [id, user.id, user.name, user.email, role])
   }
+  await t.test('the Organization creation receipt and active directory use the stored lifecycle dates', async t => {
+    const created = await org.createOrganization(owner, { name: 'Directory dates' })
+    t.after(async () => { await pool.query('delete from mikka_organizations where id=$1', [created.id]) })
+    const dates = async () => (await pool.query<{ createdAt: Date; updatedAt: Date }>(
+      'select "createdAt", "updatedAt" from mikka_organizations where id=$1', [created.id],
+    )).rows[0]
+    const initial = await dates()
+    assert.deepEqual({ createdAt: created.createdAt, updatedAt: created.updatedAt }, initial)
+    assert.deepEqual(await org.listOrganizations(owner.id, created.id), [created])
+
+    await org.renameOrganization(created.id, owner.id, { name: 'Changed name' })
+    const changed = await dates()
+    const [entry] = await org.listOrganizations(owner.id, created.id)
+    assert.equal(entry.name, 'Changed name')
+    assert.deepEqual(entry.createdAt, initial.createdAt)
+    assert.deepEqual(entry.updatedAt, changed.updatedAt)
+    assert.deepEqual(await org.listOrganizations(outsider.id, created.id), [])
+  })
+
   await t.test('restore requires prior removal in the same Organization and leaves directory, Workspace and ownership authority intact', async t => {
     const restorationOrg = await org.createOrganization(owner, { name: 'Former membership' })
     const id = restorationOrg.id
