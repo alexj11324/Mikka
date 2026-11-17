@@ -1,4 +1,5 @@
 """Publish step of build-template.py, against a fake E2B API (no network, no SDK)."""
+import base64
 import importlib.util
 import io
 import copy
@@ -6,6 +7,7 @@ from contextlib import redirect_stderr
 import hashlib
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -672,6 +674,12 @@ with fixture.root_file_metadata():
                     self.assertLess(reached.index('control_installed'), reached.index('worker_exec'))
                 self.assertNotIn('synthetic-private-stage-value', result.stdout + result.stderr)
 
+    def test_fence_check_runs_the_daemon_check_inline_independent_of_the_worker(self):
+        command = bt.fence_check_command()
+        self.assertNotIn('/opt/mikka/worker', command)
+        encoded = re.search(r'b64decode\(\\?"([A-Za-z0-9+/=]+)\\?"\)', command).group(1)
+        self.assertEqual(base64.b64decode(encoded), bt.FENCE_CHECK.read_bytes())
+
     def test_ready_diagnostics_preserve_each_failed_predicate_and_short_circuit(self):
         cases = [(kind, None, 0) for kind in bt.KINDS]
         cases += [('claude', phase, code) for phase, code in (
@@ -691,9 +699,6 @@ with fixture.root_file_metadata():
                 cmdline.write_bytes(b'worker\0' + (b'other' if failure == 'worker_waiting' else b'--wait-bootstrap') + b'\0')
                 guard.write_text('import sys\nassert sys.argv[1] == "ready"\nsys.exit(' + str(code if failure == 'ingress_ready' else 0) + ')\n')
                 official.write_text('import sys\nassert sys.argv[-1] == ' + repr(kind) + '\nsys.exit(' + str(code if failure == 'official_files' else 0) + ')\n')
-                fence = runtime / 'worker/packages/daemon/scripts/workspace-control-check.py'
-                fence.parent.mkdir(parents=True)
-                fence.write_text('import sys\nsys.exit(' + str(code if failure == 'control_fence' else 0) + ')\n')
                 if failure == 'bootstrap_absent': (home / 'bootstrap.json').write_text('{}')
                 if failure == 'device_absent': (home / 'worker/device.json').write_text('{}')
                 if failure == 'viewer_key_absent': (viewer / 'key').write_text('synthetic-viewer-key')
@@ -702,7 +707,8 @@ with fixture.root_file_metadata():
                 curl.write_text('#!/bin/sh\nprintf ' + ('403' if failure == 'viewer_unauthorized' else '401') + '\n')
                 curl.chmod(0o700)
                 runuser = binary / 'runuser'
-                runuser.write_text('#!/bin/sh\n[ "$1" = -u ] && [ "$2" = user ] && [ "$3" = -- ] || exit 97\nshift 3\nexec "$@"\n')
+                runuser.write_text('#!/bin/sh\n[ "$1" = -u ] && [ "$2" = user ] && [ "$3" = -- ] && [ "$4" = python3 ] && [ "$5" = -I ] || exit 97\nexit '
+                                   + str(code if failure == 'control_fence' else 0) + '\n')
                 runuser.chmod(0o700)
                 command = bt.prebuilt_ready_command(kind).replace('/opt/mikka', str(runtime))
                 command = command.replace('/home/user/.mikka', str(home)).replace('/run/mikka-viewer', str(viewer))
