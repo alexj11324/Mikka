@@ -1980,6 +1980,15 @@
       "sourceHash": "e0e00f06f901213b5d1ca5ecb242cd0a4b18897954e9760cb284a83db85c45f9"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/restore",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/restore",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/restore/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "266128803776eaa42997585548d45141b42ba55d2cce78e36a800681bf1cdcb8"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/versions",
       "template": "/api/organizations/[organizationId]/drive/[volumeId]/versions",
       "source": "app/api/organizations/[organizationId]/drive/[volumeId]/versions/route.ts",

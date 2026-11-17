@@ -147,6 +147,12 @@ function organizationVersionsUrl(organizationId: string, volumeId: string) {
   return withBasePath(`/api/organizations/${encodeURIComponent(organizationId)}/drive/${encodeURIComponent(volumeId)}/versions`)
 }
 
+export function restoreOrganizationDriveVersion(organizationId: string, volumeId: string, versionId: string, expectedDigest: string, send?: typeof fetch) {
+  const target = withBasePath(`/api/organizations/${encodeURIComponent(organizationId)}/drive/${encodeURIComponent(volumeId)}/restore`)
+  return request<OrganizationDriveManifest>(target, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ versionId, expectedDigest }) }, send)
+}
+
 export function readOrganizationDriveVersions(organizationId: string, volumeId: string, send?: typeof fetch) {
   return request<OrganizationDriveVersion[]>(organizationVersionsUrl(organizationId, volumeId), {}, send)
 }
