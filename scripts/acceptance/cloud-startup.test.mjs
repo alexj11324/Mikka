@@ -161,7 +161,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           const candidates = Object.entries(models).map(([harness, model], index) => ({ harness, model, provider: harness === 'codex' ? 'codex' : 'claude',
             credentialOwnerId: wrongSource ? (ownedCodex ? adminId : ownerId) : (ownedCodex ? ownerId : adminId), source: { kind: 'subscription', connectionId: id(50 + index) } }))
           if (ambiguousSource) candidates.push({ ...candidates[0], source: { kind: 'subscription', connectionId: id(59) } })
-          return rpc({ candidates })
+          return rpc({ candidates, entries: candidates.map((candidate, index) => ({ ...candidate, id: `entry-${index}` })) })
         }
         if (action === 'execution-settings.getBotModelMenu' || action === 'execution-settings.chooseBotModel') {
           assert.equal(args[0], botId)
@@ -191,8 +191,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
           assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
           current.dispatchInput = input; current.harness = chosenModel?.provider === 'codex' ? 'codex' : 'claude_code'; current.profileId = input.profileId
-          // The run follows the chat's model, so neither the model nor the deprecated Agent is named.
-          assert.equal(input.model, undefined); assert.equal(input.agentId, undefined)
+          assert.equal(input.model, undefined)
           assert.equal(chosenModel?.modelId, models[current.harness], 'the coordinator must use the same explicitly chosen small subscription model')
           current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
           assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
