@@ -76,7 +76,7 @@ for (const scheme of ['light', 'dark'] as const) {
     const title = `面包屑菜单 ${randomUUID().slice(0, 8)}`
     await seedTask(page, title)
     await page.reload()
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
     await openIssueFromSearch(page, title)
     await page.setViewportSize({ width: 640, height: 800 })
     const more = page.getByRole('button', { name: '更多位置', exact: true })
@@ -105,7 +105,7 @@ test('面包屑动效：菜单进出与宽度拖动', async ({ page }) => {
   await register(page)
   await seedTask(page, title)
   await page.reload()
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
   await openIssueFromSearch(page, title)
   await page.setViewportSize({ width: 640, height: 800 })
   const more = page.getByRole('button', { name: '更多位置', exact: true })

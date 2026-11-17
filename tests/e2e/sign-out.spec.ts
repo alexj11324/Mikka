@@ -69,7 +69,7 @@ test('sign-out waits for editor validation and preserves saved edits when revoca
   const original = `退出保存 ${randomUUID()}`
   await seedTask(page, original)
   await page.reload()
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
   await openIssueFromSearch(page, original)
   const title = page.getByLabel('任务标题', { exact: true })
   await expect(title).toHaveValue(original)

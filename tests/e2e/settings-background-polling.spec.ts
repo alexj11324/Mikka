@@ -93,7 +93,7 @@ test('workspace idle reads stay within budget across settings, return and page d
     expect(pollingActions.length).toBe(2)
     expect(pollingActions.every(action => boardPollingActions.includes(action))).toBe(true)
 
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
     await expect(page.getByText(originalTitle, { exact: true })).toBeVisible()
     await waitForActionsQuiet()
 
@@ -121,7 +121,7 @@ test('workspace idle reads stay within budget across settings, return and page d
       await client.query('UPDATE issues SET title = $1 WHERE id = $2 AND "userId" = $3', [freshTitle, issue.id, issue.ownerId])
     })
     const beforeReturn = actions.length
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
     await expect(page.getByText(freshTitle, { exact: true })).toBeVisible({ timeout: 5_000 })
     await expect.poll(() => new Set(actions.slice(beforeReturn).filter(action => pollingActions.includes(action))).size, { timeout: 5_000 }).toBe(2)
     await waitForActionsQuiet()
@@ -146,7 +146,7 @@ test('workspace idle reads stay within budget across settings, return and page d
     await advance(6_000)
     checkWindow('legacy-settings-initial-idle-focus-online', beforeLegacy, 36_000, 0, 0, 0, 0, boardPollingActions)
     const beforeLegacyReturn = actions.length
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
     await expect(page.getByText(freshTitle, { exact: true })).toBeVisible({ timeout: 5_000 })
     await expect.poll(() => new Set(actions.slice(beforeLegacyReturn).filter(action => pollingActions.includes(action))).size, { timeout: 5_000 }).toBe(2)
     await waitForActionsQuiet()

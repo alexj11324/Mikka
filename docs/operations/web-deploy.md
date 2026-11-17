@@ -61,7 +61,8 @@ key, so there is no subscription run before publication.
 
 The release starts by itself. When a run of the Cloudflare application
 deployment workflow finishes with a serving-release observation
-(`gateway-observe`), the runtime workflow and Desktop release run on that
+(`gateway-observe` after a cutover, or a per-service Web `service-production`),
+the runtime workflow and Desktop release run on that
 `workflow_run` event. Each one goes ahead only when the observed product is
 current main. Otherwise it records why in its run summary and ends green.
 E2B also compares the worker inputs with the last release that made templates

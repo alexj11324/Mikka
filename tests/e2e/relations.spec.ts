@@ -38,7 +38,7 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await seedTask(page, parent)
     await seedTask(page, blocker)
     await page.reload()
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
     await openIssue(page, parent)
     const parentUrl = page.url()
     await page.setViewportSize(viewport)
@@ -151,7 +151,7 @@ for (const viewport of [{ width: 402, height: 874 }, { width: 1280, height: 900 
     await seedTask(page, current)
     await seedTask(page, target)
     await page.reload()
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
     await openIssue(page, current)
     await page.setViewportSize(viewport)
     // Start from an empty SWR cache so the picker has no stale board to fall back on.
@@ -193,7 +193,7 @@ test('关系选择器在服务端搜索：编号和标题片段都能找到，�
   const childId = await seedTask(page, child, { parentId: currentId })
   await seedTask(page, grandchild, { parentId: childId })
   await page.reload()
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
   await openIssue(page, current)
 
   // Parent picker: the server leaves out the task's descendants at every depth.
@@ -254,7 +254,7 @@ test('子任务选择器跨过已关联任务占满的第一页，读取真实�
   // target remains on a later page; no search response is mocked or rewritten.
   for (let i = 0; i < 51; i++) await seedTask(page, `分页已有子任务 ${suffix} ${i}`, { parentId: currentId })
   await page.reload()
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
   await openIssue(page, current)
   const children = page.getByRole('region', { name: '子任务', exact: true })
   await expect(children.getByRole('button', { name: '子任务 0 / 51', exact: true })).toBeVisible()
@@ -283,7 +283,7 @@ test('402x400 短视口：关系选择器标题和关闭按钮不被裁切，列
   await seedTask(page, current)
   for (let i = 0; i < 8; i++) await seedTask(page, `短视口候选 ${i} ${suffix}`)
   await page.reload()
-  await rail(page, '看板').click()
+  await rail(page, '任务').click()
   await openIssue(page, current)
   await page.setViewportSize({ width: 402, height: 400 })
   // Hold the picker's reads so the loading state is visible: its text is muted via an inner span, CommandEmpty keeps its default color.

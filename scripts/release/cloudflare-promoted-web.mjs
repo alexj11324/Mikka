@@ -246,7 +246,8 @@ export async function promotionTrigger(consumer, { env = process.env, event, fet
   }
   const path = '/actions/runs/' + source.id + '/attempts/' + source.run_attempt + '/jobs?per_page=100'
   const listing = await githubRead(path, api)
-  if (!Array.isArray(listing.jobs) || !listing.jobs.some(job => job.name?.startsWith('Serving release '))) {
+  // Every deployment run lists the Serving release job; only gateway-observe runs it (the others skip it, unnamed).
+  if (!Array.isArray(listing.jobs) || !listing.jobs.some(job => job.name?.startsWith('Serving release ') && job.conclusion === 'success')) {
     return { ready: false, reason: 'this deployment phase does not change what is served' }
   }
   const receipt = 'actions:' + source.id + ':' + source.run_attempt

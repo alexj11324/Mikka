@@ -182,7 +182,8 @@ jobs:
 
   serving-release:
     needs: deploy-application
-    if: inputs.phase == 'gateway-observe' && needs.deploy-application.outputs.serving-release != ''
+    # gateway-observe after a cutover, or a per-service Web release (which deploys and checks its own gateway version).
+    if: (inputs.phase == 'gateway-observe' || inputs.phase == 'service-production') && needs.deploy-application.outputs.serving-release != ''
     name: Serving release ${{ needs.deploy-application.outputs.serving-release }}
     runs-on: ubuntu-latest
     permissions: {}

@@ -247,6 +247,7 @@ test('a successful gateway observation that serves current main starts both rele
     [{ event:{ workflow_run:{ ...run, path:'.github/workflows/other.yml' } } }, /not a successful Cloudflare deployment/],
     [{ env:{ ...env, GITHUB_EVENT_NAME:'push' } }, /not a successful Cloudflare deployment/],
     [{ observation:{ run, jobs:{ total_count:1, jobs:[jobs.jobs[0]] } } }, /does not change what is served/],
+    [{ observation:{ run, jobs:{ total_count:2, jobs:[jobs.jobs[0], { ...jobs.jobs[1], name:'Serving release ${{ needs.deploy-application.outputs.serving-release }}', conclusion:'skipped' }] } } }, /does not change what is served/],
     [{ main:'a'.repeat(40) }, /but main is a{40}/],
     [{ env:{ ...env, GITHUB_SHA:'a'.repeat(40) } }, /but main is/],
   ]) {
