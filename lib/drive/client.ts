@@ -123,7 +123,7 @@ export function readDriveSkills(location: DriveLocation, after?: DriveSkillCurso
   return request<DriveSkillPage>(url(location, '', { view: 'skills', afterVolume: after?.volumeId, afterPath: after?.path }), {}, send)
 }
 
-function organizationFilesUrl(organizationId: string, resource: 'drive' | 'drive-scopes', filters: Record<string, string | number | boolean | undefined>) {
+function organizationFilesUrl(organizationId: string, resource: 'drive' | 'drive-scopes' | 'drive-skills', filters: Record<string, string | number | boolean | undefined>) {
   const query = new URLSearchParams()
   for (const [key, value] of Object.entries(filters)) {
     if (value !== undefined && (key !== 'exactScope' || value)) query.set(key, String(value))
@@ -140,6 +140,10 @@ export function readOrganizationDriveVolumes(organizationId: string, filters: {
   projectId?: string; userId?: string; automationId?: string; captainJamId?: string; exactScope?: boolean; archived?: boolean
 } = {}, send?: typeof fetch) {
   return request<OrganizationDriveVolume[]>(organizationFilesUrl(organizationId, 'drive', filters), {}, send)
+}
+
+export function readOrganizationDriveSkills(organizationId: string, filters: { projectId?: string } = {}, send?: typeof fetch) {
+  return request<{ name: string; description: string }[]>(organizationFilesUrl(organizationId, 'drive-skills', filters), {}, send)
 }
 
 export function readDriveVolumes(location: DriveLocation, before?: string, send?: typeof fetch) {
