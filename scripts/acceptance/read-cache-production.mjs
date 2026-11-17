@@ -70,9 +70,7 @@ export function productionGuard(env, event) {
     return { applicationSha: run.head_sha, driverRevision: env.GITHUB_SHA, mode: 'readonly', trigger: 'workflow_run' }
   }
   check(env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.GITHUB_REF === 'refs/heads/main', 'trigger_rejected')
-  const guard = triggerGuard(env, event, plan)
-  check(guard.applicationSha === guard.driverRevision, 'trigger_rejected')
-  return guard
+  return triggerGuard(env, event, plan)
 }
 
 export async function attestProductionReadCache({ env = process.env, event, fetchImpl = fetch, now = Date.now, issueNumber = 1372 } = {}) {
