@@ -689,8 +689,35 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
         assert.equal((await fetch(new URL(base.file.url, origin))).status, 401)
         const expired = new URL(base.file.url, origin)
         const proof = expired.searchParams.get('download')!
+        const { requireCurrentDownload } = await import('./share-view')
+        const fileDigest = createHash('sha256').update('selected file').digest('hex')
+        const expiresAt = Date.parse(base.file.expiresAt)
+        // The signing replica's clock can be ahead of the download replica.
+        // A genuine credential is usable immediately and stops exactly at expiry.
+        requireCurrentDownload(proof, teamLink, peer, fileDigest, expiresAt - 5 * 60_000 - 1000)
+        assert.throws(() => requireCurrentDownload(proof, teamLink, peer, fileDigest, expiresAt), /drive_not_found/)
+
         expired.searchParams.set('download', proof.replace(/^\d+/, String(Date.now() - 1)))
         assert.equal((await bytes(expired.href, peerToken)).status, 404)
+        const callerExpiry = new URL(base.url, origin)
+        callerExpiry.searchParams.set('expiresAt', String(expiresAt + 60_000))
+        assert.equal((await bytes(callerExpiry.href, peerToken)).status, 400)
+        callerExpiry.searchParams.delete('expiresAt')
+        callerExpiry.searchParams.set('issuedAt', String(Date.now()))
+        assert.equal((await bytes(callerExpiry.href, peerToken)).status, 400)
+        const extended = new URL(base.file.url, origin)
+        extended.searchParams.set('download', proof.replace(/^\d+/, String(expiresAt + 60_000)))
+        assert.equal((await bytes(extended.href, peerToken)).status, 404)
+        const listing = (await (await myDirectory(sharedToken)).json()).links.find((item: { id: string }) => item.id === teamLink)
+        const visibility = (value: 'private' | 'org') => fetch(new URL(listing.url, origin), { method: 'PATCH',
+          headers: { origin, authorization: 'Bearer ' + sharedToken, 'content-type': 'application/json' }, body: JSON.stringify({ visibility: value }) })
+        assert.equal((await visibility('private')).status, 200)
+        assert.equal((await bytes(base.file.url, peerToken)).status, 404)
+        assert.equal((await visibility('org')).status, 200)
+        assert.equal(await (await bytes(base.file.url, peerToken)).text(), 'selected file')
+        await fixture.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [team.id, peer])
+        try { assert.equal((await bytes(base.file.url, peerToken)).status, 401) }
+        finally { await fixture.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [team.id, peer]) }
         const orgId = randomUUID()
         await fixture.query('INSERT INTO mikka_organizations(id,name,"createdBy") VALUES($1,$2,$3)', [orgId, 'Drive schema owner', owner])
         try {
@@ -742,13 +769,18 @@ test('private Drive HTTP lifecycle uses real PAT, tenant admission, CAS and vers
         assert.equal(historic.createdAt, null)
         assert.equal(historic.changedAt, modified.changedAt)
       })
+      const peerDownload = (await (await view(projectLink, peerToken)).json()).file.url
+      const ownerDownload = (await (await view(projectLink, sharedToken)).json()).file.url
+      const redeem = (path: string, token: string) => fetch(new URL(path, origin), { headers: { authorization: 'Bearer ' + token } })
       await fixture.query("update resource_access_policies set visibility='private' where kind='project' and id=$1", [projectId])
       assert.deepEqual((await actual(peerToken)).map(l => l.id), [teamLink])
       assert.equal((await view(projectLink, peerToken)).status, 404)
+      assert.equal((await redeem(peerDownload, peerToken)).status, 404)
       await fixture.query('update workspace_projects set "archivedAt"=now() where id=$1', [projectId])
       assert.deepEqual((await actual(sharedToken)).map(l => l.id).sort(), [onlyOwner.id, teamLink].sort())
       assert.equal((await myDirectory(ownerToken, personal)).status, 404)
       assert.equal((await view(projectLink, sharedToken)).status, 404)
+      assert.equal((await redeem(ownerDownload, sharedToken)).status, 404)
     })
 
   })

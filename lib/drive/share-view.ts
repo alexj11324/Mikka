@@ -31,7 +31,7 @@ function signature(id: string, reader: string, digest: string, expires: number):
 export function requireCurrentDownload(proof: string, id: string, reader: string, digest: string, now = Date.now()) {
   const parts = /^(\d{13})\.([a-f0-9]{64})$/.exec(proof)
   const expires = Number(parts?.[1])
-  if (!parts || expires <= now || expires > now + lifetime || !timingSafeEqual(signature(id, reader, digest, expires), Buffer.from(parts[2], 'hex'))) {
+  if (!parts || expires <= now || !timingSafeEqual(signature(id, reader, digest, expires), Buffer.from(parts[2], 'hex'))) {
     throw new DriveError('drive_not_found', 404)
   }
 }
