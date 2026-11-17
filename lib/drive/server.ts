@@ -18,7 +18,7 @@ import { boundedDriveBytes, driveBytes, driveSha256, readDriveBlobObject, record
 import { applyDriveWrite, DriveError, readDriveFileHistory, readDriveHistory, readDriveVersion, restoreDriveVersion } from './store'
 import { createDriveVolume, findDriveVolumeLocation, listDriveVolumes, readDriveVolume, setOrganizationDriveArchive, setPersonalDriveArchive } from './volumes'
 import { driveFileLocation } from './location'
-import { driveErrorResponse } from './http'
+import { driveErrorBody, driveErrorResponse } from './http'
 import { listDriveSkills } from './skills'
 import { createDriveFileLink, fileLinkProjectIds, listDriveFileLinks, listWorkspaceDriveFileLinks, readLinkedDriveFile, readOwnDriveFileLink, revokeDriveFileLink, updateDriveFileLink, type DriveFileBytes } from './file-links'
 
@@ -31,6 +31,13 @@ const write = z.object({ expectedDigest: digest, mutationId, changes: z.array(z.
   z.object({ op: z.literal('delete'), path: z.string().refine(isDrivePath) }).strict(),
 ])).min(1).max(DRIVE_MAX_CHANGES) }).strict()
 const restore = z.object({ versionId, expectedDigest: digest, mutationId }).strict()
+const organizationRestore = restore.omit({ mutationId: true })
+
+function organizationManifest(volumeId: string, version: Awaited<ReturnType<typeof readDriveVersion>>) {
+  return { versionId: version.id, volumeId, digest: version.digest, parentDigest: version.parentDigest,
+    entries: version.manifest, fileCount: version.fileCount, totalBytes: version.totalBytes }
+}
+
 type Operation = 'scopes' | 'volumes' | 'volume' | 'write' | 'upload' | 'file' | 'history' | 'version' | 'restore' | 'archive' | 'unarchive' | 'links' | 'link' | 'workspaceLinks' | 'shareView' | 'organizationFileHistory'
 type Params = { volumeId?: string; versionId?: string; shareId?: string; organizationId?: string }
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers })
@@ -55,14 +62,14 @@ export async function driveResponse(request: Request, operation: Operation, para
     if (viewId && (params.organizationId ? search.size !== 0 : [...search.keys()].some(key => key !== 'download'))) throw new DriveError('drive_write_invalid', 400)
     let located = viewId ? await findShareLocation(pool, viewId, session.user.id) : null
     const organizationArchive = !!params.organizationId && (operation === 'archive' || operation === 'unarchive')
-    const organizationVersionRead = !!params.organizationId && (operation === 'version' || operation === 'history')
-    if ((organizationArchive || organizationVersionRead) && search.size) throw new DriveError('drive_write_invalid', 400)
+    const organizationVersionOperation = params.organizationId && (operation === 'version' || operation === 'history' || operation === 'restore')
+    if ((organizationArchive || organizationVersionOperation) && search.size) throw new DriveError('drive_write_invalid', 400)
     let historyPath: string | undefined
     if (operation === 'organizationFileHistory') {
       if ([...search.keys()].some(key => key !== 'path') || search.getAll('path').length !== 1) throw new DriveError('drive_write_invalid', 400)
       historyPath = z.string().refine(isDrivePath).parse(search.get('path'))
     }
-    if (historyPath !== undefined || organizationArchive || organizationVersionRead) {
+    if (historyPath !== undefined || organizationArchive || organizationVersionOperation) {
       located = await findDriveVolumeLocation(pool, z.string().refine(isVolumeId).parse(params.volumeId), session.user.id, organizationArchive)
     }
     const workspaceId = located?.workspaceId ?? z.uuid().parse(search.get('workspaceId')).toLowerCase()
@@ -207,8 +214,7 @@ export async function driveResponse(request: Request, operation: Operation, para
       }
       if (operation === 'version') {
         const version = await readDriveVersion(pool, actor, volume.id, versionId.parse(params.versionId))
-        return params.organizationId ? json({ versionId: version.id, volumeId: volume.id, digest: version.digest,
-          parentDigest: version.parentDigest, entries: version.manifest, fileCount: version.fileCount, totalBytes: version.totalBytes }) : json({ version })
+        return json(params.organizationId ? organizationManifest(volume.id, version) : { version })
       }
       if (operation === 'write') {
         const input = write.parse(await body(request))
@@ -223,9 +229,12 @@ export async function driveResponse(request: Request, operation: Operation, para
         return json(result)
       }
       if (operation === 'restore') {
-        const result = await restoreDriveVersion(pool, { ownerId: actor.ownerId, volumeId: volume.id }, actor, restore.parse(await body(request)))
+        const input = (params.organizationId ? organizationRestore : restore).parse(await body(request))
+        const result = await restoreDriveVersion(pool, { ownerId: actor.ownerId, volumeId: volume.id }, actor, input)
         changed = !result.replayed
-        return json(result)
+        if (!params.organizationId) return json(result)
+        const version = await readDriveVersion(pool, actor, volume.id, result.headVersionId)
+        return json(organizationManifest(volume.id, version))
       }
       if (operation === 'upload') {
         const content = await boundedDriveBytes(request.body, DRIVE_MAX_FILE_BYTES)
@@ -281,6 +290,9 @@ export async function driveResponse(request: Request, operation: Operation, para
     if (error instanceof z.ZodError || error instanceof SyntaxError) return json({ error: 'drive_write_invalid' }, 400)
     if (error instanceof ActionFailureError && ['workspaceAccessDenied', 'projectNotFound', 'issueNotFound'].includes(error.code)
       || error instanceof WorkspaceError && error.code === 'workspaceAccessDenied') return json({ error: 'drive_not_found' }, 404)
+    if (params.organizationId && operation === 'restore' && error instanceof DriveError && error.code === 'drive_version_conflict') {
+      return json({ ...driveErrorBody(error), volumeId: params.volumeId }, error.status)
+    }
     return driveErrorResponse(error, headers)
   }
 }
