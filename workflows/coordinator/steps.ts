@@ -485,8 +485,9 @@ async function dispatchByRules(userId: string, { followed, ...input }: { threadR
     // the named Agent, the model's own Agent, or the computer's only one. A
     // computer with several Agents and nothing naming one refuses at once.
     const agentId = await namedDeviceAgent(userId, device.deviceId, input.agentId, input.model?.harness)
-    if ('error' in agentId) return { error: agentId.error, issueId: input.issueId }
-    input = { ...input, agentId: agentId.id }
+    // A computer that lacks the asked harness keeps its own card (这台电脑没装 …) from the planner below.
+    if ('error' in agentId && (agentId.error === 'agentRequired' || input.agentId)) return { error: agentId.error, issueId: input.issueId }
+    if (!('error' in agentId)) input = { ...input, agentId: agentId.id }
     const { executionWorkspace } = await import('@/lib/execution-settings')
     const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
     const { target, agentProfile, selectionMode } = await resolveAgentProfileDispatch(pool, { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId }, { issueId: input.issueId, stage, note: input.note, profileId: input.profileId, asked: input.model, location: 'local', deviceId: device.deviceId, agentId: input.agentId, defaultOnly: Boolean(input.threadRunId) })
