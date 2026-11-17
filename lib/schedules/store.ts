@@ -1,4 +1,4 @@
-import type { WebhookBatchPage } from './automation-view'
+import type { CancelledAutomationRun, WebhookBatchPage } from './automation-view'
 import { isDeepStrictEqual } from 'node:util'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
@@ -228,16 +228,23 @@ export class ScheduleStore {
         if(row.owner_id!==actor.ownerId && access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
         await this.source(tx,actor,row.workspace_id)
         if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
-        const run=(await tx.query<Occurrence & {can_cancel:boolean}>(`SELECT *,${cancellableRun} AS can_cancel
+        const run=(await tx.query<Occurrence & {can_cancel:boolean; finished_at:Date|null}>(`SELECT *,${cancellableRun} AS can_cancel
           FROM schedule_occurrences WHERE id=$1 AND schedule_id=$2 FOR UPDATE`,[cmd.runId,row.id])).rows[0]
         if(!run) throw new ScheduleError('scheduleRunNotFound',404)
         if(run.version!==row.version) throw new ScheduleError('scheduleVersionConflict')
-        if(run.status==='cancelled' && run.error==='scheduleRunCancelled') return {runId:run.id,status:'cancelled' as const}
-        if(!run.can_cancel) throw new ScheduleError('scheduleRunNotQueued')
-        await tx.query(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleRunCancelled',finished_at=$2 WHERE id=$1`,[run.id,this.clock()])
-        await this.lockChat(tx,row)
-        await this.report(tx,row,run,'cancelled',null,'scheduleRunCancelled')
-        return {runId:run.id,status:'cancelled' as const}
+        let completedAt = run.finished_at
+        if (run.status !== 'cancelled' || run.error !== 'scheduleRunCancelled') {
+          if(!run.can_cancel) throw new ScheduleError('scheduleRunNotQueued')
+          const {rows: [updated]} = await tx.query<{finished_at: Date}>(`UPDATE schedule_occurrences
+            SET status='cancelled',error='scheduleRunCancelled',finished_at=$2 WHERE id=$1 RETURNING finished_at`, [run.id,this.clock()])
+          completedAt = updated!.finished_at
+          await this.lockChat(tx,row)
+          await this.report(tx,row,run,'cancelled',null,'scheduleRunCancelled')
+        }
+        return {
+          runId: run.id, id: run.id, automationId: run.schedule_id, status: 'cancelled',
+          jamId: null, failure: null, createdAt: run.created_at, startedAt: run.started_at, completedAt,
+        } satisfies CancelledAutomationRun
       }
       if(row.status_before_delete && (cmd.action==='pin'||cmd.action==='organize')) throw new ScheduleError('scheduleCancelled')
       if(cmd.action==='pin'){

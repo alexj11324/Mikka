@@ -29,6 +29,19 @@ export type AutomationView = {
 }
 export type AutomationList = { schedules: AutomationView[]; nextCursor: string | null }
 
+/** Receipt for a run cancelled before the worker claimed it. */
+export type CancelledAutomationRun = {
+  runId: string
+  id: string
+  automationId: string
+  status: 'cancelled'
+  jamId: null
+  failure: null
+  startedAt: string | Date | null
+  completedAt: string | Date | null
+  createdAt: string | Date
+}
+
 /** One run. `result` and `error` are blank for a member who is neither its creator nor an owner or admin. */
 export type AutomationRun = {
   id: string

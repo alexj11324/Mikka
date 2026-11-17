@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import { Pool } from 'pg'
+import type { CancelledAutomationRun } from './automation-view'
 import { dbUrl, seedBot, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import type { Command, Definition, GitHubEventTrigger } from './contract'
 
@@ -81,7 +82,7 @@ test('dispatch_task automations run as their creator through the existing create
     const {schedule} = await create({...definition(),maxConcurrent:2})
     const one = (await runNow(schedule)).occurrence
     const two = (await runNow(schedule)).occurrence
-    const cancel = (runId:string, who=owner, bot=chat) => page<{runId:string;status:string}>(who,bot,{
+    const cancel = (runId:string, who=owner, bot=chat) => page<CancelledAutomationRun>(who,bot,{
       action:'cancel_run',scheduleId:schedule.id,version:schedule.version,runId,
     })
     const history = (who:string,bot:string) => page<{occurrences:{id:string;can_cancel:boolean}[]}>(who,bot,{action:'history',scheduleId:schedule.id})
@@ -92,7 +93,15 @@ test('dispatch_task automations run as their creator through the existing create
     const foreign = await create()
     await assert.rejects(page(owner,chat,{action:'cancel_run',scheduleId:foreign.schedule.id,version:foreign.schedule.version,runId:one.id}),/scheduleRunNotFound/)
     const [first,duplicate]=await Promise.all([cancel(one.id),cancel(one.id)])
-    assert.deepEqual(first,{runId:one.id,status:'cancelled'}); assert.deepEqual(duplicate,first)
+    const {rows: [stored]} = await fixture.query(`SELECT created_at,started_at,finished_at
+      FROM schedule_occurrences WHERE id=$1 AND schedule_id=$2`, [one.id,schedule.id])
+    assert.ok(stored.finished_at)
+    assert.equal(stored.started_at, null)
+    assert.deepEqual(first, {
+      runId: one.id, id: one.id, automationId: schedule.id, status: 'cancelled',
+      jamId: null, failure: null, createdAt: stored.created_at, startedAt: null, completedAt: stored.finished_at,
+    })
+    assert.deepEqual(duplicate,first)
     assert.equal((await history(owner,chat)).occurrences.find(r=>r.id===one.id)?.can_cancel,false)
     assert.equal((await occurrence(two.id)).status,'pending')
     await tick()
