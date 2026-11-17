@@ -1,5 +1,4 @@
 import type { ComponentType, SVGProps } from 'react'
-import type { ComposioAppId } from '@/lib/composio-accounts'
 import { GitHubIcon, LinearIcon } from '@/components/icons/brand-icons'
 
 // The plugins' own marks, in their brand colours (R-71: the icon each product
@@ -55,8 +54,8 @@ export function TelegramIcon(props: IconProps) {
   </svg>
 }
 
-/** Every app the 插件 page lists: the Composio toolkits plus the ones Mikka links itself. */
-export type PluginAppId = ComposioAppId | 'github' | 'linear' | 'telegram'
+/** Apps with a drawn brand mark here. Every other store app shows Composio's logo; this is not which apps exist. */
+export type PluginAppId = 'gmail' | 'googlecalendar' | 'notion' | 'slack' | 'github' | 'linear' | 'telegram'
 
 export const APP_ICONS: Record<PluginAppId, ComponentType<IconProps>> = {
   gmail: GmailIcon,

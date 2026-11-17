@@ -72,6 +72,26 @@ export function storeSections(apps: StoreApp[]): StoreCatalog {
   return { apps, popular: apps.slice(0, SECTION_SIZE).map(app => app.id), latest, categories }
 }
 
+/**
+ * Apps to offer first where a page suggests connecting a few (onboarding): Composio's most used apps
+ * that connect in one click, in its usage order, then any the person already connected. Live data only.
+ */
+export function suggestedConnectApps(catalog: Pick<StoreCatalog, 'apps' | 'popular'> | null | undefined, count: number, connected: readonly string[] = []): StoreApp[] {
+  if (!catalog) return []
+  const byId = new Map(catalog.apps.map(app => [app.id, app]))
+  const ordered = [...catalog.popular.flatMap(id => byId.get(id) ?? []), ...catalog.apps]
+  const picked: StoreApp[] = []
+  for (const app of ordered) {
+    if (picked.length >= count) break
+    if (app.connect === 'managed' && !picked.some(item => item.id === app.id)) picked.push(app)
+  }
+  for (const id of connected) {
+    const app = byId.get(id)
+    if (app && !picked.some(item => item.id === id)) picked.push(app)
+  }
+  return picked
+}
+
 export async function fetchStoreCatalog(list: ToolkitLister): Promise<StoreCatalog> {
   const apps: StoreApp[] = []
   const seen = new Set<string>()
