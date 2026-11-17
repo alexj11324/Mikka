@@ -104,6 +104,13 @@
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
+  "drizzle/20261117025303_workspace_app_policies_any_toolkit.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lets the workspace app policy store a choice for any Composio toolkit slug instead of a fixed five apps, while still refusing GitHub, Linear and Telegram.",
+    "test": "tests/app-policy.db.test.ts",
+    "suite": "test:workspace-admin-db"
+  },
   "drizzle/20261116204507_drive_link_directory_metadata.sql": {
     "mode": "built-in",
     "environment": [],
