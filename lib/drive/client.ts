@@ -34,10 +34,11 @@ export const driveVolumesKey = (location: DriveLocation, ownerId: string) => ['d
 export const driveHeadKey = (location: DriveLocation, ownerId: string, volumeId: string) => ['drive:head', ownerId, ...locationKey(location), volumeId] as const
 export const driveHistoryKey = (location: DriveLocation, ownerId: string, volumeId: string) => ['drive:history', ownerId, ...locationKey(location), volumeId] as const
 
-async function request<T>(target: string, init: RequestInit = {}, send: typeof fetch = fetch): Promise<T> {
+async function request<T>(target: string, init: RequestInit = {}, send: typeof fetch = fetch, empty = false): Promise<T> {
   let response: Response
   try { response = await send(target, { ...init, credentials: 'same-origin', cache: 'no-store' }) }
   catch (cause) { throw new DriveRequestError('drive_unavailable', undefined, { cause }) }
+  if (empty && response.status === 204) return undefined as T
   let body: unknown
   try { body = await response.json() }
   catch (cause) { throw new DriveRequestError('drive_unavailable', response.status, { cause }) }
@@ -98,6 +99,19 @@ export function updateDriveFileLink(location: DriveLocation, volumeId: string, l
 
 export function revokeDriveFileLink(location: DriveLocation, volumeId: string, linkId: string, send?: typeof fetch) {
   return request<{ revoked: true }>(driveFileLinkUrl(location, volumeId, linkId), { method: 'DELETE' }, send)
+}
+
+function organizationShareUrl(organizationId: string, shareId: string) {
+  return withBasePath(`/api/organizations/${encodeURIComponent(organizationId)}/drive-shares/${encodeURIComponent(shareId)}`)
+}
+
+export function updateOrganizationDriveFileLink(organizationId: string, shareId: string, visibility: DriveFileLinkVisibility, send?: typeof fetch) {
+  return request<DriveFileLinkDetails>(organizationShareUrl(organizationId, shareId),
+    { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visibility }) }, send)
+}
+
+export function revokeOrganizationDriveFileLink(organizationId: string, shareId: string, send?: typeof fetch) {
+  return request<void>(organizationShareUrl(organizationId, shareId), { method: 'DELETE' }, send, true)
 }
 
 export function readDriveSkills(location: DriveLocation, after?: DriveSkillCursor, send?: typeof fetch) {
