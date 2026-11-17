@@ -16,7 +16,7 @@ const configText = readFileSync(new URL('../../cloudflare/device-gateway/wrangle
 
 function fixture() {
   const state = { main: SOURCE, live: SOURCE, same: true, writes: 0, waits: 0, calls: [], status: 'READY', namespace: NAMESPACE,
-    migration: 'v1', secret: true, project: PROJECT, aliasProject: PROJECT, activeVersion: VERSION, cfStatus: 200 }
+    migration: 'v1', secret: true, reportURL: 'https://app.example.test/mikka/v1/internal/device-sessions', project: PROJECT, aliasProject: PROJECT, activeVersion: VERSION, cfStatus: 200 }
   const repository = {
     async assertCheckout() {},
     async refreshMain() { return state.main },
@@ -41,6 +41,7 @@ function fixture() {
       if (url.pathname.endsWith('/settings')) data = { bindings: [
         { type: 'durable_object_namespace', name: 'DEVICE_SESSION', class_name: 'DeviceSession', namespace_id: state.namespace },
         ...(state.secret ? [{ type: 'secret_text', name: 'GATEWAY_PUSH_SECRET' }] : []),
+        ...(state.reportURL ? [{ type: 'plain_text', name: 'DEVICE_SESSION_REPORT_URL', text: state.reportURL }] : []),
       ] }
       else if (url.pathname.endsWith(`/services/${WORKER}`)) data = { default_environment: { script: { migration_tag: state.migration } } }
       else if (url.pathname.endsWith('/deployments')) data = { deployments: [{ versions: [{ version_id: state.activeVersion, percentage: 100 }] }] }
@@ -106,6 +107,15 @@ test('missing Worker/bindings, unapplied migrations and foreign projects fail be
     const { state, options } = fixture()
     Object.assign(state, patch)
     await assert.rejects(() => deployGateway(options), /provider_read_http_404|gateway_bindings_mismatch|gateway_existing_migration_required|production_project_mismatch|production_identity_mismatch/)
+    assert.equal(state.writes, 0)
+  }
+})
+
+test('a Worker without the device session report URL is refused before any deploy', async () => {
+  for (const reportURL of ['', 'http://app.example.test/mikka/v1/internal/device-sessions', 'https://app.example.test/mikka/v1/devices', 'not a url']) {
+    const { state, options } = fixture()
+    state.reportURL = reportURL
+    await assert.rejects(() => deployGateway(options), /gateway_session_report_url_required/)
     assert.equal(state.writes, 0)
   }
 })

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash, createHmac } from 'node:crypto'
 import { realpathSync, mkdtempSync, rmSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
@@ -22,6 +23,34 @@ let runtime
 let origin
 let runtimeOptions
 const persistence = mkdtempSync(join(tmpdir(), 'mikka-gateway-revocation-'))
+
+// The application's session report endpoint, on loopback. Answers 204.
+const sessionReports = []
+const reportWaiters = new Set()
+const reportServer = createServer((request, response) => {
+  let body = ''
+  request.on('data', chunk => { body += chunk })
+  request.on('end', () => {
+    const report = { path: request.url, authorization: request.headers.authorization, body: JSON.parse(body) }
+    sessionReports.push(report)
+    for (const waiter of reportWaiters) waiter()
+    response.writeHead(204).end()
+  })
+})
+
+/** The first report (already received or later) that matches. */
+export function sessionReport(accept, timeoutMs = 5_000) {
+  return new Promise((resolve, reject) => {
+    const check = () => {
+      const found = sessionReports.find(accept)
+      if (!found) return
+      clearTimeout(timeout); reportWaiters.delete(check); resolve(found)
+    }
+    const timeout = setTimeout(() => { reportWaiters.delete(check); reject(new Error('No matching session report')) }, timeoutMs)
+    reportWaiters.add(check)
+    check()
+  })
+}
 
 function ticket(id = deviceId, exp = Math.floor(Date.now() / 1000) + 300) {
   const mac = createHmac('sha256', secret).update(`${id}.${exp}`).digest('hex')
@@ -61,6 +90,8 @@ export async function status(id = deviceId) {
 }
 
 before(async () => {
+  await new Promise(resolve => reportServer.listen(0, '127.0.0.1', resolve))
+  const reportURL = `http://127.0.0.1:${reportServer.address().port}/mikka/v1/internal/device-sessions`
   const bundle = await build({
     entryPoints: [fileURLToPath(new URL('../src/index.ts', import.meta.url))],
     bundle: true,
@@ -77,7 +108,7 @@ before(async () => {
       compatibilityDate: '2026-10-22',
       compatibilityFlags: ['nodejs_compat'],
       durableObjects: { DEVICE_SESSION: { className: 'DeviceSession', useSQLite: true } },
-      bindings: { GATEWAY_PUSH_SECRET: secret },
+      bindings: { GATEWAY_PUSH_SECRET: secret, DEVICE_SESSION_REPORT_URL: reportURL },
     }],
     host: '127.0.0.1',
     port: 0,
@@ -96,7 +127,27 @@ after(async () => {
     if (socket.readyState === WebSocket.OPEN) socket.close(1000, 'test complete')
   }
   await runtime?.dispose()
+  reportServer.closeAllConnections?.()
+  await new Promise(resolve => reportServer.close(resolve))
   rmSync(persistence, { recursive: true, force: true })
+})
+
+test('a real device socket reports connected on open and disconnected after the 30s close grace', { timeout: 45_000 }, async () => {
+  const id = '0b7d4c2e-8f3a-4e51-9c6d-2a1b3c4d5e6f'
+  const socket = connect(ticket(id), id)
+  await event(socket, 'open')
+  const connected = await sessionReport(report => report.path.endsWith(`/${id}`) && report.body.state === 'connected')
+  assert.equal(connected.path, `/mikka/v1/internal/device-sessions/${id}`)
+  assert.equal(connected.authorization, `Bearer ${secret}`)
+  assert.match(connected.body.socketId, /^[A-Za-z0-9_-]{8,64}$/)
+  const closed = event(socket, 'close')
+  const closedAt = Date.now()
+  socket.close(1000, 'done')
+  await closed
+  const disconnected = await sessionReport(report => report.path.endsWith(`/${id}`) && report.body.state === 'disconnected', 40_000)
+  assert.ok(Date.now() - closedAt >= 29_000, 'the disconnect waits out the grace')
+  assert.equal(disconnected.body.socketId, connected.body.socketId)
+  assert.ok(Math.abs(Date.parse(disconnected.body.at) - closedAt) < 2_000, 'the report carries the close time')
 })
 
 test('Node built-in WebSocket opens against the Worker with its exact ticket protocol', async () => {
@@ -235,7 +286,7 @@ test('a real watched device disconnect and reconnect push its owner home without
   live.close(1000, 'complete'); returned.close(1000, 'complete')
 })
 
-test('a real observer receives natural 90s expiry while the idle device socket remains open', { timeout: 105_000 }, async () => {
+test('a real observer receives natural 40s expiry (30s silence plus one ping) while the idle device socket remains open', { timeout: 60_000 }, async () => {
   const home = 'bf156f6b-40e7-49e7-8dbb-0dc236e46e1e', id = '2a7d7301-402a-4b18-83f5-10001923571c'
   const channel = liveChannel('expiry-owner', home)
   const live = liveSocket(channel, undefined, WebSocket, 2, true)
@@ -245,8 +296,8 @@ test('a real observer receives natural 90s expiry while the idle device socket r
   const ack = messages(live, 1, value => value.type === 'presence_ack')
   live.send(JSON.stringify({ type: 'presence_watch', id: 'expiry', token: presenceProof(channel, home, [[id, true, 0]]) }))
   await ack
-  const received = await messages(live, 2, value => !!value.kind, 100_000)
-  assert.ok(Date.now() - Date.parse(connected.lastSeenAt) >= 90_000)
+  const received = await messages(live, 2, value => !!value.kind, 55_000)
+  assert.ok(Date.now() - Date.parse(connected.lastSeenAt) >= 40_000)
   assert.deepEqual(received, [{ kind: 'device_list', id: home }, { kind: 'thread_list', id: home }])
   assert.equal(device.readyState, WebSocket.OPEN)
   assert.equal((await status(id)).online, false)

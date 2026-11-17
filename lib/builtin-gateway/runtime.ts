@@ -12,7 +12,11 @@ export function builtinGateway(): Runtime | null {
   if (!config) return null
   if (!runtime) {
     const bus = new PostgresGatewayBus({ connectionString: process.env.MIKKA_DATABASE_URL_UNPOOLED || process.env.MIKKA_DATABASE_URL })
-    const hub = new GatewayHub(bus, Date.now, config.secret, (sessionId, channel) => authorizeEnterpriseLiveChannel(sessionId, channel))
+    // Device sessions are applied in this process, by the replica holding the
+    // socket; no HTTP hop back to itself (decision 2026-11-17-2215).
+    const hub = new GatewayHub(bus, Date.now, config.secret, (sessionId, channel) => authorizeEnterpriseLiveChannel(sessionId, channel), {
+      report: async (deviceId, report) => (await import('@/lib/device-session')).applyDeviceSessionReport(deviceId, report),
+    })
     runtime = { hub, bus, async stop() { hub.stop(); await bus.stop(); runtime = undefined } }
   }
   return runtime
