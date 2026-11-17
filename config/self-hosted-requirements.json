@@ -3339,5 +3339,12 @@
     "behavior": "Stores the optional architecture reported by the daemon on its pending sign-in request. An existing daemon that omits it can still sign in.",
     "test": "lib/daemon-authorization.test.ts",
     "suite": "test:auth-composio"
+  },
+  "app/api/organizations/deleted/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the retained id and name of archived Organizations for the current active owner through the existing governance directory.",
+    "test": "lib/enterprise/governance.db.test.ts",
+    "suite": "test:enterprise-db"
   }
 }
