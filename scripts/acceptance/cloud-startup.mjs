@@ -361,8 +361,9 @@ export async function dispatchThroughCoordinator(client, record, { botId, profil
     // names its Agent with the computer (taskDestination below), so the host,
     // not the model's tool input, fixes it. A named Agent takes the first entry
     // of 优先使用的模型 for its harness, which the acceptance workspace keeps on
-    // the subscription model this case proves.
-    readOnly: !(leaseAudit || probe),
+    // the subscription model this case proves. The tool input keeps the same
+    // Agent so the request the model repeats matches the person's message.
+    ...(agentId ? { agentId } : {}), readOnly: !(leaseAudit || probe),
     note: probe?.instructions ?? `Read one line of README (or list the repository root if absent), then reply ${marker}. Do not modify files, create branches, commit, push, open a PR, send messages, or spawn other agents.` }
   const sponsored = record.taskProvider === 'cloudflare'
   const delivery = sponsored && probe?.sponsoredRepositoryDelivery === true
@@ -878,11 +879,23 @@ export async function cleanupCase(client, record, target, { timeoutMs = 60000, W
     assert(listing.issueId === record.issueId && Array.isArray(listing.tasks), 'factory_list_invalid')
     for (const item of listing.tasks) {
       assert(item.issueId === record.issueId && UUID.test(item.id), 'cleanup_scope_mismatch')
-      const snapshot = await client.json(`/api/factory/tasks/${item.id}`)
-      assert(snapshot.task?.issueId === record.issueId, 'cleanup_scope_mismatch')
-      for (const attempt of snapshot.attempts ?? []) if (UUID.test(attempt.runId ?? '')) runIds.add(attempt.runId)
-      if (!['passed', 'cancelled', 'revoked'].includes(snapshot.task.status)) await client.json(`/api/factory/tasks/${item.id}`, post({
-        binding: { taskId: item.id, revision: snapshot.task.revision }, eventId: randomUUID(), action: 'cancel', reason: '测试 1505 startup measurement complete; stop only this test task.' }))
+      // A task that just finished its run keeps moving (its revision changes),
+      // so a cancel on the revision read a moment ago can conflict. Read it
+      // again and cancel that revision, unless it has ended meanwhile.
+      for (let tries = 0; ; tries++) {
+        const snapshot = await client.json(`/api/factory/tasks/${item.id}`)
+        assert(snapshot.task?.issueId === record.issueId, 'cleanup_scope_mismatch')
+        for (const attempt of snapshot.attempts ?? []) if (UUID.test(attempt.runId ?? '')) runIds.add(attempt.runId)
+        if (['passed', 'cancelled', 'revoked'].includes(snapshot.task.status)) break
+        try {
+          await client.json(`/api/factory/tasks/${item.id}`, post({
+            binding: { taskId: item.id, revision: snapshot.task.revision }, eventId: randomUUID(), action: 'cancel', reason: '测试 1505 startup measurement complete; stop only this test task.' }))
+          break
+        } catch (error) {
+          if (tries >= 2 || error?.message !== 'startup_http_409') throw error
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+      }
     }
   })
   // A normal stop on the original run also stops its later attempts. Keep any

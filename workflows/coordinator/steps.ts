@@ -360,8 +360,12 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
     }
     request.profileId = selection.profileId
     if (selection.taskDestination?.kind === 'cloud') target = 'cloud'
-    // The Agent the person named with their computer, whatever the model passed.
-    if (selection.taskDestination?.kind === 'device' && selection.taskDestination.agentId) request.agentId = selection.taskDestination.agentId
+    // The computer the person named, when the model left the place out, and
+    // its Agent whatever the model passed. A different place stays refused.
+    if (selection.taskDestination?.kind === 'device') {
+      if (target === undefined) target = { deviceId: selection.taskDestination.deviceId }
+      if (selection.taskDestination.agentId) request.agentId = selection.taskDestination.agentId
+    }
   } catch (error) { if (error instanceof AgentProfileError) return { error: error.code }; throw error }
   // The Agent or model the Bot named must be one of 优先使用的模型, the list its prompt shows; otherwise nothing is queued.
   if (request.model) {
