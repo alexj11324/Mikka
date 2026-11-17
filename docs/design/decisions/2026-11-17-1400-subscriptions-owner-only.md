@@ -10,4 +10,4 @@
 - 迁移 `20261117140000_subscriptions_owner_only` 删除旧的分享记录。Bot 对话里如果还选着同事的订阅，这个选择会被清掉，对话会请主人选自己的模型。
 - 派到指定电脑的任务必须能确定用哪个 Agent：要么点名，要么对话的模型属于该电脑上唯一对应的 Agent，要么这台电脑只有一个 Agent。否则派发时立即返回 `agentRequired`，不会悄悄退回默认 Agent。
 
-取代 [orchestration.md](../orchestration.md) §2 第 2 步（「其他成员分享的凭据」）和 其他文档里关于团队共享订阅的描述。
+取代 [2026-11-15-1900](2026-11-15-1900-models-on-gateway-like-capy.md) 规则 3 里的「工作区共享的连接」（来源顺序现在是：自己的连接 → Mikka 额度）、[orchestration.md](../orchestration.md) §2 第 2 步（「其他成员分享的凭据」）和 其他文档里关于团队共享订阅的描述。

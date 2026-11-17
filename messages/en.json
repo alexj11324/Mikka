@@ -2982,7 +2982,7 @@
     "sharePolicy": {
       "loading": "Loading sharing settings",
       "heading": "Subscriptions and API keys",
-      "label": "Members share their own subscriptions and API keys with teammates",
+      "label": "Members share their own API keys with teammates",
       "detail": "Block stops only what is shared with others; everyone keeps using their own"
     },
     "appPolicy": {
@@ -4063,7 +4063,6 @@
       "noMatch": "No matching models",
       "source": {
         "subscription": "Runs on your {service} subscription",
-        "sharedSubscription": "Runs on {name}'s {service} subscription",
         "apiKey": "Runs on your {vendor} key (…{last4}), not charged",
         "apiKeyPlain": "Runs on your {vendor} key, not charged",
         "sharedKey": "Runs on {name}'s {vendor} key, not charged",
@@ -7001,11 +7000,11 @@
     },
     "policy": {
       "title": "Resource sharing policy",
-      "description": "Decides whether members can share their own model credentials, subscriptions and MCP into Organization workspaces. Sharing still needs the resource's own permission; this policy can only make it stricter.",
+      "description": "Decides whether members can share their own API keys and MCP into Organization workspaces (subscriptions serve their owner only and cannot be shared). Sharing still needs the resource's own permission; this policy can only make it stricter.",
       "needsEnterprise": "Resource policy needs Enterprise.",
       "modelCredentialSharing": {
-        "label": "Model credentials and subscriptions",
-        "note": "Members sharing API keys or model subscriptions."
+        "label": "Model credentials",
+        "note": "Members sharing API keys. Subscriptions serve their owner only."
       },
       "mcpSharing": {
         "label": "MCP servers",
@@ -7047,7 +7046,7 @@
         "title": "Sharing approvals",
         "description": "With “Needs approval”, shared resources wait here. Denying withdraws the resource from the workspace; approving never bypasses the resource's own permission.",
         "empty": "No sharing requests",
-        "emptyNote": "Requests appear when members share model credentials, subscriptions or MCP into Organization workspaces.",
+        "emptyNote": "Requests appear when members share API keys or MCP into Organization workspaces.",
         "approvedDone": "Approved.",
         "deniedDone": "Denied; the share was withdrawn.",
         "kinds": {
