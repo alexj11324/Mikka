@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { execFile, execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises'
 import { basename, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { promisify } from 'node:util'
 
@@ -24,38 +25,14 @@ export function verifyPickedRepository(application, page, directory) {
 // Only called inside the Linux smoke job's isolated Xvfb display. No account
 // or renderer-supplied path enters the product's directory picker.
 export function verifyLinuxRepositoryDialog(page, directory) {
-  async function xdo(...args) {
-    return (await execute('xdotool', args, { timeout: 10_000 })).stdout.trim()
-  }
-  const dialogTitle = '^(Open|Select|Choose)( (a |an )?(File|Folder|Directory))?$'
-  async function driveDialog(path) {
-    const windows = await xdo('search', '--sync', '--onlyvisible', '--name', dialogTitle)
-    assert.match(windows, /^\d+$/, 'Expected one visible native directory dialog on this private display')
-    const { stdout } = await execute('xprop', ['-id', windows, '_NET_WM_WINDOW_TYPE'])
-    assert.match(stdout, /_NET_WM_WINDOW_TYPE_DIALOG/)
-    await xdo('windowfocus', '--sync', windows)
-    if (!path) {
-      await xdo('key', 'Escape')
-      return
-    }
-    await xdo('key', 'ctrl+l')
-    await xdo('type', '--clearmodifiers', '--', path)
-    await xdo('key', 'Return')
-    // GTK can use Return to enter the chosen directory first. Activate the
-    // dialog's Open button if it remains visible after path entry.
-    await delay(350)
-    const visible = await xdo('search', '--onlyvisible', '--name', dialogTitle).catch(error => {
-      if (error.code === 1) return ''
-      throw error
-    })
-    if (visible === windows) await xdo('key', 'alt+o')
-  }
+  const driver = fileURLToPath(new URL('./linux-directory-dialog.py', import.meta.url))
+  const driveDialog = path => execute('/usr/bin/python3', [driver, ...(path ? [path] : [])], { timeout: 20_000 })
   return verifyRepositoryChoices(directory, async path => {
     const timeout = new AbortController()
     try {
       const [result] = await Promise.race([
         Promise.all([page.evaluate(() => window.mikka.device.pickRepo()), driveDialog(path)]),
-        delay(18_000, undefined, { signal: timeout.signal }).then(() => { throw new Error('NATIVE_DIRECTORY_DIALOG_TIMEOUT') }),
+        delay(23_000, undefined, { signal: timeout.signal }).then(() => { throw new Error('NATIVE_DIRECTORY_DIALOG_TIMEOUT') }),
       ])
       return result
     } finally { timeout.abort() }
