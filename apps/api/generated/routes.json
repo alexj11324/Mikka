@@ -1961,6 +1961,24 @@
       "sourceHash": "a16a38b52e068af884022c5a10cf35201f68401aaf2d0450145618952bcc6e84"
     },
     {
+      "path": "/mikka/api/organizations/[organizationId]/drive",
+      "template": "/api/organizations/[organizationId]/drive",
+      "source": "app/api/organizations/[organizationId]/drive/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "6df6b211f4bfb0682d50eeb34cdae10ba62eaecbf3196a0c6a3317a8fa11fd4b"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/drive-scopes",
+      "template": "/api/organizations/[organizationId]/drive-scopes",
+      "source": "app/api/organizations/[organizationId]/drive-scopes/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "1aaeb0d34a64a745e88c964fe5727a82a0808a30aae098fba92e3da619385288"
+    },
+    {
       "path": "/mikka/api/organizations/[organizationId]/drive-shares",
       "template": "/api/organizations/[organizationId]/drive-shares",
       "source": "app/api/organizations/[organizationId]/drive-shares/route.ts",
@@ -1987,6 +2005,15 @@
         "GET"
       ],
       "sourceHash": "e0e00f06f901213b5d1ca5ecb242cd0a4b18897954e9760cb284a83db85c45f9"
+    },
+    {
+      "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/restore",
+      "template": "/api/organizations/[organizationId]/drive/[volumeId]/restore",
+      "source": "app/api/organizations/[organizationId]/drive/[volumeId]/restore/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "266128803776eaa42997585548d45141b42ba55d2cce78e36a800681bf1cdcb8"
     },
     {
       "path": "/mikka/api/organizations/[organizationId]/drive/[volumeId]/versions",

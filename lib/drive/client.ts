@@ -2,6 +2,7 @@ import { withBasePath } from '../base-path'
 import { driveFileLinkUrl, driveShareViewUrl, organizationDriveVersionFileUrl, driveVolumeUrl as url, type DriveLocation } from './location'
 export { driveFileLinkUrl, type DriveLocation } from './location'
 import { DRIVE_MAX_CHANGES, DRIVE_MAX_FILE_BYTES, isDrivePath, type DriveFileVersion, type DriveFileLinkDetails, type DriveFileLinkPage, type DriveShareView, type DriveWorkspaceFileLinkPage, type DriveFileLinkVisibility, type DriveManifestEntry, type DriveSkillCursor, type DriveSkillPage } from './contract'
+import type { OrganizationDriveScopePage, OrganizationDriveVolume } from './organization-volumes'
 import type { DriveVolumeSummary } from './volumes'
 import type { DriveVersionSummary } from './store'
 
@@ -122,6 +123,25 @@ export function readDriveSkills(location: DriveLocation, after?: DriveSkillCurso
   return request<DriveSkillPage>(url(location, '', { view: 'skills', afterVolume: after?.volumeId, afterPath: after?.path }), {}, send)
 }
 
+function organizationFilesUrl(organizationId: string, resource: 'drive' | 'drive-scopes', filters: Record<string, string | number | boolean | undefined>) {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && (key !== 'exactScope' || value)) query.set(key, String(value))
+  }
+  const target = `/api/organizations/${encodeURIComponent(organizationId)}/${resource}`
+  return withBasePath(query.size ? target + '?' + query : target)
+}
+
+export function readOrganizationDriveScopes(organizationId: string, filters: { projectId?: string; automationId?: string; page?: number } = {}, send?: typeof fetch) {
+  return request<OrganizationDriveScopePage>(organizationFilesUrl(organizationId, 'drive-scopes', filters), {}, send)
+}
+
+export function readOrganizationDriveVolumes(organizationId: string, filters: {
+  projectId?: string; userId?: string; automationId?: string; captainJamId?: string; exactScope?: boolean; archived?: boolean
+} = {}, send?: typeof fetch) {
+  return request<OrganizationDriveVolume[]>(organizationFilesUrl(organizationId, 'drive', filters), {}, send)
+}
+
 export function readDriveVolumes(location: DriveLocation, before?: string, send?: typeof fetch) {
   return request<DriveVolumePage>(url(location, '', { before }), {}, send)
 }
@@ -145,6 +165,12 @@ export function readDriveHistory(location: DriveLocation, volumeId: string, befo
 
 function organizationVersionsUrl(organizationId: string, volumeId: string) {
   return withBasePath(`/api/organizations/${encodeURIComponent(organizationId)}/drive/${encodeURIComponent(volumeId)}/versions`)
+}
+
+export function restoreOrganizationDriveVersion(organizationId: string, volumeId: string, versionId: string, expectedDigest: string, send?: typeof fetch) {
+  const target = withBasePath(`/api/organizations/${encodeURIComponent(organizationId)}/drive/${encodeURIComponent(volumeId)}/restore`)
+  return request<OrganizationDriveManifest>(target, { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ versionId, expectedDigest }) }, send)
 }
 
 export function readOrganizationDriveVersions(organizationId: string, volumeId: string, send?: typeof fetch) {

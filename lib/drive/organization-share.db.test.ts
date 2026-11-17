@@ -192,6 +192,54 @@ test('organization share management holds the actual attachment, creator and cur
     assert.equal((await getVersions()).status, 404)
     assert.equal((await getManifest(first.id, theirs)).status, 200)
   })
+  await t.test('organization restore serializes lost-response retries, preserves unrelated changes and requires current Project steering rights', async () => {
+    const restoreRoute = await import('../../app/api/organizations/[organizationId]/drive/[volumeId]/restore/route')
+    const projectTeam = await seedTeam(database, workspace.id, creator)
+    const projectId = await seedProject(database, creator, [{ teamId: projectTeam.id, workspaceId: workspace.id }])
+    const { volumeId } = await makeShare(projectId, 'Restore target')
+    await database.query("UPDATE resource_access_policies SET visibility='private' WHERE kind='project' AND id=$1", [projectId])
+    await database.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+      VALUES ('project',$1,'account',$2,ARRAY['canReadContent'])`, [projectId, peer])
+    const getVersions = async () => (await database.query<{id: string; digest: string; kind: string}>(
+      'SELECT id,digest,kind FROM drive_volume_versions WHERE "volumeId"=$1 ORDER BY seq', [volumeId])).rows
+    const receipts = async () => (await database.query('SELECT count(*)::integer AS n FROM drive_mutations WHERE "volumeId"=$1', [volumeId])).rows[0].n
+    const [empty, filled] = await getVersions(), originalReceipts = await receipts()
+    const restore = (cookie: string, payload: object, requestOrigin = origin) => restoreRoute.POST(new Request(
+      origin + '/api/organizations/' + organizationId + '/drive/' + volumeId + '/restore', {
+        method: 'POST', headers: { cookie, origin: requestOrigin, 'content-type': 'application/json' }, body: JSON.stringify(payload),
+      }), { params: Promise.resolve({ organizationId, volumeId }) })
+    const request = { versionId: empty.id, expectedDigest: filled.digest }
+    assert.equal((await history(theirs, volumeId)).status, 200)
+    assert.equal((await restore(theirs, request)).status, 404)
+    assert.equal((await restore(mine, request, 'https://other.invalid')).status, 403)
+    assert.equal((await restore(mine, { ...request, mutationId: randomUUID() })).status, 400)
+    const [one, retry] = await Promise.all([restore(mine, request), restore(mine, request)])
+    assert.deepEqual([one.status, retry.status], [200, 200])
+    const manifest = await one.json()
+    assert.deepEqual(await retry.json(), manifest)
+    assert.deepEqual([manifest.digest, manifest.parentDigest, manifest.entries], [empty.digest, filled.digest, []])
+    assert.equal((await getVersions()).filter(v => v.kind === 'restore').length, 1)
+    assert.equal(await receipts(), originalReceipts)
+    const bytes = new TextEncoder().encode('selected bytes')
+    const actor = { ownerId: `drive-project:${workspace.id}:${projectId}`, authorName: 'Independent editor' }
+    const change = await applyDriveWrite(database, { ownerId: actor.ownerId, volumeId, driveScope: 'project' }, actor, {
+      expectedDigest: manifest.digest, mutationId: randomUUID(), changes: [{ op: 'put', path: 'independent.txt', mode: 0o644,
+        sha256: driveSha256(bytes), sizeBytes: bytes.length }],
+    })
+    const conflict = await restore(mine, request)
+    assert.equal(conflict.status, 409)
+    const moved = await conflict.json()
+    assert.deepEqual([moved.volumeId, moved.headVersionId, moved.headDigest, moved.paths], [volumeId, change.headVersionId, change.headDigest, ['independent.txt']])
+    assert.equal((await getVersions()).at(-1)?.id, change.headVersionId)
+    const sameTree = { versionId: change.headVersionId, expectedDigest: change.headDigest }
+    const unchanged = await (await restore(mine, sameTree)).json()
+    assert.equal(unchanged.digest, change.headDigest)
+    assert.deepEqual(await (await restore(mine, sameTree)).json(), unchanged)
+    assert.equal((await getVersions()).filter(v => v.kind === 'restore').length, 2)
+    await database.query(`UPDATE mikka_organization_members SET status='suspended' WHERE "organizationId"=$1 AND "userId"=$2`, [organizationId, creator])
+    assert.ok([403, 404].includes((await restore(mine, sameTree)).status))
+    await database.query(`UPDATE mikka_organization_members SET status='active' WHERE "organizationId"=$1 AND "userId"=$2`, [organizationId, creator])
+  })
   const team = await seedTeam(database, workspace.id, peer)
   const projectId = await seedProject(database, peer, [{ teamId: team.id, workspaceId: workspace.id }])
   const projectShare = await makeShare(projectId)

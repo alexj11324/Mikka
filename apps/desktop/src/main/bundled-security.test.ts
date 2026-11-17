@@ -77,6 +77,7 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     ['/api/drive/shares', ['GET']],
     ['/api/drive/shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844', ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive-shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844', ['PATCH', 'DELETE']],
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/restore', ['POST']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions', ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000', ['GET']],
     [`/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000/files/${'a'.repeat(64)}`, ['GET']],
@@ -184,6 +185,16 @@ test('Organization Files forwards only a signed directory read', () => {
     assert.equal(allowedApiPath(path, method), method === 'GET')
     assert.equal(allowedApiPath(path + '/all', method), false)
     assert.equal(allowedApiPath('/api/organizations/unknown/drive-shares', method), false)
+  }
+})
+
+test('Organization Drive catalogs allow GET for the exact Organization path', () => {
+  for (const resource of ['drive', 'drive-scopes']) {
+    const path = '/api/organizations/' + identity.user.id + '/' + resource
+    for (const method of ['GET', 'POST', 'PATCH', 'DELETE']) {
+      assert.equal(allowedApiPath(path, method), method === 'GET')
+      assert.equal(allowedApiPath(path + '/all', method), false)
+    }
   }
 })
 
