@@ -65,6 +65,29 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
     assert.equal(mask(`key ${E2B_KEY}`), 'key [secret:E2B_API_KEY]')
   })
 
+  await t.test('preparation telemetry and a replay keep the claimed Run preparing until a fresh execution event', async () => {
+    const { persistRunEventBatch } = await import('../lib/secrets/run-events')
+    const { identityMasker } = await import('../lib/secrets/mask')
+    const runId = await newRun()
+    const prepare = () => pool.query("UPDATE agent_runs SET status='preparing' WHERE id=$1", [runId])
+    const status = async () => (await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status
+    await prepare()
+    const preparing = [{ type: 'data-run-state', transient: true, data: { state: 'preparing' } }]
+    await persistRunEventBatch(runId, 1, preparing, identityMasker)
+    assert.equal(await status(), 'preparing', 'reporting preparation must not announce execution')
+    await persistRunEventBatch(runId, 2, [{ type: 'start', messageId: 'progress' },
+      { type: 'data-run-stage', data: { stage: 'repository', ms: 15, ok: true } }], identityMasker)
+    assert.equal(await status(), 'preparing', 'a message opened for repository timing is still preparation')
+    const execution = [{ type: 'text-delta', id: 'turn', delta: 'Fixture reply' }]
+    await persistRunEventBatch(runId, 4, execution, identityMasker)
+    assert.equal(await status(), 'running', 'older daemons can establish execution with agent output')
+    await prepare()
+    await persistRunEventBatch(runId, 4, execution, identityMasker)
+    assert.equal(await status(), 'preparing', 'a previously stored batch must not reapply its transition')
+    await persistRunEventBatch(runId, 5, [{ type: 'data-run-state', transient: true, data: { state: 'running' } }], identityMasker)
+    assert.equal(await status(), 'running', 'an explicit running state still establishes execution')
+  })
+
   await t.test('mobile steps read masked tool output and source timing through a retried event batch', async () => {
     const events = await import('../app/v1/runs/[runId]/events/route')
     const { threadItems } = await import('../lib/issue-run-conversation')
