@@ -67,3 +67,27 @@ test('native progress advances line cursors and a new mapped session rewinds onl
   assert.deepEqual(observed.map(event => event.meta.position.line), [1, 2])
   assert.equal(result.nextIndex, 3)
 })
+
+test('a stream lease ending resumes the same session at the next line until the boundary', async () => {
+  const paths = [], observed = []
+  const [requested, settled] = facts.map(fact => JSON.stringify({ at: '2026-11-11T00:00:00.000Z', facts: [fact] }))
+  const bodies = [`{"$eve":"heartbeat"}\n${requested}\n{"$eve":"stream.lease-ended"}\n`, `${settled}\n`]
+  const client = { request: async (path, init) => {
+    paths.push(path)
+    return init?.method === 'POST' ? Response.json({ ok: true, sessionId: 'wrun_fixture' }) : new Response(bodies.shift(), { headers: eveHeaders })
+  } }
+  const result = await observeEveSession(client, botId, { onEvent: event => { observed.push(event.type); return event.type === 'call.settled' } })
+  assert.deepEqual(observed, ['call.requested', 'call.settled'])
+  assert.deepEqual(paths.slice(1).map(path => path.split('startIndex=')[1]), ['0', '1'])
+  assert.deepEqual(result, { sessionId: 'wrun_fixture', nextIndex: 2 })
+})
+
+test('stream.ended ends observation without another connection', async () => {
+  const paths = []
+  const client = { request: async (path, init) => {
+    paths.push(path)
+    return init?.method === 'POST' ? Response.json({ ok: true, sessionId: 'wrun_fixture' }) : new Response('{"$eve":"stream.ended"}\n', { headers: eveHeaders })
+  } }
+  assert.deepEqual(await observeEveSession(client, botId), { sessionId: 'wrun_fixture', nextIndex: 0 })
+  assert.equal(paths.length, 2)
+})
