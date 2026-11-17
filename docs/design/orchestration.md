@@ -298,12 +298,12 @@ remove this responsibility. Its slow recovery sweep recovers lost wakeups.
 
 Execution leases, estimated running compute, monitor duration and paused data
 retention are separate clocks. The monitor's 12-hour limit performs a final
-state read and hands responsibility to the recovery owner. A run's 12-hour
-compute budget requests a stop; paused time does not consume that budget.
-This is a budget for the admitted run, not the lifetime of the task's VM. A
-new authorized continuation run receives its own budget while the previous
-run retains its compute record. Heartbeat renewal and Workflow replay do not
-reset a run's budget, and a stopped run cannot silently restart itself.
+state read and hands responsibility to the recovery owner. E2B runs on the
+person's own key, so Mikka sets no compute budget on it (2026-11-17): a run is
+never stopped for its running time. The machine pauses right after its run
+ends, after two minutes idle and unclaimed, and on the 15-minute provider
+timeout as a safety net; paused machines are kept 7 days (1 hour once the task
+is closed). Heartbeat renewal and Workflow replay never restart a stopped run.
 Missing leases use the existing lease recovery, and the Factory watchdog
 continues to distinguish progress from a healthy heartbeat.
 
