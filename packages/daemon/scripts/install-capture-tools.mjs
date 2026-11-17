@@ -20,10 +20,7 @@ async function safeDirectory(path, ownerId) {
 
 async function download(asset) {
   const response = await fetch(`https://api.github.com/repos/eugeneware/ffmpeg-static/releases/assets/${asset.assetId}`, {
-    // CI may pass a read-only token for the API rate limit; it only ever goes to api.github.com.
-    headers: { accept: 'application/octet-stream', 'user-agent': 'Mikka-pinned-capture-tools',
-      ...(process.env.CAPTURE_TOOLS_GITHUB_TOKEN ? { authorization: `Bearer ${process.env.CAPTURE_TOOLS_GITHUB_TOKEN}` } : {}) },
-    signal: AbortSignal.timeout(120_000),
+    headers: { accept: 'application/octet-stream', 'user-agent': 'Mikka-pinned-capture-tools' }, signal: AbortSignal.timeout(120_000),
   })
   if (!response.ok || !response.body) fail('capture_tools_download_failed')
   const chunks = []; let size = 0
