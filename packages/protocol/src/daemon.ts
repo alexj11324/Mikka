@@ -139,6 +139,15 @@ export const daemonStatusSchema = z.object({
   /** Holds a device credential (it may still be refused by the server). */
   signedIn: z.boolean(),
   server: z.enum(["online", "offline", "unregistered"]),
+  /**
+   * The device session (decision 2026-11-17-2215). `update_required`: the
+   * server refused this daemon version; it does nothing until it is updated.
+   * `gateway_required`: the server has no device gateway, so it has no devices.
+   * Absent from older daemons.
+   */
+  session: z.enum(["signed_out", "connecting", "open", "update_required", "gateway_required"]).optional(),
+  /** With `update_required`: the oldest version the server accepts, if it said. */
+  requiredVersion: z.string().max(40).nullable().optional(),
   harnesses: z.array(harnessInfoSchema),
   runs: z.array(runSummarySchema),
   /** Bytes used by run worktrees under the daemon's data dir. */
