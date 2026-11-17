@@ -2979,7 +2979,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "93a5ef76097ef52f09bfe646c268a5979d3bf1a8d72a1c0795e93386884fdc74"
+      "sourceHash": "7f7e89c150b03f3805c1a7ab214f284aeb9faeed10c18c2d155d69b32ddcd2f8"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/service-identities",

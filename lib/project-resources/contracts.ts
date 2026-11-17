@@ -32,9 +32,17 @@ export const repositoryBindingInput = z.object({
   repositoryKey: projectRepositoryKey, baseBranch: projectBranch.nullable().default(null),
   environmentId: z.uuid().nullable().default(null), isPrimary: z.boolean().default(false),
 }).strict()
-const maxProjectRepositories = 100
-export const projectRepositoryKeys = z.array(projectRepositoryKey).max(maxProjectRepositories)
-export const addProjectRepositoriesBody = z.object({ repos: projectRepositoryKeys }).strict()
+export const maxProjectRepositories = 100
+const projectRepositoryAddition = z.object({
+  repoFullName: z.string().regex(/^[a-z0-9][a-z0-9-]{0,38}\/[a-z0-9_.-]{1,100}$/i)
+    .refine(name => {
+      const repository = name.slice(name.indexOf('/') + 1)
+      return repository !== '.' && repository !== '..' && !repository.startsWith('-') && !repository.toLowerCase().endsWith('.git')
+    }),
+  baseBranch: z.union([z.literal(''), projectBranch]).optional(),
+  mode: z.enum(['primary', 'lazy']).optional(),
+}).strict()
+export const addProjectRepositoriesBody = z.object({ repos: z.array(projectRepositoryAddition).max(maxProjectRepositories) }).strict()
 
 export const projectResourcesInput = z.object({
   workspaceId: z.uuid(), projectId: z.uuid(), revision: z.number().int().positive(),

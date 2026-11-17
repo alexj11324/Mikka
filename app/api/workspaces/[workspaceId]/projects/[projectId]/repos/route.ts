@@ -16,7 +16,7 @@ export const POST = freshSessionRoute(async (request: Request, context: Context)
     return await saveProjectResources(session.user, { ...params, ...body })
   } catch (error) {
     if (error instanceof ActionFailureError && error.code === 'projectNotFound') throw new GovernanceError('not_found', error)
-    if (error instanceof ActionFailureError && error.code === 'projectArchived') {
+    if (error instanceof ActionFailureError && (error.code === 'projectArchived' || error.code === 'projectResourceConflict')) {
       return Response.json({ error: { code: error.code } }, { status: 409, headers: { 'cache-control': 'private, no-store' } })
     }
     throw error

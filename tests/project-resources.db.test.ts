@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { randomUUID } from 'node:crypto'
+import type { z } from 'zod'
+import type { addProjectRepositoriesBody } from '../lib/project-resources/contracts'
 import { dbUrl, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl }, async t => {
@@ -75,23 +77,37 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
       repositories: [{ repositoryKey: repoA, isPrimary: true, baseBranch: 'release', environmentId }],
       environmentIds: [environmentId], defaultEnvironmentId: environmentId })
     const before = await resources.listProjectResources(owner, workspace.id, id)
-    const add = (repos: string[]) => resources.saveProjectResources(owner, { ...scope, repos })
-    const revisions = await Promise.all([add([repoA, repoB]), add([repoC])])
+    const add = (repos: z.input<typeof addProjectRepositoriesBody>['repos']) => resources.saveProjectResources(owner, { ...scope, repos })
+    const [a, b, c] = [repoA, repoB, repoC].map(key => ({ repoFullName: key.slice('v2/github.com/'.length) }))
+    const revisions = await Promise.all([add([a, { ...b, baseBranch: 'release/b' }]), add([c])])
     assert.deepEqual(revisions.map(result => result.revision).sort(), [3, 4])
-    assert.deepEqual(await add([repoB.toUpperCase(), repoB, repoC]), { revision: 4 })
-    assert.deepEqual(await add([]), { revision: 4 })
+    const replay = await add([{ ...b, repoFullName: b.repoFullName.toUpperCase() }, b, c])
+    assert.ok('repos' in replay)
+    assert.equal(replay.id, id)
+    assert.equal(replay.name, 'Add repositories')
+    assert.equal(replay.revision, 4)
+    assert.equal(replay.repos.find(row => row.repoFullName === b.repoFullName)?.baseBranch, 'release/b')
+    assert.deepEqual(await add([]), replay)
+    await rejects(add([{ ...b, baseBranch: 'conflicts' }]), 'projectResourceConflict')
+    await rejects(add([{ repoFullName: 'acme/new-primary', mode: 'primary' }]), 'projectResourceConflict')
+    await assert.rejects(add([{ repoFullName: 'acme/new' }, { ...c, mode: 'lazy' }]), { detail: 'feature_unavailable' })
     const updated = await resources.listProjectResources(owner, workspace.id, id)
     assert.deepEqual(updated.environmentBindings, before.environmentBindings)
     assert.deepEqual(updated.policy, before.policy)
     assert.deepEqual(updated.repositories.find(row => row.repositoryKey === repoA), before.repositories[0])
     assert.deepEqual(updated.repositories.map(row => row.repositoryKey).sort(), [repoA, repoB, repoC].sort())
-    const extra = Array.from({ length: 98 }, (_, index) => 'v2/github.com/acme/extra-' + index)
+    const extra = Array.from({ length: 98 }, (_, index) => ({ repoFullName: 'acme/extra-' + index }))
     await assert.rejects(add(extra), { name: 'ZodError' })
     const { rows: [row] } = await connection.query(`select revision,
       (select count(*)::int from workspace_resource_events where "resourceId"=$1 and kind='project_resources.changed') as audits
       from workspace_projects where id=$1`, [id])
     assert.deepEqual(row, { revision: 4, audits: 3 })
     assert.deepEqual((await resources.listProjectResources(owner, workspace.id, id)).repositories, updated.repositories)
+    await resources.saveProjectResources(owner, { ...scope, revision: 4, repositories: [], environmentIds: [], defaultEnvironmentId: null })
+    const first = await add([{ ...a, mode: 'primary', baseBranch: 'trunk' }])
+    assert.ok('repos' in first)
+    assert.deepEqual(first.repos, [{ ...a, repositoryKey: repoA, isPrimary: true, baseBranch: 'trunk', environmentId: null }])
+
   })
 
   await t.test('two Projects in one Workspace select the same repository independently across a binding change', async () => {
