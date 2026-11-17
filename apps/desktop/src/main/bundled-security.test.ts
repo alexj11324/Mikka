@@ -126,6 +126,17 @@ test('Factory flow accepts only a strict UUID and its two declared methods', () 
   assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
 })
 
+test('Factory activity and its media are read-only under a strict task UUID', () => {
+  const task = identity.user.id
+  for (const path of [`/api/factory/tasks/${task}/activity`, `/api/factory/tasks/${task}/media/${task}`]) {
+    assert.equal(allowedApiPath(path, 'GET'), true, path)
+    for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
+    assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
+  }
+  assert.equal(allowedApiPath('/api/factory/tasks/task_1/activity', 'GET'), false)
+  assert.equal(allowedApiPath(`/api/factory/tasks/${task}/media/`, 'GET'), false)
+})
+
 test('service identity management forwards only its declared human-session methods and UUID paths', () => {
   const workspace = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
   const identity = 'ebb7878e-6918-4b68-9300-d956761b5011'
