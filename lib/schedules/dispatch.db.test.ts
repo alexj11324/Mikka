@@ -640,7 +640,9 @@ test('dispatch_task automations run as their creator through the existing create
   })
 
   await t.test('a standing Task in a Project receives once and pauses when its creator loses Project steering', async () => {
-    const { schedule } = await create({ ...definition(builder), eachRun: 'same_task' })
+    const selected = definition(builder)
+    assert.ok(selected.task.kind === 'dispatch_task')
+    const { schedule } = await create({ ...selected, eachRun: 'same_task' })
     const first = await runNow(schedule)
     await tick()
     const taskId = (await occurrence(first.occurrence.id)).result!.id
@@ -654,6 +656,15 @@ test('dispatch_task automations run as their creator through the existing create
     const second = await runNow(schedule)
     await tick()
     assert.equal((await occurrence(second.occurrence.id)).status, 'succeeded')
+    // The first accepted occurrence stays anchored even if a later turn now
+    // leads the same thread. The old receipt, not a second message, wins.
+    await fixture.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`, [run])
+    const next = await seedRun(fixture, { userId: owner, workspaceId: workspace.id, issueId: taskId, agentId, status: 'running' })
+    await fixture.query('UPDATE agent_runs SET "continuesRunId"=$1 WHERE id=$2', [run, next])
+    const replay = await runtime.automationSeams.dispatch!({ ownerId: owner, workspaceId: workspace.id, scheduleId: schedule.id,
+      occurrenceId: second.occurrence.id, single: true, task: selected.task })
+    assert.equal(replay.runId, run)
+    assert.equal((await fixture.query('SELECT count(*)::int n FROM run_messages WHERE "runId"=ANY($1::uuid[])', [[run, next]])).rows[0].n, 1)
     const { changeResourceAccess } = await import('../resource-access/store')
     await changeResourceAccess(member, { kind: 'project', id: projectId, workspaceId: workspace.id },
       { expectedRevision: 1, visibility: 'private', grants: [{ subjectId: owner, capabilities: ['canReadContent'] }], confirmExpansion: true })
