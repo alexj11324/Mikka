@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 61 |
+| partial | 65 |
 | prior-partial | 36 |
-| unreviewed | 6273 |
+| unreviewed | 6269 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -138,3 +138,7 @@ Continued on the **same public G branch** after the three source contracts above
 ## G-074 contract bulk-confirm failure path (2026-11-18 UTC)
 
 The fixed `components/blocks/rich-text-editor-3/components/resolve-all-dialog.tsx` original/main Git object `e395c084972aac62b01f101a3203906c8b359acc` confirms a local Tiptap bulk suggestion editor behavior, not Cloudflare infrastructure. The real `ContractEditor` supplies the modal and closes its narrow-screen review Sheet via `onResolved`. The shared `AlertDialogAction` is a plain Button. Original-source isolated V8 replay for both accept/reject returned `false` and still observed dialog close and review Sheet dismissal; success cases closed normally. Existing G branch product source commit [`f5f89405c40b`](https://github.com/alexj11324/Mikka/commit/f5f89405c40bff59546c3a8eb1587a2d48d127fe) now exits immediately on `false` and retains `ranRef`, focus and sheet state, with no success toast. Exact new blob `19198731965d9f724cf78ba2b364332bb5352bd0`. The isolated original-handler acceptance matrix is 5/5 across accept/reject true/false plus null editor, but **installed Node24, real mounted Tiptap/Base UI, keyboard/AT and browser, protected CI, ordinary merge and merged-SHA execution remain unverified**. Fixed 7,996 tracked paths / 6,556 code path denominator and 274 unique JSONL records are unchanged; the original path stays `partial`. The pre-merge candidate is recorded in `changes.jsonl`. F, other G owners, production/signing/devices are not modified.
+
+## 2026-11-18 fixed Contract editor: four independent consumer reviews
+
+Fully read four previously unreviewed original Git paths: `change-navigator.tsx`, `contract-toolbar.tsx`, `rich-text-extensions.ts`, `rich-text-task-item.tsx`, with actual ContractEditor → ContractHeader → navigator/toolbar and ContractEditor → configured Tiptap extensions → task node consumers. Exact baseline, current main, existing G and pinned Cloud vendor blobs agree for all four. 14/14 bounded read-only source/consumer predicates passed, not mounted Node24/Tiptap/browser/AT/PG17/protected CI. Each partial-retain row in CSV-06/07 and reviews.jsonl identifies its local UI/selection business contract, origin uncertainty, dependency and remaining dynamic proof. Selection's one-time global mouseup and fallback timeout warrant editor-destroy lifecycle tests; no proven leak or Cloudflare scheduler replacement is claimed. Fixed-code denominator remains 6556 = 186 complete / 65 partial / 36 prior-partial / 6269 unreviewed; 278 unique JSONL paths. Original G-015 Cloudflare native runtime and production Owner acceptance are still separate.
