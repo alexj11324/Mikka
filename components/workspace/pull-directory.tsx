@@ -15,6 +15,7 @@ import {
   filterDirectoryPulls,
   groupDirectoryPulls,
   linkedPullDirectory,
+  pullViews,
   type PullDirectoryPage,
   type PullDirectoryRow,
   type PullState,
@@ -25,14 +26,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { PULL_REQUEST_ICONS } from "@/lib/pull-request-appearance";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResizablePane } from "@/components/ui/resizable-pane";
 import { cn } from "cn";
-import { PullFilterBar, PullFilterChips } from "./pull-filters";
+import { PullConnectState, PullFilterBar } from "./pull-filters";
 import { PullPreview } from "./pull-preview";
 import { PullGroupHeader, PullRow, PullRowSkeleton } from "./pull-row";
 
 const EmptyMark = PULL_REQUEST_ICONS.open;
 
+const viewKeys: Record<PullFilters["view"], `views.${PullFilters["view"]}`> = {
+  open: "views.open",
+  ready: "views.ready",
+  merged: "views.merged",
+  all: "views.all",
+};
 const initial: PullFilters = {
   view: "open",
   search: "",
@@ -313,12 +322,42 @@ export function PullDirectory({
         }
       }}
     >
+      <div className="flex min-w-0 flex-wrap items-center gap-2 px-4 pt-4">
+        <h1 className="me-1 text-md font-semibold">{t("title")}</h1>
+        <Tabs
+          value={filters.view}
+          onValueChange={(value) => set({ view: value as PullFilters["view"], state: "" })}
+        >
+          <TabsList variant="line" aria-label={t("viewLabel")}>
+            {pullViews.map((view) => (
+              <TabsTrigger key={view} value={view}>
+                {t(viewKeys[view])}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <NativeSelect
+          size="sm"
+          aria-label={t("source")}
+          value={repo}
+          onChange={(event) => changeRepo(event.target.value)}
+          className="ms-auto max-w-56"
+        >
+          <NativeSelectOption value="">{t("linkedPulls")}</NativeSelectOption>
+          {repo && !(repositories?.repositories ?? []).some((row) => row.fullName === repo) && (
+            <NativeSelectOption value={repo}>{repo}</NativeSelectOption>
+          )}
+          {(repositories?.repositories ?? []).map((row) => (
+            <NativeSelectOption key={row.fullName} value={row.fullName}>
+              {row.fullName}
+            </NativeSelectOption>
+          ))}
+        </NativeSelect>
+      </div>
       <PullFilterBar
         filters={filters}
         grouping={grouping}
         repo={repo}
-        repositories={repositories?.repositories.map((row) => row.fullName) ?? []}
-        repositoryError={Boolean(repositoryError) || Boolean(repositories && !repositories.connected)}
         authors={[...new Set(rows.flatMap((row) => (row.author ? [row.author] : [])))].sort()}
         labels={[...new Set(rows.flatMap((row) => row.labels))].sort()}
         total={rows.length}
@@ -326,10 +365,8 @@ export function PullDirectory({
         busy={busy}
         searchRef={searchRef}
         onChange={set}
-        onRepo={changeRepo}
         onGrouping={setGrouping}
         onRefresh={() => void refresh()}
-        onRetryRepositories={() => void retryRepositories()}
         views={views}
         onApplyView={(view) => {
           setFilters(view.filters);
@@ -341,15 +378,6 @@ export function PullDirectory({
         onDeleteView={(name) => setViews((previous) => previous.filter((view) => view.name !== name))}
         onSaveView={saveView}
       />
-      <PullFilterChips filters={filters} onChange={set} />
-      {error && (
-        <div role="alert" className="flex items-center gap-2 px-4 py-2 text-xs text-destructive-foreground">
-          {t("loadError")}
-          <Button size="sm" variant="ghost" disabled={busy} onClick={() => void refresh()}>
-            {t("retry")}
-          </Button>
-        </div>
-      )}
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <div
           data-pull-list
@@ -361,6 +389,21 @@ export function PullDirectory({
           )}
         >
           <div className="px-2">
+            {repositoryError || (repositories && !repositories.connected) ? (
+              <PullConnectState
+                error={Boolean(repositoryError)}
+                busy={busy}
+                onRetry={() => void retryRepositories()}
+              />
+            ) : null}
+            {error && (
+              <div role="alert" className="mx-4 mt-6 flex flex-col items-start gap-3 rounded-xl bg-control px-4 py-4">
+                <p className="text-sm text-foreground">{t("loadError")}</p>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void refresh()}>
+                  {t("retry")}
+                </Button>
+              </div>
+            )}
             {!data && !error && (
               <div role="status" aria-label={t("loading")} className="flex flex-col py-1">
                 {[0, 1, 2, 3, 4, 5, 6].map((key) => (

@@ -1,17 +1,16 @@
 "use client";
 
-// The PR directory's detail: what a pull request is, whether it can go in, and
-// what already points at it. The title leads; one line under it carries the
-// derived state, the owner and the age; then the facts as a label/value table
-// so a column of them scans instead of reading as a sentence; then the
-// description and the work it belongs to. Nothing here repeats the list row
-// (decision 2026-11-18-1400).
+// The PR directory's detail. A header that says what this is and gives the one
+// action it has, then two views of the same pull request: 概览 is the facts as
+// a label/value table plus what points at it, 改动 is its size and where its
+// diff is reviewed. Nothing here repeats the row (decision 2026-11-18-1400).
 import { useState } from "react";
 import { Copy, ExternalLink, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { cn } from "cn";
 import { compactAge } from "@/components/nav/compact-age";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PULL_STATE_TONES } from "@/lib/pull-request-appearance";
 import { pullDirectoryState, type PullDirectoryRow, type PullState } from "@/lib/pull-directory";
 import { openGroupConversation, openTask, openThread } from "./workspace-navigation";
@@ -42,6 +41,7 @@ const reviewKeys: Record<ReviewState, `reviewState.${ReviewState}`> = {
   REVIEW_REQUIRED: "reviewState.REVIEW_REQUIRED",
   unknown: "reviewState.unknown",
 };
+
 export function PullPreview({
   row,
   source,
@@ -53,6 +53,7 @@ export function PullPreview({
 }) {
   const t = useTranslations("PullDirectory");
   const age = useTranslations("Nav.age");
+  const [view, setView] = useState("overview");
   const [copied, setCopied] = useState<"copied" | "copyError" | null>(null);
   const [expanded, setExpanded] = useState(false);
   const state = pullDirectoryState(row);
@@ -68,6 +69,7 @@ export function PullPreview({
   ];
   const review = row.reviewDecision;
   const body = row.body?.trim() ?? "";
+  const diff = row.additions !== undefined && row.deletions !== undefined;
 
   async function copy() {
     try {
@@ -80,46 +82,49 @@ export function PullPreview({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <header className="flex h-12 shrink-0 items-center gap-1 pe-2 ps-4">
-        <PullRequestIcon state={row.state} />
-        <bdi className="min-w-0 flex-1 truncate text-xs text-muted-foreground tabular-nums">
-          {row.repo} #{row.number}
-        </bdi>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label={t("copyLink")}
-          title={t("copyLink")}
-          onClick={() => void copy()}
-          className="text-muted-foreground"
-        >
-          <Copy data-icon />
-        </Button>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label={t("openGitHub")}
-          title={t("openGitHub")}
-          nativeButton={false}
-          render={<a href={row.url} target="_blank" rel="noopener noreferrer" />}
-          className="text-muted-foreground"
-        >
-          <ExternalLink data-icon />
-        </Button>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          aria-label={t("closePreview")}
-          title={t("closePreview")}
-          onClick={onClose}
-          className="text-muted-foreground"
-        >
-          <X data-icon />
-        </Button>
-      </header>
-      <div className="min-h-0 flex-1 overflow-auto px-4 pb-6">
+      <header className="flex shrink-0 flex-col gap-1 px-4 pb-2 pt-3">
+        <div className="flex items-center gap-1">
+          <PullRequestIcon state={row.state} />
+          <bdi className="min-w-0 flex-1 truncate text-xs text-muted-foreground tabular-nums">
+            {row.repo} #{row.number}
+          </bdi>
+          {tasks[0] ? (
+            <Button size="sm" variant="secondary" onClick={() => openTask(tasks[0][0])}>
+              {t("openTask")}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="secondary"
+              nativeButton={false}
+              render={<a href={row.url} target="_blank" rel="noopener noreferrer" />}
+            >
+              {t("openGitHub")}
+            </Button>
+          )}
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={t("copyLink")}
+            title={t("copyLink")}
+            onClick={() => void copy()}
+            className="text-muted-foreground"
+          >
+            <Copy data-icon />
+          </Button>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={t("closePreview")}
+            title={t("closePreview")}
+            onClick={onClose}
+            className="text-muted-foreground"
+          >
+            <X data-icon />
+          </Button>
+        </div>
         <h2 className="text-md font-semibold break-words">{title}</h2>
-        <p className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
           <span className={PULL_STATE_TONES[state]}>{t(stateKeys[state])}</span>
           {row.author && (
             <>
@@ -132,112 +137,160 @@ export function PullPreview({
             {compactAge(row.updatedAt, Date.now(), (key, values) => age(key, values))}
           </span>
         </p>
-        {tasks.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {tasks.map(([id, name]) => (
-              <Button
-                key={id}
-                size="sm"
-                variant="secondary"
-                aria-label={t("openTaskNamed", { name })}
-                onClick={() => openTask(id)}
-              >
-                {t("openTask")}
-                <span className="max-w-40 truncate text-muted-foreground">{name}</span>
-              </Button>
-            ))}
-          </div>
-        )}
-        {source ? (
-          <dl className="mt-4 grid grid-cols-[4.5rem_minmax(0,1fr)] items-baseline gap-y-1.5 text-xs">
-            <Fact label={t("checks")}>{t(checkKeys[row.checks ?? "unknown"])}</Fact>
-            <Fact label={t("review")}>
-              {t(
-                reviewKeys[
-                  review === "APPROVED" || review === "CHANGES_REQUESTED" || review === "REVIEW_REQUIRED"
-                    ? review
-                    : "unknown"
-                ],
-              )}
-            </Fact>
-            {row.base && row.head && (
-              <Fact label={t("branch")}>
-                <bdi dir="ltr" className="block break-all font-mono text-xs">
-                  {row.base} ← {row.head}
-                </bdi>
-              </Fact>
-            )}
-            <Fact label={t("updated")}>
-              <time dateTime={row.updatedAt} className="tabular-nums">
-                {new Date(row.updatedAt).toLocaleDateString(undefined, {
-                  month: "short",
-                  day: "numeric",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })}
-              </time>
-            </Fact>
-            {row.labels.length > 0 && (
-              <Fact label={t("label")}>
-                <span className="flex flex-wrap gap-1">
-                  {row.labels.map((label) => (
-                    <span key={label} className="rounded-md bg-control px-1.5 py-0.5 text-xs text-foreground">
-                      {label}
+      </header>
+      <Tabs value={view} onValueChange={(key) => setView(String(key))} className="min-h-0 flex-1 gap-0">
+        <TabsList aria-label={t("preview")}>
+          <TabsTrigger value="overview">{t("overview")}</TabsTrigger>
+          <TabsTrigger value="changes">{t("changes")}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="overview" className="flex min-h-0 flex-col gap-4 overflow-auto px-4 pb-6 pt-3">
+          <dl className="grid grid-cols-[5rem_minmax(0,1fr)] items-baseline gap-y-1.5 text-xs">
+            {source && (
+              <>
+                <Fact label={t("checks")}>{t(checkKeys[row.checks ?? "unknown"])}</Fact>
+                <Fact label={t("review")}>
+                  {t(
+                    reviewKeys[
+                      review === "APPROVED" || review === "CHANGES_REQUESTED" || review === "REVIEW_REQUIRED"
+                        ? review
+                        : "unknown"
+                    ],
+                  )}
+                </Fact>
+                <Fact label={t("branch")}>
+                  {row.base && row.head ? (
+                    <bdi dir="ltr" className="block break-all font-mono text-xs">
+                      {row.base} ← {row.head}
+                    </bdi>
+                  ) : (
+                    t("notReported")
+                  )}
+                </Fact>
+                <Fact label={t("label")}>
+                  {row.labels.length > 0 ? (
+                    <span className="flex flex-wrap gap-1">
+                      {row.labels.map((label) => (
+                        <span key={label} className="rounded-md bg-control px-1.5 py-0.5 text-xs text-foreground">
+                          {label}
+                        </span>
+                      ))}
                     </span>
+                  ) : (
+                    t("none")
+                  )}
+                </Fact>
+                <Fact label={t("updated")}>
+                  <time dateTime={row.updatedAt} className="tabular-nums">
+                    {new Date(row.updatedAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </time>
+                </Fact>
+              </>
+            )}
+            <Fact label={t("tasks")}>
+              {tasks.length > 0 ? (
+                <span className="flex flex-col items-start gap-0.5">
+                  {tasks.map(([id, name]) => (
+                    <Button
+                      key={id}
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto -ms-1.5 px-1.5 py-0.5 text-xs font-normal"
+                      aria-label={t("openTaskNamed", { name })}
+                      onClick={() => openTask(id)}
+                    >
+                      {name}
+                    </Button>
                   ))}
                 </span>
-              </Fact>
-            )}
+              ) : (
+                t("none")
+              )}
+            </Fact>
+            <Fact label={t("threads")}>
+              {row.threads.length > 0 ? (
+                <span className="flex flex-col items-start gap-0.5">
+                  {row.threads.map((thread) => (
+                    <Button
+                      key={thread.kind + thread.id}
+                      variant="ghost"
+                      size="sm"
+                      className="h-auto -ms-1.5 max-w-full justify-start px-1.5 py-0.5 text-xs font-normal"
+                      onClick={() =>
+                        thread.kind === "chat" ? openGroupConversation(thread.id) : openThread(thread.id)
+                      }
+                    >
+                      <span className="min-w-0 truncate">{thread.title}</span>
+                    </Button>
+                  ))}
+                </span>
+              ) : (
+                t("none")
+              )}
+            </Fact>
           </dl>
-        ) : (
-          <p className="mt-4 text-xs text-muted-foreground">{t("linkedSnapshot")}</p>
-        )}
-        {body && (
-          <section aria-label={t("description")} className="mt-5">
-            <h3 className="sr-only">{t("description")}</h3>
-            <p className={cn("whitespace-pre-wrap break-words text-sm", !expanded && "line-clamp-6")}>{body}</p>
-            {body.length > 280 && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="mt-1 -ms-2 text-muted-foreground"
-                onClick={() => setExpanded(!expanded)}
-              >
-                {expanded ? t("showLess") : t("showMore")}
-              </Button>
-            )}
-          </section>
-        )}
-        {row.threads.length > 0 && (
-          <section aria-label={t("threads")} className="mt-5">
-            <h3 className="text-xs font-medium text-muted-foreground">{t("threads")}</h3>
-            <ul className="mt-1 flex flex-col">
-              {row.threads.map((thread) => (
-                <li key={thread.kind + thread.id}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto w-full justify-start px-0 py-1 text-start text-sm font-normal"
-                    onClick={() =>
-                      thread.kind === "chat" ? openGroupConversation(thread.id) : openThread(thread.id)
-                    }
-                  >
-                    <span className="min-w-0 truncate">{thread.title}</span>
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-        {copied && (
-          <p
-            role={copied === "copyError" ? "alert" : "status"}
-            className={cn("mt-3 text-xs", copied === "copyError" ? "text-destructive-foreground" : "text-muted-foreground")}
+          {!source && <p className="text-xs text-muted-foreground">{t("linkedSnapshot")}</p>}
+          {body && (
+            <section aria-label={t("description")} className="flex flex-col gap-1">
+              <h3 className="text-xs font-medium text-muted-foreground">{t("description")}</h3>
+              <p className={cn("whitespace-pre-wrap break-words text-sm", !expanded && "line-clamp-8")}>{body}</p>
+              {body.length > 340 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="-ms-2 self-start text-muted-foreground"
+                  onClick={() => setExpanded(!expanded)}
+                >
+                  {expanded ? t("showLess") : t("showMore")}
+                </Button>
+              )}
+            </section>
+          )}
+          {copied && (
+            <p
+              role={copied === "copyError" ? "alert" : "status"}
+              className={cn("text-xs", copied === "copyError" ? "text-destructive-foreground" : "text-muted-foreground")}
+            >
+              {t(copied)}
+            </p>
+          )}
+        </TabsContent>
+        <TabsContent value="changes" className="flex min-h-0 flex-col gap-3 overflow-auto px-4 pb-6 pt-3">
+          <dl className="grid grid-cols-[5rem_minmax(0,1fr)] items-baseline gap-y-1.5 text-xs">
+            <Fact label={t("diffSize")}>
+              {diff ? (
+                <bdi className="tabular-nums">
+                  <span className="text-github-pr-open">+{row.additions}</span>{" "}
+                  <span className="text-github-pr-closed">−{row.deletions}</span>
+                </bdi>
+              ) : (
+                t("notReported")
+              )}
+            </Fact>
+          </dl>
+          {tasks[0] ? (
+            <Button size="sm" variant="secondary" className="self-start" onClick={() => openTask(tasks[0][0])}>
+              {t("openReview")}
+            </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground">{t("noLinkedTask")}</p>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="-ms-2 self-start text-muted-foreground"
+            nativeButton={false}
+            render={<a href={`${row.url}/files`} target="_blank" rel="noopener noreferrer" />}
           >
-            {t(copied)}
-          </p>
-        )}
-      </div>
+            <ExternalLink data-icon />
+            {t("openGitHub")}
+          </Button>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

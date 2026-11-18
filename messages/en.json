@@ -8352,6 +8352,16 @@
     }
   },
   "PullDirectory": {
+    "overview": "Overview",
+    "changes": "Changes",
+    "none": "None",
+    "notReported": "Not reported",
+    "tasks": "Tasks",
+    "diffSize": "Diff",
+    "openReview": "Open review",
+    "noLinkedTask": "No linked task.",
+    "moreActions": "More",
+    "readingViews": "Views",
     "countAll": "{count} total",
     "countShown": "{shown} of {count}",
     "filter": "Filter",

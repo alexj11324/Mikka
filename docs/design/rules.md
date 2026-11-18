@@ -724,11 +724,14 @@ library's shipped look ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-
   actions, branch names, counts and shortcut hints go into 「⋯」 or a
   tooltip, not a row of their own (Alex, 2026-11-08; [2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)).
 - **R-92** Lists have three sanctioned densities and nothing in between: a
-  two-line entry is 50px (13/20 Medium title over a 12/18 quiet line), a
-  single-line entry is 40px, a group header is 32px. A skeleton is drawn at the
-  height of the row it replaces, so the list does not move when data lands. An
-  entry's information set never depends on the window width: the priority order
-  is fixed and only the text truncates.
+  one-line entry is 40px, a two-line entry is 50px (13/20 Medium title over a
+  12/18 quiet line), a group header is 32px. A skeleton is drawn at the height
+  of the row it replaces, so the list does not move when data lands. An entry's
+  own information set never depends on the window width: the priority order is
+  fixed and only the text truncates. Where Alex has named a surface to be
+  arranged as Capy's is, that arrangement wins over the shape below and the
+  tokens, type and colour stay ours: the PR list carries repository, number,
+  title, diff size, age and state on one line (Alex, 2026-11-18).
 - **R-93** An entry's own actions are disclosed, not permanent: they hold a
   reserved slot at the row's end, start at `opacity-0`, and appear on
   `group/row` hover or keyboard focus; a coarse pointer shows them always. The

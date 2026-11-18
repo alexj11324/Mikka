@@ -8352,6 +8352,16 @@
     }
   },
   "PullDirectory": {
+    "overview": "概览",
+    "changes": "改动",
+    "none": "无",
+    "notReported": "未报告",
+    "tasks": "任务",
+    "diffSize": "改动量",
+    "openReview": "打开审阅",
+    "noLinkedTask": "没有关联的任务。",
+    "moreActions": "更多",
+    "readingViews": "视图",
     "countAll": "共 {count} 个",
     "countShown": "{shown} / {count}",
     "filter": "筛选",
