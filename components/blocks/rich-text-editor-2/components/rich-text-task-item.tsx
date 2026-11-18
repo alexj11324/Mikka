@@ -8,7 +8,7 @@ import {
 } from "@tiptap/react"
 
 import { Checkbox } from "@/components/ui/checkbox"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 function TaskItemView({ node, editor, updateAttributes }: ReactNodeViewProps) {
   const t = useTranslations('Editor.richText')

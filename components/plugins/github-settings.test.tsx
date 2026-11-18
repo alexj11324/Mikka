@@ -8,7 +8,7 @@ import { Window } from 'happy-dom'
 // browser, so the page re-reads on each return until it is linked, and says when
 // the browser is signed in as another account than the app.
 const t = (key: string, args?: Record<string, string>) => args ? `${key} ${JSON.stringify(args)}` : key
-mock.module('next-intl', { namedExports: { useTranslations: () => t } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => t } })
 mock.module('sonner', { namedExports: { toast: { success: () => undefined } } })
 const signOut = mock.fn(async () => undefined)
 mock.module('@/lib/auth-client', { namedExports: { authClient: { useSession: () => ({ data: { user: { id: 'app-user', email: 'alex@acme.test' } }, isPending: false }), signOut }, endSession: signOut } })

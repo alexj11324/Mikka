@@ -7,7 +7,7 @@ import type { BoardTask } from './data'
 
 // Board copy is not under test here: every string reads as its key.
 const translate = Object.assign((key: string, args?: { status?: string }) => args?.status ? `${key}:${args.status}` : key, { has: () => false })
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => '' }), useNow: () => new Date(0) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => '' }), useNow: () => new Date(0) } })
 
 mock.module('@/components/workspace/issue-metadata-controls', { namedExports: { IssueMetadataControls: () => null, LabelDot: () => null } })
 let TaskContextMenu: typeof import('./kanban-board')['TaskContextMenu']

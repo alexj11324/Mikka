@@ -2,7 +2,7 @@
 
 import { Skeleton } from '@/components/ui/skeleton'
 import { ChevronRight, Hash, Laptop, Server } from 'lucide-react'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'

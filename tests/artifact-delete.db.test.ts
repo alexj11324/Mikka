@@ -24,7 +24,7 @@ mock.module(new URL('../lib/artifacts/storage.ts', import.meta.url).href, { name
   deleteArtifactObject: async (key: string) => { if (failRemoval) throw new Error('storage down'); removed.push(key) },
 } })
 
-mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 
 test('only the owner deletes an artifact; anything else is 404', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')

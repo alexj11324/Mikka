@@ -22,7 +22,7 @@ test('issue members and relations keys reach only the task audience, after the a
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
   const nextServer = await import('next/server')
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
   mock.module('next/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
   // The same writers refresh lists and documents; lists.db.test.ts and panels.db.test.ts cover those keys.
   for (const file of ['./lists.ts']) {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type FormEvent } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { Ellipsis, EyeIcon, EyeOffIcon, LockIcon, Plus } from 'lucide-react'
 import type { SavedLogin } from '@/lib/settings/saved-logins'
 import { useSavedLoginEditor, useSavedLoginUsage, useSavedLogins, withoutScheme } from '@/hooks/settings/use-secrets'

@@ -7,7 +7,7 @@ import type { BotModelMenu } from '../../lib/bot-model-menu-view'
 let data: BotModelMenu
 const cache = new Map()
 mock.module('swr', { namedExports: { useSWRConfig: () => ({ cache }) }, defaultExport: () => ({ data, mutate: async () => {} }) })
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string, args?: Record<string, string>) => args?.name ? `${key}: ${args.name}` : key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string, args?: Record<string, string>) => args?.name ? `${key}: ${args.name}` : key } })
 mock.module(new URL('../../app/actions/execution-settings.ts', import.meta.url).href, { namedExports: {
   getBotModelMenu: async () => data, chooseBotModel: async () => data, refreshBotModelMenuAction: async () => data,
 } })

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import type { LucideIcon, LucideProps } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Check } from 'lucide-react'
 import { BadgeButton } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'

@@ -9,7 +9,7 @@ if(process.env.REQUIRE_DB==='1'&&!valid)throw new Error('Eve default scope tests
 test('native default Bot uses the authenticated active Workspace and rejects supplied invalid selectors',{skip:!valid},async t=>{
   const aliases=[
     mock.module('next/headers',{namedExports:await import('../../apps/api/compat/headers')}),
-    mock.module('next-intl/server',{namedExports:await import('../../apps/api/compat/intl')}),
+    mock.module('@/lib/intl/i18n-server',{namedExports:await import('../../apps/api/compat/intl')}),
   ]
   const {pool}=await import('../db')
   const {resolveEveRequestBot}=await import('./auth-bot')

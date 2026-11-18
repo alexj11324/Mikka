@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useViewState } from '@/lib/hooks/view-state'
 import useSWR, { useSWRConfig } from 'swr'
 import useSWRInfinite from 'swr/infinite'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { goToHref } from '@/components/workspace/workspace-navigation'
 import { withBasePath } from '@/lib/base-path'

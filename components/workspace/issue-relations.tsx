@@ -3,7 +3,7 @@
 import { isTaskPresentationKey, issueKeys } from '@/lib/swr/keys'
 import { useRef, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronDown, ChevronRight, Circle, Flag, GitBranch, Link2, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { listIssueConnections, updateIssueRelation } from '@/app/actions/issue-operations'

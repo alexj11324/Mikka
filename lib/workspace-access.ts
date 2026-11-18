@@ -1,5 +1,5 @@
 import { tokenWorkspace } from '@/lib/tokens/principal'
-import { getLocale } from 'next-intl/server'
+import { getLocale } from '@/lib/intl/i18n-server'
 import 'server-only'
 import { cookies } from 'next/headers'
 import { and, asc, eq, inArray, or } from 'drizzle-orm'

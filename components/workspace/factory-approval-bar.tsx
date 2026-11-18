@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Ban, Check, CircleCheck, CircleX, Clock, ExternalLink, GitMerge, RefreshCw, Server, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

@@ -2,7 +2,7 @@
 
 import { useDecisionSubmission } from '@/hooks/use-decision-submission'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { createContext, use, useState, type ReactElement, type ReactNode } from 'react'
 import { Check, ChevronRight, ExternalLink } from 'lucide-react'
 import { GITHUB_APP_INSTALL_URL } from '@/lib/github/repository-match'

@@ -1,5 +1,5 @@
 import { forwardRef, useMemo } from 'react'
-import { useLocale } from 'next-intl'
+import { useLocale } from '@/lib/intl/i18n-client'
 import { BASE_PATH } from '@/lib/base-path'
 import { routing } from '@/i18n/routing'
 import NextLink, { type LinkProps } from './next-link'

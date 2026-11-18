@@ -61,7 +61,7 @@ test('Task review reads preserve exact source, tenancy and accepted comments on 
     mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
       get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {},
     }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en',
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const { resolveRunWorktree } = await import('../identity')
     const { resolveReviewScope, withReviewTransaction } = await import('../diff/authority')

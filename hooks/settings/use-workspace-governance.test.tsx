@@ -13,7 +13,7 @@ let liveKeys: string[] = []
 const membersRead = { currentUserId: ownerId, workspace: { id: workspaceId, name: 'Fixture' }, live: { ownerId, homeWorkspaceId: null } }
 
 mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams('') } })
-mock.module('next-intl', { namedExports: { useTranslations: () => Object.assign((key: string) => key, { has: () => false }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => Object.assign((key: string) => key, { has: () => false }) } })
 mock.module('@/hooks/use-live-key', { namedExports: { useLiveKeys: (_entities: unknown, keys: string[]) => { liveKeys = keys } } })
 mock.module('@/lib/settings-prefetch', { namedExports: { prefetchConnectedApps: () => () => {} } })
 

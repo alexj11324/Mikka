@@ -5,7 +5,7 @@ import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 
 const box = ({ children }: { children?: ReactNode }) => <>{children}</>
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string) => key } })
 mock.module('@/components/ui/input-group', { namedExports: { InputGroup: box, InputGroupAddon: box, InputGroupButton: box, InputGroupTextarea: box } })
 mock.module('@/components/ui/tooltip', { namedExports: {
   Tooltip: box,

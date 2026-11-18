@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import useSWR from 'swr'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { authClient } from '@/lib/auth-client'
 import { getPathname } from '@/i18n/navigation'
 import { withBasePath } from '@/lib/base-path'

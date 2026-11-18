@@ -6,7 +6,7 @@ import { Window } from 'happy-dom'
 import { Button } from '../ui/button'
 
 let opened: string | null | undefined
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: ({ href, children }: { href: string; children: ReactNode }) => <a href={href}>{children}</a> } })
 mock.module(new URL('./bot-model-picker.tsx', import.meta.url).href, { namedExports: { openModelPicker: (botId: string | null) => { opened = botId } } })
 const browser = new Window({ url: 'https://fixture.example/mikka' })

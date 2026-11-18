@@ -43,7 +43,7 @@ test('registered Project RPC reads and writes stay inside a native human session
   // Workspace selection, resource ACLs and both PostgreSQL pools remain real.
   const framework = [
     mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') }),
-    mock.module('next-intl/server', { namedExports: await import('../apps/api/compat/intl') }),
+    mock.module('@/lib/intl/i18n-server', { namedExports: await import('../apps/api/compat/intl') }),
   ]
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')

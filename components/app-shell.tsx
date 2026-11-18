@@ -1,6 +1,6 @@
 'use client'
 import { useViewScroll } from '@/lib/hooks/view-state'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { cn } from '@/lib/utils'

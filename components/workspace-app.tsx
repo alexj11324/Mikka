@@ -1,5 +1,5 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'

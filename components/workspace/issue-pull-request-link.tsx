@@ -2,7 +2,7 @@
 
 import useSWR, { unstable_serialize } from 'swr'
 import { useState, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 import { withBasePath } from '@/lib/base-path'

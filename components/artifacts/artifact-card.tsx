@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { AppWindow, ChevronRight, FileText, type LucideProps } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
 import { HarnessMark } from '@/components/labels/entity-labels'

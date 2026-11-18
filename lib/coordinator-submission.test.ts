@@ -759,7 +759,7 @@ test('the composer carries its captured Workspace expectation through the native
   const client = mock.module(new URL('./auth-client.ts', import.meta.url).href, { namedExports: {
     authClient: { getSession: async () => ({ data: { user: { id: 'owner' } }, error: null }) },
   } })
-  const translations = mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+  const translations = mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string) => key } })
   try {
     const { useCoordinatorSubmit } = await import('../components/coordinator/use-coordinator-submit')
     const held: { composer?: ReturnType<typeof useCoordinatorSubmit> } = {}

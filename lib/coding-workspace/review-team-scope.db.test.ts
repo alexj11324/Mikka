@@ -36,7 +36,7 @@ test('review capabilities follow real team relation changes and their transactio
   // Framework translation and audit request metadata are outside this SQL
   // regression. Session rows, membership, issue access, action authorization
   // and transactions are real; actAs uses the existing verified-actor path.
-  t.mock.module('next-intl/server', { namedExports: { getTranslations: async () => Object.assign((key: string) => key, { has: () => false }), getLocale: async () => 'en' } })
+  t.mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => Object.assign((key: string) => key, { has: () => false }), getLocale: async () => 'en' } })
   t.mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, set() {}, delete() {} }) } })
   const { resolveTaskReviewAuthority: resolve, ReviewAuthorityError } = await import('./review-authority')
   const { beginReviewSession, readReviewSession, closeReviewSession, drainRevokedReviewSessions, reviewSessionTransport } = await import('./review-sessions')

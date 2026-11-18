@@ -78,7 +78,7 @@ test('Task review send composes real transactional deliveries on PostgreSQL 17',
     mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
       get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {},
     }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en',
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     mock.module(new URL('../../github/user-access.ts', import.meta.url).href, { namedExports: {
       GitHubAccessError,

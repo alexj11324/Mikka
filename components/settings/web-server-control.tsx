@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useSyncExternalStore } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ServerChooser } from '@/components/desktop/desktop-server'
 import { Button } from '@/components/ui/button'
 import { FieldError } from '@/components/ui/field'

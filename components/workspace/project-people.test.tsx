@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import messages from '../../messages/en.json'
 import { DEFAULT_PROJECT_PROPERTIES } from '@/lib/project-input'
 import type { Project, ProjectControlField } from './project-properties'

@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment } from 'react'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { cn } from 'cn'
 import { PersonAvatar } from '@/components/person-avatar'
 import { Button } from '@/components/ui/button'

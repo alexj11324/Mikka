@@ -60,7 +60,7 @@ test('retained Diff snapshots, review authority and deletion on PostgreSQL 17', 
     const next = await import('next/server')
     mock.module('next/server', { namedExports: { ...next, after() {} } })
     mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const { resolveRunWorktree } = await import('../identity')
     const { resolveReviewScope, withReviewTransaction } = await import('./authority')
     const { manifestRevision, retainDiffSnapshot, readDiffSnapshot, latestDiffSnapshot, readDiffFilePage, readStoredDiffFile, retainDiffFilePatch } = await import('./store')

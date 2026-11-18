@@ -1,7 +1,7 @@
 'use client'
 
 import { Cloud, Laptop, Server } from 'lucide-react'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { harnessName } from '@/components/labels/entity-labels'
 import type { OrderView } from '@/lib/model-order'
 import { DEVICE_STAGES, type DeviceStage } from '@/lib/model-order-plan'

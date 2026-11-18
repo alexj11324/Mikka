@@ -32,7 +32,7 @@ mock.module('sonner', { namedExports: { toast: {
   error(message: string, options?: typeof removalNotice) { errors.push(message); removalNotice = options },
   dismiss() { removalNotice = undefined },
 } } })
-mock.module('next-intl', {
+mock.module('@/lib/intl/i18n-client', {
   namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` },
 })
 

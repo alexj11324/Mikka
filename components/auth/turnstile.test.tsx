@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-mock.module('next-intl', { namedExports: { useLocale: () => 'zh-CN' } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'zh-CN' } })
 mock.module('next/script', { defaultExport: ({ src }: { src: string }) => <script data-src={src} /> })
 
 let Turnstile: typeof import('./turnstile')['Turnstile']

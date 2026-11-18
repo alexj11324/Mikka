@@ -2,7 +2,7 @@
 
 import { createContext, memo, useCallback, useContext, useMemo, useState, type ComponentType } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import {
   BellRing, BookOpen, Brain, CalendarDays, ChevronsDownUp, ChevronsUpDown, CircleStop, Factory, FolderGit2, Power, FolderOpen, Globe, ListChecks,
   Mail, MessageSquare, MessageSquareText, Pencil, Search, Send, SquarePlus, Wrench,

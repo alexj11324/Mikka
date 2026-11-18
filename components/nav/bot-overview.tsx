@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR from 'swr'
 import { toast } from 'sonner'
 import type { listIssues } from '@/app/actions/issues'

@@ -11,7 +11,7 @@ test('Telegram settings withdraw unavailable status and retry the original accou
     if (++attempts === 1) throw new Error('status unavailable')
     return { configured: true, connected: true, telegramUserName: 'accepted', linkedAt: null }
   })
-  mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+  mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string) => key } })
   mock.module('@/app/actions/telegram', { namedExports: {
     getTelegramIntegrationStatus: read, createTelegramConnectLink: mock.fn(), disconnectTelegram: mock.fn(),
   } })

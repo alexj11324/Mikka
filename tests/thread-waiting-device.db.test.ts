@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 import { dbUrl, seedAgent, seedRun, seedUser } from './support/workspace-admin-db'
 
-mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 
 test('thread waiting device uses the same private queue projection as visibleRuns', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')

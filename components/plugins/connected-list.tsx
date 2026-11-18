@@ -1,7 +1,7 @@
 'use client'
 
 import type { SWRResponse } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Puzzle } from 'lucide-react'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { Link } from '@/i18n/navigation'

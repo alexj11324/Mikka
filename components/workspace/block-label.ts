@@ -1,4 +1,4 @@
-import type { useTranslations } from 'next-intl'
+import type { useTranslations } from '@/lib/intl/i18n-client'
 import type { TaskBlock } from '@/lib/task-blocked'
 
 /** How a card or a list row names why a task is 受阻 (`Shell.board.card.block.*`). */

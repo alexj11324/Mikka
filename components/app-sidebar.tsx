@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { listTeams } from '@/app/actions/teams'
 import { Box, ChevronDown, CircleHelp, Ellipsis, House, Inbox, Layers, Puzzle, Scan, Search, Send, SquarePen, SquareUserRound, Workflow } from 'lucide-react'
 import { WorkspaceMenu } from '@/components/workspace-menu'

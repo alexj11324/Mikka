@@ -1,5 +1,5 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { Inbox, Star, Bell } from 'lucide-react'
 import useSWR, { unstable_serialize } from 'swr'

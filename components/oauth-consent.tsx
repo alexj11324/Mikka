@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { createAuthClient } from 'better-auth/react'
 import { oauthProviderClient } from '@better-auth/oauth-provider/client'
 import { Loader2Icon } from 'lucide-react'

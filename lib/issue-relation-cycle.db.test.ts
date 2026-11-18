@@ -8,7 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { mock, test } from 'node:test'
 
 mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false }) } })
-mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 import { isE2eTarget } from '../tests/helpers/e2e-target.mjs'
 
 let hasDb = false

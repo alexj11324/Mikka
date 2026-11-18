@@ -1,7 +1,7 @@
 import { useCallback } from "react"
 import { TableKit } from "@tiptap/extension-table"
 import { findParentNodeClosestToPos, type Editor } from "@tiptap/react"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 import { BubbleMenu } from "@tiptap/react/menus"
 import { cn } from "cn"
 

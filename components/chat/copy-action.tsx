@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Check, Copy } from 'lucide-react'
 import { MessageAction } from '@/components/ai-elements/message'
 

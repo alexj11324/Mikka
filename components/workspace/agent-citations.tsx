@@ -4,7 +4,7 @@ import { createContext, useContext, useState, type ComponentProps, type ReactNod
 import useSWR from 'swr'
 import { Globe } from 'lucide-react'
 import { GitHubIcon } from '@/components/icons/brand-icons'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { getLinkPreview } from '@/app/actions/link-preview'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName, runTitle } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'

@@ -67,7 +67,7 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
     mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
       get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {},
     }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en',
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const userToken = mock.fn(async (userId: string, options: { minValidityMs?: number; budget?: RequestBudget } = {}) => {
       const value = tokens.get(userId)

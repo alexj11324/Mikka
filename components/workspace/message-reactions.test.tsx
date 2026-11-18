@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { before, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { IntlProvider } from 'next-intl'
+import { IntlProvider } from '@/lib/intl/i18n-client'
 
 const messages = JSON.parse(readFileSync(new URL('../../messages/en.json', import.meta.url), 'utf8'))
 mock.module('swr', { defaultExport: () => ({ data: undefined }) })

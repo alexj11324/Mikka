@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { setProjectIssues } from '@/app/actions/projects'
 import type { listIssues } from '@/app/actions/issues'
 import { useActionError } from '@/lib/use-action-error'

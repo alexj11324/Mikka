@@ -56,7 +56,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   // The ordinary API framework adapters supply request-local headers, cookies,
   // translations and after-work. Authentication and authorization stay real.
   mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') })
-  mock.module('next-intl/server', { namedExports: await import('../apps/api/compat/intl') })
+  mock.module('@/lib/intl/i18n-server', { namedExports: await import('../apps/api/compat/intl') })
   mock.module('next/server', { namedExports: await import('../apps/api/compat/server') })
   const { auth } = await import('../lib/auth')
   const { GET } = await import('../app/api/mobile/tasks/[id]/route')

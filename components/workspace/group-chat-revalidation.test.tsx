@@ -21,7 +21,7 @@ let currentRole: 'owner' | 'member' = 'owner'
 let leaveStatus = 200
 let leftId = ''
 let namedRevision: number | undefined
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ AgentCopy: {} }), useFormatter: () => ({}) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate, useMessages: () => ({ AgentCopy: {} }), useFormatter: () => ({}) } })
 mock.module('@/lib/group-messages', { namedExports: { ...groupMessages, leaveGroupConversation: async (id: string, self: string) => {
   assert.equal(id, 'group-one'); assert.equal(self, 'owner')
   if (leaveStatus !== 200) throw new groupMessages.GroupMessagesRequestError('unavailable', leaveStatus)

@@ -39,7 +39,7 @@ test('API requests stay in their effective workspace on thread, evidence, propos
   let activeWorkspaceId: string | undefined = ws.id
   mock.module('next/headers', { namedExports: { headers: async () => currentHeaders,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' && activeWorkspaceId ? { value: activeWorkspaceId } : undefined }) } })
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
   // A browser session (no bearer token) is the owner's cookie session when `browser` is set.
   let browser = false
   const ownerName = 'pat-scope-owner'

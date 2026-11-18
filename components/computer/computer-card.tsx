@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Cloud, Monitor, ShieldCheck } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useComputer } from '@/hooks/use-computer'

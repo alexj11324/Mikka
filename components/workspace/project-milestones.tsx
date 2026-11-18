@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Flag, Plus, Trash2, ChevronDown } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { ProjectDraft } from '@/lib/project-input'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

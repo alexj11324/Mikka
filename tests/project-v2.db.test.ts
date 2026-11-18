@@ -56,8 +56,8 @@ test('Project v2: split database migration, canonical relationships and live ten
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }),
     headers: async () => new Headers(),
   } })
-  const localization = await import('next-intl/server')
-  const localeMock = mock.module('next-intl/server', { namedExports: { ...localization, getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
+  const localization = await import('@/lib/intl/i18n-server')
+  const localeMock = mock.module('@/lib/intl/i18n-server', { namedExports: { ...localization, getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     const names = orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))

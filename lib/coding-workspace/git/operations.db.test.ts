@@ -55,7 +55,7 @@ test('Git status, history, safe revert, Undo and checkpoint restore on PostgreSQ
     mock.module('next/server', { namedExports: { ...next, after() {} } })
     mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
       get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en',
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const gateway = await import('../../device-gateway-notify')
     mock.module('../../device-gateway-notify', { namedExports: { ...gateway, wakeDeviceWorkNow: async () => {} } })

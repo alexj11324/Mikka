@@ -1,7 +1,7 @@
 'use client'
 
 import { useViewState } from '@/lib/hooks/view-state'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronRight } from 'lucide-react'
 import { threadStepCounts, type ThreadStep } from '@/lib/issue-run-conversation'
 import { Button } from '@/components/ui/button'

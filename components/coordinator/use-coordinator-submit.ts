@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useRef } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { UseEveAgentReturn } from 'eve/react'
 import type { SendTurnOptions } from 'eve/client'
 import { acceptTaskDelivery } from '@/lib/task-create-form'

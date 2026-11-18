@@ -2,7 +2,7 @@
 
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
 import Script from 'next/script'
-import { useLocale } from 'next-intl'
+import { useLocale } from '@/lib/intl/i18n-client'
 
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit'
 

@@ -22,7 +22,7 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
     headers: async () => currentHeaders,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' ? { value: browserWorkspaceId } : undefined }),
   } })
-  mock.module('next-intl/server', { namedExports: {
+  mock.module('@/lib/intl/i18n-server', { namedExports: {
     getLocale: async () => 'en',
     getTranslations: async () => Object.assign((code: string) => code, { has: () => true }),
   } })

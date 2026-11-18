@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
 import { useSearchParams } from 'next/navigation'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronRight, ClipboardList, FileText, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { listRunArtifacts } from '@/app/actions/artifacts'

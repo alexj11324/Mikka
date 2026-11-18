@@ -8,7 +8,7 @@ import { Window } from 'happy-dom'
 // A thread that works on no task opens like any other, from its chat card and
 // from the thread list (Bot 资料 › 线程): the whole card is one button.
 const t = Object.assign((key: string) => key, { rich: (key: string) => key, has: () => true })
-mock.module('next-intl', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: {
   useTranslations: () => t,
   useFormatter: () => ({ relativeTime: () => 'just now', dateTime: () => 'today' }),
   useNow: () => new Date('2026-11-01T12:00:00Z'),

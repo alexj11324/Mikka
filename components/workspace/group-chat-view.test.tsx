@@ -12,7 +12,7 @@ let pages: GroupMessagePage[] = []
 let hasMemberPage = true
 let groupMembers: GroupMember[] = []
 let membersError: Error | undefined
-mock.module('next-intl', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: {
   useTranslations: () => (key: string) => key,
   useMessages: () => ({ AgentCopy: {} }),
   useFormatter: () => ({}),

@@ -2,7 +2,7 @@
 
 import { Fragment, useState, type MouseEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronDown, Ellipsis, Pin, Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { organizeAutomation, pinAutomation, restoreAutomation } from '@/app/actions/automations'

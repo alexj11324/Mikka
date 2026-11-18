@@ -1,7 +1,7 @@
 'use client'
 
 import { ListTodo, Plus } from 'lucide-react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { cn } from '@/lib/utils'
 import type { listIssues } from '@/app/actions/issues'
 import { Button } from '@/components/ui/button'

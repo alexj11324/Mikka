@@ -46,7 +46,7 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
     const next = await import('next/server')
     mock.module('next/server', { namedExports: { ...next, after() {} } })
     mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
     // Only external gateway delivery is replaced. SQL, LISTEN/NOTIFY, source
     // authority, secret masking and the daemon filesystem handler stay real.
     const wakes: string[] = [], wakeBarriers = new Map<string, Promise<void>>()

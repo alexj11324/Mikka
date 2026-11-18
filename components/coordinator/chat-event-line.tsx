@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { AgentCitationsContext, CitationChip, type AgentCitations } from '@/components/workspace/agent-citations'
 import type { EventLine } from '@/lib/coordinator/event-line'
 

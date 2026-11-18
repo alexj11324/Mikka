@@ -11,7 +11,7 @@ test('one person saves an environment, selects it for a Project and queues a Run
   process.env.MIKKA_BYOS_ENABLED = '1'
   t.after(() => { if (previousByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = previousByos })
   const headers = mock.module('next/headers', { namedExports: { cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() } })
-  const locale = mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
+  const locale = mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
   t.after(() => { headers.restore(); locale.restore() })
   const fixture = new Pool({ connectionString: dbUrl })
   const { pool } = await import('../lib/db')

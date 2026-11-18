@@ -11,7 +11,7 @@ const translator = (namespace: string) => (key: string, args?: Record<string, st
   assert.equal(typeof value, 'string', `missing ${namespace}.${key}`)
   return (value as string).replace(/\{(\w+)\}/g, (_, name) => String(args?.[name] ?? ''))
 }
-mock.module('next-intl', { namedExports: { useTranslations: translator, useFormatter: () => ({ dateTime: () => 'date' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: translator, useFormatter: () => ({ dateTime: () => 'date' }) } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => () => '读取失败' } })
 type ReadState = { data?: unknown; error?: Error; isLoading?: boolean }
 let designation: ReadState, share: ReadState, links: ReadState, preferences: ReadState

@@ -28,7 +28,7 @@ mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { name
   sendDeviceCommand: async (value: unknown) => { writes.push(value); return { id: 'command' } },
 } })
 mock.module('sonner', { namedExports: { toast: { success: (v: string) => successes.push(v), error: (v: string) => errors.push(v) } } })
-mock.module('next-intl', { namedExports: { useTranslations: () => Object.assign((key: string) => key, { has: () => true }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => Object.assign((key: string) => key, { has: () => true }) } })
 
 mock.module('@/hooks/use-live-key', { namedExports: { useLiveKey: () => {} } })
 mock.module(new URL('../slots/settings-devices.tsx', import.meta.url).href, { namedExports: {

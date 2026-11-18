@@ -6,7 +6,7 @@ import { cn } from "cn"
 
 import { Button } from '@/components/ui/button'
 import { XIcon } from "lucide-react"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />

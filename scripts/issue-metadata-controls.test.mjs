@@ -15,7 +15,7 @@ let latest, readResult, writes, changes, move
 const translate = Object.assign(key => key, { has: () => true })
 const stub = (path, namedExports) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
 const children = ({ children }) => children
-mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate } })
 mock.module('swr', { defaultExport: () => ({}) })
 stub('app/actions/issues.ts', { pollIssue: async () => readResult ?? { issue: latest } })
 stub('app/actions/projects.ts', { moveIssueToProject: input => move(input) })

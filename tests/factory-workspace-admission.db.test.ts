@@ -66,8 +66,8 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
   } })
   const next = await import('next/server')
   mock.module('next/server', { namedExports: { ...next, after: (work: () => unknown) => context.requireRequestScope().after.add(work) } })
-  const locale = await import('next-intl/server')
-  mock.module('next-intl/server', { namedExports: { ...locale, getLocale: async () => 'en',
+  const locale = await import('@/lib/intl/i18n-server')
+  mock.module('@/lib/intl/i18n-server', { namedExports: { ...locale, getLocale: async () => 'en',
     getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   // Only the external GitHub wire and background consumer are fixtures.
   // Native authentication, SQL, queue admission, Profile and COMMIT are real.

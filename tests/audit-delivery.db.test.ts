@@ -63,7 +63,7 @@ test('workspace mutations retain and idempotently deliver audit intent across tw
   const translate = Object.assign((key: string) => key, { has: () => true })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => user } })
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set() {}, delete() {} }) } })
-  mock.module('next-intl/server', { namedExports: { getTranslations: async () => translate, getLocale: async () => 'en' } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => translate, getLocale: async () => 'en' } })
   await prepareWorkspace(workspace)
   const [{ deliverWorkspaceAudits, enqueueWorkspaceAudit }, actions, general, members, { workspaceDb, workspacePool }, { pool }] = await Promise.all([
     import('../lib/audit/delivery'), import('../app/actions/workspace'), import('../lib/workspace-admin/general'), import('../lib/workspace-admin/members'), import('../lib/workspace-db'), import('../lib/db'),

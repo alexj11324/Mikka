@@ -23,8 +23,8 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
     headers: async () => new Headers(requestBearer ? { authorization: `Bearer ${requestBearer}` } : undefined),
   } })
   t.after(() => requestContext.restore())
-  const localization = await import('next-intl/server')
-  const localeContext = mock.module('next-intl/server', { namedExports: { ...localization, getLocale: async () => 'en' } })
+  const localization = await import('@/lib/intl/i18n-server')
+  const localeContext = mock.module('@/lib/intl/i18n-server', { namedExports: { ...localization, getLocale: async () => 'en' } })
   t.after(() => localeContext.restore())
   const admin = new Pool({ connectionString: url, max: 1 })
   const suffix = randomUUID().replaceAll('-', '')

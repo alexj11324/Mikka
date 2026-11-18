@@ -1,7 +1,7 @@
 'use server'
 
 import { withFreshSession } from '@/lib/fresh-session'
-import { getLocale, getTranslations } from 'next-intl/server'
+import { getLocale, getTranslations } from '@/lib/intl/i18n-server'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, eq, ne } from 'drizzle-orm'
 import { cookies, headers } from 'next/headers'

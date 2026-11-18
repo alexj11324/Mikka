@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ArrowUpRight, LoaderCircle } from 'lucide-react'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'

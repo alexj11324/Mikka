@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ArrowUpRight, ChevronRight, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { AppTile, ToolGroup } from '@/components/plugins/connected-apps'

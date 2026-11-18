@@ -3,7 +3,7 @@
 import { settingsKeys } from '@/lib/swr/keys'
 import { useMemo, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import type { getUsage } from '@/app/actions/usage'
 import { settingsRead } from '@/lib/settings-read'
 import { ReadResponseError } from '@/lib/swr/retry'

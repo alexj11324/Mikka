@@ -17,7 +17,7 @@ let savedAutoRouting = true
 const changes: OrderChange[] = []
 const events: string[] = []
 const translate = Object.assign((key: string) => key, { has: () => false })
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time', relativeTime: () => 'ago' }), useNow: () => new Date() } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time', relativeTime: () => 'ago' }), useNow: () => new Date() } })
 mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderView) => {
   events.push(value ? 'order-cache' : 'order')
   if (value) data = value

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { Ban, Check, CircleAlert, CircleX, ClipboardList, ExternalLink, FileCheck, GitMerge, GitPullRequest, MessageCircleQuestion, RefreshCw, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

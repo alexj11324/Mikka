@@ -12,7 +12,7 @@ export const apiAliases = {
   'next/headers': here('./compat/headers.ts'),
   'next/headers.js': here('./compat/headers.ts'),
   'next/navigation': here('./compat/navigation.ts'),
-  'next-intl/server': here('./compat/intl.ts'),
+  'next-intl/server': here('../../lib/intl/i18n-server.ts'),
   '@/i18n/navigation': here('./compat/localized-navigation.ts'),
   'server-only': here('./compat/server-only.ts'),
   'mikka-real-react': require.resolve('react'),

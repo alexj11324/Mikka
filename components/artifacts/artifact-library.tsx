@@ -3,7 +3,7 @@
 import { useEffect, useState, type ComponentType } from 'react'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import useSWR from 'swr'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { AppWindow, FileText } from 'lucide-react'
 import { listArtifacts } from '@/app/actions/artifacts'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'

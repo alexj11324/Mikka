@@ -1,6 +1,6 @@
 'use client'
 
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
 import { BalanceSection } from '@/components/billing/balance-section'

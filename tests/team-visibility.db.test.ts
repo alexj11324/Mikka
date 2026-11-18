@@ -20,8 +20,8 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     cookies: async () => ({ get: () => undefined }),
   } })
   t.after(() => request.restore())
-  const intl = await import('next-intl/server')
-  const locale = mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en',
+  const intl = await import('@/lib/intl/i18n-server')
+  const locale = mock.module('@/lib/intl/i18n-server', { namedExports: { ...intl, getLocale: async () => 'en',
     getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   t.after(() => locale.restore())
   const { Pool } = await import('pg')

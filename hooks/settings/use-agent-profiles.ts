@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
 import { agentProfileTemplateDefinition, type AgentProfileTemplateId } from '@/lib/factory/agent-profile-templates'

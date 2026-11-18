@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { EditorContent, useEditor, type JSONContent } from '@tiptap/react'
 import { Extension } from '@tiptap/core'
 import { ArrowDown, ArrowUp, Check, History } from 'lucide-react'

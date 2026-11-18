@@ -1,4 +1,4 @@
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { paths } from 'mikka:native-offline'
 
 /** The HTML fallback supplies this card's exact styles and icon geometry at

@@ -83,7 +83,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   const requestHeaders = await import('../apps/api/compat/headers')
   const requestIntl = await import('../apps/api/compat/intl')
   mock.module('next/headers', { namedExports: { ...requestHeaders } })
-  mock.module('next-intl/server', { namedExports: { ...requestIntl } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { ...requestIntl } })
   const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })

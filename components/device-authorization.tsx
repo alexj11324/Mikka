@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { DAEMON_CLIENT_ID } from '@mikka/protocol/auth'
 import { AuthLogo } from '@/components/blocks/auth-19/components/auth-logo'
 import { Button } from '@/components/ui/button'

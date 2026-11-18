@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { openInteractions } from 'eve/events'
 import { parseAnswers } from 'eve/client'
 import type { Interaction, UseEveAgentReturn } from 'eve/react'

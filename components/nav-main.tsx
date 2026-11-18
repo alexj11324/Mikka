@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar"
 import { ChevronRightIcon, type LucideIcon } from "lucide-react"
 import { Button } from '@/components/ui/button'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 export function NavMain({
   items,

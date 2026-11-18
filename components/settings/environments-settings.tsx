@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Archive, Pencil, Plus } from 'lucide-react'
 import type { EnvironmentView, EnvironmentsView } from '@/app/actions/environments'
 import { listProjectSetupVersions, rollbackProjectSetup, saveEnvironment, setProjectDefaultEnvironment } from '@/app/actions/project-resources'

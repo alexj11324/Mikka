@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { MESSAGE_MAX } from '@/lib/message-limits'

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type FormEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR, { unstable_serialize } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { UNRESOLVED_LIST_SCOPE } from '@/lib/live/list-read'

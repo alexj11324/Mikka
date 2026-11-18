@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Info } from 'lucide-react'
 import { getBotModelMenu } from '@/app/actions/execution-settings'
 import { getCreditShare, updateCreditShare } from '@/app/actions/personal-policy'

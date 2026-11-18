@@ -18,12 +18,23 @@ minimumReleaseAgeExclude:
   - next
 
 allowBuilds:
+  '@mongodb-js/zstd': set this to true or false
+  '@openuidev/lang-core': set this to true or false
   '@parcel/watcher': true
   '@swc/core': true
+  cbor-extract: set this to true or false
+  core-js: set this to true or false
+  core-js-pure: set this to true or false
   electron: true
+  electron-winstaller: set this to true or false
   esbuild: true
   ffmpeg-static: true
+  free-email-domains: set this to true or false
+  node-liblzma: set this to true or false
+  nx: set this to true or false
   sharp: true
+  tesseract.js: set this to true or false
+  workerd: set this to true or false
 
 patchedDependencies:
   '@fantasticfour/world-cloudflare@2.4.3': patches/@fantasticfour__world-cloudflare@2.4.3.patch

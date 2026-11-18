@@ -15,7 +15,7 @@ const translate = Object.assign((key: string) => key, { has: () => false })
 const nothing = () => {}
 const empty = () => null
 const Pass = ({ children }: { children?: ReactNode }) => <>{children}</>
-mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate } })
 const syncReads: (string | undefined)[] = []
 let mappedWorkspace: string | undefined
 mock.module('@/hooks/use-task-collection', { namedExports: { TaskPresentationsContext: createContext({}) } })

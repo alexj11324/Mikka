@@ -1,7 +1,7 @@
 'use client'
 
 import useSWR, { unstable_serialize } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { SharedResourceKind } from '@/lib/db/governance-schema'
 import { withBasePath } from '@/lib/base-path'
 import { authClient } from '@/lib/auth-client'

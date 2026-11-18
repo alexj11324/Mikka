@@ -12,7 +12,7 @@ const translate = Object.assign((key: string) => key, { has: () => false })
 let decisions = 0, ticketReads = 0
 let pendingReply: (() => Promise<Response>) | undefined
 mock.module('posthog-js', { defaultExport: { getFeatureFlag: () => undefined, onFeatureFlags: () => () => {} } })
-mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate } })
 mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: { useSession: () => ({ data: { user: { id: 'owner' }, session: { id: 'owner-session' } }, isPending: false }) } } })
 mock.module(new URL('../app/actions/pending-actions.ts', import.meta.url).href, { namedExports: { decidePendingAction: async () => { decisions++; return { status: 'declined' } } } })
 mock.module(new URL('../components/coordinator/approved-write-actions.tsx', import.meta.url).href, { namedExports: { ApprovedWriteActions: () => null } })

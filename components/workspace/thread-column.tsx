@@ -3,7 +3,7 @@
 import { TaskConversation } from '@ui-slot/task-conversation'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { findThreadIssue } from '@/app/actions/agents'
 import { Skeleton } from '@/components/ui/skeleton'

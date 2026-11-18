@@ -4,7 +4,7 @@ const sources = new Map([
   ['server-only', 'export {}'],
   ['next/headers', 'export async function headers(){return new Headers()} export async function cookies(){return {get(){return undefined},set(){}}}'],
   ['next/server', 'export function after(){throw new Error("unexpected background dispatch")}'],
-  ['next-intl/server', 'export async function getLocale(){return "en"} export async function getTranslations(){return (key)=>key}'],
+  ['@/lib/intl/i18n-server', 'export async function getLocale(){return "en"} export async function getTranslations(){return (key)=>key}'],
 ])
 const files = new Map([
   ['/lib/acting-user.ts', 'export async function currentUser(){return {id:"owner",name:"Owner",email:"owner@example.invalid"}};export function actAs(_id,fn){return fn()}'],

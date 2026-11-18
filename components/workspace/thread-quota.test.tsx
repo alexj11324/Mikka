@@ -9,7 +9,7 @@ import type { ThreadModelFallbackView } from '../../lib/run-model-fallback-view'
 let locale: 'zh-CN' | 'en' = 'zh-CN'
 const messages = () => locale === 'en' ? english : chinese
 const lookup = (path: string) => path.split('.').reduce<unknown>((value, key) => (value as Record<string, unknown>)[key], messages()) as string
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => lookup(`${namespace}.${key}`), useMessages: messages } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: (namespace: string) => (key: string) => lookup(`${namespace}.${key}`), useMessages: messages } })
 mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: (props: ComponentProps<'a'>) => <a {...props} href={props.href} /> } })
 mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { namedExports: { resumeQuotaPausedRunOnApiKey: async () => {}, retryQuotaPausedRun: async () => {} } })
 mock.module(new URL('../coordinator/quota-notice.tsx', import.meta.url).href, { namedExports: { subscriptionName: () => '', useKeyName: () => () => '', useResetTime: () => () => '' } })

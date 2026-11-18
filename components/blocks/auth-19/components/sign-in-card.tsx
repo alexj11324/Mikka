@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, type FormEvent, type FormEventHandler, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Link } from '@/i18n/navigation'
 import { ArrowRightIcon, Loader2Icon, LockKeyholeIcon, MailIcon, UserIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'

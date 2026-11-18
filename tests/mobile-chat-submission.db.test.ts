@@ -6,7 +6,7 @@ import { dbUrl, seedBot, seedUser, seedWorkspace } from './support/workspace-adm
 import { personalMessage, sendFailureState, submissionBody, unsettled } from '../apps/mobile/lib/outbox'
 import { mobileMessages } from '../apps/mobile/lib/messages'
 
-mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 
 test('mobile chat response-loss retries use the real immutable submission ledger', { skip: !dbUrl }, async t => {
   const { Pool } = await import('pg')

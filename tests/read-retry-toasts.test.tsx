@@ -107,7 +107,7 @@ const browser = new Window({ url: 'https://fixture.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
 let SWRConfig: typeof import('swr')['SWRConfig'], useSWRConfig: typeof import('swr')['useSWRConfig'], serialize: typeof import('swr')['unstable_serialize']
 let Toaster: typeof import('sonner')['Toaster'], toast: typeof import('sonner')['toast']
-let IntlProvider: typeof import('next-intl')['NextIntlClientProvider']
+let IntlProvider: typeof import('@/lib/intl/i18n-client')['NextIntlClientProvider']
 let ArtifactLibrary: typeof import('../components/artifacts/artifact-library')['ArtifactLibrary']
 let ArtifactViewer: typeof import('../components/artifacts/artifact-viewer')['ArtifactViewer']
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
@@ -134,7 +134,7 @@ before(async () => {
   ;({ createRoot } = await import('react-dom/client'))
   ;({ SWRConfig, useSWRConfig, unstable_serialize: serialize } = await import('swr'))
   ;({ Toaster, toast } = await import('sonner'))
-  ;({ NextIntlClientProvider: IntlProvider } = await import('next-intl'))
+  ;({ NextIntlClientProvider: IntlProvider } = await import('@/lib/intl/i18n-client'))
   ;({ ArtifactLibrary } = await import('../components/artifacts/artifact-library'))
   ;({ ArtifactViewer } = await import('../components/artifacts/artifact-viewer'))
   ;({ IssueThreadPanel } = await import('../components/workspace/issue-thread-panel'))

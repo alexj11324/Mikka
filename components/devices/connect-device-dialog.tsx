@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Plus, TerminalSquare } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { useSWRConfig } from 'swr'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'

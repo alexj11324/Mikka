@@ -43,7 +43,7 @@ test('welcome and approved-write decisions wake through their stored event', { s
   const realAuth = await import('../auth')
   t.mock.module('../auth', { namedExports: { ...realAuth, auth: { api: { getSession: async () => viewer } } } })
   t.mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' ? { value: workspaceId } : undefined }) } })
-  t.mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  t.mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   const existingWake = await import('./wake')
   t.mock.module('./wake', { namedExports: { ...existingWake, coordinatorEnabled: async () => configured, wakeCoordinator: async (userId: string) => { direct.push(userId) } } })
   let sends = 0

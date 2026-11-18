@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { SuggestionSource } from '@/lib/db/schema'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { GitHubIcon, GmailIcon, LinearIcon, NotionIcon, SlackIcon } from '@/components/icons/brand-icons'

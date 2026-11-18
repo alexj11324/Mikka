@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import useSWR from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { ArrowRight, ChevronRight, CircleCheck, CircleX, ExternalLink, Play } from 'lucide-react'
 import { getArtifact } from '@/app/actions/artifacts'
 import { useThreadChanges } from '@/hooks/use-thread-run-reads'

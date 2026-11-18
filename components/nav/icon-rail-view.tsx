@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { useEffect, useState } from 'react'
 import { CircleArrowDown, SquarePen } from 'lucide-react'
 import { RAIL_ITEMS, type RailProps } from '@/components/nav/rail-items'

@@ -32,7 +32,7 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     headers: async () => currentHeaders,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' ? { value: other.id } : undefined }),
   } })
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
   mock.module('@/lib/auth', { namedExports: { MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => {
     cookieReads++
     return currentHeaders.has('cookie') ? { user: { id: owner }, session: { id: 'browser-session' } } : null

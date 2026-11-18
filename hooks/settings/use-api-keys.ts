@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { harnessName } from '@/components/labels/entity-labels'
 import useSWR, { useSWRConfig } from 'swr'
 import type { GatewayFeature } from '@/lib/model-gateway/features'

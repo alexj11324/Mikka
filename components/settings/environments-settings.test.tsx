@@ -19,7 +19,7 @@ const translator = (namespace: string) => Object.assign((key: string, values?: R
   assert.equal(typeof value, 'string', `missing ${namespace}.${key}`)
   return (value as string).replace(/\{(\w+)\}/g, (match, name: string) => values?.[name] === undefined ? match : String(values[name]))
 }, { has: (key: string) => typeof lookup(`${namespace}.${key}`) === 'string' })
-mock.module('next-intl', { namedExports: { useTranslations: translator } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: translator } })
 
 let state: { data?: EnvironmentsView; error?: Error }
 let history: ProjectSetupHistory

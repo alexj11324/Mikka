@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { withBasePath } from '@/lib/base-path'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'

@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import { useClipboardCopy } from '@/hooks/use-clipboard-copy'
 import { Check, Copy, MoreHorizontal, RefreshCw, TriangleAlert } from 'lucide-react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'

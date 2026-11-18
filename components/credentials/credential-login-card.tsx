@@ -1,7 +1,7 @@
 'use client'
 
 import { CircleCheckIcon, EyeIcon, EyeOffIcon, LockIcon, XIcon } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'

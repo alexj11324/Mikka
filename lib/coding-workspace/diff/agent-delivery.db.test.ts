@@ -58,7 +58,7 @@ test('agent review delivery with PostgreSQL 17 and real Git source proofs', { sk
     mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
       get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {},
     }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en',
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const { resolveRunWorktree } = await import('../identity')
     const { validateWorkspaceReceipt } = await import('../receipt')

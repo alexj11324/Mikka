@@ -3,7 +3,7 @@ import { Mention, type MentionNodeAttrs } from "@tiptap/extension-mention"
 import { PluginKey } from "@tiptap/pm/state"
 import type { SuggestionProps } from "@tiptap/suggestion"
 import { cn } from "cn"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 import {
   Avatar,

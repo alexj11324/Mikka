@@ -176,7 +176,7 @@ for (const navigationType of ['document', undefined] as const) test(navigationTy
   ? 'full-document navigation retires old readers while private storage finishes clearing'
   : 'ordinary cache invalidation still refreshes and replaces the retired provider', async () => {
   const { IndexedReadStorage } = await import('./indexed-db')
-  const { NextIntlClientProvider } = await import('next-intl')
+  const { NextIntlClientProvider } = await import('@/lib/intl/i18n-client')
   const clearing = deferred<void>(), entered = deferred<void>()
   const activate = mock.method(IndexedReadStorage.prototype, 'activate', async () => [])
   const write = mock.method(IndexedReadStorage.prototype, 'write', async () => undefined)

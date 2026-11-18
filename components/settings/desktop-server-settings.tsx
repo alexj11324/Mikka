@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ServerIcon } from 'lucide-react'
 import type { BundledServer } from '@mikka/protocol/bridge'
 import { withBasePath } from '@/lib/base-path'

@@ -13,7 +13,7 @@ if (process.env.REQUIRE_DB === '1' && !enabled) throw new Error('Conversation ta
 
 test('authenticated header actions keep same-UUID chat and run distinct across owner and workspace boundaries', { skip: !enabled, timeout: 60_000 }, async t => {
   t.mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') })
-  t.mock.module('next-intl/server', { namedExports: await import('../apps/api/compat/intl') })
+  t.mock.module('@/lib/intl/i18n-server', { namedExports: await import('../apps/api/compat/intl') })
   const calls: string[] = []
   t.mock.module('@/lib/default-model', { namedExports: { defaultModelAvailable: async () => true } })
   t.mock.module('@/lib/short-title-server', { namedExports: { generateShortTitle: async (_owner: string, content: { title: string }) => {

@@ -28,7 +28,7 @@ const desktopAliases = new Map([
 ])
 
 export function serverSpecifier(source) {
-  return source === 'server-only' || source === 'next-intl/server' || source.startsWith('node:') || builtins.has(source)
+  return source === 'server-only' || source.startsWith('@/lib/intl/i18n-server') || source.startsWith('node:') || builtins.has(source)
     || /^next\/(?:headers|server|font)(?:\/|$)/.test(source)
     || source === 'better-auth' || source === 'pg' || source === 'postgres'
 }

@@ -1,5 +1,5 @@
 'use client'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 
 import { useRef, useState, type FormEvent } from 'react'
 import { Loader2 } from 'lucide-react'

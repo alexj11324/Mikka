@@ -25,7 +25,7 @@ mock.module(new URL('../../app/actions/issue-operations.ts', import.meta.url).hr
 })
 mock.module(new URL('../../app/actions/issues.ts', import.meta.url).href, { namedExports: { moveIssue: save } })
 mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey() {} } })
-mock.module('next-intl', { namedExports: { useTranslations: () => Object.assign((key: string) => key, { has: () => true }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => Object.assign((key: string) => key, { has: () => true }) } })
 
 let state: ReturnType<typeof import('./issue-relations')['useIssueConnections']>
 let useIssueConnections: typeof import('./issue-relations')['useIssueConnections']

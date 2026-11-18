@@ -10,7 +10,7 @@ Object.assign(globalThis, { window: browser, document: browser.document, HTMLEle
 const { createRoot } = await import('react-dom/client')
 Object.assign(globalThis, { requestAnimationFrame: browser.requestAnimationFrame.bind(browser) })
 
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string) => key } })
 mock.module(new URL('../../app/actions/task-runs.ts', import.meta.url).href, { namedExports: { findThreadReferences: async () => [
   { kind: 'thread', conversationKind: 'chat', id: sharedId, title: 'Standalone conversation' },
   { kind: 'thread', id: sharedId, title: 'Execution run' },

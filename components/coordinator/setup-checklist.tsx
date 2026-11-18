@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR from 'swr'
 import { Circle, CircleCheck, X } from 'lucide-react'
 import { dismissSetupChecklist, restoreSetupChecklist, setupChecklist } from '@/app/actions/onboarding'

@@ -8,7 +8,7 @@ import type { McpWorkspacePage } from '@/lib/plugins/contracts'
 import { withBasePath } from '@/lib/base-path'
 
 const translate = (key: string, args?: Record<string, string>) => args ? `${key} ${Object.values(args).join(' ')}` : key
-mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate } })
 mock.module(new URL('./connected-apps.tsx', import.meta.url).href, { namedExports: {
   AppTile: () => <span data-app-icon="mcp" />,
 } })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { checkPageBuildBeforeAction } from '@/lib/app-build'
 import { useActionError } from '@/lib/use-action-error'
 import { prepareThreadReply } from '@/lib/thread-submission-input'

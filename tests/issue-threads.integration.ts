@@ -19,7 +19,7 @@ const removedAgent = randomUUID()
 let requestHeaders = new Headers()
 let selectedWorkspace: string | undefined
 mock.module('next/headers', { namedExports: { cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }), draftMode, headers: async () => requestHeaders } })
-mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 const bot = randomUUID()
 const excessRuns = Array.from({ length: 21 }, () => randomUUID())
 test('real actions keep thread content with its owner; current members see only whose threads exist and their status', async () => {

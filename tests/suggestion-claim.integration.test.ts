@@ -30,7 +30,7 @@ let release!: () => void
 let signal!: () => void
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: owner, name: 'Suggestion fixture', email: `${owner}@example.invalid` }, session: { id: 'suggestion-fixture-session' } }) } } } })
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => true, wakeCoordinator: () => { throw Error('must not invoke provider') } } })
   mock.module('next/server', { namedExports: { after: (fn: () => unknown) => callbacks.push(fn) } })
   mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })

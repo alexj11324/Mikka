@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import type { Definition } from '@/lib/schedules/contract'
 import { cronShape } from './automation-draft'
 
