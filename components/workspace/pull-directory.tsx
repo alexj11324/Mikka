@@ -565,14 +565,18 @@ export function PullDirectory({
               setViewName("");
             }}
           >
-            <Input
-              autoFocus
-              maxLength={40}
-              aria-label={t("viewName")}
-              placeholder={t("viewName")}
-              value={viewName}
-              onChange={(event) => setViewName(event.target.value)}
-            />
+            <FieldGroup className="min-w-0 flex-1">
+              <Field>
+                <Input
+                  autoFocus
+                  maxLength={40}
+                  aria-label={t("viewName")}
+                  placeholder={t("viewName")}
+                  value={viewName}
+                  onChange={(event) => setViewName(event.target.value)}
+                />
+              </Field>
+            </FieldGroup>
             <Button size="sm" type="submit" disabled={!viewName.trim()}>
               {t("save")}
             </Button>

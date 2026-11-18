@@ -140,8 +140,7 @@ const { PullDirectory } = await import("./pull-directory");
 
 async function mount() {
   browser.localStorage.clear();
-  const host = document.createElement("div");
-  document.body.append(host);
+  const host = document.body;
   const root = createRoot(host);
   await act(async () =>
     root.render(
@@ -203,7 +202,6 @@ test("the PR tab switches from linked task snapshots to real repository PRs and 
     );
   } finally {
     await act(async () => root.unmount());
-    host.remove();
   }
 });
 
@@ -239,7 +237,6 @@ test("filters act on PR metadata and the Ready view is not inferred from a green
     assert.match(document.body.textContent ?? "", /noMatches/);
   } finally {
     await act(async () => root.unmount());
-    host.remove();
     await browser.happyDOM.abort();
   }
 });
