@@ -37,6 +37,7 @@ import { registrationCommand, quoteShell, REGISTRATION_WAITING, REGISTRATION_COM
 import { openWorkerBootstrapBroker, type WorkerBootstrapBroker } from '@/lib/computer/bootstrap-broker'
 import { finishThreadRegistration, prepareThreadRegistration } from './thread-registration'
 import { hostedSnapshot } from './sponsored-task'
+import { vercelPreviewProtectionBypass } from '../computer/preview-transport'
 
 // Load the native Cloudflare transport only for an explicitly sponsored machine.
 async function releaseOwnedCloudflareTaskMachine(...args:Parameters<typeof import('../eve/cloudflare-task-bridge').releaseOwnedCloudflareTaskMachine>) {

@@ -572,6 +572,16 @@
     "test": "lib/coding-workspace/machine-metrics.test.ts",
     "suite": "test:coding-workspace-review-runtime"
   },
+  "lib/computer/preview-transport.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_CLOUD_PREVIEW_BYPASS",
+      "VERCEL_ENV"
+    ],
+    "behavior": "Send the optional Vercel deployment-protection bypass only to an HTTPS .vercel.app host in Vercel preview; other preview hosts rely on the existing per-device bearer credential.",
+    "test": "lib/computer/preview-transport.test.ts",
+    "suite": "test:computer-db"
+  },
   "lib/computer/e2b-provider.ts": {
     "mode": "operator-configured",
     "environment": [],
