@@ -30,9 +30,11 @@ describe("quota on the daemon", () => {
         },
       }
     )
+    let reads = 0
     const source: QuotaSource = {
       id: "local_credentials",
       read() {
+        reads += 1
         return Promise.reject(new Error(`Bearer ${SECRET}`))
       },
     }
@@ -49,13 +51,10 @@ describe("quota on the daemon", () => {
       quotaSource: source,
     }).start()
     daemons.push(daemon)
-    await waitFor(() =>
-      lines.some((line) => line.includes("quota refresh failed"))
-    )
-    expect(lines.join("\n")).not.toContain(SECRET)
-    expect(lines.join("\n")).toContain("[REDACTED]")
-
     await daemon.syncWithServer()
+    expect(reads).toBe(0)
+    expect(lines.join("\n")).not.toContain("quota refresh failed")
+    expect(lines.join("\n")).not.toContain(SECRET)
     const heartbeat = server.devices.get("device-1")?.lastHeartbeat
     expect(JSON.stringify(heartbeat)).not.toContain(SECRET)
     const quotas = heartbeat?.quotas ?? []
@@ -66,9 +65,12 @@ describe("quota on the daemon", () => {
 
     const client = await connectDaemonInDataDir(dataDir, CLIENT)
     const report = await client.request("quota.snapshot")
+    expect(reads).toBe(1)
     expect(report.quotas.every((quota) => quota.status === "unknown")).toBe(
       true
     )
+    expect(lines.join("\n")).toContain("quota refresh failed")
+    expect(lines.join("\n")).toContain("[REDACTED]")
     expect(JSON.stringify(report)).not.toContain(SECRET)
     const status = await client.request("daemon.status")
     expect(status.pid).toBe(process.pid)

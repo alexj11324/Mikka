@@ -24,7 +24,6 @@ export const pollingRoots = [
   "deploy/",
 ];
 
-const web = "hooks/use-live-key.tsx";
 const daemon = "lib/device-gateway-notify.ts";
 const server = "lib/live/notify.ts";
 const db = (replaceWith, reason, hits) => ({
@@ -325,10 +324,6 @@ export const pollingAllowlist = {
     1,
   ),
   // Third-party APIs.
-  "packages/daemon/src/quota/poller.ts": external(
-    "provider quota (Claude/Codex), every 3 min; not our database",
-    2,
-  ),
   "apps/desktop/src/main/index.ts": external(
     "the existing published GitHub desktop-release update check; no Mikka database request and disabled in Mikka Dev",
     1,

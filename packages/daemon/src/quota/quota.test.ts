@@ -25,7 +25,7 @@ import {
   readCursorQuota,
 } from "./cursor"
 import { LocalCredentialsSource } from "./local-credentials"
-import { QUOTA_POLL_INTERVAL_MS, QuotaPoller } from "./poller"
+import { QuotaPoller } from "./poller"
 import type { QuotaSource } from "./poller"
 
 const SECRET = "sk-ant-api03-fixturetokenvalue"
@@ -586,17 +586,6 @@ describe("local credential source", () => {
 })
 
 describe("quota poller", () => {
-  it("never polls faster than every three minutes", () => {
-    const source: QuotaSource = {
-      id: "local_credentials",
-      read: async () => [],
-    }
-    expect(new QuotaPoller(source, { intervalMs: 10 }).intervalMs).toBe(
-      QUOTA_POLL_INTERVAL_MS
-    )
-    expect(QUOTA_POLL_INTERVAL_MS).toBeGreaterThanOrEqual(3 * 60 * 1000)
-  })
-
   it("turns a thrown read into unknown and keeps the secret out of the log", async () => {
     const lines: string[] = []
     const source: QuotaSource = {
