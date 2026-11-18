@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 181 |
-| partial | 29 |
+| complete | 183 |
+| partial | 31 |
 | prior-partial | 36 |
-| unreviewed | 6310 |
+| unreviewed | 6306 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -48,3 +48,9 @@ The complete private/public consumer review passed 29/29 narrow V8 source assert
 Four original immutable source/test paths (two pure helpers, two original tests) were reviewed, each against the public fixed tree `b19eed90`, current public main `0c4de849`, and Cloud's fixed nested `vendor/mikka@82d285ed`: every file's object ID is unchanged. `waitingLabel` is a local 30-second label formatter, not a server polling mechanism; its caller has a one-second UI clock with effect cleanup. `webChatPath` requires a valid explicit Bot/workspace target; `web.ts` hands off real identity to a separate authenticated one-time-token endpoint. Its current-main consumer has an added `confirmAccount` option that must survive later integration. Source comments identify Figma/identity reasons; introduction commits remain unverified rather than guessed.
 
 All four original Git source objects were reproduced byte-for-byte and checked by `git hash-object`. Running the **actual original** `waiting.test.mts` and `web-chat.test.mts` against those copies on Linux Node **22.16.0** (`--experimental-strip-types --test`) passed **3/3**. This validates only the pure-unit contracts, not the original repository install, Node24, Expo/iOS/Android, real browser, AT, server permissions, protected CI, merged-SHA or production. Each path's independent consumer, native-vs-added responsibility and retention are recorded in the original CSV/JSONL. Fixed code queue now **181 complete / 29 partial / 36 prior-partial / 6310 unreviewed**. The full changed-main census and Cloud's 6,471 pinned-code census are separate unfinished obligations; do not equate identical helper blobs with all current callers reviewed.
+
+## 2026-11-18 fixed mobile title and reduced-motion follow-up
+
+Complete original display-title sanitizer + original 4-case test were read against fixed/main/pinned Cloud Git objects, then the exact two Git objects were reconstructed and `git hash-object` confirmed. On isolated Node 22.16.0 the unchanged native original test passed **4/4** (four test cases, display assertions for issue key/date/version preservation). App chat headers, bot info and task lists consume this display-only projection; it does not rewrite persisted server titles. Real native UI, Node24, protection CI and final merged SHA remain unverified.
+
+Also read both *distinct* native accessibility preference consumers: app-wide `apps/mobile/lib/reduced-motion.ts` uses a shared React external store and browser/native listener, while beui-native's vendored hook uses a Reanimated initial value and per-mount native event listener. Both have real downstream consumers. The apparent duplicate preference subscription is an **unproven** native-equivalence candidate, **not** a new G fix or safe deletion; multi-consumer, first-frame, SSR/web and native AccessibilityInfo lifecycle tests remain required. Both are partial, not complete. Status: **183 complete / 31 partial / 36 prior-partial / 6306 unreviewed** in fixed public code census. F, G-015/G-046 and production Owner boundaries unchanged.
