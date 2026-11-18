@@ -3489,5 +3489,12 @@
     "behavior": "A cloud dispatch that names an Agent with no usable model is refused with agentNoModel, its message and a link to 模型与订阅, instead of agentProfileUnavailable.",
     "test": "tests/cloud-runtime-auto.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "lib/run-authority-stop.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "When a change takes a run's authority away (Bot archived, task deleted, member gone, workspace or account deleted), stop the affected runs in the installation database and push the stop to their devices.",
+    "test": "lib/run-authority-stop.db.test.ts",
+    "suite": "test:bot-chats-db"
   }
 }
