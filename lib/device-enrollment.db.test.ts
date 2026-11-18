@@ -402,7 +402,7 @@ test('a fresh login cannot admit an old daemon, and updating cannot revive a rev
   await pool.query(`INSERT INTO agent_runs(id,status,"deviceTokenId","userId","leaseExpiresAt") VALUES($1,'running',$2,'version-owner',now()+interval '1 minute')`, [claimedRun, tokenId])
   assert.equal((await handler(request('0.0.329', `/v1/runs/${claimedRun}/events`))).status, 426, 'the run that the old binary holds gets no grace')
   for (const path of ['/v1/devices/fixture/commands', '/v1/devices/fixture/report', `/v1/runs/${claimedRun}/events`]) {
-    const unsessioned = new Request(`http://localhost/mikka${path}`, { method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': MIN_DAEMON_VERSION } })
+    const unsessioned: Request = new Request(`http://localhost/mikka${path}`, { method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-mikka-client-version': MIN_DAEMON_VERSION } })
     assert.equal((await handler(unsessioned)).status, 426, `${path} requires the device session header`)
   }
   assert.equal(invoked, 1)
