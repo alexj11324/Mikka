@@ -1,6 +1,10 @@
 import { mobileMessages } from '@/lib/messages'
+import type { ComponentType } from 'react'
 import { View } from 'react-native'
-import { Circle, CircleAlert, CircleCheck, CircleDashed, CircleDot, CircleGauge, CirclePause, CircleSlash2, CircleX, Clock, Hand, OctagonAlert, SignalHigh, SignalLow, SignalMedium, TriangleAlert } from 'lucide-react-native'
+import Animated from 'react-native-reanimated'
+import Svg, { Circle as SvgCircle } from 'react-native-svg'
+import { Circle, CircleAlert, CircleCheck, CircleDashed, CircleDot, CirclePause, CircleSlash2, CircleX, Clock, Eye, Hand, OctagonAlert, SignalHigh, SignalLow, SignalMedium, TriangleAlert } from 'lucide-react-native'
+import { useReducedMotionPreference } from '@/lib/reduced-motion'
 import type { TaskGroup, TaskState } from '@/lib/types'
 import { ATTEMPT_WORD, type AttemptResult } from '../model/task-groups'
 import { colors } from '@/lib/theme'
@@ -8,15 +12,41 @@ import { colors } from '@/lib/theme'
 /**
  * One icon per state (decisions/2026-11-07-2230-one-icon-per-task-state.md). The hand is only 等你处理; 失败 is a
  * triangle (✕ is the board's 已取消); 受阻 an octagon (login, key, permission, quota, a device offline); 运行中 the
- * board's In Progress ring; 排队中 a clock. Each glyph has its state's system colour (decisions/2026-11-08-0130): needs
- * you blue, blocked or under way orange, failed red, done green, not started or closed grey. Never a coloured dot.
+ * board's In Progress ring, turning while it runs; 排队中 a clock. Each glyph has its state's system colour
+ * (decisions/2026-11-08-0130): needs you blue, blocked or under way orange, failed red, done green, not started or
+ * closed grey. Never a coloured dot. The glyphs are the web's one lucide table (decisions/2026-11-18-0300).
  */
+/** What a status glyph takes: lucide's props, so the turning ring sits where a lucide icon does. */
+type Glyph = ComponentType<{ size?: number; color?: string; strokeWidth?: number; accessibilityLabel?: string }>
+
+// A run under way: the board's In Progress ring (lucide CircleDot) whose ring turns as a broken arc, as on the web
+// (decisions/2026-11-18-0300). State indication, looped, so a Reanimated CSS animation on the UI thread; under
+// Reduce Motion it is CircleDot itself.
+const TURN = { animationName: { from: { transform: [{ rotate: '0deg' }] }, to: { transform: [{ rotate: '360deg' }] } }, animationDuration: '1.6s', animationIterationCount: 'infinite', animationTimingFunction: 'linear' } as const
+
+const RunningIcon: Glyph = ({ size = 24, color, strokeWidth = 2, accessibilityLabel }) => {
+  const reduced = useReducedMotionPreference()
+  if (reduced) return <CircleDot size={size} color={color} strokeWidth={strokeWidth} accessibilityLabel={accessibilityLabel} />
+  return (
+    <View accessible accessibilityRole="image" accessibilityLabel={accessibilityLabel} style={{ width: size, height: size }}>
+      <Animated.View style={[{ position: 'absolute', width: size, height: size }, TURN]}>
+        <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+          <SvgCircle cx={12} cy={12} r={10} stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeDasharray="44 19" />
+        </Svg>
+      </Animated.View>
+      <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <SvgCircle cx={12} cy={12} r={1} stroke={color} strokeWidth={strokeWidth} />
+      </Svg>
+    </View>
+  )
+}
+
 const STATE_COLOR: Record<TaskState, string> = { waiting: colors.accent, failed: colors.danger, blocked: colors.orange, running: colors.orange, queued: colors.orange }
-const STATE_ICON: Record<TaskState, typeof Hand> = { waiting: Hand, failed: TriangleAlert, blocked: OctagonAlert, running: CircleDot, queued: Clock }
+const STATE_ICON: Record<TaskState, Glyph> = { waiting: Hand, failed: TriangleAlert, blocked: OctagonAlert, running: RunningIcon, queued: Clock }
 export const STATE_LABEL: Record<TaskState, string> = mobileMessages.MobileCore.states
 
 /** The board's status icons (components/workspace/issue-properties.ts), so a task looks the same on the board and in a list. */
-const BOARD_ICON: Record<string, typeof Hand> = { backlog: CircleDashed, todo: Circle, doing: CircleDot, review: CircleGauge, done: CircleCheck, canceled: CircleX, duplicate: CircleSlash2 }
+const BOARD_ICON: Record<string, typeof Hand> = { backlog: CircleDashed, todo: Circle, doing: CircleDot, review: Eye, done: CircleCheck, canceled: CircleX, duplicate: CircleSlash2 }
 const BOARD_COLOR: Record<string, string> = { backlog: colors.tertiary, todo: colors.tertiary, doing: colors.orange, review: colors.accent, done: colors.success, canceled: colors.secondary, duplicate: colors.secondary }
 export const BOARD_LABEL: Record<string, string> = mobileMessages.MobileCore.board
 
@@ -27,8 +57,8 @@ export function TaskStateIcon({ state, status, size = 18 }: { state: TaskState |
   return <Icon size={size} color={color} strokeWidth={1.9} accessibilityLabel={state ? STATE_LABEL[state] : BOARD_LABEL[status] ?? status} />
 }
 
-/** An attempt's own result (never the hand): ring, pause, check, triangle, octagon. */
-const ATTEMPT_ICON: Record<AttemptResult, typeof Hand> = { running: CircleDot, paused: CirclePause, done: CircleCheck, failed: TriangleAlert, blocked: OctagonAlert }
+/** An attempt's own result (never the hand): turning ring, pause, check, triangle, octagon. */
+const ATTEMPT_ICON: Record<AttemptResult, Glyph> = { running: RunningIcon, paused: CirclePause, done: CircleCheck, failed: TriangleAlert, blocked: OctagonAlert }
 const ATTEMPT_COLOR: Record<AttemptResult, string> = { running: colors.orange, paused: colors.accent, done: colors.success, failed: colors.danger, blocked: colors.orange }
 
 export function AttemptIcon({ result, size = 18 }: { result: AttemptResult; size?: number }) {

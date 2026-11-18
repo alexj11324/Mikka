@@ -40,4 +40,6 @@ All glyphs are lucide, in two tables in `components/workspace/`:
 - **Status-icon exception, extended** ([2026-11-09-0050](2026-11-09-0050-paid-blocks-as-shipped.md), 1405): the glyph-only swap now also covers the task page's status menu and property lines (they were the Kanban template's `ColumnMark`), the board's 受阻 column head and a card's 受阻 line, and the hosted thread's task card for a run with no task. As before, only the glyph changes; the block's box, spacing and colour tokens stay.
 - The Orca shapes and their notice are removed (`NOTICE`).
 
-Not changed: a thread stays a speech bubble with a state dot (`ThreadStatusIcon`). The iOS app keeps its own icons until it follows. The paid Kanban's and Thread's demo-only parts that Mikka never shows (its own create window and card detail, the Thread's away summary) keep their template glyphs.
+- **The iOS app uses the same glyphs** (`apps/mobile/features/tasks/components/task-icons.tsx`, lucide-react-native): 评审中 is `Eye` (it was `CircleGauge`), and a running task or attempt is the turning `CircleDot` (a Reanimated CSS animation; `CircleDot` itself under Reduce Motion). Its list keeps its own groups and run states (2026-11-13-1405 left the app's model unchanged); only the glyphs follow this table, with the app's system colours (2026-11-08-0130).
+
+Not changed: a thread stays a speech bubble with a state dot (`ThreadStatusIcon`). The paid Kanban's and Thread's demo-only parts that Mikka never shows (its own create window and card detail, the Thread's away summary) keep their template glyphs.
