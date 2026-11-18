@@ -12,16 +12,16 @@ export async function readCronPromotion({ sourceCommit, token, fetchImpl = fetch
   if (serving.provider !== 'cloudflare' || !sha.test(serving.sha ?? '')) throw Error('cron_production_origin_invalid')
   const api = { token, fetchImpl }
   for (let page = 1; ; page++) {
-    const listing = await read(`/actions/workflows/cloudflare-app-deploy.yml/runs?head_sha=${serving.sha}&branch=main&per_page=100&page=${page}`, api)
+    const listing = await read(`/actions/workflows/cloudflare-app-deploy.yml/runs?branch=main&per_page=100&page=${page}`, api)
     if (!Array.isArray(listing.workflow_runs)) throw Error('cron_promotion_listing_invalid')
     for (const run of listing.workflow_runs) {
-      if (run.head_sha !== serving.sha || run.head_branch !== 'main' || run.path !== path || run.event !== 'workflow_dispatch'
+      if (!sha.test(run.head_sha ?? '') || run.head_branch !== 'main' || run.path !== path || run.event !== 'workflow_dispatch'
         || run.status !== 'completed' || run.conclusion !== 'success' || run.repository?.full_name !== repo
         || run.head_repository?.full_name !== repo || !Number.isSafeInteger(run.id) || run.id < 1
         || !Number.isSafeInteger(run.run_attempt) || run.run_attempt < 1) continue
       const jobs = await read(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`, api)
       if (!Array.isArray(jobs.jobs) || jobs.total_count !== jobs.jobs.length) throw Error('cron_promotion_jobs_invalid')
-      if (!jobs.jobs.some(job => job.name?.startsWith('Serving release ') && job.status === 'completed' && job.conclusion === 'success')) continue
+      if (!jobs.jobs.some(job => job.name?.startsWith('Serving release ' + serving.sha + ' ') && job.status === 'completed' && job.conclusion === 'success')) continue
       const record = await verify(`actions:${run.id}:${run.run_attempt}`, { token, fetchImpl })
       if (record.product !== serving.sha || typeof record.releasePin !== 'string') throw Error('cron_promotion_source_mismatch')
       return { id: record.releasePin, sha: record.product }
