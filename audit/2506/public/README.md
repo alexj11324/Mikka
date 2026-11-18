@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 56 |
+| partial | 59 |
 | prior-partial | 36 |
-| unreviewed | 6278 |
+| unreviewed | 6275 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -126,3 +126,7 @@ The native `messages.ts` source chooses between the existing en/zh bundles by de
 The original code denominator now remains **6,556 = 186 complete + 56 partial + 36 prior-partial + 6,278 unreviewed**, out of 7,996 fixed tracked paths; reviews JSONL has **269 unique records**, including non-code. Source review is a bounded contribution, not all ten G DoD conditions or the G-015 Cloudflare-native SDK+fallback physical retirement. This G branch is still severely behind main, the other branch/Owner roots are unchanged, and normal protected merge plus precise post-merge runtime checks remain open.
 
 After the main-blob restoration, an **isolated Node 22.16.0 execution of the current-main `agoWhen` function body** (adapted to a local test with stubbed `mobileMessages.MobileCore.ago` and `shortWhen`) completed **1/1 TAP with nine assertions**: now, 5 minutes, 3 hours, 2 days, 31-day fallback, future timestamp, invalid input, 59-minute and 60-minute boundary. This does not run the original repository test, its actual translation bundle, Node24, Expo renderer or the mounted current task-properties consumers, and cannot authorize merge on its own.
+
+## 2026-11-18 fixed contract editor selector and bulk-resolution consumers
+
+Three formerly unreviewed fixed source paths were read in full: `components/blocks/rich-text-editor-3/components/{mode-select.tsx,resolve-all-dialog.tsx,rich-text-state.ts}`. All three original blobs matched current checked public main, existing G branch and Cloud's fixed `vendor/mikka@82d285edd2dfc9ee95622ec4a22c58436bffc255`; their direct `contract-header.tsx` and `contract-editor.tsx` consumers were read, and cross-repository code search returned no same-name private UI or Cloud consumers. They are controlled React Select, Tiptap suggestion/Undo dialog, and official `useEditorState`/`characterCount` selectors, **not** Cloudflare/DO/Queue duplicated implementations. Original introduction commits are not independently established. **15/15 limited static V8 source/consumer predicates passed**, including a specific potential no-op bug (`onResolved` invoked even when suggestion command returns false); no runtime regression or new product fix is claimed. All three are **partial retain**, with keyboard, AT, mounted editor, failed-command, multi-instance, Node24 and protected CI checks outstanding. Fixed public code now **6,556 = 186 complete / 59 partial / 36 prior-partial / 6,275 unreviewed**; fixed 7,996 total tracked paths unchanged. New evidence is appended to the original `reviews.jsonl` rather than creating another task. Main full deltas, Cloud gitlink, G-015 physical SDK removal, ordinary protected merge, merged-SHA/production acceptance and ten DoD remain open.
