@@ -67,6 +67,14 @@ dbTest('one read of a device\'s runs finds its stops, messages and queued runs',
     const back = await deviceWork(other, [ids.elsewhere], { queued: true })
     assert.deepEqual(new Set(back.commands), new Set([{ kind: 'stop', runId: ended }, { kind: 'stop', runId: reclaimed }]))
     assert.deepEqual(back.commands.map(command => command.runId).sort(), [ended, reclaimed].sort(), 'only recent lease ends; nothing else for the taken-back runs')
+
+    // A stop that ends the lease at once (a policy change, a revocation) is
+    // still delivered once, although the run is both stopped and taken back.
+    const policyStopped = randomUUID()
+    await run(policyStopped, other, 'running', true)
+    await pool.query(`update agent_runs set "leaseExpiresAt"=now() where id=$1`, [policyStopped])
+    const stopped = await deviceWork(other, [ids.elsewhere, ended, reclaimed], { queued: true })
+    assert.deepEqual(stopped.commands, [{ kind: 'stop', runId: policyStopped }])
   })
 })
 

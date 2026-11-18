@@ -200,7 +200,9 @@ export async function deviceWork(deviceId: string, skip: readonly string[], opti
     .from(agentRuns)
     .where(and(eq(agentRuns.deviceId, deviceId), or(inArray(agentRuns.status, [...LIVE_RUN_STATUSES]), sql.raw(takenBackSql('"agent_runs"')))))
   const skipped = new Set(skip)
-  const takenBack = rows.filter(run => run.takenBack && !run.stopRequestedAt && !skipped.has(run.id)).map(run => ({ kind: 'stop' as const, runId: run.id }))
+  // A run whose lease ended gets its stop here, whether the server took it back
+  // or a stop (policy, revocation, a person) ended the lease at the same time.
+  const takenBack = rows.filter(run => run.takenBack && !skipped.has(run.id)).map(run => ({ kind: 'stop' as const, runId: run.id }))
   const runs = rows.filter(run => (LIVE_RUN_STATUSES as readonly string[]).includes(run.status) && !run.takenBack)
   const live = runs.filter(run => !skipped.has(run.id))
   const queuedRuns = options.queued ? live.filter(run => run.status === 'queued').map(run => run.id).slice(0, 100) : []
