@@ -243,13 +243,11 @@ export function ContractEditor({
 
   // Instant and undoable with Mod-Z, so no confirm and no toast.
   function resolveOne(id: string, resolution: SuggestionResolution) {
-    if (!editor) return
+    if (!editor) return false
 
-    if (resolution === "accept") {
-      editor.commands.acceptChange(id)
-    } else {
-      editor.commands.rejectChange(id)
-    }
+    return resolution === "accept"
+      ? editor.commands.acceptChange(id)
+      : editor.commands.rejectChange(id)
   }
 
   function confirmResolveAll(resolution: SuggestionResolution) {
