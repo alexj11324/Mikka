@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 182 |
-| partial | 37 |
+| partial | 38 |
 | prior-partial | 36 |
-| unreviewed | 6301 |
+| unreviewed | 6300 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -72,3 +72,9 @@ Four additional fixed original files were fully read and traced: `apps/mobile/li
 Reparsed **all 27 original `paths-01.csv` through `paths-27.csv`** as quote-aware CSV (not comma-split and not relying on README prior totals). The exact locked snapshot contains **7,996 tracked paths**, of which **6,556 code** and **1,440 other tracked inputs**; every file parsed with the declared 10 columns and **zero malformed rows**. Actual code statuses at the current precise HEAD are **182 complete, 37 partial, 36 prior-partial, 6,301 unreviewed**. This corrects an already-existing **five-file optimistic error** in the README's earlier semantic numerator; the ten new reviews, their status transitions and the original fixed file objects are unchanged. Do not interpret the prior README 183 complete as a proven CSV count.
 
 Re-read the full `reviews.jsonl` and checked every one of its **246 unique paths** against all 27 CSVs, including exact Git object and status: **246/246 present, zero mismatches** (195 matches across CSV 01-09, 28 across 10-18, 23 across 19-27). JSONL includes reviewed non-code symlinks/assets, so its 208 `complete` entries must not be mistaken for the 182 code-complete denominator. This audit corrected the written summary, not source behavior; current main and Cloud pinned vendor remain separate incremental/dynamic acceptance requirements.
+
+## G-073 bounded Mobile list-section retirement (2026-11-18 UTC)
+
+On the **existing public G branch**, exact source commit `cf02fe3e7f8e5541d88851193020f8476ee836da` removed two unused `CLOSED_SHOWN` / `ShowAllRow` exports and their `Pressable` / haptic / dead-style code from `apps/mobile/shared/components/list-section.tsx`. The functional `ListSectionHeader` and its accessibility/count/grouped style were preserved. No indexed consumers of either deleted name exist in three main repositories; the preserved header is used by Mobile Search, Suggestions, Plugins and the search-screen regression. Fixed original Git blob `cc5095b9` was reconstructed locally; TypeScript TSX parse before/after had 0 diagnostics, and exported header markup was checked. This is an independent business UI dead-code candidate, **not a Cloudflare-native migration**. Original introducing commit is unverified; dynamically loaded Metro uses, actual Expo native/web, Node24, protected CI, ordinary merge and precise merged-SHA validation are still open. G-073 remains `candidate_unmerged` in changes.jsonl; Cloud vendor is pinned separately and not modified. No F, G-015, G-046, release, signing or device owner files were changed.
+
+Fixed code census **6556 = 182 complete / 38 partial / 36 prior-partial / 6300 unreviewed**; `reviews.jsonl` now has **247** distinct paths (including previously reviewed non-code). Main deltas and the full file denominator remain separate.
