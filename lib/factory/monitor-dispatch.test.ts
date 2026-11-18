@@ -149,7 +149,7 @@ test(
         [randomUUID()],
       );
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,'owner','Fixture device',true,now(),'[{"harness":"codex","installed":true}]')`,
+        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt","sessionOpenedAt",harnesses) VALUES ($1,'owner','Fixture device',true,now(),now(),'[{"harness":"codex","installed":true}]')`,
         [deviceId],
       );
       await pool.query(

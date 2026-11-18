@@ -3,7 +3,7 @@ import test from 'node:test'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import { createServer, IncomingMessage } from 'node:http'
-import { registerHooks } from 'node:module'
+import { createRequire, registerHooks } from 'node:module'
 import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -117,8 +117,16 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
       route('/api/tasks/[taskId]/review/send', ['POST'], () => import('../../app/api/tasks/[taskId]/review/send/route')),
     ]
     const application = createApiHandler(routes)
+    // The daemon works only while it holds its device session socket (decision
+    // 2026-11-17-2215). The node-server build mounts the built-in gateway on
+    // these paths (apps/api/builtin-services-module.mjs); mount the real one.
+    const { H3 } = await import('h3')
+    const { createGatewayHandler } = await import('../../apps/api/routes/builtin-gateway')
+    const gateway = new H3().all('/**', createGatewayHandler())
+    const gatewayPath = /^\/mikka\/v1\/(?:live\/|devices\/[^/]+\/(?:socket|push|status)$)/
     const runtime = serve({ manual: true, gracefulShutdown: false, silent: true, trustProxy: false, hostname: '127.0.0.1', port: 0,
       async fetch(request) {
+        if (gatewayPath.test(new URL(request.url).pathname)) return gateway.fetch(request)
         assert.ok(request.runtime?.node?.req instanceof IncomingMessage, 'requests enter through a TCP socket and srvx NodeRequest')
         const path = new URL(request.url).pathname
         // Observe the actual private TCP receipt without changing the request
@@ -145,6 +153,17 @@ export function registerHTTPDaemonAcceptance(kind: 'shared' | 'personal') {
       },
     })
     const server = createServer(runtime.node!.handler)
+    // Upgrades reach the built-in gateway through the Nitro WebSocket adapter production uses.
+    const nitroRequire = createRequire(createRequire(import.meta.url).resolve('nitro/package.json'))
+    const { default: websocketAdapter } = await import(pathToFileURL(nitroRequire.resolve('crossws/adapters/node')).href)
+    const { NodeRequest } = await import(pathToFileURL(nitroRequire.resolve('srvx/node')).href)
+    const websocket = websocketAdapter({ resolve: async (request: Request & { [key: symbol]: unknown }) => {
+      const response = await gateway.fetch(request) as Response & { crossws?: unknown }
+      return response.crossws ?? request[Symbol.for('crossws.hooks')] ?? {}
+    } })
+    server.on('upgrade', (request, socket, head) => {
+      websocket.handleUpgrade(request, socket, head, new NodeRequest({ req: request, upgrade: { socket, head } }))
+    })
     await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
     const address = server.address()
     assert.ok(address && typeof address !== 'string')

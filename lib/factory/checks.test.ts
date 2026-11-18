@@ -83,7 +83,7 @@ test(
         [issueId, await seedFixtureWorkspace(pool, 'owner')],
       );
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Isolated PG fixture',now(),'[{"harness":"codex","installed":true,"version":"fixture"}]')`,
+        `INSERT INTO devices (id,"ownerId",name,"lastSeenAt","sessionOpenedAt",harnesses) VALUES ($1,'owner','Isolated PG fixture',now(),now(),'[{"harness":"codex","installed":true,"version":"fixture"}]')`,
         [deviceId],
       );
       await pool.query(
