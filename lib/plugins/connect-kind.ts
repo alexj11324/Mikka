@@ -1,13 +1,14 @@
 // How a store app connects (decision 2026-11-02): Composio-managed OAuth in
-// one click, the person's own credentials (an API key, a token, a login) in
-// a form, or nothing at all. The form's fields are Composio's own definition
+// one click (including provider-supported DCR), the person's own credentials
+// in a form, no-auth, provider OAuth awaiting a Composio app, or unsupported
+// provider auth. The form's fields are Composio's own definition
 // for the toolkit; nothing here is written per app. Pure, shared by the
 // catalog, the app page, the connect route and tests.
 
-/** Credential schemes a person can fill in themselves. OAuth without Composio-managed auth needs a developer app, so it is not offered. */
+/** Credential schemes a person can fill in themselves. */
 export const CREDENTIAL_SCHEMES = ['API_KEY', 'BEARER_TOKEN', 'BASIC'] as const
 export type CredentialScheme = (typeof CREDENTIAL_SCHEMES)[number]
-export type ConnectKind = 'managed' | 'credentials' | 'none' | 'unsupported'
+export type ConnectKind = 'managed' | 'credentials' | 'none' | 'oauthSetupRequired' | 'unsupported'
 
 export const isCredentialScheme = (value: unknown): value is CredentialScheme => typeof value === 'string' && (CREDENTIAL_SCHEMES as readonly string[]).includes(value)
 
@@ -15,7 +16,13 @@ export function connectKind(item: { no_auth?: boolean | null; auth_schemes?: str
   const schemes = item.auth_schemes ?? []
   if (item.no_auth || (schemes.length > 0 && schemes.every(scheme => scheme === 'NO_AUTH'))) return 'none'
   if ((item.composio_managed_auth_schemes?.length ?? 0) > 0) return 'managed'
-  return schemes.some(isCredentialScheme) ? 'credentials' : 'unsupported'
+  // DCR lets Composio register an OAuth client with the provider at connect time;
+  // unlike regular OAuth, it does not require an app owner to supply client secrets.
+  if (schemes.includes('DCR_OAUTH')) return 'managed'
+  if (schemes.some(isCredentialScheme)) return 'credentials'
+  // Regular OAuth without a managed app needs an app registration before it can connect.
+  if (schemes.length > 0 && schemes.every(scheme => scheme === 'OAUTH1' || scheme === 'OAUTH2')) return 'oauthSetupRequired'
+  return 'unsupported'
 }
 
 export type CredentialField = { name: string; label: string; description: string; secret: boolean; required: boolean; defaultValue: string | null }

@@ -316,7 +316,11 @@
     "connectKind": {
       "managed": "一键授权",
       "credentials": "需要 API Key",
-      "none": "无需连接"
+      "none": "无需连接",
+      "oauthSetupRequired": "该服务需要 Composio 提供托管 OAuth 应用，目前尚未向 Mikka 开放",
+      "oauthSetupRequiredWithAlternative": "Composio 暂未向 Mikka 提供该服务的托管 OAuth · API Key 版本：{name}",
+      "alternativeLink": "改用 API Key 版本：{name}",
+      "unsupported": "Mikka 暂不支持该服务的认证方式。"
     },
     "key": {
       "title": "连接 {name}",

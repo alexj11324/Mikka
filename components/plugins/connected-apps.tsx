@@ -24,7 +24,7 @@ import { Switch } from '@/components/ui/switch'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appState, needsReconnect } from '@/lib/composio-account-state'
 import { composioConnectRedirect, type ConnectedAccountView as AccountView } from '@/lib/composio-accounts'
-import type { StoreApp, StoreCatalog } from '@/lib/plugins/catalog'
+import { findCredentialAlternative, type StoreApp, type StoreCatalog } from '@/lib/plugins/catalog'
 import type { AppDetail, AppTool } from '@/lib/plugins/app-detail'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
 import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
@@ -433,6 +433,8 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   const { name, iconUrl } = useAppInfo()(app)
   // Composio's own page data, for everyone, connected or not.
   const detail = useAppDetail(app)
+  const catalog = useStoreCatalog()
+  const credentialAlternative = detail.data ? findCredentialAlternative({ id: app, connect: detail.data.auth.kind }, catalog.data?.apps ?? []) : null
   // 开发者 only where Mikka already knows it; Composio does not say.
   const about = Object.hasOwn(APP_ABOUT, app) ? APP_ABOUT[app] : null
   const website = detail.data?.website ?? about?.website ?? null
@@ -444,10 +446,10 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   // How it connects: Composio's OAuth, the person's own key in a form, or nothing to connect.
   const kind = detail.data?.auth.kind ?? null
   const withKey = kind === 'credentials'
-  const canAdd = withKey ? apps.canEnterKey : apps.canLink
+  const canAdd = withKey ? apps.canEnterKey : kind === 'managed' && apps.canLink
   const [keyTarget, setKeyTarget] = useState<CredentialTarget | null>(null)
-  const add = () => { if (withKey) setKeyTarget({ app }); else void apps.connect(app) }
-  const reconnect = (accountId: string) => { if (withKey) setKeyTarget({ app, replaceAccountId: accountId }); else void apps.reconnect(accountId) }
+  const add = () => { if (withKey) setKeyTarget({ app }); else if (kind === 'managed') void apps.connect(app) }
+  const reconnect = (accountId: string) => { if (withKey) setKeyTarget({ app, replaceAccountId: accountId }); else if (kind === 'managed') void apps.reconnect(accountId) }
   const makeDefault = (account: ConnectedAccountView) => {
     const title = accountName(account)
     void apps.makeDefault(account.id).then(ok => { if (ok) toast.success(t('madeDefault', { account: title })) })
@@ -473,7 +475,7 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   /** What the confirmation says will happen. */
   const disconnectText = (account: ConnectedAccountView) => takeoverText(accounts, account.id) ?? t('disconnectConsequence', { name })
   return {
-    name, iconUrl, accounts, several, detail, about, website, busy, kind, withKey, canAdd, keyTarget, setKeyTarget,
+    name, iconUrl, accounts, several, detail, about, website, busy, kind, withKey, canAdd, credentialAlternative, keyTarget, setKeyTarget,
     accountName, statusLabel, needsReconnect, add, reconnect, makeDefault, toggle, disconnect, disconnectText,
   }
 }
