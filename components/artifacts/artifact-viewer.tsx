@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type
 import useSWR, { unstable_serialize } from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { ChevronDown, Download, Globe, History, MessageSquare, SquareDashedMousePointer, X } from 'lucide-react'
+import { ChevronDown, Download, Globe, History, MessageSquare, SquareDashedMousePointer, X } from '@/components/icons'
 import { getArtifact, getArtifactText } from '@/app/actions/artifacts'
 import { openConnectedAsset } from '@/lib/web-connection/assets'
 import { Badge } from '@/components/ui/badge'

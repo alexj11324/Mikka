@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 // beui.dev/components/motion/file-tree
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ChevronRight, File, Folder, FolderOpen } from "lucide-react";
+import { ChevronRight, File, Folder, FolderOpen } from "@/components/icons";
 import {
   Children,
   Fragment,

@@ -25,7 +25,7 @@ import { MessageScroller, MessageScrollerButton, MessageScrollerContent, Message
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { CircleAlert, CircleHelp } from 'lucide-react'
+import { CircleAlert, CircleHelp } from '@/components/icons'
 import { toast } from 'sonner'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from '@/components/workspace/agent-citations'
 import { UserMessageText } from '@/components/workspace/user-message-text'

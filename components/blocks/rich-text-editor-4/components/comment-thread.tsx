@@ -24,7 +24,7 @@ import {
 import { CURRENT_USER } from "./data"
 import type { ThreadRecord } from "./rich-text-comments"
 import { firstName, formatTime, PersonAvatar, personFor } from "./value-faces"
-import { CheckIcon } from "lucide-react"
+import { Check } from "@/components/icons"
 
 // A hovered row already takes the ghost hover's gray, so Resolve fills solid
 // in its outcome's color on hover and focus.
@@ -161,7 +161,7 @@ export function CommentThread({
                 />
               }
             >
-              <CheckIcon aria-hidden="true" />
+              <Check aria-hidden="true" />
             </TooltipTrigger>
             <TooltipContent>Resolve</TooltipContent>
           </Tooltip>

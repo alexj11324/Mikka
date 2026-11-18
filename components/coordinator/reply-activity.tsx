@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import {
   BellRing, BookOpen, Brain, CalendarDays, ChevronsDownUp, ChevronsUpDown, CircleStop, Factory, FolderGit2, Power, FolderOpen, Globe, ListChecks,
   Mail, MessageSquare, MessageSquareText, Pencil, Search, Send, SquarePlus, Wrench,
-} from 'lucide-react'
+} from '@/components/icons'
 import { coordinatorReasoning } from '@/app/actions/coordinator'
 import { CodeBlock, CodeBlockContent } from '@/components/ui/code-block'
 import { Button } from '@/components/ui/button'

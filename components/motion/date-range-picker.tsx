@@ -7,7 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-} from "lucide-react";
+} from "@/components/icons";
 import {
   AnimatePresence,
   type HTMLMotionProps,

@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Circle, Loader2, TerminalSquare, X } from 'lucide-react'
+import { Check, ChevronDown, Circle, LoaderCircle, SquareTerminal, X } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import { LOCAL_RECONNECT, LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 import type { DeviceView } from '@/app/actions/agents'
@@ -19,7 +19,7 @@ import { DaemonCommandList } from './connect-device-dialog'
 function StepIcon({ state }: { state: StepState }) {
   if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success-foreground" />
   if (state === 'failed') return <X aria-hidden="true" className="size-4 text-destructive-foreground" />
-  if (state === 'running') return <Loader2 aria-hidden="true" className="size-4 animate-spin text-muted-foreground" />
+  if (state === 'running') return <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-muted-foreground" />
   return <Circle aria-hidden="true" className="size-4 text-muted-foreground/60" />
 }
 
@@ -164,7 +164,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
                   <Item role="option" aria-selected={active} aria-disabled={exists || undefined} size="sm"
                     render={<Button variant="ghost" disabled={exists} onClick={() => { setSelected(host); setOther('') }} />}
                     className={cn('h-auto w-full justify-start gap-2.5 rounded-none px-3 py-2.5 font-normal', active && 'bg-muted')}>
-                    <TerminalSquare aria-hidden="true" className="text-muted-foreground" />
+                    <SquareTerminal aria-hidden="true" className="text-muted-foreground" />
                     <span className="flex min-w-0 flex-1 flex-col text-left">
                       <span className="truncate text-sm">{host}</span>
                       {address && <span className="truncate font-mono text-xs text-muted-foreground">{address}</span>}

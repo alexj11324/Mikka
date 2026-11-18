@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, LoaderCircle, X } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import { LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 import { Button } from '@/components/ui/button'
@@ -51,7 +51,7 @@ export function LocalSetupStatus({ onOnline }: { onOnline: () => void }) {
     <ItemMedia>
       {state.status === 'online' ? <Check aria-hidden="true" className="text-success-foreground" />
         : state.status === 'failed' ? <X aria-hidden="true" className="text-destructive-foreground" />
-          : <Loader2 aria-hidden="true" className="animate-spin text-muted-foreground motion-reduce:animate-none" />}
+          : <LoaderCircle aria-hidden="true" className="animate-spin text-muted-foreground motion-reduce:animate-none" />}
     </ItemMedia>
     <ItemContent className="min-w-0">
       <ItemTitle>{state.status === 'online' ? t('local.online') : state.status === 'failed' ? t('local.failed') : t('local.adding')}</ItemTitle>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Ban, Check, CircleCheck, CircleX, Clock, ExternalLink, GitMerge, RefreshCw, Server, TriangleAlert, Upload, type LucideIcon } from 'lucide-react'
+import { Ban, Check, CircleCheck, CircleX, Clock, ExternalLink, GitMerge, RefreshCw, Server, TriangleAlert, Upload, type IconGlyph } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
@@ -61,7 +61,7 @@ function StateIcon({ state, refused }: { state: AcceptanceState; refused: boolea
 }
 
 /** A busy action swaps its icon for the Spinner, so the button keeps its width (no layout jump). */
-function ActionIcon({ icon: Icon, busy }: { icon: LucideIcon; busy: boolean }) {
+function ActionIcon({ icon: Icon, busy }: { icon: IconGlyph; busy: boolean }) {
   return busy ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" aria-hidden="true" />
 }
 

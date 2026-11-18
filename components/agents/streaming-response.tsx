@@ -9,7 +9,7 @@ import {
   RotateCcw,
   ThumbsDown,
   ThumbsUp,
-} from "lucide-react";
+} from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   type ReactNode,

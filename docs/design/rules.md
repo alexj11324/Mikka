@@ -494,10 +494,20 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   products use for the same function (memory = book as in ChatGPT,
   notifications = bell, connectors = blocks as in Claude…). The spec or review
   page names the product for each. Rail icons: 主页 House, 建议 Lightbulb,
-  看板 Columns3, 插件 Blocks. Artifact is the one exception: it uses
-  Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
+  看板 Kanban, 插件 Blocks. Artifact is the one exception: it uses
+  Mikka's own stacked-cards icon (R-56), never Copy or Library.
   No sparkle for AI (unslop): thinking is Brain, a bot is Bot (ui-policy
   `icons/no-sparkle`).
+- **R-71a** Mikka's own UI draws one icon family: affectUI's Hugeicons, through
+  `components/icons/index.tsx` (`@/components/icons`), whose glyphs are stroke
+  2 in a 24 box in `currentColor` ([2026-11-18-1900](decisions/2026-11-18-1900-icons-hugeicons.md)).
+  A task's status icon is the one exception: `ISSUE_STATUSES` keeps its lucide
+  glyphs and `status-icons.tsx` its three rings
+  ([2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), and no
+  other family stands in for a status. Paid blocks keep their own icons
+  ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+  A new glyph is a line in that file, not a new package (ui-policy
+  `icons/glyph-set`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
   value read-only. A person's own subscriptions and API keys are not such a
@@ -541,7 +551,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
   status lines — the icon comes first, then the name. Devices use their
-  type (laptop, server = lucide Server, 云端托管 = cloud) plus the online dot;
+  type (laptop, server = `Server`, 云端托管 = `Cloud`) plus the online dot;
   agents use their own brand mark (Claude Code, Codex, Cursor…); models use
   their provider's mark (Claude, OpenAI…); apps use the R-70 brand tile.
   Brand marks are the colored logo on its own, never set in a white disc or
@@ -586,7 +596,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   account's email (small, muted) with its workspaces under it (avatar, name,
   a check on the current one; about five show, more scroll), 创建工作区;
   then 设置 with its shortcut as one quiet text hint (⌘, not keycaps); then
-  添加账户 and 退出登录. Every action row leads with a muted lucide icon in
+  添加账户 and 退出登录. Every action row leads with a muted glyph in
   the same 20px box as the workspace avatars (创建工作区 `Plus`, 设置
   `Settings`, 添加账户 `UserPlus`, 退出登录 `LogOut`), so all rows share
   one text column. Menu text and item height are the defaults; the

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
 import useSWR from 'swr'
-import { Circle, CircleCheck, X } from 'lucide-react'
+import { Circle, CircleCheck, X } from '@/components/icons'
 import { dismissSetupChecklist, restoreSetupChecklist, setupChecklist } from '@/app/actions/onboarding'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { FieldError } from '@/components/ui/field'

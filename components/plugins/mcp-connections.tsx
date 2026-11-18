@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import useSWR, { type SWRResponse } from 'swr'
 import { useTranslations } from 'next-intl'
-import { Plus, Trash2, UserRound } from 'lucide-react'
+import { Plus, Trash2, UserRound } from '@/components/icons'
 import { withBasePath } from '@/lib/base-path'
 import { settingsKeys } from '@/lib/swr/keys'
 import { ReadResponseError } from '@/lib/swr/retry'

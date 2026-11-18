@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 // beui.dev/components/agents/chat-app
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown } from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   type ReactNode,

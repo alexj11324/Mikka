@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { ServerIcon } from 'lucide-react'
+import { Server } from '@/components/icons'
 import type { BundledServer } from '@mikka/protocol/bridge'
 import { withBasePath } from '@/lib/base-path'
 import { clearPersistentReadCaches } from '@/lib/swr/persistent-cache'
@@ -44,7 +44,7 @@ export function DesktopServerSettings() {
 
   return <div data-desktop-only className="contents">
     <SettingsSection id="desktop-server-heading" title={t('server')}>
-      {rows.map(server => <SettingRow key={server.url} icon={<ServerIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />} title={label(server)} description={server.cloud ? undefined : new URL(server.url).host}>
+      {rows.map(server => <SettingRow key={server.url} icon={<Server aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />} title={label(server)} description={server.cloud ? undefined : new URL(server.url).host}>
         <div className="flex items-center gap-2">
           {server.url === current.url && <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => setChoosing(true)}>{t('switch')}</Button>}
           <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { setFailed(false); setLeaving(server) }}>{t('disconnect')}</Button>

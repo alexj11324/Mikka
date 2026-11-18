@@ -12,7 +12,7 @@ import { useRichTextState } from "./rich-text-state"
 import { SpecActions } from "./spec-actions"
 import { SpecToolbar } from "./spec-toolbar"
 import { formatTime } from "./value-faces"
-import { MessageSquareTextIcon } from "lucide-react"
+import { MessageSquareText } from "@/components/icons"
 
 function Dot({ className }: { className?: string }) {
   return (
@@ -155,7 +155,7 @@ export function SpecHeader({
               aria-label={`Comments, ${comments.open} open`}
               onClick={comments.onOpenList}
             >
-              <MessageSquareTextIcon aria-hidden="true" />
+              <MessageSquareText aria-hidden="true" />
               <span className="max-sm:sr-only">Comments</span>
               <span className="text-muted-foreground tabular-nums">
                 {comments.open}

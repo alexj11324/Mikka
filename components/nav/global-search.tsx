@@ -2,7 +2,7 @@
 
 import { useContext, useMemo, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Bot, FileDiff, FolderClosed, ListTodo, Plus, RotateCw, Search, SquarePen, Users } from 'lucide-react'
+import { Bot, FileDiff, FolderClosed, ListTodo, Plus, RotateCw, Search, SquarePen, Users } from '@/components/icons'
 import type { listIssues } from '@/app/actions/issues'
 import type { listProjects } from '@/app/actions/projects'
 import type { Thread } from '@/app/actions/task-runs'

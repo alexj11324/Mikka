@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { ArrowUpRight, LoaderCircle } from 'lucide-react'
+import { ArrowUpRight, LoaderCircle } from '@/components/icons'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
 import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'

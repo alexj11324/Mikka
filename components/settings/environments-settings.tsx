@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from 'next-intl'
-import { Archive, Pencil, Plus } from 'lucide-react'
+import { Archive, Pencil, Plus } from '@/components/icons'
 import type { EnvironmentView, EnvironmentsView } from '@/app/actions/environments'
 import { listProjectSetupVersions, rollbackProjectSetup, saveEnvironment, setProjectDefaultEnvironment } from '@/app/actions/project-resources'
 import type { EnvironmentConfiguration, ProjectSetupHistory } from '@/lib/project-resources/contracts'

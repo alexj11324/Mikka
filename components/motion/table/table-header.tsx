@@ -7,7 +7,7 @@ import {
   GripVertical,
   MoreHorizontal,
   Trash2,
-} from "lucide-react";
+} from "@/components/icons";
 import { motion } from "motion/react";
 import { type PointerEvent as ReactPointerEvent, useEffect } from "react";
 import { createPortal } from "react-dom";

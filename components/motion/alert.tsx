@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/motion/alert
 
-import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from "lucide-react";
+import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from "@/components/icons";
 import { AnimatePresence, type HTMLMotionProps, motion, useReducedMotion } from "motion/react";
 import {
   createContext,
@@ -51,9 +51,9 @@ const VARIANT_CLASS: Record<AlertVariant, string> = {
 const VARIANT_ICON = {
   default: Info,
   info: Info,
-  success: CheckCircle2,
+  success: CircleCheck,
   warning: TriangleAlert,
-  destructive: AlertCircle,
+  destructive: CircleAlert,
 };
 
 export interface AlertProps extends Omit<HTMLMotionProps<"div">, "initial" | "animate" | "exit" | "layout" | "transition" | "role"> {

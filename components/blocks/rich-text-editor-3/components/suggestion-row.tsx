@@ -25,7 +25,7 @@ import {
   PersonAvatar,
   personFor,
 } from "./value-faces"
-import { CheckIcon, XIcon } from "lucide-react"
+import { Check, X } from "@/components/icons"
 
 // A hovered row already takes the ghost hover's gray, so each action fills
 // solid in its outcome's color (the Badge recipe) on hover and focus.
@@ -106,7 +106,7 @@ export function SuggestionRow({
                 />
               }
             >
-              <CheckIcon aria-hidden="true" />
+              <Check aria-hidden="true" />
             </TooltipTrigger>
             <TooltipContent>Accept</TooltipContent>
           </Tooltip>
@@ -125,7 +125,7 @@ export function SuggestionRow({
                 />
               }
             >
-              <XIcon aria-hidden="true" />
+              <X aria-hidden="true" />
             </TooltipTrigger>
             <TooltipContent>Reject</TooltipContent>
           </Tooltip>

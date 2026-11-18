@@ -4,7 +4,7 @@ import { useAgentCopy } from '@/hooks/use-agent-copy'
 import type { AgentCopy } from '@/lib/agent-copy'
 // beui.dev/components/agents/chat-app
 
-import { ChevronDown, ListTodo } from "lucide-react";
+import { ChevronDown, ListTodo } from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   type ReactNode,

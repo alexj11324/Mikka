@@ -2,7 +2,7 @@
 
 import { useViewState } from '@/lib/hooks/view-state'
 import { useTranslations } from 'next-intl'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight } from '@/components/icons'
 import { threadStepCounts, threadStepOutput, type ThreadStep } from '@/lib/issue-run-conversation'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'

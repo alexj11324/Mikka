@@ -2,7 +2,7 @@
 
 // The default chat-composer slot (docs/ui-overlay.md): the Grok-style composer every chat uses.
 import { useTranslations } from 'next-intl'
-import { ArrowUp, Plus, Square } from 'lucide-react'
+import { ArrowUp, Plus, Square } from '@/components/icons'
 import { Input } from '@/components/ui/input'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from '@/components/ui/input-group'

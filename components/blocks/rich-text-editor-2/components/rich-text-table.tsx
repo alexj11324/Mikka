@@ -29,7 +29,7 @@ import {
   RichTextToolbarGroup,
   RichTextToolbarSeparator,
 } from "./rich-text-toolbar"
-import { TableIcon, BetweenHorizontalEndIcon, BetweenVerticalEndIcon, PanelTopIcon, Trash2Icon, Rows3Icon, Columns3Icon } from "lucide-react"
+import { Table, BetweenHorizontalEnd, BetweenVerticalEnd, PanelTop, Trash2, Rows3, Columns3 } from "@/components/icons"
 
 /** Tables with draggable column edges; the header row comes from insertTable. */
 export const RichTextTable = TableKit.configure({
@@ -56,7 +56,7 @@ export const RICH_TEXT_TABLE_SLASH_ITEM: RichTextSlashItem = {
   hint: "Rows and columns with a header",
   keywords: ["grid", "rows", "columns", "spreadsheet"],
   icon: (
-    <TableIcon aria-hidden="true" />
+    <Table aria-hidden="true" />
   ),
   // Cells accept blocks, so a table would nest inside a table.
   can: (editor) => !editor.isActive("table"),
@@ -172,13 +172,13 @@ export function RichTextTableBubble({
             label={t('addRowBelow')}
             onClick={() => editor.chain().focus().addRowAfter().run()}
           >
-            <BetweenHorizontalEndIcon aria-hidden="true" />
+            <BetweenHorizontalEnd aria-hidden="true" />
           </RichTextButton>
           <RichTextButton
             label={t('addColumnRight')}
             onClick={() => editor.chain().focus().addColumnAfter().run()}
           >
-            <BetweenVerticalEndIcon aria-hidden="true" />
+            <BetweenVerticalEnd aria-hidden="true" />
           </RichTextButton>
         </RichTextToolbarGroup>
         <RichTextToolbarSeparator />
@@ -187,7 +187,7 @@ export function RichTextTableBubble({
           pressed={table.headerRow}
           onToggle={() => editor.chain().focus().toggleHeaderRow().run()}
         >
-          <PanelTopIcon aria-hidden="true" />
+          <PanelTop aria-hidden="true" />
         </RichTextToggle>
         <RichTextToolbarSeparator />
         <DropdownMenu>
@@ -204,7 +204,7 @@ export function RichTextTableBubble({
                   />
                 }
               >
-                <Trash2Icon aria-hidden="true" />
+                <Trash2 aria-hidden="true" />
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent>{t('delete')}</TooltipContent>
@@ -220,20 +220,20 @@ export function RichTextTableBubble({
                 disabled={!table.canDeleteRow}
                 onClick={() => editor.chain().focus().deleteRow().run()}
               >
-                <Rows3Icon aria-hidden="true" />
+                <Rows3 aria-hidden="true" />
                 {t('deleteRow')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!table.canDeleteColumn}
                 onClick={() => editor.chain().focus().deleteColumn().run()}
               >
-                <Columns3Icon aria-hidden="true" />
+                <Columns3 aria-hidden="true" />
                 {t('deleteColumn')}
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={onDeleteTable}>
-              <Trash2Icon aria-hidden="true" />
+              <Trash2 aria-hidden="true" />
               {t('deleteTableAction')}
             </DropdownMenuItem>
           </DropdownMenuContent>

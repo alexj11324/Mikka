@@ -3,21 +3,21 @@ import { Button } from "@/components/ui/button";
 // beui.dev/components/blocks/file-upload
 
 import {
-  AlertCircle,
-  CheckCircle2,
+  CircleAlert,
+  CircleCheck,
   FileArchive,
   FileAudio,
   FileCode2,
-  FileIcon,
+  File,
   FileImage,
   FileSpreadsheet,
   FileText,
   FileVideo,
-  Loader2,
+  LoaderCircle,
   RotateCcw,
   UploadCloud,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useCallback, useId, useRef, useState } from "react";
 import { EASE_OUT } from "@/lib/ease";
@@ -192,7 +192,7 @@ function getFileIcon(item: FileUploadItem) {
     return FileCode2;
   }
 
-  return FileIcon;
+  return File;
 }
 
 export function createFileUploadItem(file: File, index = 0): FileUploadItem {
@@ -235,11 +235,11 @@ function StatusIcon({
         className={cn("grid h-6 w-6 place-items-center", STATUS_TONE[status])}
       >
         {status === "success" ? (
-          <CheckCircle2 className={iconClassName} />
+          <CircleCheck className={iconClassName} />
         ) : status === "error" ? (
-          <AlertCircle className={iconClassName} />
+          <CircleAlert className={iconClassName} />
         ) : status === "uploading" ? (
-          <Loader2
+          <LoaderCircle
             className={cn(
               iconClassName,
               "animate-spin",
@@ -247,7 +247,7 @@ function StatusIcon({
             )}
           />
         ) : (
-          <FileIcon className={iconClassName} />
+          <File className={iconClassName} />
         )}
         <span className="sr-only">{STATUS_LABEL[status]}</span>
       </motion.span>

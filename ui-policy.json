@@ -3,6 +3,7 @@
   "base": "base",
   "style": "base-nova",
   "iconLibrary": "lucide-react",
+  "glyphLibrary": "@/components/icons",
   "componentRoots": ["components/ui/", "components/reui/", "components/blocks/", "components/motion/", "components/agents/", "components/ai-elements/"],
   "asShipped": {
     "$comment": "Paid blocks and components are used as shipped: only data and text change. Files under these paths skip style/semantic-colors and typography/preset-only; every other rule applies. See docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md. Empty: paid source is not allowed in this repository; the hosted list is in its AGENTS.md.",

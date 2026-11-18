@@ -9,7 +9,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useMessages, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown } from '@/components/icons'
 import { getThreadInstructions, stopRun, getThreadContinuationModels } from '@/app/actions/agents'
 import { useThreadChanges } from '@/hooks/use-thread-run-reads'
 import { useIssueThreadRead } from '@/hooks/use-issue-thread-read'

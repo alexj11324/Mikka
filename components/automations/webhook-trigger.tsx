@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { Copy } from 'lucide-react'
+import { Copy } from '@/components/icons'
 import { automationWebhookKey } from '@/app/actions/automations'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

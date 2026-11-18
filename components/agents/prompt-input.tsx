@@ -2,7 +2,7 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 // beui.dev/components/agents/chat-app
 
-import { ArrowUp, Plus, Square } from "lucide-react";
+import { ArrowUp, Plus, Square } from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   type FormEvent,

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, type ComponentProps, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { Globe } from 'lucide-react'
+import { Globe } from '@/components/icons'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { getLinkPreview } from '@/app/actions/link-preview'

@@ -2,7 +2,7 @@
 // beui.dev/components/blocks/file-upload
 
 import {
-  AlertCircle,
+  CircleAlert,
   Check,
   ExternalLink,
   FileImage,
@@ -15,7 +15,7 @@ import {
   RotateCcw,
   Upload,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import {
   AnimatePresence,
   LayoutGroup,
@@ -242,7 +242,7 @@ function RowAction({
             aria-label={`Upload failed for ${label}`}
             className="grid size-9 shrink-0 place-items-center rounded-xl text-destructive-foreground"
           >
-            <AlertCircle className="size-4" />
+            <CircleAlert className="size-4" />
           </span>
         </Tooltip>
       );

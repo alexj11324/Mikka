@@ -38,7 +38,8 @@ function audit(file, text, bindingsOnly) {
         if (node.moduleSpecifier.text === 'react-native' && /^(?:Button|Pressable|TouchableOpacity|TouchableHighlight)$/.test(original)) nativePressables.add(spec.name.text)
         if (node.moduleSpecifier.text === 'react-native' && original === 'Alert') nativeAlerts.add(spec.name.text)
         if (node.moduleSpecifier.text === 'expo-router' && original === 'Link') expoLinks.add(spec.name.text)
-        if (ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === 'lucide-react') iconImports.add(spec.name.text)
+        // Mikka's own glyphs (2026-11-18-1900) and a task's status icon are both drawn as icons.
+        if (ts.isStringLiteral(node.moduleSpecifier) && ['lucide-react', '@/components/icons'].includes(node.moduleSpecifier.text)) iconImports.add(spec.name.text)
       }
     }
     if ((ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) || ts.isFunctionDeclaration(node) && node.name) {

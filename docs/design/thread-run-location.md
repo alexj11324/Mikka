@@ -49,8 +49,8 @@ Screenshots of the key frames are in [`thread-run-location/`](thread-run-locatio
 | Parts: mark variants (`1054:77`), hover cards, icons | `1053:2` |
 
 - **Icons only** (Alex, 2026-11-06: 「这些都只留图标，文字必须要 hover 上去才能看得见」).
-  After the title come two icons and no text: the device type icon (lucide
-  `Cloud`, `Laptop`, `Server`) with the StatusDot on its top right (R-24),
+  After the title come two icons and no text: the device type icon (`Cloud`,
+  `Laptop`, `Server`) with the StatusDot on its top right (R-24),
   then the Agent's mark. Hovering the device icon opens the card below; the
   Agent mark has a tooltip 「Claude Code · Mikka Frontend 派出」. The mark
   component's 「显示名称」 property is off in headers and on inside the identity

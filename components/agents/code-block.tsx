@@ -2,7 +2,7 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 // beui.dev/components/agents/chat-app
 
-import { Check, Copy, FileCode2, LoaderCircle } from "lucide-react";
+import { Check, Copy, FileCode2, LoaderCircle } from "@/components/icons";
 import { motion, useReducedMotion } from "motion/react";
 import {
   type ReactNode,

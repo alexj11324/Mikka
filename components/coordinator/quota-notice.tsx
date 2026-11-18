@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { Info } from 'lucide-react'
+import { Info } from '@/components/icons'
 import { getBotModelMenu } from '@/app/actions/execution-settings'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'

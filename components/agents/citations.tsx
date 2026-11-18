@@ -3,7 +3,7 @@
 // beui.dev/components/agents/citations
 
 import { Button } from "@/components/ui/button";
-import { BookOpenText, ChevronDown, ExternalLink, Globe2 } from "lucide-react";
+import { BookOpenText, ChevronDown, ExternalLink, Globe2 } from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   type ReactNode,

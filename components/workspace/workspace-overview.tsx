@@ -1,7 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { Inbox, Star, Bell } from 'lucide-react'
+import { Inbox, Star, Bell } from '@/components/icons'
 import useSWR, { unstable_serialize } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { InlineLoadError } from '@/components/load-error'

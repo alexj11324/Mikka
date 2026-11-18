@@ -1,7 +1,7 @@
 'use client'
 
 import { useId, useState, type ReactNode } from 'react'
-import { Box, Users, UserRound, CalendarDays, CalendarCheck, Tag, GitBranch, Plus, type LucideIcon } from 'lucide-react'
+import { Box, Users, UserRound, CalendarDays, CalendarCheck, Tag, GitBranch, Plus, type IconGlyph } from '@/components/icons'
 import { parseISO } from 'date-fns'
 import { useFormatter, useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
@@ -18,7 +18,7 @@ import { statusTone, statusDots, statusTones, type StatusTone } from '@/lib/stat
 import type { WorkspaceSettings } from '@/lib/workspace-access'
 import { BadgeButton } from '@/components/reui/badge'
 
-type Choice = { value: string; label: string; icon?: LucideIcon; description?: string; tone?: StatusTone }
+type Choice = { value: string; label: string; icon?: IconGlyph; description?: string; tone?: StatusTone }
 export function ProjectPicker({ label, title, children, choices, selected, onChange, multiple = false, onCreate, createDisabled = false, disabled, plain = false, tone, dotOnly = false }: { dotOnly?: boolean; tone?: StatusTone; label: string; title: string; children: ReactNode; choices: Choice[]; selected: string[]; onChange: (value: string) => void; multiple?: boolean; onCreate?: (value: string) => void; createDisabled?: boolean; disabled?: boolean; plain?: boolean }) {
   const t = useTranslations('Projects')
   const common = useTranslations('Common')
@@ -47,7 +47,7 @@ export function ProjectPicker({ label, title, children, choices, selected, onCha
   </Popover>
 }
 
-function ProjectDatePicker({ label, value, onChange, disabled, plain, min, max, icon: Icon }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; plain?: boolean; min?: string; max?: string; icon: LucideIcon }) {
+function ProjectDatePicker({ label, value, onChange, disabled, plain, min, max, icon: Icon }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; plain?: boolean; min?: string; max?: string; icon: IconGlyph }) {
   const t = useTranslations('Projects')
   const common = useTranslations('Common')
   const format = useFormatter()
