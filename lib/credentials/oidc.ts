@@ -13,5 +13,5 @@ export async function verifyAppOidc(token: string, environment = process.env.VER
       ownerId: 'team_C7lwxVVvnUicFli6112mvxpv',
       environment, algorithms: ['RS256'], requiredClaims: ['exp', 'iat', 'sub'],
     })
-  } catch { throw new CredentialError('credential_denied', 403) }
+  } catch (error) { throw new CredentialError('credential_denied', 403, { cause: error }) }
 }
