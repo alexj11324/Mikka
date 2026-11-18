@@ -291,7 +291,7 @@ describe('sampling and settings', () => {
     assert.equal(traceSampleRate({ NODE_ENV: 'test', MIKKA_TRACE_SAMPLE_RATE: '1' }), 0)
     assert.equal(traceSampleRate({ CI: 'true', MIKKA_TRACE_SAMPLE_RATE: '1' }), 0)
     assert.equal(traceSampleRate({ NEXT_PHASE: 'phase-production-build' }), 0)
-    assert.equal(traceSampleRate({ VERCEL: '1', CI: '1', VERCEL_ENV: 'production' }), 0.1)
+    assert.equal(traceSampleRate({ VERCEL: '1', CI: '1', VERCEL_ENV: 'production' }), 0)
     assert.equal(traceSampleRate({}), 0.1)
     assert.equal(traceSampleRate({ NODE_ENV: 'development', MIKKA_TRACE_SAMPLE_RATE: '1' }), 1)
     assert.equal(traceSampleRate({ MIKKA_TRACE_SAMPLE_RATE: '7' }), 1)
