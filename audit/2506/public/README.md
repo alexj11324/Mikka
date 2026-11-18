@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 182 |
-| partial | 43 |
+| complete | 184 |
+| partial | 45 |
 | prior-partial | 36 |
-| unreviewed | 6295 |
+| unreviewed | 6291 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -86,3 +86,13 @@ Full original `apps/mobile/components/Segmented.{ios.tsx,tsx}` sources were read
 ## Continued Mobile stop failure and Symbol platform pair (2026-11-18 UTC)
 
 Three further original code sources were read fully and cross-consumer tracked: `apps/mobile/components/StopFailed.tsx` is the **existing** stateless retry row mounted by chat/task/thread only while `useStop` reports stuck; it has no timer, network or Cloudflare state owner. `Symbol.ios.tsx` uses the official `@expo/ui/swift-ui` Host/Image and exact SF Symbols type. `Symbol.tsx` provides explicit Web/Android ReactNode fallback (a caller's Lucide icon is an observed example). Native and fallback props match. All three fixed blobs equal public main and pinned Cloud `vendor/mikka@82d285ed`. Bounded original source assertions **6/6** passed; neither Node24, installed Expo, accessibility/Android/browser parity, real Stop ACK or protected CI was run. All three are `partial retain`, not duplicate Cloudflare services. One risk remains: a Web/Android consumer that supplies no `web` node renders no icon; keep actual visible-action verification before closure. Fixed census now **6556 code = 182 complete / 43 partial / 36 prior-partial / 6295 unreviewed**, **252 unique review records** including non-code. Main diff and Cloud vendor pin remain separate; no other Owner changes.
+
+## 2026-11-18 fixed Mobile web handoff and orphan scroll hook review
+
+Four previously unreviewed immutable fixed-source paths were fully read and checked against the public current main and Cloud's pinned public vendor `82d285ed`, with independent CSV and JSONL evidence. Original `apps/mobile/lib/chat-scroll.ts` and `apps/mobile/tests/chat-scroll.test.mts` were reconstructed byte-for-byte, verified with `git hash-object`, then the **unchanged original suite** ran under isolated Linux Node **22.16.0** (`--experimental-strip-types --test`), **3/3 passing, zero skips**. This covers the pure scroll-follow, history prepending and paused-card state, not the current ChatMessageList renderer. The original `useChatScroll.ts` has no indexed consumers across three repository mains, although historical UX-02/#1296 names it; removing it requires resolved Metro/Expo import graph and C UX ownership verification. It is **partial orphan candidate**, not a proven removable substitute for a platform API.
+
+The original `apps/mobile/lib/web.ts` is the one-time-token/account-bound browser handoff and contains a distinct security contract; do **not** replace it with browser cookies or an unscoped redirect. Latest main changed its entry signature to `openOnWeb(path, { confirmAccount: true })` for organization and personal Files, but the older G audit branch lacked that behavior. The existing G branch source commit [`25c185d5`](https://github.com/alexj11324/Mikka/commit/25c185d5bbb1b0ea7869e67feef23e57f6fd0779) restored the **exact current-main blob `b328614d`**, protecting this authorization UX in a future integration. No new self-built scheduler, state service, wrapper or Cloudflare fallback was added. The full original handoff source and existing main regression file were read, but **real one-time-token/browser/native/PG17 tests and Node24 protected CI were not run**.
+
+All four paths have explicit baseline Git blobs and current-main / pinned-Cloud comparison in `reviews.jsonl`. The public code denominator stays 6,556; status is **184 complete / 45 partial / 36 prior-partial / 6,291 unreviewed**, and reviews have **256 distinct paths**. These are only bounded per-file findings. They do not complete full main deltas, Cloud's pinned-vendor delta, dynamic tests, protected ordinary merges, exact merged SHA acceptance or the parent ten DoD.
+
+Cloudflare official [Container-class migration](https://developers.cloudflare.com/containers/guides/migrate-to-durable-object-container-api/) (updated Nov 9, 2026) still requires verifying equivalent readiness, egress, start/stop and activity/alarms before removing the deprecated SDK. The separate [scheduling-policy migration](https://developers.cloudflare.com/containers/guides/migrate-to-durable-object-scheduling-policy/) (updated Nov 14, 2026) requires a replacement application/DO namespace, with no automatic data transfer. Current [policy guide](https://developers.cloudflare.com/containers/configuration/scheduling-policy/) lists `basic` among supported instance sizes while its runtime section explicitly says runtime does **not** accept `basic`; **do not select `basic` by documentation assumption**. G-015's original Owner must run the locked Wrangler 4.152.0/workerd variant and capture the actual accepted runtime configuration. This audit pass made no G-015, F, production, signing or device mutation.
