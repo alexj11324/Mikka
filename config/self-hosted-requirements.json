@@ -134,14 +134,18 @@
   },
   "app/api/drive/shares/[shareId]/route.ts": {
     "mode": "built-in",
-    "environment": ["BETTER_AUTH_SECRET"],
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
     "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
   "lib/drive/share-view.ts": {
     "mode": "built-in",
-    "environment": ["BETTER_AUTH_SECRET"],
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
     "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
@@ -3447,6 +3451,15 @@
     "environment": [],
     "behavior": "Lists the signed-in person's own live, dispatchable local devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
     "test": "lib/devices/dispatchable.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/tracing/config.ts": {
+    "mode": "optional-cloud",
+    "environment": [
+      "MIKKA_BUILD_REVISION"
+    ],
+    "behavior": "Configures optional server tracing and records the supplied build revision; when no tracing token is configured, self-hosted instances do not export traces.",
+    "test": "lib/tracing/tracing.test.ts",
     "suite": "test:lib-units"
   }
 }
