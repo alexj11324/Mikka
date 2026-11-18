@@ -31,7 +31,7 @@ const detail = { ...artifact, latestVersion: 1, runId: null, issueId: null, live
 const thread = { id: 'run', issueId: 'issue', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true, createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run', prompt: 'Fixture thread', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false, detail: { name: 'Fixture thread', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
 stub('app/actions/artifacts.ts', {
   listArtifacts: () => read('library', [artifact]), getArtifact: () => read('detail', detail),
-  getArtifactText: () => read('text', 'Retained document body.'), listRunArtifacts: async () => [],
+  getArtifactText: () => read('text', 'Retained document body.'), listRunArtifacts: async () => [], listTaskArtifacts: async () => [],
 })
 stub('app/actions/agents.ts', {
   pollTaskDetail: async () => { throw Object.assign(new Error('older server'), { code: 'desktop_rpc_action_unknown', status: 404 }) },
@@ -57,10 +57,10 @@ stub('components/workspace/thread-changes.tsx', { ThreadChangesPane: Empty, Chan
 stub('components/workspace/self-improvement.tsx', { ThreadFeedback: Empty })
 stub('components/workspace/thread-run-place.tsx', { ThreadRunPlace: Empty })
 stub('components/workspace/thread-execution-identity.tsx', { ThreadExecutionIdentity: Empty })
-stub('components/workspace/artifact-review.tsx', { ThreadArtifactButton: Empty, ThreadArtifactCards: Empty })
+stub('components/workspace/artifact-review.tsx', { ThreadArtifactChips: Empty })
 stub('components/workspace/thread-quota.tsx', { ThreadModelFallbackNotice: Empty, ThreadQuotaPausedCard: Empty, ThreadQuotaSwitchLine: Empty })
 stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
-stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
+stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', threadTopologyKey: (id: string) => ['issue-thread-topology', id], IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
 stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
 mock.module('next/dynamic', { defaultExport: () => Empty })
@@ -80,6 +80,7 @@ stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Emp
 // The task page's layer frame (docs/ui-overlay.md task-detail); this test reads through the open-source layout.
 stub('components/workspace/task-detail-frame.tsx', { FramedTask: ({ titleField }: import('../components/workspace/task-detail-frame').FramedTaskProps) => <Input id="task-title" value={titleField.value} readOnly /> })
 stub('components/slots/task-conversation.tsx', { TaskConversation: ({ issueId, runId }: { issueId: string; runId: string }) => <ol data-task-conversation={issueId}><li>{runId}</li></ol> })
+stub('components/slots/thread.tsx', { ThreadScreen: ({ entries }: import('../components/slots/thread-contract').ThreadScreenProps) => <ol>{entries?.map(entry => <li key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, index) => part.kind === 'text' ? <span key={index}>{part.node}</span> : null)}</li>)}</ol> })
 stub('components/workspace/message-reactions.tsx', { MessageReactions: Empty, useMessageReactions: () => ({}) })
 
 const Workspace = () => <main data-fixture-workspace="">Retained workspace</main>

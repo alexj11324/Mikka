@@ -387,7 +387,7 @@ export function openSectionPage(section: WorkspaceSection) {
  * A chat's work area (the hosted chat, FRAME_OWNS_PANEL; decision 2026-11-10), while that chat is on screen: a task or
  * a thread opened from anywhere on the page opens as one of its tabs instead of a right column beside the chat.
  */
-export type WorkAreaOpener = { task: (issueId: string) => void; thread: (runId: string) => void }
+export type WorkAreaOpener = { task: (issueId: string) => void; thread: (runId: string, issueId?: string | null, name?: string) => void }
 let workArea: WorkAreaOpener | null = null
 
 /** The chat on screen hands over its work area; the returned function takes it back (on unmount). */
@@ -415,8 +415,8 @@ export function rememberMobileTask(task: { server: string; ref: string; target: 
 }
 
 /** Opens a thread in the right column beside what is in the centre (R-82), or in the chat's work area (setWorkAreaOpener). */
-export function openThread(runId: string) {
-  if (toWorkArea({ thread: runId })) return
+export function openThread(runId: string, issueId?: string | null, name?: string) {
+  if (workArea) { workArea.thread(runId, issueId, name); return }
   const from = here()
   goTo({ thread: runId })
   // Remembers where it came from, so ← steps back to that list as the browser's back does.

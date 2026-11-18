@@ -6,8 +6,13 @@ import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { ChevronRight, ClipboardList, FileText, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { listRunArtifacts } from '@/app/actions/artifacts'
+import { listRunArtifacts, listTaskArtifacts } from '@/app/actions/artifacts'
 import { withBasePath } from '@/lib/base-path'
+import { ArtifactIcon } from '@/components/icons/artifact-icon'
+import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { InlineLoadError } from '@/components/load-error'
+import { Skeleton } from '@/components/ui/skeleton'
+import { readAccessFailure } from '@/lib/swr/persistent-cache'
 import { RequestError } from '@/lib/factory/browser-request'
 import { PULL_REQUEST_COLORS, PULL_REQUEST_ICONS } from '@/lib/pull-request-appearance'
 import { readTaskEvidenceTarget } from '@/lib/task-factory-events'
@@ -61,18 +66,49 @@ function useThreadArtifacts({ issueId, runId, runIds: listed, conversation, stat
   const target = readTaskEvidenceTarget(useSearchParams() ?? new URLSearchParams())
   const focusId = target && target.issueId === issueId && factory?.task.id === target.factoryTaskId &&
     THREAD_ARTIFACT_GROUPS.some(group => groups[group].some(item => item.id === target.receiptId)) ? target.receiptId : null
-  return { groups, count: threadArtifactCount(groups), focusId, factoryTaskId: factory?.task.id ?? null }
+  const documents = useMemo(() => {
+    const admitted = threadArtifacts({ factory: factory?.artifacts ?? null, runIds, runArtifacts: evidence.data?.artifacts })
+    return [...admitted.plans, ...admitted.reports].flatMap(item => ('artifactId' in item && item.title)
+      ? [{ id: item.artifactId, title: item.title, latestVersion: item.version }] : [])
+  }, [factory, runIds, evidence.data])
+  return { groups, documents, count: threadArtifactCount(groups), focusId, factoryTaskId: factory?.task.id ?? null }
 }
 
-/** Mounted only where a thread has its tabs, so a transcript-only part of a conversation reads nothing more. */
+/** Loads contextual evidence for the primary thread pane. */
 export function ThreadArtifactsReader({ onRead, ...props }: ThreadArtifactsProps & { onRead: (read: ThreadArtifactsRead) => void }) {
   const read = useThreadArtifacts(props)
   const report = useRef(onRead)
   report.current = onRead
   // Report what changed, not each render's new arrays: the panel holds the read as state.
-  const signature = JSON.stringify([read.groups, read.focusId, read.factoryTaskId])
+  const signature = JSON.stringify([read.groups, read.documents, read.focusId, read.factoryTaskId])
   useEffect(() => { report.current(read) }, [signature]) // eslint-disable-line react-hooks/exhaustive-deps
   return null
+}
+
+export function TaskArtifactsButton({ issueId, threads, work, failed }: { issueId: string; threads: readonly import('@/lib/issue-threads').IssueThread[]; work: ReturnType<typeof useIssueThreads>['work']; failed: (() => void) | null }) {
+  const t = useTranslations('ArtifactsPage')
+  const title = useTranslations('Nav')('artifacts')
+  const [open, setOpen] = useState(false)
+  const documents = useSWR(open ? ['task-artifacts', issueId] : null, () => listTaskArtifacts(issueId), { revalidateOnFocus: false })
+  const runs = [...new Set(threads.filter(thread => thread.detail).flatMap(thread => [thread.id, ...thread.attempts.map(attempt => attempt.runId)]))].sort()
+  const evidence = useSWR(open && work && runs.length ? ['task-artifact-evidence', issueId, ...runs] : null,
+    () => readRunEvidence(runs), { revalidateOnFocus: false })
+  const refused = readAccessFailure(documents.error) || readAccessFailure(evidence.error)
+  const groups = threadArtifacts({ factory: refused ? null : work?.factory?.artifacts ?? null, runIds: null,
+    pullRequests: refused ? [] : work?.presentation?.pullRequests ?? [],
+    runArtifacts: refused ? [] : [...documents.data ?? [], ...evidence.data?.artifacts ?? []], captures: refused ? [] : evidence.data?.captures })
+  const hasError = documents.error || evidence.error || failed
+  const loading = !documents.data || work === undefined || evidence.isLoading
+  return <Dialog open={open} onOpenChange={setOpen}>
+    <DialogTrigger render={<Button variant="ghost" size="sm" data-slot="task-artifacts-button" />}><ArtifactIcon data-icon="inline-start" />{title}</DialogTrigger>
+    <DialogContent className="flex max-h-[80dvh] flex-col sm:max-w-xl">
+      <DialogTitle>{title}</DialogTitle>
+      {hasError && <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { failed?.(); void documents.mutate(); void evidence.mutate() }} />}
+      {threadArtifactCount(groups) > 0 ? <ThreadArtifactsPane groups={groups} focusId={null} mediaTaskId={work?.factory?.task.id ?? issueId} onOpenDocument={() => setOpen(false)} />
+        : !hasError && (loading ? <div role="status" aria-label={t('loading')}><Skeleton className="h-10 w-full" /></div>
+          : <p role="status" className="text-muted-foreground">{t('empty')}</p>)}
+    </DialogContent>
+  </Dialog>
 }
 
 const ROW = 'h-auto w-full min-w-0 justify-start gap-3 rounded-lg px-2 py-2 text-left font-normal whitespace-normal data-[focused=true]:bg-muted'
@@ -80,7 +116,7 @@ const ROW = 'h-auto w-full min-w-0 justify-start gap-3 rounded-lg px-2 py-2 text
 const GROUP_LABEL = { plans: 'plans', pullRequests: 'pullRequests', reports: 'reports', captures: 'captures' } as const
 
 /** The Artifact tab's pane: 方案, PR, 报告, 截图和录屏, each with its count; an empty group is left out. */
-export function ThreadArtifactsPane({ groups, focusId, mediaTaskId }: { groups: ReturnType<typeof threadArtifacts>; focusId: string | null; mediaTaskId: string }) {
+export function ThreadArtifactsPane({ groups, focusId, mediaTaskId, onOpenDocument }: { groups: ReturnType<typeof threadArtifacts>; focusId: string | null; mediaTaskId: string; onOpenDocument?: () => void }) {
   const t = useTranslations('IssueThreads.artifacts')
   const tState = useTranslations('Metadata.prState')
   const tKind = useTranslations('FactoryAcceptance.kind')
@@ -111,7 +147,7 @@ export function ThreadArtifactsPane({ groups, focusId, mediaTaskId }: { groups: 
         </li>)}</ul>
         : <ul className="flex flex-col">{groups[group].map(item => <li key={item.id}>
           {item.group === 'pullRequests' ? <PullRow item={item} focused={item.id === focusId} stateLabel={item.state ? tState(item.state) : null} />
-            : item.group !== 'captures' && <Button variant="ghost" data-artifact-item={item.id} data-focused={item.id === focusId} className={ROW} onClick={() => openArtifact(item.artifactId)}>
+            : item.group !== 'captures' && <Button variant="ghost" data-artifact-item={item.id} data-focused={item.id === focusId} className={ROW} onClick={() => { onOpenDocument?.(); openArtifact(item.artifactId) }}>
               {item.group === 'plans' ? <ClipboardList data-icon="inline-start" aria-hidden="true" className="text-muted-foreground" /> : <FileText data-icon="inline-start" aria-hidden="true" className="text-muted-foreground" />}
               <span className="min-w-0 flex-1 truncate text-sm">{item.title || tKind('report')}</span>
               {item.version !== null && <span className="shrink-0 text-xs text-muted-foreground tabular-nums">v{item.version}</span>}
