@@ -33,7 +33,7 @@ async function measured<T>(work: () => Promise<T>) {
 test('an open thread\'s later reads leave its prompt and report in the database and show the same thread', { skip: !enabled, timeout: 120_000 }, async t => {
   const { pool } = await import('../lib/db')
   const { withActivitySession } = await import('./fixtures/activity-runtime.mjs')
-  const { getIssueThread } = await import('../app/actions/agents')
+  const { getIssueThread, getOlderIssueThread, getIssueThreadContext } = await import('../app/actions/agents')
   const { mergeThreadChunks } = await import('../lib/issue-run-conversation')
   const owner = `thread-detail-${randomUUID()}`
   const agent = randomUUID(), issue = randomUUID(), run = randomUUID()
@@ -76,6 +76,42 @@ test('an open thread\'s later reads leave its prompt and report in the database 
     // A cursor the server cannot continue from reads everything again, prompt included.
     const stale = await as(() => getIssueThread(issue, run, { ...first.value.chunkCursor!, seq: 999 } as never))
     if (!stale.chunksAppend) assert.equal(stale.thread.prompt, prompt)
+    await t.test('the recent page is bounded across messages and chunks, and cursors recover both directions', async () => {
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt")
+        SELECT gen_random_uuid(),$1,n,jsonb_build_object('type','text-delta','id',n::text,'delta','event '||n), now()
+        FROM generate_series(5,1204) n`, [run])
+      const messageId = randomUUID()
+      await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,"createdAt") VALUES ($1,$2,$3,'latest person message',now())`, [messageId, run, owner])
+      const initial = await as(() => getIssueThread(issue, run, { kind: 'history' }))
+      assert.equal(initial.chunks.length + initial.messages.length, 500)
+      assert.equal(initial.messages.at(-1)?.id, messageId)
+      assert.equal(initial.context, undefined)
+      assert.deepEqual(initial.composerModel, first.value.context?.composerModel)
+      assert.ok((await as(() => getIssueThreadContext(issue, run))).used > 0)
+      assert.ok(initial.historyPage?.before)
+      assert.ok(initial.historyPage.latest)
+      const history = [initial.chunks]
+      let before: import('../lib/thread-history').ThreadHistoryPosition | null = initial.historyPage.before
+      while (before) {
+        const older = await as(() => getOlderIssueThread(issue, run, before!))
+        assert.ok(older.chunks.length + older.messages.length <= 500)
+        history.unshift(older.chunks)
+        before = older.before
+      }
+      assert.equal(history.flat().length, 1204)
+      assert.equal(new Set(history.flat().map(row => row.chunk.delta)).size, 1204)
+      await chunk(1205)
+      const position = { chain: initial.historyPage.chain, count: initial.historyPage.count, position: initial.historyPage.latest }
+      const next = await as(() => getIssueThread(issue, run, { kind: 'history', after: position }))
+      assert.equal(next.historyPage?.append, true)
+      assert.equal(next.promptOmitted, true)
+      assert.deepEqual(next.chunks.map(row => row.chunk.delta), ['part 1205 '])
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES(gen_random_uuid(),$1,1206,'{"type":"text-delta","delta":"late event"}',now()-interval '1 day')`, [run])
+      const reset = await as(() => getIssueThread(issue, run, { kind: 'history', after: position }))
+      assert.equal(reset.historyPage?.append, false)
+      assert.ok(reset.historyPage.before)
+      await assert.rejects(as(() => getOlderIssueThread(null, run, initial.historyPage!.before!)))
+    })
     await t.test('only the claiming device and current native session can change a live Composer model', async () => {
       const { issueDeviceToken, hashDeviceToken } = await import('../lib/device-link')
       const { CLIENT_VERSION_HEADER } = await import('@mikka/protocol/version')

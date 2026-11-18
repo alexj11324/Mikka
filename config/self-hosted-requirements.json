@@ -34,6 +34,13 @@
     "test": "tests/thread-continue.db.test.ts",
     "suite": "test:bot-threads-db"
   },
+  "app/actions/artifacts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List artifacts for a task using the signed-in reader's existing workspace, task and artifact authorization in the installation PostgreSQL database.",
+    "test": "tests/task-workspace-governance.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/actions/issues.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1569,6 +1576,20 @@
     "behavior": "Group a thread's plans, pull requests, reports and captures for its Artifact tab from reads the reader is already authorized for.",
     "test": "lib/thread-artifacts.test.ts",
     "suite": "test:lib-units"
+  },
+  "lib/thread-history-read.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Page conversation chunks and message keys from the installation PostgreSQL database for the authorized run chain selected by the thread action.",
+    "test": "tests/thread-detail-bytes.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
+  "lib/thread-history.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate and type the history page cursor and bound each page without any external service.",
+    "test": "tests/thread-detail-bytes.db.test.ts",
+    "suite": "test:activity-actor-db"
   },
   "lib/thread-title-schedule.ts": {
     "mode": "built-in",

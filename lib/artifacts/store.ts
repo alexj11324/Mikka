@@ -226,6 +226,15 @@ export async function listRunArtifacts(reader: ArtifactReader, runId: string): P
   return withIssueKeys(reader, await withAgentAuthors(rows), access)
 }
 
+export async function listTaskArtifacts(reader: ArtifactReader, issueId: string): Promise<ArtifactListItem[]> {
+  const access = await artifactReadAccess(reader)
+  const rows = await db.select(listColumns).from(artifacts).leftJoin(artifactVersions, latestVersion).leftJoin(agentRuns, madeBy)
+    .where(and(access.artifactPredicate, sql`coalesce(${artifacts.issueId}, ${agentRuns.issueId}) = ${issueId}::uuid`,
+      sql`exists (select 1 from ${issues} where ${issues.id} = ${issueId}::uuid and ${issues.workspaceId} = ${artifacts.workspaceId} and ${access.taskPredicate})`))
+    .orderBy(desc(artifacts.updatedAt)).limit(LIST_LIMIT)
+  return withIssueKeys(reader, await withAgentAuthors(rows), access)
+}
+
 /** The file of one version, or null when the artifact or version is not there. */
 async function versionContent(artifactId: string, version: number): Promise<string | null> {
   const [row] = await db.select({ storageKey: artifactVersions.storageKey, inlineContent: artifactVersions.inlineContent })

@@ -1,4 +1,4 @@
-import { createContext, type ReactNode } from 'react'
+import { createContext, type ReactNode, type RefObject } from 'react'
 import type { DecisionReceipt } from '@/hooks/use-decision-submission'
 import type { RunSource } from '@/lib/coordinator/citations'
 import type { ChatComposerProps } from './chat-composer-contract'
@@ -96,7 +96,9 @@ export type ThreadScreenProps = {
   entries: ThreadEntry[] | null
   /** Shown in place of an empty conversation: the welcome being written, or starters. */
   empty?: ReactNode
-  older?: { loading: boolean; onLoad: () => void }
+  /** Older rows were added above the visible transcript. */
+  historyPrepend?: number
+  older?: { loading: boolean; auto?: boolean; onLoad: () => void }
   /** The Bot is answering: Stop ends it. */
   working: boolean
   onStop?: () => void
@@ -105,8 +107,9 @@ export type ThreadScreenProps = {
   onMarkRead?: () => void
   /** The composer, as the chat-composer slot gets it: `useChatComposer` (hooks/use-chat-composer.ts) does what it does. */
   composer: Omit<ChatComposerProps, 'quote'>
-  /** A thread nobody replies to (a child thread: a review or verify) shows no composer (Alex, 2026-11-15). */
+  /** A reader without a reply target does not get a composer. */
   readOnly?: boolean
+  scrollRef?: RefObject<HTMLDivElement | null>
   /** Chips that go out with the next message (a quote, a browser note), each with Remove. */
   pending: { id: string; name: string; meta?: string; onRemove: () => void }[]
   /** Notices that wait above the composer (quota, sign in again, actions to approve). */
@@ -145,4 +148,4 @@ export type ThreadScreenProps = {
 /** The hosted shell waits for a task tab's existing save before removing it. */
 export const WorkTabCloseContext = createContext<((tabId: string) => Promise<boolean>) | null>(null)
 
-export type ThreadPanelTab = { id: 'overview' | 'browser' | `task:${string}` | `thread:${string}`; title: string; content: ReactNode }
+export type ThreadPanelTab = { id: 'overview' | 'browser' | `task:${string}` | `thread:${string}`; title: string; label?: string; content: ReactNode }

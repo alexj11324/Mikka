@@ -13,6 +13,7 @@ import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type St
 import { Claude } from '@/components/ui/svgs/claude'
 import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
+import { useIssueThreadRead } from '@/hooks/use-issue-thread-read'
 import { useTaskCards } from '@/hooks/use-task-cards'
 import { TaskPresentationsContext } from '@/hooks/use-task-collection'
 import { ISSUE_PRIORITIES } from '@/components/workspace/issue-properties'
@@ -69,7 +70,7 @@ export function useAgentCitations() {
  */
 function ChipHead({ icon, title }: { icon: ReactNode; title: string }) {
   const [first = '', ...rest] = Array.from(title)
-  return <InlineCitationLabel>
+  return <InlineCitationLabel className="whitespace-normal wrap-anywhere">
     {/* The icon sits in an inline box: a reset that makes `svg` a block cannot drop it onto its own line. */}
     <span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" className="me-1 inline-flex align-[-0.125em]">{icon}</span>{first}</span>{rest.join('')}
   </InlineCitationLabel>
@@ -142,10 +143,11 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const identifier = issue.identifier
   // A chip has one icon, the task's status (2026-11-13-1405). What an Agent is doing is the conversation's: its mark
   // sits on the thread's title and its card, and here only as a line of words in the hover card.
-  const icon = presentation && <TaskStatusIcon status={presentation.primaryStatus} />
+  const status = presentation?.primaryStatus ?? issue.status
+  const icon = <TaskStatusIcon status={status} />
   const indicator = presentation ? runIndicatorOf(presentation.state) : null
   return <InlineCitation>
-    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={presentation?.primaryStatus ?? ''} onClick={() => onOpen(issue.id)}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={status} onClick={() => onOpen(issue.id)}>
       {identifier
         // A code never breaks: the icon and the code are one unit.
         ? <InlineCitationLabel><span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" className="me-1 inline-flex align-[-0.125em]">{icon}</span>{identifier}</span></InlineCitationLabel>
@@ -156,7 +158,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
         <InlineCitationSource><Mikka />{identifier ? `Mikka · ${identifier}` : 'Mikka'}</InlineCitationSource>
         <InlineCitationTitle>{issue.title}</InlineCitationTitle>
         <InlineCitationMeta>
-          {presentation && <span data-task-status-label={presentation.primaryStatus}><TaskStatusIcon status={presentation.primaryStatus} />{statusLabel(presentation.primaryStatus)}</span>}
+          <span data-task-status-label={status}><TaskStatusIcon status={status} />{statusLabel(status)}</span>
           {indicator && <span data-run-indicator-label={indicator}>{runLabel(indicator)}</span>}
           {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>
@@ -203,17 +205,19 @@ export function RunCitation({ run, paired = false }: { run: RunSource; paired?: 
   const harness = run.harness === 'claude_code' ? 'Claude Code' : 'Codex'
   const title = runTitle(run)
   const activity = threadIndicatorOf(run)
-  return <InlineCitation>
+  const [previewing, setPreviewing] = useState(false)
+  useIssueThreadRead(run.issue?.id ?? null, previewing ? run.id : null)
+  return <InlineCitation onOpenChange={setPreviewing}>
     <InlineCitationTrigger
       variant="object"
       className={runLinkClassName}
       data-thread-link=""
       data-thread-pair={paired ? '' : undefined}
       aria-label={t('openThread', { name: title })}
-      onClick={() => openThread(run.id)}
+      onClick={() => openThread(run.id, run.issue?.id ?? null)}
     >
       {/* One small mark after the title while the conversation is working, waiting or failed; nothing when idle or finished. After, so it never sits beside its task chip's status icon. */}
-      <InlineCitationLabel>{title}{activity && <span data-slot="thread-activity" className="ms-1 inline-flex align-[-0.125em]"><TaskRunMark indicator={activity} /></span>}</InlineCitationLabel>
+      <InlineCitationLabel className="whitespace-normal wrap-anywhere">{title}{activity && <span data-slot="thread-activity" className="ms-1 inline-flex align-[-0.125em]"><TaskRunMark indicator={activity} /></span>}</InlineCitationLabel>
     </InlineCitationTrigger>
     <InlineCitationContent>
       <InlineCitationBody>

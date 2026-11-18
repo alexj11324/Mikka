@@ -89,12 +89,6 @@ export function ThreadChangesView({ changes, wrap, onWrapChange, filesOpen, onFi
   </div>
 }
 
-/** 「改动 +128 −34」 on the thread's tab. */
-export function ChangesTabLabel({ changes }: { changes: ThreadChanges | null }) {
-  const t = useTranslations('IssueThreads')
-  return <>{t('changesTab')}{changes && <Counts additions={changes.additions} deletions={changes.deletions} />}</>
-}
-
 export function Counts({ additions, deletions }: { additions: number; deletions: number }) {
   return <span className="flex shrink-0 items-center gap-1.5 text-xs tabular-nums">
     {additions > 0 && <span className="text-success-foreground">+{additions}</span>}

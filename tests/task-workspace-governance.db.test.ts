@@ -94,7 +94,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
     const { issueForUser } = await import('../lib/issue-access')
     const { activeTaskWorkspaces, withTaskWorkspace } = await import('../lib/task-workspace')
     const { tokenWorkspace } = await import('../lib/tokens/principal')
-    const { readArtifact, readArtifactContent, listArtifacts, listRunArtifacts, createShare, sharedArtifact } = await import('../lib/artifacts/store')
+    const { readArtifact, readArtifactContent, listArtifacts, listRunArtifacts, listTaskArtifacts, createShare, sharedArtifact } = await import('../lib/artifacts/store')
     const { artifactOutsideToken, runOutsideToken } = await import('../lib/tokens/scope')
     const { actAs } = await import('../lib/acting-user')
     const { enterprisePrincipal } = await import('../lib/enterprise/principal')
@@ -216,6 +216,9 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.deepEqual((await listRunArtifacts(alphaReader, runA)).map(row => row.id), [artifact])
       assert.deepEqual(await listRunArtifacts(betaReader, runA), [])
       assert.deepEqual(await listArtifacts({ id: member, [tokenWorkspace]: alpha }), [], 'Workspace membership does not widen the artifact owner ACL')
+      assert.deepEqual((await listTaskArtifacts(alphaReader, bound)).map(row => row.id), [artifact])
+      assert.deepEqual(await listTaskArtifacts(betaReader, bound), [])
+      assert.deepEqual(await listTaskArtifacts({ id: member, [tokenWorkspace]: alpha }, bound), [])
     })
     await t.test('conversation envelopes use persisted mailbox tenancy; mismatched run or sender writes leave no message', async () => {
       const inbox = randomUUID(), sender = randomUUID(), outside = randomUUID(), otherOwner = randomUUID()

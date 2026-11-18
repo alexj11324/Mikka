@@ -48,11 +48,11 @@ const CHIP = 'h-7 max-w-full justify-start gap-1.5 rounded-md px-2 text-xs'
 const CHIP_ACTIVE = 'bg-sidebar-primary-soft text-sidebar-primary-soft-foreground hover:bg-sidebar-primary-soft hover:text-sidebar-primary-soft-foreground'
 
 /** The same output as a small chip, for the chat beside the reader; the open one is blue. */
-export function ArtifactChip({ artifact, active, onOpen }: { artifact: ArtifactSummary; active: boolean; onOpen: (id: string) => void }) {
+export function ArtifactChip({ artifact, active, onOpen }: { artifact: Pick<ArtifactSummary, "id" | "title"> & { kind?: ArtifactKind; latestVersion?: number | null }; active: boolean; onOpen: (id: string) => void }) {
   const t = useTranslations('Artifact')
   return <Button variant="secondary" data-slot="artifact-chip" aria-current={active || undefined} onClick={() => onOpen(artifact.id)} className={cn(CHIP, active && CHIP_ACTIVE)}>
-    <ArtifactKindIcon kind={artifact.kind} data-icon="inline-start" />
+    <ArtifactKindIcon kind={artifact.kind ?? "markdown"} data-icon="inline-start" />
     <span className="truncate">{artifact.title}</span>
-    <span className={cn('shrink-0 font-normal', active ? 'text-sidebar-primary-soft-foreground' : 'text-muted-foreground')}>{t('version', { version: artifact.latestVersion })}</span>
+    {artifact.latestVersion != null && <span className={cn('shrink-0 font-normal', active ? 'text-sidebar-primary-soft-foreground' : 'text-muted-foreground')}>{t('version', { version: artifact.latestVersion })}</span>}
   </Button>
 }

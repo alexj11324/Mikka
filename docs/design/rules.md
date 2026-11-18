@@ -55,16 +55,17 @@ source wins in a conflict is in [`README.md`](README.md).
   button). Views that are not a conversation never get one: the task list
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
-  ends in that composer and what is typed there goes to that agent, whether
-  the thread is running or has ended (an ended one runs again, R-81), wherever
-  it opens: task page, thread column, Artifact window, phone. Only the legacy
-  agent archive is read-only
+  uses that composer in the task page, thread column and Artifact window.
+  It sends to the current authorized run. An independent review or verification
+  waiting for an answer uses the same composer. Send follows the run's reply
+  permission, and the legacy Agent archive is read-only
   ([decision](decisions/2026-11-02-0220-every-thread-ends-in-the-composer.md)).
 - **R-11** A bot's composer, the Coordinator's included, has one model chip
   (`BotModelPicker`) beside 「+」, saved per bot; it picks a model only, never
   an Agent. Settings has no per-bot model rows
-  ([decision](decisions/2026-10-31-2330-bot-model-picker.md)). A thread's
-  composer has none.
+  ([decision](decisions/2026-10-31-2330-bot-model-picker.md)). A run thread shows
+  one model control, using the continuation picker when enabled and the
+  recorded model's display name otherwise.
 - **R-12** No starter or suggestion cards in any chat ("试试从这些事情开始").
   Suggestions live only on the 建议 page (R-55). A new bot greets with one
   bubble and an A–D choice card.
@@ -732,13 +733,13 @@ review of the Factory redesign on 2026-11-04
 the chat tool group (`chat-tool-calls.md`). Each check is pass or fail; a
 design that fails any of them is sent back before it reaches Alex.
 
-- **R-84** A thread's conversation always uses the existing thread view
-  (`IssueThreadPanel`, drawn as its code renders it: the person's prompt
-  first, collapsible `ThreadSteps`, the agent's grey bubbles and its composer;
-  in `bare` mode, as inside the Artifact window, no header and no tabs),
-  wherever it appears: the Artifact window, the session view,
-  an inbox detail. A one-to-one bot chat uses the existing coordinator chat.
-  No design draws a third chat style or adds a new chat component.
+- **R-84** The Web and Electron views of a run thread use `IssueThreadPanel`
+  and the shared `ThreadScreen` for messages, references and the composer.
+  This applies in the task page, side pane, inbox and Artifact window at every
+  width. In `bare` mode the enclosing window supplies the header and tabs.
+  The chat header puts 改动 and 验收 in 更多. A delivered document opens from
+  its message chip. The task toolbar opens the task's Artifact collection.
+  A one-to-one bot chat uses `CoordinatorChat`.
 - **R-85** Deliverables (PR, diff, recording, screenshot, test output) live
   on the acceptance page (the Artifact window, R-56). Coding-task diffs, PR
   checks and review actions also live on the dedicated review page under

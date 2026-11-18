@@ -26,9 +26,22 @@ import { useAcceptanceTasks } from './factory-acceptance'
 
 /** Shared by the Task's workspace reads and its thread actions. */
 export const issueThreadsKey = (issueId: string) => ['issue-threads', issueId] as const
+export const threadTopologyKey = (issueId: string) => ['issue-thread-topology', issueId] as const
 export type IssueThreadsRead = Awaited<ReturnType<typeof pollIssueThreads>>
 type History = ListSnapshot<Awaited<ReturnType<typeof listIssueVersions>>[number]>
 type JoinedWork = { data: IssueWorkSnapshot & { history: History }; refresh: () => Promise<(IssueWorkSnapshot & { history: History }) | undefined> }
+
+/** The combined thread only needs the run roots and their live scope. */
+export function useThreadTopology(issueId: string) {
+  const key = threadTopologyKey(issueId)
+  const read = useSWR(key, () => pollIssueThreads(issueId), { revalidateOnFocus: false })
+  const scope = read.data?.live.workspaceId ?? null
+  const liveKey = unstable_serialize(key)
+  useLiveKey('issue_threads', scope ? issueId : UNRESOLVED_LIST_SCOPE, [liveKey], scope, { minIntervalMs: 2_000 })
+  useLiveKey('factory_issue', scope ? issueId : null, [liveKey], scope, { minIntervalMs: 2_000 })
+  useLiveKey('issue_list', scope, [liveKey], scope, { minIntervalMs: 2_000 })
+  return { ...read, data: read.data?.threads }
+}
 
 /** No timer reads the list (#1212): a run change on this issue, a teammate's included, pushes
  * `issue_threads` to every member who can see it. While the channel is down it is read once a minute. */

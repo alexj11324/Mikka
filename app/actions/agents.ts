@@ -36,6 +36,8 @@ import { requestRunStop } from '@/lib/agent-runs'
 import { sendThreadMessage } from '@/lib/thread-continue'
 import { factoryEventId } from '@/lib/factory/event-id'
 import { FactoryError } from '@/lib/factory/contract'
+import { readLatestThreadHistory, readThreadHistory } from '@/lib/thread-history-read'
+import { threadHistoryInput, threadHistoryPosition, type ThreadHistoryInput, type ThreadHistoryPage, type ThreadHistoryPosition } from '@/lib/thread-history'
 import { readThreadChunks, threadChunkCursor, type ThreadChunkCursor } from '@/lib/thread-chunks'
 import { executionBotName, runBotId, runBotName, threadNameLines } from '@/lib/run-bot-name'
 import { requireIssueAccessWithoutBody } from '@/lib/issue-access'
@@ -373,6 +375,8 @@ export interface IssueThreadDetail {
   live?: { viewerId?: string; runs: import('@/lib/live/panels').ThreadLiveReference[]; issueWorkspaceId: string | null; questionDeadline: ThreadQuestionDeadline | null; revisions?: Record<string, number> }
   /** The owner sees the stop deadline too, so a reload does not reset the timeout. */
   thread: IssueThread & { failureDetails: RunFailure | null; prompt: string; /** `prompt` is the task alone; the Agent also received system instructions (getThreadInstructions). */ hasInstructions?: true; stopRequestedAt: Date | null; /** Host projection for the existing controls; mutations still revalidate. */ replyAvailable: boolean; retryAvailable: boolean; feedbackEligible:boolean; /** The latest masked run error or the host's fixed wake failure. */ error: string | null; /** The owner's own: quota switches and a quota pause (lib/run-quota-view.ts). */ quota: import('@/lib/run-quota-view').ThreadQuotaView | null; /** Host-confirmed provider recovery, within this owner's thread chain. */ modelFallback?: import('@/lib/run-model-fallback-view').ThreadModelFallbackView[] | null; /** Keep polling while the host prepares a continuation; no uncommitted switch is displayed. */ modelFallbackPending?: boolean }
+  historyPage?: ThreadHistoryPage
+  messageUpdates?: IssueThreadDetail['messages']
   chunks: { chunk: Record<string, unknown>; at: Date }[]
   messages: { id: string; sourceRunId?:string|null; editable?:boolean; submissionId?: string; text: string; at: Date; author: string; image: string | null; mine: boolean }[]
   /** Where `chunks` ends; passed back, the next read returns only later chunks. */
@@ -388,6 +392,7 @@ export interface IssueThreadDetail {
    * projection here.
    */
   context?: import('@/lib/context-usage').ContextUsage
+  composerModel?: import('@/lib/context-usage').ContextUsage['composerModel']
 }
 
 /**
@@ -482,20 +487,79 @@ async function readContextUsage(runIds: string[], rootRunId: string, latestRunId
   })
 }
 
+/** Load the whole-history estimate after the conversation's first page. */
+export async function getIssueThreadContext(issueId: string | null, runId: string) {
+  return withDatabaseOperation('/actions/threads/context', async () => {
+    const { row } = await readableThread(issueId, runId, threadIdentityColumns)
+    const chain = await readRunChain(pool, row.userId, row.id)
+    return readContextUsage(chain?.attempts.map(attempt => attempt.runId) ?? [row.id], row.id, chain?.latestRunId ?? row.id)
+  })
+}
+
+async function readThreadComposerModel(runId: string) {
+  const { threadModelProjection } = await import('@/lib/context-usage')
+  const { rows: [model] } = await pool.query<{ selectedModel: string | null; servedModel: string | null }>(
+    `SELECT ${threadModelProjection} FROM agent_runs latest WHERE latest.id=$1`, [runId])
+  return model?.selectedModel || model?.servedModel ? { selected: model.selectedModel, served: model.servedModel } : undefined
+}
+
+async function readThreadMessages(runIds: string[], viewerId: string, ids?: string[]): Promise<IssueThreadDetail['messages']> {
+  if (ids && !ids.length) return []
+  const messages = await db.select({ id: runMessages.id, sourceRunId:runMessages.runId, editable:sql<boolean>`${runMessages.origin}='owner' AND ${runMessages.deliveredAt} IS NOT NULL AND failure IS NULL`,
+      submissionId: sql<string | null>`${coordinatorEvents.payload}#>>'{threadSubmission,requestId}'`,
+      text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
+      .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
+      .leftJoin(coordinatorEvents, and(eq(coordinatorEvents.id, runMessages.id), eq(coordinatorEvents.userId, viewerId), eq(coordinatorEvents.kind, 'user_message')))
+      .where(ids ? and(inArray(runMessages.runId, runIds), inArray(runMessages.id, ids)) : inArray(runMessages.runId, runIds))
+      .orderBy(asc(runMessages.createdAt), asc(runMessages.id))
+  return messages.map(message => ({
+    id: message.id, sourceRunId: message.sourceRunId, editable: message.editable && message.userId === viewerId,
+    ...(message.submissionId ? { submissionId: message.submissionId } : {}), text: message.text, at: message.at,
+    author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === viewerId,
+  }))
+}
+
+async function readPagedThreadMessages(runIds: string[], viewerId: string, ids: string[], append: boolean) {
+  if (!append) return { messages: await readThreadMessages(runIds, viewerId, ids), messageUpdates: undefined }
+  // Delivery can turn a rendered message into an editable one without creating an event.
+  const newest = await db.select({ id: runMessages.id }).from(runMessages).where(inArray(runMessages.runId, runIds))
+    .orderBy(desc(runMessages.createdAt), desc(runMessages.id)).limit(32)
+  const all = await readThreadMessages(runIds, viewerId, [...new Set([...ids, ...newest.map(row => row.id)])])
+  const added = new Set(ids)
+  return { messages: all.filter(row => added.has(row.id)), messageUpdates: all.filter(row => !added.has(row.id)) }
+}
+
+/** Read older events through the same authorized run and its current chain. */
+export async function getOlderIssueThread(issueId: string | null, runId: string, before: ThreadHistoryPosition) {
+  return withDatabaseOperation('/actions/threads/history', async () => {
+    const position = threadHistoryPosition.parse(before)
+    const { row, user } = await readableThread(issueId, runId, threadIdentityColumns)
+    const chain = await readRunChain(pool, row.userId, row.id)
+    const from = chain ? Math.max(0, chain.attempts.findIndex(attempt => attempt.runId === row.id)) : 0
+    const runIds = chain ? chain.attempts.slice(from).map(attempt => attempt.runId) : [row.id]
+    if (!runIds.includes(position.runId)) throw new ActionFailureError('runNotFound')
+    const page = await readThreadHistory(runIds, 'before', position)
+    return { chain: runIds.join(','), before: page.more ? page.earliest : null, chunks: page.chunks,
+      messages: await readThreadMessages(runIds, user.id, page.messageIds) }
+  })
+}
+
 /** One thread as a conversation: what it was asked, what the agent did, and what people said in it. */
-export async function getIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | null): Promise<IssueThreadDetail> {
+export async function getIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | ThreadHistoryInput | null): Promise<IssueThreadDetail> {
   return withDatabaseOperation('/actions/threads/detail', () => readIssueThread(issueId, runId, after))
 }
 
-async function readIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | null): Promise<IssueThreadDetail> {
-  const cursor = after ? threadChunkCursor.parse(after) : null
+async function readIssueThread(issueId: string | null, runId: string, after?: ThreadChunkCursor | ThreadHistoryInput | null): Promise<IssueThreadDetail> {
+  const history = after && 'kind' in after ? threadHistoryInput.parse(after) : null
+  const cursor = after && !history ? threadChunkCursor.parse(after) : null
+  const resuming = Boolean(cursor || history?.after)
   // Before any of the thread: this run's keys' revisions (other attempts carry none, so they always read).
   const { readRevisions } = await import('@/lib/live/revision-read')
   const revisions = await readRevisions([{ kind: 'thread', id: runId }, { kind: 'run', id: runId }])
-  const { row, user } = cursor ? await readableThread(issueId, runId, threadCursorColumns) : await readableThread(issueId, runId, threadColumns)
+  const { row, user } = resuming ? await readableThread(issueId, runId, threadCursorColumns) : await readableThread(issueId, runId, threadColumns)
   // The run that resumes this one after an answered question, or runs it again after it ended (R-81), is the same thread: its chain (BE-18).
   // Named by its task, not by system text prepended to the prompt (lib/thread-prompt.ts); a cursor read's prompt is already its name lines.
-  const named = cursor ? row : { ...row, prompt: threadPromptView(row.prompt, row.promptTaskStart, row.promptTaskLength).task }
+  const named = resuming ? row : { ...row, prompt: threadPromptView(row.prompt, row.promptTaskStart, row.promptTaskLength).task }
   const [projected] = projectIssueThreads([named], row.issueId, user.id, new Set([user.id]))
   const chain = projected ? await readRunChain(pool, row.userId, row.id) : null
   // The conversation is the thread's, across its runs from this one on, oldest first.
@@ -505,20 +569,20 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
   // Capture exactly what this read could display. An arriving reply after this
   // point stays unread until a subsequent transcript is visible.
   const readReceipts = await threadReadReceipts(user.id, runIds)
-  const read = await readThreadChunks(runIds, cursor)
-  const chunks = read.chunks
+  const [transcript, { threads: [thread], deadline: questionDeadline }] = await Promise.all([
+    history ? readLatestThreadHistory(runIds, history.after).then(async page => ({
+      chunks: page.chunks, cursor: null, append: false, historyPage: page.historyPage,
+      ...await readPagedThreadMessages(runIds, user.id, page.messageIds, page.historyPage.append),
+    })) : Promise.all([readThreadChunks(runIds, cursor), readThreadMessages(runIds, user.id)])
+      .then(([read, messages]) => ({ ...read, messages, messageUpdates: undefined, historyPage: undefined })),
+    projected ? threadQuestions([withRunChain(projected, chain)], user.id) : { threads: [], deadline: null },
+  ])
+  const { chunks, messages, messageUpdates, historyPage } = transcript
   // The client keeps its held prompt only when it keeps its held chunks; any other read sends the whole prompt.
-  const promptOmitted = Boolean(cursor && read.append)
-  const stored = cursor && !read.append ? (await db.select({ prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength }).from(agentRuns).where(eq(agentRuns.id, row.id)).limit(1))[0] ?? { prompt: '', promptTaskStart: null, promptTaskLength: null } : row
+  const promptOmitted = resuming && (historyPage?.append ?? transcript.append)
+  const stored = resuming && !promptOmitted ? (await db.select({ prompt: agentRuns.prompt, promptTaskStart: agentRuns.promptTaskStart, promptTaskLength: agentRuns.promptTaskLength }).from(agentRuns).where(eq(agentRuns.id, row.id)).limit(1))[0] ?? { prompt: '', promptTaskStart: null, promptTaskLength: null } : row
   // The thread shows the task it was given; the Agent's full instructions open on request (getThreadInstructions).
   const { task: prompt, hasInstructions } = threadPromptView(stored.prompt, stored.promptTaskStart, stored.promptTaskLength)
-  const messages = await db.select({ id: runMessages.id, sourceRunId:runMessages.runId, editable:sql<boolean>`${runMessages.origin}='owner' AND ${runMessages.deliveredAt} IS NOT NULL AND failure IS NULL`,
-    submissionId: sql<string | null>`${coordinatorEvents.payload}#>>'{threadSubmission,requestId}'`,
-    text: runMessages.text, at: runMessages.createdAt, userId: runMessages.userId, name: users.name, email: users.email, image: users.image })
-    .from(runMessages).leftJoin(users, eq(users.id, runMessages.userId))
-    .leftJoin(coordinatorEvents, and(eq(coordinatorEvents.id, runMessages.id), eq(coordinatorEvents.userId, user.id), eq(coordinatorEvents.kind, 'user_message')))
-    .where(inArray(runMessages.runId, runIds)).orderBy(asc(runMessages.createdAt))
-  const { threads: [thread], deadline: questionDeadline } = projected ? await threadQuestions([withRunChain(projected, chain)], user.id) : { threads: [], deadline: null }
   if (!thread) throw new ActionFailureError('runNotFound')
   // A stop request belongs to the live run that send and stop address, not to an earlier attempt.
   const live = chain?.attempts.find(attempt => attempt.runId === thread.latestRunId)
@@ -557,32 +621,33 @@ async function readIssueThread(issueId: string | null, runId: string, after?: Th
       retryAvailable = originalSessionRetryAvailable(recovery?.question, thread.latestRunId)
     }
   }
-  const quota = row.userId === user.id
-    ? await (await import('@/lib/run-quota-view')).threadQuotaView(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
-    : null
-  const modelFallback = row.userId === user.id
-    ? await (await import('@/lib/run-quota-view')).threadModelFallbackState(user.id, chain?.attempts.map(attempt => attempt.runId) ?? [row.id], thread.latestRunId)
-    : null
-  const { threadLiveReferences, documentLiveWorkspace } = await import('@/lib/live/panels')
-  const { workspacePool } = await import('@/lib/workspace-db')
+  const [{ threadLiveReferences, documentLiveWorkspace }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/workspace-db')])
   const chainRunIds = chain ? chain.attempts.map(attempt => attempt.runId) : [row.id]
-  const [runs, issueWorkspaceId, context, delivery] = await Promise.all([
+  const quotaView = row.userId === user.id ? import('@/lib/run-quota-view') : null
+  const [runs, issueWorkspaceId, context, composerModel, delivery, quota, modelFallback] = await Promise.all([
     threadLiveReferences(pool, workspacePool, runIds, user.id),
     row.issueId ? documentLiveWorkspace(pool, workspacePool, row.issueId, user.id) : null,
     // Over the whole chain and the whole brief, so a cursor read reports what a full one does.
-    readContextUsage(chainRunIds, row.id, chain?.latestRunId ?? row.id),
-    row.userId === user.id ? (await import('@/lib/thread-delivery-queue')).threadDeliveryView(pool, user.id, chain?.rootRunId ?? row.id, thread.latestRunId) : undefined,
+    history ? undefined : readContextUsage(chainRunIds, row.id, chain?.latestRunId ?? row.id),
+    history ? readThreadComposerModel(thread.latestRunId) : undefined,
+    row.userId === user.id ? import('@/lib/thread-delivery-queue').then(({ threadDeliveryView }) =>
+      threadDeliveryView(pool, user.id, chain?.rootRunId ?? row.id, thread.latestRunId)) : undefined,
+    quotaView?.then(({ threadQuotaView }) => threadQuotaView(user.id, chainRunIds, thread.latestRunId)),
+    quotaView?.then(({ threadModelFallbackState }) => threadModelFallbackState(user.id, chainRunIds, thread.latestRunId)),
   ])
   return {
     readReceipts,
     delivery,
     live: { viewerId: user.id, runs, issueWorkspaceId, questionDeadline, ...(Object.keys(revisions).length ? { revisions } : {}) },
-    thread: { ...thread, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
+    thread: { ...thread, failureDetails, questionWake, prompt: promptOmitted ? '' : prompt, ...(!promptOmitted && hasInstructions ? { hasInstructions: true as const } : {}), stopRequestedAt, replyAvailable, retryAvailable, quota: quota ?? null, modelFallback: modelFallback?.notices ?? null, modelFallbackPending: modelFallback?.pending ?? false, error, feedbackEligible: row.userId===user.id && ['succeeded','failed'].includes(row.status) && !!row.finishedAt && !!row.sessionId && !!row.deviceRepoId },
     chunks,
-    messages: messages.map(message => ({ sourceRunId:message.sourceRunId, editable:message.editable && message.userId===user.id, id: message.id, ...(message.submissionId ? { submissionId: message.submissionId } : {}), text: message.text, at: message.at, author: message.name || message.email || '', image: message.image ?? null, mine: message.userId === user.id })),
-    chunkCursor: read.cursor,
-    chunksAppend: read.append,
+    messages,
+    chunkCursor: transcript.cursor,
+    chunksAppend: transcript.append,
+    ...(historyPage ? { historyPage } : {}),
+    ...(messageUpdates?.length ? { messageUpdates } : {}),
     context,
+    ...(composerModel ? { composerModel } : {}),
     ...(promptOmitted ? { promptOmitted: true as const } : {}),
   }
 }
