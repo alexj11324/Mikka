@@ -78,8 +78,8 @@ export function assertWorkspaceAttestation(expected, proof) {
     && proof.upstream?.runId === expected.runId && proof.upstream?.runAttempt === expected.runAttempt
     && proof.upstream?.workflowId === expected.workflowId
     && proof.web?.sourceCommit === expected.sourceCommit && proof.web.publicBuild === expected.sourceCommit
-    && Number.isSafeInteger(proof.web.webRunId) && proof.web.webRunId > 0
-    && Number.isSafeInteger(proof.web.webAttempt) && proof.web.webAttempt > 0, 'attestation')
+    && proof.web.provider === 'cloudflare' && typeof proof.web.verifiedAt === 'string'
+      && Number.isFinite(Date.parse(proof.web.verifiedAt)) && new Date(proof.web.verifiedAt).toISOString() === proof.web.verifiedAt, 'attestation')
 }
 
 /** Rechecked immediately before each credential read and at driver entry. */

@@ -159,7 +159,7 @@ export async function publish({ token, githubToken, templates, sourceSha, source
   if (!/^[0-9a-f]{40}$/.test(sourceCommit ?? '')) fail('official_source_commit_invalid')
   const env = verifiedRuntimeEnvironment({ releaseEvidence, templates, sourceSha, sourceCommit, models })
   await assertCurrentMain({ expectedBuild: sourceCommit, token: githubToken, fetchImpl })
-  await assertProductionSource({ expectedBuild: sourceCommit, token, fetchImpl })
+  await assertProductionSource({ expectedBuild: sourceCommit, fetchImpl })
   const call = (path, options = {}) => api(path, { token, fetchImpl, ...options })
   const listedNow = await call(`/v10/projects/${PROJECT}/env`)
   const unchanged = [], previous = {}

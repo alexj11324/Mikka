@@ -173,7 +173,8 @@ export function assertAttestation(expected, proof) {
     && proof.sourceCommit === expected.sourceCommit && proof.upstream?.runId === expected.runId
     && proof.upstream?.runAttempt === expected.runAttempt && proof.upstream?.workflowId === expected.workflowId
     && proof.web?.sourceCommit === expected.sourceCommit && proof.web.publicBuild === expected.sourceCommit
-    && integer(proof.web.webRunId) && integer(proof.web.webAttempt), 'upstream')
+    && proof.web.provider === 'cloudflare' && typeof proof.web.verifiedAt === 'string'
+      && Number.isFinite(Date.parse(proof.web.verifiedAt)) && new Date(proof.web.verifiedAt).toISOString() === proof.web.verifiedAt, 'upstream')
 }
 
 /** The driver's closed stage error is emitted only after its finally confirmed cleanup.

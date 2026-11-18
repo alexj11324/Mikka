@@ -88,7 +88,7 @@ const expected = { sourceCommit: SHA, runId: 123, runAttempt: 2, workflowId: wor
 function attestation() {
   return { kind: 'coding-workspace-ci-attestation', selected: true, runtime: 'validated_and_published', sourceCommit: SHA,
     workerSourceCommit: SHA, workerSha: OTHER, upstream: { runId: 123, runAttempt: 2, workflowId: workflow.id },
-    web: { sourceCommit: SHA, publicBuild: SHA, webRunId: 456, webAttempt: 1 } }
+    web: { sourceCommit: SHA, publicBuild: SHA, provider: 'cloudflare', verifiedAt: '2026-11-18T10:00:00.000Z' } }
 }
 test('attestation binds upstream attempt, actual Web and both source identities', () => {
   assert.doesNotThrow(() => assertWorkspaceAttestation(expected, attestation()))
@@ -101,7 +101,8 @@ test('attestation binds upstream attempt, actual Web and both source identities'
     value => { value.workerSha = 'main' },
     value => { value.upstream.runAttempt++ },
     value => { value.web.publicBuild = OTHER },
-    value => { value.web.webAttempt = 0 },
+    value => { value.web.provider = 'vercel' },
+    value => { value.web.verifiedAt = 'invalid' },
   ]) {
     const changed = attestation(); mutate(changed)
     assert.throws(() => assertWorkspaceAttestation(expected, changed), /coding_workspace_ci:attestation/)

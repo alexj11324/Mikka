@@ -31,7 +31,6 @@
 /scripts/migrate.mjs      @alexj11324
 /scripts/check-migrations*.mjs @alexj11324
 /.github/workflows/       @alexj11324
-/vercel.json              @alexj11324
 /next.config.mjs          @alexj11324
 /package.json             @alexj11324
 /pnpm-lock.yaml           @alexj11324
