@@ -1,7 +1,6 @@
 import 'server-only'
 import { notifySubagentEvents } from '@/lib/computer/event-log'
 import type { LiveScope } from '@/lib/live/scope'
-import { getVercelOidcToken } from '@vercel/oidc'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
@@ -11,7 +10,7 @@ import { credentialKms } from './kms'
 import { isCloudEdition } from '@/lib/edition'
 import { CredentialStore, type BrowserTarget } from './store'
 import { credentialVaultEnabled } from './feature'
-import { credentialRuntimeEnvironment } from './runtime-identity'
+import { cloudflareCredentialToken, credentialRuntimeEnvironment } from './runtime-identity'
 
 export const credentialStore = new CredentialStore(pool, credentialKms('app'))
 export async function credentialActor(request: Request) {
@@ -67,16 +66,14 @@ export async function executeCredentialLease(lease: string, origin: string, scop
     if (result.status !== 'guarded') notifySubagentEvents(scope)
     return result
   }
-  const cloudflare = credentialRuntimeEnvironment()
-  const broker = new URL(cloudflare ? 'https://broker.internal' : process.env.CREDENTIAL_BROKER_URL ?? '')
-  if (!cloudflare && (broker.protocol !== 'https:' || !broker.hostname.endsWith('.vercel.app') || broker.pathname !== '/' || broker.username || broker.password || broker.search || broker.hash)) throw new CredentialError()
   let dispatched = false, responseReceived = false
   try {
-    const identity = cloudflare ? null : await getVercelOidcToken()
+    if (!credentialRuntimeEnvironment()) throw new CredentialError()
+    const broker = new URL('https://broker.internal')
+    const identity = await cloudflareCredentialToken()
     dispatched = true
     const response = await fetch(new URL('/api/fill', broker), { method: 'POST', headers: {
-      'Content-Type': 'application/json', ...(identity ? { Authorization: `Bearer ${identity}` } : {}),
-      ...(!cloudflare && process.env.CREDENTIAL_BROKER_PREVIEW_BYPASS ? { 'x-vercel-protection-bypass': process.env.CREDENTIAL_BROKER_PREVIEW_BYPASS } : {}),
+      'Content-Type': 'application/json', Authorization: `Bearer ${identity}`,
     }, body: JSON.stringify({ lease }), redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(40_000) })
     responseReceived = true
     if (!response.ok) {

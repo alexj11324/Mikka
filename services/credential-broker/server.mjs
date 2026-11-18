@@ -1,8 +1,7 @@
 import { createServer } from 'node:http'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import fill, { handlePrivateFill } from './dist/fill.js'
-import probe from './dist/oidc.js'
+import { handlePrivateFill } from './dist/fill.js'
 
 const privateHeaders = { 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer',
   'x-content-type-options': 'nosniff', 'content-type': 'application/json' }
@@ -15,8 +14,7 @@ export function createBrokerServer() {
     }
     // Each compiled handler owns its own identity check, body limit and lease
     // verification. Match the literal private route; never derive an upstream.
-    const handler = request.url === '/api/fill' ? (process.env.CREDENTIAL_RUNTIME === 'cloudflare' ? handlePrivateFill : fill)
-      : request.url === '/api/oidc' && process.env.CREDENTIAL_RUNTIME !== 'cloudflare' ? probe : null
+    const handler = request.url === '/api/fill' ? handlePrivateFill : null
     if (!handler) { response.writeHead(404, privateHeaders).end(); return }
     try { await handler(request, response) }
     catch {
