@@ -91,7 +91,7 @@ export function PageActions({
   }
 
   function clearPage() {
-    editor?.commands.clearContent()
+    if (!editor?.commands.clearContent()) return
     setConfirmOpen(false)
     toast.success("Page cleared", {
       icon: TOAST_SUCCESS_ICON,
