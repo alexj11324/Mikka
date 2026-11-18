@@ -52,7 +52,7 @@ export interface CommentPanelProps {
   replying: Record<string, string[]>
   onSelect: (id: string) => void
   onResolve: (id: string) => void
-  onReply: (id: string, body: string) => void
+  onReply: (id: string, body: string) => boolean
   onDraftSubmit: (body: string) => void
   onDraftCancel: () => void
   draftFieldRef: RefObject<HTMLTextAreaElement | null>
