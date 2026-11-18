@@ -2312,6 +2312,13 @@
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
   },
+  "lib/mobile-task-refresh.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Version the existing native task list and validate bounded failure metadata. The list works without an observability exporter.",
+    "test": "tests/mobile-tasks.db.test.ts",
+    "suite": "test:workspace-admin-db"
+  },
   "lib/mobile-web-scope.ts": {
     "mode": "built-in",
     "environment": [
