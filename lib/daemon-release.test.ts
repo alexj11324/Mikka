@@ -65,17 +65,18 @@ test('only a daemon that holds a device session is admitted; there is no update 
   assert.equal(deviceSessionSupported(request('GET', '/v1/devices/fixture/commands', String(DEVICE_SESSION_VERSION + 1))), true, 'a newer daemon')
 })
 
-test('the 426 body names the latest release once this instance knows it, without waiting for npm', async () => {
+test('the 426 body names the latest release this instance already knows, and never calls out', async () => {
   resetDaemonVersionCacheForTest()
-  let reads = 0, release!: (version: string | undefined) => void
-  const read = () => { reads++; return new Promise<string | undefined>(resolve => { release = resolve }) }
-  const first = await daemonUpgradeResponse(0, read).json()
+  let reads = 0
+  const read = async () => { reads++; return '0.0.900' }
+  const first = await daemonUpgradeResponse(0).json()
   assert.deepEqual([first.code, first.daemonVersions], ['daemonUpgradeRequired', { min: MIN_DAEMON_VERSION }], 'nothing known yet: answered at once')
-  assert.equal(reads, 1, 'one background refresh started')
-  release('0.0.900'); await new Promise(resolve => setImmediate(resolve))
-  const next = await daemonUpgradeResponse(1, read).json()
+  assert.equal(reads, 0, 'a refusal never starts a read')
+  // A report or commands answer learns the release; the next refusal names it.
+  await daemonVersions(1, read)
+  const next = await daemonUpgradeResponse(2).json()
   assert.deepEqual(next.daemonVersions, { min: MIN_DAEMON_VERSION, latest: '0.0.900' })
+  assert.equal(reads, 1)
   assert.equal(next.code, 'daemonUpgradeRequired')
-  assert.equal(reads, 1, 'a fresh cache is not read again')
   resetDaemonVersionCacheForTest()
 })
