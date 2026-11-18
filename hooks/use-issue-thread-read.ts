@@ -1,7 +1,7 @@
 'use client'
 
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
-import { getIssueThread, type IssueThreadDetail } from '@/app/actions/agents'
+import type { IssueThreadDetail } from '@/app/actions/agents'
 import { mergeThreadChunks } from '@/lib/issue-run-conversation'
 
 export function useIssueThreadRead(issueId: string | null, runId: string | null) {
@@ -10,6 +10,7 @@ export function useIssueThreadRead(issueId: string | null, runId: string | null)
     const [, issue, run] = key
     const held = cache.get(unstable_serialize(key))?.data as IssueThreadDetail | undefined
     const page = held?.historyPage
+    const { getIssueThread } = await import('@/app/actions/agents')
     const read = await getIssueThread(issue, run, held?.chunkCursor ?? {
       kind: 'history',
       ...(page?.latest ? { after: { chain: page.chain, count: page.count, position: page.latest } } : {}),

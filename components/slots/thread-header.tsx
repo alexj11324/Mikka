@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThreadStatus } from '@/components/workspace/thread-status-icon'
 import { cn } from '@/lib/utils'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { ThreadHeaderProps, ThreadStatusLineProps } from './thread-header-contract'
 
 export function ThreadHeader({ title, viewTitle, headingRef, onBack, onClose, onStop, onOpenTask, place, acceptanceBadge, identity, views = [] }: ThreadHeaderProps) {
@@ -27,7 +27,9 @@ export function ThreadHeader({ title, viewTitle, headingRef, onBack, onClose, on
     {onOpenTask && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className="shrink-0 text-muted-foreground" aria-label={t('openTask')} onClick={onOpenTask} />}><SquareKanban data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{t('openTask')}</TooltipContent></Tooltip>}
     {views.length > 0 && <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={nav('more')} />}><Ellipsis /></DropdownMenuTrigger>
-      <DropdownMenuContent align="end">{views.map(view => <DropdownMenuItem key={view.id} onClick={view.onSelect}>{view.label}</DropdownMenuItem>)}</DropdownMenuContent>
+      <DropdownMenuContent align="end">
+        <DropdownMenuGroup>{views.map(view => <DropdownMenuItem key={view.id} onClick={view.onSelect}>{view.label}</DropdownMenuItem>)}</DropdownMenuGroup>
+      </DropdownMenuContent>
     </DropdownMenu>}
     {onClose && <Button variant="ghost" size="icon-sm" aria-label={t('close')} onClick={onClose}><X data-icon="inline-start" /></Button>}
   </header>

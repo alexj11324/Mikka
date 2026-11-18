@@ -143,11 +143,11 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
   const identifier = issue.identifier
   // A chip has one icon, the task's status (2026-11-13-1405). What an Agent is doing is the conversation's: its mark
   // sits on the thread's title and its card, and here only as a line of words in the hover card.
-  const status = presentation?.primaryStatus ?? issue.status
-  const icon = <TaskStatusIcon status={status} />
+  const status = presentation?.primaryStatus
+  const icon = status && <TaskStatusIcon status={status} />
   const indicator = presentation ? runIndicatorOf(presentation.state) : null
   return <InlineCitation>
-    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={status} onClick={() => onOpen(issue.id)}>
+    <InlineCitationTrigger variant="object" aria-label={t('openIssue', { title: issue.title })} data-focus-id={issue.id} data-task-chip={status ?? ''} onClick={() => onOpen(issue.id)}>
       {identifier
         // A code never breaks: the icon and the code are one unit.
         ? <InlineCitationLabel><span data-slot="chip-head" className="whitespace-nowrap"><span data-slot="chip-icon" className="me-1 inline-flex align-[-0.125em]">{icon}</span>{identifier}</span></InlineCitationLabel>
@@ -158,7 +158,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
         <InlineCitationSource><Mikka />{identifier ? `Mikka · ${identifier}` : 'Mikka'}</InlineCitationSource>
         <InlineCitationTitle>{issue.title}</InlineCitationTitle>
         <InlineCitationMeta>
-          <span data-task-status-label={status}><TaskStatusIcon status={status} />{statusLabel(status)}</span>
+          {status && <span data-task-status-label={status}><TaskStatusIcon status={status} />{statusLabel(status)}</span>}
           {indicator && <span data-run-indicator-label={indicator}>{runLabel(indicator)}</span>}
           {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>

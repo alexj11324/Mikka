@@ -10,7 +10,6 @@ import { findThreadIssue } from '@/app/actions/agents'
 import { useIssueThreadRead } from '@/hooks/use-issue-thread-read'
 import { Skeleton } from '@/components/ui/skeleton'
 import { InlineLoadError } from '@/components/load-error'
-import { IssueThreadPanel } from '@/components/workspace/issue-thread-panel'
 import { TaskDetailPlacementContext } from '@/components/slots/task-detail-contract'
 import type { ThreadPanelTab, ThreadScreenProps } from '@/components/slots/thread-contract'
 import { NAVIGATE_EVENT, navigate, openThread, readLocation, rememberWorkTab, setWorkAreaOpener, workTabForEntry } from '@/components/workspace/workspace-navigation'
@@ -22,8 +21,9 @@ import { NAVIGATE_EVENT, navigate, openThread, readLocation, rememberWorkTab, se
 export const ConversationPanels = createContext<ThreadScreenProps['panels'] | undefined>(undefined)
 export const useConversationPanels = () => useContext(ConversationPanels)
 
-// The task editor loads with its first tab. TaskConversation already shares the thread renderer.
+// Load standalone work panes only when they are opened. The task conversation uses the same run renderer.
 const TaskDetail = dynamic(() => import('@/components/workspace/task-detail').then(module => module.TaskDetail), { loading: () => <TabLoading /> })
+const IssueThreadPanel = dynamic(() => import('@/components/workspace/issue-thread-panel').then(module => module.IssueThreadPanel), { loading: () => <TabLoading /> })
 
 function TabLoading() {
   return <div role="status" className="flex flex-col gap-3 p-4"><Skeleton className="h-6 w-2/3" /><Skeleton className="h-24 w-full" /></div>
