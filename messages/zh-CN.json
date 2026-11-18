@@ -6286,25 +6286,77 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
-    "cloud_machine_unfunded": {"default":"额度不足，无法继续使用云端机器"},
-    "review_auth_required": {"default":"请登录后审阅任务。"},
-    "review_not_found": {"default":"任务审阅不可用。"},
-    "not_owner_terminal": {"default":"只有任务负责人可以使用终端。"},
-    "review_machine_gone": {"default":"任务环境已不可用。"},
-    "review_binding_changed": {"default":"任务环境已变化，请重新打开审阅。"},
-    "review_checkout_unavailable": {"default":"任务暂无可用的工作目录。"},
-    "review_preview_unavailable": {"default":"预览不可用","configuration":"当前环境不支持安全预览","runtime":"预览服务暂时不可用","protocol":"预览响应无效","scope_changed":"任务环境或授权已变化","limit":"预览已达到使用上限"},
-    "terminal_unsupported": {"default":"当前环境尚未接入任务终端。","local_device":"此本地设备暂不支持远程终端。","runtime_version":"请更新任务运行环境后使用终端。"},
-    "terminal_already_controlled": {"default":"Agent 仍在使用任务环境，请结束其工作后打开终端。"},
-    "terminal_binding_changed": {"default":"终端环境或授权已变化。"},
-    "terminal_ended": {"default":"终端会话已结束。"},
-    "terminal_input_too_large": {"default":"终端输入超过 16 KiB。"},
-    "terminal_invalid_request": {"default":"终端请求无效。"},
-    "terminal_request_conflict": {"default":"此输入请求 ID 已用于其他内容。"},
-    "terminal_input_uncertain": {"default":"输入是否送达尚不确定，请查看终端后再决定是否重发。"},
-    "terminal_limit": {"default":"终端已达到使用上限。"},
-    "terminal_unavailable": {"default":"终端暂时不可用。","configuration":"安全终端尚未配置。","runtime":"终端运行环境暂时不可用。","protocol":"终端响应无效。","installation":"终端运行环境准备失败。","lease":"终端授权已过期或变化。"},
-    "terminal_control_unavailable": {"default":"暂时无法独占任务环境。","fence_unavailable":"任务环境控制锁不可用。","fence_lost":"任务环境控制锁已丢失。"},
+    "cloud_machine_unfunded": {
+      "default": "额度不足，无法继续使用云端机器"
+    },
+    "review_auth_required": {
+      "default": "请登录后审阅任务。"
+    },
+    "review_not_found": {
+      "default": "任务审阅不可用。"
+    },
+    "not_owner_terminal": {
+      "default": "只有任务负责人可以使用终端。"
+    },
+    "review_machine_gone": {
+      "default": "任务环境已不可用。"
+    },
+    "review_binding_changed": {
+      "default": "任务环境已变化，请重新打开审阅。"
+    },
+    "review_checkout_unavailable": {
+      "default": "任务暂无可用的工作目录。"
+    },
+    "review_preview_unavailable": {
+      "default": "预览不可用",
+      "configuration": "当前环境不支持安全预览",
+      "runtime": "预览服务暂时不可用",
+      "protocol": "预览响应无效",
+      "scope_changed": "任务环境或授权已变化",
+      "limit": "预览已达到使用上限"
+    },
+    "terminal_unsupported": {
+      "default": "当前环境尚未接入任务终端。",
+      "local_device": "此本地设备暂不支持远程终端。",
+      "runtime_version": "请更新任务运行环境后使用终端。"
+    },
+    "terminal_already_controlled": {
+      "default": "Agent 仍在使用任务环境，请结束其工作后打开终端。"
+    },
+    "terminal_binding_changed": {
+      "default": "终端环境或授权已变化。"
+    },
+    "terminal_ended": {
+      "default": "终端会话已结束。"
+    },
+    "terminal_input_too_large": {
+      "default": "终端输入超过 16 KiB。"
+    },
+    "terminal_invalid_request": {
+      "default": "终端请求无效。"
+    },
+    "terminal_request_conflict": {
+      "default": "此输入请求 ID 已用于其他内容。"
+    },
+    "terminal_input_uncertain": {
+      "default": "输入是否送达尚不确定，请查看终端后再决定是否重发。"
+    },
+    "terminal_limit": {
+      "default": "终端已达到使用上限。"
+    },
+    "terminal_unavailable": {
+      "default": "终端暂时不可用。",
+      "configuration": "安全终端尚未配置。",
+      "runtime": "终端运行环境暂时不可用。",
+      "protocol": "终端响应无效。",
+      "installation": "终端运行环境准备失败。",
+      "lease": "终端授权已过期或变化。"
+    },
+    "terminal_control_unavailable": {
+      "default": "暂时无法独占任务环境。",
+      "fence_unavailable": "任务环境控制锁不可用。",
+      "fence_lost": "任务环境控制锁已丢失。"
+    },
     "review_scope_denied": {
       "default": "你没有权限查看此任务。",
       "sponsored_placement": "此任务的托管工作区已无法用于查看任务。"
@@ -6405,7 +6457,15 @@
     "run_provider_error": {
       "default": "模型服务商未能完成这次请求，请重试。"
     },
-    "run_credentials_unavailable": {"default":"任务凭据暂不可用。","device_unavailable":"这台电脑暂时不能领取该任务的凭据。","credential_missing":"任务所有者没有连接这项订阅。请在模型与订阅里连接后重试。","credential_expired":"任务所有者的订阅登录已过期。请重新登录后重试。","quota_exhausted":"任务所有者的订阅额度已用完。","native_credentials":"订阅凭据暂不可用。","github_credentials":"GitHub 凭据暂不可用。"},
+    "run_credentials_unavailable": {
+      "default": "任务凭据暂不可用。",
+      "device_unavailable": "这台电脑暂时不能领取该任务的凭据。",
+      "credential_missing": "任务所有者没有连接这项订阅。请在模型与订阅里连接后重试。",
+      "credential_expired": "任务所有者的订阅登录已过期。请重新登录后重试。",
+      "quota_exhausted": "任务所有者的订阅额度已用完。",
+      "native_credentials": "订阅凭据暂不可用。",
+      "github_credentials": "GitHub 凭据暂不可用。"
+    },
     "run_failed": {
       "default": "任务未能完成，请查看错误详情或重试。"
     },
@@ -8346,5 +8406,94 @@
       "app": "去连接",
       "invite": "去邀请"
     }
+  },
+  "PullDirectory": {
+    "title": "PR",
+    "source": "仓库",
+    "linkedPulls": "关联的 PR",
+    "refresh": "刷新",
+    "newPull": "在 GitHub 新建 PR",
+    "viewLabel": "PR 视图",
+    "views": {
+      "open": "打开",
+      "ready": "可合并",
+      "merged": "已合并",
+      "all": "全部"
+    },
+    "search": "搜索 PR",
+    "state": "状态",
+    "author": "作者",
+    "label": "标签",
+    "grouping": "分组",
+    "groups": {
+      "state": "按状态",
+      "repo": "按仓库",
+      "author": "按作者",
+      "none": "不分组"
+    },
+    "states": {
+      "ready": "可合并",
+      "pending": "检查中",
+      "failed": "检查失败",
+      "draft": "草稿",
+      "open": "打开",
+      "merged": "已合并",
+      "closed": "已关闭"
+    },
+    "clearFilters": "清除筛选",
+    "saveView": "保存视图",
+    "viewName": "视图名称",
+    "deleteView": "删除视图 {name}",
+    "save": "保存",
+    "cancel": "取消",
+    "repositoryError": "无法读取 GitHub 仓库。",
+    "connectGitHub": "连接 GitHub 后可浏览仓库的 PR。",
+    "connections": "连接",
+    "retry": "重试",
+    "loadError": "PR 加载失败。",
+    "list": "PR 列表",
+    "loading": "正在加载 PR",
+    "noLoadedMatches": "已加载的 PR 中没有匹配项，加载更多后继续查找。",
+    "noMatches": "没有符合筛选条件的 PR。",
+    "empty": "还没有 PR。",
+    "selectPull": "选择 PR #{number}",
+    "pin": "固定",
+    "unpin": "取消固定",
+    "more": "加载更多 PR",
+    "loadedPartial": "已加载 {count} 个 PR · 还有更多",
+    "loaded": "已加载 {count} 个 PR",
+    "preview": "PR 预览",
+    "copyLink": "复制链接",
+    "openGitHub": "在 GitHub 打开",
+    "closePreview": "关闭预览",
+    "selection": "已选 PR",
+    "selected": "已选 {count} 项",
+    "copyLinks": "复制链接",
+    "deselect": "取消选择",
+    "copied": "已复制",
+    "copyError": "复制失败，请重试。",
+    "pinned": "已固定",
+    "results": "PR",
+    "unknownAuthor": "未知作者",
+    "checks": "检查",
+    "review": "审阅",
+    "updated": "更新于",
+    "threads": "线程",
+    "checksState": {
+      "SUCCESS": "通过",
+      "PENDING": "检查中",
+      "FAILURE": "失败",
+      "ERROR": "出错",
+      "EXPECTED": "等待检查",
+      "unknown": "未报告"
+    },
+    "reviewState": {
+      "APPROVED": "已通过",
+      "CHANGES_REQUESTED": "要求修改",
+      "REVIEW_REQUIRED": "等待审阅",
+      "unknown": "未报告"
+    },
+    "linkedSnapshot": "上次交付时的状态。当前检查与审阅请在 GitHub 查看。",
+    "resizePreview": "调整拉取请求预览宽度"
   }
 }
