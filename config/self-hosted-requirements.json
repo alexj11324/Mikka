@@ -1,4 +1,11 @@
 {
+  "lib/subscription-ui.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Checks a subscription sign-in's provider page (Claude's localhost return for the desktop app, or Claude Code's code page for the web and phones) and reads the clipboard for 粘贴 in the person's own browser. No installation dependency.",
+    "test": "lib/subscription-ui.test.ts",
+    "suite": "test:byos"
+  },
   "app/actions/bots.ts": {
     "mode": "built-in",
     "environment": [],

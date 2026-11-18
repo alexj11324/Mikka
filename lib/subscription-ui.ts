@@ -30,6 +30,20 @@ export class InvalidAuthorization extends Error {
   constructor() { super('Invalid authorization'); this.name = 'InvalidAuthorization' }
 }
 
+/** Where Claude may send the browser back: localhost, which only the desktop
+ * app catches, or Claude Code's own code page (MANUAL_REDIRECT_URL in
+ * @anthropic-ai/claude-code 2.1.327), which shows a code to paste on the web and phones. */
+export const CLAUDE_RETURNS = ['http://localhost:54545/callback', 'https://platform.claude.com/oauth/code/callback'] as const
+/** The Claude return the page shows a code for, rather than a localhost address. */
+export function claudeShowsCode(authorizationUrl: string) {
+  try { return new URL(authorizationUrl).searchParams.get('redirect_uri') === CLAUDE_RETURNS[1] } catch { return false }
+}
+
+/** 粘贴: the clipboard's text where the browser allows reading it, else null (the field still takes a paste). */
+export async function readClipboardText() {
+  try { return (await navigator.clipboard?.readText?.())?.trim() || null } catch { return null }
+}
+
 /** Accept provider-owned authorization URLs only; never navigate to a URL
  * supplied by a model, arbitrary redirect or unexpected OAuth response. The
  * Codex page is the fixed one the Codex CLI device flow shows
@@ -42,7 +56,7 @@ export function parseSubscriptionStart(value: unknown, provider: 'codex' | 'clau
   if (url.protocol !== 'https:' || url.username || url.password || url.hash || !Number.isFinite(Date.parse(result.expiresAt))) throw new InvalidAuthorization()
   if (provider === 'codex') {
     if (result.flow !== 'device' || url.origin !== 'https://auth.openai.com' || url.pathname !== '/codex/device' || url.search || !result.userCode || !result.interval) throw new InvalidAuthorization()
-  } else if (result.flow !== 'callback_handoff' || url.origin !== 'https://claude.ai' || url.pathname !== '/oauth/authorize' || url.searchParams.getAll('state').length !== 1 || url.searchParams.get('state') !== result.state || url.searchParams.getAll('redirect_uri').length !== 1 || url.searchParams.get('redirect_uri') !== 'http://localhost:54545/callback' || url.searchParams.get('code_challenge_method') !== 'S256') throw new InvalidAuthorization()
+  } else if (result.flow !== 'callback_handoff' || url.origin !== 'https://claude.ai' || url.pathname !== '/oauth/authorize' || url.searchParams.getAll('state').length !== 1 || url.searchParams.get('state') !== result.state || url.searchParams.getAll('redirect_uri').length !== 1 || !(CLAUDE_RETURNS as readonly string[]).includes(url.searchParams.get('redirect_uri') ?? '') || url.searchParams.get('code_challenge_method') !== 'S256') throw new InvalidAuthorization()
   return result
 }
 

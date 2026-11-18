@@ -9,55 +9,12 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths(t *testing.T) {
 	w, inf, _ := fixtureWorker(t, "claude")
-	var calls atomic.Int32
-	issuer := httptest.NewTLSServer(http.HandlerFunc(func(out http.ResponseWriter, r *http.Request) {
-		calls.Add(1)
-		if r.Header.Get("User-Agent") != "Mikka/1.0" {
-			t.Error("OAuth client spoofed another client")
-		}
-		if r.Method == http.MethodGet && r.URL.Path == "/api/oauth/profile" {
-			if r.Header.Get("Authorization") != "Bearer fixture-rotated-access" {
-				t.Error("profile used another grant")
-			}
-			_ = json.NewEncoder(out).Encode(map[string]any{"account": map[string]string{"uuid": "fixture-account", "email": "fixture@example.invalid"}, "organization": map[string]string{"uuid": "fixture-org", "name": "Fixture"}})
-			return
-		}
-		var body map[string]any
-		if json.NewDecoder(r.Body).Decode(&body) != nil {
-			out.WriteHeader(400)
-			return
-		}
-		if body["grant_type"] == "authorization_code" {
-			if body["redirect_uri"] != claudeCallbackURI || body["code"] != "fixture-code" || len(body["code_verifier"].(string)) != 43 || len(body["state"].(string)) != 43 {
-				out.WriteHeader(400)
-				return
-			}
-			_ = json.NewEncoder(out).Encode(map[string]any{"access_token": "fixture-access", "refresh_token": "fixture-plain-claude-refresh", "expires_in": 7200, "account": map[string]string{"uuid": "fixture-account", "email_address": "fixture@example.invalid"}, "organization": map[string]string{"uuid": "fixture-org", "name": "Fixture"}})
-		} else if body["grant_type"] == "refresh_token" && body["refresh_token"] == "fixture-plain-claude-refresh" {
-			_ = json.NewEncoder(out).Encode(map[string]any{"access_token": "fixture-rotated-access", "refresh_token": "fixture-rotated-refresh", "expires_in": 7200})
-		} else {
-			out.WriteHeader(400)
-		}
-	}))
-	defer issuer.Close()
-	target, _ := url.Parse(issuer.URL)
-	transport := issuer.Client().Transport
-	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if r.URL.String() != "https://platform.claude.com/v1/oauth/token" && r.URL.String() != "https://api.anthropic.com/api/oauth/profile" {
-			t.Error("native companion/profile/roles endpoint unexpectedly called")
-			return nil, ErrUnsupported
-		}
-		clone := r.Clone(r.Context())
-		u := *r.URL
-		u.Scheme = target.Scheme
-		u.Host = target.Host
-		clone.URL = &u
-		return transport.RoundTrip(clone)
-	})}
+	client, calls := claudeFixtureClient(t, claudeCallbackURI)
 	w.OAuth = CPAClaudeOAuth{Client: client}
 	w.Executor = CPAClaudeLifecycle{Client: client}
 	begin, err := w.StartOAuth(context.Background(), 1, "fixture-session")
@@ -70,7 +27,7 @@ func TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths(t *t
 	}
 	state := begin.State
 	callback := claudeCallbackURI + "?code=fixture-code&state=" + state
-	for _, bad := range []string{"https://mikka.invalid/callback?code=fixture-code&state=" + state, callback + "&state=" + state, callback + "#override", strings.Replace(callback, "localhost:54545", "localhost:6666", 1), claudeCallbackURI + "?code=fixture-code&state=" + strings.Repeat("x", 43), "fixture-code", claudeCallbackURI + "?code=fixture-code", callback + "&error=denied", strings.Replace(callback, "/callback?", "/%63allback?", 1), strings.Replace(callback, "localhost:54545", "alice@localhost:54545", 1)} {
+	for _, bad := range []string{"https://mikka.invalid/callback?code=fixture-code&state=" + state, callback + "&state=" + state, strings.Replace(callback, "localhost:54545", "localhost:6666", 1), claudeCallbackURI + "?code=fixture-code&state=" + strings.Repeat("x", 43), "fixture-code#" + strings.Repeat("x", 43), callback + "&error=denied", strings.Replace(callback, "localhost:54545", "alice@localhost:54545", 1)} {
 		if _, err = w.CompleteHandoff(context.Background(), "fixture-session", state, bad); err != ErrUnsupported {
 			t.Fatal("malformed handoff accepted")
 		}
@@ -111,5 +68,86 @@ func TestClaudePlainOAuthAndRefreshExcludeNativeIdentityAndFingerprintPaths(t *t
 	}
 	if _, err = w.CompleteHandoff(context.Background(), "fixture-session", next.State, claudeCallbackURI+"?code=fixture-code&state="+next.State); err != ErrStale || calls.Load() != 3 {
 		t.Fatal("expired Claude handoff reached provider")
+	}
+}
+
+// A fake platform.claude.com that accepts one authorization code, issued for redirect.
+func claudeFixtureClient(t *testing.T, redirect string) (*http.Client, *atomic.Int32) {
+	t.Helper()
+	calls := new(atomic.Int32)
+	issuer := httptest.NewTLSServer(http.HandlerFunc(func(out http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.Header.Get("User-Agent") != "Mikka/1.0" {
+			t.Error("OAuth client spoofed another client")
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/api/oauth/profile" {
+			if r.Header.Get("Authorization") != "Bearer fixture-rotated-access" {
+				t.Error("profile used another grant")
+			}
+			_ = json.NewEncoder(out).Encode(map[string]any{"account": map[string]string{"uuid": "fixture-account", "email": "fixture@example.invalid"}, "organization": map[string]string{"uuid": "fixture-org", "name": "Fixture"}})
+			return
+		}
+		var body map[string]any
+		if json.NewDecoder(r.Body).Decode(&body) != nil {
+			out.WriteHeader(400)
+			return
+		}
+		if body["grant_type"] == "authorization_code" {
+			if body["redirect_uri"] != redirect || body["code"] != "fixture-code" || len(body["code_verifier"].(string)) != 43 || len(body["state"].(string)) != 43 {
+				out.WriteHeader(400)
+				return
+			}
+			_ = json.NewEncoder(out).Encode(map[string]any{"access_token": "fixture-access", "refresh_token": "fixture-plain-claude-refresh", "expires_in": 7200, "account": map[string]string{"uuid": "fixture-account", "email_address": "fixture@example.invalid"}, "organization": map[string]string{"uuid": "fixture-org", "name": "Fixture"}})
+		} else if body["grant_type"] == "refresh_token" && body["refresh_token"] == "fixture-plain-claude-refresh" {
+			_ = json.NewEncoder(out).Encode(map[string]any{"access_token": "fixture-rotated-access", "refresh_token": "fixture-rotated-refresh", "expires_in": 7200})
+		} else {
+			out.WriteHeader(400)
+		}
+	}))
+	t.Cleanup(issuer.Close)
+	target, _ := url.Parse(issuer.URL)
+	transport := issuer.Client().Transport
+	client := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.String() != "https://platform.claude.com/v1/oauth/token" && r.URL.String() != "https://api.anthropic.com/api/oauth/profile" {
+			t.Error("native companion/profile/roles endpoint unexpectedly called")
+			return nil, ErrUnsupported
+		}
+		clone := r.Clone(r.Context())
+		u := *r.URL
+		u.Scheme = target.Scheme
+		u.Host = target.Host
+		clone.URL = &u
+		return transport.RoundTrip(clone)
+	})}
+	return client, calls
+}
+
+// Web and phones: Claude returns to Claude Code's code page, the person pastes
+// the `code#state` it shows, and the exchange names that same page.
+func TestClaudeCodePageSignInExchangesWithItsOwnRedirect(t *testing.T) {
+	w, _, _ := fixtureWorker(t, "claude")
+	client, calls := claudeFixtureClient(t, claudeCodePageURI)
+	w.OAuth = CPAClaudeOAuth{Client: client}
+	begin, err := w.StartOAuthWith(context.Background(), 1, "fixture-session", "code")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, _ := url.Parse(begin.AuthorizationURL)
+	if parsed.Host != "claude.ai" || parsed.Query().Get("redirect_uri") != claudeCodePageURI || parsed.Query().Get("state") != begin.State || parsed.Query().Get("code") != "true" {
+		t.Fatal("code page not requested", begin.AuthorizationURL)
+	}
+	if left := time.Until(begin.ExpiresAt); left < 14*time.Minute || left > 15*time.Minute {
+		t.Fatal("sign-in window is not 15 minutes", left)
+	}
+	resumed, err := w.ResumeOAuth(context.Background(), "fixture-session")
+	if err != nil || resumed.AuthorizationURL != begin.AuthorizationURL || resumed.State != begin.State {
+		t.Fatal("a reloaded page cannot resume the code-page attempt", err)
+	}
+	if _, err = w.StartOAuthWith(context.Background(), 1, "fixture-session", "elsewhere"); err != ErrUnsupported {
+		t.Fatal("unknown redirect accepted")
+	}
+	done, err := w.CompleteHandoff(context.Background(), "fixture-session", begin.State, " fixture-code#"+begin.State+" ")
+	if err != nil || done.State != "connected" || calls.Load() != 1 {
+		t.Fatal("code page sign-in did not finish", err, calls.Load())
 	}
 }
