@@ -92,14 +92,13 @@ export function RichTextHighlightPopover({
 
   function apply(color: HighlightColorId | null) {
     const chain = editor?.chain().focus()
+    if (!chain) return
 
-    if (color) {
-      chain?.setHighlight({ color }).run()
-    } else {
-      chain?.unsetHighlight().run()
-    }
+    const applied = color
+      ? chain.setHighlight({ color }).run()
+      : chain.unsetHighlight().run()
 
-    setOpen(false)
+    if (applied) setOpen(false)
   }
 
   return (
