@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 59 |
+| partial | 61 |
 | prior-partial | 36 |
-| unreviewed | 6275 |
+| unreviewed | 6273 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -130,3 +130,7 @@ After the main-blob restoration, an **isolated Node 22.16.0 execution of the cur
 ## 2026-11-18 fixed contract editor selector and bulk-resolution consumers
 
 Three formerly unreviewed fixed source paths were read in full: `components/blocks/rich-text-editor-3/components/{mode-select.tsx,resolve-all-dialog.tsx,rich-text-state.ts}`. All three original blobs matched current checked public main, existing G branch and Cloud's fixed `vendor/mikka@82d285edd2dfc9ee95622ec4a22c58436bffc255`; their direct `contract-header.tsx` and `contract-editor.tsx` consumers were read, and cross-repository code search returned no same-name private UI or Cloud consumers. They are controlled React Select, Tiptap suggestion/Undo dialog, and official `useEditorState`/`characterCount` selectors, **not** Cloudflare/DO/Queue duplicated implementations. Original introduction commits are not independently established. **15/15 limited static V8 source/consumer predicates passed**, including a specific potential no-op bug (`onResolved` invoked even when suggestion command returns false); no runtime regression or new product fix is claimed. All three are **partial retain**, with keyboard, AT, mounted editor, failed-command, multi-instance, Node24 and protected CI checks outstanding. Fixed public code now **6,556 = 186 complete / 59 partial / 36 prior-partial / 6,275 unreviewed**; fixed 7,996 total tracked paths unchanged. New evidence is appended to the original `reviews.jsonl` rather than creating another task. Main full deltas, Cloud gitlink, G-015 physical SDK removal, ordinary protected merge, merged-SHA/production acceptance and ten DoD remain open.
+
+## 2026-11-18 follow-through: contract editor and header original entry chain
+
+Continued on the **same public G branch** after the three source contracts above. Read original `components/blocks/rich-text-editor-3/page.tsx` and the full unreviewed `components/{contract-editor.tsx,contract-header.tsx}` (11,983 + 5,085 source chars), their live in-page consumers, current `main`, current G blobs and Cloud fixed vendor blobs. Editor owns a real Tiptap `useEditor` instance, one suggestion plugin, local mode/preview, responsive Sheet and cleanup; Header composes the owned mode, tracked position, suggestion count, toolbar and accessible buttons. These are demo UI presentation and edit contracts, not duplicate Cloudflare Durable Object/Queues/Container scheduling or a second persisted task backend. **19/19 narrowly scoped read-only source checks passed**, not Node24, installed browser/AT, PG17, Metro, ordinary merge or production. Both remain **partial retain** until actual editor, undo, responsive sheet, focus, SSR, and assistive technology tests. Fixed public code count now **6,556 = 186 complete / 61 partial / 36 prior-partial / 6,273 unreviewed**, 7,996 tracked paths pinned unchanged. Per-file evidence in original CSV/JSONL. All baseline-to-latest main and Cloud gitlink deltas, locked Cloudflare G-015 physical retirement and exact merged-SHA runtime acceptance remain open.
