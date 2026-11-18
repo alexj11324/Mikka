@@ -1,4 +1,11 @@
 {
+  "drizzle/20261118132000_subscription_authority_notifications.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Install transactional PostgreSQL notifications for subscription authority changes; active streams end on revocation and reconnect starts with a fresh authorization read.",
+    "test": "scripts/test-subscription-worker.mjs",
+    "suite": "test:byos-worker"
+  },
   "lib/subscription-ui.ts": {
     "mode": "built-in",
     "environment": [],
