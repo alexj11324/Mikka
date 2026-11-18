@@ -165,7 +165,7 @@ function change(select: HTMLSelectElement, value: string) {
 
 test("the PR tab switches from linked task snapshots to real repository PRs and opens a useful preview", async () => {
   calls.length = 0;
-  const { root, host } = await mount();
+  const { root } = await mount();
   try {
     assert.match(document.body.textContent ?? "", /Better PR overview/);
     const source = document.querySelector('select[aria-label="source"]');
@@ -206,7 +206,7 @@ test("the PR tab switches from linked task snapshots to real repository PRs and 
 });
 
 test("filters act on PR metadata and the Ready view is not inferred from a green check alone", async () => {
-  const { root, host } = await mount();
+  const { root } = await mount();
   try {
     const source = document.querySelector('select[aria-label="source"]');
     assert.ok(source instanceof browser.HTMLSelectElement);
