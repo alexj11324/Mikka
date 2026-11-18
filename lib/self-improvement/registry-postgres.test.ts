@@ -129,7 +129,6 @@ test('PG candidate registration, immutable replay and exact-version claim/resume
     await pool.query(`INSERT INTO improvement_skill_lifecycle(id,"userId","issueId","repoId","versionId",operation,"publicationId","approvalId")
       VALUES($1,$2,$3,$4,$5,'withdraw',$6,$7)`,[randomUUID(),userId,issueId,repoId,registered.versionId,randomUUID(),randomUUID()])
     await assert.rejects(assignments.revalidate(userId,activeRunId,prepared.skillReceipt.id,true),/runUnavailable/)
-    assert.deepEqual((await assignments.renewHeartbeat(userId,deviceId,[activeRunId],true)).revoked,[activeRunId])
     const historical=await pool.connect()
     try {
       const run=(await historical.query('SELECT * FROM agent_runs WHERE id=$1',[activeRunId])).rows[0]

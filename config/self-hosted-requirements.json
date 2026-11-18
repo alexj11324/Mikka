@@ -73,7 +73,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "A signed-in owner can page through visible active thread roots on their local device in the current workspace, using the installation PostgreSQL database.",
-    "test": "lib/device-heartbeat.db.test.ts",
+    "test": "lib/device-session.db.test.ts",
     "suite": "test:device-revocation-db"
   },
   "app/api/drive/scopes/route.ts": {
@@ -134,14 +134,18 @@
   },
   "app/api/drive/shares/[shareId]/route.ts": {
     "mode": "built-in",
-    "environment": ["BETTER_AUTH_SECRET"],
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
     "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
   "lib/drive/share-view.ts": {
     "mode": "built-in",
-    "environment": ["BETTER_AUTH_SECRET"],
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
     "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
@@ -1008,7 +1012,7 @@
       "DATABASE_URL"
     ],
     "behavior": "Keep explicit Run cancellation intent in the installation database so a paired local device can distinguish it from a lost lease.",
-    "test": "lib/device-heartbeat.db.test.ts",
+    "test": "lib/device-session.db.test.ts",
     "suite": "test:device-revocation-db"
   },
   "drizzle/20261117051905_organization_join_domain_receipts.sql": {
@@ -3435,12 +3439,91 @@
     "test": "lib/enterprise/governance.db.test.ts",
     "suite": "test:enterprise-db"
   },
+  "app/v1/devices/[deviceId]/report/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A paired daemon reports changed device state, command receipts and update failures once to the installation database; the report renews no lease and records no presence.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "app/v1/internal/device-sessions/[deviceId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The device gateway reports a device socket opening or closing, authenticated with the gateway push secret; the installation database records the session and extends or ends the device's run leases.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "drizzle/20261117221604_device_session.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Store each device's gateway session (opened, closed, socket) in the installation database, so presence and run leases follow the session instead of a heartbeat.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/builtin-gateway/session-reports.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The built-in gateway reports device sessions to the installation in process, after a 30 second close grace, in order and with retries.",
+    "test": "lib/builtin-gateway/session-reports.test.ts",
+    "suite": "test:device-gateway"
+  },
+  "lib/daemon-release.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Refuse every device request without the device session header with 426 and the daemon versions, so an old daemon updates before it can be used.",
+    "test": "lib/daemon-release.test.ts",
+    "suite": "test:platform"
+  },
+  "lib/device-link.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authenticate device credentials against the installation database; a removed device reaches only its report, and a commands read stops runs whose lease the server ended.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/device-presence.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read device presence from the recorded gateway session in the installation database, without a heartbeat window or a gateway round trip.",
+    "test": "lib/device-presence.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/device-report-body.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bound the device report request body before parsing.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/device-session.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Apply gateway session reports in order to the installation database, extend or end run leases, and close sessions the gateway no longer holds during run recovery.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/secrets/egress-binding.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check a task Secret capability against the live run, claim credential and device session in the installation database on every use.",
+    "test": "tests/task-secret-access.db.test.ts",
+    "suite": "test:secrets-db"
+  },
   "lib/agent-no-model.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "A cloud dispatch that names an Agent with no usable model is refused with agentNoModel, its message and a link to 模型与订阅, instead of agentProfileUnavailable.",
     "test": "tests/cloud-runtime-auto.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "lib/run-authority-stop.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "When a change takes a run's authority away (Bot archived, task deleted, member gone, workspace or account deleted), stop the affected runs in the installation database and push the stop to their devices.",
+    "test": "lib/run-authority-stop.db.test.ts",
+    "suite": "test:bot-chats-db"
   },
   "drizzle/20261118120000_conversation_model_device.sql": {
     "mode": "built-in",

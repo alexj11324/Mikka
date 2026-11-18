@@ -26,7 +26,7 @@ function daemon(dataDir: string) {
   const link = server.link()
   const register = vi.spyOn(link, 'registerDevice')
   const process = new Daemon({ dataDir, flavor: 'prod', link, harnesses: [{ harness: 'mock', installed: true, version: 'fixture' }],
-    quotaSource: null, heartbeatMs: 60_000, log: createLogger({ level: 'silent' }) })
+    quotaSource: null, log: createLogger({ level: 'silent' }) })
   daemons.push(process)
   return { process, register, link, server }
 }
@@ -91,11 +91,12 @@ it.each(['replace', 'clear', 'workspace'] as const)('discards an in-flight regis
   const paused = new Promise<void>(resolve => { entered = resolve })
   const nextGate = new Promise<void>(resolve => { releaseNext = resolve })
   const nextPaused = new Promise<void>(resolve => { enteredNext = resolve })
-  register.mockImplementationOnce(async () => { entered(); await gate; return { deviceId: 'stale-device' } })
+  let settled = false
+  register.mockImplementationOnce(async () => { entered(); await gate; settled = true; return { deviceId: 'stale-device' } })
   register.mockImplementationOnce(async (...args) => { enteredNext(); await nextGate; return server.link().registerDevice(...args) })
-  const heartbeat = vi.spyOn(link, 'heartbeat')
+  const report = vi.spyOn(link, 'report')
+  // The device session's first ticket registers: that is the in-flight registration.
   await process.start()
-  const oldSync = process.syncWithServer()
   const client = await connectDaemonInDataDir(root, { name: 'registration-test', version: 'fixture' })
   try {
     await paused
@@ -105,12 +106,13 @@ it.each(['replace', 'clear', 'workspace'] as const)('discards an in-flight regis
       workspaceId: change === 'workspace' ? nextWorkspaceId : workspaceId,
     })
     release()
-    await oldSync
+    await waitFor(() => settled)
+    await new Promise(resolve => setImmediate(resolve))
     const saved = JSON.parse(readFileSync(daemonPaths(root).device, 'utf8'))
     expect(saved.deviceId).toBeUndefined()
     expect(saved.credential).toBe(change === 'clear' ? undefined : change === 'replace' ? credential : oldCredential)
     expect(saved.workspaceId).toBe(change === 'workspace' ? nextWorkspaceId : workspaceId)
-    expect(heartbeat).not.toHaveBeenCalled()
+    expect(report).not.toHaveBeenCalled()
     expect(register.mock.calls[0]?.[1].workspaceId).toBe(workspaceId)
     if (change === 'clear') {
       await process.syncWithServer()
@@ -124,10 +126,10 @@ it.each(['replace', 'clear', 'workspace'] as const)('discards an in-flight regis
       releaseNext()
       await process.syncWithServer()
       expect(JSON.parse(readFileSync(daemonPaths(root).device, 'utf8')).deviceId).toBe('startup-device')
-      expect(heartbeat.mock.calls.every(([deviceId]) => deviceId === 'startup-device')).toBe(true)
+      expect(report.mock.calls.every(([deviceId]) => deviceId === 'startup-device')).toBe(true)
       expect(process.status().server).toBe('online')
     }
-  } finally { release(); releaseNext(); client.close(); await oldSync }
+  } finally { release(); releaseNext(); client.close() }
 })
 
 it('does not report success when a live holder never opens its RPC socket', async () => {

@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
-import { RUN_LEASE_MS } from '@mikka/protocol/device'
 import { skillAssignmentReceiptSchema } from '@mikka/protocol/skill'
 import { BASELINE_ARTIFACT, BASELINE_MARKDOWN } from './builtin-skill'
 import { digest, ImprovementError } from './contract'
@@ -236,37 +235,7 @@ export function createSkillAssignments(pool: Pool, authorize: Authorize, authori
       return {skillReceipt:source.skillReceipt,leaseExpiresAt:run.leaseExpiresAt.toISOString()}
     })
   }
-  async function renewHeartbeat(userId:string,deviceId:string,runIds:string[],supportsArtifacts:boolean,supportsTeam=false) {
-    // Protocol IDs may be non-UUIDs; the legacy lease boundary revokes those after partitioning.
-    const validRunIds=runIds.filter(id=>z.uuid().safeParse(id).success)
-    const {rows}=await pool.query(`SELECT s."runId",r.id FROM improvement_skill_selections s
-      LEFT JOIN improvement_skill_receipts r ON r."runId"=s."runId" AND r."userId"=s."userId"
-      WHERE s."userId"=$1 AND s."runId"=ANY($2::uuid[])`,[userId,validRunIds])
-    const revoked:string[]=[],leases:Record<string,string>={}
-    for(const row of rows) {
-      try {
-        if(!supportsArtifacts||!row.id)throw new ImprovementError('workerCapabilityRequired')
-        leases[row.runId]=await transaction(async tx=>{
-          const run=await owned(tx,userId,row.runId,true)
-          if(run.deviceId!==deviceId||!['preparing','running','waiting_input','finishing'].includes(run.status)||!run.leaseExpiresAt||run.leaseExpiresAt.getTime()<=Date.now())
-            throw new ImprovementError('runUnavailable')
-          const source=await assignedSkillForRun(tx,userId,run)
-          if(source.skillUsage==='assigned'&&source.skillArtifact.registryId==='mikka-team'&&!supportsTeam)throw new ImprovementError('workerCapabilityRequired')
-          if(source.skillUsage!=='assigned'||source.skillReceipt.id!==row.id)throw new ImprovementError('sourceMismatch')
-          await currentSkillEligibility(tx,userId,run,source.skillArtifact,authorizeEvaluation)
-          const expiry=new Date(Date.now()+RUN_LEASE_MS).toISOString()
-          const changed=await tx.query(`UPDATE agent_runs SET "leaseExpiresAt"=$4,"updatedAt"=now() WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3
-            AND "stopRequestedAt" IS NULL AND "leaseExpiresAt"=$5 AND "leaseExpiresAt">now() RETURNING id`,[run.id,userId,deviceId,expiry,run.leaseExpiresAt])
-          if(!changed.rowCount)throw new ImprovementError('runUnavailable')
-          return expiry
-        })
-      }
-      catch(error) {if (!(error instanceof ImprovementError)) throw error;revoked.push(row.runId)}
-    }
-    const protectedIds=new Set(rows.map(row=>row.runId))
-    return {legacy:runIds.filter(id=>!protectedIds.has(id)),leases,revoked}
-  }
-  return { selectBaseline, selectTeam, selectVersion, selectActive, lockQuestion, continueQuestion, preflight, recordClaim, revalidate, renewHeartbeat }
+  return { selectBaseline, selectTeam, selectVersion, selectActive, lockQuestion, continueQuestion, preflight, recordClaim, revalidate }
 }
 
 /** Historical provenance stays readable after source withdrawal or task revocation. */

@@ -87,7 +87,7 @@ test('an open thread\'s later reads leave its prompt and report in the database 
       const read = async () => (await as(() => getIssueThread(issue, run))).context?.composerModel
       const patch = (credential: string, sessionId: string, observedModel: string) => PATCH(new Request(
         'http://localhost/v1/runs/' + run, { method: 'PATCH', headers: { authorization: 'Bearer '+credential,
-          [CLIENT_VERSION_HEADER]: SOURCE_DAEMON_VERSION, 'content-type':'application/json' },
+          'x-mikka-device-session': '1', [CLIENT_VERSION_HEADER]: SOURCE_DAEMON_VERSION, 'content-type':'application/json' },
           body: JSON.stringify({ state:'running', sessionId, observedModel }) }), { params: Promise.resolve({ runId: run }) })
       try {
         await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType") VALUES($1,$2,'QA','local','laptop')`,[device,owner])

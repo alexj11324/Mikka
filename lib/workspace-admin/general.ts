@@ -247,6 +247,13 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
  * if the workspace transaction then fails a retry finishes the job.
  */
 export async function deleteWorkspaceData(actorId: string, workspaceId: string, confirmName: string): Promise<WorkspaceDeletion> {
+  const deletion = await deleteWorkspaceRecords(actorId, workspaceId, confirmName)
+  // Runs in the deleted workspace stop now; nothing rechecks them later (decision 2026-11-17-2215).
+  await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ workspaceId })
+  return deletion
+}
+
+async function deleteWorkspaceRecords(actorId: string, workspaceId: string, confirmName: string): Promise<WorkspaceDeletion> {
   z.uuid().parse(workspaceId)
   const typed = z.string().max(200).parse(confirmName).trim()
   let reviewIds: string[] = []

@@ -33,7 +33,7 @@ function fixture() {
     workspace: { id: workspaceId, kind: 'team', ownerId: 'owner' },
     run: { id:'run',userId:'member',workspaceId,issueId:'issue',agentId:'agent',deviceId:'device',deviceRepoId:'repo',botId:null,attempt:1,baseBranch:null as string|null,status:'queued',prompt:'private claim instructions',kind:'implement',retryOf:null as string|null,stopReason:null as string|null,stopRequestedAt:null as Date|null,leaseExpiresAt:null as Date|null },
     issue: {id:'issue',userId:'owner',workspaceId,ownershipState:'bound',scope:'workspace',linearSyncPolicy:'explicit',linearSyncBlocked:false,content:{type:'doc'}},
-    device: {id:'device',ownerId:'member',enabled:true,kind:'local',protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]},
+    device: {id:'device',ownerId:'member',enabled:true,sessionOpenedAt:new Date() as Date|null,sessionClosedAt:null as Date|null,kind:'local',protocolVersion:DAEMON_PROTOCOL_VERSION,harnesses:[{harness:'codex',installed:true,toolApproval:true}]},
     agent: {id:'agent',userId:'member',deviceId:'device',harness:'codex'},
     repo: {id:'repo',userId:'member',deviceId:'device',baseBranch:'main',repoPath:repository.key,remoteUrl:repository.remoteUrl},
     // The CLI layer as resolveTrustedRunPolicy builds it: an unset git_push does not restrict the App grant.
@@ -125,6 +125,28 @@ function selectEnvironment(probe: ReturnType<typeof fixture>, runtime: 'local' |
 function claimHistory(probe: ReturnType<typeof fixture>) {
   return structuredClone({ run: probe.run, issue: probe.issue, publication: probe.publication, checkpoint: probe.checkpoint })
 }
+
+test('a device without an open session claims nothing and is told to open it, before any preparation', async () => {
+  for (const session of [{ sessionOpenedAt: null, sessionClosedAt: null }, { sessionOpenedAt: new Date(Date.now() - 60_000), sessionClosedAt: new Date() }]) {
+    const probe = fixture()
+    Object.assign(probe.device, session)
+    const before = claimHistory(probe)
+    const response = await claim(probe, [], false)
+    assert.equal(response.status, 409)
+    assert.deepEqual(await response.json(), { error: 'Open the device session before claiming.', code: 'deviceSessionRequired' })
+    assert.deepEqual(claimHistory(probe), before, 'the run stays queued, with no lease')
+  }
+})
+
+test('a claim leases the run for its device session, not for a heartbeat interval', async () => {
+  const { SESSION_LEASE_MS } = await import('@mikka/protocol/device')
+  const probe = fixture()
+  const started = Date.now()
+  const response = await claim(probe)
+  assert.equal(response.status, 200)
+  const lease = new Date(probe.run.leaseExpiresAt as unknown as string).getTime()
+  assert.ok(lease >= started + SESSION_LEASE_MS && lease <= Date.now() + SESSION_LEASE_MS, 'the lease is the session lease bound; a disconnect ends it')
+})
 
 test('resource refusal leaves the queued run and history unchanged without reading secrets or claiming', async () => {
   for (const denial of ['projectRepositoryDenied', 'projectEnvironmentUnavailable'] as const) {
@@ -806,6 +828,9 @@ test('the actual claim response carries an opaque sealed task grant bound to the
   assert.deepEqual(opened.http, secret.delivery.http)
   assert.ok(opened.expiresAt - opened.issuedAt <= EGRESS_CAPABILITY_TTL_MS)
   assert.ok(opened.expiresAt <= new Date(probe.run.leaseExpiresAt!).getTime())
+  // Nothing renews a grant (decision 2026-11-17-2215): it expires exactly with the session lease of the claim.
+  assert.equal(grant.expiresAt, new Date(probe.run.leaseExpiresAt!).toISOString())
+  assert.equal(opened.expiresAt, new Date(probe.run.leaseExpiresAt!).getTime())
   for (const mismatch of [{ ownerId: 'other' }, { workspaceId: 'other' }, { repository: 'other/repo' }, { runId: 'other' },
     { deviceId: 'other' }, { deviceTokenId: 'other' }, { attempt: 2 }]) {
     assert.throws(() => openEgressCapability(grant.capability, { ...binding, ...mismatch }), { code: 'task_secret_unavailable', detail: 'binding_mismatch' })

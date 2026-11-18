@@ -30,7 +30,7 @@ test('a bound cloud device can renew its own subscription lease through the actu
     } as unknown as ReturnType<typeof subscriptionRuntime>),
   } })
   const route = await import('../app/v1/devices/[deviceId]/runs/[runId]/subscription-lease/route')
-  const request = (deviceId = device, id = runId) => new Request(`http://127.0.0.1/mikka/v1/devices/${deviceId}/runs/${id}/subscription-lease`, { method: 'POST', headers: { authorization: `Bearer ${credential}` } })
+  const request = (deviceId = device, id = runId) => new Request(`http://127.0.0.1/mikka/v1/devices/${deviceId}/runs/${id}/subscription-lease`, { method: 'POST', headers: { authorization: `Bearer ${credential}`, 'x-mikka-device-session': '1' } })
   t.after(async () => {
     mock.restoreAll()
     await pool.query('DELETE FROM thread_machines WHERE "ownerId"=$1', [owner])
@@ -41,8 +41,8 @@ test('a bound cloud device can renew its own subscription lease through the actu
     const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('./db'), import('./workspace-db')])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
-  await t.test('the same credential remains valid for its established heartbeat route', async () => {
-    const caller = await authenticateDevice(new Request(`http://127.0.0.1/v1/devices/${device}/heartbeat`, { method: 'POST', headers: { authorization: `Bearer ${credential}` } }))
+  await t.test('the same credential remains valid for its established report route', async () => {
+    const caller = await authenticateDevice(new Request(`http://127.0.0.1/v1/devices/${device}/report`, { method: 'POST', headers: { authorization: `Bearer ${credential}` } }))
     assert.equal(caller?.tokenId, tokenId)
   })
   await t.test('own run renewal passes route authentication and reaches issuance once', async () => {

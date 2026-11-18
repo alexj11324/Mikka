@@ -20,7 +20,7 @@ test('API requests stay in their effective workspace on thread, evidence, propos
   }
   const agent = await seedAgent(pool, owner)
   const device = randomUUID(), repo = randomUUID()
-  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES ($1,$2,'Laptop','local',true,now())`, [device, owner])
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt") VALUES ($1,$2,'Laptop','local',true,now(),now())`, [device, owner])
   await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,$3,'/repo')`, [repo, device, owner])
   const run = async (botId: string | null, issueId: string | null, workspaceId?: string) => {
     const id = await seedRun(pool, { userId: owner, agentId: agent, botId, issueId, workspaceId, status: 'succeeded', finishedAt: new Date() })

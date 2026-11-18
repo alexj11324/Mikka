@@ -48,7 +48,6 @@ it('the real daemon materializes initial and live-input files before handing the
     harnesses: [{ harness: 'mock', installed: true, version: 'fixture' }],
     fixturesDir,
     mockSpeed: 1,
-    heartbeatMs: 60_000,
     quotaSource: null,
   }).start()
   try {

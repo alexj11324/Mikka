@@ -566,7 +566,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       for (const value of [task, row]) assert.deepEqual([value.state, value.reason], [state, reason])
     }
     await compare('blocked', 'offline')
-    await pool.query('update devices set "lastSeenAt"=now() where id=$1', [device])
+    await pool.query('update devices set "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL where id=$1', [device])
     await compare('queued', null)
     await pool.query('update devices set enabled=false where id=$1', [device])
     await compare('blocked', 'offline')

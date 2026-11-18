@@ -19,7 +19,7 @@ import { promisify } from 'node:util'
 import { gzipSync } from 'node:zlib'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
-import { MIN_DAEMON_VERSION, type DeviceHeartbeat, type DeviceRegistration, type HeartbeatResult, type RunAssignment, type RunCheckpoint, type RunCheckpointReceipt } from '@mikka/protocol/device'
+import { DEVICE_SESSION_HEADER, DEVICE_SESSION_VERSION, MIN_DAEMON_VERSION, type DeviceRegistration, type RunAssignment, type RunCheckpoint, type RunCheckpointReceipt } from '@mikka/protocol/device'
 import type { RunCompletion } from '@mikka/protocol/run'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import type { TaskSecretAccess } from '@mikka/protocol/task-secrets'
@@ -27,6 +27,7 @@ import { taskExecutionEnv } from '../packages/daemon/src/task-env'
 import { startTaskSecretBridge, type TaskSecretBridge } from '../packages/daemon/src/task-secret-bridge'
 import { executeEgressRequest, pinnedEgressRequestOptions, type EgressHttpTarget, type EgressUpstreamResponse } from '../lib/secrets/egress-http'
 import { taskSecretEgressResponse } from '../lib/secrets/egress-route'
+import { egressBindingActive } from '../lib/secrets/egress-binding'
 import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 
@@ -34,7 +35,6 @@ import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-
 // runtime, as the released-daemon contract test does, and share wire types.
 interface LocalLink {
   registerDevice(credential: string, info: Omit<DeviceRegistration, 'deviceId'>, knownDeviceId: string): Promise<{ deviceId: string }>
-  heartbeat(deviceId: string, status: DeviceHeartbeat): Promise<HeartbeatResult>
   claimRun(deviceId: string, runId: string): Promise<RunAssignment>
   checkpointRun(runId: string, checkpoint: RunCheckpoint): Promise<RunCheckpointReceipt | undefined>
   completeRun(runId: string, completion: RunCompletion): Promise<void>
@@ -100,7 +100,6 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   const { RunJournal } = await import(journalModule) as { RunJournal: new (path: string) => { put(entry: JournalEntry): void; get(runId: string): JournalEntry | undefined } }
   const routes = {
     register: await import('../app/v1/devices/register/route'),
-    heartbeat: await import('../app/v1/devices/[deviceId]/heartbeat/route'),
     claim: await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route'),
     checkpoint: await import('../app/v1/runs/[runId]/checkpoint/route'),
     complete: await import('../app/v1/runs/[runId]/complete/route'),
@@ -198,7 +197,6 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
       let found: string[] | undefined, result: Response
       if (path === '/api/secrets/delivery' && request.method === 'PATCH') result = await routes.delivery.PATCH(request)
       else if (path === '/v1/devices/register') result = await routes.register.POST(request)
-      else if ((found = match(/^\/v1\/devices\/([^/]+)\/heartbeat$/))) result = await routes.heartbeat.POST(request, { params: Promise.resolve({ deviceId: found[0] }) })
       else if ((found = match(/^\/v1\/devices\/([^/]+)\/runs\/([^/]+)\/claim$/))) result = await routes.claim.POST(request, { params: Promise.resolve({ deviceId: found[0], runId: found[1] }) })
       else if ((found = match(/^\/v1\/runs\/([^/]+)\/checkpoint$/))) result = await routes.checkpoint.POST(request, { params: Promise.resolve({ runId: found[0] }) })
       else if ((found = match(/^\/v1\/runs\/([^/]+)\/complete$/))) result = await routes.complete.POST(request, { params: Promise.resolve({ runId: found[0] }) })
@@ -212,7 +210,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
         result = await runRequestScope(createRequestScope(request), () => routes.capture.GET(request, { params: Promise.resolve({ captureId }) }))
       }
       else if ((found = match(/^\/v1\/task-secrets\/([^/]+)$/))) result = await taskSecretEgressResponse(request, found[0], (input, binding, options) =>
-        executeEgressRequest(input, binding, { ...options, resolve: async () => [{ address: '93.184.216.34', family: 4 }], transport }))
+        executeEgressRequest(input, binding, { ...options, bindingActive: egressBindingActive, resolve: async () => [{ address: '93.184.216.34', family: 4 }], transport }))
       else result = new Response(null, { status: 404 })
       outgoing.writeHead(result.status, Object.fromEntries(result.headers))
       outgoing.end(Buffer.from(await result.arrayBuffer()))
@@ -245,12 +243,19 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   const harnesses = [{ harness: 'claude_code' as const, installed: true, version: '2.1.0', toolApproval: true as const }]
   const device = async (userId: string) => {
     const id = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), token = 'synthetic-' + randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"daemonVersion","protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Local fixture','local',true,$3,$4,now(),$5)`,
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"daemonVersion","protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Local fixture','local',true,$3,$4,now(),$5,now())`,
       [id, userId, MIN_DAEMON_VERSION, DAEMON_PROTOCOL_VERSION, JSON.stringify(harnesses)])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'claude_code',$4)`, [agentId, userId, id, `fixture-${agentId}`])
     await pool.query('INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,$3,$4,$5)', [repoId, id, userId, normalizeRepository(remote).key, remote])
     await pool.query('INSERT INTO device_tokens (id,"userId","tokenHash") VALUES ($1,$2,$3)', [randomUUID(), userId, hashDeviceToken(token)])
-    const link = new HttpServerLink(base, fetch, MIN_DAEMON_VERSION)
+    // The daemon holds its device session (decision 2026-11-17-2215); this
+    // test drives its HTTP link only, so it sends the session header itself.
+    const sessioned = ((input: string | URL | Request, init?: RequestInit) => {
+      const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined))
+      headers.set(DEVICE_SESSION_HEADER, String(DEVICE_SESSION_VERSION))
+      return fetch(input, { ...init, headers })
+    }) as typeof fetch
+    const link = new HttpServerLink(base, sessioned, MIN_DAEMON_VERSION)
     assert.equal((await link.registerDevice(token, { name: 'Local fixture', platform: 'linux', arch: 'x64', daemonVersion: MIN_DAEMON_VERSION, protocolVersion: DAEMON_PROTOCOL_VERSION, harnesses }, id)).deviceId, id)
     return { id, agentId, token, link }
   }
@@ -261,7 +266,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
   const { runId } = await queueRun(owner, { issueId, agentId: a.agentId, repo: remote, model: 'fixture-model',
     modelDispatch: { mode: 'preference', routing: { version: 1, difficulty: 'hard', model: 'fixture-model', harness: 'claude_code', tier: 'standard', effort: 'high', reason: 'difficulty_fit' } } }, botId)
   const claimStatus = async (token: string, deviceId: string) => {
-    const response = await fetch(`${base}/v1/devices/${deviceId}/runs/${runId}/claim`, { method: 'POST', headers: { authorization: `Bearer ${token}`, [CLIENT_VERSION_HEADER]: MIN_DAEMON_VERSION } })
+    const response = await fetch(`${base}/v1/devices/${deviceId}/runs/${runId}/claim`, { method: 'POST', headers: { authorization: `Bearer ${token}`, 'x-mikka-device-session': '1', [CLIENT_VERSION_HEADER]: MIN_DAEMON_VERSION } })
     await response.arrayBuffer()
     return response.status
   }
@@ -307,27 +312,28 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
     assert.equal(restored?.assignment.taskSecrets, undefined)
     assert.equal(restored?.assignment.taskEnv, undefined)
   })
-  const reportRun = (id: string, access: TaskSecretAccess) => ({ runId: id, lastProgressAt: new Date().toISOString(), secretCapabilities: access.grants.map(grant => grant.capability) })
-  await t.test('the ordinary heartbeat renews the opaque capability and cross-run replay is rejected before TLS', async () => {
-    const beat = await a.link.heartbeat(a.id, { harnesses, runs: [reportRun(runId, firstAccess)], worktreeDiskBytes: 0 })
-    assert.ok(beat.leases[runId] && beat.taskSecrets?.[runId])
-    state.current = beat.taskSecrets[runId]
-    assert.equal(JSON.stringify(beat).includes(protectedValue), false)
+  const { applyDeviceSessionReport } = await import('../lib/device-session')
+  const egress = async (id: string, capability: string) => {
+    const response = await fetch(`${base}/v1/task-secrets/${id}`, { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ capability, method: 'GET', path: '/v1/items', headers: [] }) })
+    return { status: response.status, detail: (await response.json() as { detail?: string }).detail }
+  }
+  await t.test('the capability lasts as long as the run lease and cross-run replay is rejected before TLS', async () => {
+    assert.equal(firstAccess.grants[0].expiresAt, assignment.leaseExpiresAt, 'issued for the session lease, with no 90-second renewal')
     const before = upstreamRequests
-    const replay = await fetch(`${base}/v1/task-secrets/${randomUUID()}`, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ capability: state.current.grants[0].capability, method: 'GET', path: '/v1/items', headers: [] }) })
-    assert.equal(replay.status, 401)
-    assert.equal((await replay.json()).detail, 'binding_mismatch')
+    assert.deepEqual(await egress(randomUUID(), firstAccess.grants[0].capability), { status: 401, detail: 'binding_mismatch' })
     assert.equal(upstreamRequests, before)
   })
   let retry: RunAssignment
-  await t.test('a real checkpoint and expired local lease recover onto B with a new grant', async () => {
+  await t.test('a closed device session refuses the capability at its next use; recovery moves the run to B with a new grant', async () => {
     const receipt = await a.link.checkpointRun(runId, { baseCommit: 'a'.repeat(40), patch: gzipSync('').toString('base64'), files: 0, takenAt: new Date().toISOString() })
     assert.equal(receipt?.runId, runId)
-    // Controlled liveness input on this test's rows; the recovery and admission
-    // decisions, new retryOf row and claim all come from production functions.
-    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '10 minutes' WHERE id=$1 AND "ownerId"=$2`, [a.id, owner])
-    await pool.query(`UPDATE agent_runs SET "leaseExpiresAt"=now()-interval '1 second' WHERE id=$1 AND "userId"=$2`, [runId, owner])
+    // The gateway reports A's socket, then its close: the real session writer ends A's leases.
+    assert.equal((await applyDeviceSessionReport(a.id, { state: 'connected', at: new Date().toISOString(), socketId: 'socket-secret-a1' })).applied, true)
+    assert.equal((await applyDeviceSessionReport(a.id, { state: 'disconnected', at: new Date().toISOString(), socketId: 'socket-secret-a1' })).applied, true)
+    const before = upstreamRequests
+    assert.deepEqual(await egress(runId, firstAccess.grants[0].capability), { status: 410, detail: 'expired_capability' }, 'refused at use, long before the capability expires')
+    assert.equal(upstreamRequests, before, 'nothing reaches the provider')
     await reclaimLostRuns(owner)
     const rows = (await pool.query<{ id: string; deviceId: string; attempt: number }>('SELECT id,"deviceId",attempt FROM agent_runs WHERE "retryOf"=$1 AND "userId"=$2', [runId, owner])).rows
     assert.equal(rows.length, 1)
@@ -337,23 +343,20 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
     assert.ok(retry.taskSecrets?.grants.length === 1)
     assert.equal(retry.resumeFrom?.baseCommit, 'a'.repeat(40))
     assert.equal(retry.taskSecrets.grants[0].capability === firstAccess.grants[0].capability, false)
-    const oldBeat = await a.link.heartbeat(a.id, { harnesses, runs: [reportRun(runId, state.current!)], worktreeDiskBytes: 0 })
-    assert.ok(oldBeat.revoked?.includes(runId))
-    assert.equal(oldBeat.taskSecrets?.[runId], undefined)
+    assert.deepEqual(await egress(runId, firstAccess.grants[0].capability), { status: 410, detail: 'expired_capability' }, 'the old attempt stays refused')
     state.current = undefined
     assert.equal((await child(assignment, bridgeA)).status, 409)
     const retryBridge = await startBridge(() => retry.taskSecrets)
     assert.equal((await child(retry, retryBridge)).status, 200)
   })
-  await t.test('changing the stored Secret withdraws B on its next heartbeat and the bridge refuses further child requests', async () => {
+  await t.test('changing the stored Secret withdraws B at its next use and the bridge refuses further child requests', async () => {
     assert.ok(retry?.taskSecrets)
     const held = { current: retry.taskSecrets as TaskSecretAccess | undefined }
     const bridge = await startBridge(() => held.current)
     await personal.replaceUserSecret(owner, { id: saved.id, value: 'synthetic-protected-' + randomBytes(24).toString('hex') })
-    const beat = await b.link.heartbeat(b.id, { harnesses, runs: [reportRun(retry.runId, retry.taskSecrets)], worktreeDiskBytes: 0 })
-    assert.ok(beat.revoked?.includes(retry.runId))
-    assert.equal(beat.leases[retry.runId], undefined)
-    assert.equal(beat.taskSecrets?.[retry.runId], undefined)
+    const before = upstreamRequests
+    assert.notEqual((await egress(retry.runId, retry.taskSecrets.grants[0].capability)).status, 200, 'the withdrawn grant is refused')
+    assert.equal(upstreamRequests, before)
     held.current = undefined
     assert.equal((await child(retry, bridge)).status, 409)
     await b.link.completeRun(retry.runId, { stopReason: 'cancelled', report: { summary: 'Local Secret withdrawal fixture', filesChanged: [], verify: { status: 'not_run' }, openQuestions: [], nextStep: null } })

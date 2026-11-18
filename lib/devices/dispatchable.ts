@@ -1,8 +1,9 @@
 export type DeviceOption = { id: string; name: string; online: boolean }
 type Query = (sql: string, values: unknown[]) => Promise<{ rows: DeviceOption[] }>
 
-/** A device counts as online when its daemon checked in inside the presence window. */
-export const ONLINE_WINDOW = "interval '2 minutes'"
+/** A device is online while its gateway session is open (decision 2026-11-17-2215);
+ * the same predicate as `deviceSessionOpenSql` in lib/device-presence.ts. */
+export const SESSION_OPEN = `("sessionOpenedAt" IS NOT NULL AND ("sessionClosedAt" IS NULL OR "sessionClosedAt" < "sessionOpenedAt"))`
 
 /**
  * The machines a new thread may be pinned to: only this person's own live, dispatchable
@@ -15,7 +16,7 @@ export const ONLINE_WINDOW = "interval '2 minutes'"
  */
 export async function listDispatchableDevices(query: Query, ownerId: string): Promise<DeviceOption[]> {
   const { rows } = await query(
-    `SELECT id, name, ("lastSeenAt" IS NOT NULL AND "lastSeenAt" > now() - ${ONLINE_WINDOW}) AS online
+    `SELECT id, name, ${SESSION_OPEN} AS online
        FROM devices
       WHERE "ownerId"=$1 AND "removedAt" IS NULL AND enabled AND kind='local'
       ORDER BY online DESC, name ASC
