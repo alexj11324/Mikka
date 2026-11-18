@@ -94,7 +94,7 @@ async function verifyReceipt(context) {
 }
 
 export async function runCi({ env = process.env, verify = false } = {}) {
-  if (!process.version.startsWith('v24.')) fail('CI_NODE_24_REQUIRED')
+  if (Number(process.versions.node.split('.')[0]) < 22) fail('CI_NODE_22_REQUIRED')
   const publicSha = git(['rev-parse', 'HEAD'])
   const context = sourceContext(env, publicSha, env.OVERLAY_SHA)
   if (verify) return verifyReceipt(context)

@@ -22,7 +22,7 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
   await admin.query(`CREATE SCHEMA "${schema}"`)
   const pool = new Pool({ connectionString: target, options: `-c search_path=${schema}` })
   t.after(async () => { await pool.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
-  for (const name of ['20261023213851_group_conversations.sql','20261029043634_group_turns.sql','20261031153511_group_bot_members.sql','20261103220300_group_decision_quality.sql']) await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
+  for (const name of ['20261023213851_group_conversations.sql','20261118120000_conversation_model_device.sql','20261029043634_group_turns.sql','20261031153511_group_bot_members.sql','20261103220300_group_decision_quality.sql']) await pool.query(await readFile(new URL(`../../drizzle/${name}`, import.meta.url), 'utf8'))
   await pool.query('CREATE TABLE hosted_usage ("generationId" text,model text,state text,"costMicroUsd" bigint)')
   await pool.query('CREATE TABLE message_reactions ("messageId" uuid,"userId" text,emoji text,"createdAt" timestamptz DEFAULT now())')
   const group = randomUUID(), foreign = randomUUID(), workspace = randomUUID(), message = randomUUID(), foreignMessage = randomUUID(), member = randomUUID()

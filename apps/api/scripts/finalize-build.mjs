@@ -19,7 +19,7 @@ const within = (root, path) => path === root || path.startsWith(`${root}${sep}`)
 export async function compileTracing(root) {
   const result = await build({
     absWorkingDir: root, entryPoints: ['apps/api/runtime/tracing-start.ts'],
-    bundle: true, platform: 'node', format: 'esm', target: 'node24',
+    bundle: true, platform: 'node', format: 'esm', target: 'node22',
     alias: { '@': root }, external: nodeRuntimePackages, write: false, metafile: true,
     sourcemap: false,
   })

@@ -18,22 +18,12 @@ minimumReleaseAgeExclude:
   - next
 
 allowBuilds:
-  '@mongodb-js/zstd': false
-  '@openuidev/lang-core': false
   '@parcel/watcher': true
   '@swc/core': true
-  cbor-extract: false
-  core-js: false
   electron: true
-  electron-winstaller: false
   esbuild: true
   ffmpeg-static: true
-  free-email-domains: false
-  node-liblzma: false
-  nx: false
   sharp: true
-  tesseract.js: false
-  workerd: false
 
 patchedDependencies:
   '@fantasticfour/world-cloudflare@2.4.3': patches/@fantasticfour__world-cloudflare@2.4.3.patch
@@ -42,3 +32,11 @@ patchedDependencies:
   ffmpeg-static@5.3.0: patches/ffmpeg-static@5.3.0.patch
   graphile-worker@0.16.6: patches/graphile-worker@0.16.6.patch
   '@workflow/world-postgres@5.2.0': patches/@workflow__world-postgres@5.2.0.patch
+  # Eve CLI reads this engine range; actual build/start is tested on 22 and 24.
+  eve@1.0.0-rc.9: patches/eve@1.0.0-rc.9.patch
+
+# Eve development cleanup uses explicit resource management, absent on Node 22.
+packageExtensions:
+  eve@1.0.0-rc.9:
+    dependencies:
+      core-js-pure: 3.51.0

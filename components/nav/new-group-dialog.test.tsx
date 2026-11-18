@@ -35,7 +35,7 @@ test('a completed create from an unmounted workspace cannot navigate the current
   const response = new Promise<Response>(done => { resolve = done })
   const request = mock.method(globalThis, 'fetch', () => response)
   const created = mock.fn()
-  const render = (workspaceId: string) => root.render(<NewGroupDialog key={workspaceId} open workspaceId={workspaceId} bots={[bot]}
+  const render = (workspaceId: string) => root.render(<NewGroupDialog key={workspaceId} open workspaceId={workspaceId} bots={[bot]} devices={[]}
     onOpenChange={() => {}} onCreated={created} onNewBot={() => {}} onReviewGroups={() => {}} />)
   await act(async () => render('00000000-0000-4000-8000-000000000010'))
   const input = document.querySelector<HTMLInputElement>('#new-group-title')!
@@ -56,4 +56,51 @@ test('a completed create from an unmounted workspace cannot navigate the current
   assert.equal(request.mock.callCount(), 1)
   assert.equal(document.querySelector<HTMLInputElement>('#new-group-title')!.value, '')
   assert.equal(document.querySelector('[role="alert"]'), null)
+})
+
+/** The empty form used to leave 开始线程 disabled with nothing on screen saying why: the press must answer. */
+test('the primary button answers an empty form by naming what is missing', async () => {
+  const request = mock.method(globalThis, 'fetch', () => Promise.resolve(Response.json({}, { status: 201 })))
+  await act(async () => root.render(<NewGroupDialog open workspaceId="00000000-0000-4000-8000-000000000010" bots={[bot]} devices={[]}
+    onOpenChange={() => {}} onCreated={() => {}} onNewBot={() => {}} onReviewGroups={() => {}} />))
+  const primary = [...document.querySelectorAll('button')].find(button => button.textContent?.trim() === 'create')!
+  assert.equal(primary.disabled, false)
+  const form = document.querySelector('form')!
+  await act(async () => { form.dispatchEvent(new browser.Event('submit', { bubbles: true, cancelable: true }) as unknown as Event) })
+  assert.equal(document.querySelector('[role="alert"]')?.textContent, 'nameRequired')
+  assert.equal(request.mock.callCount(), 0)
+  // The message follows the field the person is filling, not a fixed line above the buttons.
+  const input = document.querySelector<HTMLInputElement>('#new-group-title')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, 'value')!.set!.call(input, 'Fixture group')
+    input.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event)
+  })
+  assert.equal(document.querySelector('[role="alert"]'), null)
+  await act(async () => { form.dispatchEvent(new browser.Event('submit', { bubbles: true, cancelable: true }) as unknown as Event) })
+  assert.equal(document.querySelector('[role="alert"]')?.textContent, 'botsRequired')
+  assert.equal(request.mock.callCount(), 0)
+})
+
+/** A create that never answers used to remove ✕, disable 取消 and gate onOpenChange: the dialog became unclosable. */
+test('every exit stays live while a create is in flight', async () => {
+  let resolve!: (response: Response) => void
+  const response = new Promise<Response>(done => { resolve = done })
+  mock.method(globalThis, 'fetch', () => response)
+  const changes: boolean[] = []
+  await act(async () => root.render(<NewGroupDialog open workspaceId="00000000-0000-4000-8000-000000000010" bots={[bot]} devices={[]}
+    onOpenChange={next => changes.push(next)} onCreated={() => {}} onNewBot={() => {}} onReviewGroups={() => {}} />))
+  const input = document.querySelector<HTMLInputElement>('#new-group-title')!
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, 'value')!.set!.call(input, 'Fixture group')
+    input.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event)
+    document.querySelector<HTMLElement>('[role="checkbox"]')!.click()
+  })
+  const form = document.querySelector('form')!
+  await act(async () => { form.dispatchEvent(new browser.Event('submit', { bubbles: true, cancelable: true }) as unknown as Event) })
+  const buttons = [...document.querySelectorAll('button')]
+  assert.equal(buttons.find(button => button.textContent?.trim() === 'cancel')!.disabled, false, 'cancel stays pressable')
+  assert.ok(buttons.some(button => button.textContent?.trim() === 'close'), '✕ stays rendered')
+  await act(async () => { buttons.find(button => button.textContent?.trim() === 'cancel')!.click() })
+  assert.deepEqual(changes, [false], 'the close request is not swallowed')
+  await act(async () => { resolve(Response.json({ id: 'created', title: 'Fixture group' }, { status: 201 })); await response })
 })

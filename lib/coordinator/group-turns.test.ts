@@ -321,6 +321,7 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
   let releasePending = () => {}
   try {
     await scoped.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql', import.meta.url),'utf8'))
+    await scoped.query(await readFile(new URL('../../drizzle/20261118120000_conversation_model_device.sql', import.meta.url),'utf8'))
     const migration = await readFile(new URL('../../drizzle/20261029043634_group_turns.sql', import.meta.url),'utf8')
     await Promise.all([scoped.query(migration),scoped.query(migration)]); await scoped.query(migration)
     await scoped.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql', import.meta.url), 'utf8'))

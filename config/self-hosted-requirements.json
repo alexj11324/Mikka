@@ -3420,5 +3420,33 @@
     "behavior": "A cloud dispatch that names an Agent with no usable model is refused with agentNoModel, its message and a link to 模型与订阅, instead of agentProfileUnavailable.",
     "test": "tests/cloud-runtime-auto.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "drizzle/20261118120000_conversation_model_device.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds an optional model and device to a conversation: a thread may pin which model answers it and which machine runs it, while every existing row and every caller that sends neither keeps the lead Bot's own model and any eligible device.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/bot-models.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Names the three models a Bot or a thread may pin, shared by the conversations CHECK constraint, the strict create schema and the create dialog's picker; no network, no credentials.",
+    "test": "lib/bot-models.test.ts",
+    "suite": "test:lib-units"
+  },
+  "app/api/devices/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lists the signed-in person's own live, dispatchable devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
+    "test": "lib/devices/dispatchable.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/devices/dispatchable.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lists the signed-in person's own live, dispatchable local devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
+    "test": "lib/devices/dispatchable.test.ts",
+    "suite": "test:lib-units"
   }
 }
