@@ -6,7 +6,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import type { ThreadDeliveryMode } from '@/lib/thread-delivery'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
+import { unstable_serialize, useSWRConfig } from 'swr'
 import { useMessages, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { ChevronDown } from '@/components/icons'
@@ -52,7 +52,6 @@ import { navigate, openTask } from './workspace-navigation'
 import { ThreadHeader } from './thread-header'
 import { ThreadStatus } from './thread-status-icon'
 import { PersonReferences, ThreadReferencePicker } from './thread-references'
-import { ThreadContextUsage } from './thread-context-usage'
 import { ThreadOutlineIndex } from './thread-outline-index'
 import { AgentCitationsContext, CitationSources, useLinkPreviews, type AgentCitations } from './agent-citations'
 import { useLiveCitations } from '@/components/coordinator/use-live-citations'
@@ -171,12 +170,6 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   // Observe SWR's successful read, including one started before this panel remounted.
   const readRejected = refused || Boolean(error && accessRejected)
   const data = readRejected ? undefined : read
-  const estimateKey = data?.historyPage && !transcriptOnly
-    ? ['thread-context', issueId, runId, data.thread.latestRunId, data.thread.status, Math.floor(data.historyPage.count / 200)]
-    : null
-  const estimate = useSWR(estimateKey, () => import('@/app/actions/agents').then(actions => actions.getIssueThreadContext(issueId, runId)),
-    { revalidateOnFocus: false, revalidateOnReconnect: false, keepPreviousData: true })
-  const context = data?.context ?? (estimateKey ? estimate.data : undefined)
   const backgroundFailed = Boolean(error && data)
   const [olderState, setOlderState] = useState<'idle' | 'loading' | 'failed'>('idle')
   const [historyPrepend, setHistoryPrepend] = useState(0)
@@ -496,13 +489,17 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
     // 「正在工作 · 12 秒」, 「在等你回复」; it replaces the old 「完成 · 开始于 … · Agent」 status line (Alex, 2026-11-15).
     {
       const status = view?.status ?? data.thread.status
+      const outcome = acceptedProducerOutcome(data.thread, issueId, allTasks)
+      const waitingForReply = question === 'waiting' || status === 'waiting_input'
+      // The list's fallback group for an unjudged run is not a request for input.
+      const showBadge = !stopRequested && (waitingForReply || runIsActive(status) || status === 'failed' || status === 'paused' || outcome !== null)
       const started = new Date(data.thread.createdAt).getTime()
       const ended = data.thread.finishedAt ? new Date(data.thread.finishedAt).getTime() : Date.now()
       const seconds = Math.max(0, Math.round((ended - started) / 1000))
       const duration = seconds < 60 ? t('activityLine.seconds', { s: seconds })
         : seconds < 3600 ? (seconds % 60 ? t('activityLine.minutes', { m: Math.floor(seconds / 60), s: seconds % 60 }) : t('activityLine.minutesOnly', { m: seconds / 60 }))
         : t('activityLine.hours', { h: Math.floor(seconds / 3600), m: Math.floor(seconds / 60) % 60 })
-      const line = stopRequested ? t('stopping') : question === 'waiting' ? t('activityLine.waiting')
+      const line = stopRequested ? t('stopping') : waitingForReply ? t('activityLine.waiting')
         : active ? t('activityLine.working', { duration })
         : [t('activityLine.worked', { duration }), ...status === 'failed' ? [t('activityLine.failed')] : status === 'stopped' || status === 'cancelled' ? [t('activityLine.stopped')] : []].join(' · ')
       const folds = !active && items.some(item => item.kind === 'steps')
@@ -511,8 +508,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
           {folds ? <Button type="button" variant="ghost" size="xs" aria-expanded={stepsOpen} onClick={() => setStepsOpen(value => !value)} className="text-muted-foreground">
             {line}<ChevronDown data-icon="inline-end" aria-hidden className={cn('transition-transform', stepsOpen && 'rotate-180')} />
           </Button> : <span role="status">{line}</span>}
-          {!stopRequested && <ThreadStatus status={status} outcome={acceptedProducerOutcome(data.thread, issueId, allTasks)} waiting={question === 'waiting'} icon={false} />}
-          {context && <ThreadContextUsage usage={context} />}
+          {showBadge && <ThreadStatus status={status} outcome={outcome} waiting={waitingForReply} icon={false} />}
           <ThreadOutlineIndex entries={outline} />
         </div> }] })
     }
@@ -617,7 +613,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       </>}
     </div>)}
   </div>
-  const recorded = data?.composerModel ?? context?.composerModel
+  const recorded = data?.composerModel ?? data?.context?.composerModel
   const currentModel = recorded?.served || recorded?.selected
   const pickerEnabled = issueId && data?.live?.viewerId && !active && !question && !replyBlocked && !changeRequest &&
     (detail?.harness === 'codex' || detail?.harness === 'claude_code')

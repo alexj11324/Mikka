@@ -41,7 +41,7 @@ function conversationQuery() {
     SELECT 'run'::text AS kind,delivered.pulls,root.id,EXISTS (SELECT 1 FROM assigned receipt JOIN agent_runs ON agent_runs.id=receipt.id
       LEFT JOIN conversation_reads ON conversation_reads."userId"=${owner} AND conversation_reads."conversationId"='run:' || agent_runs.id::text
       WHERE receipt.root=root.id AND NOT receipt."depthExceeded" AND (${unread.sql})) AS unread, coalesce(agent_runs.title,root.title) AS title, agents.name AS "agentName",agents.harness,
-      root."issueId",i."issuedIdentifier" AS identifier,i.title AS "taskTitle",i.status,agent_runs.status AS "runStatus",
+      root."issueId",root.kind AS "runKind",i."issuedIdentifier" AS identifier,i.title AS "taskTitle",i.status,agent_runs.status AS "runStatus",
       agent_runs."deviceId" AS "currentDeviceId", root."threadReplacedBy" IS NOT NULL AS replaced,
       root."conversationPinnedAt" IS NOT NULL AS pinned,root."conversationArchivedAt" AS manual,
       root."conversationRestoredAt" AS restored,latest.touched,root.source,
@@ -195,16 +195,21 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
 }
 
 /** A single bounded result per visible Bot, independent of thread-list paging. */
-export async function conversationSidebar(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, botId?: string) {
+export async function conversationSidebar(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, botId?: string, options?: { nestChecks?: boolean }) {
   const { userId } = taskReaderScope(reader)
-  return await withConversationWorkspace(reader, workspaceId, () => sidebarRows(database, userId, workspaceId, botId)) ?? {}
+  return await withConversationWorkspace(reader, workspaceId, () => sidebarRows(database, userId, workspaceId, botId, options?.nestChecks)) ?? {}
 }
 
-async function sidebarRows(database: RunChainQueryable, userId: string, workspaceId: string, botId?: string) {
+async function sidebarRows(database: RunChainQueryable, userId: string, workspaceId: string, botId?: string, nestChecks?: boolean) {
   const values = [...facts.params, userId, workspaceId, RUN_CHAIN_MAX_DEPTH]
   const botFilter = botId ? `AND "botId"=$${values.push(botId)}::uuid` : ''
+  const parentFilter = nestChecks ? `WHERE v."issueId" IS NULL OR v."runKind" IN ('implement','plan') OR NOT EXISTS (
+      SELECT 1 FROM visible parent WHERE parent."issueId"=v."issueId" AND parent."botId"=v."botId"
+        AND parent."runKind" IN ('implement','plan') AND NOT parent.archived AND parent.source IS DISTINCT FROM 'mcp'
+    )` : ''
   const statement = conversationQuery() + `, bot_rows AS (
-    SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,"runStatus",pinned,touched,source,asked,state,at,archived,"botId" FROM visible
+    SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,"runStatus",pinned,touched,source,asked,state,at,archived,"botId"
+    FROM visible v ${parentFilter}
     UNION ALL
     SELECT n.*,b.id AS "botId" FROM named_chats n JOIN conversation_members cm ON cm."conversationId"=n.id AND cm."memberType"='bot' AND cm."leftAt" IS NULL
       JOIN bots b ON b.id::text=cm."memberId" AND b."workspaceId"=$${facts.params.length+2} AND b."ownerId"=$${facts.params.length+1}

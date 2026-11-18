@@ -103,7 +103,8 @@ export function useChatNav({ bots, archivedBots = [], workspaceId, active, userI
     return { moreBotId: group?.more ? botId : undefined, work: group?.items.map(row => {
       const task = row.issueId ? presentations[row.issueId] : undefined
       const runs = row.kind === 'chat' ? [] : [{id:row.id,name:row.title,harness:row.harness}]
-      return { actions: threadActions(row, threadPlace({ kind: row.kind, id: row.id, issueId: row.issueId, runs })),
+      const place = threadPlace({ kind: row.kind, id: row.id, issueId: row.issueId, runs })
+      return { actions: threadActions(row, place.mainThread && botId ? { ...place, bot: botId } : place),
         kind:row.kind, id:row.id, issueId:row.issueId, name:row.title, fullName:row.title, at: row.at, identifier: row.identifier ?? null,
         ...(row.kind === 'chat' && workspaceId ? {
           conversationTarget: { kind: 'group' as const, id: row.id, title: row.title, workspaceId },
