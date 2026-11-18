@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 87 |
+| partial | 90 |
 | prior-partial | 36 |
-| unreviewed | 6247 |
+| unreviewed | 6244 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -201,3 +201,7 @@ Three more previously unreviewed original files have independent fixed-source an
 ## 2026-11-18 correction: full 27-shard CSV counts supersede stale heading
 
 After both G-076 work batches, all 27 fixed `paths-*.csv` shards were parsed as RFC-style quoted CSV instead of naive splitting. They hold exactly 7996 tracked rows with ten expected columns; no malformed rows. The fixed `code` status sum is 186 complete + 87 partial + 36 prior-partial + 6247 unreviewed = 6556. The heading before this correction had already been three partial reviews behind its own CSV at HEAD `fd8da58f` (it said 80 but actual was 83). The first two 2026-11-18 README appendices above accidentally propagated that pre-existing stale heading; their historical counters are reconciled above. No original immutable baseline row was added, deleted or reclassified here, and no source review claim is upgraded to complete. Original 300 JSONL path records remain to be fully cross-shard reconciled; this structural count check does not establish consumer or runtime coverage. Current main deltas are not included.
+
+## 2026-11-18 fixed PageEditor root and navigation consumers
+
+Three additional original fixed source paths were read in full and scoped against a real same-version consumer chain: `page-editor.tsx` (Tiptap editor root, native transaction-driven onUpdate, 900ms edit debounce, ResizeObserver cleanup and direct `page.tsx` route; original-source V8 with synthetic timer produced 4/4 bounded scenario outcomes), `page-header.tsx` (edited/local-date and local Saving/Saved aria-live, history, PageActions and outline composition), and `page-outline-popover.tsx` (one responsive native Popover reusing shared outline state and editor focus restoration). Baseline, main `42f39219`, G and Cloud pinned vendor `82d285ed` exact object IDs agree; file introduction is `50bc4a25` of 2026-10-20. The root is demonstrably a demo accepting an optional `onSave` and not a proven durable task writer: no callback can still show local Saved, so this requires mounted real-writer semantics rather than unsupported persisted-ACK claims. Three distinct partial retains, no new Cloudflare abstraction or controller. Fixed code count is 186 complete / 90 partial / 36 prior-partial / 6244 unreviewed = 6556, with 303 unique JSONL path entries expected; all earlier fixed baseline path objects stay intact. Real Node24, installed React/Tiptap, browser/AT, consumers on latest main, protected CI and exact merge-SHA acceptance not completed.
