@@ -227,6 +227,8 @@ test('large runtime reports cross jobs only as immutable artifact files', () => 
   assert.match(builder, /name: e2b-candidate-build-cleanup-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
   assert.match(runtime, /artifact-ids: \$\{\{ needs\.validate\.outputs\.candidate-artifact-id \}\}/)
   assert.match(runtime, /name: e2b-release-evidence-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
+  assert.match(runtime, /name: e2b-release-evidence-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}[\s\S]{0,300}retention-days: 90/,
+    'published E2B release attestations must outlive the short-lived candidate evidence')
   assert.match(runtime, /name: e2b-runtime-release-cleanup-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}/)
   assert.match(runtime, /release-artifact-id: \$\{\{ steps\.release\.outputs\.artifact-id \}\}/)
   assert.match(runtime, /RUNTIME_REPORT_ARTIFACT_ID: \$\{\{ steps\.release\.outputs\.artifact-id \}\}/)
