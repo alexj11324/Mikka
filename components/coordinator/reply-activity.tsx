@@ -285,7 +285,7 @@ export function useThreadToolRows() {
     ...tools.map(tool => {
       const row = view(tool, live)
       return { id: row.key, label: row.title, status: row.state === 'running' ? 'running' as const : row.state === 'error' ? 'failed' as const : 'done' as const,
-        ...(row.why ? { error: row.why } : {}), ...(row.target ? { note: row.target } : {}), ...(tool.output ? { detail: tool.output.slice(0, 2000) } : {}) }
+        ...(row.why ? { error: row.why } : {}), ...(row.target ? { note: row.target } : {}), input: row.input, detail: row.output }
     }),
   ]
 }

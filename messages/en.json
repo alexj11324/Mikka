@@ -4302,6 +4302,8 @@
         "finished": "{tool} finished",
         "failed": "Failed",
         "args": "Arguments",
+        "command": "Command",
+        "exitCode": "Exit code {code}",
         "result": "Result",
         "waiting": "Waiting for result…",
         "empty": "No arguments or result",

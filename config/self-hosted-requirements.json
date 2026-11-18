@@ -2266,6 +2266,13 @@
     "test": "components/workspace/issue-relations.test.tsx",
     "suite": "test:view-state"
   },
+  "lib/issue-run-conversation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project recorded commands and exit status from existing thread chunks. The thread preserves the serialized result for other clients and applies credential masking to displayed command and output text.",
+    "test": "lib/issue-run-conversation.test.ts",
+    "suite": "test:issues"
+  },
   "lib/issue-threads.ts": {
     "mode": "built-in",
     "environment": [],
