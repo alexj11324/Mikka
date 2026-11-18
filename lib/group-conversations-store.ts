@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from 'node:util'
 import { acknowledgeGroupReads } from './group-read-receipts'
 import { connectForCommitEffects } from './db/commit-effects'
 import { groupSubmissionMessageId } from './group-submission'
+import { WORKSPACE_BOT_MODELS } from './bot-models'
 import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
@@ -13,7 +14,7 @@ import { groupListChanged, groupListReadChanged } from './live/lists'
 import { groupChatChanged } from './live/groups'
 
 const member = z.object({ memberType: z.enum(['user', 'agent', 'bot']), memberId: z.string().min(1).max(256) }).strict()
-const create = z.object({ purpose: z.literal('conversation').optional(), workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
+const create = z.object({ purpose: z.literal('conversation').optional(), workspaceId: z.uuid(), title: z.string().trim().min(1).max(200), members: z.array(member).max(100).default([]), leadAgentId: z.uuid().nullable().optional(), leadBotId: z.uuid().nullable().optional(), model: z.enum(WORKSPACE_BOT_MODELS).nullable().optional(), deviceId: z.uuid().nullable().optional() }).strict().refine(input => !input.leadAgentId || !input.leadBotId)
 const configure = z.union([z.object({ leadAgentId: z.uuid().nullable() }).strict(), z.object({ leadBotId: z.uuid().nullable() }).strict()])
 const message = z.object({ requestId: z.uuid().optional(), expectedOwnerId: z.string().min(1).max(256).optional(), expectedWorkspaceId: z.uuid().optional(), body: z.string().trim().min(1).max(32000), mentions: z.array(member).max(100).default([]), replyToId: z.uuid().nullable().optional() }).strict()
 const read = z.object({ messageId: z.string().min(1).max(64).nullable(), readRevision: z.number().int().min(0).max(2147483647).optional() }).strict()
@@ -60,15 +61,20 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       if (!await directory(input.workspaceId, userId, input.members)) return fail(404)
       if (input.leadAgentId && (!queueAgents || !input.members.some(m => m.memberType === 'agent' && m.memberId === input.leadAgentId))) return fail(422)
       if (input.leadBotId && (!queueAgents || !input.members.some(m => m.memberType === 'bot' && m.memberId === input.leadBotId))) return fail(422)
+      // A pinned device has to be one of this person's live machines: answer 404 instead of a foreign-key 500.
+      if (input.deviceId) {
+        const { rows } = await q('SELECT 1 FROM devices WHERE id=$1 AND "ownerId"=$2 AND "removedAt" IS NULL', [input.deviceId, userId])
+        if (!rows.length) return fail(404)
+      }
       const id = randomUUID()
-      await q('INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy") VALUES ($1,$2,\'group\',$3,$4)', [id, input.workspaceId, input.title, userId])
+      await q('INSERT INTO conversations (id,"workspaceId",kind,title,"createdBy",model,"deviceId") VALUES ($1,$2,\'group\',$3,$4,$5,$6)', [id, input.workspaceId, input.title, userId, input.model ?? null, input.deviceId ?? null])
       await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,\'user\',$2,\'owner\')', [id, userId])
       if (input.purpose) await q('UPDATE conversations SET "creationPurpose"=$2 WHERE id=$1', [id, input.purpose])
       for (const m of input.members) await q('INSERT INTO conversation_members ("conversationId","memberType","memberId",role) VALUES ($1,$2,$3,\'member\') ON CONFLICT DO NOTHING', [id, m.memberType, m.memberId])
       if (queueAgents && input.leadAgentId) await q('UPDATE conversations SET "leadAgentId"=$2 WHERE id=$1', [id, input.leadAgentId])
       if (queueAgents && input.leadBotId) await q('UPDATE conversations SET "leadBotId"=$2 WHERE id=$1', [id, input.leadBotId])
       await groupListChanged(client, id)
-      result = { id, title: input.title, ...(queueAgents ? { leadAgentId: input.leadAgentId ?? null, leadBotId: input.leadBotId ?? null } : {}) }; status = 201
+      result = { id, title: input.title, model: input.model ?? null, deviceId: input.deviceId ?? null, ...(queueAgents ? { leadAgentId: input.leadAgentId ?? null, leadBotId: input.leadBotId ?? null } : {}) }; status = 201
     } else if (req.resource === 'conversations' && req.method === 'GET') {
       if (req.workspaceId && (!z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, []))) return fail(404)
       const { rows } = await q(`SELECT c.*, last.message AS "lastMessage", coalesce(pref."markedUnread",false) as "markedUnread", coalesce(pref.pinned,false) AS pinned, coalesce(pref.hidden,false) AS hidden, pref."pinOrder",
