@@ -43,8 +43,6 @@ jobs:
       E2E_DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       DATABASE_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
       MIKKA_LOCAL_TEST_ACCOUNTS: '1'
-      MIKKA_DATA_DIR: ${{ runner.temp }}/mikka-node-compat-data
-      MIKKA_EVE_DATA_DIR: ${{ runner.temp }}/mikka-node-compat-eve
       NEXT_TELEMETRY_DISABLED: '1'
       NITRO_PRESET: node-server
       NODE_OPTIONS: --max-old-space-size=4096
@@ -62,6 +60,10 @@ jobs:
             sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
             sudo apt-get -o Acquire::http::Timeout=30 install -y ffmpeg
           fi
+      - name: Isolate runtime data in this runner
+        run: |
+          echo "MIKKA_DATA_DIR=$RUNNER_TEMP/mikka-node-compat-data" >> "$GITHUB_ENV"
+          echo "MIKKA_EVE_DATA_DIR=$RUNNER_TEMP/mikka-node-compat-eve" >> "$GITHUB_ENV"
       - run: pnpm test:e2e:setup
       - name: Build actual app and Eve on the selected Node runtime
         run: |
