@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 105 |
+| partial | 106 |
 | prior-partial | 36 |
-| unreviewed | 6229 |
+| unreviewed | 6228 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -225,3 +225,12 @@ Six of seven fixed public source blobs match main `6c685f99`; `rich-text-comment
 Continued the original source review after G-076 product repair rather than stopping at the first commit. Four more immutable, previously `unreviewed` paths in `components/blocks/rich-text-editor-4/components/` were **read in full**: `follow-chip.tsx` (native follow Stop action and keyboard label), `presence-stack.tsx` (Awareness user state and guarded follow), `replay-dialog.tsx` (controlled confirm/cancel of in-memory Yjs demo replay), and `spec-header.tsx` (actual shared consumer composing PresenceStack, FollowChip, ConnectionSwitch, comments, formatting and replay). All fixed/G/main/Cloud fixed-vendor `82d285ed` Git blobs match; source origin was `50bc4a25` (2026-10-20). No additional root issue, no custom Cloudflare scheduler or separate persistent writer and no arbitrary deletion. Each is `partial retain`: **static source/full consumer inspection** only, no installed React/Yjs/Node24, real keyboard/AT, two-client replay or protected CI.
 
 The four per-file `paths-07.csv` rows and `reviews.jsonl` records were written and rechecked independently. Fixed public code is now **186 complete / 105 partial / 36 prior-partial / 6229 unreviewed = 6556**, 318 expected unique review records. Fixed 7996 Git-tracked paths remain the denominator; latest-main delta, Cloud G-015 owned native migration/physical retirement, protected merge and exact post-merge tests still OPEN, as are all original production/signing/device owners.
+
+
+## 2026-11-18 · G-077 ProseMirror block commands previously reported success but discarded all edits
+
+Reviewed the entire fixed original `components/blocks/rich-text-editor-2/components/rich-text-block-actions.ts@e6103bf3` introduced in 2026-10-20 commit `50bc4a25`; current public main and Cloud's `vendor/mikka@82d285ed` have the same original blob. The real UI consumers are `page.tsx → PageEditor → RichTextBlockGutter` (insert row), `RichTextBlockMenu` (move/duplicate/delete) and the extension's Mod-key shortcuts. The module uses native Tiptap/ProseMirror selection and commands, not Cloudflare scheduler/DO/Queues. An original `BlockAction` created and modified `state.tr` but its wrapper `blockCommand` returned a boolean and never applied that separate transaction. Tiptap chains commit the `tr` supplied by the command, so move, copy, delete and insert-row could return success without changing document content.
+
+Confirmed the original actual `blockCommand` by extracting it from GitHub's immutable source: isolated V8 success ran with **0** changes on the provided chain transaction, **1** change on a discarded separate transaction. The revised original G source [fb07c519](https://github.com/alexj11324/Mikka/commit/fb07c5194a3ad94f78b633b644dccd4b282aba79) now passes the native `tr` to each action, retains same selection and plugin behavior, and resolves explicit targets against `tr.doc`; on the same synthetic test it gave **1** chained change and **0** discarded changes. Missing/denied targets remained false with no edits. Regression TypeScript source test [7f0ea112](https://github.com/alexj11324/Mikka/commit/7f0ea112eb9c2555036f8828705e9605c48df89a) exercises move up/down, duplicate, delete, row insert, false result and dry-run; **not yet executed** with installed Tiptap/Node 24. Official [Tiptap command transaction and dry-run](https://tiptap.dev/docs/editor/api/commands). No new wrapper, control plane, polling or fallback.
+
+One original fixed code path moves `unreviewed → partial`: 186 complete / 106 partial / 36 prior-partial / 6,228 unreviewed = 6,556; original tracked denominator remains 7,996. `reviews.jsonl` now has 319 unique source paths and `changes.jsonl` 37 records including one new **G-077 candidate_unmerged**. The newly created regression test is a **post-fixed-baseline G branch addition**, not a fabricated baseline path. Require installed Node24 test and browser/keyboard/AT on the true editor, official CI, ordinary protected merge and exact merge-SHA execution; current-main delta, other original G owners and production #1954 / Cloud #155 are still separate.
