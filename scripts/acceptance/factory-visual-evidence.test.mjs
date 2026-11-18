@@ -287,7 +287,9 @@ test('native visual proof binds the entire browser program, actual queued captur
   }
 })
 
-test('released real FFmpeg processing is byte-deterministic for the native expected-output versus normal uploader comparison', async () => {
+// The community image lane has no FFmpeg; every lane that installs it runs this.
+const ffmpeg = (() => { try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true } catch { return false } })()
+test('released real FFmpeg processing is byte-deterministic for the native expected-output versus normal uploader comparison', { skip: !ffmpeg && 'FFmpeg is not installed' }, async () => {
   const directory = await mkdtemp(join(tmpdir(), 'factory-visual-ffmpeg-'))
   try {
     const input = join(directory, 'actual-test.webm')
