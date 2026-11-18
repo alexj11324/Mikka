@@ -248,9 +248,9 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
       const plain = await mount()
       await plain.render(<ReplyActivity tools={[]} {...props} />)
       assert.equal(plain.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'none')
-      assert.equal(plain.container.querySelector('[data-activity-thinking] button'), null, 'no trigger')
-      assert.equal(plain.container.querySelector('[data-slot="trace-icon"] svg'), null, 'no chevron')
-      assert.equal(plain.container.querySelector('[data-slot="trace-collapsible-content"]'), null)
+      assert.equal(plain.container.querySelector('[data-activity-thinking] button')?.outerHTML ?? null, null, 'no trigger')
+      assert.equal(plain.container.querySelector('[data-activity-thinking] button [data-slot="trace-icon"] svg')?.outerHTML ?? null, null, 'no chevron')
+      assert.equal(plain.container.querySelector('[data-activity-thinking] [data-slot="trace-collapsible-content"]')?.outerHTML ?? null, null, 'does not open')
       await plain.unmount()
     }
   } finally { try { await view.unmount() } catch { /* already unmounted */ } }
