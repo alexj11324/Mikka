@@ -1599,6 +1599,8 @@
       "filterComments": "Comments",
       "filterAgents": "Agents & bots",
       "showEarlier": "Show {count} earlier",
+      "noActivity": "No activity yet",
+      "noMatchingActivity": "No activity matches these filters",
       "copy": "Copy",
       "copied": "Copied",
       "copyFailed": "Could not copy",
