@@ -70,7 +70,7 @@ test("run completion enters review without the Coordinator; replays do not advan
     const authorize = async (user: string, issue: string, tx: PoolClient) =>
       (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issue, user])).rowCount === 1;
     const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID();
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Disposable',now(),'[{"harness":"codex","installed":true}]')`, [deviceId]);
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,'owner','Disposable',now(),'[{"harness":"codex","installed":true}]',now())`, [deviceId]);
     await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Fixture','codex',$2)`, [agentId, deviceId]);
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,'owner','/fixture/repo','https://github.com/acme/fixture.git')`, [repoId, deviceId]);
     const store = createFactoryStore(pool, authorize, null, { independent: factoryCheckIndependent });
@@ -876,7 +876,7 @@ test("run completion enters review without the Coordinator; replays do not advan
       await pool.query('UPDATE factory_agent_profiles SET version=2,definition=$2,digest=$3 WHERE id=$1', [profileId, JSON.stringify(editedRole), profileApi.agentProfileDigest(editedRole, [])]);
       const checkBefore = (await store.read('owner', f.task.id)).attempts.at(-1)!.output.check;
       const nextDevice = randomUUID(), nextAgent = randomUUID(), nextRepo = randomUUID();
-      await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Next provider device',now(),'[{"harness":"claude_code","installed":true}]')`, [nextDevice]);
+      await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,'owner','Next provider device',now(),'[{"harness":"claude_code","installed":true}]',now())`, [nextDevice]);
       await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Next provider agent','claude_code',$2)`, [nextAgent, nextDevice]);
       await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath","remoteUrl") VALUES ($1,$2,'owner','v2/github.com/acme/provider-fixture','https://github.com/acme/provider-fixture.git')`, [nextRepo, nextDevice]);
       const tx = await pool.connect();

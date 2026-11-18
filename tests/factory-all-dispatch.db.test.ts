@@ -53,7 +53,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     [connection, userId, ws.id, `acme-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .1, resetsAt: null }] })])
   await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), userId, ws.id, connection])
   const deviceId = randomUUID()
-  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'acme-build-01','local','server',true,now(),$3)`, [deviceId, userId, JSON.stringify(codex)])
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'acme-build-01','local','server',true,now(),$3,now())`, [deviceId, userId, JSON.stringify(codex)])
   await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Codex on acme-build-01')`, [randomUUID(), userId, deviceId])
   const issueId = randomUUID()
   await pool.query(`INSERT INTO issues (id,"userId","workspaceId","ownershipState",scope,title,content,status,priority) VALUES ($1,$2,$4,'bound','workspace','Checkout rounds sales tax down on multi-item carts',$3,'todo','high')`,
@@ -146,10 +146,10 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   const epoch = continuedTask.sourceEventId
   const deviceB = randomUUID(), agentB = randomUUID()
   const { DAEMON_PROTOCOL_VERSION } = await import('@mikka/protocol/daemon')
-  await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"protocolVersion")
-    VALUES($1,$2,'acme-build-02','local','server',true,now(),$3,$4)`, [deviceB, userId, JSON.stringify(codex), DAEMON_PROTOCOL_VERSION])
+  await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"protocolVersion","sessionOpenedAt")
+    VALUES($1,$2,'acme-build-02','local','server',true,now(),$3,$4,now())`, [deviceB, userId, JSON.stringify(codex), DAEMON_PROTOCOL_VERSION])
   await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,'codex','Codex on acme-build-02')`, [agentB, userId, deviceB])
-  await pool.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId])
+  await pool.query(`UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1`, [deviceId])
   await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now()-interval '2 hours',"updatedAt"=now(),"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [continued.runId])
   await pool.query(`UPDATE factory_tasks SET "updatedAt"='2000-01-01' WHERE id=$1`, [acceptance.id])
   await pool.query(`UPDATE factory_attempts SET "createdAt"='2000-01-01' WHERE id=$1`, [continuedTask.attemptId])
@@ -198,7 +198,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     const { resolveAgentProfileDispatch } = await import('../lib/factory/agent-profile')
     const { rows: [agent] } = await pool.query('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2', [userId, deviceId])
     const { rows: [repo] } = await pool.query('SELECT id FROM device_repos WHERE "userId"=$1 AND "deviceId"=$2', [userId, deviceId])
-    await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+    await pool.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [deviceId])
     let number = 1276000
     const request = async () => {
       const issue = randomUUID(), source = randomUUID()

@@ -775,7 +775,7 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
       await pool.query('INSERT INTO repository_settings("userId","remoteKey",push) VALUES($1,$2,$3)', [p.id, normalizeRepository(repo).key,
         JSON.stringify({ approved: true, remote: 'origin', approvedByUserId: p.id, approvedAt: new Date().toISOString() })])
       const deviceId = randomUUID(), agentId = await seedAgent(pool, p.id)
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES($1,$2,'Synthetic backfill device','local',true,now())`, [deviceId, p.id])
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt") VALUES($1,$2,'Synthetic backfill device','local',true,now(),now())`, [deviceId, p.id])
       await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
       await seedAllowedModel(pool, p.id, { workspaceId: p.workspaceId, deviceIds: [deviceId] })
       const issueId = await seedIssue(pool, p.id)

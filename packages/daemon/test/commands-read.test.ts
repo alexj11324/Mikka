@@ -6,7 +6,7 @@ import { POLICY_SNAPSHOT_TTL_MS, policySnapshotMessage, type PolicySnapshotPaylo
 import { Daemon } from '../src/main'
 import { createLogger } from '../src/log'
 import { MemoryServer, type RunAssignment, type ServerLink } from '../src/server-link'
-import { ServerUnreachableError } from '../src/errors'
+import { DeviceSessionRequiredError, ServerUnreachableError } from '../src/errors'
 import { DAEMON_VERSION } from '../src/paths'
 import * as service from '../src/service'
 import { mkdtempSync } from 'node:fs'
@@ -14,23 +14,27 @@ import { createHash, generateKeyPairSync, sign } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+// The commands read (decision 2026-11-17-2215): one `GET /commands?wait=0`
+// per gateway push or socket open, never a long-poll and never on a timer.
+
 const daemons: Daemon[] = []
 
-function pollCommands(fetchCommands: ServerLink['fetchCommands'], commandsWaitSeconds?: number) {
+function readsCommands(fetchCommands: ServerLink['fetchCommands']) {
   const ackCommands = vi.fn(async () => {})
   const send = vi.fn(async () => {})
   const notifyMailbox = vi.fn(async () => {})
-  const daemon = new Daemon({ dataDir: '/unused-commands-poll-test', flavor: 'dev',
+  const daemon = new Daemon({ dataDir: '/unused-commands-read-test', flavor: 'dev',
     link: { ...new MemoryServer('device-1').link(), fetchCommands, ackCommands },
-    commandsWaitSeconds, log: createLogger({ level: 'silent' }) })
-  // Isolate the polling boundary from RPC, filesystem and agent processes.
+    log: createLogger({ level: 'silent' }) })
+  // Isolate the read from RPC, filesystem and agent processes.
   Reflect.set(daemon, 'device', { deviceId: 'device-1', credential: 'fixture' })
   Reflect.set(daemon, 'registered', true)
   Reflect.set(daemon, 'journal', { get: () => ({ state: 'running' }) })
-  Reflect.set(daemon, 'supervisor', { send, notifyMailbox, stop: async () => {} })
-  Reflect.set(daemon, 'commandsLoop', Reflect.get(daemon, 'pollCommands').call(daemon))
+  Reflect.set(daemon, 'supervisor', { send, notifyMailbox, stop: async () => {}, activeRunIds: () => [] })
   daemons.push(daemon)
-  return { daemon, ackCommands, send, notifyMailbox }
+  /** What the session does on a push: one read. */
+  const read = (): Promise<void> => Reflect.get(daemon, 'pullSignaledWork').call(daemon, 'device-1', new AbortController().signal)
+  return { daemon, ackCommands, send, notifyMailbox, read }
 }
 
 afterEach(async () => {
@@ -39,55 +43,46 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-it.each([0, 5_000, 25_000])('paces an empty response after a %i ms server wait to one requested cycle', async serverWait => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
-  const fetch = vi.fn<ServerLink['fetchCommands']>()
-    .mockImplementationOnce(async () => {
-      await new Promise(resolve => setTimeout(resolve, serverWait))
-      return []
-    })
-    .mockResolvedValueOnce([]).mockRejectedValue(new Error('Unexpected additional poll'))
-  const { daemon } = pollCommands(fetch)
-  await vi.advanceTimersByTimeAsync(24_999)
-  expect(fetch).toHaveBeenCalledTimes(1)
-  await vi.advanceTimersByTimeAsync(1)
-  expect(fetch).toHaveBeenCalledTimes(2)
-  await daemon.stop()
-  expect(vi.getTimerCount()).toBe(0)
+it('reads with wait 0 and the release this daemon knows: it never long-polls', async () => {
+  const fetch = vi.fn<ServerLink['fetchCommands']>().mockResolvedValue([])
+  const { read } = readsCommands(fetch)
+  await read()
+  expect(fetch).toHaveBeenCalledOnce()
+  expect(fetch.mock.calls[0]![1]).toBe(0)
+  expect(fetch.mock.calls[0]![2]?.updates).toEqual({ daemonLatest: DAEMON_VERSION })
 })
 
-it('delivers and acknowledges a queued message immediately before the next poll', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+it('delivers and acknowledges a message on the read; a lost acknowledgement is sent again on the next read, without redelivery', async () => {
   const fetch = vi.fn<ServerLink['fetchCommands']>()
     .mockResolvedValueOnce([{ kind: 'input', runId: 'run-1', messageId: 'message-1', text: 'hello' }])
-    .mockResolvedValueOnce([]).mockRejectedValue(new Error('Unexpected additional poll'))
-  const { ackCommands, send } = pollCommands(fetch)
-  await vi.advanceTimersByTimeAsync(0)
-  expect(send).toHaveBeenCalledWith('run-1', 'hello')
-  expect(ackCommands).toHaveBeenCalledWith('device-1', ['message-1'])
-  expect(fetch).toHaveBeenCalledTimes(2)
+    .mockResolvedValue([{ kind: 'input', runId: 'run-1', messageId: 'message-1', text: 'hello' }])
+  const { read, send, ackCommands } = readsCommands(fetch)
+  ackCommands.mockRejectedValueOnce(new ServerUnreachableError('offline'))
+  await expect(read()).rejects.toBeInstanceOf(ServerUnreachableError)
+  expect(send).toHaveBeenCalledOnce()
+  await read()
+  expect(send).toHaveBeenCalledOnce()
+  expect(ackCommands).toHaveBeenCalledTimes(2)
+  expect(ackCommands).toHaveBeenLastCalledWith('device-1', ['message-1'])
 })
 
 it('pushes a mailbox notice once and ACKs notification ids without treating it as user input', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
   const ids = ['10000000-0000-4000-8000-000000000001']
   const command = { kind: 'mailbox_notice' as const, runId: 'run-1', messageIds: ids }
-  const fetch = vi.fn<ServerLink['fetchCommands']>().mockResolvedValueOnce([command]).mockResolvedValueOnce([command]).mockResolvedValue([])
-  const { daemon, notifyMailbox, send, ackCommands } = pollCommands(fetch)
-  ackCommands.mockRejectedValue(new ServerUnreachableError('lost receipt'))
-  await vi.advanceTimersByTimeAsync(0)
+  const fetch = vi.fn<ServerLink['fetchCommands']>().mockResolvedValue([command])
+  const { read, notifyMailbox, send, ackCommands } = readsCommands(fetch)
+  ackCommands.mockRejectedValueOnce(new ServerUnreachableError('lost receipt'))
+  await read().catch(() => undefined)
   expect(notifyMailbox).toHaveBeenCalledOnce()
   expect(notifyMailbox).toHaveBeenCalledWith('run-1', ids)
   expect(send).not.toHaveBeenCalled()
   expect(ackCommands).toHaveBeenCalledWith('device-1', ids)
-  await vi.advanceTimersByTimeAsync(1000)
+  await read()
   expect(notifyMailbox).toHaveBeenCalledOnce()
-  await daemon.stop()
 })
 
 it('never delivers a mailbox notice to an ended run', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
-  const { daemon, notifyMailbox, ackCommands } = pollCommands(async () => [])
+  const { daemon, notifyMailbox, ackCommands } = readsCommands(async () => [])
   Reflect.set(daemon, 'journal', { get: () => ({ state: 'succeeded' }) })
   await Reflect.get(daemon, 'applyCommands').call(daemon, [{ kind: 'mailbox_notice', runId: 'run-1', messageIds: ['10000000-0000-4000-8000-000000000001'] }])
   expect(notifyMailbox).not.toHaveBeenCalled()
@@ -95,171 +90,82 @@ it('never delivers a mailbox notice to an ended run', async () => {
 })
 
 it('batches notification receipts within the ACK protocol limit', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
   const commands = Array.from({ length: 11 }, () => ({ kind: 'mailbox_notice' as const, runId: 'run-1',
     messageIds: Array.from({ length: 50 }, () => crypto.randomUUID()) }))
   const fetch = vi.fn<ServerLink['fetchCommands']>().mockResolvedValueOnce(commands).mockResolvedValue([])
-  const { ackCommands } = pollCommands(fetch)
-  await vi.advanceTimersByTimeAsync(0)
+  const { read, ackCommands } = readsCommands(fetch)
+  await read()
   expect(ackCommands.mock.calls.map(call => (call as unknown as [string, string[]])[1].length)).toEqual([500, 50])
 })
 
-it('uses a one-second minimum when zero wait is configured', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
-  const fetch = vi.fn<ServerLink['fetchCommands']>()
-    .mockResolvedValueOnce([]).mockResolvedValueOnce([]).mockRejectedValue(new Error('Unexpected additional poll'))
-  pollCommands(fetch, 0)
-  await vi.advanceTimersByTimeAsync(999)
-  expect(fetch).toHaveBeenCalledTimes(1)
-  await vi.advanceTimersByTimeAsync(1)
-  expect(fetch).toHaveBeenCalledTimes(2)
-})
-
-it('stops an in-flight poll without scheduling an idle pause or another request', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
-  const fetch = vi.fn<ServerLink['fetchCommands']>((_device, _wait, { signal } = {}) =>
-    new Promise(resolve => signal?.addEventListener('abort', () => resolve([]), { once: true })))
-  const { daemon } = pollCommands(fetch)
-  await vi.advanceTimersByTimeAsync(0)
-  expect(fetch).toHaveBeenCalledTimes(1)
+it('does not deliver work returned by a read that resolves during shutdown', async () => {
+  let answer!: () => void
+  const fetch = vi.fn<ServerLink['fetchCommands']>(() => new Promise(resolve => {
+    answer = () => resolve([{ kind: 'input', runId: 'run-1', messageId: 'message-1', text: 'hello' }])
+  }))
+  const { daemon, read, send, ackCommands } = readsCommands(fetch)
+  const reading = read()
   await daemon.stop()
-  expect(vi.getTimerCount()).toBe(0)
-  await vi.advanceTimersByTimeAsync(60_000)
-  expect(fetch).toHaveBeenCalledTimes(1)
-})
-
-it('bounds consecutive failures to capped exponential backoff and cancels retries on stop', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
-  const fetch = vi.fn<ServerLink['fetchCommands']>().mockRejectedValue(new ServerUnreachableError('offline'))
-  const { daemon } = pollCommands(fetch)
-  await vi.advanceTimersByTimeAsync(0)
-  let calls = 1
-  for (const delay of [1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000]) {
-    await vi.advanceTimersByTimeAsync(delay - 1)
-    expect(fetch).toHaveBeenCalledTimes(calls)
-    await vi.advanceTimersByTimeAsync(1)
-    expect(fetch).toHaveBeenCalledTimes(++calls)
-  }
-  await daemon.stop()
-  expect(vi.getTimerCount()).toBe(0)
-  await vi.advanceTimersByTimeAsync(60_000)
-  expect(fetch).toHaveBeenCalledTimes(calls)
-})
-
-it('resets failure backoff after a successful response', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
-  const error = new ServerUnreachableError('offline')
-  const fetch = vi.fn<ServerLink['fetchCommands']>()
-    .mockRejectedValueOnce(error).mockRejectedValueOnce(error)
-    .mockResolvedValueOnce([]).mockRejectedValue(error)
-  pollCommands(fetch)
-  await vi.advanceTimersByTimeAsync(28_000)
-  expect(fetch).toHaveBeenCalledTimes(4)
-  await vi.advanceTimersByTimeAsync(999)
-  expect(fetch).toHaveBeenCalledTimes(4)
-  await vi.advanceTimersByTimeAsync(1)
-  expect(fetch).toHaveBeenCalledTimes(5)
-})
-
-it('does not deliver work returned by a poll that resolves during shutdown', async () => {
-  const fetch = vi.fn<ServerLink['fetchCommands']>((_device, _wait, { signal } = {}) =>
-    new Promise(resolve => signal?.addEventListener('abort', () => resolve([
-      { kind: 'input', runId: 'run-1', messageId: 'message-1', text: 'hello' },
-    ]), { once: true })))
-  const { daemon, send, ackCommands } = pollCommands(fetch)
-  await daemon.stop()
+  answer()
+  await reading
   expect(send).not.toHaveBeenCalled()
   expect(ackCommands).not.toHaveBeenCalled()
 })
 
-it('resets backoff before immediately acknowledging work after failures', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
-  const error = new ServerUnreachableError('offline')
-  const fetch = vi.fn<ServerLink['fetchCommands']>()
-    .mockRejectedValueOnce(error).mockRejectedValueOnce(error)
-    .mockResolvedValueOnce([{ kind: 'input', runId: 'run-1', messageId: 'message-1', text: 'hello' }])
-    .mockRejectedValue(error)
-  const { ackCommands, send } = pollCommands(fetch)
-  ackCommands.mockRejectedValue(error)
-  await vi.advanceTimersByTimeAsync(3_000)
-  expect(send).toHaveBeenCalledTimes(1)
-  expect(ackCommands).toHaveBeenCalledTimes(1)
-  await vi.advanceTimersByTimeAsync(999)
-  expect(ackCommands).toHaveBeenCalledTimes(1)
-  await vi.advanceTimersByTimeAsync(1)
-  expect(ackCommands).toHaveBeenCalledTimes(2)
-})
-
-function pollWithClaims(fetchCommands: ServerLink['fetchCommands'], claimAndStart: (runId: string) => Promise<unknown>) {
-  const daemon = new Daemon({ dataDir: '/unused-commands-poll-test', flavor: 'dev',
+function readsWithClaims(fetchCommands: ServerLink['fetchCommands'], claimAndStart: (runId: string) => Promise<unknown>) {
+  const daemon = new Daemon({ dataDir: '/unused-commands-read-test', flavor: 'dev',
     link: { ...new MemoryServer('device-1').link(), fetchCommands, ackCommands: async () => {} },
     log: createLogger({ level: 'silent' }) })
   Reflect.set(daemon, 'device', { deviceId: 'device-1', credential: 'fixture' })
   Reflect.set(daemon, 'registered', true)
   Reflect.set(daemon, 'journal', { get: () => undefined })
-  Reflect.set(daemon, 'supervisor', { send: async () => {}, stop: async () => {} })
+  Reflect.set(daemon, 'supervisor', { send: async () => {}, stop: async () => {}, activeRunIds: () => [] })
   Reflect.set(daemon, 'claimAndStart', claimAndStart)
-  Reflect.set(daemon, 'commandsLoop', Reflect.get(daemon, 'pollCommands').call(daemon))
   daemons.push(daemon)
-  return daemon
+  const read = (): Promise<void> => Reflect.get(daemon, 'pullSignaledWork').call(daemon, 'device-1', new AbortController().signal)
+  return { daemon, read }
 }
 
-// Model the HTTP long-poll's cancellation contract so stop() can join it.
-const waitForAbort: ServerLink['fetchCommands'] = async (_device, _wait, { signal } = {}) =>
-  new Promise(resolve => {
-    if (signal?.aborted) resolve([])
-    else signal?.addEventListener('abort', () => resolve([]), { once: true })
-  })
+const queued = (runId: string): ServerLink['fetchCommands'] => async (_device, _wait, options) => { options?.onQueuedRuns?.([runId]); return [] }
 
-it('claims a run the commands poll reports queued at once, without waiting for a heartbeat', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+it('claims a run the commands read reports queued at once', async () => {
   const claim = vi.fn(async () => ({}))
-  const fetch = vi.fn<ServerLink['fetchCommands']>()
-    .mockImplementationOnce(async (_device, _wait, options) => { options?.onQueuedRuns?.(['run-new']); return [] })
-    .mockImplementation(waitForAbort)
-  pollWithClaims(fetch, claim)
-  await vi.advanceTimersByTimeAsync(0)
+  const { read } = readsWithClaims(vi.fn(queued('run-new')), claim)
+  await read()
   expect(claim).toHaveBeenCalledWith('run-new')
-  // The next poll follows immediately instead of pacing out the 25-second wait.
-  expect(fetch).toHaveBeenCalledTimes(2)
 })
 
-it('a failed claim stays out of the poll until the heartbeat retries it, so the poll cannot spin', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+it('a failed claim is left out of the next read until a pass retries it', async () => {
   const claim = vi.fn(async () => { throw new Error('claim refused') })
-  const fetch = vi.fn<ServerLink['fetchCommands']>()
-    .mockImplementationOnce(async (_device, _wait, options) => { options?.onQueuedRuns?.(['run-bad']); return [] })
-    .mockResolvedValueOnce([])
-    .mockImplementation(waitForAbort)
-  const daemon = pollWithClaims(fetch, claim)
-  await vi.advanceTimersByTimeAsync(0)
+  const fetch = vi.fn<ServerLink['fetchCommands']>().mockImplementationOnce(queued('run-bad')).mockResolvedValue([])
+  const { daemon, read } = readsWithClaims(fetch, claim)
+  await read()
+  await vi.waitFor(() => expect(Reflect.get(daemon, 'queuedClaims').get('run-bad')).toBe('failed'))
+  await read()
   expect(claim).toHaveBeenCalledTimes(1)
-  // The second poll was already sent while the claim was in flight; the third carries the failure in skip.
-  Reflect.get(daemon, 'wakeCommands')?.()
-  await vi.advanceTimersByTimeAsync(0)
-  expect(Reflect.get(daemon, 'queuedClaims').get('run-bad')).toBe('failed')
-  expect(fetch).toHaveBeenCalledTimes(3)
-  expect(fetch.mock.calls[2]?.[2]?.skipRuns).toContain('run-bad')
+  expect(fetch.mock.calls[1]?.[2]?.skipRuns).toContain('run-bad')
 })
 
-it('a run still being claimed is not claimed twice; the poll waits briefly instead of spinning', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+it('a run still being claimed is not claimed twice by a second push', async () => {
   const claim = vi.fn(async () => new Promise(() => {}))
-  const report = async (_device: string, _wait: number, options?: Parameters<ServerLink['fetchCommands']>[2]) => { options?.onQueuedRuns?.(['run-slow']); return [] }
-  const fetch = vi.fn<ServerLink['fetchCommands']>().mockImplementationOnce(report).mockImplementationOnce(report)
-    .mockImplementation(waitForAbort)
-  pollWithClaims(fetch, claim)
-  await vi.advanceTimersByTimeAsync(0)
-  expect(fetch).toHaveBeenCalledTimes(2)
+  const { read } = readsWithClaims(vi.fn(queued('run-slow')), claim)
+  await read()
+  await read()
   expect(claim).toHaveBeenCalledTimes(1)
-  await vi.advanceTimersByTimeAsync(499)
-  expect(fetch).toHaveBeenCalledTimes(2)
-  await vi.advanceTimersByTimeAsync(1)
-  expect(fetch).toHaveBeenCalledTimes(3)
+})
+
+it('a claim the server refuses for want of an open session redials the socket instead of retrying', async () => {
+  const claim = vi.fn(async () => { throw new DeviceSessionRequiredError() })
+  const { daemon, read } = readsWithClaims(vi.fn(queued('run-early')), claim)
+  const redial = vi.fn()
+  Reflect.set(daemon, 'session', { redial, stop: async () => {} })
+  await read()
+  await vi.waitFor(() => expect(redial).toHaveBeenCalledOnce())
+  expect(claim).toHaveBeenCalledOnce()
 })
 
 function claimDaemon(claimRun: ServerLink['claimRun']) {
-  const daemon = new Daemon({ dataDir: '/unused-commands-poll-test', flavor: 'dev',
+  const daemon = new Daemon({ dataDir: '/unused-commands-read-test', flavor: 'dev',
     link: { ...new MemoryServer('device-1').link(), claimRun },
     log: createLogger({ level: 'silent' }) })
   const start = vi.fn(() => ({}))
@@ -373,7 +279,7 @@ it.each(['runId', 'deviceId'] as const)('refuses a desktop claim response for an
   expect(start).not.toHaveBeenCalled()
 })
 
-it('shares an in-flight heartbeat or RPC claim with the commands poll', async () => {
+it('shares an in-flight pass or RPC claim with a commands read', async () => {
   let finish!: (assignment: RunAssignment) => void
   const claimRun = vi.fn<ServerLink['claimRun']>(() => new Promise(resolve => { finish = resolve }))
   const { daemon, start, claim } = claimDaemon(claimRun)
@@ -421,71 +327,49 @@ it.each(['deviceId', 'credential', 'workspaceId'] as const)('does not launch an 
 })
 
 const UPDATE = { id: '6f1c2b8e-2a8e-4c39-9d1a-3b5d7c9e1f20', kind: 'update' as const }
-function pollWithUpdates(fetch: ServerLink['fetchCommands'], runs: unknown[] = []) {
-  const { daemon } = pollCommands(fetch)
+function readsWithUpdates(fetch: ServerLink['fetchCommands'], runs: unknown[] = []) {
+  const { daemon, read } = readsCommands(fetch)
   const install = vi.fn(async (_version: string) => {})
   const restart = vi.spyOn(service, 'restartService').mockResolvedValue(undefined)
-  const sync = vi.spyOn(daemon, 'syncWithServer').mockResolvedValue(undefined)
   Reflect.set(daemon, 'options', { ...Reflect.get(daemon, 'options'), autoUpdate: { install } })
-  Reflect.set(daemon, 'paths', { dataDir: mkdtempSync(join(tmpdir(), 'mikka-poll-update-')) })
-  Reflect.set(daemon, 'supervisor', { ...Reflect.get(daemon, 'supervisor'), heartbeatRuns: () => runs })
-  return { daemon, install, restart, sync }
+  Reflect.set(daemon, 'paths', { dataDir: mkdtempSync(join(tmpdir(), 'mikka-read-update-')) })
+  Reflect.set(daemon, 'supervisor', { ...Reflect.get(daemon, 'supervisor'), activeRunIds: () => runs })
+  return { daemon, read, install, restart }
 }
 
-it('a release named on the commands poll installs at once when idle, and later polls say the daemon knows it', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+it('a release named on a commands read installs at once when idle, and later reads say the daemon knows it', async () => {
   const fetch = vi.fn<ServerLink['fetchCommands']>()
-    .mockImplementationOnce(async (_id, _wait, options) => { await Promise.resolve(); options?.onUpdates?.({ daemonVersions: { min: '0.0.299', latest: '999.0.0' }, deviceCommands: [] }); return [] })
+    .mockImplementationOnce(async (_id, _wait, options) => { options?.onUpdates?.({ daemonVersions: { min: '0.0.299', latest: '999.0.0' }, deviceCommands: [] }); return [] })
     .mockResolvedValue([])
-  const { daemon, install, restart, sync } = pollWithUpdates(fetch)
-  await vi.advanceTimersByTimeAsync(0)
+  const { daemon, read, install, restart } = readsWithUpdates(fetch)
+  await read()
   await Reflect.get(daemon, 'maintenance')
   expect(install).toHaveBeenCalledExactlyOnceWith('999.0.0')
   expect(restart).toHaveBeenCalledOnce()
-  expect(sync).not.toHaveBeenCalled()
-  expect(fetch.mock.calls[0]![2]?.updates).toEqual({ daemonLatest: DAEMON_VERSION, skipDeviceCommands: [] })
-  expect(fetch).toHaveBeenCalledTimes(2) // polls again at once, so stops and messages are not held back
+  await read()
   expect(fetch.mock.calls[1]![2]?.updates?.daemonLatest).toBe('999.0.0')
 })
 
-it('a release named while a run is active waits for the run to end, then installs at the next heartbeat', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+it('a release named while a run is active waits for the run to end, then the local timer installs it', async () => {
   const runs: unknown[] = [{ runId: 'run-1' }]
   const fetch = vi.fn<ServerLink['fetchCommands']>()
-    .mockImplementationOnce(async (_id, _wait, options) => { await Promise.resolve(); options?.onUpdates?.({ daemonVersions: { min: '0.0.299', latest: '999.0.0' }, deviceCommands: [] }); return [] })
+    .mockImplementationOnce(async (_id, _wait, options) => { options?.onUpdates?.({ daemonVersions: { min: '0.0.299', latest: '999.0.0' }, deviceCommands: [] }); return [] })
     .mockResolvedValue([])
-  const { daemon, install } = pollWithUpdates(fetch, runs)
-  await vi.advanceTimersByTimeAsync(0)
+  const { daemon, read, install } = readsWithUpdates(fetch, runs)
+  await read()
   expect(install).not.toHaveBeenCalled()
   runs.length = 0
-  Reflect.get(daemon, 'checkAutoUpdate').call(daemon) // the start of every heartbeat pass
+  Reflect.get(daemon, 'checkAutoUpdate').call(daemon) // what the local timer calls
   await Reflect.get(daemon, 'maintenance')
   expect(install).toHaveBeenCalledExactlyOnceWith('999.0.0')
 })
 
-it('an update a person asked for arrives on the commands poll and is carried out now, then left out of later polls', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
+it('an update a person asked for arrives on a commands read and waits for the pass to carry it out', async () => {
   const fetch = vi.fn<ServerLink['fetchCommands']>()
-    .mockImplementationOnce(async (_id, _wait, options) => { await Promise.resolve(); options?.onUpdates?.({ deviceCommands: [UPDATE] }); return [] })
-    .mockImplementationOnce(async (_id, _wait, options) => { await Promise.resolve(); options?.onUpdates?.({ deviceCommands: [UPDATE] }); return [] })
-    .mockResolvedValue([])
-  const { install, sync } = pollWithUpdates(fetch)
-  await vi.advanceTimersByTimeAsync(0)
-  expect(sync).toHaveBeenCalledOnce()
-  expect(fetch.mock.calls[1]![2]?.updates?.skipDeviceCommands).toEqual([UPDATE.id])
-  expect(sync).toHaveBeenCalledOnce()
-  expect(fetch).toHaveBeenCalledTimes(2) // the same command again is not news: the poll is paced as usual
-  await vi.advanceTimersByTimeAsync(24_999)
-  expect(fetch).toHaveBeenCalledTimes(2)
+    .mockImplementation(async (_id, _wait, options) => { options?.onUpdates?.({ deviceCommands: [UPDATE] }); return [] })
+  const { daemon, read, install } = readsWithUpdates(fetch)
+  await read()
+  await read()
+  expect(Reflect.get(daemon, 'heldDeviceCommand')).toEqual(UPDATE)
   expect(install).not.toHaveBeenCalled()
-})
-
-it('an older server sends neither releases nor device commands: the daemon keeps polling and never updates', async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'performance'] })
-  const fetch = vi.fn<ServerLink['fetchCommands']>().mockResolvedValue([])
-  const { install, sync } = pollWithUpdates(fetch)
-  await vi.advanceTimersByTimeAsync(50_000)
-  expect(fetch).toHaveBeenCalledTimes(3)
-  expect(install).not.toHaveBeenCalled()
-  expect(sync).not.toHaveBeenCalled()
 })

@@ -29,7 +29,7 @@ async function boot(server: MemoryServer, dataDir: string) {
   const daemon = await new Daemon({
     dataDir, flavor: "dev", agentSandbox: null, link: server.link(), credential: "cred-1",
     harnesses: [{ harness: "mock", installed: true, version: "test" }], mockSpeed: Number.POSITIVE_INFINITY,
-    heartbeatMs: 50, quotaSource: null,
+   quotaSource: null,
   }).start()
   daemons.push(daemon)
   await daemon.syncWithServer()

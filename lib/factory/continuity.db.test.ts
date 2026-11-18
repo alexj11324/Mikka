@@ -332,7 +332,7 @@ test('PG: request epochs, stale completion fences and unattended handoff are dur
     const original = await fixture()
     const pending = await advance(original, await followup(original, 'Continue only while this workspace membership remains active'))
     const deviceId = randomUUID(), childId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES ($1,$2,'Watchdog commit fixture','local',true,now())`, [deviceId, owner])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt") VALUES ($1,$2,'Watchdog commit fixture','local',true,now(),now())`, [deviceId, owner])
     await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
     await seedAllowedModel(pool, owner, { workspaceId: workspace.id, deviceIds: [deviceId] })
     await pool.query(`UPDATE factory_tasks SET "updatedAt"=now()-interval '2 minutes' WHERE id=$1`, [pending.id])

@@ -25,8 +25,8 @@ test('one person saves an environment, selects it for a Project and queues a Run
   const deviceId = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
   const repository = `https://github.com/mikka-ci/environment-${randomUUID()}.git`
   const repositoryKey = remoteKey(repository)
-  await fixture.query(`INSERT INTO devices(id,"ownerId",name,kind,harnesses,"protocolVersion","lastSeenAt")
-    VALUES($1,$2,'Single workflow fixture','local',$3,3,now())`, [deviceId, owner, JSON.stringify(codexWithModel)])
+  await fixture.query(`INSERT INTO devices(id,"ownerId",name,kind,harnesses,"protocolVersion","lastSeenAt","sessionOpenedAt")
+    VALUES($1,$2,'Single workflow fixture','local',$3,3,now(),now())`, [deviceId, owner, JSON.stringify(codexWithModel)])
   await fixture.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,'codex','Single workflow Agent')`, [agentId, owner, deviceId])
   await fixture.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,'main')`, [repoId, deviceId, owner, repositoryKey, repository])
   await seedAllowedModel(fixture, owner, { workspaceId, deviceIds: [deviceId] })

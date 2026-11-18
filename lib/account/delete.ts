@@ -202,6 +202,8 @@ export async function deleteAccount(userId: string, email: string, options: impo
   const requested = await requestAccountDeletion(userId, email, undefined, options)
   if (!requested.ok) return requested
   const job = await resumeAccountDeletion(requested.id, options)
+  // Runs the account requested stop once its memberships are gone (decision 2026-11-17-2215).
+  if (job.stage === 'completed') await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ userId })
   if (job.stage === 'cancelled' && job.blockedReasons.includes('last_owner')) throw new GovernanceError('last_owner')
   if (job.stage === 'completed') return job.warnings.length ? { ok: true, receipt: { id: job.id, warnings: job.warnings } } : { ok: true }
   return { ok: false, pending: true, id: job.id, stage: job.stage }

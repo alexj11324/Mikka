@@ -33,14 +33,11 @@ export const pollingAllowlist = {
   // Web: SWR polling that reads our database.
   'components/workspace/issue-pull-request-link.tsx': db(web, 'a PR with no webhook of ours (linked by hand, or a repository without the app) is re-checked with GitHub every 5 min while visible; a run-delivered PR also re-reads on pull_request_status', 1),
   // Server: loops that re-query our database.
-  'app/v1/devices/[deviceId]/commands/route.ts': db(daemon, 'long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops', 1),
   'lib/coordinator/group-turns.ts': db(server, 'untilStopped fallback only: 15 s for best-effort subscriptions or a failed reliable-push read, 1 s if LISTEN is unavailable', 1),
   'workflows/run-publication/workflow.ts': db(server, 'untilDone: publish and fail results retried with exponential backoff, 30 s doubling to a 10 min cap, until done (GitHub outage or another worker\'s lease; nothing to push)', 1),
   // Daemon: loops that call our server, which reads the database.
-  'packages/daemon/src/agents/tool-approval.ts': db(daemon, 'ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down (always so for a cloud computer, whose server pushes), 1 s against a server older than run-control push; a watcher with timedFloorMs runs at most that often on timer ticks', 1),
-  'packages/daemon/src/computer/web-review.ts': db(daemon, 'pollWebComputerReviews: checks the local broker every second; with review push it syncs only when the pending set changes, on a gateway push, or every 5 s for presence (the server takes decisions on requests seen in the last 10 s); every second only against a server without review push or while the gateway is down', 1),
   'packages/daemon/src/login.ts': db(daemon, 'device login polls the token endpoint at the server-given interval until approved (RFC 8628)', 1),
-  'packages/daemon/src/runs/supervisor.ts': db(daemon, 'CHECKPOINT_EVERY_MS: a periodic write, not a read; saves an idle run\'s checkpoint to the server at most every 2 min', 1),
+  'packages/daemon/src/runs/supervisor.ts': db(daemon, 'CHECKPOINT_EVERY_MS: a write, not a read, only while the device session is open; an idle run\'s tree is checked locally at most every 2 min and sent only when it changed', 1),
   // Third-party APIs.
   'packages/daemon/src/quota/poller.ts': external('provider quota (Claude/Codex), every 3 min; not our database', 2),
   'apps/desktop/src/main/index.ts': external('the existing published GitHub desktop-release update check; no Mikka database request and disabled in Mikka Dev', 1),
@@ -49,10 +46,11 @@ export const pollingAllowlist = {
   'packages/daemon/src/lock.ts': local('waits for the daemon file lock', 1),
   'packages/daemon/src/repositories.ts': local('waits for the repository cache file lock', 1),
   'packages/daemon/src/adapters/mock.ts': local('mock adapter paces scripted output', 1),
+  'packages/daemon/src/main.ts': local('the daemon\'s local timer (5 s): run lease deadline and watchdog, harness rescan, model probe, held device commands; it sends a request only when something changed and the device session is open (decision 2026-11-17-2215)', 1),
   'lib/db/transport-sample.ts': local('flushes the in-process database transfer counter to the log once a minute; runs no query', 1),
   'lib/schedules/claim-child.mts': local('keeps a database-test child process alive until it is killed; reads nothing', 1),
   // The push channel's own keepalive.
-  'packages/daemon/src/device-gateway.ts': { kind: 'keepalive', reason: 'pings the device gateway WebSocket so live push stays connected; reads no data', hits: 1 },
+  'packages/daemon/src/device-gateway.ts': { kind: 'keepalive', reason: 'pings the device session WebSocket every 10 s and drops it after 30 s of silence (decision 2026-11-17-2215); the gateway answers without the database', hits: 1 },
   // UI timers: read no data.
   'components/motion/loader.tsx': ui('loader animation frames', 3),
   'components/ui/thinking-loader-clean.tsx': ui('thinking loader animation', 1),

@@ -5,7 +5,6 @@ import { pool } from '@/lib/db'
 import { DEVICE_DESCRIPTION_MAX, DEVICE_NAME_MAX } from './device-name'
 import { deviceIsOnline } from '@/lib/device-presence'
 import { notifyDeviceWork } from '@/lib/device-gateway-notify'
-import { DEVICE_WORK_CHANNEL, notifyChannel } from '@/lib/db/listen'
 import { DEVICE_UNINSTALL_GRACE_MS, enqueueDeviceCommand } from '@/lib/device-management'
 import { ownerListChanged } from '@/lib/live/lists'
 
@@ -87,12 +86,12 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     await client.query(`SELECT id FROM agents WHERE "deviceId"=$1 AND "userId"=$2 FOR UPDATE`, [target, userId])
     // Run admission reads this row FOR SHARE and requires enabled, so no run
     // can be admitted between the check below and the commit.
-    const device = await client.query(`SELECT id,"lastSeenAt" FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE`, [target, userId])
+    const device = await client.query(`SELECT id,"sessionOpenedAt","sessionClosedAt" FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE`, [target, userId])
     if (!device.rowCount) throw new ActionFailureError('deviceNotFound')
     const live = await client.query(`SELECT 1 FROM agent_runs WHERE "deviceId"=$1 AND status = ANY($2::text[]) LIMIT 1`, [target, [...LIVE_RUN_STATUSES]])
     if (live.rowCount) throw new ActionFailureError('deviceHasActiveRuns')
     const row = device.rows[0]
-    const online = await deviceIsOnline(row)
+    const online = deviceIsOnline(row)
     if (online) await enqueueDeviceCommand(userId, target, 'uninstall', client, { notify: false })
     const revoked = await client.query(`WITH changed AS (
       UPDATE device_tokens SET "revokedAt"=CASE WHEN $3::boolean THEN NULL ELSE now() END,
@@ -108,8 +107,6 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     ) SELECT id FROM changed`, [target, userId, Boolean(online), new Date(Date.now() + DEVICE_UNINSTALL_GRACE_MS)])
     await client.query(`UPDATE agents SET "deviceId"=NULL,"updatedAt"=now() WHERE "deviceId"=$1 AND "userId"=$2`, [target, userId])
     await client.query(`UPDATE devices SET "removedAt"=now(),enabled=false,"updatedAt"=now() WHERE id=$1`, [target])
-    // A commands long poll for this device re-checks on COMMIT (lib/db/listen.ts).
-    await notifyChannel(client, DEVICE_WORK_CHANNEL, [target])
     await ownerListChanged(client, userId, ['thread_list', 'device_list'])
     await client.query('COMMIT')
     if (online) notifyDeviceWork(target)

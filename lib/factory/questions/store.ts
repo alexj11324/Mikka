@@ -887,7 +887,7 @@ export function createFactoryQuestions(
         const {
           rows: [run],
         } = await tx.query(
-          `SELECT r.*,a."runId" AS "boundRunId",origin."deviceId" AS "originDeviceId",origin."sessionId" AS "originSessionId",origin."agentId" AS "originAgentId",origin."deviceRepoId" AS "originRepoId",d.enabled,d."lastSeenAt",d.harnesses,d.kind AS "deviceKind",ag.harness,ag."deviceId" AS "agentDeviceId" FROM agent_runs r JOIN factory_attempts a ON a.id=$3 AND a."taskId"=$4 JOIN agent_runs origin ON origin.id=$5 AND origin."userId"=$2 AND origin."issueId"=$6 JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=$2 JOIN agents ag ON ag.id=r."agentId" AND ag."userId"=$2 JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=$2 AND repo."deviceId"=d.id WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$6 FOR UPDATE OF r FOR SHARE OF d,ag,repo`,
+          `SELECT r.*,a."runId" AS "boundRunId",origin."deviceId" AS "originDeviceId",origin."sessionId" AS "originSessionId",origin."agentId" AS "originAgentId",origin."deviceRepoId" AS "originRepoId",d.enabled,d."lastSeenAt",d."sessionOpenedAt",d."sessionClosedAt",d.harnesses,d.kind AS "deviceKind",ag.harness,ag."deviceId" AS "agentDeviceId" FROM agent_runs r JOIN factory_attempts a ON a.id=$3 AND a."taskId"=$4 JOIN agent_runs origin ON origin.id=$5 AND origin."userId"=$2 AND origin."issueId"=$6 JOIN devices d ON d.id=r."deviceId" AND d."ownerId"=$2 JOIN agents ag ON ag.id=r."agentId" AND ag."userId"=$2 JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=$2 AND repo."deviceId"=d.id WHERE r.id=$1 AND r."userId"=$2 AND r."issueId"=$6 FOR UPDATE OF r FOR SHARE OF d,ag,repo`,
           [runId, userId, task.attemptId, task.id, q.originRunId, q.issueId],
         );
         // Match the execution run before acquiring placement locks, as runtime
@@ -913,7 +913,7 @@ export function createFactoryQuestions(
           run.originRepoId !== run.deviceRepoId ||
           run.originSessionId !== q.originSessionId ||
           !run.enabled ||
-          !await deviceIsOnline({ id: run.deviceId, lastSeenAt: run.lastSeenAt }) ||
+          !deviceIsOnline(run) ||
           !run.harnesses?.some(
             (h: { harness: string; installed: boolean }) =>
               h.harness === run.harness && h.installed,
