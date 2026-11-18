@@ -14,7 +14,7 @@ import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } f
 import type { ModelMessage } from 'ai'
 import { db, pool } from '@/lib/db'
 import { botUnreadCounts } from '@/lib/conversation-reads-store'
-import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { agentRuns, bots, chatPreferences, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -551,7 +551,9 @@ export async function botChats(reader: IssueReader): Promise<Record<string, BotC
 export async function botChatSnapshot(reader: IssueReader) {
   const userId = typeof reader === 'string' ? reader : reader.id
   const workspaces = await activeTaskWorkspaces(reader)
-  const readableBots = workspaces.length ? await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
+  // The person's own 置顶 / 通知 / 隐藏 come with the bots (lib/chat-preferences.ts writes them and pushes this list), in the same read.
+  const readableBots = workspaces.length ? await db.select({ id: bots.id, pinned: chatPreferences.pinned, muted: chatPreferences.muted, hidden: chatPreferences.hidden, pinOrder: chatPreferences.pinOrder }).from(bots)
+    .leftJoin(chatPreferences, and(eq(chatPreferences.userId, userId), eq(chatPreferences.chatKey, sql`${bots.id}::text`))).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
   if (!readableBots.length) return { items: {} as Record<string, BotChatSummary>, expiries: [] as Date[], observedAt: Date.now() }
   const botIds = readableBots.map(bot => bot.id)
   const latest = await db.selectDistinctOn([coordinatorMessages.botId], { id: coordinatorMessages.id, botId: coordinatorMessages.botId, nativePending:nativePendingForChat(userId,sql.raw('"coordinator_messages"."botId"')), message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
@@ -595,10 +597,10 @@ export async function botChatSnapshot(reader: IssueReader) {
   for (const [botId, count] of await botUnreadCounts(pool, userId, botIds)) {
     if (count) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), unreadCount: count }
   }
-  // The same writer that pushes this list (setChatPreference) owns these, so the sidebar's pin, mute and hide stay live.
-  const { rows: preferences } = await pool.query<{ chatKey: string; pinned: boolean; muted: boolean; hidden: boolean; pinOrder: number | null }>(
-    'SELECT "chatKey", pinned, muted, hidden, "pinOrder" FROM chat_preferences WHERE "userId"=$1 AND "chatKey"=ANY($2::text[])', [userId, botIds])
-  for (const { chatKey, ...preference } of preferences) result[chatKey] = { ...(result[chatKey] ?? { line: null, at: null, working: false }), ...preference }
+  for (const { id, pinned, muted, hidden, pinOrder } of readableBots) {
+    if (pinned === null) continue
+    result[id] = { ...(result[id] ?? { line: null, at: null, working: false }), pinned, muted: Boolean(muted), hidden: Boolean(hidden), pinOrder }
+  }
   return { items: result, expiries, observedAt: now.getTime() }
 }
 
