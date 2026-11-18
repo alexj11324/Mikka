@@ -3434,5 +3434,19 @@
     "behavior": "Names the three models a Bot or a thread may pin, shared by the conversations CHECK constraint, the strict create schema and the create dialog's picker; no network, no credentials.",
     "test": "lib/bot-models.test.ts",
     "suite": "test:lib-units"
+  },
+  "app/api/devices/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lists the signed-in person's own live, dispatchable devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
+    "test": "lib/devices/dispatchable.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/devices/dispatchable.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lists the signed-in person's own live, dispatchable local devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
+    "test": "lib/devices/dispatchable.test.ts",
+    "suite": "test:lib-units"
   }
 }
