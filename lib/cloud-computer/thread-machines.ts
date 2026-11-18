@@ -1402,9 +1402,10 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     // command. Count only this credential's use since its handoff began.
     refreshPhase = timings.next('publish_bootstrap')
     const handoffStartedAt = issuedCredential.now as Date
+    const protectionBypass = vercelPreviewProtectionBypass(origin.toString())
     const bootstrap = JSON.stringify({ deviceId, workspaceId: actor.workspaceId, credential, server: origin.toString(),
       traceContext: captureTraceContext({ runId }), tracing: daemonTraceSettings(),
-      ...(process.env.VERCEL_ENV === 'preview' && process.env.MIKKA_CLOUD_PREVIEW_BYPASS ? { protectionBypass: process.env.MIKKA_CLOUD_PREVIEW_BYPASS } : {}) })
+      ...(protectionBypass ? { protectionBypass } : {}) })
     // Keep the strict bootstrap schema readable by old workers during rollout
     // and rollback. This optional locator binds to the same one-use bytes; it
     // carries no assignment or usable credential. String multipart is one RPC.
