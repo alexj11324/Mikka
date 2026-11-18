@@ -20,9 +20,10 @@ import { FRAME_OWNS_HEADER } from '@/components/app-shell'
 import { BotAvatar, COORDINATOR_AVATAR } from '@/components/nav/bot-avatar'
 import type { BotView } from '@/app/actions/bots'
 import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
+import { loadCoordinator } from './page-loaders'
 
 const LegacyChatArchive = dynamic(() => import('./legacy-chat-archive').then(module => module.LegacyChatArchive), { loading: WorkspaceContentLoading })
-const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: WorkspaceContentLoading })
+const CoordinatorChat = dynamic(loadCoordinator, { loading: WorkspaceContentLoading })
 
 export function WorkspaceOverview({ section, workspaceId, onView, tasks, userId, onOpen, initialAgentHistory, agentRequest, onAgentActive, onAgentSessions, coordinatorPrefill, bot }: { bot?: BotView; onAgentSessions?: (sessions: SavedAgentSession[]) => void; coordinatorPrefill?: CoordinatorPrefill; section: WorkspaceSection; workspaceId?: string; onView: (view: IssueView) => void; tasks: Awaited<ReturnType<typeof listIssues>>; userId: string; onOpen: (id: string) => void; initialAgentHistory?: AgentHistory; agentRequest?: LegacyChatRequest; onAgentActive?: (sessionId: string | null) => void }) {
   const i18nText = useTranslations()
