@@ -500,7 +500,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "7772b6c6f371d9fc82a7857c3a49c55e5eb2521224abfc6ebf5a884d7d066989"
+      "sourceHash": "7fe01041f9674499a1a484fc7a7da89cd25bd1853b3020aa51a89ba17ceab678"
     },
     {
       "path": "/mikka/api/conversations/[id]",
@@ -833,6 +833,15 @@
         "POST"
       ],
       "sourceHash": "ab4b013b0030ecc407065f75f86227fb80c144a7fae59a63cf7991d442bcd9f6"
+    },
+    {
+      "path": "/mikka/api/devices",
+      "template": "/api/devices",
+      "source": "app/api/devices/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "127e493483c69c4c76b4046566cfd10227865fdc85fbeb41269e4f347a5e6c00"
     },
     {
       "path": "/mikka/api/devices/computer",
@@ -2552,7 +2561,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "25176c47f725d048467bed224881baea31439c18a62a299d05cd8bfe96c55bff"
+      "sourceHash": "41f1884cd107639b182a269c7dbfc4cc57e0abed228b58ea31e6b8eabe4075cb"
     },
     {
       "path": "/mikka/api/skills/share",

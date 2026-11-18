@@ -54,6 +54,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     const migration = await readFile(new URL('../drizzle/20261023213851_group_conversations.sql', import.meta.url), 'utf8')
     await Promise.all([scoped.query(migration), scoped.query(migration)])
     await scoped.query(migration) // production retry / coexistence with #69
+    await scoped.query(await readFile(new URL('../drizzle/20261118120000_conversation_model_device.sql', import.meta.url), 'utf8'))
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')
     await scoped.query(reads) // this migration first, then #69
     // Exercise the reverse migration order in a second retained schema.
@@ -61,6 +62,9 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     try {
       await reverse.query(reads) // #69 first, then this migration
       await reverse.query(migration)
+      // Every later additive migration has to land in both orders, or the catalog comparison below fails on
+      // a column only one of the two schemas ever received.
+      await reverse.query(await readFile(new URL('../drizzle/20261118120000_conversation_model_device.sql', import.meta.url), 'utf8'))
       // Compare both orders at the catalog level, including table columns,
       // defaults, constraints and index keys. Each pool resolves its own schema.
       const catalog = async (target: Pool) => {

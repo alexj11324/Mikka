@@ -7,6 +7,8 @@ settings:
 overrides:
   next-intl@4.14.9>@swc/core: 1.16.20
 
+packageExtensionsChecksum: sha256-6D3/iud088kujq5G4Zfbj8iVg34Id9PCxtGTuDn+h70=
+
 patchedDependencies:
   '@better-auth/sso@1.7.12':
     hash: df295fc634aab5294da3c99dda5d8fe160e24af563a9f32d67240699cb1e36d2
@@ -17,6 +19,9 @@ patchedDependencies:
   '@novnc/novnc@1.6.0':
     hash: 4c366142582a7e49bf37b4e30502f6cc47d708fe1d91b0627c029c3872963573
     path: patches/@novnc__novnc@1.6.0.patch
+  eve@1.0.0-rc.9:
+    hash: e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2
+    path: patches/eve@1.0.0-rc.9.patch
   ffmpeg-static@5.3.0:
     hash: 7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b
     path: patches/ffmpeg-static@5.3.0.patch
@@ -279,7 +284,7 @@ importers:
         version: 8.5.1(react@19.3.1)
       eve:
         specifier: 1.0.0-rc.9
-        version: 1.0.0-rc.9(0ec25fadac82cd3688c4adb6ab00bbed)
+        version: 1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(0ec25fadac82cd3688c4adb6ab00bbed)
       fflate:
         specifier: 0.8.3
         version: 0.8.3
@@ -544,7 +549,7 @@ importers:
         version: 5.2.0(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)
       eve:
         specifier: 1.0.0-rc.9
-        version: 1.0.0-rc.9(c629b6f9c4762629636b6743fc5a3ca8)
+        version: 1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(c629b6f9c4762629636b6743fc5a3ca8)
 
   apps/frontend:
     devDependencies:
@@ -583,7 +588,7 @@ importers:
         version: 1.7.12(@opentelemetry/api@1.10.0)(drizzle-orm@0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1)(sql.js@1.16.0))(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(pg@8.23.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@2.0.0-rc.0)(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@25.9.9)(happy-dom@15.11.7)(vite@8.3.6(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.0)))
       eve:
         specifier: 1.0.0-rc.9
-        version: 1.0.0-rc.9(f1e35574caad8581bd8099a0f38b0283)
+        version: 1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(f1e35574caad8581bd8099a0f38b0283)
       expo:
         specifier: ~58.0.22
         version: 58.0.22(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.16)(expo-router@58.0.29)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
@@ -6705,6 +6710,9 @@ packages:
     resolution: {integrity: sha512-52r6fkXgxv4GLMjmFcMWRx7X9bw071xTTdrDcdyPGRqU2oE+9pCG0bAOMifSBdLw0JRBZKEF0q3B55qPlLuE8g==}
     engines: {node: '>=6.4.0'}
 
+  core-js-pure@3.51.0:
+    resolution: {integrity: sha512-NE4SFDJ+qzQeqHG2vVSNwopzS6zZNPYJ5kinIqs+OofTqGzOmICgT89E/yvS9XY7rwb3eU1utWXTJ9nVFqv74A==}
+
   core-js@3.51.0:
     resolution: {integrity: sha512-7bDKx/5jm5MxzsXxc93g6Z2+4ZsuT/MddrfRmTDJNAkWsYWHU8EVNEsBiIEWnMAMCHMmRfUEjkuo3jeNBOIHRw==}
 
@@ -11741,10 +11749,6 @@ packages:
 
   throat@5.0.0:
     resolution: {integrity: sha512-fcwX4mndzpLQKBS1DVYhGAcYaYt7vsHNIvQV+WXMvnow5cgjPphq5CaayLaGsjRdSCKZFNGt7/GYAuXaNOiYCA==}
-
-  throttleit@2.1.0:
-    resolution: {integrity: sha512-nt6AMGKW1p/70DF/hGBdJB57B8Tspmbp5gfJ8ilhLnt7kkr2ye7hzD6NVG8GGErk2HWF34igrL2CXmNIkzKqKw==}
-    engines: {node: '>=18'}
 
   through@2.3.8:
     resolution: {integrity: sha512-w89qg7PI8wAdvX60bMDP+bFoD5Dvhm9oLheFp5O4a2QF0cSBGsBX4qZmadPMvVqlLJBBci+WqGGOAPvcDeNSVg==}
@@ -19571,6 +19575,8 @@ snapshots:
     dependencies:
       browserslist: 4.29.4
 
+  core-js-pure@3.51.0: {}
+
   core-js@3.51.0: {}
 
   core-util-is@1.0.3: {}
@@ -20356,9 +20362,10 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@1.0.0-rc.9(0ec25fadac82cd3688c4adb6ab00bbed):
+  eve@1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(0ec25fadac82cd3688c4adb6ab00bbed):
     dependencies:
       ai: 7.0.148(zod@4.6.7)
+      core-js-pure: 3.51.0
       nitro: 3.0.261103-rc
       rolldown: 1.2.16
       undici: 8.12.3
@@ -20371,9 +20378,10 @@ snapshots:
       react: 19.3.1
       vite: 8.3.6(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.0)
 
-  eve@1.0.0-rc.9(c629b6f9c4762629636b6743fc5a3ca8):
+  eve@1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(c629b6f9c4762629636b6743fc5a3ca8):
     dependencies:
       ai: 7.0.148(zod@4.6.7)
+      core-js-pure: 3.51.0
       nitro: 3.0.261103-rc
       rolldown: 1.2.16
       undici: 8.12.3
@@ -20386,9 +20394,10 @@ snapshots:
       react: 19.3.1
       vite: 8.3.6(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.0)
 
-  eve@1.0.0-rc.9(f1e35574caad8581bd8099a0f38b0283):
+  eve@1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(f1e35574caad8581bd8099a0f38b0283):
     dependencies:
       ai: 7.0.148(zod@4.6.7)
+      core-js-pure: 3.51.0
       nitro: 3.0.261103-rc
       rolldown: 1.2.16
       undici: 8.12.3
@@ -25737,8 +25746,6 @@ snapshots:
       real-require: 1.0.0
 
   throat@5.0.0: {}
-
-  throttleit@2.1.0: {}
 
   through@2.3.8: {}
 

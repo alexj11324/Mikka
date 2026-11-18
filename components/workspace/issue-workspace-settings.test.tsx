@@ -20,6 +20,7 @@ const browser = new Window({ url: 'https://fixture.example/?workspace=workspace-
 let user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
 let workspaceId = 'workspace-one'
 let workspaceReady = true
+let switcherReady = true
 let workspaceError: Error | undefined
 let groupList: { id: string; title: string; workspaceId: string }[] = []
 let groupListError: Error | undefined
@@ -57,7 +58,7 @@ mock.module('@/i18n/navigation', { namedExports: { getPathname: ({ href }: { hre
 mock.module('../settings/settings-link.tsx', { namedExports: { SettingsLink: ({ href, children }: { href: string; children?: ReactNode }) => <a href={href}>{children}</a> } })
 mock.module('sonner', { namedExports: { toast: { error: nothing, dismiss: nothing } } })
 mock.module('swr', { defaultExport: (key: unknown, _read?: unknown, options?: { isPaused?: () => boolean }) => ({
-  data: key === '/api/workspace/switcher' ? { ...workspace(), live: { ownerId: user.id } }
+  data: key === '/api/workspace/switcher' ? (switcherReady ? { ...workspace(), live: { ownerId: user.id } } : undefined)
     : key === 'teams' && scopedTeamFixture ? [{ id: teamIssuesId, name: 'Scoped Team' }]
     : Array.isArray(key) && key[0] === 'team-home' ? { members: [], taskCount: 0 }
     : Array.isArray(key) && key[0] === 'projects' ? [{ id: 'known-project', name: 'Known project', summary: '' }]
@@ -237,6 +238,7 @@ beforeEach(() => {
   user = { id: 'owner-one', name: 'Fixture', email: 'fixture@example.com' }
   workspaceId = 'workspace-one'
   workspaceReady = true
+  switcherReady = true
   rosterPending = false; rosterError = undefined; rosterRetries = 0
   workspaceError = undefined
   refreshGlobalTasks = refreshed
@@ -559,12 +561,14 @@ test('a group absent from stale rows offers retry until a successful membership 
 
 test('a cached conversation cannot accept a draft before its authenticated workspace scope resolves', async () => {
   workspaceReady = false
+  switcherReady = false
   await render()
   assert.equal(Boolean(container.querySelector('textarea')), false, 'a cached transcript must not expose an editable loading-scope draft')
   assert.ok(container.querySelector('[data-loading-placeholder]'))
   assert.equal(composerMounts, 0)
 
   workspaceReady = true
+  switcherReady = true
   await render()
   assert.ok(container.textContent?.includes('Cached conversation'))
   await act(async () => editDraft('Lifecycle readiness draft'))
@@ -586,6 +590,7 @@ test('a cached conversation cannot accept a draft before its authenticated works
 
 test('a failed workspace read keeps editing unavailable and offers the normal read retry', async () => {
   workspaceReady = false
+  switcherReady = false
   workspaceError = new Error('unavailable fixture workspace')
   await render()
   assert.equal(Boolean(container.querySelector('textarea')), false)
@@ -599,6 +604,25 @@ test('a failed workspace read keeps editing unavailable and offers the normal re
   await act(async () => editDraft('draft after retry'))
   await render()
   assert.equal(container.querySelector('textarea')?.value, 'draft after retry')
+})
+
+test('a confirmed workspace opens its composer while the full settings read is pending', async () => {
+  workspaceReady = false
+  await render()
+  assert.ok(container.querySelector('textarea'))
+  assert.equal(container.querySelector('[data-loading-placeholder]'), null)
+  await act(async () => editDraft('Draft while settings load'))
+
+  workspaceReady = true
+  await render()
+  assert.equal(container.querySelector('textarea')?.value, 'Draft while settings load')
+  assert.equal(composerMounts, 1)
+
+  workspaceReady = false
+  workspaceError = Object.assign(new Error('Access denied'), { status: 403 })
+  await render()
+  assert.equal(container.querySelector('textarea'), null)
+  assert.ok(container.querySelector('[role="alert"]'))
 })
 
 test('a cold Settings chunk keeps the same frame, bar and rail; returning keeps pending browser notes and draft', async () => {

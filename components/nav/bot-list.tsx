@@ -17,7 +17,8 @@ import type { BotWorkTask } from './bot-work-tree'
 import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 import { toast } from 'sonner'
 import { navigate } from '@/components/workspace/workspace-navigation'
-import { openChatInNewTab, setChatUnread, type ChatNavAction } from './chat-row-actions'
+import { ChatRowActionError, chatPlace, copyPlaceLink, openPlaceInNewTab, setChatPreference, setChatUnread, setThreadUnread, threadPlace, type ChatNavAction } from './chat-row-actions'
+import { setConversationOrganization } from '@/app/actions/task-runs'
 
 /**
  * What the center column shows: the Coordinator, a bot's chat (both on the
@@ -35,92 +36,151 @@ function useChatRows({ bots, workspaceId, userId }: { bots: BotView[]; workspace
   const chats = chatList?.items ?? {}
   // Group chats sit among the bots (R-01), ordered by their latest message.
   const { data: groups = [], error: groupsError, mutate: reloadGroups } = useLiveGroupList(userId, workspaceId)
-  // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots.
-  const rows = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '' })), ...groups.filter(group => group.creationPurpose !== 'conversation').map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt }))]
-    .sort((a, b) => b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
+  // The Coordinator's bot row is the entry pinned on top; the rest are the person's other bots and group chats:
+  // the ones they pinned first (in their pin order, then newest), then the rest newest first. Hidden ones list apart.
+  const all = [...bots.filter(bot => !bot.coordinator).map(bot => ({ kind: 'bot' as const, bot, at: chats[bot.id]?.at ?? '',
+    pinned: Boolean(chats[bot.id]?.pinned), pinOrder: chats[bot.id]?.pinOrder ?? null, hidden: Boolean(chats[bot.id]?.hidden) })),
+  ...groups.filter(group => group.creationPurpose !== 'conversation').map(group => ({ kind: 'group' as const, group, at: group.lastMessage?.createdAt ?? group.createdAt,
+    pinned: Boolean(group.pinned), pinOrder: group.pinOrder ?? null, hidden: Boolean(group.hidden) }))]
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned)
+      || (a.pinned && a.pinOrder !== null && b.pinOrder !== null ? a.pinOrder - b.pinOrder : 0)
+      || b.at.localeCompare(a.at) || (a.kind === 'bot' ? a.bot.name : a.group.title).localeCompare(b.kind === 'bot' ? b.bot.name : b.group.title))
+  const rows = all.filter(row => !row.hidden)
+  const hiddenRows = all.filter(row => row.hidden)
   const unreadCount = (id: string) => chats[id]?.unreadCount ?? 0
   const latestMessage = (id: string) => chats[id]?.messageId
-  return { reloadGroups, rows, unreadCount, latestMessage, referenceGroups: groupsError ? [] : groups }
+  const summary = (id: string) => chats[id]
+  const muted = (id: string) => Boolean(chats[id]?.muted)
+  return { reloadGroups, rows, hiddenRows, unreadCount, latestMessage, summary, muted, referenceGroups: groupsError ? [] : groups }
 
 }
 
 /** One row of the chat list as data, for a frame that draws its own navigation (RailProps.chats). */
-export type ChatNavEntry = { id: string; kind: 'coordinator' | 'bot' | 'group'; name: string; unread: boolean; unreadCount?: number; current: boolean; target: ChatTarget; avatar: ReactNode; work?: BotWorkTask[]; moreBotId?: string; actions?: ChatNavAction[] }
+/**
+ * One row of the chat list as data. As Capy's Captain row (decision 2026-11-18-1200): `unread` only makes the name stronger, never a number;
+ * `preview` is the latest line and `at` its time; `working` is a live turn; `waitingCount` counts the threads under it that wait on the person.
+ */
+export type ChatNavEntry = { id: string; kind: 'coordinator' | 'bot' | 'group'; name: string; unread: boolean; preview?: string | null; at?: string | null; working?: boolean; waitingCount?: number; /** The row's picture at Capy's two densities: 详细 (32px) and 紧凑 (20px). */ face?: (density: 'detailed' | 'compact') => ReactNode; current: boolean; target: ChatTarget; avatar: ReactNode; work?: BotWorkTask[]; moreBotId?: string; actions?: ChatNavAction[] }
 export type { ChatNavAction }
 
 /** The bot list's rows as data: what the hosted App Shell lists under Bots and 群聊, with the same unread dots. */
 /** What the person can do to the bot itself from its row (lib/bot-lifecycle.ts): archive or restore it, or ask to delete it. */
 export type BotLifecycle = { archive: (bot: BotView, archived: boolean) => void; askDelete: (bot: BotView) => void }
+/** What a row's menu asks the page for: a Bot's profile (its chat's 概览), and a thread's new title. */
+export type ChatNavPage = { openProfile: (target: ChatTarget) => void; renameThread: (thread: { target: { kind: 'run' | 'chat'; id: string }; title: string }) => void }
 
-export function useChatNav({ bots, archivedBots = [], workspaceId, active, userId, presentations, onLeaveGroup, lifecycle }: { bots: BotView[]; archivedBots?: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[]; presentations: Readonly<Record<string, TaskPresentation>>; onLeaveGroup?: (group: GroupSummary) => void; lifecycle?: BotLifecycle }): { entries: ChatNavEntry[]; archived: ChatNavEntry[]; reloadGroups: () => Promise<unknown>; referenceGroups: GroupSummary[] } {
+export function useChatNav({ bots, archivedBots = [], workspaceId, active, userId, presentations, onLeaveGroup, lifecycle, page }: { bots: BotView[]; archivedBots?: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[]; presentations: Readonly<Record<string, TaskPresentation>>; onLeaveGroup?: (group: GroupSummary) => void; lifecycle?: BotLifecycle; page?: ChatNavPage }): { entries: ChatNavEntry[]; archived: ChatNavEntry[]; hidden: ChatNavEntry[]; reloadGroups: () => Promise<unknown>; referenceGroups: GroupSummary[] } {
   const i18nText = useTranslations()
-  const { rows, unreadCount, latestMessage, reloadGroups, referenceGroups } = useChatRows({ bots, workspaceId, active, userId })
+  const { rows, hiddenRows, unreadCount, latestMessage, summary, muted, reloadGroups, referenceGroups } = useChatRows({ bots, workspaceId, active, userId })
   const coordinatorId = bots.find(bot => bot.coordinator)?.id
   const sidebarKey = workspaceId ? ['conversation-sidebar',userId,workspaceId] : null
   const {data: sidebar} = useSWR(sidebarKey, () => listConversationSidebar(), {revalidateOnFocus:false})
   useLiveKey('thread_list', workspaceId, sidebarKey ? [unstable_serialize(sidebarKey)] : [], workspaceId)
   useLiveKey('group_list', workspaceId, sidebarKey ? [unstable_serialize(sidebarKey)] : [], workspaceId)
+  // A row's right-click menu (Capy's Captain and thread rows): only what the existing writers do, and what the list then shows.
+  const failed = (error: unknown) => toast.error(i18nText(error instanceof ChatRowActionError && error.status === 409 ? 'Nav.botMenu.pinLimit' : 'Nav.botMenu.failed'))
+  const runChange = (change: Promise<unknown>) => { void change.catch(failed) }
+  const copyLink = (place: Parameters<typeof copyPlaceLink>[0]) => runChange(copyPlaceLink(place).then(() => { toast.success(i18nText('Nav.botMenu.linkCopied')) }))
+  const organize = (target: { kind: 'run' | 'chat'; id: string }, field: 'archived' | 'pinned', value: boolean, done?: () => void) =>
+    runChange(setConversationOrganization(target, { field, value }).then(state => { if (!state) throw new ChatRowActionError(404); done?.() }))
+  const threadActions = (row: NonNullable<typeof sidebar>[string]['items'][number], place: ReturnType<typeof threadPlace>): ChatNavAction[] => {
+    const target = { kind: row.kind === 'chat' ? 'chat' as const : 'run' as const, id: row.id }
+    return [
+      { id: 'openNewTab', label: i18nText('IssueDetail.menu.openNewTab'), run: () => openPlaceInNewTab(place) },
+      { id: 'copyLink', label: i18nText('Nav.botMenu.copyLink'), run: () => copyLink(place) },
+      row.pinned
+        ? { id: 'unpin', label: i18nText('Nav.botMenu.unpin'), run: () => organize(target, 'pinned', false) }
+        : { id: 'pin', label: i18nText('Nav.botMenu.pin'), run: () => organize(target, 'pinned', true) },
+      ...(page ? [{ id: 'rename' as const, label: i18nText('Nav.botMenu.rename'), run: () => page.renameThread({ target, title: row.title }) }] : []),
+      row.unread
+        ? { id: 'markRead', label: i18nText('HostedThread.markRead'), run: () => runChange(setThreadUnread(row, false)) }
+        : { id: 'markUnread', label: i18nText('ConversationDirectory.markUnread'), run: () => runChange(setThreadUnread(row, true)) },
+      { id: 'archive', label: i18nText('Nav.botMenu.archive'), run: () => organize(target, 'archived', true, () => toast.success(i18nText('Nav.botMenu.threadArchived', { name: row.title || i18nText('Nav.untitledConversation') }))) },
+    ]
+  }
   const workFor = (botId: string | undefined) => {
     const group = botId ? sidebar?.[botId] : undefined
     return { moreBotId: group?.more ? botId : undefined, work: group?.items.map(row => {
       const task = row.issueId ? presentations[row.issueId] : undefined
-      return { kind:row.kind, id:row.id, issueId:row.issueId, name:row.title, fullName:row.title,
+      const runs = row.kind === 'chat' ? [] : [{id:row.id,name:row.title,harness:row.harness}]
+      return { actions: threadActions(row, threadPlace({ kind: row.kind, id: row.id, issueId: row.issueId, runs })),
+        kind:row.kind, id:row.id, issueId:row.issueId, name:row.title, fullName:row.title, at: row.at, identifier: row.identifier ?? null,
         ...(row.kind === 'chat' && workspaceId ? {
           conversationTarget: { kind: 'group' as const, id: row.id, title: row.title, workspaceId },
         } : {}),
         pullState: row.pulls?.length ? pullRequestsState(row.pulls) : undefined,
         status:row.status, state:task?.state ?? null, reason:task?.reason ?? null,
-        unread:row.unread,unreadCount:Number(row.unread), activity: row.state === 'waiting' ? 'waiting' as const : row.state === 'working' ? 'working' as const : row.state === 'failed' ? 'error' as const : null,
-        runs:row.kind === 'chat' ? [] : [{id:row.id,name:row.title,harness:row.harness}] }
+        unread:row.unread, activity: row.state === 'waiting' ? 'waiting' as const : row.state === 'working' ? 'working' as const : row.state === 'failed' ? 'error' as const : null,
+        runs }
     }) ?? [] }
   }
-  const botUnread = (id: string) => {
-    const group = sidebar?.[id]
-    const childCount = group?.unreadCount ?? group?.items.filter(row => row.unread).length ?? 0
-    const count = unreadCount(id) + childCount
-    return { unread: count > 0, unreadCount: count }
+  // A Bot's row: its own chat's unread (the name in bold), latest line and time, a live turn, and how many of its threads wait on the person.
+  const botRow = (id: string) => {
+    const chat = summary(id)
+    const waitingCount = sidebar?.[id]?.items.filter(row => row.state === 'waiting').length ?? 0
+    return { unread: unreadCount(id) > 0, preview: chat?.line ?? null, at: chat?.at ?? null, working: Boolean(chat?.working), waitingCount }
   }
-  // The row's right-click menu (Capy's Captain row): only what the chat's existing writers do, and what the list then shows.
-  const runChange = (change: Promise<void>) => { void change.catch(() => toast.error(i18nText('ConversationDirectory.writeError'))) }
   const chatUnreadActions = (chat: Parameters<typeof setChatUnread>[0], unread: boolean): ChatNavAction[] => [unread
     ? { id: 'markRead', label: i18nText('HostedThread.markRead'), run: () => runChange(setChatUnread(chat, false)) }
     : { id: 'markUnread', label: i18nText('ConversationDirectory.markUnread'), run: () => runChange(setChatUnread(chat, true)) }]
-  const botActions = (botId: string | undefined, target: ChatTarget, unread: boolean, bot?: BotView): ChatNavAction[] => [
-    { id: 'openNewTab', label: i18nText('IssueDetail.menu.openNewTab'), run: () => openChatInNewTab(target) },
+  const linkActions = (target: ChatTarget): ChatNavAction[] => [
+    { id: 'openNewTab', label: i18nText('IssueDetail.menu.openNewTab'), run: () => openPlaceInNewTab(chatPlace(target)) },
+    { id: 'copyLink', label: i18nText('Nav.botMenu.copyLink'), run: () => copyLink(chatPlace(target)) },
+  ]
+  const preference = (chat: Parameters<typeof setChatPreference>[0], change: Parameters<typeof setChatPreference>[1]) => () => runChange(setChatPreference(chat, change))
+  const pinActions = (chat: Parameters<typeof setChatPreference>[0], pinned: boolean): ChatNavAction[] => [pinned
+    ? { id: 'unpin', label: i18nText('Nav.botMenu.unpin'), run: preference(chat, { pinned: false }) }
+    : { id: 'pin', label: i18nText('Nav.botMenu.pin'), run: preference(chat, { pinned: true }) }]
+  const hideActions = (chat: Parameters<typeof setChatPreference>[0], hidden: boolean): ChatNavAction[] => [hidden
+    ? { id: 'unhide', label: i18nText('Nav.botMenu.unhide'), run: preference(chat, { hidden: false }) }
+    : { id: 'hide', label: i18nText('Nav.botMenu.hide'), run: preference(chat, { hidden: true }) }]
+  const botActions = (botId: string | undefined, target: ChatTarget, unread: boolean, bot?: BotView, state?: { pinned: boolean; hidden: boolean }): ChatNavAction[] => [
+    ...linkActions(target),
+    ...(page ? [{ id: 'profile' as const, label: i18nText('Nav.botMenu.profile'), run: () => page.openProfile(target) }] : []),
     ...(botId ? [
+      muted(botId)
+        ? { id: 'unmute' as const, label: i18nText('Nav.botMenu.unmute'), run: preference({ kind: 'bot', botId }, { muted: false }) }
+        : { id: 'mute' as const, label: i18nText('Nav.botMenu.mute'), run: preference({ kind: 'bot', botId }, { muted: true }) },
+      // The Coordinator stays on top: it is neither pinned nor hidden, archived nor deleted; its row passes no bot.
+      ...(bot && state ? pinActions({ kind: 'bot', botId }, state.pinned) : []),
       { id: 'viewAll' as const, label: i18nText('ConversationDirectory.viewAll'), run: () => navigate({ section: 'conversations', directoryBot: botId, issue: null, task: null, thread: null, threads: null }) },
       ...chatUnreadActions({ kind: 'bot', botId, latestMessageId: latestMessage(botId) }, unread),
+      ...(bot && state ? hideActions({ kind: 'bot', botId }, state.hidden) : []),
     ] : []),
-    // The Coordinator is neither archived nor deleted; its row passes no bot.
     ...(bot && lifecycle ? [
       { id: 'archive' as const, label: i18nText('Nav.botMenu.archive'), run: () => lifecycle.archive(bot, true) },
       { id: 'delete' as const, label: i18nText('Nav.botMenu.delete'), danger: true, run: () => lifecycle.askDelete(bot) },
     ] : []),
   ]
   const groupActions = (group: GroupSummary, target: ChatTarget, unread: boolean): ChatNavAction[] => [
-    { id: 'openNewTab', label: i18nText('IssueDetail.menu.openNewTab'), run: () => openChatInNewTab(target) },
+    ...linkActions(target),
+    ...pinActions({ kind: 'group', id: group.id }, Boolean(group.pinned)),
     ...chatUnreadActions({ kind: 'group', id: group.id, latestMessageId: group.lastMessage?.id }, unread),
+    ...hideActions({ kind: 'group', id: group.id }, Boolean(group.hidden)),
     ...(onLeaveGroup && group.createdBy !== userId ? [{ id: 'leave' as const, label: i18nText('GroupChat.leave'), danger: true, run: () => onLeaveGroup(group) }] : []),
   ]
-  const coordinatorUnread = botUnread(coordinatorId ?? '')
-  const coordinator: ChatNavEntry = { id: 'coordinator', kind: 'coordinator', name: i18nText('Nav.coordinator'), ...coordinatorUnread, current: active?.kind === 'coordinator', target: { kind: 'coordinator' }, avatar: <CoordinatorAvatar size="row" />, ...workFor(coordinatorId),
+  const coordinator: ChatNavEntry = { id: 'coordinator', kind: 'coordinator', name: i18nText('Nav.coordinator'), ...botRow(coordinatorId ?? ''), current: active?.kind === 'coordinator', target: { kind: 'coordinator' }, avatar: <CoordinatorAvatar size="row" />, face: density => <CoordinatorAvatar size={density === 'detailed' ? 'list' : 'pill'} />, ...workFor(coordinatorId),
     actions: botActions(coordinatorId, { kind: 'coordinator' }, unreadCount(coordinatorId ?? '') > 0) }
-  const entries = [coordinator, ...rows.map((row): ChatNavEntry => {
+  const entry = (row: (typeof rows)[number]): ChatNavEntry => {
     if (row.kind === 'group') {
       const target: ChatTarget = { kind: 'group', id: row.group.id, title: row.group.title, workspaceId: row.group.workspaceId }
       const unread = Boolean(Number(row.group.unreadCount) || row.group.markedUnread)
-      return { id: row.group.id, kind: 'group', name: row.group.title || i18nText('Nav.untitledConversation'), unread, unreadCount: Number(row.group.unreadCount) || Number(Boolean(row.group.markedUnread)), current: active?.kind === 'group' && active.id === row.group.id, target, avatar: <CachedGroupAvatar id={row.group.id} title={row.group.title || i18nText('Nav.untitledConversation')} />, actions: groupActions(row.group, target, unread) }
+      return { id: row.group.id, kind: 'group', name: row.group.title || i18nText('Nav.untitledConversation'), unread, preview: row.group.lastMessage?.body ?? null, at: row.group.lastMessage?.createdAt ?? row.group.createdAt, current: active?.kind === 'group' && active.id === row.group.id, target, avatar: <CachedGroupAvatar id={row.group.id} title={row.group.title || i18nText('Nav.untitledConversation')} />, actions: groupActions(row.group, target, unread) }
     }
     const target: ChatTarget = { kind: 'bot', botId: row.bot.id }
     // 标为已读 reads the Bot's own chat; its threads' unread stay with the threads.
-    return { id: row.bot.id, kind: 'bot', name: row.bot.name, ...botUnread(row.bot.id), current: active?.kind === 'bot' && active.botId === row.bot.id, target, avatar: <BotAvatar id={row.bot.id} color={row.bot.color} shape={row.bot.shape} size="row" still />, ...workFor(row.bot.id), actions: botActions(row.bot.id, target, unreadCount(row.bot.id) > 0, row.bot) }
-  })]
+    return { id: row.bot.id, kind: 'bot', name: row.bot.name, ...botRow(row.bot.id), current: active?.kind === 'bot' && active.botId === row.bot.id, target, avatar: <BotAvatar id={row.bot.id} color={row.bot.color} shape={row.bot.shape} size="row" still />, face: density => <BotAvatar id={row.bot.id} color={row.bot.color} shape={row.bot.shape} size={density === 'detailed' ? 'list' : 'pill'} still />, ...workFor(row.bot.id), actions: botActions(row.bot.id, target, unreadCount(row.bot.id) > 0, row.bot, row) }
+  }
+  const entries = [coordinator, ...rows.map(entry)]
+  // 已隐藏: chats the person hid. They still open; their menu brings them back (取消隐藏).
+  const hidden = hiddenRows.map(row => ({ ...entry(row), work: undefined, moreBotId: undefined }))
   // 已归档: the person's archived bots. They open nothing; their menu restores or deletes them.
   const archived = lifecycle ? archivedBots.map((bot): ChatNavEntry => ({ id: bot.id, kind: 'bot', name: bot.name, unread: false, current: false, target: { kind: 'bot', botId: bot.id },
     avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" still />,
+    face: density => <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size={density === 'detailed' ? 'list' : 'pill'} still />,
     actions: [
       { id: 'unarchive', label: i18nText('Nav.botMenu.unarchive'), run: () => lifecycle.archive(bot, false) },
       { id: 'delete', label: i18nText('Nav.botMenu.delete'), danger: true, run: () => lifecycle.askDelete(bot) },
     ] })) : []
-  return { entries, archived, reloadGroups, referenceGroups }
+  return { entries, archived, hidden, reloadGroups, referenceGroups }
 }
