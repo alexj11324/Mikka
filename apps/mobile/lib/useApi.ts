@@ -6,13 +6,20 @@ import { needsForegroundRead, withholdsCachedRead } from './api-read-state'
 import { live, useLive, type LiveSpec } from './live'
 import { presenceScope } from './presence-scope'
 
+/** Subscribe to the native foreground transition. Callers decide whether
+ * an already-loaded result needs a receipt or a stale result needs a read. */
+export function onAppForeground(entered: () => void) {
+  const subscription = AppState.addEventListener('change', state => { if (state === 'active') entered() })
+  return () => subscription.remove()
+}
+
 // The last answer per path, so a screen opened again draws at once and refreshes behind (a chat is not blank while it loads).
 // Another workspace's answers are dropped.
 /** Data younger than this is fresh: coming back to the app leaves it alone (decision 2026-11-01-0400-no-refetch-on-focus). */
 export const FRESH_FOR_MS = 60_000
 onWorkspaceChange(() => cache.clear())
 
-/** Loads `path` ahead of its screen, once, so opening it draws at once (对话 warms the top chats). */
+/** Loads `path` ahead of its screen, once, so opening it draws at once (线程 warms the top chats). */
 export async function prefetch(path: string) {
   await cache.prefetch(path, api)
 }
@@ -144,15 +151,11 @@ function useApiRead<T>(path: string | null, read: (path: string) => Promise<T>, 
 
   useEffect(() => {
     if (!path) return
-    const sub = AppState.addEventListener('change', state => {
-      if (state === 'active') {
-        // Stale-while-revalidate: one silent read only when the data is older than
-        // FRESH_FOR_MS; the screen keeps what it shows meanwhile. A pushed screen's
-        // catch-up read is the live channel's; here only a failed read recovers.
-        if (pushed ? failed.current || loadedAt.current === 0 : needsForegroundRead(loadedAt.current, failed.current, Date.now(), FRESH_FOR_MS)) void load()
-      }
+    return onAppForeground(() => {
+      // Pushed screens catch up on their live channel. Only a failed or stale
+      // read needs an additional request on returning to the foreground.
+      if (pushed ? failed.current || loadedAt.current === 0 : needsForegroundRead(loadedAt.current, failed.current, Date.now(), FRESH_FOR_MS)) void load()
     })
-    return () => sub.remove()
   }, [load, path, pushed])
 
   const sameSource = source.path === path && source.context === context
