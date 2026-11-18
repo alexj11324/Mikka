@@ -116,6 +116,13 @@ export function linkedPullDirectory(
   return [...pulls.values()];
 }
 
+/** A saved combination of view, filters and grouping, kept per device like the filters themselves. */
+export type SavedPullView = {
+  name: string;
+  filters: PullFilters;
+  repo: string;
+  grouping: PullGroup;
+};
 export type PullFilters = {
   view: PullView;
   search: string;
@@ -151,6 +158,17 @@ export function filterDirectoryPulls(
   });
 }
 
+/** Groups read in the order someone works them: what is broken, what is running, what is ready, then history. */
+export const pullAttentionOrder: readonly PullState[] = [
+  "failed",
+  "pending",
+  "ready",
+  "open",
+  "draft",
+  "merged",
+  "closed",
+];
+
 export function groupDirectoryPulls(
   rows: PullDirectoryRow[],
   grouping: PullGroup,
@@ -176,7 +194,7 @@ export function groupDirectoryPulls(
   }
   const order: string[] =
     grouping === "state"
-      ? ["pinned", ...pullStates]
+      ? ["pinned", ...pullAttentionOrder]
       : ["pinned", ...[...groups.keys()].filter((key) => key !== "pinned")];
   return order.flatMap((key) =>
     groups.has(key) ? [{ key, rows: groups.get(key)! }] : [],
