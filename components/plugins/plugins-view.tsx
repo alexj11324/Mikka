@@ -34,7 +34,10 @@ async function fetchSkills([path, query, page]: readonly [string, string, number
   if (page) params.set('page', String(page))
   const search = params.toString()
   const response = await fetch(withBasePath(search ? path + '?' + search : path))
-  if (!response.ok) throw new Error('skills search failed')
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null) as { error?: string } | null
+    throw new Error(failure?.error ?? 'skills_search_failed')
+  }
   return await response.json() as SkillsPage
 }
 

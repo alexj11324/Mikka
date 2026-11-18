@@ -288,6 +288,8 @@
     "loadFailed": "暂时无法加载 skills.sh 技能目录。",
     "retry": "重试",
     "browseSkills": "打开 skills.sh",
+    "identityUnavailable": "当前部署没有搜索 skills.sh 所需的身份凭证；你仍可直接打开 skills.sh 浏览。",
+    "identityRejected": "skills.sh 拒绝了部署身份；请检查 Vercel OIDC 配置，或直接打开 skills.sh 浏览。",
     "noResults": "没有找到匹配的技能。",
     "clearSearch": "清除搜索",
     "installCount": "{count} 次安装",
