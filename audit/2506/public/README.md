@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 101 |
+| partial | 105 |
 | prior-partial | 36 |
-| unreviewed | 6233 |
+| unreviewed | 6229 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -219,3 +219,9 @@ Seven previously unreviewed original `components/blocks/rich-text-editor-4/compo
 **Existing G-076 extended, not renumbered.** Source commits [`4cae9195`](https://github.com/alexj11324/Mikka/commit/4cae9195797eff8be0aea105f7da0c8774d8fe0f), [`cd4eab5a`](https://github.com/alexj11324/Mikka/commit/cd4eab5afee189bfd416e2aa5965dcdc14ec550c), [`abad30fc`](https://github.com/alexj11324/Mikka/commit/abad30fc965981b82a6182d1b36d9f20d5c53ddc) propagate the existing Yjs reply-to-thread boolean through the existing callback, retaining a typed reply draft on false (missing/deleted thread) and clearing only on successful write. No wrapper, retry, fallback or new state machine. Extracted actual original and modified `CommentThread.submit()` bodies in isolated V8: previous false-result draft loss reproduced, corrected false/true/blank bounded scenarios. Extracted original `rich-text-comments.ts` readAnchorRanges/readActiveComment functions produced **9/9** synthetic ProseMirror assertions. These are **not** installed Yjs/React/Tiptap/Node24, two-device or browser/AT, protected CI, normal Merge or post-merge checks.
 
 Six of seven fixed public source blobs match main `6c685f99`; `rich-text-comments.ts` is the exception: main `0b0a4e11` includes a newer `replyToMessageId` guard absent from original G `cd44fbee`. That current-main business validation **must survive integration**. All seven entries remain **partial retain**; G-076 is **candidate_unmerged**, not delivered. Fixed code tally: **186 complete / 101 partial / 36 prior-partial / 6233 unreviewed = 6556**, within unchanged 7996 pinned Git paths, 314 unique review rows. Current-main additions and remaining unreviewed paths, the official Cloudflare runtime migration / physical SDK cleanup under G-015, protected CI and exact merge-SHA acceptance remain OPEN. Production/signing/devices remain with #1954 and Cloud #155 original owners.
+
+## 2026-11-18 · Next four independent Yjs demo consumer files
+
+Continued the original source review after G-076 product repair rather than stopping at the first commit. Four more immutable, previously `unreviewed` paths in `components/blocks/rich-text-editor-4/components/` were **read in full**: `follow-chip.tsx` (native follow Stop action and keyboard label), `presence-stack.tsx` (Awareness user state and guarded follow), `replay-dialog.tsx` (controlled confirm/cancel of in-memory Yjs demo replay), and `spec-header.tsx` (actual shared consumer composing PresenceStack, FollowChip, ConnectionSwitch, comments, formatting and replay). All fixed/G/main/Cloud fixed-vendor `82d285ed` Git blobs match; source origin was `50bc4a25` (2026-10-20). No additional root issue, no custom Cloudflare scheduler or separate persistent writer and no arbitrary deletion. Each is `partial retain`: **static source/full consumer inspection** only, no installed React/Yjs/Node24, real keyboard/AT, two-client replay or protected CI.
+
+The four per-file `paths-07.csv` rows and `reviews.jsonl` records were written and rechecked independently. Fixed public code is now **186 complete / 105 partial / 36 prior-partial / 6229 unreviewed = 6556**, 318 expected unique review records. Fixed 7996 Git-tracked paths remain the denominator; latest-main delta, Cloud G-015 owned native migration/physical retirement, protected merge and exact post-merge tests still OPEN, as are all original production/signing/device owners.
