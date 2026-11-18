@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 184 |
-| partial | 45 |
+| complete | 186 |
+| partial | 47 |
 | prior-partial | 36 |
-| unreviewed | 6291 |
+| unreviewed | 6287 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -96,3 +96,13 @@ The original `apps/mobile/lib/web.ts` is the one-time-token/account-bound browse
 All four paths have explicit baseline Git blobs and current-main / pinned-Cloud comparison in `reviews.jsonl`. The public code denominator stays 6,556; status is **184 complete / 45 partial / 36 prior-partial / 6,291 unreviewed**, and reviews have **256 distinct paths**. These are only bounded per-file findings. They do not complete full main deltas, Cloud's pinned-vendor delta, dynamic tests, protected ordinary merges, exact merged SHA acceptance or the parent ten DoD.
 
 Cloudflare official [Container-class migration](https://developers.cloudflare.com/containers/guides/migrate-to-durable-object-container-api/) (updated Nov 9, 2026) still requires verifying equivalent readiness, egress, start/stop and activity/alarms before removing the deprecated SDK. The separate [scheduling-policy migration](https://developers.cloudflare.com/containers/guides/migrate-to-durable-object-scheduling-policy/) (updated Nov 14, 2026) requires a replacement application/DO namespace, with no automatic data transfer. Current [policy guide](https://developers.cloudflare.com/containers/configuration/scheduling-policy/) lists `basic` among supported instance sizes while its runtime section explicitly says runtime does **not** accept `basic`; **do not select `basic` by documentation assumption**. G-015's original Owner must run the locked Wrangler 4.152.0/workerd variant and capture the actual accepted runtime configuration. This audit pass made no G-015, F, production, signing or device mutation.
+
+## 2026-11-18 fixed Mobile API-read and foreground contract review
+
+Four previously unreviewed fixed Git paths were fully read: `apps/mobile/lib/api-read-state.ts`, `apps/mobile/lib/useApi.ts`, and their original `api-read-state.test.mts` and `api-context.test.mts`. Their fixed, G, current-main and Cloud-pinned `vendor/mikka@82d285ed` Git object IDs, downstream callers, server/native responsibilities and retention evidence are recorded per path in original CSVs and `reviews.jsonl`. The original unchanged `api-read-state.test.mts` and helper were independently reconstructed byte-identically by `git hash-object`; isolated Linux Node **22.16.0** `--experimental-strip-types --test` ran **2/2 native TAP tests, 0 failures**. These cover returning-to-foreground freshness and failure recovery, not a mounted React view. The original 9,630-byte `api-context.test.mts` was read but its real React/happy-dom multi-reader test was **not** run in this isolated setup: no claim of installed Node24, browser, Expo, PG17, protected CI or release.
+
+The `ApiCache` and `useApiRead` code paths independently protect account/workspace generation, path-specific server denials (403/404), transient response handling (503), and fresh reads after writer ACK. The `useLiveApi` native channel and one-minute disconnected/foreground fallback do not establish an extra Cloudflare DO, Queue, scheduler or polling service. Removing these client authority/UX fences without real simultaneous-reader, revoked-member and after-write test evidence would regress authorized behavior. Two pure helper/test files are `complete`; the React hook and mounted complex test are `partial` pending their full runtime consumers.
+
+**Current main integration safeguard:** original G `useApi.ts@a8a01331` predates main `ed13256a`, which exports native `onAppForeground` for `features/chat/model/use-thread-read-end.ts` and the chat screen. Existing G source [`9a9004b1`](https://github.com/alexj11324/Mikka/commit/9a9004b11114235b645dee8376f597da5e6f40ad) restores that **exact same current-main blob**, retaining subscription cleanup and the foreground refresh contract without adding another mechanism. Main/Cloud pinned vendor remain different versions; no assumption that the old vendor inherits this change.
+
+The fixed 7,996 tracked-path denominator and 6,556 code-path denominator are unchanged. Original CSV rows and JSONL now show **186 complete / 47 partial / 36 prior-partial / 6,287 unreviewed**, **260 distinct review records**. Full three-repository fixed-source semantic reviews, all main deltas, vendor consumers, genuine CI, ordinary protected merge and exact merged-SHA and Cloudflare migration/physical deletion acceptance remain outstanding. The original G-015 Owner and #1954 / Cloud #155 production-signing-device Owner retain their scope; F #2300 remains untouched.
