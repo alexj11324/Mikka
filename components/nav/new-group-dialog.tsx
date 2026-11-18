@@ -16,6 +16,7 @@ import { useOpenerFocus } from '@/hooks/use-focus-return'
 import { BotAvatar } from './bot-avatar'
 
 type CreatedGroup = { id: string; title: string; workspaceId: string }
+export type DeviceOption = { id: string; name: string; online: boolean }
 type Props = {
   purpose?: 'conversation'
   open: boolean
@@ -25,12 +26,12 @@ type Props = {
   onCreated: (group: CreatedGroup) => void
   onNewBot: () => void
   onReviewGroups: () => void
-  /** The person's live machines, offered only when there is a real choice (two or more). */
-  devices?: readonly { id: string; name: string; online: boolean }[]
+  /** The person's live machines. Omit to let the dialog read them once it opens. */
+  devices?: readonly DeviceOption[]
 }
 
 /** Both entry points use the workspace's owned Bots and the same persistent message transport. */
-export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots, onCreated, onNewBot, onReviewGroups, devices = [] }: Props) {
+export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots, onCreated, onNewBot, onReviewGroups, devices }: Props) {
   const t = useTranslations(purpose ? 'Shell.createConversation' : 'Shell.newGroup')
   const common = useTranslations('Common')
   const [title, setTitle] = useState('')
@@ -38,6 +39,19 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
   // A thread may pin the model that answers it and the machine that runs it. 'auto' means "Mikka chooses".
   const [model, setModel] = useState('auto')
   const [deviceId, setDeviceId] = useState('auto')
+  // The page may hand the roster over; otherwise the dialog asks once on open. Reading it never blocks the form,
+  // and a failed read simply leaves the picker out instead of offering a machine that cannot be honoured.
+  const [roster, setRoster] = useState<readonly DeviceOption[] | null>(null)
+  useEffect(() => {
+    if (!open || devices) return
+    let live = true
+    fetch(withBasePath('/api/devices'), { credentials: 'same-origin' })
+      .then(async response => response.ok ? await response.json() as { items?: DeviceOption[] } : { items: [] })
+      .then(body => { if (live) setRoster(body.items ?? []) })
+      .catch(() => { if (live) setRoster([]) })
+    return () => { live = false }
+  }, [open, devices])
+  const machines = devices ?? roster ?? []
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<'failed' | 'unconfirmed' | 'nameRequired' | 'botsRequired' | null>(null)
   const pending = useRef(false)
@@ -110,11 +124,11 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
               {WORKSPACE_BOT_MODELS.map(name => <ToggleGroupItem key={name} value={name}>{name}</ToggleGroupItem>)}
             </ToggleGroup>
           </Field>
-          {devices.length > 1 && <Field>
+          {machines.length > 1 && <Field>
             <FieldLabel>{t('device')}</FieldLabel>
             <ToggleGroup variant="outline" spacing={0} aria-label={t('device')} disabled={saving || error === 'unconfirmed'} value={[deviceId]} onValueChange={values => setDeviceId(values[0] ?? 'auto')}>
               <ToggleGroupItem value="auto">{t('deviceAuto')}</ToggleGroupItem>
-              {devices.map(device => <ToggleGroupItem key={device.id} value={device.id}>{device.name}</ToggleGroupItem>)}
+              {machines.map(device => <ToggleGroupItem key={device.id} value={device.id}>{device.name}</ToggleGroupItem>)}
             </ToggleGroup>
           </Field>}
         </FieldGroup>
