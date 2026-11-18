@@ -25,7 +25,8 @@ export interface BlockTarget {
 
 type BlockAction = (
   state: EditorState,
-  target: BlockTarget
+  target: BlockTarget,
+  tr: Transaction
 ) => Transaction | null
 
 const LIST_ITEMS = new Set(["listItem", "taskItem"])
@@ -202,11 +203,15 @@ export function canMoveBlock(target: BlockTarget, dir: -1 | 1) {
 }
 
 /** Swaps the block with its previous or next sibling in one step. */
-function moveBlock(state: EditorState, target: BlockTarget, dir: -1 | 1) {
+function moveBlock(
+  state: EditorState,
+  target: BlockTarget,
+  dir: -1 | 1,
+  tr: Transaction
+) {
   if (!canMoveBlock(target, dir)) return null
   const { pos, node, parent, index } = target
   const sibling = parent.child(index + dir)
-  const tr = state.tr
 
   if (dir < 0) {
     const from = pos - sibling.nodeSize
@@ -217,16 +222,16 @@ function moveBlock(state: EditorState, target: BlockTarget, dir: -1 | 1) {
   return carryAcross(tr, state, target, pos + sibling.nodeSize).scrollIntoView()
 }
 
-export const moveBlockUp: BlockAction = (state, target) =>
-  moveBlock(state, target, -1)
+export const moveBlockUp: BlockAction = (state, target, tr) =>
+  moveBlock(state, target, -1, tr)
 
-export const moveBlockDown: BlockAction = (state, target) =>
-  moveBlock(state, target, 1)
+export const moveBlockDown: BlockAction = (state, target, tr) =>
+  moveBlock(state, target, 1, tr)
 
 /** Inserts a copy right after the block and moves the selection into it. */
-export const duplicateBlock: BlockAction = (state, target) => {
+export const duplicateBlock: BlockAction = (state, target, tr) => {
   const at = target.pos + target.node.nodeSize
-  const tr = state.tr.insert(at, target.node)
+  tr.insert(at, target.node)
   const { selection } = state
   const inside =
     selection.from >= target.pos &&
@@ -237,9 +242,8 @@ export const duplicateBlock: BlockAction = (state, target) => {
 }
 
 /** Removes the block; an only child takes its now-empty wrapper with it. */
-export const deleteBlock: BlockAction = (state, target) => {
+export const deleteBlock: BlockAction = (state, target, tr) => {
   const { from, to, depth } = removalRange(state.doc, target)
-  const tr = state.tr
 
   if (depth === 1 && state.doc.childCount === 1) {
     tr.replaceWith(
@@ -262,8 +266,7 @@ export const deleteBlock: BlockAction = (state, target) => {
 /** An empty row above or below the block with the caret in it: a paragraph,
  * or an item where only items fit; an empty row is reused, never doubled. */
 export function insertBlockRow(side: "before" | "after"): BlockAction {
-  return (state, target) => {
-    const tr = state.tr
+  return (state, target, tr) => {
     const { node, parent, pos } = target
     const first = node.firstChild
 
@@ -291,13 +294,15 @@ export function insertBlockRow(side: "before" | "after"): BlockAction {
 
 /** Runs an action on the block at pos, or on the caret's block without one. */
 export function blockCommand(action: BlockAction, pos?: number): Command {
-  return ({ state }) => {
+  return ({ state, tr }) => {
     const target =
       pos === undefined
         ? selectionBlockTarget(state)
-        : blockTargetAtPos(state.doc, pos)
+        : blockTargetAtPos(tr.doc, pos)
 
-    return target ? action(state, target) !== null : false
+    // Tiptap chains every command on `tr`; mutating a fresh state.tr would
+    // report success but silently discard block edits and queued selections.
+    return target ? action(state, target, tr) !== null : false
   }
 }
 
