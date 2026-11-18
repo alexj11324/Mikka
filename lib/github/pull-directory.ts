@@ -117,7 +117,6 @@ export async function repositoryPullDirectory(
         },
       }),
     });
-    // error-cause: fetch exceptions can contain Authorization headers; never propagate them.
   } catch {
     // error-cause: network errors may contain the credential-bearing request.
     throw new GitHubAccessError("githubUnavailable", 502);
@@ -147,10 +146,9 @@ export async function repositoryPullDirectory(
       chunks.push(item.value);
     }
     raw = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    // error-cause: provider bodies and JSON errors may contain private source or credentials.
   } catch {
-    // error-cause: provider bodies and parsing errors can include private source or credentials.
     await reader.cancel().catch(() => {});
+    // error-cause: provider bodies and parsing errors can include private source or credentials.
     throw new GitHubAccessError("githubUnavailable", 502);
   } finally {
     reader.releaseLock();

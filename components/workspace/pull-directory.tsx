@@ -399,6 +399,7 @@ export function PullDirectory({
             <Button
               size="sm"
               variant="outline"
+              nativeButton={false}
               render={
                 <a
                   href={`https://github.com/${repo}/compare`}
@@ -830,6 +831,7 @@ export function PullDirectory({
                 variant="ghost"
                 aria-label={t("openGitHub")}
                 title={t("openGitHub")}
+                nativeButton={false}
                 render={
                   <a
                     href={active.url}

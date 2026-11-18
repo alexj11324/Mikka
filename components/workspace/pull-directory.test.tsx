@@ -109,9 +109,27 @@ const stub = (file: string, namedExports: Record<string, unknown>) =>
 stub("../../hooks/use-live-key.tsx", { useLiveKey: () => {} });
 stub("../../app/actions/task-runs.ts", { listConversations: () => linkedPage });
 stub("../ui/resizable-pane.tsx", {
-  ResizablePane: ({ children, ...props }: React.ComponentProps<"aside">) => (
-    <aside {...props}>{children}</aside>
-  ),
+  ResizablePane: ({
+    children,
+    storageKey: _storageKey,
+    defaultWidth: _defaultWidth,
+    min: _min,
+    max: _max,
+    edge: _edge,
+    label: _label,
+    from: _from,
+    render: _render,
+    ...props
+  }: React.ComponentProps<"aside"> & {
+    storageKey?: string;
+    defaultWidth?: number | null;
+    min?: number;
+    max?: number;
+    edge?: "start" | "end";
+    label?: string;
+    from?: string;
+    render?: "aside" | "div" | "section";
+  }) => <aside {...props}>{children}</aside>,
 });
 stub("./workspace-navigation.ts", {
   openGroupConversation: (id: string) => calls.push("chat:" + id),
@@ -153,7 +171,9 @@ test("the PR tab switches from linked task snapshots to real repository PRs and 
     assert.match(document.body.textContent ?? "", /Better PR overview/);
     const source = document.querySelector('select[aria-label="source"]');
     assert.ok(source instanceof browser.HTMLSelectElement);
-    await act(async () => change(source as unknown as HTMLSelectElement, "Owner/Repo"));
+    await act(async () =>
+      change(source as unknown as HTMLSelectElement, "Owner/Repo"),
+    );
     const row = [...document.querySelectorAll("button")].find((button) =>
       button.textContent?.includes("Better PR overview"),
     );
@@ -192,7 +212,9 @@ test("filters act on PR metadata and the Ready view is not inferred from a green
   try {
     const source = document.querySelector('select[aria-label="source"]');
     assert.ok(source instanceof browser.HTMLSelectElement);
-    await act(async () => change(source as unknown as HTMLSelectElement, "Owner/Repo"));
+    await act(async () =>
+      change(source as unknown as HTMLSelectElement, "Owner/Repo"),
+    );
     const ready = [...document.querySelectorAll('[role="tab"]')].find(
       (tab) => tab.textContent === "views.ready",
     );

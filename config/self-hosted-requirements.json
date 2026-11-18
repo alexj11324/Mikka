@@ -3349,7 +3349,7 @@
     "environment": [],
     "behavior": "Reads the signed-in owner’s pull requests from their authorized GitHub repositories through the existing GitHub App access policy. Missing GitHub configuration or denied repository access cannot return pull requests.",
     "test": "app/api/integrations/github/repositories/pulls/route.test.ts",
-    "suite": "test:github"
+    "suite": "test:github-pulls"
   },
   "app/api/integrations/github/repositories/branches/route.ts": {
     "mode": "built-in",

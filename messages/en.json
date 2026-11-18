@@ -6286,77 +6286,25 @@
     "chatUnavailable": "This Bot uses its owner’s personal chat model settings, which this request cannot access. Use your own Bot or ask its owner to start this chat. Task delegation checks your own execution resources separately."
   },
   "RunErrors": {
-    "cloud_machine_unfunded": {
-      "default": "Not enough Mikka credits to keep the cloud machine running"
-    },
-    "review_auth_required": {
-      "default": "Sign in to review this task."
-    },
-    "review_not_found": {
-      "default": "This task review is unavailable."
-    },
-    "not_owner_terminal": {
-      "default": "Only the task owner can use this terminal."
-    },
-    "review_machine_gone": {
-      "default": "The task environment is no longer available."
-    },
-    "review_binding_changed": {
-      "default": "The task environment has changed. Open the review again."
-    },
-    "review_checkout_unavailable": {
-      "default": "This task has no available working directory."
-    },
-    "review_preview_unavailable": {
-      "default": "Preview is unavailable",
-      "configuration": "This environment does not support a secure preview",
-      "runtime": "The preview server is unavailable",
-      "protocol": "The preview response is invalid",
-      "scope_changed": "The task environment or authorization has changed",
-      "limit": "The preview has reached its usage limit"
-    },
-    "terminal_unsupported": {
-      "default": "This environment does not support the task terminal.",
-      "local_device": "Remote terminal access is not available on this local device.",
-      "runtime_version": "Update the task runtime to use its terminal."
-    },
-    "terminal_already_controlled": {
-      "default": "The Agent is still using this environment. End its work before opening the terminal."
-    },
-    "terminal_binding_changed": {
-      "default": "The terminal environment or authorization has changed."
-    },
-    "terminal_ended": {
-      "default": "This terminal session has ended."
-    },
-    "terminal_input_too_large": {
-      "default": "Terminal input exceeds 16 KiB."
-    },
-    "terminal_invalid_request": {
-      "default": "The terminal request is invalid."
-    },
-    "terminal_request_conflict": {
-      "default": "This input request ID was already used for different input."
-    },
-    "terminal_input_uncertain": {
-      "default": "Input delivery is uncertain. Check the terminal before sending it again."
-    },
-    "terminal_limit": {
-      "default": "The terminal has reached its usage limit."
-    },
-    "terminal_unavailable": {
-      "default": "The terminal is unavailable.",
-      "configuration": "Secure terminal access is not configured.",
-      "runtime": "The terminal runtime is unavailable.",
-      "protocol": "The terminal response is invalid.",
-      "installation": "The terminal runtime could not be prepared.",
-      "lease": "The terminal authorization has expired or changed."
-    },
-    "terminal_control_unavailable": {
-      "default": "Exclusive control of the task environment is unavailable.",
-      "fence_unavailable": "The task environment control lock is unavailable.",
-      "fence_lost": "The task environment control lock was lost."
-    },
+    "cloud_machine_unfunded": {"default":"Not enough Mikka credits to keep the cloud machine running"},
+    "review_auth_required": {"default":"Sign in to review this task."},
+    "review_not_found": {"default":"This task review is unavailable."},
+    "not_owner_terminal": {"default":"Only the task owner can use this terminal."},
+    "review_machine_gone": {"default":"The task environment is no longer available."},
+    "review_binding_changed": {"default":"The task environment has changed. Open the review again."},
+    "review_checkout_unavailable": {"default":"This task has no available working directory."},
+    "review_preview_unavailable": {"default":"Preview is unavailable","configuration":"This environment does not support a secure preview","runtime":"The preview server is unavailable","protocol":"The preview response is invalid","scope_changed":"The task environment or authorization has changed","limit":"The preview has reached its usage limit"},
+    "terminal_unsupported": {"default":"This environment does not support the task terminal.","local_device":"Remote terminal access is not available on this local device.","runtime_version":"Update the task runtime to use its terminal."},
+    "terminal_already_controlled": {"default":"The Agent is still using this environment. End its work before opening the terminal."},
+    "terminal_binding_changed": {"default":"The terminal environment or authorization has changed."},
+    "terminal_ended": {"default":"This terminal session has ended."},
+    "terminal_input_too_large": {"default":"Terminal input exceeds 16 KiB."},
+    "terminal_invalid_request": {"default":"The terminal request is invalid."},
+    "terminal_request_conflict": {"default":"This input request ID was already used for different input."},
+    "terminal_input_uncertain": {"default":"Input delivery is uncertain. Check the terminal before sending it again."},
+    "terminal_limit": {"default":"The terminal has reached its usage limit."},
+    "terminal_unavailable": {"default":"The terminal is unavailable.","configuration":"Secure terminal access is not configured.","runtime":"The terminal runtime is unavailable.","protocol":"The terminal response is invalid.","installation":"The terminal runtime could not be prepared.","lease":"The terminal authorization has expired or changed."},
+    "terminal_control_unavailable": {"default":"Exclusive control of the task environment is unavailable.","fence_unavailable":"The task environment control lock is unavailable.","fence_lost":"The task environment control lock was lost."},
     "review_scope_denied": {
       "default": "You do not have access to review this task.",
       "sponsored_placement": "The hosted workspace is no longer available for reviewing this task."
@@ -6457,15 +6405,7 @@
     "run_provider_error": {
       "default": "The model provider could not complete this request. Try again."
     },
-    "run_credentials_unavailable": {
-      "default": "The task's credentials are unavailable.",
-      "device_unavailable": "This computer cannot receive the task's credentials right now.",
-      "credential_missing": "This task's subscription is not connected for its owner. Connect it in Settings and try again.",
-      "credential_expired": "The owner's subscription sign-in has expired. Sign in to it again and try again.",
-      "quota_exhausted": "The owner's subscription has used up its quota.",
-      "native_credentials": "The subscription credential is unavailable.",
-      "github_credentials": "The GitHub credential is unavailable."
-    },
+    "run_credentials_unavailable": {"default":"The task's credentials are unavailable.","device_unavailable":"This computer cannot receive the task's credentials right now.","credential_missing":"This task's subscription is not connected for its owner. Connect it in Settings and try again.","credential_expired":"The owner's subscription sign-in has expired. Sign in to it again and try again.","quota_exhausted":"The owner's subscription has used up its quota.","native_credentials":"The subscription credential is unavailable.","github_credentials":"The GitHub credential is unavailable."},
     "run_failed": {
       "default": "The task could not be completed. Check the error details or try again."
     },
