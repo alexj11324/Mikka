@@ -60,7 +60,7 @@ interface CommentThreadProps {
   replying: string[]
   onSelect: (id: string) => void
   onResolve: (id: string) => void
-  onReply: (id: string, body: string) => void
+  onReply: (id: string, body: string) => boolean
 }
 
 export function CommentThread({
@@ -82,8 +82,7 @@ export function CommentThread({
   function submit() {
     const body = draft.trim()
     if (!body) return
-    onReply(thread.id, body)
-    setDraft("")
+    if (onReply(thread.id, body)) setDraft("")
   }
 
   return (
