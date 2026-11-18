@@ -12,6 +12,7 @@ import { assigneeGroupOf } from '@/components/blocks/kanban-board-1/components/k
 
 import { PriorityIcon } from './priority-icon'
 import { blockLabel } from './block-label'
+import { preloadTaskDetail } from './page-loaders'
 
 const LIST_COLUMNS: ReadonlySet<CardProperty> = new Set(['identifier', 'priority', 'assignee'])
 
@@ -61,7 +62,7 @@ export function IssueList({ issues, blocks, properties = LIST_COLUMNS, owners, s
         </header>
         <ul>
           {group.map(issue => <li key={issue.id}>
-            <Button type="button" variant="ghost" data-focus-id={issue.id} onClick={() => onOpen(issue.id)} className="h-auto min-h-13 w-full justify-start p-0">
+            <Button type="button" variant="ghost" data-focus-id={issue.id} onPointerEnter={preloadTaskDetail} onFocus={preloadTaskDetail} onClick={() => onOpen(issue.id)} className="h-auto min-h-13 w-full justify-start p-0">
               <span className="flex w-full items-center gap-3 px-4 py-3 text-left sm:px-6">
                 {/* Linear's row order: priority, number, status, title. */}
                 {properties.has('priority') && <PriorityIcon priority={issue.priority} label={priorityLabel(issue.priority)} />}

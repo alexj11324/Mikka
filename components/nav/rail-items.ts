@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react'
 import type { ChatNavEntry, ChatTarget } from './bot-list'
+import type { WorkspacePage } from '@/components/workspace/page-loaders'
 import { Columns3, GitPullRequest, House, Lightbulb } from 'lucide-react'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactFilled, Columns3Filled, HouseFilled, LightbulbFilled, PlugCircle, PlugCircleFilled } from '@/components/icons/rail-filled-icons'
@@ -22,6 +23,7 @@ export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: Ra
 export type RailProps = {
   active: RailDestination | null
   onNavigate: (destination: RailDestination) => void
+  onPageIntent?: (page: WorkspacePage) => void
   user: { name: string; email: string; image?: string | null }
   onSettings: (href?: string) => void
   onSignOut: () => void
