@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 183 |
-| partial | 31 |
+| complete | 185 |
+| partial | 35 |
 | prior-partial | 36 |
-| unreviewed | 6306 |
+| unreviewed | 6300 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -54,3 +54,11 @@ All four original Git source objects were reproduced byte-for-byte and checked b
 Complete original display-title sanitizer + original 4-case test were read against fixed/main/pinned Cloud Git objects, then the exact two Git objects were reconstructed and `git hash-object` confirmed. On isolated Node 22.16.0 the unchanged native original test passed **4/4** (four test cases, display assertions for issue key/date/version preservation). App chat headers, bot info and task lists consume this display-only projection; it does not rewrite persisted server titles. Real native UI, Node24, protection CI and final merged SHA remain unverified.
 
 Also read both *distinct* native accessibility preference consumers: app-wide `apps/mobile/lib/reduced-motion.ts` uses a shared React external store and browser/native listener, while beui-native's vendored hook uses a Reanimated initial value and per-mount native event listener. Both have real downstream consumers. The apparent duplicate preference subscription is an **unproven** native-equivalence candidate, **not** a new G fix or safe deletion; multi-consumer, first-frame, SSR/web and native AccessibilityInfo lifecycle tests remain required. Both are partial, not complete. Status: **183 complete / 31 partial / 36 prior-partial / 6306 unreviewed** in fixed public code census. F, G-015/G-046 and production Owner boundaries unchanged.
+
+## 2026-11-18 fixed Mobile group/trace/overlay consumer continuation
+
+Reviewed six additional previously unreviewed exact public Git paths: mobile `thread-icon.ts`, its three-case `thread-icon.test.mts`, `thread-send-error.ts`, its wider `thread-send-error.test.mts`, the native protocol `tracing.ts` adapter, and mobile `bot-avatar-contract.ts`. Full fixed source was read; each baseline/current-main/Cloud-pinned Git object was matched, and real indexed public/private consumers are captured separately in `reviews.jsonl`. Two paths become **complete** and four **partial**; totals **185 complete / 35 partial / 36 prior-partial / 6300 unreviewed** out of 6,556 fixed code. These remain path-specific conclusions, not whole-chain CI or merger approval.
+
+Three original exact Git objects (icon source `c70f222a`, its original TAP test `01618db9`, refusal helper `eb5d3ce9`) were independently reproduced by `git hash-object`. On isolated Linux Node **22.16.0**, the unchanged **original** `thread-icon.test.mts` passed **3/3** and two separately authored refusal helper tests passed **2/2**, combined **5/5**. Do not claim the 9,437-byte *original* thread-send-error suite ran: its remaining React/happy-dom/Expo and cross-session delivery tests were read but are **unexecuted** in this checkout. Likewise Node24, Expo, React Native renderer/VoiceOver, browser, PG17, protected CI, source merge and precise post-merge tests were not run.
+
+Current-main code search across all three repositories finds the refusal formatter only in its own original test, not in a product caller. This is a *dead-export candidate* requiring real Expo/Metro import-graph and dynamic-loader proof, not permission to delete. Cloud's pinned `vendor/mikka@82d285ed` `thread-send-error.test.mts` blob `ef5e52fb` lacks the newer public baseline `52f618aa` group-revocation/delayed-failure concurrency segment, although its production formatter blob matches. The Cloud pinned vendor is not automatically current public main. The mobile trace adapter reuses existing protocol origin-limited trace headers; public and private avatars implement the shared mobile slot contract and independent accessibility/motion requirements, none substitutes Cloudflare native runtime. F, G-015/G-046 and production/Signer/Device Owners untouched.
