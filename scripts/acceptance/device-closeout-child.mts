@@ -45,10 +45,7 @@ if (process.env.MIKKA_CLOSEOUT_TRANSPORT_ONLY === '1') {
   const observedFetch: typeof fetch = async (input, init) => {
     const target = new URL(input instanceof Request ? input.url : input)
     if (target.origin !== origin || !target.pathname.startsWith('/mikka/v1/')) throw new Error('Unexpected device request')
-    const response = await fetch(input, init)
-    const heartbeat = /^\/mikka\/v1\/devices\/([a-f0-9-]{36})\/heartbeat$/.exec(target.pathname)
-    if (heartbeat && init?.method === 'POST' && response.ok) process.send?.({ phase: 'heartbeat', deviceId: heartbeat[1] })
-    return response
+    return fetch(input, init)
   }
   // Normal registration, RPC, HTTP and gateway; no fake harness or model work.
   const daemon = await startDaemon({ dataDir, flavor: 'prod', modelProbe: false,

@@ -113,7 +113,7 @@ try {
   observations.push({ phase: 'pending-long-poll-refused', milliseconds: performance.now() - revokeStarted })
   const runId = randomUUID(), captureId = randomUUID(), requestId = randomUUID()
   const paths = [
-    ['POST', '/v1/devices/register'], ['POST', `/v1/devices/${first.deviceId}/heartbeat`],
+    ['POST', '/v1/devices/register'], ['POST', `/v1/devices/${first.deviceId}/report`],
     ['GET', `/v1/devices/${first.deviceId}/runs`], ['GET', `/v1/devices/${first.deviceId}/repos`],
     ['GET', `/v1/devices/${first.deviceId}/commands?wait=0`], ['POST', `/v1/devices/${first.deviceId}/commands/ack`],
     ['POST', `/v1/devices/${first.deviceId}/coordinator`], ['GET', `/v1/devices/${first.deviceId}/fs/requests`],
