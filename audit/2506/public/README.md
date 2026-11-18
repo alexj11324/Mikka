@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 76 |
+| partial | 80 |
 | prior-partial | 36 |
-| unreviewed | 6258 |
+| unreviewed | 6254 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -165,3 +165,11 @@ Four fixed original `components/blocks/rich-text-editor-{1,2,3,4}/components/ric
 ## 2026-11-18 complete fixed manifest parse and review-record reconciliation
 
 After G-076 writeback, the original 27 fixed CSV shards were each reloaded from exact G HEAD and parsed with RFC4180-compatible quote/newline handling rather than splitting source lines. All 27 headers and **7996/7996 fixed tracked entries** have ten fields; the three consecutive shard batches contain 2700 + 2700 + 2596 paths, with zero duplicate keys inside each batch. The source-classified **6556 code** fields sum to 186 complete, 76 partial, 36 prior-partial and 6258 unreviewed. Every one of the **289/289 unique reviews.jsonl** paths resolved to its CSV shard and the record status and fixed Git object matched exactly (238 + 28 + 23 across three shard batches; zero mismatches). This is fixed-version ledger integrity only, **not** full meaning review, cross-shard uniqueness independently checked as a whole, current main delta closure, or runtime acceptance. G-076 remains candidate_unmerged.
+
+## 2026-11-18 G-076 extension: four highlight pickers
+
+Continued the existing G-076 command-result root (no new root number) on the original public `g/2506-file-coverage` branch. The four immutable `components/blocks/rich-text-editor-{1,2,3,4}/components/rich-text-highlight.tsx` files match the reviewed fixed baseline, observed public main and pinned Cloud `vendor/mikka@82d285edd2dfc9ee95622ec4a22c58436bffc255`. Editor-2 is actually imported by the document FormattingToolbar and Page format bubble; other three have real Highlight mark extension consumers but their local picker exports are not proven mounted. This difference remains an explicit consumer gap, not a claim of four user-visible regressions.
+
+Native Tiptap `.chain().focus().setHighlight()/unsetHighlight().run()` has a boolean success result per [official command contract](https://tiptap.dev/docs/editor/api/commands). Original pickers always called `setOpen(false)` even if command failed or editor was null. Four source edits now close only when `run()` succeeds; the native extension/color attributes, accessible popover, theme swatches and focus contract remain. No new command wrapper, compatibility fallback, service, poller or separate controller. Four actual source commits: `1957d9c8`, `db17b77f`, `d8ac58ca`, `d41b2c11`. The prior G-076 link form fix is independently preserved, candidate still unmerged.
+
+Extracted each exact original source `apply()` and executed against a minimal in-memory native-shaped chain in V8: 2/5 expected outcomes before, 5/5 after per file (aggregate 8/20 -> 20/20). This proves only isolated branch-source behavior; Node24, installed Tiptap/React, browser focus/keyboard/AT, PG17 where applicable, protected CI, normal merge, exact merged SHA and current-main reconciliation are outstanding. Original introduction SHA not independently established. Fixed source-code denominator now `6556 = 186 complete + 80 partial + 36 prior-partial + 6254 unreviewed`; four entries are partial, not full. Cloudflare native Container migration/locked Wrangler/old SDK physical removal remain with G-015 Owner; production and signing/device acceptance with #1954 / Cloud #155.
