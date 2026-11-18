@@ -91,10 +91,11 @@ export function ResolveAllDialog({
         ? editor.commands.acceptAllChanges()
         : editor.commands.rejectAllChanges()
 
-    ranRef.current = done
+    // A refused editor command must not close the confirm or dismiss its sheet.
+    if (!done) return
+    ranRef.current = true
     onOpenChange(false)
     onResolved()
-    if (!done) return
 
     // Undo here reverts this action only; newer edits leave it to the toolbar.
     const depth = undoDepth(editor.state)
