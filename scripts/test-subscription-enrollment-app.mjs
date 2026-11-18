@@ -31,7 +31,7 @@ export function initializeSnapshotIndex(snapshot, records) {
 }
 
 export function enrollmentContainerArgs({ source, snapshot, viteCache, certificate, name, port, env }) {
-  assert.match(env.VERCEL_GIT_COMMIT_SHA, /^[a-f0-9]{40}$/)
+  assert.match(env.MIKKA_BUILD_REVISION, /^[a-f0-9]{40}$/)
   const args = ['run', '-d', '--name', name, '--network=host', '--memory=4g', '--cpus=2', '--user', `${process.getuid()}:${process.getgid()}`,
     '-v', `${snapshot}:/workspace/Mikka`,
     '-v', `${source}/node_modules:/workspace/Mikka/node_modules:ro`,
@@ -117,7 +117,7 @@ export async function checkSubscriptionEnrollment() {
     await new Promise(resolve => reservation.close(resolve))
     const origin = `http://127.0.0.1:${port}`
     const env = {
-      VERCEL_ENV: 'preview', VERCEL_GIT_COMMIT_SHA: revision, MIKKA_BYOS_ACCEPTANCE_RETAIN_SOURCES: '1', HOME: '/tmp', XDG_CACHE_HOME: '/tmp/mikka-api-cache', NODE_ENV: 'development', MIKKA_DEV_SKIP_ENV_FILES: '1', BETTER_AUTH_URL: origin,
+      VERCEL_ENV: 'preview', MIKKA_BUILD_REVISION: revision, MIKKA_BYOS_ACCEPTANCE_RETAIN_SOURCES: '1', HOME: '/tmp', XDG_CACHE_HOME: '/tmp/mikka-api-cache', NODE_ENV: 'development', MIKKA_DEV_SKIP_ENV_FILES: '1', BETTER_AUTH_URL: origin,
       BETTER_AUTH_SECRET: 'fixture-auth-secret-not-used-for-any-account',
       MIKKA_BYOS_ENROLLMENT_ENABLED: '1', MIKKA_BYOS_ENROLLMENT_OPERATOR_TOKEN: operator,
       MIKKA_BYOS_ENROLLMENT_BINARY: `/workspace/Mikka/${binary}`,

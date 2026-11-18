@@ -57,7 +57,7 @@ export async function readServerInfo(options: { env?: Environment; query?: Query
   return {
     kind: 'mikka-server', schemaVersion: 1, edition: 'community',
     name: env.MIKKA_SERVER_NAME?.trim().slice(0, 120) || 'Mikka', address,
-    version: APP_BUILD || env.MIKKA_BUILD_REVISION || env.VERCEL_GIT_COMMIT_SHA || 'development',
+    version: APP_BUILD || env.MIKKA_BUILD_REVISION || 'development',
     status: { configuration: origin ? 'ready' : 'unavailable', database: databaseReady ? 'ready' : 'unavailable', authentication: authReady ? 'ready' : 'unavailable' },
     // Retain the v1 discovery field for installed clients.
     communityUI: { enabled: false, frozen: true },

@@ -1,7 +1,6 @@
 import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
-import { api, activeAlias, TEAM, PROJECT, PRODUCTION_ALIAS } from './deployment-regression.mjs'
 
 export const NEON_PROJECT = 'autumn-fire-21908520'
 export const NEON_ORG = 'org-sweet-lab-80289846'
@@ -76,39 +75,17 @@ export function summarize(events, deploymentId, now = Date.now(), environment = 
     measurement: 'sampled_json_result_bytes_not_wire_bytes', collection: 'best_effort' }
 }
 
-export async function run({ vercelToken, neonToken, now = Date.now(), fetchImpl = fetch, providerOnly = false, includeProviderUsage = true, containerWindow = /** @type {Awaited<ReturnType<typeof import('./cloudflare-container-logs.mjs').readContainerWindow>> | undefined} */ (undefined) }) {
+export async function run({ neonToken, now = Date.now(), fetchImpl = fetch, providerOnly = false, includeProviderUsage = true, containerWindow = /** @type {Awaited<ReturnType<typeof import('./cloudflare-container-logs.mjs').readContainerWindow>> | undefined} */ (undefined) }) {
   if (providerOnly && containerWindow || !includeProviderUsage && !containerWindow) fail('container_window_invalid')
   const report = { version: 1, observedAt: iso(now), windowStart: iso(now-WINDOW_MS), environment: containerWindow?.environment ?? 'production', reasons: [], status: 'insufficient',
     collectorSource: providerOnly ? 'cloudflare_provider_fallback' : 'github_runtime_collector', collectionScope: providerOnly ? 'provider' : 'provider_and_runtime' }
-  const read = (path, body) => api(path, { token: vercelToken, body, fetchImpl, headers: { 'x-vercel-observability-query-reason': 'cli/logs-runtime' } })
   if (!providerOnly) try {
-    if (containerWindow) {
-      const { applicationId, environment, start, end, events } = containerWindow
-      if (start !== now - WINDOW_MS || end !== now) fail('container_window_invalid')
-      report.collectorSource = 'cloudflare_container_runtime'
-      report.deploymentId = applicationId
-      report.runtime = summarize(events, applicationId, now, environment)
-    } else {
-      if (!vercelToken) fail('vercel_token_unavailable')
-      const alias = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`)), events = [], cursors = new Set()
-      report.deploymentId = alias.deploymentId
-      let cursor
-      for (let page = 0; ; page++) {
-        const response = await read('/v1/observability/events', { event: 'vercel.log', scope: { ownerId: TEAM, projectIds: [PROJECT] },
-          timeRange: { start: iso(now-WINDOW_MS), end: iso(now) }, select: ['deploymentId','environment','message','truncated'],
-          order: 'desc', limit: 1000, filter: `deploymentId:"${alias.deploymentId}" AND environment:production AND (db_sample OR api_request)`, ...(cursor ? {cursor} : {}) })
-        if (!Array.isArray(response.events) || typeof response.pagination?.hasMore !== 'boolean') fail('log_response_invalid')
-        events.push(...response.events)
-        if (response.meta?.excludedIntervals?.length) fail('log_intervals_excluded')
-        if (!response.pagination.hasMore) break
-        const next = response.pagination.nextCursor
-        if (page >= 9 || !next || cursors.has(next)) fail('log_pagination_incomplete')
-        cursors.add(next); cursor = next
-      }
-      const after = activeAlias(await read(`/v4/aliases/${PRODUCTION_ALIAS}`))
-      if (after.deploymentId !== alias.deploymentId || after.updatedAt !== alias.updatedAt) fail('deployment_changed')
-      report.runtime = summarize(events, alias.deploymentId, now)
-    }
+    if (!containerWindow) fail('container_window_unavailable')
+    const { applicationId, environment, start, end, events } = containerWindow
+    if (start !== now - WINDOW_MS || end !== now) fail('container_window_invalid')
+    report.collectorSource = 'cloudflare_container_runtime'
+    report.deploymentId = applicationId
+    report.runtime = summarize(events, applicationId, now, environment)
     if (report.runtime.truncated || report.runtime.malformed) report.reasons.push('log_records_incomplete')
     if (!report.runtime.samples) report.reasons.push('no_database_samples')
   } catch(e) { report.reasons.push(safeError(e)) }
@@ -205,8 +182,7 @@ export async function publishRuntimeAttribution(report, promotion, token, fetchI
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const providerOnly=process.argv.length===3 && process.argv[2]==='--provider-only'
   if(process.argv.length!==2 && !providerOnly) fail('invalid_collector_mode')
-  const report = await run({vercelToken:providerOnly?undefined:process.env.VERCEL_TEAM_TOKEN || process.env.VERCEL_TOKEN,
-    neonToken:process.env.NEON_API_KEY,providerOnly})
+  const report = await run({neonToken:process.env.NEON_API_KEY,providerOnly})
   if(providerOnly) report.collectorSource='github_runtime_collector'
   try { await publish(report, process.env.NEXT_PUBLIC_POSTHOG_KEY) } catch(e) {report.reasons.push(safeError(e)); report.status='insufficient'}
   await mkdir('egress-monitor-report',{recursive:true})

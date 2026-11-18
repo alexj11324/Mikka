@@ -31,6 +31,11 @@ test('only the existing explicit public configuration is defined for the web gra
   ].map(key => `process.env.${key}`).sort())
 }))
 
+test('public build identity uses the explicit project revision instead of legacy deployment metadata', async () => environment({ NEXT_PUBLIC_MIKKA_BUILD: undefined, MIKKA_BUILD_REVISION: 'b'.repeat(40), VERCEL_DEPLOYMENT_ID: 'dpl_old', VERCEL_GIT_COMMIT_SHA: 'c'.repeat(40) }, async () => {
+  const config = await frontendConfig()
+  assert.equal(config.define['process.env.NEXT_PUBLIC_MIKKA_BUILD'], JSON.stringify('b'.repeat(40)))
+}))
+
 test('the production explicit computer rollout follows VERCEL_ENV without requiring PostHog', async () => environment({ VERCEL_ENV: 'production', NEXT_PUBLIC_COMPUTER_DEPLOYMENT: undefined, NEXT_PUBLIC_COMPUTER_ENABLED: '1', NEXT_PUBLIC_POSTHOG_KEY: undefined }, async () => {
   const config = await frontendConfig()
   const flags = await browserModule('export { computerProductionEnabled } from "./lib/feature-flags.ts"', config.define)

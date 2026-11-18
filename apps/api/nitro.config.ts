@@ -13,9 +13,9 @@ import { workflowDevelopmentAliases } from './workflow-development-aliases.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const stage = deploymentStage()
-const revision = process.env.MIKKA_BUILD_REVISION || process.env.VERCEL_GIT_COMMIT_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+const revision = process.env.MIKKA_BUILD_REVISION || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
 if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('API_BUILD_SHA_REQUIRED')
-const build = process.env.NEXT_PUBLIC_MIKKA_BUILD || process.env.VERCEL_DEPLOYMENT_ID || revision
+const build = process.env.NEXT_PUBLIC_MIKKA_BUILD || revision
 const assets = await publicAssetConfiguration(root)
 
 export default defineConfig({

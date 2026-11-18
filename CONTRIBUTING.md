@@ -101,8 +101,7 @@ cannot.
    Selected DB suites keep PG17 isolation, clone databases and strict no-skip
    summaries across 1–4 dynamic shards. Required gate names stay stable; every
    selected lane must succeed. Weekly and manual runs cover the full inventory.
-   The Web release workflow builds `main` on GitHub Actions and uploads the
-   prebuilt output to Vercel. See
+   Production application deployments use the protected Cloudflare workflow. See
    [selection, trust and fallback rules](docs/ci/incremental.md).
 3. **Ordinary acceptance uses API and CLI.** Acceptance runs locally through
    the API and the CLI (`pnpm test:local-loop`), and UI changes are checked

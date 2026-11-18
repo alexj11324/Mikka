@@ -48,7 +48,7 @@ test('the runner preserves its container boundary and mounts only its Vite cache
   const settings = {
     source: '/source', snapshot: '/private/run/app', viteCache: '/private/run/vite-cache',
     certificate: '/private/run/cert.pem', name: 'mikka-enrollment-test-fixture', port: 31234,
-    env: { VERCEL_GIT_COMMIT_SHA: revision, MIKKA_DEV_SKIP_ENV_FILES: '1' },
+    env: { MIKKA_BUILD_REVISION: revision, MIKKA_DEV_SKIP_ENV_FILES: '1' },
   }
   const args = enrollmentContainerArgs(settings)
   assert.deepEqual(args.slice(0, 9), ['run', '-d', '--name', settings.name, '--network=host', '--memory=4g', '--cpus=2', '--user', `${process.getuid()}:${process.getgid()}`])
@@ -60,14 +60,14 @@ test('the runner preserves its container boundary and mounts only its Vite cache
     '/private/run/vite-cache:/workspace/Mikka/apps/frontend/node_modules/.vite',
     '/private/run/cert.pem:/tmp/vault-ca.pem:ro',
   ])
-  assert.ok(args.includes(`VERCEL_GIT_COMMIT_SHA=${revision}`))
+  assert.ok(args.includes(`MIKKA_BUILD_REVISION=${revision}`))
   assert.ok(args.includes('MIKKA_DEV_SKIP_ENV_FILES=1'))
   assert.deepEqual(args.slice(-7), [
     'node@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a',
     'node', 'apps/api/scripts/dev.mjs', '--host', '127.0.0.1', '--port', '31234',
   ])
   assert.throws(() => enrollmentContainerArgs({ ...settings, env: {} }))
-  assert.throws(() => enrollmentContainerArgs({ ...settings, env: { VERCEL_GIT_COMMIT_SHA: 'main' } }))
+  assert.throws(() => enrollmentContainerArgs({ ...settings, env: { MIKKA_BUILD_REVISION: 'main' } }))
 })
 
 test('cleanup stops only the newly owned container, waits for real exit, and preserves its evidence', async () => {

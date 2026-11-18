@@ -1,6 +1,5 @@
 name: Analytics SSR
-# Runs on pull requests only. After a merge, Vercel's production build of main
-# is the build check; repeating this one on main added nothing.
+# Called by the parent CI after its trusted change selection; it can also run manually.
 on:
   workflow_call:
     inputs:

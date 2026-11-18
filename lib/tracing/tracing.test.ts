@@ -302,6 +302,8 @@ describe('sampling and settings', () => {
     assert.equal(traceSettings({}, ''), null)
     assert.equal(traceSettings({ MIKKA_TRACE_SAMPLE_RATE: '0' }, 'phc_test'), null)
     assert.deepEqual(traceSettings({ VERCEL_ENV: 'preview' }, 'phc_test'), { endpoint: 'https://us.i.posthog.com/i/v1/traces', token: 'phc_test', sampleRate: 0.1, environment: 'preview', version: undefined })
+    assert.equal(traceSettings({ MIKKA_BUILD_REVISION: '123456789abcdef0123456789abcdef012345678' }, 'phc_test')?.version, '123456789abc')
+    assert.equal(traceSettings({ VERCEL_GIT_COMMIT_SHA: 'abcdef0123456789abcdef0123456789abcdef01' }, 'phc_test')?.version, undefined)
   })
 
   test('rate 0 provider records nothing', async () => {

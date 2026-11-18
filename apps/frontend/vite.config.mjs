@@ -10,7 +10,7 @@ import { installationBuild } from '../../scripts/build-installation.mjs'
 import { sharedStylePlugins } from './scripts/shared-styles.mjs'
 
 function applicationBuild() {
-  const configured = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? process.env.MIKKA_BUILD_REVISION ?? process.env.VERCEL_DEPLOYMENT_ID ?? process.env.VERCEL_GIT_COMMIT_SHA
+  const configured = process.env.NEXT_PUBLIC_MIKKA_BUILD ?? process.env.MIKKA_BUILD_REVISION
   if (configured !== undefined) return configured
   try { return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repository, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() } catch { return '' }
 }

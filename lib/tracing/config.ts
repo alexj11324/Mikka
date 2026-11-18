@@ -43,7 +43,7 @@ export function traceSettings(env: Env = process.env, token = posthogConfig.toke
     token,
     sampleRate,
     environment: traceEnvironment(env),
-    version: env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || undefined,
+    version: env.MIKKA_BUILD_REVISION?.slice(0, 12) || undefined,
   }
 }
 

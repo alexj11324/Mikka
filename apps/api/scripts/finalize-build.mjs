@@ -110,7 +110,7 @@ export async function finalizeBuild({ root, output, preset, revision }) {
   }
   const evidence = { version: 1, revision, preset, node: process.version,
     basePath: '/mikka',
-    appBuild: process.env.NEXT_PUBLIC_MIKKA_BUILD || process.env.VERCEL_DEPLOYMENT_ID || revision,
+    appBuild: process.env.NEXT_PUBLIC_MIKKA_BUILD || revision,
     testDeploymentSha: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '',
     lockSha256: hash(await readFile(join(root, 'pnpm-lock.yaml'))),
     routesSha256: hash(await readFile(join(root, 'apps/api/generated/routes.json'))),

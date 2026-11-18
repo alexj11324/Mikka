@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export async function buildEve({ root = process.cwd(), env = process.env, execute = execFileSync } = {}) {
-  const revision = env.MIKKA_BUILD_REVISION || env.VERCEL_GIT_COMMIT_SHA || execute('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
+  const revision = env.MIKKA_BUILD_REVISION || execute('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
   if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('EVE_BUILD_REVISION_REQUIRED')
   const preset = env.NITRO_PRESET || (env.VERCEL ? 'vercel' : 'node-server')
   if (!['node-server', 'vercel'].includes(preset)) throw new Error('EVE_BUILD_PRESET_INVALID')
