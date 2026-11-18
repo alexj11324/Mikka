@@ -38,11 +38,12 @@ request on a timer to prove it is alive.
   existing run recovery retries elsewhere or fails.
 - A run lease lasts as long as the session that claimed it. Revocation, stop
   and policy changes still end a lease at once and are pushed to the daemon.
-- Nothing rechecks a running run on a timer. Losing workspace membership,
-  deleting the task, archiving the Bot or an identity change no longer stop a
-  run within 15 seconds; the run finishes or is stopped by hand. Alex,
-  2026-11-18: Capy does not recheck either, and a 15 second recheck is not worth
-  its queries.
+- Nothing rechecks a running run on a timer. The change that takes a run's
+  authority away stops the run itself, once it has committed, and pushes the
+  stop to the daemon: archiving its Bot, deleting its task, a member leaving or
+  being suspended (with any Bot handed over), a Bot taken over, deleting the
+  workspace or the account (`lib/run-authority-stop.ts`). Alex, 2026-11-18: no
+  15 second recheck; push the stop when the change happens.
 
 ## Reports instead of beats
 

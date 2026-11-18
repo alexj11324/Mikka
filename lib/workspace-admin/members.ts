@@ -107,6 +107,8 @@ export async function releaseDepartingMember(workspaceId: string, userId: string
   // Runs there on their subscription stop now, including other members' bots they had shared it with.
   await stopRunsUsingSubscriptions(pool, { ownerId: userId, workspaceId })
   await stopRunsUsingApiKeys(pool, { ownerId: userId, workspaceId })
+  // Every run there that lost its authority (theirs, and others' on Bots handed over) stops now (decision 2026-11-17-2215).
+  await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ workspaceId })
 }
 
 /** Reactivation brings a suspended member's own bots back; their subscription stays unshared until they share it again. */
@@ -118,7 +120,7 @@ export async function restoreReturningMember(workspaceId: string, userId: string
 /** An admin takes over a paused bot of someone who left, was suspended or deleted their account (null owner); it then runs on the admin's own resources. */
 export async function takeOverBot(actorId: string, workspaceId: string, botId: string): Promise<AssetTransfer> {
   z.uuid().parse(botId)
-  return workspaceDb.transaction(async tx => {
+  const transfer = await workspaceDb.transaction(async tx => {
     const { membership } = await requireWorkspace(tx, workspaceId, actorId, true)
     return db.transaction(async main => {
       const [bot] = await main.select({ ownerId: bots.ownerId, name: bots.name }).from(bots)
@@ -133,6 +135,9 @@ export async function takeOverBot(actorId: string, workspaceId: string, botId: s
       return transferBots(main, workspaceId, bot.ownerId, actorId, [botId], tx)
     })
   })
+  // A new owner changes the runs' execution identity; those runs stop now.
+  await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ botId })
+  return transfer
 }
 
 /** Paused bots in this workspace, for its admins. */

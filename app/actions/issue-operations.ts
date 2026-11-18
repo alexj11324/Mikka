@@ -306,6 +306,8 @@ export async function setIssueDeleted(input: { id: string; revision?: number; re
         await issueRelationsChanged(tx, [saved.id])
         return { issue: await issueView(saved, tx) }
       }))
+      // A deleted task's running work stops now; nothing rechecks it later (decision 2026-11-17-2215).
+      if (!input.restore && 'issue' in result) await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ issueId: issue.id })
       if (input.restore && 'issue' in result && result.issue?.scope === 'workspace' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) dispatchLinearIssueSync(issue.id)
       return result
     } catch (error) {
