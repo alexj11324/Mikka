@@ -1384,6 +1384,15 @@
       "sourceHash": "8b33a238386db8af61da018f821b650c340e40244ea341180744b9b6b8d57643"
     },
     {
+      "path": "/mikka/api/integrations/github/repositories/pulls",
+      "template": "/api/integrations/github/repositories/pulls",
+      "source": "app/api/integrations/github/repositories/pulls/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "c79702e37d207489887ff6c326ae93951b30402e264f516b3fd00d9828c888bf"
+    },
+    {
       "path": "/mikka/api/integrations/github/repositories/tree",
       "template": "/api/integrations/github/repositories/tree",
       "source": "app/api/integrations/github/repositories/tree/route.ts",

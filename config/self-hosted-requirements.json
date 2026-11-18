@@ -3344,6 +3344,27 @@
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
   },
+  "app/api/integrations/github/repositories/pulls/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads the signed-in owner’s pull requests from their authorized GitHub repositories through the existing GitHub App access policy. Missing GitHub configuration or denied repository access cannot return pull requests.",
+    "test": "app/api/integrations/github/repositories/pulls/route.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/github/pull-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads a bounded pull-request page only through the signed-in owner's existing GitHub repository authorization, validates repository identity and provider response, and never exposes the credential.",
+    "test": "lib/github/pull-directory.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/pull-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates bounded pull-directory inputs and derives metadata-only filtering, grouping, saved-view and linked-thread projections without accessing another user's GitHub data.",
+    "test": "lib/pull-directory.test.ts",
+    "suite": "test:github-pulls"
+  },
   "app/api/integrations/github/repositories/branches/route.ts": {
     "mode": "built-in",
     "environment": [],
