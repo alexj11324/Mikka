@@ -16,11 +16,10 @@ import { Badge as BoardBadge } from '@/components/reui/badge'
 type Status = { state: IssuePullRequest['state']; checkedAt: number; liveWorkspaceId: string | null } | { error: string }
 
 /**
- * GitHub's answer for a PR with no webhook of ours (one linked by hand, or in a repository without the app)
- * is re-read at most this often, while the page is visible. A PR a run delivered also re-reads when the
- * webhook commits its state (`pull_request_status`, #1212).
+ * A PR with no webhook of ours (one linked by hand, or in a repository without the app) is read on
+ * mount or an explicit page refresh; the app cannot receive its GitHub events. A PR a run delivered
+ * re-reads when the webhook commits its state (`pull_request_status`, #1212).
  */
-const UNHOOKED_RECHECK_MS = 5 * 60_000
 
 async function fetchStatus([, userId, issueId, url]: readonly string[]): Promise<Status> {
   try {
@@ -79,8 +78,8 @@ function usePullRequestView({ issueId, pr, compact = false, userId, isPending }:
   const [mountedAt] = useState(() => performance.now())
   const key = userId ? ['github-pr-status', userId, issueId, pr.url] as const : null
   const { data, isValidating } = useSWR(key, fetchStatus, {
-    // A GitHub status check: on mount, on the task's live key, and on the slow recheck below; never on focus.
-    refreshInterval: compact ? 0 : UNHOOKED_RECHECK_MS, refreshWhenHidden: false, revalidateOnFocus: false, revalidateOnMount: true, dedupingInterval: 0,
+    // Read on mount and task push only; no periodic GitHub status reads for repositories without our webhook.
+    refreshInterval: 0, refreshWhenHidden: false, revalidateOnFocus: false, revalidateOnMount: true, dedupingInterval: 0,
   })
   // Only the task's own channel, once a read has named it: an unknown channel would read on the 60 s fallback.
   const liveWorkspaceId = !compact && data && 'state' in data ? data.liveWorkspaceId : null

@@ -8,6 +8,8 @@ export const wakeTokens = {
   threadMachine: (runId: string) => 'thread-machine:' + runId,
   /** A web subagent's workflow (workflows/subagent), woken by any change to its row or its approvals. */
   subagent: (subagentId: string) => 'subagent:' + subagentId,
+  /** A run publication workflow, woken when its run or publication reaches a new durable state. */
+  runPublication: (runId: string) => 'run-publication:' + runId,
   /** A Bot chat's pending Coordinator wake deadline (workflows/coordinator-wake-recovery), woken when a lease it waits behind is released. */
   coordinatorWake: (userId: string, botId: string) => 'coordinator-wake:' + JSON.stringify([userId, botId]),
   /** The one durable due timer of a reconciled job (workflows/due-timer), woken by writes that make its work due sooner. */

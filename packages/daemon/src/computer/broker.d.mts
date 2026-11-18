@@ -31,6 +31,10 @@ export class ComputerBroker {
   request(token: string, value: unknown, signal?: AbortSignal): Promise<unknown>;
   captureRequest(token: string, value: unknown, signal?: AbortSignal): Promise<{ result: unknown } | { error: string; detail?: string }>;
   list(): PendingComputerRequest[];
+  /** Local pending-review changes; returns an unsubscribe function. */
+  onPendingChange(listener: () => void): () => void;
+  /** Monotonic local revision used to avoid missing a change before subscription. */
+  pendingRevision: number;
   revoke(token: string): void;
   decide(id: string, digest: string, approve: boolean): Promise<{ ok: true }>;
   suspend(): void;

@@ -3,6 +3,7 @@ import { randomBytes, createHash } from 'node:crypto'
 import { and, eq, gt, lt } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { linearConnections, linearOAuthStates, linearTeamSyncs } from '@/lib/db/schema'
+import { ownerWorkspaceSettingsChanged } from '@/lib/live/lists'
 import { authBaseURL } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
 import { hashValue, seal, unseal } from './crypto'
@@ -86,6 +87,7 @@ export async function exchangeLinearCode(state: string, code: string, userId: st
         updatedAt: new Date(),
       },
     })
+    await ownerWorkspaceSettingsChanged(tx, grant.userId)
   })
   return grant.userId
 }
@@ -106,5 +108,6 @@ export async function disconnectLinear(userId: string) {
   await db.transaction(async tx => {
     await tx.update(linearTeamSyncs).set({ active: false, updatedAt: new Date() }).where(eq(linearTeamSyncs.ownerId, userId))
     await tx.delete(linearConnections).where(eq(linearConnections.userId, userId))
+    await ownerWorkspaceSettingsChanged(tx, userId)
   })
 }

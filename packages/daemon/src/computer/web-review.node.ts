@@ -90,6 +90,9 @@ test('idle review sync sends one cleanup, resumes for a pending call and retries
     execute: async () => { executed++; return 'ok' },
   })
   const abort = new AbortController()
+  let localReads = 0
+  const list = broker.list.bind(broker)
+  broker.list = () => { localReads++; return list() }
   let polling: Promise<void> | undefined
   t.after(async () => { abort.abort(); await polling; await broker.close(); await rm(dir, { recursive: true, force: true }) })
   polling = pollWebComputerReviews(broker, 'device', { async syncComputerReviews(_id, requests) {
@@ -103,6 +106,7 @@ test('idle review sync sends one cleanup, resumes for a pending call and retries
   } }, abort.signal, 5)
   await new Promise(resolve => setTimeout(resolve, 40))
   assert.equal(attempts, 1, 'an empty broker must not generate periodic network traffic')
+  assert.equal(localReads, 2, 'after startup cleanup, an empty broker sleeps on local events instead of polling')
   const grant = broker.spec(randomUUID(), 'ask')!
   const result = broker.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })
   assert.equal(await result, 'ok')

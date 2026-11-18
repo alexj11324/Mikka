@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { createLinearOAuthRevocationProcessor } from './oauth-revocation-core'
 import { linearConnections, linearTeamSyncs } from '@/lib/db/schema'
+import { ownerWorkspaceSettingsChanged } from '@/lib/live/lists'
 
 const disableOwners = async (tx: Parameters<Parameters<typeof db.transaction>[0]>[0], userIds: string[]) => {
   if (userIds.length) {
@@ -21,6 +22,7 @@ export const processLinearOAuthRevocation = createLinearOAuthRevocationProcessor
       ))
       .returning({ userId: linearConnections.userId })
     await disableOwners(tx, revoked.map(row => row.userId))
+    for (const { userId } of revoked) await ownerWorkspaceSettingsChanged(tx, userId)
   }),
   revokeOrganization: async organizationId => db.transaction(async tx => {
     const now = new Date()
@@ -28,5 +30,6 @@ export const processLinearOAuthRevocation = createLinearOAuthRevocationProcessor
       .where(eq(linearConnections.organizationId, organizationId))
       .returning({ userId: linearConnections.userId })
     await disableOwners(tx, revoked.map(row => row.userId))
+    for (const { userId } of revoked) await ownerWorkspaceSettingsChanged(tx, userId)
   }),
 })

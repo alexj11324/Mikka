@@ -40,12 +40,12 @@ The official package supports `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` and
 connection limit. Eve's guide recommends at least concurrency plus two
 connections.
 
-The package's default poll interval is 500 ms per worker, so 50 idle workers
-query the database about 100 times a second. The host sets
-`WORKFLOW_POSTGRES_POLL_INTERVAL_MS` to `5000`; LISTEN/NOTIFY still wakes idle
-workers as soon as a job is added. A deployment can override it with
-`EVE_ENV_WORKFLOW_POSTGRES_POLL_INTERVAL_MS`. Keep the concurrency at 50: the
-package documents a deadlock at 10.
+The repository pins a Graphile Worker patch that disables idle job-claim polling
+for `pollInterval: 0`: workers wake on `LISTEN/NOTIFY`, schedule an in-memory
+timer for the next durable `run_at`, and reconcile queued jobs after listener
+reconnect. The Postgres World integration defaults to that mode; legacy
+`EVE_ENV_WORKFLOW_POSTGRES_POLL_INTERVAL_MS` overrides are intentionally ignored.
+Keep the concurrency at 50: the package documents a deadlock at 10.
 
 Each release runs its own Eve Container, and the host never sleeps. Stop a
 release's Container with `stopForOwner` once no gateway release serves it,

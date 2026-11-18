@@ -32,11 +32,9 @@ import {
   DAEMON_PROTOCOL_VERSION,
   DAEMON_RPC_ERRORS,
   daemonRpc,
-  FS_REQUESTS_MAX_WAIT_SECONDS,
   isTerminalRunState,
   type DaemonStatus,
   type Flavor,
-  type FsResult,
   type Harness,
   type HarnessInfo,
   unknownQuotaReport,
@@ -56,7 +54,7 @@ import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
 import { NoSandbox, type AgentSandbox } from "./agents/sandbox"
 import { buildChildEnv } from "./env"
-import { browseFolder, verifyExpectedOrigin } from "./fs-browse"
+import { verifyExpectedOrigin } from "./fs-browse"
 import {
   DaemonError,
   InvalidIdError,
@@ -297,7 +295,6 @@ export class Daemon {
   private deviceReceiptsVersion = 0
   private deviceReceiptsAcknowledged = 0
   private commandsLoop: Promise<void> = Promise.resolve()
-  private fsLoop: Promise<void> = Promise.resolve()
   private reviewAbort: AbortController | null = null
   private reviewLoop: Promise<void> = Promise.resolve()
   private cloudComputerBroker: ComputerBroker | null = null
@@ -910,59 +907,6 @@ export class Daemon {
       }
     }
     return false
-  }
-
-  /**
-   * Answers the app's folder requests for the repository picker (ADR 0037):
-   * a second long-poll next to the run commands, so a slow folder never
-   * delays a stop.
-   */
-  private async pollFolderRequests() {
-    const { link } = this.options
-    if (!link.fetchFsRequests || !link.answerFsRequest) return
-    const signal = this.commandsAbort.signal
-    const wait = this.options.commandsWaitSeconds ?? FS_REQUESTS_MAX_WAIT_SECONDS
-    let backoff = 1_000
-    while (!this.stopped) {
-      const deviceId = this.device.deviceId
-      const credential = this.device.credential
-      try {
-        if (!this.registered || !deviceId) {
-          await this.pauseCommands(1_000, signal)
-          continue
-        }
-        const started = performance.now()
-        const requests = await link.fetchFsRequests(
-          deviceId,
-          wait,
-          { signal }
-        )
-        if (this.stopped || signal.aborted) return
-        backoff = 1_000
-        // Some servers return an empty queue without honoring the long-poll wait.
-        if (requests.length === 0 && !signal.aborted) {
-          const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
-          if (remaining > 0) await this.pauseCommands(remaining, signal)
-        }
-        await Promise.all(
-          requests.map(async ({ id, ...request }) => {
-            const result = await browseFolder(request).catch((): FsResult => ({
-              ok: false,
-              code: "failed",
-              message: "Could not read that folder.",
-            }))
-            await link.answerFsRequest!(deviceId, id, result)
-          })
-        )
-      } catch (error) {
-        if (this.stopped || signal.aborted) return
-        if (error instanceof SessionRejectedError) this.rejectDeviceSession(credential)
-        if (!(error instanceof ServerUnreachableError))
-          this.log.warn({ err: error }, "answering folder requests failed")
-        await this.pauseCommands(backoff, signal)
-        backoff = Math.min(backoff * 2, 30_000)
-      }
-    }
   }
 
   /** Starts claiming the reported queued runs; true when any claim began. */
@@ -2020,7 +1964,6 @@ export class Daemon {
     this.reviewAbort?.abort()
     await this.reviewLoop.catch(() => undefined)
     await this.commandsLoop.catch(() => undefined)
-    await this.fsLoop.catch(() => undefined)
     await this.tick
     // The commands poll starts claims outside the heartbeat tick. Abort their
     // HTTP requests and settle them before stopping the run supervisor.

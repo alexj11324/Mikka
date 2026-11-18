@@ -12,7 +12,7 @@ import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-t
 import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { captureDatabaseQuery, observePoolCommits } from '../db/commit-effects'
-import { groupListTargets, issueListTargets, issueListScopesBeforeChange, issueListScopeChanged, ownerListTargets, ownerSettingsTargets, runListChanged, runListTargets, workspaceListTargets } from './lists'
+import { groupListTargets, issueListTargets, issueListScopesBeforeChange, issueListScopeChanged, ownerListTargets, ownerSettingsTargets, ownerWorkspaceSettingsTargets, runListChanged, runListTargets, workspaceListTargets } from './lists'
 import { liveChannelId, type LiveScope } from './scope'
 import type { LiveInvalidation } from './events'
 import { isolateCoordinatorWakes } from '../../tests/support/coordinator-wake'
@@ -142,9 +142,14 @@ test('real PG: lists retain their reader scope and publish only the originating 
       assert.deepEqual((await groupListTargets(database, database, groupId, 'foreign')).map(value => value.scope.ownerId), ['owner'], 'a caller cannot invent prior group membership')
     })
 
-    await t.test('模型与订阅 pushes model_settings to the account alone, in each workspace it is an active member of', async () => {
+    await t.test('owner-specific integrations push workspace_settings only to the account in its active workspaces', async () => {
+      const audience = async () => (await ownerWorkspaceSettingsTargets(database, database, 'owner')).map(value => `${value.scope.ownerId}@${value.scope.workspaceId === home ? 'home' : 'team'}:${value.events.map(event => event.kind).join(',')}`).sort()
+      assert.deepEqual(await audience(), ['owner@home:workspace_settings', 'owner@team:workspace_settings'])
+      assert.deepEqual(await ownerWorkspaceSettingsTargets(database, database, 'no-such-account'), [])
+    })
+
+    await t.test('model and subscription pushes remain owner-only model_settings, not workspace settings', async () => {
       const audience = async () => (await ownerSettingsTargets(database, database, 'owner')).map(value => `${value.scope.ownerId}@${value.scope.workspaceId === home ? 'home' : 'team'}:${value.events.map(event => event.kind).join(',')}`).sort()
-      // Subscriptions serve their owner only (decision 2026-11-17): teammates never receive these settings; never the app-wide workspace_settings.
       assert.deepEqual(await audience(), ['owner@home:model_settings', 'owner@team:model_settings'])
       assert.deepEqual(await ownerSettingsTargets(database, database, 'no-such-account'), [])
     })

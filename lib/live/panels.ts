@@ -165,6 +165,8 @@ export const documentChanged = (executor: object, issueId: string) => {
 export const runChanged = (executor: object, runId: string) => {
   // A cloud run's thread-machine lifecycle waits on this instead of re-reading every 30 s (#1212).
   wakeWorkflowAfterCommit(executor, wakeTokens.threadMachine(runId))
+  // Publication retries wake on a committed run transition instead of waiting for the next backoff.
+  wakeWorkflowAfterCommit(executor, wakeTokens.runPublication(runId))
   armDueTimerAfterCommit(executor, 'run-recovery')
   return changed(executor, 'run', runId)
 }

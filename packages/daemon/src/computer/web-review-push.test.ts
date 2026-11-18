@@ -4,18 +4,23 @@ import { DeviceWorkSignal } from "../device-work-signal"
 import { pollWebComputerReviews } from "./web-review"
 import type { ComputerBroker } from "./broker.mjs"
 
-// #1212: the local broker is checked every interval, but the server is asked
-// only when something changed: the pending set, a gateway push, or presence.
+// #1212: local broker changes and gateway pushes wake immediately; server syncs
+// retain only the needed legacy fallback and presence refresh.
 const request = (id: string) => ({ id, digest: id.repeat(64).slice(0, 64), runId: "00000000-0000-4000-8000-000000000001", display: ":1", call: { name: "click", arguments: {} } }) as unknown as LocalComputerRequest
 
 function fakeBroker() {
   const pending = new Map<string, LocalComputerRequest>()
   const decided: LocalComputerDecision[] = []
+  const listeners = new Set<() => void>()
+  let pendingRevision = 0
+  const changed = () => { pendingRevision++; for (const listener of [...listeners]) listener() }
   const broker = {
+    get pendingRevision() { return pendingRevision },
+    onPendingChange(listener: () => void) { listeners.add(listener); return () => listeners.delete(listener) },
     list: () => [...pending.values()],
-    decide: async (id: string, digest: string, approve: boolean) => { decided.push({ id, digest, approve }); pending.delete(id) },
+    decide: async (id: string, digest: string, approve: boolean) => { decided.push({ id, digest, approve }); pending.delete(id); changed() },
   } as unknown as ComputerBroker
-  return { broker, pending, decided }
+  return { broker, pending, decided, addPending: (id: string, value: LocalComputerRequest) => { pending.set(id, value); changed() } }
 }
 const tick = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
@@ -23,12 +28,12 @@ describe("web computer review sync", () => {
   const aborts: AbortController[] = []
   afterEach(() => { for (const abort of aborts) abort.abort() })
   function start(signalSource: DeviceWorkSignal | undefined, presenceMs: number, answer: (requests: LocalComputerRequest[]) => LocalComputerDecision[]) {
-    const { broker, pending, decided } = fakeBroker()
+    const { broker, pending, decided, addPending } = fakeBroker()
     const syncs: number[] = []
     const abort = new AbortController()
     aborts.push(abort)
     const loop = pollWebComputerReviews(broker, "device", { async syncComputerReviews(_id, requests) { syncs.push(requests.length); return answer(requests) } }, abort.signal, 5, signalSource, presenceMs)
-    return { pending, decided, syncs, abort, loop }
+    return { pending, decided, syncs, abort, loop, addPending }
   }
   const pushing = () => {
     const signal = new DeviceWorkSignal()
@@ -38,12 +43,13 @@ describe("web computer review sync", () => {
   }
 
   it("with push, a pending review is synced when it appears and then only for presence, not on every check", async () => {
-    const { pending, syncs } = start(pushing(), 200, () => [])
+    const run = start(pushing(), 200, () => [])
+    const { pending, syncs } = run
     await tick(30)
     expect(syncs).toEqual([0]) // the startup cleanup only
-    pending.set("a", request("a"))
+    run.addPending("a", request("a"))
     await tick(100)
-    expect(syncs).toEqual([0, 1]) // ~20 local checks, one server sync
+    expect(syncs).toEqual([0, 1]) // one server sync on the broker event
     await tick(200)
     expect(syncs.length).toBe(3) // the presence refresh
   })
@@ -51,8 +57,9 @@ describe("web computer review sync", () => {
   it("with push, a person's decision is applied on the push at once; a lost push still lands at the presence refresh", async () => {
     let decision: LocalComputerDecision[] = []
     const signal = pushing()
-    const { pending, decided, syncs } = start(signal, 300, () => decision)
-    pending.set("a", request("a"))
+    const run = start(signal, 300, () => decision)
+    const { pending, decided, syncs } = run
+    run.addPending("a", request("a"))
     await tick(40)
     const before = syncs.length
     decision = [{ id: "a", digest: request("a").digest, approve: false }]
@@ -61,9 +68,9 @@ describe("web computer review sync", () => {
     for (let i = 0; i < 40 && !decided.length; i++) await tick(2)
     expect(decided).toEqual(decision)
     expect(Date.now() - pushedAt).toBeLessThan(50) // the old cadence was up to a second
-    expect(syncs.length).toBe(before + 1)
+    expect(syncs.length).toBe(before + 2) // decision sync plus empty-snapshot cleanup
 
-    pending.set("b", request("b"))
+    run.addPending("b", request("b"))
     await tick(40)
     decision = [{ id: "b", digest: request("b").digest, approve: true }] // decided, but its push is lost
     const lostAt = Date.now()
@@ -80,7 +87,7 @@ describe("web computer review sync", () => {
     const down = new DeviceWorkSignal()
     down.setPushedWaits(["computerReviews"]) // pushes, but the socket is closed
     const fallback = start(down, 10_000, () => [])
-    for (const run of [legacy, unpushed, fallback]) run.pending.set("a", request("a"))
+    for (const run of [legacy, unpushed, fallback]) run.addPending("a", request("a"))
     await tick(100)
     for (const run of [legacy, unpushed, fallback]) expect(run.syncs.length).toBeGreaterThan(8)
   })

@@ -33,27 +33,42 @@ function snapshotKey(requests: { id: string; digest: string }[]) {
   return requests.map(row => `${row.id}:${row.digest}`).sort().join(',')
 }
 
-/** A worker owns this loop for its lifetime. A failed upload cannot approve a
- * call; retrying preserves the original pending request and digest.
- *
- * The broker is checked locally every `intervalMs`. The server is asked only
- * when something changed (#1212): the pending set, a gateway push (a person
- * decided in the web), or the presence refresh above. Against a server that
- * does not push review decisions, or while the gateway is down, a pending
- * request is synced every `intervalMs` as before, so a decision still lands
- * within a second. */
+/** Wait for local broker state, a server push, or an intentional retry/lease deadline. */
+function waitForReviewWake(broker: ComputerBroker, sinceRevision: number, pushes: DeviceWorkSignal | undefined, timeoutMs: number | undefined, signal: AbortSignal) {
+  return new Promise<void>(resolve => {
+    if (signal.aborted || broker.pendingRevision !== sinceRevision) { resolve(); return }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    let offBroker = () => {}
+    let offPush = () => {}
+    const done = () => {
+      if (timer) clearTimeout(timer)
+      offBroker()
+      offPush()
+      signal.removeEventListener('abort', done)
+      resolve()
+    }
+    offBroker = broker.onPendingChange(done)
+    offPush = pushes?.subscribe(done) ?? (() => {})
+    signal.addEventListener('abort', done, { once: true })
+    if (timeoutMs !== undefined) timer = setTimeout(done, Math.max(0, timeoutMs))
+    // Protect against a broker mutation between the first revision check and subscription.
+    if (broker.pendingRevision !== sinceRevision) done()
+  })
+}
+
+/** A worker owns this loop for its lifetime. Empty brokers sleep until local state changes.
+ * Pending reviews retain the legacy short fallback when the server cannot push, or a bounded
+ * presence refresh when push is available; gateway reconnect and every push always sync now. */
 export async function pollWebComputerReviews(broker: ComputerBroker, deviceId: string, link: { syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]> }, signal: AbortSignal, intervalMs = 1000, pushes?: DeviceWorkSignal, presenceMs = REVIEW_PRESENCE_MS) {
   if (!link.syncComputerReviews) throw new Error('Computer review transport unavailable')
-  // Clear stale server requests once on startup and after a nonempty snapshot:
-  // an empty snapshot differs from the last one synced. A failed upload may
-  // have reached the server, so the same snapshot is retried until it succeeds.
-  // Empty brokers still check locally at the existing cadence.
   let pushed = false
   let synced: string | undefined
   let syncedAt = 0
+  let retryNeeded = false
   const unsubscribe = pushes?.subscribe(() => { pushed = true })
   try {
     while (!signal.aborted) {
+      const revision = broker.pendingRevision
       const snapshot = broker.list() as LocalComputerRequest[]
       const pending = snapshot.length > 0
       const key = snapshotKey(snapshot)
@@ -64,17 +79,14 @@ export async function pollWebComputerReviews(broker: ComputerBroker, deviceId: s
           await syncWebComputerReviews(broker, deviceId, link, signal)
           synced = key
           syncedAt = Date.now()
-        } catch { /* pending calls remain unapproved; failed cleanup retries */ }
+          retryNeeded = false
+        } catch { retryNeeded = true /* pending calls remain unapproved; retry after a bounded wait */ }
       }
       if (signal.aborted) break
-      // A push ends the local wait early: the decision is applied now, not on the next check.
-      if (pushes) await pushes.next(intervalMs, signal)
-      else await new Promise<void>(resolve => {
-        const done = () => { clearTimeout(timer); signal.removeEventListener('abort', done); resolve() }
-        const timer = setTimeout(done, intervalMs)
-        signal.addEventListener('abort', done, { once: true })
-        if (signal.aborted) done()
-      })
+      const waitMs = retryNeeded ? intervalMs : pending
+        ? (everyCheck ? intervalMs : Math.max(0, presenceMs - (Date.now() - syncedAt)))
+        : undefined
+      await waitForReviewWake(broker, revision, pushes, waitMs, signal)
     }
   } finally { unsubscribe?.() }
 }
