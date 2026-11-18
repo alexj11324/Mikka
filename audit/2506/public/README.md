@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 182 |
-| partial | 40 |
+| partial | 43 |
 | prior-partial | 36 |
-| unreviewed | 6298 |
+| unreviewed | 6295 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -82,3 +82,7 @@ Fixed code census **6556 = 182 complete / 38 partial / 36 prior-partial / 6300 u
 ## Additional fixed Segmented platform pair (2026-11-18 UTC)
 
 Full original `apps/mobile/components/Segmented.{ios.tsx,tsx}` sources were read and both exact original Git objects independently reproduced. The platform-specific **native iOS SwiftUI Picker** (`@expo/ui`) and generic React Native fallback share the same controlled selected value/callback interface. The current public main has 10 indexed importers of `@/components/Segmented` across task creation, chat, plugin, account, inbox and thread panels; baseline new-task demonstrates the real choice. Both sources equal the current main and fixed Cloud `vendor/mikka@82d285ed` objects. Node22 TypeScript TSX parsing reported 0 diagnostics for each exact source; no installed Node24/Expo runtime, browser keyboard/VoiceOver/Android device or protected CI. Both are **partial retain**, not redundant CF services or proven deletions. Original introduction SHA has not been confirmed. Fixed code census **6556 = 182 complete / 40 partial / 36 prior-partial / 6298 unreviewed**; review JSONL now **249** unique paths, including non-code records. Future main deltas and dynamic consumer parity remain open.
+
+## Continued Mobile stop failure and Symbol platform pair (2026-11-18 UTC)
+
+Three further original code sources were read fully and cross-consumer tracked: `apps/mobile/components/StopFailed.tsx` is the **existing** stateless retry row mounted by chat/task/thread only while `useStop` reports stuck; it has no timer, network or Cloudflare state owner. `Symbol.ios.tsx` uses the official `@expo/ui/swift-ui` Host/Image and exact SF Symbols type. `Symbol.tsx` provides explicit Web/Android ReactNode fallback (a caller's Lucide icon is an observed example). Native and fallback props match. All three fixed blobs equal public main and pinned Cloud `vendor/mikka@82d285ed`. Bounded original source assertions **6/6** passed; neither Node24, installed Expo, accessibility/Android/browser parity, real Stop ACK or protected CI was run. All three are `partial retain`, not duplicate Cloudflare services. One risk remains: a Web/Android consumer that supplies no `web` node renders no icon; keep actual visible-action verification before closure. Fixed census now **6556 code = 182 complete / 43 partial / 36 prior-partial / 6295 unreviewed**, **252 unique review records** including non-code. Main diff and Cloud vendor pin remain separate; no other Owner changes.
