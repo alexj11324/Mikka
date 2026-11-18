@@ -62,6 +62,9 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     try {
       await reverse.query(reads) // #69 first, then this migration
       await reverse.query(migration)
+      // Every later additive migration has to land in both orders, or the catalog comparison below fails on
+      // a column only one of the two schemas ever received.
+      await reverse.query(await readFile(new URL('../drizzle/20261118120000_conversation_model_device.sql', import.meta.url), 'utf8'))
       // Compare both orders at the catalog level, including table columns,
       // defaults, constraints and index keys. Each pool resolves its own schema.
       const catalog = async (target: Pool) => {
