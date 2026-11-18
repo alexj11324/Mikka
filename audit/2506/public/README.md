@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 182 |
-| partial | 38 |
+| partial | 40 |
 | prior-partial | 36 |
-| unreviewed | 6300 |
+| unreviewed | 6298 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -78,3 +78,7 @@ Re-read the full `reviews.jsonl` and checked every one of its **246 unique paths
 On the **existing public G branch**, exact source commit `cf02fe3e7f8e5541d88851193020f8476ee836da` removed two unused `CLOSED_SHOWN` / `ShowAllRow` exports and their `Pressable` / haptic / dead-style code from `apps/mobile/shared/components/list-section.tsx`. The functional `ListSectionHeader` and its accessibility/count/grouped style were preserved. No indexed consumers of either deleted name exist in three main repositories; the preserved header is used by Mobile Search, Suggestions, Plugins and the search-screen regression. Fixed original Git blob `cc5095b9` was reconstructed locally; TypeScript TSX parse before/after had 0 diagnostics, and exported header markup was checked. This is an independent business UI dead-code candidate, **not a Cloudflare-native migration**. Original introducing commit is unverified; dynamically loaded Metro uses, actual Expo native/web, Node24, protected CI, ordinary merge and precise merged-SHA validation are still open. G-073 remains `candidate_unmerged` in changes.jsonl; Cloud vendor is pinned separately and not modified. No F, G-015, G-046, release, signing or device owner files were changed.
 
 Fixed code census **6556 = 182 complete / 38 partial / 36 prior-partial / 6300 unreviewed**; `reviews.jsonl` now has **247** distinct paths (including previously reviewed non-code). Main deltas and the full file denominator remain separate.
+
+## Additional fixed Segmented platform pair (2026-11-18 UTC)
+
+Full original `apps/mobile/components/Segmented.{ios.tsx,tsx}` sources were read and both exact original Git objects independently reproduced. The platform-specific **native iOS SwiftUI Picker** (`@expo/ui`) and generic React Native fallback share the same controlled selected value/callback interface. The current public main has 10 indexed importers of `@/components/Segmented` across task creation, chat, plugin, account, inbox and thread panels; baseline new-task demonstrates the real choice. Both sources equal the current main and fixed Cloud `vendor/mikka@82d285ed` objects. Node22 TypeScript TSX parsing reported 0 diagnostics for each exact source; no installed Node24/Expo runtime, browser keyboard/VoiceOver/Android device or protected CI. Both are **partial retain**, not redundant CF services or proven deletions. Original introduction SHA has not been confirmed. Fixed code census **6556 = 182 complete / 40 partial / 36 prior-partial / 6298 unreviewed**; review JSONL now **249** unique paths, including non-code records. Future main deltas and dynamic consumer parity remain open.
