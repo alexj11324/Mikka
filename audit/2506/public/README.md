@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 177 |
+| complete | 181 |
 | partial | 29 |
 | prior-partial | 36 |
-| unreviewed | 6314 |
+| unreviewed | 6310 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -42,3 +42,9 @@ Full Git tree inventory at 834571eb2383fc2f0768142d1b38a1db5217d158: 8350 paths,
 Continued the **existing G #2506** on the original public `g/2506-file-coverage`, alongside existing private UI PR #217. The actual public `components/settings/bot-permissions.tsx` exports the canonical `AppTools` provider catalogue at pinned public `b19eed9081d9858686d57547e7afcec73d6e9005` and latest checked main `0c4de849476e90f43ecffba525585c59823ffe62` (same source blob `0b0de3af`). Private G source `34593c65` physically removed optional/cast import and missing-export alert, private test `8bf23bb9` removed only its synthetic old-public fallback expectation (eight real contract tests remain). Public original G branch `8d5ee367` then physically deleted its now-orphan `HostedPermissions.toolsComponentUnavailable` translation in `messages/zh-CN.json`, preserving every other locale key. JSON parsed successfully and three-repo indexed search found no active consumer. The original public fixed locale manifest path is **partial** (not a whole-file completion); one exact original path CSV and one semantic JSONL entry were updated with fixed/current Git blobs and the new branch blob. G-072 is listed as a nonmerged candidate in both repositories' original changes ledgers.
 
 The complete private/public consumer review passed 29/29 narrow V8 source assertions; it is **not** installed Node24, actual i18n test, paired Web/Desktop build, real permission/browser test, protected CI, ordinary merge or exact merged-SHA acceptance. Public tracked-code census is unchanged by the partial non-code locale path; 27 fixed original CSV shards remain the denominator. Public main is ahead of the old G branch and must be reconciled without overwriting newer strings or permissions. F, G-015/G-046, #1954 and Cloud #155 owners remain unchanged. No completion/Issue close/automation stop.
+
+## 2026-11-18 fixed Mobile chat wait and identity-target contracts
+
+Four original immutable source/test paths (two pure helpers, two original tests) were reviewed, each against the public fixed tree `b19eed90`, current public main `0c4de849`, and Cloud's fixed nested `vendor/mikka@82d285ed`: every file's object ID is unchanged. `waitingLabel` is a local 30-second label formatter, not a server polling mechanism; its caller has a one-second UI clock with effect cleanup. `webChatPath` requires a valid explicit Bot/workspace target; `web.ts` hands off real identity to a separate authenticated one-time-token endpoint. Its current-main consumer has an added `confirmAccount` option that must survive later integration. Source comments identify Figma/identity reasons; introduction commits remain unverified rather than guessed.
+
+All four original Git source objects were reproduced byte-for-byte and checked by `git hash-object`. Running the **actual original** `waiting.test.mts` and `web-chat.test.mts` against those copies on Linux Node **22.16.0** (`--experimental-strip-types --test`) passed **3/3**. This validates only the pure-unit contracts, not the original repository install, Node24, Expo/iOS/Android, real browser, AT, server permissions, protected CI, merged-SHA or production. Each path's independent consumer, native-vs-added responsibility and retention are recorded in the original CSV/JSONL. Fixed code queue now **181 complete / 29 partial / 36 prior-partial / 6310 unreviewed**. The full changed-main census and Cloud's 6,471 pinned-code census are separate unfinished obligations; do not equate identical helper blobs with all current callers reviewed.
