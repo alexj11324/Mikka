@@ -20,7 +20,7 @@ const env = (mode = 'preflight') => ({
 const event = mode => ({ inputs: { mode: mode ?? 'preflight' } })
 const attestation = (mode = 'preflight') => ({
   status: 'ready', issue: 1245, repository: REPOSITORY, revision: SHA, mode, workerReleaseSha: SHA,
-  webDeployRunId: 11, workerReleaseRunId: 12, checkedAt: new Date(EPOCH).toISOString(),
+  workerReleaseRunId: 12, checkedAt: new Date(EPOCH).toISOString(),
 })
 const release = kind => ({
   id: kind === 'web' ? 11 : 12, name: kind === 'web' ? 'Web deploy' : 'E2B official instance runtime',
@@ -72,14 +72,15 @@ test('attestation never reads account credentials or forwards the GitHub token t
     assert.equal(parsed.origin, 'https://api.github.com')
     assert.equal(init.headers.authorization, 'Bearer private-github-token')
     assert.equal(parsed.searchParams.get('head_sha'), SHA)
-    return Response.json({ workflow_runs: [release(parsed.pathname.includes('web-deploy') ? 'web' : 'worker')] })
+    assert.ok(parsed.pathname.endsWith('/e2b-official-runtime.yml/runs'))
+    return Response.json({ workflow_runs: [release('worker')] })
   }
   assert.equal((await attestDeployment({ env: input, event: event(), fetchImpl, now: () => EPOCH })).status, 'ready')
-  assert.ok(calls.length >= 5)
+  assert.ok(calls.length >= 4)
   await assert.rejects(attestDeployment({ env: input, event: event(), now: () => EPOCH,
     fetchImpl: async () => Response.json({ build: 'b'.repeat(40) }) }), /build_mismatch/)
   await assert.rejects(attestDeployment({ env: input, event: event(), now: () => EPOCH,
-    fetchImpl: async url => new URL(url).origin === ORIGIN ? Response.json({ build: SHA }) : Response.json({ workflow_runs: [] }) }), /web_deploy/)
+    fetchImpl: async url => new URL(url).origin === ORIGIN ? Response.json({ build: SHA }) : Response.json({ workflow_runs: [] }) }), /worker_release/)
 })
 
 test('decision proof rejects forged identity, substituted models, reconstructed records and ungrounded changes', () => {
@@ -286,8 +287,8 @@ test('task prompt uses the structured issue and leaves the future live direction
 test('workflow attests before OIDC and uploads only two explicit sanitized reports', async () => {
   const workflow = await readFile(new URL('../../.github/workflows/project-decisions-acceptance.yml', import.meta.url), 'utf8')
   assert.ok(workflow.indexOf('project-decisions.mjs --attest') < workflow.indexOf('Infisical/secrets-action'))
-  assert.ok(workflow.includes('contains(github.event.workflow_run.head_commit.message, \'[project-map-acceptance]\')'))
-  assert.ok(workflow.includes('ref: ' + '$' + '{{ github.event.workflow_run.head_sha || github.sha }}'))
+  assert.ok(!workflow.includes('workflow_run'), 'per-service releases publish no Web deploy run to follow')
+  assert.ok(workflow.includes('ref: ' + '$' + '{{ github.sha }}'))
   assert.ok(workflow.includes('secret-path: /'))
   assert.ok(workflow.includes('recursive: false'))
   assert.ok(workflow.includes('project-decisions-report/attestation.json'))

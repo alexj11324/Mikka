@@ -9,7 +9,7 @@ import { and, eq } from 'drizzle-orm'
 import { workspaces, workspaceMembers } from './db/workspace-schema'
 import { WorkspaceError } from './workspace-error'
 import { pool } from './db'
-import { captureDatabaseQuery } from './db/commit-effects'
+import { captureDatabaseQuery, connectForCommitEffects } from './db/commit-effects'
 import { byosEnabled, byosEnrollmentEnabled } from './cloud-computer-flag'
 import { subscriptionRouteReady } from './subscription-routes'
 import { SubscriptionRepository } from './subscription-repository'
@@ -58,7 +58,10 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
   }
   // Capture the proxy's bound query while still in this request's DB scope;
   // later stream/tool callbacks must keep that same pool as the Go worker.
-  const database = captureDatabaseQuery(pool)
+  // 连接 reserves its sign-in in a short transaction (SubscriptionRepository.acquire),
+  // so the repository needs a checkout as well as the bound query. Without
+  // connect every new sign-in was refused as backend_unavailable.
+  const database = Object.assign(captureDatabaseQuery(pool), { connect: () => connectForCommitEffects(pool) })
   const infisicalOrigin = process.env.MIKKA_BYOS_INFISICAL_ORIGIN
   const project = process.env.MIKKA_BYOS_INFISICAL_PROJECT
   const environment = process.env.MIKKA_BYOS_INFISICAL_ENVIRONMENT

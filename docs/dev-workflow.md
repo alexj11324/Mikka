@@ -50,12 +50,11 @@ with the isolated database configured. The build
 emits the Vite frontend and Nitro Node server into `.output`. Startup validates
 `.output/mikka-build.json` and serves the compiled application. Node 24 is
 required. `pnpm build` also builds the subscription worker, generates the Agent
-UI, runs type checks and invokes migrations. The official Web workflow builds
-with `NITRO_PRESET=vercel` into `.vercel/output` through
-`scripts/release/build-vercel.mjs`.
+UI, runs type checks and invokes migrations. The official Web release is built
+by `cloudflare-api-image.yml` and deployed to Cloudflare
+([build source of truth](operations/build-source-of-truth.md)); Vercel is retired.
 
-`vercel.json` installs every workspace except `@mikka/mobile`, which the Web
-build does not use. Runtime and frontend build configuration lives in
+Runtime and frontend build configuration lives in
 `apps/api/nitro.config.ts` and `apps/frontend/vite.config.mjs`.
 
 ## 3. Environment

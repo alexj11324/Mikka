@@ -198,7 +198,6 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       targetProof = await assertCoreProductionTarget({ env, event, attestation: targetProof, fetchImpl, now })
       Object.assign(report, { targetMode: CORE_MODE, applicationSha: targetProof.applicationSha,
         driverRevision: targetProof.driverRevision, driverRunId: targetProof.driverRunId, driverRunAttempt: targetProof.driverRunAttempt,
-        webDeployRunId: targetProof.webDeployRunId, webAttempt: targetProof.webAttempt, webDeployJobId: targetProof.webDeployJobId,
         openIssues: targetProof.openIssues })
       report.client.sourceRevision = targetProof.driverRevision
       return
@@ -207,9 +206,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     const proof = await assertDeployedTarget({ env, event, attestation: targetProof, fetchImpl, now })
     targetProof = proof
     Object.assign(report, { targetMode: proof.targetMode, applicationSha: proof.applicationSha,
-      driverRevision: proof.driverRevision, driverRunId: proof.driverRunId, driverRunAttempt: proof.driverRunAttempt,
-      webDeployRunId: proof.webDeployRunId, webAttempt: proof.webAttempt, webDeployJobId: proof.webDeployJobId,
-      deploymentId: proof.deploymentId })
+      driverRevision: proof.driverRevision, driverRunId: proof.driverRunId, driverRunAttempt: proof.driverRunAttempt })
     // This client comes from the real driver checkout, not the separately deployed application.
     report.client.sourceRevision = proof.driverRevision
   }

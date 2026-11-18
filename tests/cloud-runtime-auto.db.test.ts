@@ -225,6 +225,21 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     } finally { httpOwner=null; }
   });
 
+  await t.test('the public computer API names an Agent with no usable model as agentNoModel, linking to 模型与订阅', async () => {
+    // Only a Codex subscription is connected: Claude Code has nothing in 优先使用的模型 and no subscription or key.
+    const a = await person('agent-no-model');
+    const before = provisioned;
+    const {POST} = await import('../app/api/bots/[botId]/computer/runs/route');
+    httpOwner = a.id;
+    try {
+      const response = await POST(new Request(`https://mikka.example/mikka/api/bots/${a.botId}/computer/runs`,{method:'POST',headers:{origin:'https://mikka.example','content-type':'application/json'},body:JSON.stringify({issueId:a.issueId,harness:'claude_code'})}),{params:Promise.resolve({botId:a.botId})});
+      assert.equal(response.status,409);
+      assert.deepEqual(await response.json(),{error:'agentNoModel',message:'agentNoModel',href:'/settings?section=models'});
+    } finally { httpOwner=null; }
+    assert.equal(provisioned,before,'no cloud computer is woken for an Agent with no model');
+    assert.equal(await count('SELECT count(*)::int AS n FROM agent_runs WHERE "userId"=$1',[a.id]),0);
+  });
+
   await t.test('ordinary tasks use existing metadata without waking a sleeping or disconnected parent', async () => {
     const a = await person('sleeping-runtime')
     await dispatch(a.id, a.issueId, a.botId)

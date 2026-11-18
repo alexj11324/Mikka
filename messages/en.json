@@ -217,7 +217,21 @@
     "archivedConversation": "Archived: {title}",
     "suggestions": "Suggestions",
     "artifacts": "Artifacts",
-    "cardPreview": "[Card]"
+    "cardPreview": "[Card]",
+    "botMenu": {
+      "archive": "Archive",
+      "unarchive": "Unarchive",
+      "delete": "Delete",
+      "archived": "Archived",
+      "archivedToast": "Archived “{name}”",
+      "unarchivedToast": "Unarchived “{name}”",
+      "deletedToast": "Deleted “{name}”",
+      "deleteTitle": "Delete “{name}”?",
+      "deletePermanent": "Its chat history is deleted permanently.",
+      "deleteKeeps": "The tasks and threads it dispatched stay.",
+      "archiveInstead": "Archive instead",
+      "failed": "Didn't finish. Try again."
+    }
   },
   "Plugins": {
     "ownDescription": {
@@ -1312,6 +1326,7 @@
     "deviceNotFound": "This device does not exist.",
     "agentHarnessMissing": "The selected Agent is not installed on this computer.",
     "agentRequired": "Name the Agent that should run this task: Claude Code or Codex.",
+    "agentNoModel": "{agent} has no usable model. Connect a subscription or API key for it in Settings › Models and subscriptions.",
     "agentDuplicateName": "This name is already in use. Choose another name.",
     "botDuplicateName": "A bot with this name already exists. Choose another name.",
     "botNameTooLong": "A bot name can be at most 60 characters.",
@@ -7738,6 +7753,7 @@
       "readOnly": "Models can’t be turned off one by one yet",
       "providerOn": "{on}/{total} enabled",
       "firstModel": "Tasks start with",
+      "noFirstModel": "No usable model yet",
       "keyProvider": "Provider"
     }
   },

@@ -61,11 +61,14 @@ jobs:
       - name: Check out the source-bound official UI and install dependencies
         env:
           HOSTED_UI_READ_KEY: ${{ secrets.HOSTED_UI_READ_KEY }}
+          # Read-only (contents: read); only api.github.com/meta sees it, never the build's child processes.
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/cloudflare-ci.mjs build
       - name: Compile and verify the API image offline
         env:
           API_PUBLIC_BUILD_SETTINGS: ${{ secrets.API_PUBLIC_BUILD_SETTINGS }}
           HOSTED_UI_READ_KEY: ${{ secrets.HOSTED_UI_READ_KEY }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/cloudflare-native-oci.mjs prepare
       - name: Issue a short-lived Registry publication credential
         id: registry

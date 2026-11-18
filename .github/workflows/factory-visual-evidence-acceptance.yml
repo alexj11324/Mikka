@@ -1,10 +1,11 @@
 name: Factory visual evidence production acceptance
 # One finite #1783 acceptance, not a paid task on every main deployment.
-# Web may finish first. E2B's completion then re-enters the selector after the
-# exact runtime is published; no credentials are read while a release is busy.
+# E2B's completion enters the selector after the exact runtime is published;
+# a Web release is per service and has no run to follow, so dispatch after it.
+# No credentials are read while a release is busy.
 on:
   workflow_run:
-    workflows: [Web deploy, E2B additive runtime release]
+    workflows: [E2B additive runtime release]
     types: [completed]
   workflow_dispatch:
     inputs:

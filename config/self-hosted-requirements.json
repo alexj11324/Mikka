@@ -1,4 +1,18 @@
 {
+  "app/actions/bots.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A person archives, restores, lists and deletes their own bots in the installation PostgreSQL database; the Coordinator and other people's bots are refused.",
+    "test": "lib/bot-lifecycle.db.test.ts",
+    "suite": "test:bot-chats-db"
+  },
+  "lib/bot-lifecycle.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Archive, restore and delete a person's own bot in one installation database transaction: deletion releases group memberships, led threads and thread machines, keeps dispatched runs, and cascades the bot's chat.",
+    "test": "lib/bot-lifecycle.db.test.ts",
+    "suite": "test:bot-chats-db"
+  },
   "app/api/workspaces/[workspaceId]/projects/[projectId]/setup/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -737,7 +751,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "Store bounded action durations with their capture timestamps in PostgreSQL and preserve existing rows with no duration.",
-    "test": "lib/captures/video-evidence.db.test.ts",
+    "test": "lib/captures/store.db.test.ts",
     "suite": "test:captures-db"
   },
   "drizzle/20261112030502_task_attachments.sql": {
@@ -3468,5 +3482,12 @@
     "behavior": "Check a task Secret capability against the live run, claim credential and device session in the installation database on every use.",
     "test": "tests/task-secret-access.db.test.ts",
     "suite": "test:secrets-db"
+  },
+  "lib/agent-no-model.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A cloud dispatch that names an Agent with no usable model is refused with agentNoModel, its message and a link to 模型与订阅, instead of agentProfileUnavailable.",
+    "test": "tests/cloud-runtime-auto.db.test.ts",
+    "suite": "test:bot-threads-db"
   }
 }

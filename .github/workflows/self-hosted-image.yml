@@ -158,16 +158,6 @@ jobs:
         name: Exercise Mailpit, MinIO, two app replicas and 31 synthetic model replies
         timeout-minutes: 10
         run: docker compose exec -T -e MIKKA_DESKTOP_ACCEPTANCE=1 -e MIKKA_DESKTOP_MEMBER_FIXTURE="${MIKKA_DESKTOP_MEMBER_FIXTURE:-0}" app node scripts/acceptance/self-hosted-services.mjs
-      - name: Ensure FFmpeg and ffprobe for community media regressions
-        timeout-minutes: 5
-        run: |
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
-            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
-            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y --no-install-recommends ffmpeg
-          fi
-          ffmpeg -version
-          ffprobe -version
       - name: Execute declared self-hosted compatibility tests in community mode
         env:
           MIKKA_EDITION: community

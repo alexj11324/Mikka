@@ -97,7 +97,7 @@ mock.module('@/hooks/use-live-lists', { namedExports: {
 for (const [file, names] of [
   ['../../app/actions/projects.ts', ['listProjects', 'listWorkspaceProjects']], ['../../app/actions/teams.ts', ['listTeams']],
   ['../../app/actions/team-relations.ts', ['listProjectTeams']], ['../../app/actions/workspace-secrets.ts', ['saveE2BKey']],
-  ['../../app/actions/bots.ts', ['listBots']], ['../../app/actions/agents.ts', ['getThreadName', 'findThreadIssue']],
+  ['../../app/actions/bots.ts', ['listBots', 'archiveBot', 'deleteBot', 'listArchivedOwnBots']], ['../../app/actions/agents.ts', ['getThreadName', 'findThreadIssue']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, async () => []])) })
 
 // Exercise the production lazy/Suspense boundary, with its chunk deliberately

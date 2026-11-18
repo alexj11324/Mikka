@@ -1,7 +1,6 @@
 import { appendFile, readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
-import { ORIGIN, REPOSITORY, successfulRelease } from './project-decisions.mjs'
-import { webPublication } from './deployed-target.mjs'
+import { ORIGIN, REPOSITORY } from './project-decisions.mjs'
 
 const api = 'https://api.github.com/repos/' + REPOSITORY
 const issuePath = '/issues/1966'
@@ -11,15 +10,12 @@ function requireMatch(condition, reason) {
   if (!condition) throw new Error(reason)
 }
 
+/** Per-service releases publish no Web deploy run: current main, served live, is the release. */
 export async function attachmentRelease(env, event, fetchImpl = fetch) {
   const sha = env.GITHUB_SHA
-  const run = event.workflow_run
-  requireMatch(env.GITHUB_EVENT_NAME === 'workflow_run' && env.GITHUB_REF === 'refs/heads/main' &&
+  requireMatch(env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.GITHUB_REF === 'refs/heads/main' &&
     env.GITHUB_REPOSITORY === REPOSITORY && env.GITHUB_WORKFLOW_REF === REPOSITORY + '/' + workflow + '@refs/heads/main' &&
-    event.action === 'completed' && event.repository?.full_name === REPOSITORY &&
-    /^[0-9a-f]{40}$/.test(sha ?? '') && run?.event === 'push' && run.repository?.full_name === REPOSITORY &&
-    Number.isSafeInteger(run.run_attempt) && run.run_attempt > 0 &&
-    successfulRelease([run], sha, 'web'), 'attachment_release_event_invalid')
+    event.repository?.full_name === REPOSITORY && /^[0-9a-f]{40}$/.test(sha ?? ''), 'attachment_release_event_invalid')
   requireMatch(env.GH_TOKEN, 'attachment_release_metadata_credential_missing')
 
   const read = async (url, headers = {}) => {
@@ -39,10 +35,6 @@ export async function attachmentRelease(env, event, fetchImpl = fetch) {
   }
 
   if (!await issueOpen()) return false
-  // A green documentation-only Web deploy has no publication. The shared check
-  // requires successful build, production upload and public-version verification.
-  const publication = await webPublication({ github }, { applicationSha: sha, webDeployRunId: run.id })
-  requireMatch(publication.webAttempt === run.run_attempt, 'attachment_release_attempt_changed')
   const ref = await github('/git/ref/heads/main')
   requireMatch(ref.ref === 'refs/heads/main' && ref.object?.type === 'commit' && ref.object.sha === sha,
     'attachment_release_main_changed')

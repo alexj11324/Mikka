@@ -6,7 +6,7 @@ import type { ChatTarget } from './bot-list'
  * A sidebar row's right-click menu (Capy's Captain row): what the frame lists for one Bot or group chat.
  * `id` lets the frame pick the item's icon; `label` is already in the person's language.
  */
-export type ChatNavAction = { id: 'openNewTab' | 'markRead' | 'markUnread' | 'viewAll' | 'leave'; label: string; danger?: boolean; run: () => void }
+export type ChatNavAction = { id: 'openNewTab' | 'markRead' | 'markUnread' | 'viewAll' | 'leave' | 'archive' | 'unarchive' | 'delete'; label: string; danger?: boolean; run: () => void }
 
 /** The place a chat opens at, as an address (the same one the row opens). */
 export function chatPlace(target: ChatTarget): Partial<WorkspaceLocation> | null {

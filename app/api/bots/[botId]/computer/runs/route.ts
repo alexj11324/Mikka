@@ -3,6 +3,8 @@ import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-referen
 import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { z } from 'zod'
+import { getTranslations } from 'next-intl/server'
+import { AGENT_NAMES, agentHasNoModel, MODEL_SETTINGS_HREF } from '@/lib/agent-no-model'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { issueForUser } from '@/lib/issue-access'
@@ -15,6 +17,7 @@ import { queueFactoryCloudRun } from '@/lib/factory/queue-cloud'
 
 const inputSchema = z.object({ issueId: z.uuid(), harness: z.enum(['codex', 'claude_code']).optional(), profileId: agentProfileReferenceSchema.optional(), note: z.string().trim().max(10_000).optional(), needsSpec: z.boolean().optional() }).strict()
 const headers = { 'Cache-Control': 'private, no-store' }
+class AgentNoModelError extends Error { constructor(public harness: 'claude_code' | 'codex') { super('agentNoModel') } }
 
 export async function POST(request: Request, { params }: { params: Promise<{ botId: string }> }) {
   if (!cloudComputerRunsEnabled()) return Response.json({ error: 'Cloud computer task unavailable' }, { status: 503, headers })
@@ -56,6 +59,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
             profileId: parsed.data.profileId, location: 'cloud', cloudPurpose: 'desktop',
             asked: { harness: parsed.data.harness } })
           const target = picked.target
+          if (target.kind === 'none' && agentHasNoModel(target.reason)) throw new AgentNoModelError(parsed.data.harness)
           if (target.kind !== 'cloud') throw new ComputerError(409, 'agentProfileUnavailable')
           harness = target.harness
           const ready = await (await import('@/lib/computer/auto-runtime')).ensureBotCloudRuntime(pool, { userId: session.user.id, workspaceId: context.workspace.id }, botId, { harness })
@@ -76,6 +80,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ bot
     if ('runId' in result && result.thread !== 'message') await (await import('@/lib/run-leases')).startThreadMachine({ userId: session.user.id, workspaceId: context.workspace.id }, result.runId)
     return Response.json(result, { status: 202, headers })
   } catch (error) {
+    if (error instanceof AgentNoModelError) {
+      const t = await getTranslations('Errors')
+      return Response.json({ error: 'agentNoModel', message: t('agentNoModel', { agent: AGENT_NAMES[error.harness] }), href: MODEL_SETTINGS_HREF }, { status: 409, headers })
+    }
     if (error instanceof AgentProfileError) return Response.json({ error: error.code }, { status: error.status, headers })
     if (error instanceof AgentProfileAdmissionError) return Response.json({ error: error.message }, { status: 409, headers })
     if (error instanceof FactoryError) return Response.json({ error: error.code }, { status: 409, headers })
