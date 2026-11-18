@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite, { unstable_serialize } from "swr/infinite";
 import { useTranslations } from "next-intl";
-import { Copy, Pin, RefreshCw, X } from "lucide-react";
+import { Copy, Pin, X } from "lucide-react";
 import { listConversations } from "@/app/actions/task-runs";
 import { withBasePath } from "@/lib/base-path";
 import { useViewState } from "@/lib/hooks/view-state";
@@ -23,12 +23,15 @@ import {
   type SavedPullView,
 } from "@/lib/pull-directory";
 import { Button } from "@/components/ui/button";
+import { PULL_REQUEST_ICONS } from "@/lib/pull-request-appearance";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { ResizablePane } from "@/components/ui/resizable-pane";
 import { cn } from "cn";
 import { PullFilterBar, PullFilterChips } from "./pull-filters";
 import { PullPreview } from "./pull-preview";
 import { PullGroupHeader, PullRow, PullRowSkeleton } from "./pull-row";
+
+const EmptyMark = PULL_REQUEST_ICONS.open;
 
 const initial: PullFilters = {
   view: "open",
@@ -369,7 +372,7 @@ export function PullDirectory({
               <Empty className="min-h-72 border-0">
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
-                    <RefreshCw />
+                    <EmptyMark />
                   </EmptyMedia>
                   <EmptyTitle>{t(filtered ? "noMatches" : "empty")}</EmptyTitle>
                   {more && <EmptyDescription>{t("noLoadedMatches")}</EmptyDescription>}
@@ -381,7 +384,7 @@ export function PullDirectory({
                     </Button>
                   ) : (
                     <Button size="sm" variant="secondary" onClick={() => void refresh()}>
-                      {t("retry")}
+                      {t("refresh")}
                     </Button>
                   )}
                 </EmptyContent>
