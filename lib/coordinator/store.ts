@@ -13,8 +13,8 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db, pool } from '@/lib/db'
-import { botUnreadCounts } from '@/lib/conversation-reads-store'
-import { agentRuns, bots, chatPreferences, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
+import { botReadState } from '@/lib/conversation-reads-store'
+import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
 import { readIssueMetadata } from '@/lib/issue-metadata'
@@ -551,9 +551,7 @@ export async function botChats(reader: IssueReader): Promise<Record<string, BotC
 export async function botChatSnapshot(reader: IssueReader) {
   const userId = typeof reader === 'string' ? reader : reader.id
   const workspaces = await activeTaskWorkspaces(reader)
-  // The person's own 置顶 / 通知 / 隐藏 come with the bots (lib/chat-preferences.ts writes them and pushes this list), in the same read.
-  const readableBots = workspaces.length ? await db.select({ id: bots.id, pinned: chatPreferences.pinned, muted: chatPreferences.muted, hidden: chatPreferences.hidden, pinOrder: chatPreferences.pinOrder }).from(bots)
-    .leftJoin(chatPreferences, and(eq(chatPreferences.userId, userId), eq(chatPreferences.chatKey, sql`${bots.id}::text`))).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
+  const readableBots = workspaces.length ? await db.select({ id: bots.id }).from(bots).where(and(eq(bots.ownerId, userId), inArray(bots.workspaceId, workspaces.map(workspace => workspace.id)))) : []
   if (!readableBots.length) return { items: {} as Record<string, BotChatSummary>, expiries: [] as Date[], observedAt: Date.now() }
   const botIds = readableBots.map(bot => bot.id)
   const latest = await db.selectDistinctOn([coordinatorMessages.botId], { id: coordinatorMessages.id, botId: coordinatorMessages.botId, nativePending:nativePendingForChat(userId,sql.raw('"coordinator_messages"."botId"')), message: summaryChatMessage, createdAt: coordinatorMessages.createdAt })
@@ -594,13 +592,12 @@ export async function botChatSnapshot(reader: IssueReader) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
     result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at, messageId: line.messageId }
   }
-  for (const [botId, count] of await botUnreadCounts(pool, userId, botIds)) {
+  // The unread counts and, in the same read, the person's own 置顶 / 通知 / 隐藏 (lib/chat-preferences.ts writes them and pushes this list).
+  const { counts, preferences } = await botReadState(pool, userId, botIds)
+  for (const [botId, count] of counts) {
     if (count) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), unreadCount: count }
   }
-  for (const { id, pinned, muted, hidden, pinOrder } of readableBots) {
-    if (pinned === null) continue
-    result[id] = { ...(result[id] ?? { line: null, at: null, working: false }), pinned, muted: Boolean(muted), hidden: Boolean(hidden), pinOrder }
-  }
+  for (const [botId, preference] of preferences) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), ...preference }
   return { items: result, expiries, observedAt: now.getTime() }
 }
 
