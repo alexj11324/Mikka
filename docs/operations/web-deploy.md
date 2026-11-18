@@ -114,3 +114,15 @@ Public builds verify the server, protocol and authentication code without privat
 See the [private runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/web-deploy.md).
 
 The current release serves GET/HEAD `/mikka/api/version` from the five-field public version document first returned by its own bound API. A cold isolate verifies the public and private revisions before reusing those values. Every response carries `Cache-Control: no-store`. Release Workers and API services are immutable while retained. Publish a new release ID for a change in the minimum native client version. Deployment acceptance also probes the Node health endpoint and the version directly on the bound API before promotion, then exercises an authenticated read through the gateway.
+
+## Acceptance after a per-service release
+
+A per-service release (private operations `service-release`) publishes no
+`Web deploy` run, and nothing waits for one. The production acceptance
+workflows that used to follow it (`read-cache-production`,
+`self-hosted-production`, `task-attachment-production`,
+`project-decisions-acceptance`, `model-provider-fallback-acceptance` and
+`issue1415-deployed-production`) are dispatched on main after the release
+instead. Their only release check is that the live `/mikka/api/version` serves
+the expected build. `factory-visual-evidence-acceptance` still follows the E2B
+runtime release.

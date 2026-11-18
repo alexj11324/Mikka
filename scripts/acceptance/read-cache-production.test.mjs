@@ -600,15 +600,13 @@ test('deployed target mode separates the actual dispatch driver from the applica
   const environment = { ...env(), GITHUB_SHA: OTHER, GITHUB_REPOSITORY_OWNER: 'alexj11324',
     GITHUB_RUN_ID: '7001', GITHUB_RUN_ATTEMPT: '2',
     GITHUB_WORKFLOW_REF: REPOSITORY + '/.github/workflows/issue1415-deployed-production.yml@refs/heads/main',
-    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP,
-    WEB_DEPLOY_RUN_ID: '81', VERCEL_DEPLOYMENT_ID: 'dpl_SyntheticDeployed1415' }
+    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP }
   const payload = { repository: { full_name: REPOSITORY, owner: { login: 'alexj11324' } },
-    inputs: { application_sha: APP, web_run_id: '81', deployment_id: 'dpl_SyntheticDeployed1415' } }
+    inputs: { application_sha: APP } }
   const guard = productionGuard(environment, payload)
   assert.equal(guard.targetMode, 'deployed-target')
   assert.equal(guard.applicationSha, APP); assert.equal(guard.driverRevision, OTHER)
   assert.equal(guard.driverRunId, 7001); assert.equal(guard.driverRunAttempt, 2)
-  assert.equal(guard.webDeployRunId, 81); assert.equal(guard.deploymentId, payload.inputs.deployment_id)
 })
 
 
@@ -616,10 +614,9 @@ test('new deployed mode authorizes only the 1415 attestation and never reopens r
   const environment = { ...env(), GITHUB_SHA: OTHER, GITHUB_REPOSITORY_OWNER: 'alexj11324',
     GITHUB_RUN_ID: '7001', GITHUB_RUN_ATTEMPT: '2',
     GITHUB_WORKFLOW_REF: REPOSITORY + '/.github/workflows/issue1415-deployed-production.yml@refs/heads/main',
-    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP,
-    WEB_DEPLOY_RUN_ID: '81', VERCEL_DEPLOYMENT_ID: 'dpl_SyntheticDeployed1415' }
+    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP }
   const payload = { repository: { full_name: REPOSITORY, owner: { login: 'alexj11324' } },
-    inputs: { application_sha: APP, web_run_id: '81', deployment_id: 'dpl_SyntheticDeployed1415' } }
+    inputs: { application_sha: APP } }
   const options = { env: noCredentials(environment), event: payload,
     fetchImpl: () => assert.fail('out-of-scope mode reached the network') }
   await assert.rejects(attestProductionReadCache(options), /trigger_rejected/)

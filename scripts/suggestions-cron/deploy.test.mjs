@@ -6,18 +6,16 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { ALIAS, PROJECT, TEAM } from '../device-gateway/deploy.mjs'
-import { MIKKA_URL, WORKER, deployCron, gitRepository, validateConfig, webDeployRun } from './deploy.mjs'
+import { MIKKA_URL, WORKER, deployCron, gitRepository, validateConfig } from './deploy.mjs'
 
 const SOURCE = 'a'.repeat(40), OLD = 'b'.repeat(40), NEW = 'c'.repeat(40), ACCOUNT = 'e'.repeat(32)
 const VERSION = '11111111-1111-4111-8111-111111111111'
 const configText = readFileSync(new URL('../../cloudflare/suggestions-cron/wrangler.jsonc', import.meta.url), 'utf8')
-const webRun = sha => ({ id: 42, head_sha: sha, head_branch: 'main', event: 'push', repository: { full_name: 'alexj11324/Mikka' },
-  path: '.github/workflows/web-deploy.yml', status: 'completed', conclusion: 'success' })
 
 function fixture() {
   const state = { main: SOURCE, live: SOURCE, build: SOURCE, same: true, writes: 0, waits: 0, calls: [], status: 'READY',
     secret: true, origin: MIKKA_URL, extraBinding: false, observability: true, publicUrl: false, previews: false,
-    schedules: ['* * * * *'], project: PROJECT, aliasProject: PROJECT, activeVersion: VERSION, cfStatus: 200, webStatus: 'success' }
+    schedules: ['* * * * *'], project: PROJECT, aliasProject: PROJECT, activeVersion: VERSION, cfStatus: 200 }
   const repository = {
     async assertCheckout() {},
     async refreshMain() { return state.main },
@@ -57,11 +55,6 @@ function fixture() {
       assert.equal(init.headers.authorization, undefined)
       assert.equal(init.headers.accept, 'application/dns-json')
       data = { Status: 3, Question: [{ type: 16, name: '_mikka-release.aspectlylabs.com.' }] }
-    } else if (url.origin === 'https://api.github.com') {
-      assert.equal(init.headers.authorization, 'Bearer fixture-github')
-      assert.equal(url.pathname, '/repos/alexj11324/Mikka/actions/workflows/web-deploy.yml/runs')
-      assert.equal(url.searchParams.get('head_sha'), state.live)
-      data = { workflow_runs: state.webStatus === 'pending' ? [] : [{ ...webRun(state.live), conclusion: state.webStatus }] }
     } else {
       assert.equal(url.href, MIKKA_URL + '/api/version')
       assert.equal(init.headers.authorization, undefined, 'public version receives no provider or GitHub token')
@@ -71,7 +64,7 @@ function fixture() {
     return Response.json(data, { headers: url.href === MIKKA_URL + '/api/version' ? { 'x-vercel-id': 'fixture' } : {} })
   }
   const options = { sourceCommit: SOURCE, accountId: ACCOUNT, cloudflareToken: 'fixture-cf', vercelToken: 'fixture-vercel',
-    githubToken: 'fixture-github', repository, configText, fetchImpl, log() {}, maxPolls: 3,
+    repository, configText, fetchImpl, log() {}, maxPolls: 3,
     async wait(ms) { assert.equal(ms, 30_000); state.waits++ },
     async deployWorker(sha, authority) {
       assert.equal(sha, SOURCE)
@@ -84,14 +77,14 @@ function fixture() {
   return { state, options }
 }
 
-test('deploys the existing Worker once after exact Web deploy, READY alias and public build agree', async () => {
+test('deploys the existing Worker once after the READY alias and public build agree, with no Web deploy run', async () => {
   const { state, options } = fixture()
   const report = await deployCron(options)
   assert.equal(state.writes, 1)
   assert.equal(state.waits, 0)
   assert.equal(state.calls.filter(url => url === MIKKA_URL + '/api/version').length, 5)
   assert.deepEqual(report, { skipped: false, sourceCommit: SOURCE, production: { id: 'dpl_fixture', sha: SOURCE },
-    webDeployRunId: 42, versionId: VERSION, cron: '0,15,30,45 * * * *', publicUrls: false, secretBinding: 'CRON_SECRET', observability: true })
+    versionId: VERSION, cron: '0,15,30,45 * * * *', publicUrls: false, secretBinding: 'CRON_SECRET', observability: true })
   assert.equal(state.calls.some(url => /\/secrets(?:\/|$)/.test(url)), false)
 })
 
@@ -112,7 +105,7 @@ test('accepts an already migrated trigger and refuses to confirm a writer that l
 test('the protected Cloudflare promotion is re-read before the single existing minute Worker write', async () => {
   const { options, state } = fixture()
   let observations = 0
-  const report = await deployCron({ ...options, vercelToken: undefined, githubToken: undefined,
+  const report = await deployCron({ ...options, vercelToken: undefined,
     readPromotedWeb: async () => { observations++; return promotion } })
   assert.equal(observations, 2)
   assert.equal(state.writes, 1)
@@ -128,21 +121,21 @@ test('revoked, mismatched or rotated Web promotion never writes a minute Worker 
     () => null, () => ({ ...promotion, gatewayVersionSha256: '5'.repeat(64) })]) {
     const { options, state } = fixture()
     let observations = 0
-    await assert.rejects(deployCron({ ...options, maxPolls: 1, githubToken: undefined, vercelToken: undefined,
+    await assert.rejects(deployCron({ ...options, maxPolls: 1, vercelToken: undefined,
       readPromotedWeb: async () => ++observations === 1 ? promotion : changed() }))
     assert.equal(state.writes, 0)
     assert.ok(state.calls.every(url => new URL(url).origin === 'https://api.cloudflare.com'))
   }
 })
 
-test('waits for application, Web deploy and public alias propagation without an early write', async () => {
-  for (const patch of [{ live: OLD }, { status: 'BUILDING' }, { webStatus: 'pending' }, { build: OLD }]) {
+test('waits for application and public alias propagation without an early write', async () => {
+  for (const patch of [{ live: OLD }, { status: 'BUILDING' }, { build: OLD }]) {
     const { state, options } = fixture()
     Object.assign(state, patch)
     options.wait = async () => {
       assert.equal(state.writes, 0)
       state.waits++
-      Object.assign(state, { live: SOURCE, status: 'READY', webStatus: 'success', build: SOURCE })
+      Object.assign(state, { live: SOURCE, status: 'READY', build: SOURCE })
     }
     await deployCron(options)
     assert.equal(state.waits, 1)
@@ -151,7 +144,7 @@ test('waits for application, Web deploy and public alias propagation without an 
 })
 
 test('old/unready/mismatched public production times out with zero mutations', async () => {
-  for (const patch of [{ live: OLD }, { status: 'BUILDING' }, { webStatus: 'pending' }, { build: OLD }]) {
+  for (const patch of [{ live: OLD }, { status: 'BUILDING' }, { build: OLD }]) {
     const { state, options } = fixture()
     Object.assign(state, patch)
     await assert.rejects(() => deployCron(options), /^Error: production_release_wait_timeout$/)
@@ -163,10 +156,10 @@ test('old/unready/mismatched public production times out with zero mutations', a
 test('missing Worker or mismatched existing configuration refuses all writes', async () => {
   for (const patch of [{ cfStatus: 404 }, { secret: false }, { origin: 'https://other.example/mikka' }, { extraBinding: true },
     { observability: false }, { publicUrl: true }, { previews: true }, { schedules: [] }, { schedules: ['* * * * *', '0 * * * *'] },
-    { project: 'prj_foreign' }, { aliasProject: 'prj_foreign' }, { webStatus: 'failure' }, { build: 'not-a-build' }]) {
+    { project: 'prj_foreign' }, { aliasProject: 'prj_foreign' }, { build: 'not-a-build' }]) {
     const { state, options } = fixture()
     Object.assign(state, patch)
-    await assert.rejects(() => deployCron(options), /cloudflareWeb:productionSource|provider_read_http_404|cron_bindings_mismatch|cron_observability_mismatch|cron_public_url_enabled|cron_schedule_mismatch|production_project_mismatch|production_identity_mismatch|web_deploy_failed|production_version_invalid/)
+    await assert.rejects(() => deployCron(options), /cloudflareWeb:productionSource|provider_read_http_404|cron_bindings_mismatch|cron_observability_mismatch|cron_public_url_enabled|cron_schedule_mismatch|production_project_mismatch|production_identity_mismatch|production_version_invalid/)
     assert.equal(state.writes, 0)
   }
 })
@@ -238,7 +231,7 @@ test('provider response/transport errors remain bounded and never expose arbitra
   const lost = fixture()
   const fetchImpl = lost.options.fetchImpl
   lost.options.fetchImpl = async (url, init) => {
-    if (url.origin === 'https://api.github.com') throw Error('fixture-github and upstream contents must not escape')
+    if (url.href === MIKKA_URL + '/api/version') throw Error('fixture upstream contents must not escape')
     return fetchImpl(url, init)
   }
   await assert.rejects(() => deployCron(lost.options), /^Error: release_read_unavailable$/)
@@ -252,16 +245,6 @@ test('configuration cannot create resources, change cadence or publish a public 
     { durable_objects: { bindings: [{ name: 'NEW', class_name: 'NewClass' }] } }, { env: { production: {} } }]) {
     assert.throws(() => validateConfig(JSON.stringify({ ...config, ...patch })), /cron_resource_change_refused/)
   }
-})
-
-test('Web deploy evidence rejects foreign runs and honors the latest exact commit attempt', () => {
-  for (const patch of [{ head_sha: OLD }, { head_branch: 'preview' }, { event: 'pull_request' },
-    { repository: { full_name: 'other/repo' } }, { path: '.github/workflows/unrelated.yml' }]) {
-    assert.equal(webDeployRun([{ ...webRun(SOURCE), ...patch }], SOURCE), null)
-  }
-  assert.equal(webDeployRun([{ ...webRun(SOURCE), event: 'workflow_dispatch' }], SOURCE), 42)
-  assert.equal(webDeployRun([webRun(SOURCE), { ...webRun(SOURCE), id: 43, status: 'in_progress', conclusion: null }], SOURCE), null)
-  assert.throws(() => webDeployRun([webRun(SOURCE), { ...webRun(SOURCE), id: 43, conclusion: 'failure' }], SOURCE), /web_deploy_failed/)
 })
 
 test('CLI refuses PR and non-main invocation before inspecting credentials', () => {

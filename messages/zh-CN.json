@@ -1326,6 +1326,7 @@
     "deviceNotFound": "设备不存在。",
     "agentHarnessMissing": "这台电脑尚未安装所选 Agent。",
     "agentRequired": "请指定由哪个 Agent 运行这个任务：Claude Code 或 Codex。",
+    "agentNoModel": "{agent} 没有可用的模型。请在 设置 › 模型与订阅 里为它连接订阅或 API Key。",
     "agentDuplicateName": "名称重复，请换一个名称。",
     "botDuplicateName": "已有同名 Bot，请换一个名字。",
     "botNameTooLong": "Bot 名字最多 60 个字。",
@@ -7752,6 +7753,7 @@
       "readOnly": "暂时不能逐个停用模型",
       "providerOn": "{on}/{total} 个已启用",
       "firstModel": "任务先用",
+      "noFirstModel": "还没有可用的模型",
       "keyProvider": "服务商"
     }
   },

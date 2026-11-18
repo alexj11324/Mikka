@@ -101,7 +101,5 @@ jobs:
           secret-path: /platform
           secret-name: VERCEL_TEAM_TOKEN
           include-imports: false
-      - name: Wait for Web deploy and the matching public build, then update the existing minute Worker
+      - name: Wait for the matching public build, then update the existing minute Worker
         run: node scripts/suggestions-cron/deploy.mjs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}

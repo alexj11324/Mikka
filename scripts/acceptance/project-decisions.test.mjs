@@ -287,8 +287,8 @@ test('task prompt uses the structured issue and leaves the future live direction
 test('workflow attests before OIDC and uploads only two explicit sanitized reports', async () => {
   const workflow = await readFile(new URL('../../.github/workflows/project-decisions-acceptance.yml', import.meta.url), 'utf8')
   assert.ok(workflow.indexOf('project-decisions.mjs --attest') < workflow.indexOf('Infisical/secrets-action'))
-  assert.ok(workflow.includes('contains(github.event.workflow_run.head_commit.message, \'[project-map-acceptance]\')'))
-  assert.ok(workflow.includes('ref: ' + '$' + '{{ github.event.workflow_run.head_sha || github.sha }}'))
+  assert.ok(!workflow.includes('workflow_run'), 'per-service releases publish no Web deploy run to follow')
+  assert.ok(workflow.includes('ref: ' + '$' + '{{ github.sha }}'))
   assert.ok(workflow.includes('secret-path: /'))
   assert.ok(workflow.includes('recursive: false'))
   assert.ok(workflow.includes('project-decisions-report/attestation.json'))

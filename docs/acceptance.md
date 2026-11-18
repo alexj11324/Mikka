@@ -280,7 +280,7 @@ After the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
 
 The [2026-11-07 production acceptance decision](design/decisions/2026-11-07-1400-production-acceptance-scope.md)
 calls for automatic sign-in, a Coordinator message and task dispatch after each
-Web deploy. The implemented `production-smoke.yml` job runs
+Web release. The implemented `production-smoke.yml` job runs
 `scripts/ops/production-smoke.mjs`, which signs in and reads the shell,
 capabilities and shared-team Coordinator runtime. `AGENTS.md` records that
 implementation and keeps messaging and dispatch in separate live acceptance

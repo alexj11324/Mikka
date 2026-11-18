@@ -139,10 +139,9 @@ function fullFixture(options = {}) {
   const selectedEnv = options.deployed ? { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: OTHER,
     GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_RUN_ID: '20', GITHUB_RUN_ATTEMPT: '1',
     GITHUB_WORKFLOW_REF: REPOSITORY + '/' + DEPLOYED_WORKFLOW + '@refs/heads/main',
-    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: SHA,
-    WEB_DEPLOY_RUN_ID: '10', VERCEL_DEPLOYMENT_ID: DEPLOYMENT } : env
+    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: SHA } : env
   const selectedEvent = options.deployed ? { repository,
-    inputs: { application_sha: SHA, web_run_id: '10', deployment_id: DEPLOYMENT } } : event
+    inputs: { application_sha: SHA } } : event
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), headers = new Headers(init.headers), method = init.method ?? 'GET'
     requests.push({ origin: url.origin, path: url.pathname, search: url.search, method, body: init.body })
@@ -155,12 +154,6 @@ function fullFixture(options = {}) {
           repository, head_repository: repository, url: 'https://api.github.com/repos/' + REPOSITORY + '/actions/runs/20',
           path: DEPLOYED_WORKFLOW, event: 'workflow_dispatch', head_branch: 'main', head_sha: OTHER,
           status: 'in_progress', conclusion: null })
-        if (url.pathname.endsWith('/actions/runs/10')) return json({ ...release, repository, head_repository: repository, run_attempt: 1 })
-        if (url.pathname.endsWith('/actions/runs/10/attempts/1/jobs')) return json({ total_count: 1, jobs: [{
-          id: 30, run_id: 10, name: 'deploy', head_sha: SHA, status: 'completed', conclusion: 'success',
-          steps: ['Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
-            'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })),
-        }] })
       }
       if (url.pathname.endsWith('/issues/1415')) return json({ number: 1415, state: options.closed ? 'closed' : 'open',
         url: 'https://api.github.com/repos/' + REPOSITORY + '/issues/1415', repository_url: 'https://api.github.com/repos/' + REPOSITORY })
@@ -171,15 +164,15 @@ function fullFixture(options = {}) {
       assert.equal(headers.get('authorization'), 'Bearer ' + TOKEN)
       assert.equal(url.searchParams.get('teamId'), TEAM); assert.equal(method, 'GET')
       return url.pathname.startsWith('/v4/') ? json({ alias: 'app.aspectlylabs.com', projectId: PROJECT,
-        deploymentId: options.driftAfterSubmit && submitted ? 'dpl_ChangedSameSha' : DEPLOYMENT, updatedAt: NOW })
+        deploymentId: DEPLOYMENT, updatedAt: NOW })
         : json({ id: DEPLOYMENT,
           ...(options.nestedProject ? { project: { id: PROJECT } } : { projectId: PROJECT }),
-          ...(options.conflictingManagedProject && ++deploymentReads === 3
+          ...(options.conflictingManagedProject && ++deploymentReads === 1
             ? { projectId: PROJECT, project: { id: 'prj_Foreign' } } : {}),
           gitSource: { sha: SHA }, readyState: 'READY', target: 'production' })
     }
     assert.equal(url.origin, ORIGIN); assert.equal(headers.get('authorization'), null)
-    if (url.pathname === '/mikka/api/version') return json({ build: SHA })
+    if (url.pathname === '/mikka/api/version') return json({ build: options.driftAfterSubmit && submitted ? OTHER : SHA })
     assert.equal(headers.get('origin'), ORIGIN)
     if (url.pathname.endsWith('/sign-in/email')) {
       assert.deepEqual(JSON.parse(init.body), { email: EMAIL, password: PASSWORD })
@@ -308,20 +301,10 @@ test('closed issue, stale main, denied manager or missing team never submits a t
   }
 })
 
-test('workflow keeps standalone read acceptance and serializes the bounded migration proof', async () => {
+test('read cache acceptance is dispatched; the closed migration proof runs only in its deployed-target workflow', async () => {
   const text = await readFile(new URL('../../.github/workflows/read-cache-production.yml', import.meta.url), 'utf8')
-  const migration = text.slice(text.indexOf('  workflow-migration:'))
-  const acceptance = text.slice(text.indexOf('  acceptance:'), text.indexOf('  workflow-migration:'))
-  assert.match(acceptance, /run: node --import tsx scripts\/acceptance\/read-cache-production\.mjs\n/)
-  assert.match(migration, /needs: \[guards, acceptance\]/)
-  assert.match(migration, /read-cache-production\.mjs --attest --migration-1415/)
-  assert.doesNotMatch(migration, /read-cache-production\.mjs --migration-1415/)
-  assert.doesNotMatch(migration, /production-web-parity-evidence|sandboxes-cloud\.docker\.com/)
-  assert.match(migration, /if: steps\.attest\.outputs\.readable == 'true'\n        run: pnpm exec playwright install --with-deps --only-shell chromium/)
-  assert.match(migration, /if: steps\.attest\.outputs\.readable == 'true'\n        run: pnpm exec playwright test -c playwright\.smoke\.config\.ts/)
-  assert.ok(migration.indexOf('secret-name: SMOKE_OWNER_PASSWORD') < migration.indexOf('run: pnpm exec playwright test'))
-  assert.ok(migration.indexOf('run: pnpm exec playwright test') < migration.indexOf('secret-name: VERCEL_TEAM_TOKEN'))
-  assert.match(text, /secret-name: VERCEL_TEAM_TOKEN/)
+  assert.match(text, /run: node --import tsx scripts\/acceptance\/read-cache-production\.mjs\n/)
+  assert.doesNotMatch(text, /workflow_run:|Web deploy|workflow-migration:/)
   assert.match(text, /workflow-migration-production\.test\.mjs/)
   const desktop = await readFile(new URL('../../.github/workflows/desktop.yml', import.meta.url), 'utf8')
   assert.ok(!desktop.includes("'scripts/acceptance/"))
@@ -334,7 +317,6 @@ test('explicit deployed target reuses the same owner and managed reminder proof 
   assert.equal(report.status, 'pass'); assert.equal(report.targetMode, 'deployed-target')
   assert.equal(report.applicationSha, SHA); assert.equal(report.driverRevision, OTHER)
   assert.equal(report.driverRunId, 20); assert.equal(report.driverRunAttempt, 1)
-  assert.equal(report.webDeployJobId, 30); assert.equal(report.deploymentId, DEPLOYMENT)
   assert.equal(report.targetBefore.status, 'ready'); assert.equal(report.targetAfter.status, 'ready')
   assert.equal(report.managed.coordinatorCompleted, true); assert.equal(report.managed.dueTimerObserved, true)
   assert.equal(report.submissionCount, 1); assert.equal(report.cleanupSubmissionCount, 0)
