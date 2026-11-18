@@ -29,6 +29,7 @@ const RichTextSelection = Selection.extend({
     let fallback: ReturnType<typeof setTimeout> | undefined
     const release = () => {
       clearTimeout(fallback)
+      window.removeEventListener("mouseup", settle, true)
       pressed = null
     }
     // A swallowed press lets go now; a click that never moves the selection
@@ -48,6 +49,9 @@ const RichTextSelection = Selection.extend({
         view: () => ({
           update(view) {
             if (pressed && !pressed.eq(view.state.selection)) release()
+          },
+          destroy() {
+            release()
           },
         }),
         props: {
