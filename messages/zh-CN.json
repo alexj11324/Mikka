@@ -5026,6 +5026,10 @@
       "lead": "负责回复",
       "failed": "创建线程失败",
       "unconfirmed": "尚未确认是否已创建",
+      "model": "模型",
+      "modelAuto": "跟随 Bot",
+      "device": "设备",
+      "deviceAuto": "自动选择",
       "reviewGroups": "查看线程"
     },
     "newGroup": {
@@ -5040,6 +5044,10 @@
       "lead": "负责回复",
       "failed": "群聊创建失败",
       "unconfirmed": "群聊创建状态未确认",
+      "model": "模型",
+      "modelAuto": "跟随 Bot",
+      "device": "设备",
+      "deviceAuto": "自动选择",
       "reviewGroups": "查看群聊"
     },
     "searchPlaceholder": "搜索 Bot、线程、群聊、任务和项目",

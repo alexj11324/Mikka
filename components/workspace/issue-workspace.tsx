@@ -51,6 +51,7 @@ import { AllThreadsColumn, AllThreadsToggle } from '@/components/nav/all-threads
 import { useTaskContinuation } from '@/lib/hooks/use-task-continuation'
 import { nextTaskListCursor } from '@/lib/task-list-page'
 import { listWorkspaceTaskPage } from '@/app/actions/issues'
+import { listDevices } from '@/app/actions/agents'
 import { TaskCardDataProvider } from '@/hooks/use-task-cards'
 import { TaskPresentationsContext, useWorkspaceTaskPresentations } from '@/hooks/use-task-collection'
 import { groupPresentedTasks, waitingTasks } from '@/lib/task-collection'
@@ -263,6 +264,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const [creatingBot, setCreatingBot] = useState(false)
   const [creation, setCreation] = useState<'group' | 'conversation' | null>(null)
   const closeComposer = () => setCreation(null)
+  // The machines a thread may be pinned to. Read only while the create dialog is open, and never blocking it.
+  const { data: deviceRoster = [] } = useSWR(creation ? ['devices', user.id] : null, listDevices, { shouldRetryOnError: false, revalidateOnFocus: false })
   const [directoryRevision, setDirectoryRevision] = useState(0)
   const [createdBot, setCreatedBot] = useState<BotView>()
   // The Coordinator's last line and time come from the bot chat summaries, never its whole chat.
@@ -775,7 +778,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
 
       onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />}
     {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={workspaceContext?.workspace.id ?? workspaceData?.workspace.id} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot); else setCreating(true) }} />}
-    {(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null) && <NewGroupDialog key={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} workspaceId={(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null)!} bots={bots} purpose={creation === 'conversation' ? creation : undefined} open={creation !== null} onOpenChange={open => { if (!open) closeComposer() }}
+    {(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null) && <NewGroupDialog key={workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null} workspaceId={(workspaceContext?.workspace.id ?? workspaceData?.workspace.id ?? null)!} bots={bots} purpose={creation === 'conversation' ? creation : undefined} devices={deviceRoster} open={creation !== null} onOpenChange={open => { if (!open) closeComposer() }}
       onCreated={group => {
         if (creation === 'conversation') setDirectoryRevision(value => value + 1)
         closeComposer()

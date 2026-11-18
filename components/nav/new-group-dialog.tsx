@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { WORKSPACE_BOT_MODELS } from '@/lib/bot-models'
 import { useOpenerFocus } from '@/hooks/use-focus-return'
 import { BotAvatar } from './bot-avatar'
 
@@ -23,14 +25,19 @@ type Props = {
   onCreated: (group: CreatedGroup) => void
   onNewBot: () => void
   onReviewGroups: () => void
+  /** The person's live machines, offered only when there is a real choice (two or more). */
+  devices?: readonly { id: string; name: string; online: boolean }[]
 }
 
 /** Both entry points use the workspace's owned Bots and the same persistent message transport. */
-export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots, onCreated, onNewBot, onReviewGroups }: Props) {
+export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots, onCreated, onNewBot, onReviewGroups, devices = [] }: Props) {
   const t = useTranslations(purpose ? 'Shell.createConversation' : 'Shell.newGroup')
   const common = useTranslations('Common')
   const [title, setTitle] = useState('')
   const [picked, setPicked] = useState<string[]>([])
+  // A thread may pin the model that answers it and the machine that runs it. 'auto' means "Mikka chooses".
+  const [model, setModel] = useState('auto')
+  const [deviceId, setDeviceId] = useState('auto')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<'failed' | 'unconfirmed' | 'nameRequired' | 'botsRequired' | null>(null)
   const pending = useRef(false)
@@ -55,7 +62,7 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
     try {
       const response = await fetch(withBasePath('/api/conversations'), {
         method: 'POST', credentials: 'same-origin', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ workspaceId, ...(purpose ? { purpose, leadBotId: selected[0] } : {}), title: title.trim(), members: selected.map(memberId => ({ memberType: 'bot', memberId })) }),
+        body: JSON.stringify({ workspaceId, ...(purpose ? { purpose, leadBotId: selected[0] } : {}), title: title.trim(), model: model === 'auto' ? null : model, deviceId: deviceId === 'auto' ? null : deviceId, members: selected.map(memberId => ({ memberType: 'bot', memberId })) }),
         signal: AbortSignal.timeout(30000),
       })
       const group = await response.json().catch(() => null) as { id?: unknown; title?: unknown } | null
@@ -84,7 +91,7 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
   // dialog, and a pending POST must never take all four away at once (alive.current already stops a late reply from
   // navigating away from the workspace the person is looking at).
   return <Dialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={next => {
-    if (!next) { setTitle(''); setPicked([]); setError(null); created.current = false }
+    if (!next) { setTitle(''); setPicked([]); setModel('auto'); setDeviceId('auto'); setError(null); created.current = false }
   }}>
     <DialogContent aria-describedby={undefined} className="top-[12vh] translate-y-0 sm:max-w-[45rem]" closeLabel={common('close')} finalFocus={() => !created.current && openerFocus()}>
       <DialogHeader><DialogTitle>{t('title')}</DialogTitle></DialogHeader>
@@ -94,6 +101,23 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
           <FieldLabel htmlFor="new-group-title">{t('name')}</FieldLabel>
           <Input id="new-group-title" autoFocus value={title} maxLength={200} disabled={saving || error === 'unconfirmed'} onChange={event => { setTitle(event.target.value); if (error === 'nameRequired') setError(null) }} />
         </Field>
+        {/* Capy's new-thread panel carries the run's terms beside the name; so does this one. */}
+        <FieldGroup className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field>
+            <FieldLabel>{t('model')}</FieldLabel>
+            <ToggleGroup variant="outline" spacing={0} aria-label={t('model')} disabled={saving || error === 'unconfirmed'} value={[model]} onValueChange={values => setModel(values[0] ?? 'auto')}>
+              <ToggleGroupItem value="auto">{t('modelAuto')}</ToggleGroupItem>
+              {WORKSPACE_BOT_MODELS.map(name => <ToggleGroupItem key={name} value={name}>{name}</ToggleGroupItem>)}
+            </ToggleGroup>
+          </Field>
+          {devices.length > 1 && <Field>
+            <FieldLabel>{t('device')}</FieldLabel>
+            <ToggleGroup variant="outline" spacing={0} aria-label={t('device')} disabled={saving || error === 'unconfirmed'} value={[deviceId]} onValueChange={values => setDeviceId(values[0] ?? 'auto')}>
+              <ToggleGroupItem value="auto">{t('deviceAuto')}</ToggleGroupItem>
+              {devices.map(device => <ToggleGroupItem key={device.id} value={device.id}>{device.name}</ToggleGroupItem>)}
+            </ToggleGroup>
+          </Field>}
+        </FieldGroup>
         <FieldSet disabled={saving || error === 'unconfirmed'} className="gap-2">
           <FieldLegend variant="label">{t('bots')}</FieldLegend>
           {choices.length ? <FieldGroup className="grid max-h-60 grid-cols-1 gap-1 overflow-y-auto sm:grid-cols-2">
