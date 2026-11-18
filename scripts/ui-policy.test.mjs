@@ -74,6 +74,12 @@ for (const [label, source, rule] of [
   ['sparkle icon', 'import { Sparkles } from "lucide-react";', 'icons/no-sparkle'],
 ]) test(label, () => has(`${prefix}\n${source}`, rule))
 
+test('a priority is Mikka\'s own staircase, never equal-height tally bars (R-71a)', () => {
+  const rules = text => auditSource('components/icons/index.tsx', text, policy).map(item => item.rule)
+  assert.ok(rules('import { Tally1Icon } from "@hugeicons/core-free-icons";').includes('icons/priority-bars'))
+  assert.deepEqual(rules("export const SignalLow = own(['M7 19V13'])"), [])
+})
+
 test('a thread icon never borrows a task\'s circle (R-52)', () => {
   const rules = text => auditSource('components/workspace/thread-status-icon.tsx', text, policy).map(item => item.rule)
   assert.ok(rules('import { CircleCheck } from "lucide-react";').includes('icons/thread-not-circle'))
