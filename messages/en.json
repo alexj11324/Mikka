@@ -316,7 +316,11 @@
     "connectKind": {
       "managed": "One-click",
       "credentials": "API key",
-      "none": "No setup"
+      "none": "No setup",
+      "oauthSetupRequired": "This provider needs a Composio-managed OAuth app that's not available to Mikka yet",
+      "oauthSetupRequiredWithAlternative": "Composio-managed OAuth isn't available to Mikka · API-key option: {name}",
+      "alternativeLink": "Use API-key version: {name}",
+      "unsupported": "Mikka doesn't support this provider's authentication method yet."
     },
     "key": {
       "title": "Connect {name}",
