@@ -723,6 +723,34 @@ library's shipped look ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-
   省略号的外边」). Secondary
   actions, branch names, counts and shortcut hints go into 「⋯」 or a
   tooltip, not a row of their own (Alex, 2026-11-08; [2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)).
+- **R-92** Lists have three sanctioned densities and nothing in between: a
+  two-line entry is 50px (13/20 Medium title over a 12/18 quiet line), a
+  single-line entry is 40px, a group header is 32px. A skeleton is drawn at the
+  height of the row it replaces, so the list does not move when data lands. An
+  entry's information set never depends on the window width: the priority order
+  is fixed and only the text truncates.
+- **R-93** An entry's own actions are disclosed, not permanent: they hold a
+  reserved slot at the row's end, start at `opacity-0`, and appear on
+  `group/row` hover or keyboard focus; a coarse pointer shows them always. The
+  slot keeps its width, so nothing shifts when the pointer crosses the list. A
+  selection control is disclosed the same way and stays visible once checked.
+- **R-94** One entry, one hover surface, one target. The hover and selected
+  fill sit on the row only (R-39); controls inside the row are its siblings and
+  keep their own feedback. No nested control carries a second background fill.
+- **R-95** A grouped list reads in the order the work is done, not in enum or
+  alphabetical order: pinned, then what needs attention, then what is running,
+  then what is ready, then history. The group header stays fixed while its rows
+  scroll under it.
+- **R-96** Every list state is drawn. "Nothing here" and "nothing matches the
+  filters" are two different states, each with the one action that resolves it
+  (R-41); loading is a skeleton, never a status string.
+- **R-97** A list, table, panel, row, menu or popover never takes a radius
+  above 12, and Mikka's own UI does not draw `rounded-3xl` (24) on those
+  surfaces. R-33's 14 stays for the approval and list card, and a dialog keeps
+  the radius the shipped modal draws ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+
+The measured baseline these come from, and the Capy values they were compared
+against, are in [2026-11-18-1400](decisions/2026-11-18-1400-pr-surface-and-craft-baseline.md).
 
 ## Design review
 
