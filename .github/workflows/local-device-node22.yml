@@ -45,6 +45,7 @@ jobs:
       MIKKA_LOCAL_TEST_ACCOUNTS: '1'
       NEXT_TELEMETRY_DISABLED: '1'
       NITRO_PRESET: node-server
+      MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -65,7 +66,15 @@ jobs:
           echo "MIKKA_DATA_DIR=$RUNNER_TEMP/mikka-node-compat-data" >> "$GITHUB_ENV"
           echo "MIKKA_EVE_DATA_DIR=$RUNNER_TEMP/mikka-node-compat-eve" >> "$GITHUB_ENV"
       - run: pnpm test:e2e:setup
+      - name: Bind the isolated MVP environment to this exact checkout
+        if: matrix.node == '24'
+        run: node scripts/test-accounts/bootstrap.mjs --output .cache/e2e/environment.json
+        env:
+          BETTER_AUTH_URL: http://localhost:3100
+          MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
       - name: Build actual app and Eve on the selected Node runtime
+        env:
+          BETTER_AUTH_URL: http://localhost:3100
         run: |
           node --version
           pnpm build:app
@@ -78,6 +87,9 @@ jobs:
         if: matrix.node == '24'
         run: pnpm test:e2e:mvp
         env:
+          BETTER_AUTH_URL: http://localhost:3100
+          E2E_BASE_URL: http://localhost:3100
+          MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
           MIKKA_MVP_E2E: '1'
           MIKKA_TEST_MODE: '1'
       - name: Preserve MVP browser results and screenshots
