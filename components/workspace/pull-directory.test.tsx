@@ -140,7 +140,9 @@ function change(select: HTMLSelectElement, value: string) {
   assert.ok(setter);
   flushSync(() => {
     setter.call(select, value);
-    select.dispatchEvent(new browser.Event("change", { bubbles: true }));
+    select.dispatchEvent(
+      new browser.Event("change", { bubbles: true }) as unknown as Event,
+    );
   });
 }
 
@@ -151,7 +153,7 @@ test("the PR tab switches from linked task snapshots to real repository PRs and 
     assert.match(document.body.textContent ?? "", /Better PR overview/);
     const source = document.querySelector('select[aria-label="source"]');
     assert.ok(source instanceof browser.HTMLSelectElement);
-    await act(async () => change(source, "Owner/Repo"));
+    await act(async () => change(source as unknown as HTMLSelectElement, "Owner/Repo"));
     const row = [...document.querySelectorAll("button")].find((button) =>
       button.textContent?.includes("Better PR overview"),
     );
@@ -190,7 +192,7 @@ test("filters act on PR metadata and the Ready view is not inferred from a green
   try {
     const source = document.querySelector('select[aria-label="source"]');
     assert.ok(source instanceof browser.HTMLSelectElement);
-    await act(async () => change(source, "Owner/Repo"));
+    await act(async () => change(source as unknown as HTMLSelectElement, "Owner/Repo"));
     const ready = [...document.querySelectorAll('[role="tab"]')].find(
       (tab) => tab.textContent === "views.ready",
     );
@@ -207,7 +209,9 @@ test("filters act on PR metadata and the Ready view is not inferred from a green
     await act(async () => {
       flushSync(() => {
         setter.call(search, "missing");
-        search.dispatchEvent(new browser.Event("input", { bubbles: true }));
+        search.dispatchEvent(
+          new browser.Event("input", { bubbles: true }) as unknown as Event,
+        );
       });
     });
     assert.match(document.body.textContent ?? "", /noMatches/);
