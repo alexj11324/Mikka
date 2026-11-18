@@ -254,7 +254,7 @@
     "test:eve-product-tool": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/eve/product-tool.test.ts lib/eve/product-definitions.test.ts",
     "test:eve-db": "node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/eve/auth-bot.db.test.ts lib/eve/scheduled-read.db.test.ts lib/eve/scope.db.test.ts lib/eve/approval-bridge.db.test.ts lib/eve/settlement.db.test.ts lib/eve/sandbox.db.test.ts lib/eve/outcome-delivery.db.test.ts lib/eve/evaluation-store.db.test.ts",
     "test:github-pulls": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test app/api/integrations/github/repositories/pulls/route.test.ts lib/github/pull-directory.test.ts lib/pull-directory.test.ts components/workspace/pull-directory.test.tsx",
-    "test:eve-graphile-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test cloudflare/eve-runtime/test/graphile-event-driven.db.test.mjs"
+    "test:eve-graphile-db": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test tests/eve-runtime-graphile-event-driven.db.test.mjs"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.121",

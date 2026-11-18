@@ -5,11 +5,11 @@ import { EventEmitter } from 'node:events'
 import { realpathSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import test from 'node:test'
-import { disposableDatabase } from '../../../tests/helpers/e2e-target.mjs'
+import { disposableDatabase } from './helpers/e2e-target.mjs'
 
 const databaseUrl = process.env.E2E_DATABASE_URL
 const safeDatabase = disposableDatabase()
-const worldEntry = fileURLToPath(new URL('../../../apps/eve/node_modules/@workflow/world-postgres/dist/queue.js', import.meta.url))
+const worldEntry = fileURLToPath(new URL('../apps/eve/node_modules/@workflow/world-postgres/dist/queue.js', import.meta.url))
 const worldRequire = createRequire(realpathSync(worldEntry))
 
 test('Graphile event-driven workers wake on jobs, delayed run_at, retries and listener recovery without idle claims', {
@@ -102,7 +102,7 @@ test('Postgres World wrapper defaults to zero idle claim polling', {
   skip: !safeDatabase,
 }, async () => {
   const { Pool } = worldRequire('pg')
-  const worldQueuePath = fileURLToPath(new URL('../../../apps/eve/node_modules/@workflow/world-postgres/dist/queue.js', import.meta.url))
+  const worldQueuePath = fileURLToPath(new URL('../apps/eve/node_modules/@workflow/world-postgres/dist/queue.js', import.meta.url))
   const { createQueue } = await import(pathToFileURL(worldQueuePath).href)
   const pgPool = new Pool({ connectionString: databaseUrl, max: 12 })
   const originalLocalBase = process.env.WORKFLOW_LOCAL_BASE_URL

@@ -52,7 +52,7 @@ test('Factory store selects marker-backed suites and real downstream imports', a
   assert(result.image, 'a new backend capability must validate self-hosted dependencies and exercise the image')
 })
 test('Cloudflare Eve Graphile Postgres recovery suite is inventoried and selected', async () => {
-  const file = 'cloudflare/eve-runtime/test/graphile-event-driven.db.test.mjs'
+  const file = 'tests/eve-runtime-graphile-event-driven.db.test.mjs'
   assert(plan.db.scripts.includes('test:eve-graphile-db'))
   const result = await pick(file)
   assert(result.db_suites.includes('test:eve-graphile-db'))
