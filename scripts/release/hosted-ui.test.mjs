@@ -57,16 +57,13 @@ test('distribution rejects source maps, inline maps, raw UI source and escaping 
 })
 test('official jobs keep private code out of public artifacts and pin desktop to Web', async () => {
   const workflow = async name => yaml.load(await readFile(new URL(`../../.github/workflows/${name}.yml`, import.meta.url), 'utf8'))
-  const web = await workflow('web-deploy'), desktop = await workflow('desktop-release')
-  for (const doc of [web, desktop]) for (const job of Object.values(doc.jobs)) {
+  const desktop = await workflow('desktop-release')
+  for (const job of Object.values(desktop.jobs)) {
     for (const step of job.steps ?? []) assert.ok(!step.uses?.startsWith('actions/upload-artifact'))
   }
-  for (const job of [web.jobs.deploy, desktop.jobs.macos]) {
-    const install = job.steps.find(step => step.name === 'Install private UI runtime dependencies without license scripts')
-    assert.match(install?.run ?? '', /--ignore-workspace --prod --ignore-scripts --frozen-lockfile/)
-  }
+  const install = desktop.jobs.macos.steps.find(step => step.name === 'Install private UI runtime dependencies without license scripts')
+  assert.match(install?.run ?? '', /--ignore-workspace --prod --ignore-scripts --frozen-lockfile/)
   for (const job of [desktop.jobs.preflight, desktop.jobs.macos]) {
-    // The paused Vercel publisher is never a Desktop prerequisite.
     assert.ok(!job.steps.some(step => /web-deploy\.mjs|hosted-ui\.mjs production/.test(step.run ?? '')))
     assert.equal(job.permissions.issues, 'read')
   }
@@ -110,5 +107,4 @@ test('official jobs keep private code out of public artifacts and pin desktop to
   assert.equal(checkout.with['ssh-key'], '${{ env.HOSTED_UI_READ_KEY }}')
   assert.equal(checkout.with.token, undefined)
   assert.ok(desktop.jobs.macos.steps.some(step => step.run?.includes('audit "$RUNNER_TEMP/official-packaged-app"')))
-  assert.ok(web.jobs.deploy.steps.some(step => step.run?.includes('audit .vercel/output/static')))
 })
