@@ -119,7 +119,7 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 
 ## Skills 搜索
 
-有 Vercel OIDC 时沿用身份请求；没有时直接读取 skills.sh 的公开 API。如果上游要求授权、不可用或返回不合规数据，接口返回固定 `skills_search_unavailable` / `invalid_skills_response`，不泄露上游响应。不需要 Mikka 账号或新增 Key。
+技能目录读取需要 Vercel OIDC。没有可用部署身份时，接口不会向上游发出未认证请求，并返回 `skills_search_identity_unavailable`；上游拒绝身份时返回 `skills_search_identity_rejected`。其他上游不可用或响应不合规时，分别返回固定 `skills_search_unavailable` / `invalid_skills_response`，不泄露上游响应。社区版或 Cloudflare 部署若没有受支持的身份，仍可从页面打开 skills.sh 浏览；不需要用户提供 Mikka Key。
 
 ## 验证
 

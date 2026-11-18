@@ -288,6 +288,8 @@
     "loadFailed": "Could not load the skills.sh directory right now.",
     "retry": "Retry",
     "browseSkills": "Open skills.sh",
+    "identityUnavailable": "This deployment doesn't have the identity needed to search skills.sh. You can still browse skills.sh directly.",
+    "identityRejected": "skills.sh rejected the deployment identity. Check the Vercel OIDC setup, or browse skills.sh directly.",
     "noResults": "No matching skills found.",
     "clearSearch": "Clear search",
     "installCount": "{count} installs",
