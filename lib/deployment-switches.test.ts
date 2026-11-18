@@ -53,7 +53,7 @@ test('a test override wins over PostHog and the variable, and clears', async () 
 })
 
 test('the test override is unreachable in production: it throws in a deployment or a production build, and only test code imports it', () => {
-  for (const env of [{ VERCEL: '1' }, { VERCEL_ENV: 'production' }, { VERCEL_ENV: 'preview' }, { NODE_ENV: 'production' }, ...['production', 'preview', 'development'].map(stage => ({ MIKKA_DEPLOYMENT_STAGE: stage }))]) {
+  for (const env of [{ NODE_ENV: 'production' }, ...['production', 'preview', 'development'].map(stage => ({ MIKKA_DEPLOYMENT_STAGE: stage }))]) {
     assert.throws(() => overrideDeploymentSwitch('issueTools', false, env), /tests only/, JSON.stringify(env))
   }
   assert.equal(deploymentSwitch('issueTools', {}), true, 'a refused override sets nothing')
@@ -142,8 +142,8 @@ test('the deployment says which one it is, so a flag can be on for production on
   assert.equal(deploymentName({ MIKKA_DEPLOYMENT_STAGE: 'preview', VERCEL_ENV: 'production' }), 'preview')
   assert.equal(deploymentName({ MIKKA_DEPLOYMENT_STAGE: 'development', VERCEL_ENV: 'preview' }), 'development')
   assert.throws(() => deploymentName({ MIKKA_DEPLOYMENT_STAGE: 'prod' }), /MIKKA_DEPLOYMENT_STAGE_INVALID/)
-  assert.equal(deploymentName({ VERCEL_ENV: 'production' }), 'production')
-  assert.equal(deploymentName({ VERCEL_ENV: 'preview' }), 'preview')
-  assert.equal(deploymentName({ VERCEL_ENV: 'development' }), 'development')
+  assert.equal(deploymentName({ VERCEL_ENV: 'production' }), 'local')
+  assert.equal(deploymentName({ VERCEL_ENV: 'preview' }), 'local')
+  assert.equal(deploymentName({ VERCEL_ENV: 'development' }), 'local')
   assert.equal(deploymentName({}), 'local')
 })

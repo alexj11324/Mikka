@@ -158,7 +158,7 @@ function testOverrides(): Map<string, boolean> | undefined {
  * test files may import it (deployment-switches.test.ts checks both).
  */
 export function overrideDeploymentSwitch(name: DeploymentSwitch, value: boolean | undefined, env: Env = process.env): void {
-  if (deploymentStage(env) || env.VERCEL || env.NODE_ENV === 'production') throw new Error('overrideDeploymentSwitch is for tests only')
+  if (deploymentStage(env) || env.NODE_ENV === 'production') throw new Error('overrideDeploymentSwitch is for tests only')
   const holder = globalThis as { [OVERRIDES]?: Map<string, boolean> }
   const map = holder[OVERRIDES] ??= new Map()
   if (value === undefined) map.delete(name)

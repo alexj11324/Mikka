@@ -3465,14 +3465,20 @@
   },
   "lib/due-timer-owner.ts": {
     "mode": "built-in",
-    "environment": [],
+    "environment": [
+      "MIKKA_DEPLOYMENT_STAGE",
+      "MIKKA_DEPLOYMENT_ENVIRONMENT"
+    ],
     "behavior": "Coordinates durable run-recovery timer ownership only for explicit production deployment stages, using the installed Workflow runtime.",
     "test": "lib/due-timer.test.ts",
     "suite": "test:schedules"
   },
   "lib/due-timer.ts": {
     "mode": "built-in",
-    "environment": [],
+    "environment": [
+      "MIKKA_DEPLOYMENT_STAGE",
+      "MIKKA_DEPLOYMENT_ENVIRONMENT"
+    ],
     "behavior": "Wakes durable due timers after committed database writes and selects deployment-aware recovery using explicit Mikka deployment configuration.",
     "test": "lib/due-timer.test.ts",
     "suite": "test:schedules"

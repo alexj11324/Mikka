@@ -7,7 +7,7 @@ import { deviceRegistered } from '../../packages/protocol/src/device'
 import { daemonTraceSettings } from './config'
 import { createTracerProvider } from './node'
 
-const production = { VERCEL: '1', VERCEL_ENV: 'production', NODE_ENV: 'production' }
+const production = { MIKKA_DEPLOYMENT_STAGE: 'production', NODE_ENV: 'production' }
 
 test('device registration hands the daemon only a public token and the PostHog endpoint', () => {
   const settings = daemonTraceSettings(production, 'phc_projecttoken1')
