@@ -128,7 +128,7 @@ const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => 
 </IntlProvider>)
 
 test('a recorded model stays available to the composer without a context estimate in the thread', () => {
-  runContext = { used: 6, promptUsed: 6, promptBudget: 25_000, segments: [], unmeasured: [], model: null,
+  runContext = { used: 6, promptUsed: 6, promptBudget: 25_000, estimated: true, segments: [], unmeasured: [], model: null,
     compactAtTokens: null, windowTokens: null, composerModel: { selected: 'gpt-5.1', served: null } }
   try {
     const html = render({ issueId: null })
