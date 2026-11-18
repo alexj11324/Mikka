@@ -21,6 +21,7 @@ let thread: Record<string, unknown> | null
 let draftText = ''
 let draftQuote: string | null = null
 let storedMessages: { id: string; text: string; at: Date; mine: boolean }[] = []
+let runContext: import('../lib/context-usage').ContextUsage | undefined
 let shownThread: import('../components/slots/thread-contract').ThreadScreenProps | undefined
 let pageChecks = 0
 let buildGate: Promise<boolean> | undefined
@@ -50,7 +51,7 @@ mock.module('swr', {
   )
     ? actualSWR.default(key, fetcher, options)
     : Array.isArray(key) && key[0] === 'issue-thread'
-    ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: storedMessages }, mutate: () => {} }
+    ? { data: thread && { thread, chunks: [{ chunk: { type: 'text-delta', id: 'a', delta: 'Done.' }, at: new Date(0) }], messages: storedMessages, context: runContext }, mutate: () => {} }
     // Where the thread runs is its own read (thread-run-place.tsx); none here.
     : Array.isArray(key) && key[0] === 'thread-machine' ? { data: null, mutate: () => {} }
     : Array.isArray(key) && key[0] === 'thread-changes' ? { data: changesRead, mutate: () => {} }
@@ -125,6 +126,18 @@ after(() => browser.close())
 const render = (props: Partial<Parameters<typeof IssueThreadPanel>[0]> = {}) => renderToStaticMarkup(<IntlProvider locale="en" timeZone="UTC" messages={messages}>
   <IssueThreadPanel bare issueId="issue-1" runId="run-1" onClose={() => {}} {...props} />
 </IntlProvider>)
+
+test('a recorded model stays available to the composer without a context estimate in the thread', () => {
+  runContext = { used: 6, promptUsed: 6, promptBudget: 25_000, segments: [], unmeasured: [], model: null,
+    compactAtTokens: null, windowTokens: null, composerModel: { selected: 'gpt-5.1', served: null } }
+  try {
+    const html = render({ issueId: null })
+    assert.doesNotMatch(html, /data-slot="thread-context-usage"|25K/)
+    assert.match(renderToStaticMarkup(shownThread?.composer.model), /GPT-5\.1/)
+  } finally {
+    runContext = undefined
+  }
+})
 
 function ReadControl() {
   const { mutate } = actualSWR.useSWRConfig()
@@ -389,6 +402,15 @@ const acceptedTask = (patch: Partial<FactoryTask> = {}): FactoryTask => ({
 function expectStatusBadge(html: string, group: string, message?: string) {
   assert.match(html, new RegExp(`<span\\b(?=[^>]*data-slot="badge")(?=[^>]*data-group="${group}")[^>]*>`), message)
 }
+
+test('finished work without a request for input shows its duration without a waiting badge', () => {
+  for (const kind of ['implement', 'acceptance']) {
+    thread = { ...base, kind, finishedAt: new Date(12_000) }
+    const html = render()
+    assert.match(html, /Worked for 12s/)
+    assert.doesNotMatch(html, /data-group="waiting"/)
+  }
+})
 
 test('acceptance resolves the current producer badge without rewriting its outcome or disabling its ordinary composer', () => {
   draftText = 'Keep this producer follow-up draft'

@@ -369,6 +369,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   - `agent_runs.outcome` supplies the ended run's judgement, based on its
     reply, status, task and PRs (`lib/run-outcome-judge.ts`). A finished
     process alone does not prove success.
+  - In the transcript, a finished run without a judged outcome or a request
+    for input shows its elapsed work time. See [thread activity status](decisions/2026-11-18-2036-thread-activity-status.md).
   - A run shows its own result icon where a run is listed (glossary: Run
     result), never the hand. Running uses the ring, waiting for the person
     uses pause, finished a check, failed a triangle, blocked an octagon, and
@@ -416,8 +418,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `components/workspace/workspace-navigation.ts`; `scripts/navigation-policy.mjs`
   checks direct history writes and workspace links. A user move pushes
   history and a filter or tab replaces it. Back and forward restore each move.
-  - Bot and group chats open in the centre. 看板 contains tasks, projects and
-    teams. A task opened from 看板 or a link is a centre page. Its origin
+  - Bot and group chats open in the centre, as do threads selected under a Bot
+    in the sidebar ([Bot sidebar threads](decisions/2026-11-18-2024-bot-sidebar-threads.md)).
+    看板 contains tasks, projects and teams. A task opened from 看板 or a link is a centre page. Its origin
     crumb and close action return to the source, defaulting to 看板; ↑↓
     appear when it was opened from a list.
   - A chat task card, task chip or right-panel task row opens the task view

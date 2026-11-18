@@ -20,11 +20,11 @@ pages as the reader approaches the top and keeps the visible message in place.
 
 | Surface | Mikka behavior |
 | --- | --- |
-| Left navigation | Highlight the thread or task open in the work area. A Bot row gives priority to the waiting count or working state, with time as the idle state. Row actions appear where they are available. |
+| Left navigation | Open a Bot's conversation threads in the main chat. Highlight the selected thread or task. A Bot row gives priority to the waiting count or working state, with time as the idle state. See the [Bot sidebar thread decision](2026-11-18-2024-bot-sidebar-threads.md). |
 | Narrow work area | Keep short visible labels such as 验证 and 审阅. The tab's accessible name and the list of open tabs carry the full title. |
 | Tab actions | Reorder by dragging or Alt plus an arrow. Open other close actions by right-click or Shift+F10. Save an edited task before closing it. On a failed save, show its tab and stop the batch. |
 | Panel collapse | Keep the selected tab and its mounted contents. Return focus to the control that expands the panel. |
-| Conversation history | Start with at most 500 combined message and event rows. Fetch older pages from the top, preserve the visible message, and append new events using the forward cursor. Compute the whole-history context estimate after showing the conversation. |
+| Conversation history | Start with at most 500 combined message and event rows. Fetch older pages from the top, preserve the visible message, and append new events using the forward cursor. |
 
 The sidebar uses Mikka's controls and tokens. The Web and desktop renderer
 share the behavior.
