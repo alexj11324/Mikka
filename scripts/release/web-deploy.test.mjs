@@ -1,33 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createServer } from 'node:http'
-import { once } from 'node:events'
 import { readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join, matchesGlob } from 'node:path'
 import { tmpdir } from 'node:os'
-import { fileURLToPath } from 'node:url'
 import { productionSha, PRODUCTION_VERSION_URL,
   assertCurrentMain, waitForWebDeployment, containsDesktopSource } from './web-deploy.mjs'
 
 const SHA = 'a'.repeat(40)
-const pulled = [
-  'VERCEL="1"',
-  'VERCEL_ENV="production"',
-  'VERCEL_GIT_COMMIT_REF=""',
-  'DATABASE_URL="postgres://u:p@db.example/app"',
-  'MIKKA_DATABASE_URL=""',
-  'NEXT_PUBLIC_POSTHOG_KEY=""',
-  'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=""',
-  'MIKKA_BUILD_BYOS_WORKER="1"',
-  'NEXT_PUBLIC_COMPUTER_ENABLED="1"',
-  'BETTER_AUTH_SECRET=""',
-  'BETTER_AUTH_URL="https://app.example"',
-  'NOTE="a \\"quoted\\" value"',
-].join('\n')
-const job = { GITHUB_SHA: SHA, MIKKA_DATABASE_URL: 'postgres://u:p@db.example/app', NEXT_PUBLIC_POSTHOG_KEY: 'phc_x', NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: 'pk_live_x', BETTER_AUTH_SECRET: 's3cret', BETTER_AUTH_URL: 'https://other.example', UNRELATED_JOB_SECRET: 'x' }
-const read = text => Object.fromEntries(text.trim().split('\n').map(line => { const i = line.indexOf('='); return [line.slice(0, i), JSON.parse(line.slice(i + 1))] }))
-
 test('reads the commit production serves through the alias', async () => {
   const calls = []
   const fetchImpl = async url => {
