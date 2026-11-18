@@ -613,6 +613,16 @@
       "sourceHash": "b21d3e06380142353b590903c42a9addbc5b28950bfa98af768dace3f8f501e3"
     },
     {
+      "path": "/mikka/api/credentials/oidc",
+      "template": "/api/credentials/oidc",
+      "source": "app/api/credentials/oidc/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 60,
+      "sourceHash": "7933cac9b39855623d74610005a29ca472b1fc45723245e9bc3373f75c8f8e31"
+    },
+    {
       "path": "/mikka/api/cron/account-deletions",
       "template": "/api/cron/account-deletions",
       "source": "app/api/cron/account-deletions/route.ts",

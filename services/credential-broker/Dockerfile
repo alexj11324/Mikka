@@ -11,7 +11,7 @@ LABEL org.opencontainers.image.revision=${MIKKA_BUILD_REVISION} \
 ENV NODE_ENV=production MIKKA_EDITION=cloud PORT=3000
 WORKDIR /app
 COPY --chown=node:node package.json server.mjs ./
-COPY --chown=node:node dist/fill.js ./dist/
+COPY --chown=node:node dist/fill.js dist/oidc.js ./dist/
 USER node
 EXPOSE 3000
 CMD ["node", "server.mjs"]

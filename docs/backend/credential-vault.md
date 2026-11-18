@@ -9,21 +9,31 @@ vault/master-key proposal remains superseded.
 
 ## Deployment and identity
 
-The Cloudflare API ingress binds the app to the private Cloudflare credential
-broker and credential-identity service. The ingress forwards only the private
-broker routes; the broker accepts calls only on that private transport and
-requires the Cloudflare workload identity. The app can GenerateDataKey/Encrypt;
-the broker can Decrypt. There is no public broker endpoint, static AWS key, or
-Vercel OIDC fallback. The gateway's Cloudflare broker/identity implementation
-is part of this path and must be deployed with the matching app release.
+The Web API runs in Vercel project `mikka` through the
+[Hono/Nitro runtime](../operations/web-runtime.md). The standalone Node APIs
+in `services/credential-broker` run in `mikka-credential-broker` with that root
+directory and access to source files outside it. Vercel deployments use Team
+OIDC. The Cloudflare API ingress also binds the app to the private Cloudflare
+credential broker and credential-identity service; this gateway path forwards
+only private broker routes and requires Cloudflare workload identity. Each
+runtime uses its platform's identity, with no fallback to another issuer. The
+app can GenerateDataKey/Encrypt; the broker can Decrypt. There is no static AWS
+key or fallback credential chain. The broker verifies the app's exact signed
+project/team/environment identity before consuming an opaque, database-bound
+30-second single-use lease. When testing together, the app and broker must
+run the same source commit against the same isolated database. Branches have
+no Vercel Preview; pre-merge checks run in CI or a local/Docker production
+build ([decision](../design/decisions/2026-11-05-1632-no-vercel-preview.md)).
 
-The app and broker use the same source revision and database. Infisical supplies
-the five AWS settings from `staging:/aws` for staging and `prod:/aws` for
-production. The vault is enabled by default; `CREDENTIAL_VAULT_ENABLED=0` is an
-incident kill switch. Cloudflare service bindings provide the private broker
-and identity endpoints; do not configure a public `CREDENTIAL_BROKER_URL` or
-preview bypass. Apply the credential migration to the matching database before
-serving the feature.
+Infisical supplies the five AWS settings from `staging:/aws` for Preview and
+`prod:/aws` for Production. The vault is enabled by default; the optional
+`CREDENTIAL_VAULT_ENABLED=0` is an incident kill switch. Runtime settings are
+`CREDENTIAL_BROKER_URL` (a frozen deployment origin) and, for protected
+Previews, `CREDENTIAL_BROKER_PREVIEW_BYPASS`. Cloudflare deployments use their private
+service bindings instead of a public broker URL or Preview bypass. Store settings
+in Infisical and scope delivery to the selected environment/branch. Deployment
+applies the credential migration to the matching database before serving the
+feature.
 
 ## Data and authorization
 
@@ -139,13 +149,21 @@ Enabled by default, with the existing authentication, owner, target and KMS
 checks. `CREDENTIAL_VAULT_ENABLED=0` retains the incident `503` path. Default
 availability does not supply missing KMS configuration or provider authority.
 
-1. Apply the credential migration to the target database.
-2. Confirm the matching AWS values are synced from Infisical to the Cloudflare
-   app and private broker services.
-3. Confirm the API ingress has its private broker and identity bindings, then
-   verify an authorized browser credential flow against that exact release.
-4. Record the matching runtime verification. An explicit incident kill switch
-   restores the `503` path; saved ciphertext rows remain.
+1. Apply the credential migration to the target database. It is already applied
+   in Production (2026-10-29); deployment migrates a fresh database.
+2. Confirm `prod:/aws` and `staging:/aws` have their five values and are synced
+   to both Vercel projects, as `aws-kms-credential-setup.md` records.
+3. Deploy `services/credential-broker` as the `mikka-credential-broker` project
+   so `CREDENTIAL_BROKER_URL` can point at a frozen origin.
+4. Configure `CREDENTIAL_BROKER_URL` for the deployment under test (production
+   after merge). Confirm that a signed-out metadata read gets `401` and a
+   signed-in read gets `200` with its owner-scoped `logins` array. Exercise an
+   authorized browser credential flow with the configured broker.
+   `/api/credentials/oidc` is a POST probe restricted in source to
+   `VERCEL_ENV=preview`. Production returns 404. Its historical KMS results
+   cannot establish production acceptance.
+5. Record the matching Production verification. An explicit incident kill
+   switch restores the `503` path; saved ciphertext rows remain.
 
 ## Verification
 
@@ -156,9 +174,10 @@ and checks same-workspace owner isolation, workspace changes, one-use forms and
 leases, code erasure, expiry and revocation. It is enrolled in the required CI
 database inventory as well as the dedicated credential workflow.
 
-Private runtime acceptance exercises the Cloudflare identity and broker binding,
-role separation, and KMS same-context/wrong-owner behavior. Runtime evidence and
-frozen deployment SHAs are recorded with the release.
+The protected Preview-only `/api/credentials/oidc` probe calls the broker using
+the app's signed OIDC token. It reports only own-role/cross-role booleans and
+real KMS same-context/wrong-owner results. It returns no OIDC or STS credentials.
+Runtime evidence and frozen deployment SHAs are recorded in the PR/issue.
 The original backend handoff left frontend pill/card/settings acceptance to
 the separately approved Figma work. Settings login creation and password
 replacement are implemented in `app/actions/settings-activity.ts`; their

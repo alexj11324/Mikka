@@ -3459,7 +3459,7 @@
   "lib/credentials/kms.ts": {
     "mode": "operator-configured",
     "environment": ["CREDENTIAL_MASTER_KEY"],
-    "behavior": "Community credential storage wraps per-secret encryption keys with the installation master key; hosted AWS KMS role access uses the Cloudflare-issued credential identity only.",
+    "behavior": "Community credential storage wraps per-secret encryption keys with the installation master key; hosted AWS KMS role access uses the runtime-specific platform identity (Cloudflare workload identity or Vercel OIDC).",
     "test": "lib/credentials/local-kms.test.ts",
     "suite": "test:self-hosted-byok"
   },

@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { Pool } from 'pg'
 import { fillCredential } from '../../../lib/credentials/broker'
+import { verifyAppOidc } from '../../../lib/credentials/oidc'
 import { credentialBody, credentialFailure, privateHeaders } from '../../../lib/credentials/http'
 import { CredentialError } from '../../../lib/credentials/contracts'
 import { credentialRuntimeEnvironment } from '../../../lib/credentials/runtime-identity'
@@ -10,7 +11,13 @@ async function fill(request: IncomingMessage, response: ServerResponse, privateT
   let result: Response
   try {
     if (request.method !== 'POST') throw new CredentialError('credential_denied', 404)
-    if (!privateTransport || !credentialRuntimeEnvironment()) throw new CredentialError('credential_denied', 403)
+    if (privateTransport) {
+      if (!credentialRuntimeEnvironment()) throw new CredentialError('credential_denied', 403)
+    } else {
+      const token = request.headers.authorization?.match(/^Bearer (\S+)$/)?.[1]
+      if (!token) throw new CredentialError('credential_denied', 403)
+      await verifyAppOidc(token)
+    }
     const chunks: Buffer[] = []; let size = 0
     for await (const chunk of request) {
       size += chunk.length
@@ -25,6 +32,10 @@ async function fill(request: IncomingMessage, response: ServerResponse, privateT
     result = Response.json(await fillCredential(pool, (input as { lease: string }).lease), { headers: privateHeaders })
   } catch (error) { result = credentialFailure(error) }
   response.writeHead(result.status, Object.fromEntries(result.headers)); response.end(await result.text())
+}
+
+export default function handler(request: IncomingMessage, response: ServerResponse) {
+  return fill(request, response, false)
 }
 
 /** Only the private Cloudflare Node server routes to this handler. */

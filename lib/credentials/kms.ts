@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto'
 import { AwsClient } from 'aws4fetch'
+import { getVercelOidcToken } from '@vercel/oidc'
 import { CredentialError, type EncryptionContext, type Envelope } from './contracts'
 import { isCloudEdition } from '@/lib/edition'
 import { cloudflareCredentialToken, credentialRuntimeEnvironment } from './runtime-identity'
@@ -51,12 +52,11 @@ export function credentialKms(role: 'app' | 'broker'): Kms {
 }
 
 /** Each platform uses its own runtime issuer; no fallback to another identity. */
-export async function assumeCredentialRole(role: 'app' | 'broker') {
+export async function assumeVercelRole(role: 'app' | 'broker') {
   const arn = process.env[role === 'app' ? 'CREDENTIAL_APP_ROLE_ARN' : 'CREDENTIAL_BROKER_ROLE_ARN']
   if (!arn || !/^arn:aws:iam::\d{12}:role\//.test(arn)) throw new CredentialError()
   try {
-    if (!credentialRuntimeEnvironment()) throw new CredentialError()
-    const token = await cloudflareCredentialToken()
+    const token = credentialRuntimeEnvironment() ? await cloudflareCredentialToken() : await getVercelOidcToken()
     const response = await fetch('https://sts.amazonaws.com/', {
       method: 'POST', body: new URLSearchParams({ Action: 'AssumeRoleWithWebIdentity', Version: '2011-06-15', RoleArn: arn,
         RoleSessionName: `mikka-credential-${role}`, DurationSeconds: '900', WebIdentityToken: token }),
@@ -76,7 +76,7 @@ export function awsKms(role: 'app' | 'broker'): Kms {
     try {
       const region = process.env.AWS_REGION ?? 'us-east-1'
       if (!/^[a-z]{2}-[a-z]+-\d$/.test(region) || !process.env.CREDENTIAL_KMS_KEY_ARN) throw new Error()
-      const client = await assumeCredentialRole(role)
+      const client = await assumeVercelRole(role)
       const response = await client.fetch(`https://kms.${region}.amazonaws.com/`, {
         method: 'POST', headers: { 'Content-Type': 'application/x-amz-json-1.1', 'X-Amz-Target': `TrentService.${action}` },
         body: JSON.stringify({ KeyId: process.env.CREDENTIAL_KMS_KEY_ARN, ...input }), signal: AbortSignal.timeout(10_000), redirect: 'error',
