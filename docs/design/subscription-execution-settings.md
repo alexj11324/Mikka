@@ -79,3 +79,15 @@ other continues. API-key execution does not gate acceptance. A mocked stream
 or successful candidate list does not establish provider acceptance. Production-build screenshots and their
 review remain distinct from API/CLI verification. See the PR's immutable
 revision and evidence for what was actually run.
+
+## Models page hierarchy (2026-11-17)
+
+The official page follows the connection-first structure observed in Capy Desktop 0.9.2:
+subscription connections, API keys, one canonical per-Agent model-order editor and
+API-key-after-quota policy, then the model catalogue, run location and Agent profiles.
+The library demo and the installed blocks' styling stay unchanged. The catalogue's empty
+result describes its selected filter. Existing credentials without returned models,
+loading reads, failed reads and absent credentials must not share an empty-state claim.
+The fallback policy names its same-model API-key prerequisite, including when no key is
+stored, without silently changing the person's saved policy. See
+[the source comparison decision](decisions/2026-11-17-2212-settings-capy.md).
