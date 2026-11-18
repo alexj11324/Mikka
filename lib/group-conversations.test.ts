@@ -52,6 +52,7 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
   observePoolCommits(scoped)
   try {
     const migration = await readFile(new URL('../drizzle/20261023213851_group_conversations.sql', import.meta.url), 'utf8')
+    const migration = await readFile(new URL('../drizzle/20261118120000_conversation_model_device.sql', import.meta.url), 'utf8')
     await Promise.all([scoped.query(migration), scoped.query(migration)])
     await scoped.query(migration) // production retry / coexistence with #69
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')

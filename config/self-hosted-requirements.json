@@ -3420,5 +3420,12 @@
     "behavior": "Adds an optional model and device to a conversation: a thread may pin which model answers it and which machine runs it, while every existing row and every caller that sends neither keeps the lead Bot's own model and any eligible device.",
     "test": "tests/thread-continue.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "lib/bot-models.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Names the three models a Bot or a thread may pin, shared by the conversations CHECK constraint, the strict create schema and the create dialog's picker; no network, no credentials.",
+    "test": "lib/bot-models.test.ts",
+    "suite": "test:lib-units"
   }
 }

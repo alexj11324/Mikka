@@ -29,6 +29,7 @@ test('PG: group delegation has one Task/Thread, requester scope, replay receipt,
   const client=await pool.connect()
   try {
     await client.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql',import.meta.url),'utf8'))
+    await client.query(await readFile(new URL('../../drizzle/20261118120000_conversation_model_device.sql',import.meta.url),'utf8'))
     await client.query(await readFile(new URL('../../drizzle/20261029043634_group_turns.sql',import.meta.url),'utf8'))
     await client.query(`CREATE TABLE bots (id uuid PRIMARY KEY); CREATE TABLE issues(id uuid PRIMARY KEY,title text,"userId" text,"workspaceId" uuid,"ownershipState" text DEFAULT 'bound',content jsonb);
       CREATE TABLE attention_settings("userId" text PRIMARY KEY,locale text);
@@ -299,6 +300,7 @@ test('PG: production group Factory authorization uses typed Bot membership and r
   const pool=new Pool({connectionString:url,options:`-c search_path=${schema}`})
   try {
     await pool.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql',import.meta.url),'utf8'))
+    await pool.query(await readFile(new URL('../../drizzle/20261118120000_conversation_model_device.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261029043634_group_turns.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql',import.meta.url),'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261113180454_standalone_bot_conversations.sql',import.meta.url),'utf8'))
