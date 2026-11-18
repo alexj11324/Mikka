@@ -82,6 +82,8 @@ import { WorkspaceOverview } from './workspace-overview'
 import { GroupChatView } from './group-chat-view'
 import { GroupLeaveAction } from './group-leave-action'
 import { DeleteBotDialog } from '@/components/nav/delete-bot-dialog'
+import { RenameThreadDialog } from '@/components/nav/rename-thread-dialog'
+import { renameConversation } from '@/app/actions/task-runs'
 import { archiveBot, deleteBot, listArchivedOwnBots } from '@/app/actions/bots'
 import type { GroupSummary } from '@/lib/group-messages'
 import { forgetGroupReads, useGroupMembershipLoss } from './group-membership-cache'
@@ -667,8 +669,20 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     afterBotLeft(bot.id)
     return true
   }
-  const { entries: chatNav, archived: archivedNav, reloadGroups, referenceGroups } = useChatNav({ bots, archivedBots, workspaceId: listWorkspaceId, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items, onLeaveGroup: setLeavingGroup,
-    lifecycle: { archive: (bot, archived) => { void setBotArchived(bot, archived) }, askDelete: setDeletingBot } })
+  // 重命名 from a thread row, and 「Bot 资料」 from a Bot row: the chat opens with its 概览 in front.
+  const [renamingThread, setRenamingThread] = useState<{ target: { kind: 'run' | 'chat'; id: string }; title: string } | null>(null)
+  const renameThread = async (thread: { target: { kind: 'run' | 'chat'; id: string } }, title: string) => {
+    const result = await renameConversation(thread.target, title)
+    if (result.error) { toast.error(botMenuText('failed')); return false }
+    return true
+  }
+  const openProfile = (target: ChatTarget) => {
+    openChat(target)
+    if (FRAME_OWNS_PANEL) setPanelReveal(value => ({ reveal: value.reveal + 1, revealId: 'overview' }))
+    else setPanelSheet(true)
+  }
+  const { entries: chatNav, archived: archivedNav, hidden: hiddenNav, reloadGroups, referenceGroups } = useChatNav({ bots, archivedBots, workspaceId: listWorkspaceId, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items, onLeaveGroup: setLeavingGroup,
+    lifecycle: { archive: (bot, archived) => { void setBotArchived(bot, archived) }, askDelete: setDeletingBot }, page: { openProfile, renameThread: setRenamingThread } })
   const referenceTitles = useMemo(() => conversationReferenceTitles(user.id, listWorkspaceId, threadsError ? undefined : threadList, referenceGroups), [user.id, listWorkspaceId, threadList, threadsError, referenceGroups])
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
   const openSettings = (href = '/settings') => {
@@ -790,6 +804,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
         openChat({ kind: 'group', ...group })
       }}
       onNewBot={() => { closeComposer(); setCreatingBot(true) }} onReviewGroups={() => { closeComposer(); if (creation === 'conversation') navigateSection('conversations'); void reloadGroups().catch(() => {}) }} />
+    {renamingThread && <RenameThreadDialog key={renamingThread.target.id} title={renamingThread.title} onClose={() => setRenamingThread(null)}
+      onSave={title => renameThread(renamingThread, title)} />}
     {deletingBot && <DeleteBotDialog key={deletingBot.id} name={deletingBot.name} onClose={() => setDeletingBot(null)}
       onDelete={() => removeBot(deletingBot)} onArchive={() => setBotArchived(deletingBot, true)} />}
     {leavingGroup && <GroupLeaveAction key={leavingGroup.id} group={leavingGroup} userId={user.id} open onOpenChange={open => { if (!open) setLeavingGroup(null) }}
@@ -847,7 +863,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
     bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser('column') } else showBrowser(rightTaken ? 'closed' : 'column') }} /></>} />}
-    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} onPageIntent={preloadWorkspacePage} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: listWorkspaceId, entries: chatNav, archived: archivedNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreation('group'), onNewConversation: () => setCreation('conversation') }} onSearch={searchFromBar} inboxCount={inboxCounts?.count ?? 0} />}>
+    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} onPageIntent={preloadWorkspacePage} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: listWorkspaceId, entries: chatNav, archived: archivedNav, hidden: hiddenNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreation('group'), onNewConversation: () => setCreation('conversation') }} onSearch={searchFromBar} inboxCount={inboxCounts?.count ?? 0} />}>
     {settingsShown ? settingsContent
       : <>
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it; every other page keeps the phone header and its list button. */}

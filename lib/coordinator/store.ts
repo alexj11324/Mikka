@@ -13,7 +13,7 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db, pool } from '@/lib/db'
-import { botUnreadCounts } from '@/lib/conversation-reads-store'
+import { botReadState } from '@/lib/conversation-reads-store'
 import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
@@ -532,6 +532,11 @@ export interface BotChatSummary {
   at: string | null
   /** The latest message's id: what 标为已读 acknowledges (POST /api/conversations/bot:<id>/read); absent before the first. */
   messageId?: string
+  /** The person's own 置顶 / 通知 / 隐藏 for this chat (lib/chat-preferences.ts), when they changed one. */
+  pinned?: boolean
+  muted?: boolean
+  hidden?: boolean
+  pinOrder?: number | null
   /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
 }
@@ -587,9 +592,12 @@ export async function botChatSnapshot(reader: IssueReader) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
     result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at, messageId: line.messageId }
   }
-  for (const [botId, count] of await botUnreadCounts(pool, userId, botIds)) {
+  // The unread counts and, in the same read, the person's own 置顶 / 通知 / 隐藏 (lib/chat-preferences.ts writes them and pushes this list).
+  const { counts, preferences } = await botReadState(pool, userId, botIds)
+  for (const [botId, count] of counts) {
     if (count) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), unreadCount: count }
   }
+  for (const [botId, preference] of preferences) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), ...preference }
   return { items: result, expiries, observedAt: now.getTime() }
 }
 

@@ -71,7 +71,7 @@ export async function handleGroup(pool: Pool, directory: Directory, req: GroupRe
       result = { id, title: input.title, ...(queueAgents ? { leadAgentId: input.leadAgentId ?? null, leadBotId: input.leadBotId ?? null } : {}) }; status = 201
     } else if (req.resource === 'conversations' && req.method === 'GET') {
       if (req.workspaceId && (!z.uuid().safeParse(req.workspaceId).success || !await directory(req.workspaceId, userId, []))) return fail(404)
-      const { rows } = await q(`SELECT c.*, last.message AS "lastMessage", coalesce(pref."markedUnread",false) as "markedUnread",
+      const { rows } = await q(`SELECT c.*, last.message AS "lastMessage", coalesce(pref."markedUnread",false) as "markedUnread", coalesce(pref.pinned,false) AS pinned, coalesce(pref.hidden,false) AS hidden, pref."pinOrder",
         (SELECT count(*)::text FROM conversation_messages m WHERE m."conversationId"=c.id
           AND m.position > COALESCE(r."lastReadPosition",0) AND NOT (m."authorType"='user' AND m."authorId"=$1)) AS "unreadCount"
         FROM conversations c JOIN conversation_members cm ON cm."conversationId"=c.id AND cm."memberType"='user' AND cm."memberId"=$1 AND cm."leftAt" IS NULL

@@ -6,7 +6,9 @@ import type { ChatTarget } from './bot-list'
  * A sidebar row's right-click menu (Capy's Captain row): what the frame lists for one Bot or group chat.
  * `id` lets the frame pick the item's icon; `label` is already in the person's language.
  */
-export type ChatNavAction = { id: 'openNewTab' | 'markRead' | 'markUnread' | 'viewAll' | 'leave' | 'archive' | 'unarchive' | 'delete'; label: string; danger?: boolean; run: () => void }
+export type ChatNavActionId = 'openNewTab' | 'copyLink' | 'profile' | 'pin' | 'unpin' | 'mute' | 'unmute' | 'markRead' | 'markUnread' | 'viewAll'
+  | 'rename' | 'hide' | 'unhide' | 'leave' | 'archive' | 'unarchive' | 'delete'
+export type ChatNavAction = { id: ChatNavActionId; label: string; danger?: boolean; run: () => void }
 
 /** The place a chat opens at, as an address (the same one the row opens). */
 export function chatPlace(target: ChatTarget): Partial<WorkspaceLocation> | null {
@@ -16,13 +18,35 @@ export function chatPlace(target: ChatTarget): Partial<WorkspaceLocation> | null
   return null
 }
 
-/** Opens the chat in a new browser tab, as a task's 在新标签页中打开 does (issue-detail-actions.tsx). */
-export function openChatInNewTab(target: ChatTarget) {
-  const place = chatPlace(target)
-  if (!place) return
+/** A sidebar thread row's place: a Bot's conversation opens as its group page, a run as the thread beside the centre, a task with no run as the task. */
+export function threadPlace(work: { kind?: 'run' | 'chat'; id: string; issueId: string | null; runs: readonly { id: string }[] }): Partial<WorkspaceLocation> {
+  if (work.kind === 'chat') return { section: 'group', group: work.id }
+  if (!work.kind && work.issueId === work.id && !work.runs.length) return { task: work.issueId }
+  return { thread: work.kind ? work.id : work.runs[0]?.id ?? work.id }
+}
+
+/** The address of a place in this app, as a link to copy or open. */
+export function placeLink(place: Partial<WorkspaceLocation>) {
   const url = new URL(window.location.href)
   url.search = workspaceSearch(place)
-  window.open(url.href, '_blank', 'noopener,noreferrer')
+  url.hash = ''
+  return url.href
+}
+
+/** Opens a place in a new browser tab, as a task's 在新标签页中打开 does (issue-detail-actions.tsx). */
+export function openPlaceInNewTab(place: Partial<WorkspaceLocation> | null) {
+  if (place) window.open(placeLink(place), '_blank', 'noopener,noreferrer')
+}
+
+/** Opens the chat in a new browser tab. */
+export function openChatInNewTab(target: ChatTarget) {
+  openPlaceInNewTab(chatPlace(target))
+}
+
+/** 复制链接: the place's address on the clipboard. Rejects when the browser refuses the clipboard. */
+export async function copyPlaceLink(place: Partial<WorkspaceLocation> | null) {
+  if (!place) throw new ChatRowActionError(0)
+  await navigator.clipboard.writeText(placeLink(place))
 }
 
 export class ChatRowActionError extends Error {
@@ -46,4 +70,17 @@ export async function setChatUnread(chat: { kind: 'bot'; botId: string; latestMe
   if (!chat.latestMessageId) return send(path, 'PATCH', { markedUnread: false })
   const conversation = chat.kind === 'bot' ? `bot:${chat.botId}` : chat.id
   return send(`/api/conversations/${encodeURIComponent(conversation)}/read`, 'POST', { messageId: chat.latestMessageId })
+}
+
+/** The person's own 置顶 / 通知 / 隐藏 for a chat, through the chat preference writer (lib/chat-preferences.ts). */
+export async function setChatPreference(chat: { kind: 'bot'; botId: string } | { kind: 'group'; id: string }, change: { pinned?: boolean; muted?: boolean; hidden?: boolean }) {
+  return send(chat.kind === 'bot' ? `/api/mobile/bots/${encodeURIComponent(chat.botId)}` : `/api/mobile/groups/${encodeURIComponent(chat.id)}`, 'PATCH', change)
+}
+
+/** A thread row's 标为已读 / 标为未读 through the thread read writer (lib/thread-reads.ts): a run reads up to its latest activity. */
+export async function setThreadUnread(work: { kind?: 'run' | 'chat'; id: string }, unread: boolean) {
+  const change = work.kind === 'chat'
+    ? { action: unread ? 'unread' : 'read', chatId: work.id }
+    : unread ? { action: 'unread', runId: work.id } : { action: 'readLatest', runId: work.id }
+  return send('/api/conversations/read-state', 'POST', change)
 }
