@@ -1362,7 +1362,7 @@ export const accountDataExports = pgTable('account_data_exports', {
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
   downloadedAt: timestamp('downloadedAt', { withTimezone: true }),
 }, table => [uniqueIndex('account_data_exports_token_key').on(table.tokenHash), index('account_data_exports_user_created_idx').on(table.userId, table.createdAt)])
-import { WORKSPACE_BOT_MODELS, type WorkspaceBotModel } from '@/lib/bot-models'
+import { WORKSPACE_BOT_MODELS, type WorkspaceBotModel } from '../bot-models'
 export { WORKSPACE_BOT_MODELS }
 export type { WorkspaceBotModel }
 
