@@ -532,6 +532,11 @@ export interface BotChatSummary {
   at: string | null
   /** The latest message's id: what 标为已读 acknowledges (POST /api/conversations/bot:<id>/read); absent before the first. */
   messageId?: string
+  /** The person's own 置顶 / 通知 / 隐藏 for this chat (lib/chat-preferences.ts), when they changed one. */
+  pinned?: boolean
+  muted?: boolean
+  hidden?: boolean
+  pinOrder?: number | null
   /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
 }
@@ -590,6 +595,10 @@ export async function botChatSnapshot(reader: IssueReader) {
   for (const [botId, count] of await botUnreadCounts(pool, userId, botIds)) {
     if (count) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), unreadCount: count }
   }
+  // The same writer that pushes this list (setChatPreference) owns these, so the sidebar's pin, mute and hide stay live.
+  const { rows: preferences } = await pool.query<{ chatKey: string; pinned: boolean; muted: boolean; hidden: boolean; pinOrder: number | null }>(
+    'SELECT "chatKey", pinned, muted, hidden, "pinOrder" FROM chat_preferences WHERE "userId"=$1 AND "chatKey"=ANY($2::text[])', [userId, botIds])
+  for (const { chatKey, ...preference } of preferences) result[chatKey] = { ...(result[chatKey] ?? { line: null, at: null, working: false }), ...preference }
   return { items: result, expiries, observedAt: now.getTime() }
 }
 

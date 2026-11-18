@@ -10,7 +10,7 @@ type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 export type BotWorkRun = { id: string; name: string; harness: string | null }
 export type BotWorkTask = {
   conversationTarget?: { kind: 'group'; id: string; title: string; workspaceId: string }
-  kind?: 'run' | 'chat'; pullState?: Thread['pullState']; unreadCount?: number; id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; /** What a conversation with no task is doing, for its one mark; null for a task row, whose one icon is its status. */ activity: RunIndicator | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[] }
+  kind?: 'run' | 'chat'; pullState?: Thread['pullState']; unreadCount?: number; /** The thread has news the person has not read: its title in bold (Capy shows no number). */ unread?: boolean; /** Its latest activity, for the row's age. */ at?: string | null; /** The task's code (MIK-12), the row's second line. */ identifier?: string | null; id: string; issueId: string | null; name: string; fullName: string; /** The task's status field; null for a run that has no task. */ status: string | null; /** What a conversation with no task is doing, for its one mark; null for a task row, whose one icon is its status. */ activity: RunIndicator | null; state: TaskState | null; reason: TaskReason | null; runs: BotWorkRun[]; /** The row's right-click menu (components/nav/chat-row-actions.ts). */ actions?: import('./chat-row-actions').ChatNavAction[] }
 
 type Dispatch = NonNullable<TaskPresentation['botDispatches']>[number]
 const taskRow = (issue: Issue, presentation: TaskPresentation, dispatch: Dispatch): BotWorkTask => ({
