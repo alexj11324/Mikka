@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 80 |
+| partial | 81 |
 | prior-partial | 36 |
-| unreviewed | 6254 |
+| unreviewed | 6253 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -189,3 +189,7 @@ Independently and completely inspected immutable `components/blocks/rich-text-ed
 Executable limited behavior: extract the original `blockKind` from the exact fixed source into V8 with only its TypeScript parameter annotation omitted; **9/9 synthetic block-type/parent cases pass**. Extract original `readTable` with only TypeScript signature removed; **5/5 synthetic table-header/colspan/row guard cases pass**. They are `partial retain`, not full review completion: mounted Tiptap + ProseMirror + React Aria, pointer/keyboard/AT, Node24, genuine writer/permission and protected CI remain. Block-turn command-failure and menu-close states require real UI verification before any further source edit. Existing G-076 table deletion guard continues to own failed command success-truth, no new numbered root.
 
 The fixed manifest still has **7996** paths, **6556** classified code. With two more new partial reviews its current code statuses are **186 complete / 83 partial / 36 historic-partial / 6251 unreviewed**. Source ledger now has **296 distinct path records** and unchanged 36 G remediation records. This is only the fixed-source counts, not the current main or Cloud vendor delta, and not formal protected CI/ordinary merge/post-merge acceptance. [Official Cloudflare Container class migration](https://developers.cloudflare.com/containers/guides/migrate-to-durable-object-container-api/) and [separate scheduling-policy cutover](https://developers.cloudflare.com/containers/guides/migrate-to-durable-object-scheduling-policy/) were rechecked on 2026-11-18; locked Wrangler/workerd implementation and physical old SDK/fallback/config removal remain G-015's current Owner, not this G-076/editor batch. #1954 and Cloud #155 still own production, signing and devices.
+
+## 2026-11-18 G-076 page clear native ACK continuation
+
+Pinned `components/blocks/rich-text-editor-2/components/page-actions.tsx` (source `e2084882`) is unchanged on the checked public main `42f39219` and Cloud vendor `82d285ed`. A real `PageEditor`→`PageHeader`→`PageActions` path opens a Base UI alert whose Action is a normal Button. The original command ignored `editor.commands.clearContent()` `false`/missing-editor returns and closed the alert with a false “Page cleared” success/Undo. Original function extracted into a V8 harness: 1/4 expected before, 4/4 after native boolean guard in source `86afbc28` (`e7e33759`), including successful Undo. The original path arrived in `50bc4a25` on 2026-10-20. Existing G-076 extends the same root, without a new mechanism or ID. Clipboard, display preferences, confirmation, translation and timers remain distinct local document UI duties; the whole file is **partial**, not complete. No locked Node24/installed editor, browser/AT, protected CI or normal merge/exact postmerge acceptance. Count becomes 186 complete / 81 partial / 36 prior-partial / 6253 unreviewed fixed code (6556). Cloudflare SDK G-015 and production remain separately owned.
