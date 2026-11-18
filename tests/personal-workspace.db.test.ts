@@ -139,6 +139,24 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     await rejects(policy.setMemberSubscriptionPolicy({ id: member, name: 'Mia' }, personal, false), 'validationGeneric')
   })
 
+  await t.test('an admin cannot take over a bot an active member archived themselves', async () => {
+    const members = await import('../lib/workspace-admin/members')
+    const lifecycle = await import('../lib/bot-lifecycle')
+    const admin = await seedUser(pool, 'archive-admin')
+    const owner = await seedUser(pool, 'archive-owner')
+    const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: owner, role: 'member' }])
+    const bot = randomUUID()
+    await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,$4)', [bot, owner, team.id, 'Writer'])
+    await lifecycle.setOwnedBotArchived({ ownerId: owner, workspaceId: team.id }, bot, true)
+    assert.deepEqual((await members.archivedBots(admin, team.id)).map(row => row.id), [], 'the owner is still here, so this is not §8.3 takeover')
+    await assert.rejects(members.takeOverBot(admin, team.id, bot), { code: 'botNotFound' })
+    assert.deepEqual((await pool.query('SELECT "ownerId", "archivedAt" IS NOT NULL AS archived FROM bots WHERE id=$1', [bot])).rows[0], { ownerId: owner, archived: true })
+    await members.removeMember(admin, team.id, owner)
+    assert.deepEqual((await members.archivedBots(admin, team.id)).map(row => row.id), [bot], 'once they leave, the paused bot is waiting for takeover')
+    assert.deepEqual(await members.takeOverBot(admin, team.id, bot), { bots: 1 })
+    assert.deepEqual((await pool.query('SELECT "ownerId", "archivedAt" FROM bots WHERE id=$1', [bot])).rows[0], { ownerId: admin, archivedAt: null })
+  })
+
   await t.test('leaving a team pauses the bots there until an admin takes one over', async () => {
     const members = await import('../lib/workspace-admin/members')
     const { executionWorkspace } = await import('../lib/execution-settings')
@@ -174,8 +192,10 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     const { workspaceTransactionKey } = await import('../lib/workspace-db')
     const admin = await seedUser(pool, 'archive-admin')
     const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const departed = await seedUser(pool, 'archive-departed')
     const bot = randomUUID()
-    await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name,"archivedAt") VALUES ($1,$2,$3,$4,now())', [bot, admin, team.id, 'Archived'])
+    // A departed owner's paused bot (not an active member's own archive) is what the admin directory lists.
+    await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name,"archivedAt") VALUES ($1,$2,$3,$4,now())', [bot, departed, team.id, 'Archived'])
     const client = await appPool.connect()
     const query = client.query
     const reads: Array<object | null> = []

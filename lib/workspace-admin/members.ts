@@ -115,6 +115,13 @@ export async function restoreReturningMember(workspaceId: string, userId: string
   for (const { id } of restored) await botListChanged(db, id)
 }
 
+/** Active owners archive their own bots (lib/bot-lifecycle.ts); that is not §8.3 takeover. */
+async function activeMemberIds(tx: WorkspaceTransaction, workspaceId: string) {
+  const rows = await tx.select({ userId: workspaceMembers.userId }).from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, workspaceId), eq(workspaceMembers.status, 'active')))
+  return new Set(rows.map(row => row.userId))
+}
+
 /** An admin takes over a paused bot of someone who left, was suspended or deleted their account (null owner); it then runs on the admin's own resources. */
 export async function takeOverBot(actorId: string, workspaceId: string, botId: string): Promise<AssetTransfer> {
   z.uuid().parse(botId)
@@ -124,6 +131,10 @@ export async function takeOverBot(actorId: string, workspaceId: string, botId: s
       const [bot] = await main.select({ ownerId: bots.ownerId, name: bots.name }).from(bots)
         .where(and(eq(bots.id, botId), eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).for('update').limit(1)
       if (!bot) throw new WorkspaceError('botNotFound')
+      // A still-active member's own archive is theirs to restore; takeover is for departed, suspended, or null owners.
+      if (bot.ownerId && bot.ownerId !== actorId && (await activeMemberIds(tx, workspaceId)).has(bot.ownerId)) {
+        throw new WorkspaceError('botNotFound')
+      }
       await enqueueWorkspaceAudit(tx, { workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'bot.taken_over', target: { type: 'bot', id: botId, label: bot.name } })
       if (bot.ownerId === actorId) {
         await main.update(bots).set({ archivedAt: null, updatedAt: new Date() }).where(eq(bots.id, botId))
@@ -135,12 +146,14 @@ export async function takeOverBot(actorId: string, workspaceId: string, botId: s
   })
 }
 
-/** Paused bots in this workspace, for its admins. */
+/** Paused bots of people who left, were suspended, or deleted their account; not an active member's own archive. */
 export async function archivedBots(actorId: string, workspaceId: string) {
   return workspaceDb.transaction(async tx => {
     await requireWorkspace(tx, workspaceId, actorId, true)
-    return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, archivedAt: bots.archivedAt })
+    const active = await activeMemberIds(tx, workspaceId)
+    const rows = await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId, archivedAt: bots.archivedAt })
       .from(bots).where(and(eq(bots.workspaceId, workspaceId), isNotNull(bots.archivedAt))).orderBy(bots.name)
+    return rows.filter(row => !row.ownerId || !active.has(row.ownerId))
   })
 }
 

@@ -162,7 +162,7 @@ export const bots = pgTable('bots', {
   repository: text('repository'),
   /** Monthly credit cap for this bot; null uses workspace_settings.botMonthlyCreditLimit. */
   monthlyCreditLimit: integer('monthlyCreditLimit'),
-  /** Set when the owner left or was suspended; the bot stays paused until an admin takes it over (§8.3). */
+  /** Set when the owner archived the bot, left, or was suspended. Admin takeover (§8.3) only applies when the owner is no longer an active member, or the owner is null. */
   archivedAt: timestamp('archivedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),

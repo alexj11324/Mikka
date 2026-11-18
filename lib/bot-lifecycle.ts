@@ -5,9 +5,10 @@ import { botListChanged, botRemovedChanged, groupListChanged } from '@/lib/live/
 /**
  * A person archives, restores or deletes one of their own bots (decision 2026-11-17-2040, as Capy's Captain).
  * Archived, a bot keeps its chat and history, leaves the sidebar and takes no new work (dispatch and schedules
- * already skip archived bots). Deleting it removes the bot and what belongs only to it (its chat, attachments,
- * sessions and schedules cascade); the tasks and runs it dispatched stay, without a bot. The Coordinator is
- * neither archived nor deleted; any bot that is not the person's own reads as not found.
+ * already skip archived bots). The owner's archive is not on the admin §8.3 takeover list while the owner is
+ * still an active member (lib/workspace-admin/members.ts). Deleting it removes the bot and what belongs only
+ * to it (its chat, attachments, sessions and schedules cascade); the tasks and runs it dispatched stay, without
+ * a bot. The Coordinator is neither archived nor deleted; any bot that is not the person's own reads as not found.
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
