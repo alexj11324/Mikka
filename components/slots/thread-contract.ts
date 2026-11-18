@@ -22,8 +22,11 @@ export type ThreadToolRow = {
   error?: string
   /** A short note after the label (its target, a count). */
   note?: string
-  /** Its output or the thought, in full, for a tooltip. */
+  /** Recorded input, output or reasoning for the expanded row. */
+  input?: string
   detail?: string
+  command?: string
+  exitCode?: number
 }
 
 /** One part of a Bot's message, top to bottom as it happened. */

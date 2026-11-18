@@ -18,7 +18,7 @@ import { sendReviewChange, type ReviewChangeTarget } from '@/lib/factory/review-
 import { RequestError } from '@/lib/factory/browser-request'
 import { useChatDelivery, useThreadReplyCommand, type ChatSubmission } from '@/lib/hooks/chat-delivery'
 import { prepareThreadReply, type ThreadReplySubmission } from '@/lib/thread-submission-input'
-import { runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems } from '@/lib/issue-run-conversation'
+import { runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, threadItems, threadStepOutput } from '@/lib/issue-run-conversation'
 import { ThreadReplyVersions } from './thread-reply-versions'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
 import { ThreadRunPlace } from './thread-run-place'
@@ -547,7 +547,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       }
       const part: ThreadEntryPart = item.kind === 'agent' ? { kind: 'text', text: item.text, node: <AgentCitationsContext value={citations.settled}><div {...{ [QUOTE_SOURCE_ATTR]: '' }}><AgentMarkdown text={item.text} isStreaming={active} /></div></AgentCitationsContext> }
         : item.kind === 'steps' ? { kind: 'tools', id: `${runId}:${item.id}`, tools: item.steps.map(step => ({ id: step.id, label: step.name, status: step.failed ? 'failed' as const : 'done' as const,
-          ...(step.ms !== undefined ? { ms: step.ms } : {}), ...(step.detail ? { note: step.detail } : {}), ...(step.output ? { detail: step.output.slice(0, 2000) } : {}) })) }
+          ms: step.ms, note: step.detail ?? undefined, command: step.command, detail: threadStepOutput(step), exitCode: step.exitCode ?? undefined })) }
         : item.kind === 'error' ? { kind: 'error', text: item.text }
         : { kind: 'text', text: '', node: item.kind === 'computer'
           ? <ComputerCard botId={item.botId} runId={item.runId} task={item.task} state={active ? 'working' : (view?.status ?? data.thread.status) === 'succeeded' ? 'done' : 'failed'} />
