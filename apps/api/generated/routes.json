@@ -2552,7 +2552,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "25176c47f725d048467bed224881baea31439c18a62a299d05cd8bfe96c55bff"
+      "sourceHash": "41f1884cd107639b182a269c7dbfc4cc57e0abed228b58ea31e6b8eabe4075cb"
     },
     {
       "path": "/mikka/api/skills/share",
