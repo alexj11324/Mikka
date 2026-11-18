@@ -5021,6 +5021,9 @@
       "noBots": "No bots available",
       "newBot": "New bot",
       "create": "Start conversation",
+      "nameRequired": "Give the conversation a name",
+      "botsRequired": "Choose at least one Bot",
+      "lead": "Replies",
       "failed": "Couldn’t create the conversation",
       "unconfirmed": "Creation not confirmed",
       "reviewGroups": "View conversations"
@@ -5032,6 +5035,9 @@
       "noBots": "No bots available",
       "newBot": "New bot",
       "create": "Create",
+      "nameRequired": "Give the group a name",
+      "botsRequired": "Choose at least one Bot",
+      "lead": "Replies",
       "failed": "Group creation failed",
       "unconfirmed": "Group creation not confirmed",
       "reviewGroups": "View group chats"

@@ -32,7 +32,7 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
   const [title, setTitle] = useState('')
   const [picked, setPicked] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<'failed' | 'unconfirmed' | null>(null)
+  const [error, setError] = useState<'failed' | 'unconfirmed' | 'nameRequired' | 'botsRequired' | null>(null)
   const pending = useRef(false)
   const alive = useRef(true)
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
@@ -40,10 +40,15 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
   const openerFocus = useOpenerFocus(open)
   const choices = purpose ? bots : bots.filter(bot => !bot.coordinator)
   const selected = picked.filter(id => choices.some(bot => bot.id === id))
-  const ready = Boolean(title.trim() && selected.length && selected.length <= 100 && workspaceId)
+  const nameMissing = !title.trim()
+  const botsMissing = selected.length === 0
 
   async function submit() {
-    if (!ready || pending.current || error === 'unconfirmed') return
+    if (pending.current || error === 'unconfirmed') return
+    // The primary button always answers a press: an incomplete form names what is missing instead of sitting dead.
+    if (nameMissing) { setError('nameRequired'); return }
+    if (botsMissing) { setError('botsRequired'); return }
+    if (selected.length > 100 || !workspaceId) return
     pending.current = true
     setSaving(true)
     setError(null)
@@ -75,25 +80,30 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
     }
   }
 
-  return <Dialog open={open} onOpenChange={next => { if (!pending.current) onOpenChange(next) }} onOpenChangeComplete={next => {
+  // Every exit stays live, including while a create is in flight: Esc, the backdrop, ✕ and 取消 are the ways out of a
+  // dialog, and a pending POST must never take all four away at once (alive.current already stops a late reply from
+  // navigating away from the workspace the person is looking at).
+  return <Dialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={next => {
     if (!next) { setTitle(''); setPicked([]); setError(null); created.current = false }
   }}>
-    <DialogContent aria-describedby={undefined} className="sm:max-w-md" showCloseButton={!saving} closeLabel={common('close')} finalFocus={() => !created.current && openerFocus()}>
+    <DialogContent aria-describedby={undefined} className="top-[12vh] translate-y-0 sm:max-w-[45rem]" closeLabel={common('close')} finalFocus={() => !created.current && openerFocus()}>
       <DialogHeader><DialogTitle>{t('title')}</DialogTitle></DialogHeader>
       <form id="new-group" className="flex min-h-0 flex-col gap-4" onSubmit={event => { event.preventDefault(); void submit() }}>
         <FieldGroup>
         <Field>
           <FieldLabel htmlFor="new-group-title">{t('name')}</FieldLabel>
-          <Input id="new-group-title" autoFocus value={title} maxLength={200} disabled={saving || error === 'unconfirmed'} onChange={event => setTitle(event.target.value)} />
+          <Input id="new-group-title" autoFocus value={title} maxLength={200} disabled={saving || error === 'unconfirmed'} onChange={event => { setTitle(event.target.value); if (error === 'nameRequired') setError(null) }} />
         </Field>
         <FieldSet disabled={saving || error === 'unconfirmed'} className="gap-2">
           <FieldLegend variant="label">{t('bots')}</FieldLegend>
-          {choices.length ? <FieldGroup className="max-h-72 gap-1 overflow-y-auto">
+          {choices.length ? <FieldGroup className="grid max-h-60 grid-cols-1 gap-1 overflow-y-auto sm:grid-cols-2">
             {choices.map(bot => <Field key={bot.id} orientation="horizontal" className="min-w-0 rounded-lg p-2 hover:bg-control has-data-checked:bg-control">
-              <Checkbox id={`new-group-bot-${bot.id}`} checked={selected.includes(bot.id)} onCheckedChange={checked => setPicked(current => checked ? [...new Set([...current, bot.id])] : current.filter(id => id !== bot.id))} disabled={saving || error === 'unconfirmed' || (!selected.includes(bot.id) && selected.length >= 100)} />
+              <Checkbox id={`new-group-bot-${bot.id}`} checked={selected.includes(bot.id)} onCheckedChange={checked => { setPicked(current => checked ? [...new Set([...current, bot.id])] : current.filter(id => id !== bot.id)); if (error === 'botsRequired' && checked) setError(null) }} disabled={saving || error === 'unconfirmed' || (!selected.includes(bot.id) && selected.length >= 100)} />
               <FieldLabel htmlFor={`new-group-bot-${bot.id}`} className="min-w-0 cursor-pointer">
                 <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" still />
                 <span className="min-w-0 flex-1 truncate">{bot.name}</span>
+                {/* The first Bot picked leads the replies (leadBotId): say so where the choice is made, not in a hint. */}
+                {selected[0] === bot.id && <span className="shrink-0 rounded-full bg-control px-1.5 py-0.5 text-xs text-muted-foreground">{t('lead')}</span>}
               </FieldLabel>
             </Field>)}
           </FieldGroup> : <div className="flex flex-col items-start gap-2">
@@ -105,10 +115,10 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
         {error && <FieldError>{t(error)}</FieldError>}
       </form>
       <DialogFooter>
-        <Button type="button" variant="ghost" disabled={saving} onClick={() => onOpenChange(false)}>{common('cancel')}</Button>
+        <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>{common('cancel')}</Button>
         {error === 'unconfirmed'
           ? <Button type="button" onClick={onReviewGroups}>{t('reviewGroups')}</Button>
-          : <Button type="submit" form="new-group" disabled={!ready || saving} aria-busy={saving}>{saving && <Spinner data-icon="inline-start" />}{t('create')}</Button>}
+          : <Button type="submit" form="new-group" disabled={saving} aria-busy={saving}>{saving && <Spinner data-icon="inline-start" />}{t('create')}</Button>}
       </DialogFooter>
     </DialogContent>
   </Dialog>
