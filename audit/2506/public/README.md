@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 72 |
+| partial | 76 |
 | prior-partial | 36 |
-| unreviewed | 6262 |
+| unreviewed | 6258 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -157,3 +157,7 @@ Four ordinary G branch product commits `57a56499`, `bb2a5348`, `e1fe72a6`, `3c56
 ## 2026-11-18 fixed Contract editor seed, toast and toolbar consumer review
 
 Four formerly unreviewed original fixed code files in the rich-text-editor-3 Contract demo now have separate partial-retain records: `components/{data.tsx,icons.tsx,rich-text-content.tsx,rich-text-controls.tsx}`. Their full immutable source was read and traced to ContractEditor/Header, ContractToolbar, ResolveAllDialog and ContractActions; source Git blobs match G, public main ccd7e6c and Cloud pinned vendor 82d285ed. The author/clock and agreement are deterministic showcase seed data, not a customer writer or Cloudflare runtime; icons are display-only; EditContent and controls use native Tiptap and UI primitives. Original introduction 50bc4a25 (2026-10-20, file additions), with token correction to icons in 0118fe53 (#1295). A scoped 20/20 source/consumer assertion batch passed. No installed Node24, Tiptap/browser/AT, Cloud workerd, protected CI, ordinary merge, exact merged SHA or production acceptance is claimed. Four paths are partial, not complete; fixed code counts are **6556 = 186 complete / 72 partial / 36 prior-partial / 6262 unreviewed**. Other current-main deltas and G-015 official Cloudflare migration remain open.
+
+## G-076 2026-11-18: native Tiptap link form refusal behavior
+
+Four fixed original `components/blocks/rich-text-editor-{1,2,3,4}/components/rich-text-link.tsx` files are each now partial-reviewed. They retain independent Document/Page/Contract/Yjs Spec UI/translation scopes, not Cloudflare schedulers. Original native Tiptap `chain().run()` failure was ignored by LinkForm.apply; unsuccessful insert/setLink and unsuccessful removeLink still closed the popover. [Official Editor class contract](https://tiptap.dev/docs/editor/api/editor) explicitly returns command booleans. G-076 repairs all four original G source paths without an added wrapper, polling layer or fallback. Four exact product commits are in changes.jsonl and each review has fixed/main/G/Cloud-vendor Git Blob IDs. Extracted original JS handlers on a synthetic editor give **20/28 expected pre-fix to 28/28 post-fix**, with a separate static check for removeLink close gating; this is **not** installed Tiptap, mounted React/Next, Node24, browser/AT/Yjs, CI or merged runtime proof. G-076 remains `candidate_unmerged`. Fixed public counts are **6556 = 186 complete / 76 partial / 36 prior-partial / 6258 unreviewed**. G-015 official Cloudflare and #1954 / Cloud #155 production owners unchanged.
