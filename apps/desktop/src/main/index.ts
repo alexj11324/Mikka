@@ -18,7 +18,7 @@ import { startReturnListener, type ReturnListener } from './return-listener'
 import { catchClaudeCallback } from './subscription-callback'
 import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision } from './security'
-import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
+import { Updates, updateCopy } from './updates'
 import { UpdateGate, gateCopy, gateView, type GateState } from './launch-update'
 import { meetsMinimumVersion } from '@mikka/protocol/version'
 import { windowAppearance } from './window-appearance'
@@ -649,9 +649,8 @@ async function start(): Promise<void> {
     if (!app.isPackaged || FLAVOR === 'dev') return
     // This app may just have updated: the daemon on this computer updates too, when idle (daemon-update.ts).
     void updateLocalDaemon(FLAVOR, { connect: connectForUpdate({ name: 'mikka-desktop', version: APP_VERSION }) })
-    // An inconclusive launch check gets an early retry after the window opens.
+    // An inconclusive launch check gets one bounded retry after the window opens.
     if (retryCheck) setTimeout(() => { void checkForUpdates(false) }, 15_000)
-    setInterval(() => { void checkForUpdates(false) }, UPDATE_CHECK_INTERVAL_MS)
   }
   // A cold start of the installed app installs any newer version first (launch-update.ts).
   if (app.isPackaged && FLAVOR === 'prod') runUpdateGate(open)

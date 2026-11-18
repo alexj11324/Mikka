@@ -324,10 +324,6 @@ export const pollingAllowlist = {
     1,
   ),
   // Third-party APIs.
-  "apps/desktop/src/main/index.ts": external(
-    "the existing published GitHub desktop-release update check; no Mikka database request and disabled in Mikka Dev",
-    1,
-  ),
   "apps/desktop/src/main/ssh-install.ts": external(
     "bounded SSH installation handshake (30 attempts) reads remote daemon status after an explicit user install; not idle application polling",
     1,

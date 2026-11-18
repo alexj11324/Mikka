@@ -1,9 +1,5 @@
-// Background updates: electron-updater downloads a new release quietly, and
-// only a downloaded one reaches the web UI, which shows the rail's restart
-// button. The menu's "Check for Updates…" is the only path that opens a
-// dialog: it answers the person's own question.
-
-export const UPDATE_CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
+// electron-updater checks during the launch gate and on explicit menu request.
+// A downloaded release reaches the web UI, which shows the rail's restart button.
 
 /** The part of electron-updater's `autoUpdater` this module drives. */
 export interface Updater {
