@@ -45,6 +45,7 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 			State       string          `json:"state,omitempty"`
 			CallbackURL string          `json:"callbackUrl,omitempty"`
 			Code        string          `json:"code,omitempty"`
+			Redirect    string          `json:"redirect,omitempty"`
 		}
 		decoder := json.NewDecoder(bytes.NewReader(frame))
 		decoder.DisallowUnknownFields()
@@ -112,7 +113,7 @@ func (w *Worker) Serve(ctx context.Context, input io.Reader, output io.Writer) e
 			case "cleanup":
 				result, err = w.Cleanup(callCtx)
 			case "oauthStart":
-				result, err = w.StartOAuth(callCtx, request.Revision, request.SessionID)
+				result, err = w.StartOAuthWith(callCtx, request.Revision, request.SessionID, request.Redirect)
 			case "oauthResume":
 				result, err = w.ResumeOAuth(callCtx, request.SessionID)
 			case "oauthPoll":
