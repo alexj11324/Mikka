@@ -61,7 +61,7 @@ export function DeleteTableDialog({
   }
 
   function deleteTable() {
-    editor?.chain().focus().deleteTable().run()
+    if (!editor?.chain().focus().deleteTable().run()) return
     onOpenChange(false)
     toast.success(t('tableDeleted'), {
       icon: TOAST_SUCCESS_ICON,
