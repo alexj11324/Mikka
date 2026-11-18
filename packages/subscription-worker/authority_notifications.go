@@ -127,8 +127,11 @@ func (w *Worker) watchActiveAuthority(parent context.Context) (context.Context, 
 			stopLeaseTimer()
 		}
 		cancel()
-		_ = conn.Close(context.Background())
+		// WaitForNotification owns the pgx connection while it is blocked.
+		// Cancel its context and join the listener before closing the connection;
+		// closing concurrently races pgx's receive loop.
 		<-closed
+		_ = conn.Close(context.Background())
 	}
 	return listenCtx, stop, true
 }
