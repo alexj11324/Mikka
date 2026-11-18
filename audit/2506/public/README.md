@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 81 |
+| partial | 84 |
 | prior-partial | 36 |
-| unreviewed | 6253 |
+| unreviewed | 6250 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -193,3 +193,7 @@ The fixed manifest still has **7996** paths, **6556** classified code. With two 
 ## 2026-11-18 G-076 page clear native ACK continuation
 
 Pinned `components/blocks/rich-text-editor-2/components/page-actions.tsx` (source `e2084882`) is unchanged on the checked public main `42f39219` and Cloud vendor `82d285ed`. A real `PageEditor`→`PageHeader`→`PageActions` path opens a Base UI alert whose Action is a normal Button. The original command ignored `editor.commands.clearContent()` `false`/missing-editor returns and closed the alert with a false “Page cleared” success/Undo. Original function extracted into a V8 harness: 1/4 expected before, 4/4 after native boolean guard in source `86afbc28` (`e7e33759`), including successful Undo. The original path arrived in `50bc4a25` on 2026-10-20. Existing G-076 extends the same root, without a new mechanism or ID. Clipboard, display preferences, confirmation, translation and timers remain distinct local document UI duties; the whole file is **partial**, not complete. No locked Node24/installed editor, browser/AT, protected CI or normal merge/exact postmerge acceptance. Count becomes 186 complete / 81 partial / 36 prior-partial / 6253 unreviewed fixed code (6556). Cloudflare SDK G-015 and production remain separately owned.
+
+## 2026-11-18 editor native helper and embedded page controls review
+
+Three more previously unreviewed original files have independent fixed-source and actual-consumer reviews: `rich-text-state.ts` (Tiptap native `useEditorState` formatting/capability/count projections; original extracted selector helpers 18/18 synthetic V8 checks); `rich-text-task-item.tsx` (native TaskItem/ReactNodeViewRenderer task checkbox and checked attribute with editor lock); `rich-text-outline-node.tsx` (native document outline atom, live heading links and native slash command). All match fixed b19eed90, checked main 42f39219 and Cloud vendor 82d285ed, but installed Node24/React/Tiptap, actual browser/AT, native transactions and paired issue editor tests remain outstanding. Origin 50bc4a25 and 9a0735cd i18n modification were checked through actual file history. These are three distinct *partial retains*, not Cloudflare wrappers or a claim of fully verified semantic paths. Cumulative fixed code: 186 complete / 84 partial / 36 prior-partial / 6250 unreviewed out of 6556; 300 unique JSONL review rows expected. See individual paths-06.csv reviews. G-015 and #1954/Cloud #155 scopes unchanged.
