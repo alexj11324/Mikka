@@ -107,7 +107,7 @@ import { ViewStateProvider, useViewState, useForgetGroupDrafts } from '@/lib/hoo
 import { AuthenticatedReadCache } from '@/components/authenticated-read-cache'
 import type { AuthorizedCacheWorkspace } from '@/lib/swr/cache-scope'
 import { readAccessFailure } from '@/lib/swr/persistent-cache'
-import { loadAutomations, loadSettings, loadTaskDetail, preloadWorkspacePage } from './page-loaders'
+import { loadAutomations, loadSettings, preloadWorkspacePage } from './page-loaders'
 
 // Start the chunk download during module evaluation, before hydration and its effects.
 if (typeof window !== 'undefined') {
@@ -124,7 +124,7 @@ function DetailLoading() {
   const t = useTranslations('Workspace')
   return <div role="status" aria-label={t('loadingEditor')} className="flex flex-col gap-6 p-8"><Skeleton className="h-8 w-3/4" /><Skeleton className="h-40 w-full" /></div>
 }
-const TaskDetail = dynamic(loadTaskDetail, { loading: DetailLoading })
+const TaskDetail = dynamic(() => import('./task-detail').then(module => module.TaskDetail), { loading: DetailLoading })
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
 const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: DetailLoading })
 const AutomationsSection = dynamic(loadAutomations, { loading: DetailLoading })

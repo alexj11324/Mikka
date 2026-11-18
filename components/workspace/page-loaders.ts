@@ -1,4 +1,4 @@
-export const loadTaskDetail = () => import('./task-detail').then(module => module.TaskDetail)
+const loadTaskDetail = () => import('./task-detail')
 export const loadAutomations = () => import('@/components/automations/automations-section').then(module => module.AutomationsSection)
 export const loadCoordinator = () => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat)
 export const loadSettings = () => import('@/components/settings/settings-shell').then(module => module.SettingsRouteContent)
