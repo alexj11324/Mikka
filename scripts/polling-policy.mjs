@@ -20,6 +20,8 @@ export const pollingRoots = [
   "workflows/",
   "cloudflare/",
   "scripts/",
+  "services/",
+  "deploy/",
 ];
 
 const web = "hooks/use-live-key.tsx";

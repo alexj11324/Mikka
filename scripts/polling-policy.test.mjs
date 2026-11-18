@@ -6,11 +6,21 @@ import {
   findPolling,
   pollingAllowlist,
   pollingMessage,
+  pollingRoots,
+  pollingPolicyFiles,
   staleAllowlistEntries,
 } from "./polling-policy.mjs";
 
 const rules = (source) =>
   findPolling("components/example.tsx", source).map((d) => d.rule);
+
+test("repository polling audit includes shipped service and deployment code", () => {
+  assert.ok(pollingRoots.includes("services/"));
+  assert.ok(pollingRoots.includes("deploy/"));
+  const files = pollingPolicyFiles();
+  assert.ok(files.includes("services/credential-broker/src/oidc.ts"));
+  assert.ok(files.includes("deploy/litellm/mock-provider.py"));
+});
 
 test("ordinary TypeScript assertions do not hide a positional mobile interval", () => {
   const source =
