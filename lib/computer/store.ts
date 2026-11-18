@@ -132,12 +132,12 @@ export class ComputerStore {
     }
     const held = row.control === 'user' && new Date(row.controlUntil).getTime() > Date.now()
     const review = (await this.pool.query(`SELECT v.id,v.digest,v."runId",v.call,v."expiresAt",
-      LEAST(v."expiresAt",v."seenAt"+interval '10 seconds',r."leaseExpiresAt") AS "visibleUntil"
+      CASE WHEN v.display IS NULL THEN LEAST(v."expiresAt",v."seenAt"+interval '10 seconds',r."leaseExpiresAt") ELSE LEAST(v."expiresAt",r."leaseExpiresAt") END AS "visibleUntil"
       FROM local_computer_reviews v JOIN agent_runs r ON r.id=v."runId" AND r."userId"=v."userId" AND r."deviceId"=v."deviceId"
       JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       WHERE b."botId"=$1 AND b."workspaceId"=$2 AND b."ownerId"=$3 AND v.decision IS NULL
         AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
-        AND v."expiresAt">now() AND v."seenAt">now()-interval '10 seconds' AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()
+        AND v."expiresAt">now() AND (v.display IS NOT NULL OR v."seenAt">now()-interval '10 seconds') AND r."stopRequestedAt" IS NULL AND r."leaseExpiresAt">now()
         AND r.status=ANY($4::text[]) ORDER BY v."seenAt",v.id LIMIT 1`, [botId, actor.workspaceId, actor.userId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
     const call = review?.call
     const pendingApproval: ComputerState['pendingApproval'] = call && (call.name === 'click' || call.name === 'type_text' || call.name === 'get_desktop_state' || call.name === 'press_key' || call.name === 'scroll')

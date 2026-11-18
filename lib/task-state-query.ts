@@ -17,7 +17,7 @@ const run = {
 export const runAwaitingApproval = sql<boolean>`exists (select 1 from run_publications p where p."runId"=${run.id} and p."userId"=${run.userId} and p.status='awaiting_approval')
   or (${run.status} in ('preparing','running','waiting_input','finishing') and ${run.stopRequestedAt} is null and (
     exists (select 1 from agent_tool_approvals a where a."runId"=${run.id} and a."userId"=${run.userId} and a.status='pending' and a."expiresAt">now())
-    or exists (select 1 from local_computer_reviews v where v."runId"=${run.id} and v."userId"=${run.userId} and v.decision is null and v."expiresAt">now() and v."seenAt">now()-interval '10 seconds')))`
+    or exists (select 1 from local_computer_reviews v where v."runId"=${run.id} and v."userId"=${run.userId} and v.decision is null and v."expiresAt">now() and (v.display is not null or v."seenAt">now()-interval '10 seconds'))))`
 export const runDeviceOffline = sql<boolean>`${run.status}='queued' and exists (select 1 from devices d where d.id=${run.deviceId} and d."ownerId"=${run.userId} and d.kind='local'
   and (d.enabled=false or d."lastSeenAt" is null or d."lastSeenAt">now() or d."lastSeenAt"<now()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond')))`
 

@@ -5,7 +5,7 @@ import { pollWebComputerReviews } from "./web-review"
 import type { ComputerBroker } from "./broker.mjs"
 
 // #1212: local broker changes and gateway pushes wake immediately; server syncs
-// retain only the needed legacy fallback and presence refresh.
+// retain only the needed legacy/disconnect fallback.
 const request = (id: string) => ({ id, digest: id.repeat(64).slice(0, 64), runId: "00000000-0000-4000-8000-000000000001", display: ":1", call: { name: "click", arguments: {} } }) as unknown as LocalComputerRequest
 
 function fakeBroker() {
@@ -27,12 +27,12 @@ const tick = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 describe("web computer review sync", () => {
   const aborts: AbortController[] = []
   afterEach(() => { for (const abort of aborts) abort.abort() })
-  function start(signalSource: DeviceWorkSignal | undefined, presenceMs: number, answer: (requests: LocalComputerRequest[]) => LocalComputerDecision[]) {
+  function start(signalSource: DeviceWorkSignal | undefined, answer: (requests: LocalComputerRequest[]) => LocalComputerDecision[]) {
     const { broker, pending, decided, addPending } = fakeBroker()
     const syncs: number[] = []
     const abort = new AbortController()
     aborts.push(abort)
-    const loop = pollWebComputerReviews(broker, "device", { async syncComputerReviews(_id, requests) { syncs.push(requests.length); return answer(requests) } }, abort.signal, 5, signalSource, presenceMs)
+    const loop = pollWebComputerReviews(broker, "device", { async syncComputerReviews(_id, requests) { syncs.push(requests.length); return answer(requests) } }, abort.signal, 5, signalSource)
     return { pending, decided, syncs, abort, loop, addPending }
   }
   const pushing = () => {
@@ -42,8 +42,8 @@ describe("web computer review sync", () => {
     return signal
   }
 
-  it("with push, a pending review is synced when it appears and then only for presence, not on every check", async () => {
-    const run = start(pushing(), 200, () => [])
+  it("with push, a pending review is synced when it appears and sleeps until a change or push", async () => {
+    const run = start(pushing(), () => [])
     const { pending, syncs } = run
     await tick(30)
     expect(syncs).toEqual([0]) // the startup cleanup only
@@ -51,13 +51,13 @@ describe("web computer review sync", () => {
     await tick(100)
     expect(syncs).toEqual([0, 1]) // one server sync on the broker event
     await tick(200)
-    expect(syncs.length).toBe(3) // the presence refresh
+    expect(syncs).toEqual([0, 1]) // no periodic presence refresh
   })
 
-  it("with push, a person's decision is applied on the push at once; a lost push still lands at the presence refresh", async () => {
+  it("with push, a person's decision is applied immediately; reconnect catches a missed push", async () => {
     let decision: LocalComputerDecision[] = []
     const signal = pushing()
-    const run = start(signal, 300, () => decision)
+    const run = start(signal, () => decision)
     const { pending, decided, syncs } = run
     run.addPending("a", request("a"))
     await tick(40)
@@ -72,29 +72,29 @@ describe("web computer review sync", () => {
 
     run.addPending("b", request("b"))
     await tick(40)
-    decision = [{ id: "b", digest: request("b").digest, approve: true }] // decided, but its push is lost
-    const lostAt = Date.now()
-    for (let i = 0; i < 200 && decided.length < 2; i++) await tick(5)
+    decision = [{ id: "b", digest: request("b").digest, approve: true }]
+    signal.setConnected(false)
+    signal.setConnected(true) // reconnect triggers an authoritative full sync
+    for (let i = 0; i < 40 && decided.length < 2; i++) await tick(2)
     expect(decided[1]).toEqual(decision[0])
-    expect(Date.now() - lostAt).toBeLessThan(600)
   })
 
   it("against a server that does not push decisions, or with the gateway down, a pending review still syncs on every check", async () => {
-    const legacy = start(undefined, 10_000, () => [])
+    const legacy = start(undefined, () => [])
     const old = new DeviceWorkSignal() // the ticket named no review push
     old.setConnected(true)
-    const unpushed = start(old, 10_000, () => [])
+    const unpushed = start(old, () => [])
     const down = new DeviceWorkSignal()
     down.setPushedWaits(["computerReviews"]) // pushes, but the socket is closed
-    const fallback = start(down, 10_000, () => [])
+    const fallback = start(down, () => [])
     for (const run of [legacy, unpushed, fallback]) run.addPending("a", request("a"))
     await tick(100)
     for (const run of [legacy, unpushed, fallback]) expect(run.syncs.length).toBeGreaterThan(8)
   })
 
   it("an empty broker makes no server calls after its startup cleanup, with or without push", async () => {
-    const quiet = start(pushing(), 50, () => [])
-    const legacy = start(undefined, 50, () => [])
+    const quiet = start(pushing(), () => [])
+    const legacy = start(undefined, () => [])
     await tick(150)
     expect(quiet.syncs).toEqual([0])
     expect(legacy.syncs).toEqual([0])

@@ -23,10 +23,6 @@ export async function syncWebComputerReviews(broker: ComputerBroker, deviceId: s
   await applyWebComputerDecisions(broker, decisions)
 }
 
-/** The server accepts a person's decision only on a request this device showed
- * in the last 10 s (lib/computer/reviews.ts), so a pending request is re-sent
- * at least this often even when nothing changed. */
-export const REVIEW_PRESENCE_MS = 5_000
 
 /** What identifies a broker snapshot: a sync is news only when this changes. */
 function snapshotKey(requests: { id: string; digest: string }[]) {
@@ -57,13 +53,12 @@ function waitForReviewWake(broker: ComputerBroker, sinceRevision: number, pushes
 }
 
 /** A worker owns this loop for its lifetime. Empty brokers sleep until local state changes.
- * Pending reviews retain the legacy short fallback when the server cannot push, or a bounded
- * presence refresh when push is available; gateway reconnect and every push always sync now. */
-export async function pollWebComputerReviews(broker: ComputerBroker, deviceId: string, link: { syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]> }, signal: AbortSignal, intervalMs = 1000, pushes?: DeviceWorkSignal, presenceMs = REVIEW_PRESENCE_MS) {
+ * Pending reviews retain the legacy short fallback when the server cannot push or the gateway
+ * is disconnected. With push connected, broker changes and reconnects drive sync without presence polling. */
+export async function pollWebComputerReviews(broker: ComputerBroker, deviceId: string, link: { syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]> }, signal: AbortSignal, intervalMs = 1000, pushes?: DeviceWorkSignal) {
   if (!link.syncComputerReviews) throw new Error('Computer review transport unavailable')
   let pushed = false
   let synced: string | undefined
-  let syncedAt = 0
   let retryNeeded = false
   const unsubscribe = pushes?.subscribe(() => { pushed = true })
   try {
@@ -73,19 +68,16 @@ export async function pollWebComputerReviews(broker: ComputerBroker, deviceId: s
       const pending = snapshot.length > 0
       const key = snapshotKey(snapshot)
       const everyCheck = (pushes?.mode('computerReviews') ?? 'legacy') !== 'push'
-      if (key !== synced || (pending && (pushed || everyCheck || Date.now() - syncedAt >= presenceMs))) {
+      if (key !== synced || (pending && (pushed || everyCheck))) {
         pushed = false
         try {
           await syncWebComputerReviews(broker, deviceId, link, signal)
           synced = key
-          syncedAt = Date.now()
           retryNeeded = false
         } catch { retryNeeded = true /* pending calls remain unapproved; retry after a bounded wait */ }
       }
       if (signal.aborted) break
-      const waitMs = retryNeeded ? intervalMs : pending
-        ? (everyCheck ? intervalMs : Math.max(0, presenceMs - (Date.now() - syncedAt)))
-        : undefined
+      const waitMs = retryNeeded || (pending && everyCheck) ? intervalMs : undefined
       await waitForReviewWake(broker, revision, pushes, waitMs, signal)
     }
   } finally { unsubscribe?.() }
