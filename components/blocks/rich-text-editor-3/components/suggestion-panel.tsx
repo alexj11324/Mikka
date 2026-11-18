@@ -66,7 +66,7 @@ export interface SuggestionPanelProps {
   markup: RichTextMarkupView
   onMarkupChange: (markup: RichTextMarkupView) => void
   onSelect: (id: string) => void
-  onResolve: (id: string, resolution: SuggestionResolution) => void
+  onResolve: (id: string, resolution: SuggestionResolution) => boolean
   onResolveAll: (resolution: SuggestionResolution) => void
   /** Mod-Z and Mod-Shift-Z from the list, so a resolve undoes where it ran. */
   onHistory: (step: "undo" | "redo") => void
@@ -149,10 +149,12 @@ export function SuggestionPanel({
   }, [changes, heading])
 
   function resolve(id: string, resolution: SuggestionResolution) {
+    // A refused native command leaves the row and its focus intact.
+    if (!onResolve(id, resolution)) return
+
     const index = changes.findIndex((change) => change.id === id)
     const next = changes[index + 1] ?? changes[index - 1] ?? null
     focusAfterResolve.current = { id: next?.id ?? null }
-    onResolve(id, resolution)
   }
 
   function handleKeyDown(event: KeyboardEvent) {
