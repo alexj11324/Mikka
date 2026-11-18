@@ -54,9 +54,16 @@ dbTest('a heartbeat re-checks execution identities only when the harnesses chang
     const identities = async () => (await pool.query(`select harness from agents where "userId"=$1 and "deviceId"=$2 order by harness`, [owner, device])).rows.map(row => row.harness)
     const seen = async () => (await pool.query(`select "lastSeenAt", "deviceType", "updateFailure", harnesses from devices where id=$1`, [device])).rows[0]
 
+    // A registration waiter can wake immediately for a heartbeat even when the device was already online.
+    const { DEVICE_REGISTRATION_CHANNEL, subscribeShared } = await import('./db/listen')
+    const registration = await subscribeShared(pool, DEVICE_REGISTRATION_CHANNEL, [device])
+    assert.ok(registration)
+    t.after(() => registration.close())
+    registration.reset()
     // Online with unchanged harnesses: the identities are taken as checked.
     const before = (await seen()).lastSeenAt
     const idle = await beat({ harnesses: [codex] })
+    assert.equal(await registration.next(2_000), 'notified')
     assert.deepEqual([idle.leases, idle.revoked], [{}, []], 'an idle device has no leases')
     const after = await seen()
     assert.ok(after.lastSeenAt > before, 'the beat records the device as seen')

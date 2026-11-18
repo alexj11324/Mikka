@@ -6,9 +6,11 @@ export const GROUP_TURN_STOP_CHANNEL = 'mikka_group_turn_stop'
 export const COORDINATOR_LEASE_CHANNEL = 'mikka_coordinator_lease'
 /** A device may have work: payload is the device id, or `token:<id>` for a revoked credential. */
 export const DEVICE_WORK_CHANNEL = 'mikka_device_work'
+/** Device registration/readiness waiters only; heartbeats must not wake ordinary work polls. */
+export const DEVICE_REGISTRATION_CHANNEL = 'mikka_device_registration'
 /** App reply/scope and workspace membership triggers; ids only, delivered at commit. */
 export const MCP_REPLY_CHANNEL = 'mikka_mcp_reply'
-type Channel = typeof GROUP_TURN_STOP_CHANNEL | typeof COORDINATOR_LEASE_CHANNEL | typeof DEVICE_WORK_CHANNEL | typeof MCP_REPLY_CHANNEL
+type Channel = typeof GROUP_TURN_STOP_CHANNEL | typeof COORDINATOR_LEASE_CHANNEL | typeof DEVICE_WORK_CHANNEL | typeof DEVICE_REGISTRATION_CHANNEL | typeof MCP_REPLY_CHANNEL
 
 /** Sent with the writer's transaction: PostgreSQL delivers it only on COMMIT.
  * NOTIFY works through the Neon pooler; only LISTEN needs a direct session. */

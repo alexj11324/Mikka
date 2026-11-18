@@ -21,6 +21,7 @@ import { renewTaskSecretAccess } from '@/lib/secrets/task-renewal'
 import { withBasePath } from '@/lib/base-path'
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 import { withDeviceHeartbeatBody } from '@/lib/device-heartbeat-body'
+import { DEVICE_REGISTRATION_CHANNEL, notifyChannel } from '@/lib/db/listen'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,6 +81,8 @@ async function handlePOST(request: Request, body: unknown, { params }: { params:
     FROM prior WHERE d.id=prior.id
     RETURNING prior.enabled, prior."lastSeenAt", prior.harnesses IS DISTINCT FROM ${JSON.stringify(harnesses)}::jsonb AS "harnessesChanged"`)
   const prior = row && { ...row, lastSeenAt: row.lastSeenAt === null ? null : new Date(row.lastSeenAt) }
+  // Wake only server-side startup readiness waiters; ordinary device-work long polls must not be nudged by heartbeats.
+  await notifyChannel(pool, DEVICE_REGISTRATION_CHANNEL, [deviceId])
   // The execution identities follow the harnesses: checked when they change or the
   // device comes back online (registration checks them too), not on every beat.
   if (prior && (prior.harnessesChanged || !isDeviceOnline(prior.lastSeenAt, now.getTime()))) await ensureDeviceAgents(pool, caller.userId, deviceId, harnesses, { reported: true })

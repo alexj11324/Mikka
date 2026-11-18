@@ -167,6 +167,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
         assert.ok(handoff)
         await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [handoff.deviceId])
         await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1', [createHash('sha256').update(handoff.credential).digest('hex')])
+        await pool.query("SELECT pg_notify('mikka_device_registration', $1)", [handoff.deviceId])
       }
     } } } as unknown as import('e2b').Sandbox
     const workerRuntime = runtime
