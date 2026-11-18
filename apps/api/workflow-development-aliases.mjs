@@ -27,7 +27,7 @@ export function developmentWorkflowAliases({ buildDir, replace = {} }) {
     if (digest(source) === completedHash) return
     const result = await build({
       stdin: { contents: source, resolveDir: dirname(filename), sourcefile: filename, loader: 'js' },
-      outfile: filename, write: false, bundle: true, format: 'esm', platform: 'node', target: 'node24',
+      outfile: filename, write: false, bundle: true, format: 'esm', platform: 'node', target: 'node22',
       packages: 'external', external: [...nodeRuntimePackages, apiAliases['mikka-real-react']],
       keepNames: true, treeShaking: false, sourcemap: false, logLevel: 'silent',
       define: Object.fromEntries(Object.entries(replace).filter(([key, value]) => /^process\.env\.[A-Z0-9_]+$/.test(key) && typeof value === 'string')),

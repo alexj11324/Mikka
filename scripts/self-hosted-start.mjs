@@ -86,7 +86,7 @@ async function migrate(root, env) {
 }
 
 export async function startSelfHosted(root = process.cwd(), env = process.env) {
-  if (!process.version.startsWith('v24.')) throw new Error('SELF_HOSTED_NODE24_REQUIRED')
+  if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('SELF_HOSTED_NODE22_REQUIRED')
   selfHostedEnvironment(env, root)
   await installationSecrets(env.MIKKA_DATA_DIR, env)
   await mkdir(env.WORKFLOW_LOCAL_DATA_DIR, { recursive: true, mode: 0o700 })

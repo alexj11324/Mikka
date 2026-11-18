@@ -6,7 +6,7 @@
   "type": "module",
   "packageManager": "pnpm@10.34.3",
   "engines": {
-    "node": "24.x"
+    "node": ">=22"
   },
   "scripts": {
     "test:coding-workspace-review-runtime": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/coding-workspace/machine-metrics.test.ts lib/coding-workspace/machine-sessions.test.ts lib/coding-workspace/terminal/runtime.test.ts lib/coding-workspace/terminal/wire.test.ts lib/coding-workspace/preview/runtime.test.ts lib/coding-workspace/terminal/http.test.ts lib/coding-workspace/preview/route.test.ts lib/coding-workspace/cloudflare-review.test.ts",

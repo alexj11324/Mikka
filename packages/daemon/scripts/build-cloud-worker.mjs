@@ -17,7 +17,7 @@ export async function buildCloudWorker(out = resolve(root, 'dist/cloud')) {
   const result = await build({
     absWorkingDir: root, entryPoints: ['bin/cloud-worker.ts', 'bin/cloud-model-probe.ts'], outdir: out,
     // Separate bundles keep the catalogue entry free of the worker's SDK graph.
-    bundle: true, splitting: false, platform: 'node', format: 'esm', target: 'node24',
+    bundle: true, splitting: false, platform: 'node', format: 'esm', target: 'node22',
     banner: { js: 'import { createRequire as mikkaCreateRequire } from "node:module"; const require = mikkaCreateRequire(import.meta.url);' },
     define: { __MIKKA_DAEMON_BUNDLE__: 'true' },
     external: external.flatMap(name => [name, `${name}/*`]), logLevel: 'warning', metafile: true,

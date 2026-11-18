@@ -31,6 +31,13 @@ GitHub Actions only still refuse to run locally.
 Overrides: `MIKKA_DEV_HOME` (default `/var/lib/mikka-dev`), `MIKKA_PGDATA`,
 `MIKKA_PG_PORT` (default `5432`).
 
+Node 22 (latest 22.x) and Node 24 can both build, start and test the full app,
+including Eve. The default remains Node 24; it is not a minimum-version check.
+To verify another supported major, put that Node binary first on `PATH` after
+bootstrap, then run `pnpm build:app`, `pnpm start` and the relevant tests.
+The frozen dependency patch for Eve only widens its CLI engine declaration;
+CI verifies its actual compiled runtime on both versions.
+
 ## In the cloud environment's setup script
 
 The environment's setup script can run it, so every new session starts ready:
