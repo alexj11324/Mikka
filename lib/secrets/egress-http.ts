@@ -1,5 +1,5 @@
 // Bounded HTTPS data plane for third-party secrets only. One read of the live
-// run per request (lib/secrets/egress-binding.ts); no provider/GitHub proxy,
+// run per request (lib/secrets/egress-binding.ts, injected by the route); no provider/GitHub proxy,
 // remote authorization preflight, cookie jar, or redirect following.
 import { lookup } from 'node:dns/promises'
 import { request as httpsRequest, type RequestOptions } from 'node:https'
@@ -62,11 +62,13 @@ export interface EgressHttpOptions {
   signal?: AbortSignal
   resolve?: (hostname: string) => Promise<LookupAddress[]>
   transport?: (target: EgressHttpTarget, signal: AbortSignal) => Promise<EgressUpstreamResponse>
-  /** Whether the capability's run still holds it; defaults to the database check. */
+  /**
+   * Whether the capability's run still holds it. The application route passes
+   * the database check (lib/secrets/egress-binding.ts); this module stays free
+   * of SQL and authentication. Without it every request is refused.
+   */
   bindingActive?: (claims: EgressCapabilityClaims) => Promise<boolean>
 }
-
-const liveBinding = async (claims: EgressCapabilityClaims) => (await import('./egress-binding')).egressBindingActive(claims)
 
 function requestTarget(claims: EgressCapabilityClaims, input: EgressHttpRequest): Omit<EgressHttpTarget, 'address'> {
   if (!input || typeof input !== 'object' || Object.keys(input).some(key => !['capability', 'method', 'path', 'headers', 'bodyBase64'].includes(key))
@@ -232,7 +234,8 @@ export async function executeEgressRequest(input: EgressHttpRequest, expected: P
   const target = requestTarget(claims, input)
   // Revocation is checked here, at use: a stopped run, an ended lease or a
   // closed device session refuses the request before any upstream connection.
-  if (!await (options.bindingActive ?? liveBinding)(claims)) throw egressError('expired_capability')
+  if (!options.bindingActive) throw egressError('configuration')
+  if (!await options.bindingActive(claims)) throw egressError('expired_capability')
   if (activeRequests >= MAX_CONCURRENT_REQUESTS) throw egressError('limit_exceeded')
   activeRequests++
   const controller = new AbortController()

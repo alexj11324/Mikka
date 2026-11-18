@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { before, beforeEach, mock, test } from 'node:test'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import type { Pool } from 'pg'
 import { issueVisibilityPredicate } from '../lib/issue-visibility-policy'
@@ -66,7 +66,11 @@ before(async () => {
   } })
   stub('../lib/db/index.ts', { db: database })
   stub('../lib/db/request-scope.ts', { inDatabaseTransaction: () => false })
-  stub('../lib/device-presence.ts', { deviceOnlineStates: async () => new Map() })
+  stub('../lib/device-presence.ts', {
+    deviceOnlineStates: () => new Map(),
+    deviceSessionOpen: sql<boolean>`("devices"."sessionOpenedAt" IS NOT NULL AND ("devices"."sessionClosedAt" IS NULL OR "devices"."sessionClosedAt" < "devices"."sessionOpenedAt"))`,
+    deviceSessionOpenSql: (alias = 'd') => `(${alias}."sessionOpenedAt" IS NOT NULL AND (${alias}."sessionClosedAt" IS NULL OR ${alias}."sessionClosedAt" < ${alias}."sessionOpenedAt"))`,
+  })
   stub('../lib/db/egress-sample.ts', { withDatabaseOperation: async (_route: string, work: () => unknown) => work() })
   stub('../lib/live/revision-read.ts', { beginWorkspaceListRead: async (owner: string, workspaceId: string) => {
     assert.equal(owner, viewer); assert.equal(workspaceId, WORKSPACE)
@@ -196,9 +200,12 @@ test('shared run facts correlate to the outer Run in both single-table and joine
     }
     assert.ok(text.includes('"agent_runs"."status" in (\'preparing\',\'running\',\'waiting_input\',\'finishing\')'))
     assert.ok(text.includes('"agent_runs"."stopRequestedAt" is null'))
-    assert.equal(text.match(/d\.id="agent_runs"\."deviceId"/g)?.length, 2, 'both presence facts use the actual Run device')
-    assert.equal(text.match(/d\."ownerId"="agent_runs"\."userId"/g)?.length, 2, 'both presence facts retain the outer owner')
-    assert.equal(text.match(/"agent_runs"\."status"='queued'/g)?.length, 2)
+    // One presence fact, read from the device session (decision 2026-11-17-2215).
+    assert.equal(text.match(/d\.id="agent_runs"\."deviceId"/g)?.length, 1, 'the presence fact uses the actual Run device')
+    assert.equal(text.match(/d\."ownerId"="agent_runs"\."userId"/g)?.length, 1, 'the presence fact retains the outer owner')
+    assert.equal(text.match(/"agent_runs"\."status"='queued'/g)?.length, 1)
+    assert.ok(text.includes('d."sessionOpenedAt" IS NOT NULL'), 'presence is the open device session')
+    assert.equal(text.includes('"lastSeenAt"<now()'), false, 'no heartbeat window')
     assert.match(text, /where \("agent_runs"\."userId" = \$\d+ and "agent_runs"\."workspaceId" = \$\d+\)/)
     assert.ok(params.includes(OWNER) && params.includes(WORKSPACE), 'actor and Workspace remain parameterized')
     assert.ok(!text.includes(OWNER) && !text.includes(WORKSPACE))

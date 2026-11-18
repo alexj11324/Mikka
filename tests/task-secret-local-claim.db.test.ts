@@ -27,6 +27,7 @@ import { taskExecutionEnv } from '../packages/daemon/src/task-env'
 import { startTaskSecretBridge, type TaskSecretBridge } from '../packages/daemon/src/task-secret-bridge'
 import { executeEgressRequest, pinnedEgressRequestOptions, type EgressHttpTarget, type EgressUpstreamResponse } from '../lib/secrets/egress-http'
 import { taskSecretEgressResponse } from '../lib/secrets/egress-route'
+import { egressBindingActive } from '../lib/secrets/egress-binding'
 import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub, recordPushGrant } from './support/github-app-stub'
 
@@ -209,7 +210,7 @@ test('local task Secret claim, child egress, recovery and withdrawal use the rea
         result = await runRequestScope(createRequestScope(request), () => routes.capture.GET(request, { params: Promise.resolve({ captureId }) }))
       }
       else if ((found = match(/^\/v1\/task-secrets\/([^/]+)$/))) result = await taskSecretEgressResponse(request, found[0], (input, binding, options) =>
-        executeEgressRequest(input, binding, { ...options, resolve: async () => [{ address: '93.184.216.34', family: 4 }], transport }))
+        executeEgressRequest(input, binding, { ...options, bindingActive: egressBindingActive, resolve: async () => [{ address: '93.184.216.34', family: 4 }], transport }))
       else result = new Response(null, { status: 404 })
       outgoing.writeHead(result.status, Object.fromEntries(result.headers))
       outgoing.end(Buffer.from(await result.arrayBuffer()))

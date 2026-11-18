@@ -1520,7 +1520,7 @@ test('bundled production probe uses a real inherited bridge and ordinary SDK ove
       const chunks = []; for await (const chunk of request) chunks.push(chunk)
       const input = new Request(`http://localhost${request.url}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: Buffer.concat(chunks) })
       const result = await taskSecretEgressResponse(input, runId, (envelope, expected, options) => executeEgressRequest(envelope, expected, {
-        ...options, env: { WORKSPACE_SECRETS_KEY: key }, resolve: async () => [{ address: '8.8.8.8', family: 4 }],
+        ...options, env: { WORKSPACE_SECRETS_KEY: key }, bindingActive: async () => true, resolve: async () => [{ address: '8.8.8.8', family: 4 }],
         // Isolated component test: the production public-DNS policy still
         // runs, while only its final HTTPS transport is sent to this local TCP fixture.
         transport: async target => {
