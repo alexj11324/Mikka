@@ -532,7 +532,7 @@ function SpecSession({ room, onReplay, className }: SpecSessionProps) {
   }
 
   function replyThread(id: string, body: string) {
-    replyToThread(room.local.doc, id, {
+    return replyToThread(room.local.doc, id, {
       author: CURRENT_USER,
       body,
       at: currentTime(),
