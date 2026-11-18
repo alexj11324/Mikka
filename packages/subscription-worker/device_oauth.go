@@ -17,6 +17,62 @@ import (
 const codexDeviceRedirect = "https://auth.openai.com/deviceauth/callback"
 const claudeCallbackURI = "http://localhost:54545/callback"
 
+// Claude Code's own manual sign-in page, for a browser that cannot reach
+// localhost (web, phones). After 允许 it shows `code#state` to copy. Source:
+// MANUAL_REDIRECT_URL in @anthropic-ai/claude-code 2.1.327, same CLIENT_ID.
+const claudeCodePageURI = "https://platform.claude.com/oauth/code/callback"
+
+// claudeReturnCode reads the provider code from what a person pasted: the
+// address their browser ended on (with or without scheme, http or https),
+// the `code#state` Claude's code page shows, or the code alone. The text only
+// carries the code: the redirect used in the exchange is the attempt's own.
+func claudeReturnCode(text, state string) (string, bool) {
+	text = strings.TrimSpace(text)
+	if text == "" || len(text) > 8192 || strings.ContainsAny(text, " \t\r\n\x00") {
+		return "", false
+	}
+	var code, got string
+	if strings.Contains(text, "code=") {
+		raw := text
+		if !strings.Contains(raw, "://") {
+			raw = "http://" + raw
+		}
+		u, err := url.Parse(raw)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || !claudeReturnPlace(u.Host, u.Path) {
+			return "", false
+		}
+		q, err := url.ParseQuery(u.RawQuery)
+		if err != nil {
+			return "", false
+		}
+		if len(q["code"]) != 1 || len(q["state"]) > 1 || q.Has("error") {
+			return "", false
+		}
+		code, got = q.Get("code"), q.Get("state")
+		if got == "" {
+			got = u.Fragment
+		}
+	} else if i := strings.IndexByte(text, '#'); i >= 0 {
+		code, got = text[:i], text[i+1:]
+	} else {
+		code = text
+	}
+	if (got != "" && got != state) || len(code) == 0 || len(code) > 4096 || strings.ContainsAny(code, "#&?/:\"'<>\\") {
+		return "", false
+	}
+	return code, true
+}
+
+func claudeReturnPlace(host, path string) bool {
+	switch host {
+	case "localhost:54545", "127.0.0.1:54545", "localhost", "127.0.0.1":
+		return path == "/callback" || path == "/callback/"
+	case "platform.claude.com", "console.anthropic.com":
+		return path == "/oauth/code/callback"
+	}
+	return false
+}
+
 // The split-phase shape follows pinned CPA sdk/auth/codex_device.go. We reuse
 // its client constant and actual token exchange/storage; no CLI callback server,
 // stdout, browser launch, identity cloaking, or local credential acquisition.
@@ -215,30 +271,29 @@ func (w *Worker) PollOAuth(ctx context.Context, session, state string) (any, err
 		return fail(ErrStale)
 	}
 	// Never use the provider's verifier/challenge as a client-supplied redirect.
-	return w.publishOAuth(ctx, op, grant.Code, "", grant.Verifier)
+	return w.publishOAuth(ctx, op, grant.Code, "", grant.Verifier, "")
 }
 func (w *Worker) CompleteHandoff(ctx context.Context, session, state, callback string) (Metadata, error) {
 	if w.Scope.Provider != "claude" || !validState(state) || len(callback) > 8192 || strings.ContainsAny(callback, "\r\n\x00") {
 		return Metadata{}, ErrUnsupported
 	}
-	parsed, err := url.Parse(callback)
-	if err != nil || parsed.Scheme != "http" || parsed.Host != "localhost:54545" || parsed.Path != "/callback" || parsed.RawPath != "" || parsed.User != nil || parsed.Fragment != "" || parsed.Opaque != "" {
+	// Phones paste what Safari shows (often https:// or no scheme), and the
+	// code page shows `code#state`; the old exact-URL check refused all of it
+	// before the attempt was even read (production, 2026-11-18).
+	code, ok := claudeReturnCode(callback, state)
+	if !ok {
 		return Metadata{}, ErrUnsupported
 	}
-	q, err := url.ParseQuery(parsed.RawQuery)
-	if err != nil || len(q) != 2 || len(q["code"]) != 1 || len(q["state"]) != 1 || q.Get("state") != state {
-		return Metadata{}, ErrUnsupported
-	}
-	return w.CompleteOAuth(ctx, session, state, q.Get("code"))
+	return w.CompleteOAuth(ctx, session, state, code)
 }
 
 // Both flows publish through the same actual CPA login manager and durable Store.
-func (w *Worker) publishOAuth(ctx context.Context, op Operation, code, state, verifier string) (Metadata, error) {
+func (w *Worker) publishOAuth(ctx context.Context, op Operation, code, state, verifier, redirect string) (Metadata, error) {
 	current, err := w.Repo.Lookup(ctx, w.Scope)
 	if err != nil || current.OperationID != op.OperationID || current.Epoch != op.Epoch || current.State != "pending" || !current.Deadline.After(time.Now()) {
 		return Metadata{}, ErrStale
 	}
-	manager := newOAuthManager(w, op, code, state, verifier)
+	manager := newOAuthManager(w, op, code, state, verifier, redirect)
 	if err := manager(ctx); err != nil {
 		_ = w.Repo.Fail(context.WithoutCancel(ctx), op, "publication_failed")
 		return Metadata{}, Refusal(safeCode(err))

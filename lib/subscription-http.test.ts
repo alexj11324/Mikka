@@ -235,6 +235,15 @@ test('explicit Cancel disconnects the pending revision without starting another 
   assert.equal(fixture.acquisitions(), 0)
 })
 
+test('the web asks for Claude Code\'s code page; the worker gets that, and nothing else', async () => {
+  const fixture = lifecycle()
+  const response = await fixture.send({ action: 'reconnect', connectionId, revision: 2, redirect: 'code' })
+  assert.equal(response.status, 200)
+  assert.deepEqual(fixture.calls.map(call => [call.method, call.params]), [['disconnect', { revision: 2 }], ['oauthStart', { revision: 3, sessionId: 'owner-session', redirect: 'code' }]])
+  const refused = await lifecycle().send({ action: 'reconnect', connectionId, revision: 2, redirect: 'https://evil.test/' })
+  assert.equal(refused.status, 409)
+})
+
 test('explicit reconnect fences a legacy or previous-session pending attempt before starting a new one', async () => {
   const fixture = lifecycle()
   const response = await fixture.send({ action: 'reconnect', connectionId, revision: 2 })

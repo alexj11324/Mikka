@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useClipboardCopy } from '@/hooks/use-clipboard-copy'
 import { Check, Copy, MoreHorizontal, RefreshCw, TriangleAlert } from 'lucide-react'
 import { useFormatter, useTranslations } from 'next-intl'
@@ -17,7 +17,7 @@ import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { Skeleton } from '@/components/ui/skeleton'
-import { planName, subscriptionSignInState, type SubscriptionUsageView } from '@/lib/subscription-ui'
+import { claudeShowsCode, planName, readClipboardText, subscriptionSignInState, type SubscriptionUsageView } from '@/lib/subscription-ui'
 import { readSubscriptionUsage, readSubscriptions, subscriptionsKey, subscriptionUsageKey, useSubscriptions, type SubscriptionAttempt, type SubscriptionProvider } from '@/hooks/settings/use-subscriptions'
 import { cn } from '@/lib/utils'
 
@@ -172,6 +172,7 @@ function SignInPanel({ attempt, callback, pending, onCallback, onFinish, onCance
   const t = useTranslations('Settings.subscriptions')
   const { state: copyState, copy } = useClipboardCopy(attempt.userCode ?? '')
   const copyText = useTranslations('AiElements.message')
+  const input = useRef<HTMLInputElement>(null)
   const name = t(attempt.provider === 'codex' ? 'codexProduct' : 'claudeProduct')
   const cancel = <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={onCancel}>{t('cancel')}</Button>
   const open = <Button variant="secondary" size="sm" nativeButton={false} render={<a href={attempt.authorizationUrl} target="_blank" rel="noopener noreferrer" />}>{t('open', { provider: name })}</Button>
@@ -184,14 +185,19 @@ function SignInPanel({ attempt, callback, pending, onCallback, onFinish, onCance
       <span className="ml-auto flex items-center gap-2">{cancel}{open}</span>
     </div>
   </div>
+  // Web and phones: Claude's page shows a code to copy back here. Desktop: the localhost address, if the app could not catch it.
+  const showsCode = claudeShowsCode(attempt.authorizationUrl)
   return <form className="flex flex-col gap-3 px-5 pb-4 sm:pl-13" onSubmit={event => { event.preventDefault(); onFinish() }}>
-    <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm text-muted-foreground">
+    {showsCode ? <p className="text-sm text-muted-foreground">{t('codeStep')}</p> : <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm text-muted-foreground">
       <li>{t('callbackStepOpen')}</li>
       <li>{t('callbackStepCopy')}</li>
       <li>{t('callbackStepPaste')}</li>
-    </ol>
-    <FieldGroup><Field><FieldLabel htmlFor="subscription-callback">{t('callbackLabel')}</FieldLabel>
-      <Input id="subscription-callback" value={callback} placeholder={t('callbackPlaceholder')} autoComplete="off" spellCheck={false} maxLength={8192} onChange={event => onCallback(event.target.value)} />
+    </ol>}
+    <FieldGroup><Field><FieldLabel htmlFor="subscription-callback">{t(showsCode ? 'codeLabel' : 'callbackLabel')}</FieldLabel>
+      <div className="flex items-center gap-2">
+        <Input ref={input} id="subscription-callback" value={callback} placeholder={t(showsCode ? 'codePlaceholder' : 'callbackPlaceholder')} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} maxLength={8192} onChange={event => onCallback(event.target.value)} />
+        <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { void readClipboardText().then(text => { if (text) onCallback(text); else input.current?.focus() }) }}>{t('paste')}</Button>
+      </div>
     </Field></FieldGroup>
     <div className="flex flex-wrap items-center justify-end gap-2">
       {cancel}{open}
