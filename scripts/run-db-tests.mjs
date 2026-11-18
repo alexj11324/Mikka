@@ -59,6 +59,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/chat-attachments/store.ts', file: 'lib/chat-attachments/store.db.test.ts', script: 'test:chat-attachments-db' },
   { marker: 'lib/plugins/store.ts', file: 'lib/plugins/store.db.test.ts', script: 'test:plugins-db' },
   { marker: 'lib/eve/evaluation-store.ts', file: 'lib/eve/evaluation-store.db.test.ts', script: 'test:eve-db' },
+  { marker: 'cloudflare/eve-runtime/test/graphile-event-driven.db.test.mjs', file: 'cloudflare/eve-runtime/test/graphile-event-driven.db.test.mjs', script: 'test:eve-graphile-db' },
   { marker: 'lib/eve/scheduled-read.ts', file: 'lib/eve/scheduled-read.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/eve/scope.ts', file: 'lib/eve/scope.db.test.ts', script: 'test:eve-db' },
   { marker: 'lib/eve/auth-bot.ts', file: 'lib/eve/auth-bot.db.test.ts', script: 'test:eve-db' },
@@ -306,7 +307,7 @@ export function readTree(root = '.') {
       else if (/\.(ts|mjs|js)$/.test(file)) files[file] = readFileSync(resolve(root, file), 'utf8')
     }
   }
-  walk('lib'); walk('tests'); walk('scripts')
+  walk('lib'); walk('tests'); walk('scripts'); walk('cloudflare/eve-runtime')
   for (const { config } of BROWSER_SUITES) if (existsSync(resolve(root, config))) files[config] = readFileSync(resolve(root, config), 'utf8')
   return files
 }
