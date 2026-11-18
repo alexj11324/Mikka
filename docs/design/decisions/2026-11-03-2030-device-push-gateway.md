@@ -4,6 +4,7 @@
 - Source: Alex, GitHub issue #1156, and the follow-up that the design has to fit 500 people and 400 devices online on the Cloudflare free plan, with no Neon Functions and no second paid membership
 - Rule: —
 - Replaces: —
+- Superseded in part by: [2026-11-17-2215](2026-11-17-2215-device-session-no-heartbeat.md) (a daemon is usable only while it holds its gateway socket; there is no heartbeat and no long-poll fallback, and the socket is the device session)
 
 A device learns that work is waiting from a Cloudflare Durable Object, one object per device, over a hibernating WebSocket. The server posts an empty signal after it commits the work. The device then reads that work through the existing authenticated route. The 30 second heartbeat is the text `ping`, which the object auto-answers without waking and without a database write.
 

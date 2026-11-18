@@ -31,13 +31,13 @@ export async function syncComputerReviews(pool: Pool, deviceId: string, userId: 
           AND r.status=ANY($4::text[]) AND (b."runId" IS NULL OR r."leaseExpiresAt">now()) FOR UPDATE OF r`, [row.runId, userId, deviceId, ['running', 'preparing', 'waiting_input', 'finishing']])).rows[0]
       if (!run || (run.botId ? row.display !== `:${run.display}` : row.display !== undefined)) throw new Error('Run or desktop unavailable')
       const inserted = await client.query(`WITH previous AS MATERIALIZED (
-        SELECT decision,"seenAt",display FROM local_computer_reviews WHERE id=$1
+        SELECT decision,"seenAt" FROM local_computer_reviews WHERE id=$1
       ) INSERT INTO local_computer_reviews (id,"deviceId","runId","userId",target,display,call,digest,"expiresAt","seenAt")
         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,now()) ON CONFLICT (id) DO UPDATE SET "seenAt"=now()
         WHERE local_computer_reviews."deviceId"=EXCLUDED."deviceId" AND local_computer_reviews."runId"=EXCLUDED."runId"
           AND local_computer_reviews."userId"=EXCLUDED."userId" AND local_computer_reviews.digest=EXCLUDED.digest
         RETURNING id,decision,"expiresAt">now() AND NOT EXISTS (
-          SELECT 1 FROM previous WHERE decision IS NULL AND (display IS NOT NULL OR "seenAt">now()-interval '10 seconds')
+          SELECT 1 FROM previous WHERE decision IS NULL
         ) AS appeared`,
       [row.id, deviceId, row.runId, userId, row.target, row.display ?? null, JSON.stringify(maskDeep(row.call, mask)), row.digest, new Date(row.expiresAt)])
       if (!inserted.rowCount) throw new Error('Review changed')
@@ -53,7 +53,7 @@ export async function syncComputerReviews(pool: Pool, deviceId: string, userId: 
     ) SELECT DISTINCT b."botId" FROM removed JOIN computer_run_bindings b ON b."runId"=removed."runId" AND b."ownerId"=$2`,
     [deviceId, userId, rows.map(row => row.id)])
     for (const row of removed.rows) await computerChanged(client, pool, row.botId)
-    const result = await client.query('SELECT id,digest,decision AS approve FROM local_computer_reviews WHERE "deviceId"=$1 AND "userId"=$2 AND id=ANY($3::uuid[]) AND decision IS NOT NULL AND "expiresAt">now() AND (display IS NOT NULL OR "seenAt">now()-interval \'10 seconds\')', [deviceId, userId, rows.map(row => row.id)])
+    const result = await client.query('SELECT id,digest,decision AS approve FROM local_computer_reviews WHERE "deviceId"=$1 AND "userId"=$2 AND id=ANY($3::uuid[]) AND decision IS NOT NULL AND "expiresAt">now()', [deviceId, userId, rows.map(row => row.id)])
     await client.query('COMMIT')
     return result.rows
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
@@ -76,6 +76,7 @@ export async function decideComputerReview(pool: Pool, actor: { userId: string; 
       JOIN devices dev ON dev.id=v."deviceId" AND dev."ownerId"=$3 AND dev.enabled=true
       WHERE v.id=$1 AND v.digest=$2 AND v."userId"=$3 AND v.decision IS NULL AND v."expiresAt">now()
         AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
+        AND dev."sessionOpenedAt" IS NOT NULL AND (dev."sessionClosedAt" IS NULL OR dev."sessionClosedAt" < dev."sessionOpenedAt")
         AND v.display=':' || (CASE WHEN t."runId" IS NULL THEN d.display ELSE 1 END)::text
         AND (t."runId" IS NULL OR (t."deviceId"=v."deviceId" AND t.state IN ('starting','running')))
         AND r."userId"=$3 AND r."deviceId"=v."deviceId" AND r."stopRequestedAt" IS NULL

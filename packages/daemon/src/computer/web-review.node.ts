@@ -7,8 +7,18 @@ import { join } from 'node:path'
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import { ComputerBroker } from './broker.mjs'
-import { applyWebComputerDecisions, pollWebComputerReviews, syncWebComputerReviews, webComputerSnapshots } from './web-review'
+import { applyWebComputerDecisions, followWebComputerReviews, syncWebComputerReviews, webComputerSnapshots } from './web-review'
 import { computerSyncBody } from '@mikka/protocol/computer'
+import { DeviceWorkSignal } from '../device-work-signal'
+import { ServerUnreachableError } from '../errors'
+
+/** An open device session whose redial reopens at once, as a reconnecting socket would. */
+function openSession() {
+  const signal = new DeviceWorkSignal()
+  signal.setConnected(true)
+  const redial = () => queueMicrotask(() => { signal.setConnected(false); signal.setConnected(true) })
+  return { signal, redial }
+}
 
 test('web decision releases original MCP call and scripted model continues screenshot -> click; no raw driver or repeated execution', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'cua-web-'))
@@ -58,7 +68,7 @@ test('web decision releases original MCP call and scripted model continues scree
   assert.equal(calls, 2)
 })
 
-test('review polling retries transport failures without granting and stops on abort', async t => {
+test('review sync retries transport failures through the redialed session without granting and stops on abort', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'cua-poll-'))
   let executed = 0, attempts = 0
   const broker = new ComputerBroker({ socketPath: join(dir, 'socket'),
@@ -69,11 +79,12 @@ test('review polling retries transport failures without granting and stops on ab
   const grant = broker.spec(randomUUID(), 'ask', { display: ':1' })!
   const result = broker.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })
   const abort = new AbortController()
-  const polling = pollWebComputerReviews(broker, 'device', { async syncComputerReviews(_id, requests) {
+  const session = openSession()
+  const polling = followWebComputerReviews(broker, 'device', { async syncComputerReviews(_id, requests) {
     attempts++
-    if (attempts === 1) { assert.equal(executed, 0); throw new Error('offline') }
+    if (attempts === 1) { assert.equal(executed, 0); throw new ServerUnreachableError('offline') }
     return [{ id: requests[0].id, digest: requests[0].digest, approve: true }]
-  } }, abort.signal, 5)
+  } }, abort.signal, session.signal, session.redial)
   assert.equal(await result, 'ok')
   abort.abort()
   await polling
@@ -84,7 +95,6 @@ test('review polling retries transport failures without granting and stops on ab
 test('idle review sync sends one cleanup, resumes for a pending call and retries the final cleanup', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'cua-idle-'))
   let executed = 0, attempts = 0, emptyAttempts = 0
-  let completed = false
   const broker = new ComputerBroker({ socketPath: join(dir, 'socket'),
     driver: { installed: true, path: '/fake', version: 'test', fingerprint: 'f'.repeat(64) }, permitted: () => true,
     execute: async () => { executed++; return 'ok' },
@@ -95,22 +105,23 @@ test('idle review sync sends one cleanup, resumes for a pending call and retries
   broker.list = () => { localReads++; return list() }
   let polling: Promise<void> | undefined
   t.after(async () => { abort.abort(); await polling; await broker.close(); await rm(dir, { recursive: true, force: true }) })
-  polling = pollWebComputerReviews(broker, 'device', { async syncComputerReviews(_id, requests) {
+  const session = openSession()
+  polling = followWebComputerReviews(broker, 'device', { async syncComputerReviews(_id, requests) {
     attempts++
     if (!requests.length) {
       emptyAttempts++
-      if (completed && emptyAttempts === 2) throw new Error('cleanup offline')
+      // The first empty sync is the cleanup on open; the second is the final cleanup.
+      if (emptyAttempts === 2) throw new ServerUnreachableError('cleanup offline')
       return []
     }
     return [{ id: requests[0].id, digest: requests[0].digest, approve: true }]
-  } }, abort.signal, 5)
+  } }, abort.signal, session.signal, session.redial)
   await new Promise(resolve => setTimeout(resolve, 40))
   assert.equal(attempts, 1, 'an empty broker must not generate periodic network traffic')
   assert.equal(localReads, 2, 'after startup cleanup, an empty broker sleeps on local events instead of polling')
   const grant = broker.spec(randomUUID(), 'ask')!
   const result = broker.request(grant.token, { name: 'click', arguments: { x: 1, y: 2 } })
   assert.equal(await result, 'ok')
-  completed = true
   for (let n = 0; n < 100 && emptyAttempts < 3; n++) await new Promise(resolve => setTimeout(resolve, 5))
   assert.equal(emptyAttempts, 3, 'failed final empty snapshot must be retried')
   assert.equal(executed, 1)

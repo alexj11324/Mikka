@@ -4,33 +4,33 @@ import { FACTORY_CLOUD_DISPATCH_AVAILABLE, createFactoryDispatchRecovery, factor
 import { handleFactoryDispatchRecovery } from './dispatch-recovery-http';
 
 const now = Date.parse('2026-10-30T07:00:00Z');
-const device = (over: Partial<{ enabled: boolean; lastSeenAt: Date | null; harnesses: unknown }> = {}) =>
-  ({ id: 'd', name: 'Mac', enabled: true, lastSeenAt: new Date(now - 1_000), harnesses: [{ harness: 'codex', installed: true }], ...over });
+type Device = { enabled: boolean; lastSeenAt: Date | null; sessionOpenedAt: Date | null; sessionClosedAt: Date | null; harnesses: unknown };
+const device = (over: Partial<Device> = {}) =>
+  ({ id: 'd', name: 'Mac', enabled: true, lastSeenAt: new Date(now - 1_000), sessionOpenedAt: new Date(now - 3_600_000), sessionClosedAt: null, harnesses: [{ harness: 'codex', installed: true }], ...over });
+const closed = { sessionClosedAt: new Date(now - 1_000) };
 
-test('online uses the 60s device window and the enabled switch', () => {
-  assert.equal(factoryDeviceOnline(device(), now), true);
-  assert.equal(factoryDeviceOnline(device({ lastSeenAt: new Date(now - 61_000) }), now), false);
-  assert.equal(factoryDeviceOnline(device({ lastSeenAt: null }), now), false);
-  assert.equal(factoryDeviceOnline(device({ enabled: false }), now), false);
+test('online is an open device session and the enabled switch', () => {
+  assert.equal(factoryDeviceOnline(device()), true);
+  assert.equal(factoryDeviceOnline(device({ lastSeenAt: new Date(now - 3_600_000) })), true, 'no heartbeat window');
+  assert.equal(factoryDeviceOnline(device(closed)), false);
+  assert.equal(factoryDeviceOnline(device({ sessionOpenedAt: null })), false);
+  assert.equal(factoryDeviceOnline(device({ enabled: false })), false);
 });
 
 test('reason codes: disabled before offline before harness', () => {
-  assert.equal(factoryDispatchFailureReason(device(), 'codex', now), null);
-  assert.equal(factoryDispatchFailureReason(device({ enabled: false, lastSeenAt: null }), 'codex', now), 'deviceDisabled');
-  assert.equal(factoryDispatchFailureReason(device({ lastSeenAt: new Date(now - 120_000) }), 'codex', now), 'deviceOffline');
-  assert.equal(factoryDispatchFailureReason(device(), 'claude_code', now), 'harnessUnavailable');
-  assert.equal(factoryDispatchFailureReason(device({ harnesses: [{ harness: 'codex', installed: false }] }), 'codex', now), 'harnessUnavailable');
+  assert.equal(factoryDispatchFailureReason(device(), 'codex'), null);
+  assert.equal(factoryDispatchFailureReason(device({ enabled: false, sessionOpenedAt: null }), 'codex'), 'deviceDisabled');
+  assert.equal(factoryDispatchFailureReason(device(closed), 'codex'), 'deviceOffline');
+  assert.equal(factoryDispatchFailureReason(device(), 'claude_code'), 'harnessUnavailable');
+  assert.equal(factoryDispatchFailureReason(device({ harnesses: [{ harness: 'codex', installed: false }] }), 'codex'), 'harnessUnavailable');
 });
 
-test('a heartbeat received during the query does not write a false dispatch failure', async t => {
-  let clock = now, queries = 0;
-  t.mock.method(Date, 'now', () => clock);
+test('a device with an open session writes no dispatch failure', async () => {
+  let queries = 0;
   const tx = { query: async (sql: string) => {
     queries++;
-    assert.match(sql, /^SELECT /, 'a fresh heartbeat must not produce a failure write');
-    await Promise.resolve();
-    clock += 20;
-    return { rows: [{ ...device({ lastSeenAt: new Date(clock) }), dId: 'd', status: 'queued', harness: 'codex' }] };
+    assert.match(sql, /^SELECT /, 'an online device must not produce a failure write');
+    return { rows: [{ ...device(), dId: 'd', status: 'queued', harness: 'codex' }] };
   } };
   assert.equal(await recordFactoryDispatchFailure(tx as never, 'owner', 'run'), null);
   assert.equal(queries, 1);

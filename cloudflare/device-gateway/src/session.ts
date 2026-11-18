@@ -1,8 +1,10 @@
 import { DurableObject } from 'cloudflare:workers'
 import { LIVE_REVISION_PARAM, liveInvalidations, liveReady, withoutRevisions, type LiveInvalidation } from '../../../lib/live/events'
 import { readDevicePresenceGrant } from '../../../lib/device-presence-grant'
-import { LIVE_PRESENCE_PARAM, PRESENCE_MAX_CHANNEL_WATCHES, PRESENCE_MAX_DEVICE_WATCHES, PRESENCE_MAX_WATCHES_PER_SOCKET, PRESENCE_ONLINE_MS, presenceCommand, type PresenceReply } from '../../../lib/live/presence'
+import { LIVE_PRESENCE_PARAM, PRESENCE_MAX_CHANNEL_WATCHES, PRESENCE_MAX_DEVICE_WATCHES, PRESENCE_MAX_WATCHES_PER_SOCKET, presenceCommand, type PresenceReply } from '../../../lib/live/presence'
 import type { GatewayEnv } from './route'
+import { DEVICE_SESSION_CLOSE_GRACE_MS, DEVICE_SOCKET_REPLACED_CODE, DEVICE_STATUS_ONLINE_MS, SESSION_REPORT_QUEUE_MAX, newSocketId,
+  sendSessionReport, sessionReportBackoff, type DeviceSessionReport, type PendingSessionReport } from './session-report'
 
 const RECOVERY_CHECK_MS = 60_000
 const DELIVERY_RETRY_MS = 30_000
@@ -11,6 +13,8 @@ export type DevicePresenceWatch = { observer: string; channel: string; home: str
 type DeviceWatch = DevicePresenceWatch & { retryAt?: number }
 type LiveWatch = { observer: string; socketId: string; id: string; channel: string; home: string; devices: string[]; expiresAt: number }
 type PresenceState = { device: DeviceWatch[]; live: LiveWatch[] }
+/** The device's session: its newest socket, a close waiting out its grace, and undelivered reports in order. */
+type SessionState = { current?: string; close?: { deviceId: string; socketId: string; at: string; dueAt: number }; reports: PendingSessionReport[] }
 
 interface ConnectionAttachment {
   connectedAt: number
@@ -19,6 +23,8 @@ interface ConnectionAttachment {
   liveRevisions?: boolean
   /** Only explicitly negotiated sockets may register owned-device watches. */
   presence?: { channel: string; socketId: string }
+  /** Device sockets only: which session this socket is, as reported to the application. */
+  device?: { id: string; socketId: string }
 }
 
 /**
@@ -27,12 +33,21 @@ interface ConnectionAttachment {
  * Cloudflare's hibernation API (`acceptWebSocket`, not `accept`) drops the
  * object from memory while the socket stays connected, so duration is not
  * billed for the idle connection. `setWebSocketAutoResponse` answers the
- * daemon's 30s `ping` without waking the object and without duration
+ * daemon's 10 s `ping` without waking the object and without duration
  * (https://developers.cloudflare.com/durable-objects/api/state/ and
  * https://developers.cloudflare.com/durable-objects/examples/websocket-hibernation-server/).
  *
- * Only actual, short-lived list observers arrange an alarm. An unobserved
- * device has no alarm and no background request. Pings never write to Neon.
+ * The device socket is the device's session (decision 2026-11-17-2215). On
+ * open the object reports `connected` to the application; on close it waits
+ * {@link DEVICE_SESSION_CLOSE_GRACE_MS} and reports `disconnected` unless a
+ * newer socket opened. A socket replaced by a newer one (4000) is never
+ * reported closed. Reports stay in storage, in order, and the alarm retries
+ * them with backoff until the application answers 2xx.
+ *
+ * Alarms exist only for that close grace, undelivered reports and actual,
+ * short-lived list observers. An idle, unobserved device with nothing pending
+ * has no alarm and no background request. Pings never write to Neon.
+ * Close codes are listed in `session-report.ts`.
  */
 export class DeviceSession extends DurableObject<GatewayEnv> {
   private deviceWatches = new Map<string, DeviceWatch>()
@@ -40,6 +55,8 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
   private controls = new Map<string, symbol>()
   private updates = Promise.resolve()
   private liveRevoked = false
+  private session: SessionState = { reports: [] }
+  private sessionWork = Promise.resolve()
 
   constructor(ctx: DurableObjectState, env: GatewayEnv) {
     super(ctx, env)
@@ -51,6 +68,7 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
       const state = await this.ctx.storage.get<PresenceState>('presence-v1')
       this.deviceWatches = new Map((state?.device ?? []).map(watch => [watch.observer, watch]))
       this.liveWatches = new Map((state?.live ?? []).map(watch => [watch.observer, watch]))
+      this.session = await this.ctx.storage.get<SessionState>('session-v1') ?? { reports: [] }
     })
   }
 
@@ -67,20 +85,29 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     const revisions = live && url.searchParams.get(LIVE_REVISION_PARAM) === '1'
     const presence = live && url.searchParams.get(LIVE_PRESENCE_PARAM) === '1'
       ? { channel: url.pathname.split('/')[3], socketId: crypto.randomUUID() } : undefined
+    const now = Date.now()
+    // The route validated the ticket for exactly this device id.
+    const device = live ? undefined : { id: decodeURIComponent(url.pathname.split('/')[3]!), socketId: newSocketId() }
+    // Record the new session before closing the old socket, so the replaced
+    // socket's close event finds a newer session and reports nothing.
+    if (device) this.sessionOpened(device.id, device.socketId, now)
     // A daemon reconnect replaces its previous socket. Browser tabs share
     // their owner/workspace channel until their individual tickets expire.
     for (const existing of this.ctx.getWebSockets()) {
       const expiry = (existing.deserializeAttachment() as ConnectionAttachment | null)?.liveExpiresAt
-      if (!live) existing.close(4000, 'replaced')
-      else if (expiry && expiry <= Date.now()) existing.close(4001, 'ticket expired')
+      if (!live) existing.close(DEVICE_SOCKET_REPLACED_CODE, 'replaced')
+      else if (expiry && expiry <= now) existing.close(4001, 'ticket expired')
     }
     this.ctx.acceptWebSocket(server)
-    server.serializeAttachment({ connectedAt: Date.now(), ...(live ? { liveExpiresAt: Number(protocol.match(/^mikka-ticket-(\d+)-/)?.[1]) * 1000 } : {}), ...(revisions ? { liveRevisions: true } : {}), ...(presence ? { presence } : {}) } satisfies ConnectionAttachment)
+    server.serializeAttachment({ connectedAt: now, ...(live ? { liveExpiresAt: Number(protocol.match(/^mikka-ticket-(\d+)-/)?.[1]) * 1000 } : {}), ...(revisions ? { liveRevisions: true } : {}), ...(presence ? { presence } : {}), ...(device ? { device } : {}) } satisfies ConnectionAttachment)
     if (live) {
       server.send(JSON.stringify(liveReady(revisions ? 2 : 1)))
       if (presence) this.reply(server, { type: 'presence_ready', version: 1 })
       await this.pruneLiveWatches()
-    } else await this.updateDevicePresence()
+    } else {
+      await this.saveSession()
+      await this.updateDevicePresence()
+    }
     // The edge authenticated this exact ticket. Node's built-in WebSocket
     // rejects the upgrade unless its offered protocol is selected here.
     return new Response(null, {
@@ -90,7 +117,9 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     })
   }
 
-  /** Queried on demand. Auto-pongs update this timestamp without waking JS. */
+  /** Queried on demand, also by the application's run-recovery backstop.
+   * Auto-pongs update this timestamp without waking JS. Online: a device socket
+   * is open and it connected or pinged within {@link DEVICE_STATUS_ONLINE_MS}. */
   async status(): Promise<{ online: boolean; lastSeenAt: string | null }> {
     const { lastSeen, online } = this.deviceStatus()
     return { online, lastSeenAt: lastSeen > 0 ? new Date(lastSeen).toISOString() : null }
@@ -101,13 +130,14 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     let open = false
     for (const socket of this.ctx.getWebSockets()) {
       if (socket.readyState !== WebSocket.OPEN) continue
-      open = true
       const attachment = socket.deserializeAttachment() as ConnectionAttachment | null
+      if (attachment?.liveExpiresAt) continue
+      open = true
       const connectedAt = attachment?.connectedAt ?? 0
       const lastPong = this.ctx.getWebSocketAutoResponseTimestamp(socket)?.getTime() ?? 0
       lastSeen = Math.max(lastSeen, connectedAt, lastPong)
     }
-    return { online: lastSeen > 0 && now - lastSeen < PRESENCE_ONLINE_MS, lastSeen, open }
+    return { online: lastSeen > 0 && now - lastSeen < DEVICE_STATUS_ONLINE_MS, lastSeen, open }
   }
 
   async webSocketClose(socket: WebSocket, code: number, reason: string) {
@@ -128,7 +158,78 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     if (attachment?.liveExpiresAt) {
       for (const key of this.controls.keys()) if (key.startsWith(`${attachment.presence?.socketId}:`)) this.controls.delete(key)
       await this.dropLiveWatches([...this.liveWatches.values()].filter(watch => watch.socketId === attachment.presence?.socketId))
-    } else await this.updateDevicePresence()
+    } else {
+      if (attachment?.device) await this.sessionClosed(attachment.device.id, attachment.device.socketId, Date.now())
+      await this.updateDevicePresence()
+    }
+  }
+
+  // --- Device session reports -------------------------------------------------
+
+  private reporting() {
+    return !!this.env.DEVICE_SESSION_REPORT_URL && !!this.env.GATEWAY_PUSH_SECRET
+  }
+
+  private enqueue(deviceId: string, report: DeviceSessionReport, now: number) {
+    const reports = this.session.reports
+    reports.push({ deviceId, report, attempts: 0, retryAt: now })
+    // The head may be in flight. Older queued reports are superseded by later ones.
+    while (reports.length > SESSION_REPORT_QUEUE_MAX) reports.splice(1, 1)
+  }
+
+  /** In memory; the caller saves. A newer socket cancels a close still in its grace. */
+  private sessionOpened(deviceId: string, socketId: string, now: number) {
+    if (!this.reporting()) return
+    this.session.current = socketId
+    delete this.session.close
+    this.enqueue(deviceId, { state: 'connected', at: new Date(now).toISOString(), socketId }, now)
+  }
+
+  private async sessionClosed(deviceId: string, socketId: string, now: number) {
+    // A replaced socket is not the current session. An error followed by a
+    // close keeps the first close time.
+    if (!this.reporting() || this.session.current !== socketId || this.session.close?.socketId === socketId) return
+    this.session.close = { deviceId, socketId, at: new Date(now).toISOString(), dueAt: now + DEVICE_SESSION_CLOSE_GRACE_MS }
+    await this.saveSession()
+  }
+
+  private async saveSession() {
+    if (!this.session.current && !this.session.close && !this.session.reports.length) await this.ctx.storage.delete('session-v1')
+    else await this.ctx.storage.put('session-v1', this.session)
+  }
+
+  /** One delivery at a time, so a device's reports reach the application in order. */
+  private deliverSession() {
+    const run = this.sessionWork.then(() => this.flushSession())
+    this.sessionWork = run.catch(() => {})
+    return run
+  }
+
+  private async flushSession() {
+    const close = this.session.close
+    if (close && close.dueAt <= Date.now()) {
+      delete this.session.close
+      if (this.session.current === close.socketId && this.reporting()) {
+        this.enqueue(close.deviceId, { state: 'disconnected', at: close.at, socketId: close.socketId }, Date.now())
+      }
+      await this.saveSession()
+    }
+    const base = this.env.DEVICE_SESSION_REPORT_URL, secret = this.env.GATEWAY_PUSH_SECRET
+    while (base && secret && this.session.reports.length) {
+      const head = this.session.reports[0]!
+      if (head.retryAt > Date.now()) break
+      const outcome = await sendSessionReport(base, secret, head.deviceId, head.report)
+      if (outcome === 'retry') {
+        head.attempts++
+        head.retryAt = Date.now() + sessionReportBackoff(head.attempts)
+        await this.saveSession()
+        break
+      }
+      if (outcome === 'dropped') console.warn('[device-gateway] session report refused', { state: head.report.state })
+      if (this.session.reports[0] === head) this.session.reports.shift()
+      await this.saveSession()
+    }
+    await this.schedule()
   }
 
   private reply(socket: WebSocket, value: PresenceReply) {
@@ -187,7 +288,7 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     // listener. A late registration cannot revive a closed/unwatched socket.
     this.liveWatches.set(watch.observer, watch)
     await this.savePresence()
-    await this.schedulePresence()
+    await this.schedule()
     const registered = await Promise.allSettled(grant.devices.map(([id, online, heartbeatUntil]) => this.env.DEVICE_SESSION.getByName(id).watchPresence({
       observer: watch.observer, channel, home: watch.home, expiresAt: watch.expiresAt, heartbeatUntil, online,
     })))
@@ -213,14 +314,14 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     const online = this.deviceStatus().online || input.heartbeatUntil > Date.now()
     this.deviceWatches.set(input.observer, { ...input, online })
     await this.savePresence()
-    await this.schedulePresence()
+    await this.schedule()
     return { accepted: true, changed: input.online !== online }
   }
 
   async unwatchPresence(observer: string) {
     if (!this.deviceWatches.delete(observer)) return
     await this.savePresence()
-    await this.schedulePresence()
+    await this.schedule()
   }
 
   /** A device sends only keys to active observers; closed or expired watches
@@ -247,7 +348,7 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     // Even if the live watch was already removed by close/unwatch, a late
     // registration completion calls this again to remove the device record.
     await Promise.allSettled(watches.flatMap(watch => watch.devices.map(id => this.env.DEVICE_SESSION.getByName(id).unwatchPresence(watch.observer))))
-    await this.schedulePresence()
+    await this.schedule()
   }
 
   private pruneLiveWatches() {
@@ -297,12 +398,13 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
       }
     }))
     if (changed.size || clearedRetry || before !== this.deviceWatches.size) await this.savePresence()
-    await this.schedulePresence()
+    await this.schedule()
   }
 
   async alarm() {
     await this.pruneLiveWatches()
     await this.updateDevicePresence()
+    await this.deliverSession()
   }
 
   private async savePresence() {
@@ -310,13 +412,17 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     else await this.ctx.storage.put('presence-v1', { device: [...this.deviceWatches.values()], live: [...this.liveWatches.values()] } satisfies PresenceState)
   }
 
-  private async schedulePresence() {
+  /** The one alarm: the session's close grace, its next report, and observer deadlines. */
+  private async schedule() {
     const now = Date.now(), status = this.deviceStatus(now)
     const deadlines = [...this.liveWatches.values()].map(watch => watch.expiresAt)
+    if (this.session.close) deadlines.push(this.session.close.dueAt)
+    if (this.session.reports.length && this.reporting()) deadlines.push(this.session.reports[0]!.retryAt)
     for (const watch of this.deviceWatches.values()) {
       deadlines.push(watch.expiresAt)
       if (watch.retryAt) deadlines.push(watch.retryAt)
-      const until = Math.max(status.online ? status.lastSeen + PRESENCE_ONLINE_MS : 0, watch.heartbeatUntil)
+      // heartbeatUntil is a legacy grant field; with no heartbeat it is already past.
+      const until = Math.max(status.online ? status.lastSeen + DEVICE_STATUS_ONLINE_MS : 0, watch.heartbeatUntil)
       if (until > now) deadlines.push(until)
       // Auto-pongs do not wake JS. An observed, still-open stale socket can
       // recover on that same socket; no observer means no recovery alarm.
@@ -354,7 +460,9 @@ export class DeviceSession extends DurableObject<GatewayEnv> {
     for (const socket of this.ctx.getWebSockets()) {
       const attachment = socket.deserializeAttachment() as ConnectionAttachment | null
       const expiry = attachment?.liveExpiresAt
-      if (!expiry || expiry <= Date.now()) { socket.close(4001, 'ticket expired'); continue }
+      // Never a device socket: on a device socket 4001 means only "this daemon must update".
+      if (!expiry) continue
+      if (expiry <= Date.now()) { socket.close(4001, 'ticket expired'); continue }
       // A version 1 reader drops any key with a third field, so it gets the plain key.
       try { for (const event of attachment?.liveRevisions ? validated : plain) socket.send(JSON.stringify(event)) }
       catch { try { socket.close() } catch { /* already closed */ } }

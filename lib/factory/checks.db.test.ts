@@ -184,7 +184,7 @@ test(
         sha = "a".repeat(40),
         command = "node acceptance.mjs";
       await db.query(
-        `INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Disposable check device',now(),'[{"harness":"codex","installed":true}]')`,
+        `INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,'owner','Disposable check device',now(),'[{"harness":"codex","installed":true}]',now())`,
         [deviceId],
       );
       await db.query(
@@ -225,11 +225,11 @@ test(
           // The fixture device is "online" only within the 90 s presence window (lib/device-presence.ts),
           // and this file runs for minutes: keep its heartbeat current so a slow runner cannot age it out.
           review: async (tx, task, id) => {
-            await tx.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId]);
+            await tx.query(`UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1`, [deviceId]);
             return configureFactoryCheck(tx, task, id, selectedPolicy);
           },
           verify: async (tx, task, id) => {
-            await tx.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId]);
+            await tx.query(`UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1`, [deviceId]);
             return configureFactoryCheck(tx, task, id, selectedPolicy);
           },
         },
@@ -481,7 +481,7 @@ test(
         // A positive local-device fixture represents a daemon which is still
         // online. Refresh its real heartbeat for each dispatch, rather than
         // relying on the suite finishing inside the 60-second presence window.
-        await db.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1 AND "ownerId"=\'owner\' AND kind=\'local\'', [deviceId]);
+        await db.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1 AND "ownerId"=\'owner\' AND kind=\'local\'', [deviceId]);
         return dispatch("owner", {
           binding: factoryBinding(task),
           agentId,
@@ -857,7 +857,7 @@ test(
         delete process.env.DEVICE_GATEWAY_URL;
         delete process.env.DEVICE_GATEWAY_PUSH_SECRET;
         try {
-          await db.query('UPDATE devices SET "lastSeenAt"=now()-interval \'61 seconds\' WHERE id=$1', [deviceId]);
+          await db.query('UPDATE devices SET "lastSeenAt"=now()-interval \'61 seconds\',"sessionClosedAt"=clock_timestamp() WHERE id=$1', [deviceId]);
           const stale = (await db.query('SELECT "lastSeenAt" FROM devices WHERE id=$1', [deviceId])).rows[0].lastSeenAt;
           // The normal fixture refreshes presence in its adapter. This refusal
           // exercises the unwrapped production adapter so it sees the stale row.
@@ -878,7 +878,7 @@ test(
           assert.equal(admitted.task.stage, 'review');
           await store.apply("owner", factoryBinding(admitted.task), randomUUID(), { action: "cancel", reason: "Presence fixture complete" });
         } finally {
-          await db.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId]);
+          await db.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [deviceId]);
           if (gateway.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = gateway.url;
           if (gateway.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = gateway.secret;
         }
@@ -1954,7 +1954,7 @@ test(
               await assert.rejects(cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString()),
                 (error: unknown) => error instanceof FactoryError && error.code === 'factoryQuestionContinuationUnavailable');
               await tx.query('ROLLBACK TO SAVEPOINT worker_not_ready');
-              await tx.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [childDevice]);
+              await tx.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [childDevice]);
               await tx.query("UPDATE thread_machines SET state='running' WHERE \"runId\"=$1", [run.id]);
               const extras = await cloudClaim(tx, 'owner', childDevice, run.id, new Date(Date.now() + 60000).toISOString());
               assert.equal(extras.requireSessionResume, true);
@@ -2010,7 +2010,7 @@ test(
               const tx = await db.connect();
               try {
                 await tx.query('BEGIN');
-                await tx.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [childDevice]);
+                await tx.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [childDevice]);
                 await tx.query("UPDATE thread_machines SET state='running' WHERE \"runId\"=$1", [recoveryRun.id]);
                 const extras = await createFactoryClaim(store, cloudQuestions, assignment)(tx, 'owner', childDevice, recoveryRun.id, new Date(Date.now() + 60000).toISOString());
                 assert.equal(extras.followUp, recoveryRun.questionContinuation.followUp);

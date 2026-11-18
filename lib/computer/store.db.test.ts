@@ -78,7 +78,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(await readFile(new URL('../../drizzle/20261101150000_run_quota_resets_at.sql', import.meta.url), 'utf8'))
     await pool.query('ALTER TABLE agent_runs ADD COLUMN "sessionId" text')
     await pool.query('ALTER TABLE agent_runs ADD COLUMN "machineAuthority" boolean NOT NULL DEFAULT false, ADD COLUMN cli_policy_hierarchy jsonb')
-    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', "nameLocked" boolean NOT NULL DEFAULT false, enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now())')
+    await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', "nameLocked" boolean NOT NULL DEFAULT false, enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz, "sessionOpenedAt" timestamptz, "sessionClosedAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now())')
     const scopeMigration = await readFile(new URL('../../drizzle/20261027164511_cloud_device_scope.sql', import.meta.url), 'utf8')
     await pool.query(scopeMigration); await pool.query(scopeMigration)
     const workerLeaseMigration = await readFile(new URL('../../drizzle/20261027164512_cloud_worker_leases.sql', import.meta.url), 'utf8')
@@ -165,7 +165,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
       assert.ok(!command.includes('orv_'), 'credential must not enter a shell command')
       if (command.includes('bin/cloud-worker.ts')) {
         assert.ok(handoff)
-        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [handoff.deviceId])
+        await pool.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [handoff.deviceId])
         await pool.query('UPDATE device_tokens SET "lastUsedAt"=now() WHERE "tokenHash"=$1', [createHash('sha256').update(handoff.credential).digest('hex')])
         await pool.query("SELECT pg_notify('mikka_device_registration', $1)", [handoff.deviceId])
       }
@@ -229,7 +229,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     // own cloud device. Every cloud thread runs there; the Bot's computer serves only the Bot.
     const onThreadMachine = async (runId: string) => {
       const deviceId = randomUUID()
-      await pool.query(`INSERT INTO devices(id,"ownerId",kind) VALUES ($1,$2,'cloud')`, [deviceId, actor.userId])
+      await pool.query(`INSERT INTO devices(id,"ownerId",kind,"sessionOpenedAt") VALUES ($1,$2,'cloud',now())`, [deviceId, actor.userId])
       await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId")
         SELECT "runId","workspaceId","ownerId","botId",$2,'snapshot-thread',$3,'running',$4 FROM computer_run_bindings WHERE "runId"=$1
         ON CONFLICT ("runId") DO UPDATE SET "sandboxId"=EXCLUDED."sandboxId",state='running',"deviceId"=EXCLUDED."deviceId"`, [runId, `sandbox-${runId}`, randomUUID(), deviceId])
@@ -362,7 +362,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(bindComputerRun(pool, actor, runId, bobBot.id), { status: 404 })
     await bindComputerRun(pool, actor, runId, bot.id)
     const deviceId = randomUUID()
-    await pool.query('INSERT INTO devices (id,"ownerId") VALUES ($1,$2)', [deviceId, actor.userId])
+    await pool.query('INSERT INTO devices (id,"ownerId","sessionOpenedAt") VALUES ($1,$2,now())', [deviceId, actor.userId])
     await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [runId, deviceId])
     assert.equal(await claimLocalRun(pool, runId, deviceId, new Date(Date.now() + 30000)), 'cloud-required')
     assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'queued')
@@ -596,7 +596,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     // A Bot on :3 can dispatch a dedicated thread on its own :1. Both sync
     // and the owner decision must use the thread binding, never the Bot's X11.
     const threadRun = randomUUID(), threadDevice = randomUUID()
-    await pool.query(`INSERT INTO devices(id,"ownerId",kind) VALUES ($1,$2,'cloud')`, [threadDevice, actor.userId])
+    await pool.query(`INSERT INTO devices(id,"ownerId",kind,"sessionOpenedAt") VALUES ($1,$2,'cloud',now())`, [threadDevice, actor.userId])
     await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","deviceId",status,"leaseExpiresAt","workspaceId") VALUES ($1,$2,$3,$4,'running',now()+interval '5 minutes',$5)`, [threadRun, actor.userId, consumer, threadDevice, actor.workspaceId])
     await pool.query(`INSERT INTO computer_run_bindings("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)`, [threadRun, later.id, actor.workspaceId, actor.userId])
     await pool.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","botId","sandboxId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,$3,$4,'sandbox-thread','snapshot-thread',$5,'running',$6)`, [threadRun, actor.workspaceId, actor.userId, later.id, randomUUID(), threadDevice])

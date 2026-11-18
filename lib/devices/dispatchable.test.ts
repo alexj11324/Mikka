@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { listDispatchableDevices, ONLINE_WINDOW } from './dispatchable'
+import { listDispatchableDevices, SESSION_OPEN } from './dispatchable'
 
 /**
  * The create dialog offers these machines, and the create path then refuses any device that
@@ -22,11 +22,12 @@ test('the roster is the caller\'s own live, dispatchable local devices', async (
   assert.match(sql, /"removedAt" IS NULL/)
   assert.match(sql, /\benabled\b/)
   assert.match(sql, /kind='local'/)
-  assert.ok(sql.includes(ONLINE_WINDOW), 'presence uses the shared window')
+  assert.ok(sql.includes(SESSION_OPEN), 'presence is the open gateway session')
+  assert.doesNotMatch(sql, /lastSeenAt/, 'no heartbeat window')
   assert.doesNotMatch(sql, /hostname|description|protocolVersion|computerUse|updateFailure/, 'carries nothing but a name and presence')
 })
 
-test('a device that fails the presence window is still returned, marked offline', async () => {
+test('a device without an open session is still returned, marked offline', async () => {
   const query = async () => ({ rows: [{ id: 'd2', name: 'Basement', online: false }] })
   assert.deepEqual(await listDispatchableDevices(query, 'user-1'), [{ id: 'd2', name: 'Basement', online: false }])
 })

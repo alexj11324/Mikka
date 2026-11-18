@@ -121,7 +121,7 @@ test('cloud locked run Profile: fresh authority and normal Task database budget'
     const actor = { userId: ownerId, workspaceId }, scope = { ownerId, workspaceId, botId }
     await pool.query('INSERT INTO user_e2b_keys ("userId",ciphertext,iv,"keyVersion",last4) VALUES ($1,\'synthetic-unopened\',\'synthetic-unopened\',1,\'test\')', [ownerId])
     await pool.query('INSERT INTO model_order_settings ("ownerId","workspaceId",location,customized) VALUES ($1,$2,\'cloud\',true)', [ownerId, workspaceId])
-    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,\'Fixture\',\'cloud\',true,now(),$3)', [deviceId, ownerId, JSON.stringify([{ harness, installed: true, models: [model], subscriptionBroker: true, computerBroker: true }])])
+    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,\'Fixture\',\'cloud\',true,now(),$3,now())', [deviceId, ownerId, JSON.stringify([{ harness, installed: true, models: [model], subscriptionBroker: true, computerBroker: true }])])
     await pool.query('INSERT INTO cloud_machines ("workspaceId","ownerId","deviceId","sandboxId","operationId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,\'running\',true)', [workspaceId, ownerId, deviceId, 'synthetic-' + deviceId, randomUUID()])
     await pool.query('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)', [botId, workspaceId, ownerId])
     await pool.query('INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,$2,\'Fixture\',$3,$4)', [agentId, ownerId, harness, deviceId])

@@ -42,7 +42,7 @@ test('thread waiting device uses the same private queue projection as visibleRun
     assert.ok(!Object.hasOwn((await thread())!, 'lastSeenAt'), 'join metadata stays private')
   })
   await t.test('online device omits the field', async () => {
-    await fixtures.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+    await fixtures.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [deviceId])
     assert.equal(Object.hasOwn((await thread())!, 'waitingFor'), false)
     assert.equal(await waitFor(), undefined)
   })

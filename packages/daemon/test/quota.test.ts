@@ -7,7 +7,7 @@ import { Daemon } from "../src/main"
 import type { QuotaSource } from "../src/quota/poller"
 import { connectDaemonInDataDir } from "../src/rpc/client"
 import { MemoryServer } from "../src/server-link"
-import { cleanupTempDirs, tempDir, waitFor } from "./helpers"
+import { cleanupTempDirs, tempDir } from "./helpers"
 
 const SECRET = "sk-ant-api03-daemonheartbeatleak"
 const CLIENT = { name: "test", version: "0" }
@@ -20,7 +20,7 @@ describe("quota on the daemon", () => {
     cleanupTempDirs()
   })
 
-  it("keeps running when a read throws and does not put the secret on the heartbeat", async () => {
+  it("keeps running when a read throws and does not put the secret on the device report", async () => {
     const lines: string[] = []
     const log = pino(
       { level: "info" },
@@ -55,9 +55,9 @@ describe("quota on the daemon", () => {
     expect(reads).toBe(0)
     expect(lines.join("\n")).not.toContain("quota refresh failed")
     expect(lines.join("\n")).not.toContain(SECRET)
-    const heartbeat = server.devices.get("device-1")?.lastHeartbeat
-    expect(JSON.stringify(heartbeat)).not.toContain(SECRET)
-    const quotas = heartbeat?.quotas ?? []
+    const sent = server.devices.get("device-1")?.reports.at(-1)
+    expect(JSON.stringify(server.devices.get("device-1")?.reports)).not.toContain(SECRET)
+    const quotas = sent?.quotas ?? []
     expect(quotas).toHaveLength(3)
     expect(
       quotas.every((quota: QuotaSnapshot) => quota.status === "unknown")
@@ -66,11 +66,11 @@ describe("quota on the daemon", () => {
     const client = await connectDaemonInDataDir(dataDir, CLIENT)
     const report = await client.request("quota.snapshot")
     expect(reads).toBe(1)
+    expect(lines.join("\n")).toContain("quota refresh failed")
+    expect(lines.join("\n")).toContain("[REDACTED]")
     expect(report.quotas.every((quota) => quota.status === "unknown")).toBe(
       true
     )
-    expect(lines.join("\n")).toContain("quota refresh failed")
-    expect(lines.join("\n")).toContain("[REDACTED]")
     expect(JSON.stringify(report)).not.toContain(SECRET)
     const status = await client.request("daemon.status")
     expect(status.pid).toBe(process.pid)

@@ -28,7 +28,6 @@ import { deviceOnlineStates } from '@/lib/device-presence'
 import { withDevicePresence } from '@/lib/live/presence-read'
 import type { PresenceDevice } from '@/lib/live/presence'
 import { devicePresenceView, type PresenceReason } from '@/lib/device-scheduling'
-import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
 import { removeOwnedDevice, renameOwnedDevice, setOwnedDeviceDescription, setOwnedDeviceEnabled } from '@/lib/device-removal'
 import { enqueueDeviceCommand, type DeviceCommandKind } from '@/lib/device-management'
 import { listSshHosts } from '@/lib/ssh'
@@ -117,23 +116,23 @@ export async function listDevices(): Promise<DeviceView[]> {
 }
 
 /**
- * The device list for 设备 settings, with when to read it again. Registration, a rename,
- * enable/disable, removal, a repository and a device coming back online push `device_list`.
- * Going offline writes nothing: a heartbeat device's lapse is a deadline, and a device
- * online through the gateway keeps the 60 s fallback while it is (presenceFallback).
+ * The device list for 设备 settings. Registration, a rename, enable/disable,
+ * removal, a repository and a device session opening or closing push
+ * `device_list` (lib/device-session.ts), so nothing needs a fallback read.
  */
 export async function pollDevices() {
   const userId = await getUserId()
-  const { devices: items, expiries, gatewayOnline, observedAt, presenceDevices } = await readDevices(userId)
+  const { devices: items, observedAt, presenceDevices } = await readDevices(userId)
   const { ownerListRead } = await import('@/lib/live/list-read-server')
-  const live = withDevicePresence(await ownerListRead(userId, expiries, observedAt), presenceDevices, process.env, observedAt)
-  return { devices: items, live, presenceFallback: gatewayOnline }
+  const live = withDevicePresence(await ownerListRead(userId, [], observedAt), presenceDevices, process.env, observedAt)
+  return { devices: items, live, presenceFallback: false }
 }
 
 async function readDevices(userId: string) {
   const rows = await db.select({
     id: devices.id, name: devices.name, description: devices.description, deviceType: devices.deviceType, hostname: devices.hostname, platform: devices.platform, arch: devices.arch,
     harnesses: devices.harnesses, lastSeenAt: devices.lastSeenAt, enabled: devices.enabled,
+    sessionOpenedAt: devices.sessionOpenedAt, sessionClosedAt: devices.sessionClosedAt,
   }).from(devices).where(and(eq(devices.ownerId, userId), eq(devices.kind, 'local'), isNull(devices.removedAt))).orderBy(desc(devices.lastSeenAt))
   const repos = rows.length
     ? await db.select({
@@ -141,10 +140,7 @@ async function readDevices(userId: string) {
     }).from(deviceRepos).where(inArray(deviceRepos.deviceId, rows.map(row => row.id)))
     : []
   const observedAt = Date.now()
-  const presence = await deviceOnlineStates(rows, observedAt)
-  const heartbeat = (device: (typeof rows)[number]) => isDeviceOnline(device.lastSeenAt, observedAt)
-  const expiries = rows.flatMap(device => device.lastSeenAt && heartbeat(device) ? [device.lastSeenAt.getTime() + DEVICE_ONLINE_WINDOW_MS] : [])
-  const gatewayOnline = rows.some(device => presence.get(device.id) && !heartbeat(device))
+  const presence = deviceOnlineStates(rows)
   const views: DeviceView[] = rows.map(device => ({
     id: device.id, name: device.name, description: device.description, deviceType: device.deviceType, hostname: device.hostname, platform: device.platform, arch: device.arch,
     harnesses: device.harnesses, lastSeenAt: device.lastSeenAt, enabled: device.enabled,
@@ -154,9 +150,8 @@ async function readDevices(userId: string) {
       id: repo.id, repoPath: repo.repoPath, baseBranch: repo.baseBranch, verifyCommand: repo.verifyCommand,
     })),
   }))
-  const presenceDevices = rows.map((device): PresenceDevice => [device.id, presence.get(device.id) ?? false,
-    device.lastSeenAt && heartbeat(device) ? device.lastSeenAt.getTime() + DEVICE_ONLINE_WINDOW_MS : 0])
-  return { devices: views, expiries, gatewayOnline, observedAt, presenceDevices }
+  const presenceDevices = rows.map((device): PresenceDevice => [device.id, presence.get(device.id) ?? false, 0])
+  return { devices: views, observedAt, presenceDevices }
 }
 
 /** Mints a device token. The plaintext is returned once and never stored. */

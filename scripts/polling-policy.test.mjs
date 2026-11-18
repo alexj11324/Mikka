@@ -52,7 +52,7 @@ test("every allowlist entry says why, and is a non-data timer, an external API o
       assert.match(entry.replaceWith, /^(?:hooks|lib)\//, file);
     } else
       assert.ok(
-        ["ui-timer", "external", "local", "harness", "keepalive"].includes(entry.kind),
+        ["ui-timer", "external", "local", "harness", "keepalive", "retry"].includes(entry.kind),
         file,
       );
   }

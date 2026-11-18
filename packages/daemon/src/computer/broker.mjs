@@ -7,15 +7,26 @@ import {
 import { chmodSync } from "node:fs";
 import { createServer } from "node:net";
 import { actionStep, normalizeCall, normalizeCaptureCall, executeDriver } from "./driver.mjs";
+// The pending reviews, telling listeners whenever one is added or removed, so
+// the web sync uploads on a change instead of checking on a timer.
+class PendingRequests extends Map {
+  constructor(changed) { super(); this.changed = changed; }
+  set(key, value) { super.set(key, value); this.changed?.(); return this; }
+  delete(key) { const had = super.delete(key); if (had) this.changed?.(); return had; }
+}
 export class ComputerBroker {
   grants = new Map();
   // runId → when its screen recording stops by itself; only set while one runs.
   recordingUntil = new Map();
   recordingSteps = new Map();
   recordingTimingFailed = new Set();
-  pending = new Map();
-  pendingRevision = 0;
   pendingListeners = new Set();
+  pending = new PendingRequests(() => { for (const listener of [...this.pendingListeners]) listener(); });
+  /** Calls `listener` whenever a pending review appears or goes; returns the unsubscribe. */
+  onPendingChange(listener) {
+    this.pendingListeners.add(listener);
+    return () => { this.pendingListeners.delete(listener); };
+  }
   sockets = new Set();
   suspended = false;
   constructor({
@@ -174,14 +185,6 @@ export class ComputerBroker {
     }
     return this.review(token, grant, call, actionId, assertLive, signal, step);
   }
-  onPendingChange(listener) {
-    this.pendingListeners.add(listener);
-    return () => this.pendingListeners.delete(listener);
-  }
-  signalPendingChange() {
-    this.pendingRevision++;
-    for (const listener of [...this.pendingListeners]) listener();
-  }
   review(token, grant, call, actionId, assertLive, signal, step) {
     if (this.pending.size >= 20) return Promise.reject(new Error("Not permitted"));
     const request = {
@@ -198,14 +201,12 @@ export class ComputerBroker {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(request.id);
-        this.signalPendingChange();
         signal?.removeEventListener("abort", cancel);
         reject(new Error("Approval expired"));
       }, this.ttl);
       const cancel = () => {
         clearTimeout(timer);
         this.pending.delete(request.id);
-        this.signalPendingChange();
         reject(new Error("Model call cancelled; approval discarded"));
       };
       signal?.addEventListener("abort", cancel, { once: true });
@@ -219,7 +220,6 @@ export class ComputerBroker {
         reject,
         timer,
       });
-      this.signalPendingChange();
     });
   }
   // Captures keep evidence for the person and return no desktop content to
@@ -261,7 +261,6 @@ export class ComputerBroker {
     for (const [id, row] of this.pending) {
       if (row.token !== token) continue;
       this.pending.delete(id);
-      this.signalPendingChange();
       clearTimeout(row.timer);
       row.cleanup();
       row.reject(new Error("Run ended; approval discarded"));
@@ -275,7 +274,6 @@ export class ComputerBroker {
     if (left.length !== right.length || !timingSafeEqual(left, right))
       throw new Error("Review changed");
     this.pending.delete(id);
-    this.signalPendingChange();
     row.cleanup();
     clearTimeout(row.timer); // Claim BEFORE I/O. Never refund.
     const { runId, call, expiresAt, target, display } = row.request;
@@ -312,7 +310,7 @@ export class ComputerBroker {
       row.cleanup();
       row.reject(new Error("Daemon stopped; approval discarded"));
     }
-    if (this.pending.size) { this.pending.clear(); this.signalPendingChange(); }
+    this.pending.clear();
   }
   async close() {
     this.suspend();

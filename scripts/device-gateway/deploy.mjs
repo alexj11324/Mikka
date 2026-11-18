@@ -39,8 +39,21 @@ export function validateConfig(text) {
 }
 
 /** API settings contain binding metadata; the secret's value is neither needed nor read back. */
+export function sessionReportURLValid(text) {
+  try {
+    const url = new URL(text)
+    return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash
+      && url.pathname.endsWith('/v1/internal/device-sessions')
+  } catch { return false }
+}
+
+/** The session report URL (decision 2026-11-17-2215) is a plain var kept by
+ * --keep-vars; without it no device would come online, so the release stops. */
 export function existingWorker(settings, service) {
-  if (!Array.isArray(settings?.bindings) || settings.bindings.length !== 2) fail('gateway_bindings_mismatch')
+  if (!Array.isArray(settings?.bindings)) fail('gateway_bindings_mismatch')
+  const report = settings.bindings.find(binding => binding.name === 'DEVICE_SESSION_REPORT_URL')
+  if (report?.type !== 'plain_text' || !sessionReportURLValid(report.text)) fail('gateway_session_report_url_required')
+  if (settings.bindings.length !== 3) fail('gateway_bindings_mismatch')
   const session = settings.bindings.find(binding => binding.name === 'DEVICE_SESSION')
   const secret = settings.bindings.find(binding => binding.name === 'GATEWAY_PUSH_SECRET')
   if (session?.type !== 'durable_object_namespace' || session.class_name !== 'DeviceSession'

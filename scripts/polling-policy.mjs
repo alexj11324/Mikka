@@ -36,6 +36,7 @@ const ui = (reason, hits) => ({ kind: "ui-timer", reason, hits });
 const external = (reason, hits) => ({ kind: "external", reason, hits });
 const local = (reason, hits) => ({ kind: "local", reason, hits });
 const harness = (reason, hits) => ({ kind: "harness", reason, hits });
+const retry = (reason, hits) => ({ kind: "retry", reason, hits });
 
 /**
  * Files allowed to poll, and why. `hits` is the number of findings the file has
@@ -45,6 +46,7 @@ const harness = (reason, hits) => ({ kind: "harness", reason, hits });
  * - kind 'local': waits on state on the same machine (a file lock, a local browser), no network.
  * - kind 'harness': explicit bounded acceptance/test operation, not a shipped idle runtime.
  * - kind 'keepalive': keeps the live push connection itself open.
+ * - kind 'retry': retries only after an observed delivery failure; no idle polling.
  * - tracking '#1212': a database poll still waiting to be replaced by push, through `replaceWith`.
  */
 export const pollingAllowlist = {
@@ -232,8 +234,8 @@ export const pollingAllowlist = {
   ),
   "packages/daemon/src/main.ts": db(
     daemon,
-    "recursive heartbeat renews active run leases and reconciles offline state; migrate exact lease deadlines and gateway recovery together in #2820",
-    1,
+    "local device-session deadline/watchdog timer plus checkpoint persistence only for changed or due active runs; these are not idle status reads, but checkpoint writes remain tracked for #1212 review",
+    3,
   ),
   "lib/mcp/reply-signals.ts": {
     kind: "keepalive",
@@ -249,6 +251,10 @@ export const pollingAllowlist = {
   },
   "hooks/use-list-expiry.ts": ui(
     "one-shot deadlines repaint local age filters; no server request",
+    1,
+  ),
+  "lib/builtin-gateway/session-reports.ts": retry(
+    "exponential backoff retries only a device-session report after an observed delivery failure; no timer while delivery succeeds",
     1,
   ),
   "lib/builtin-gateway/hub.ts": local(
@@ -297,11 +303,6 @@ export const pollingAllowlist = {
   ),
   // Web: SWR polling that reads our database.
   // Server: loops that re-query our database.
-  "app/v1/devices/[deviceId]/commands/route.ts": db(
-    daemon,
-    "long poll fallback timer only: with the gateway configured it waits on LISTEN for the device (re-check per NOTIFY, one final check at the deadline); every 5 s without push or if LISTEN drops",
-    1,
-  ),
   "lib/coordinator/group-turns.ts": db(
     server,
     "untilStopped fallback only: 15 s for best-effort subscriptions or a failed reliable-push read, 1 s if LISTEN is unavailable",
@@ -311,7 +312,7 @@ export const pollingAllowlist = {
   "packages/daemon/src/agents/tool-approval.ts": db(
     daemon,
     "ToolApprovalGate fallback timer only: none while the device gateway pushes run control, every 20 s while it is down (always so for a cloud computer, whose server pushes), 1 s against a server older than run-control push; a watcher with timedFloorMs runs at most that often on timer ticks",
-    2,
+    1,
   ),
   "packages/daemon/src/login.ts": db(
     daemon,
