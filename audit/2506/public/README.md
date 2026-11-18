@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 65 |
+| partial | 68 |
 | prior-partial | 36 |
-| unreviewed | 6269 |
+| unreviewed | 6266 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -146,3 +146,10 @@ Fully read four previously unreviewed original Git paths: `change-navigator.tsx`
 ### Additional bounded navigator execution evidence
 
 After the four source reviews, the original `ChangeNavigator.step(direction)` function body was extracted from the exact fixed Git object `f59b6cd9` with only the TypeScript direction annotation removed. Seven isolated V8 scenarios with synthetic Editor state and actual unchanged navigation code passed 7/7: missing editor, empty total, caret forward/backward, wrap in both directions, and a stale total with no current changes. This proves the bounded step logic, not React mounting, Tiptap plugin transactions, keyboard or AT behavior, installed Node24, CI or merged SHA. The path remains `partial retain`, and no G root is declared closed on this basis.
+
+
+## G-075 pointer listener lifecycle across four Tiptap presets (2026-11-18 UTC)
+
+Original fixed public files under `components/blocks/rich-text-editor-{1,2,3,4}/components/rich-text-extensions.ts` share the same ProseMirror Selection plugin, with independent document, collaborative page, contract review, and Yjs spec consumers. The original `mousedown` registers a one-shot global `window.mouseup` callback. Before a mouseup, `blur`, selection replacement, or editor destruction did not unregister it, and the ProseMirror plugin view had no `destroy` cleanup. A pending 150ms fallback likewise had no teardown hook. The independent Tiptap document selection contract is retained; this is **not** another Cloudflare scheduler/DO/Queue.
+
+Four ordinary G branch product commits `57a56499`, `bb2a5348`, `e1fe72a6`, `3c564966` physically add `removeEventListener("mouseup", settle, true)` to existing `release()` and invoke `release()` from official [ProseMirror PluginView.destroy](https://prosemirror.net/docs/ref/). No new wrapper/fallback or timer. All four fixed/source/main/Cloud vendor blobs match (see JSONL), and all four corrected selection handler blocks are byte-identical; editor-2's separate collaboration preset is untouched. Original editor-3 source was recreated locally with matching Git hash `b5b7dfde`, transpiled with TypeScript 5.8.3, and run through Node 22.16.0 VM with mock Tiptap classes, simulated global pointer events and fake timeouts: **0/5 original / 5/5 corrected** behavior assertions (destroy before mouseup, blur, selection transition, pending fallback teardown, normal pointer reuse). This is **isolated runtime on source code**, not installed Tiptap, real pointer/browser/keyboard/AT, Node24, protected CI, normal merge, exact merged SHA or production. G-075 is `candidate_unmerged` in `changes.jsonl`; no new PR/branch or G Owner created. Code denominator fixed 6556 = 186 complete / 68 partial / 36 prior-partial / 6266 unreviewed; 281 distinct reviewed paths, 7996 tracked fixed paths. Current-main incremental paths, G-015 native Container migration, and production/signing/device acceptance remain open.
