@@ -1691,6 +1691,13 @@
     "test": "lib/account/deletion-restore.db.test.ts",
     "suite": "test:account-db"
   },
+  "lib/db/listen.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installation PostgreSQL database for transactional NOTIFY and dedicated LISTEN sessions; disconnected listeners fail closed so callers retain their bounded recovery path.",
+    "test": "lib/db/listen.db.test.ts",
+    "suite": "test:live-db"
+  },
   "lib/db/direct-session.ts": {
     "mode": "built-in",
     "environment": [
