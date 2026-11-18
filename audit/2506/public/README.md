@@ -4,10 +4,10 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 
 | Code path status | Count at this ledger revision |
 |---|---:|
-| complete | 185 |
-| partial | 35 |
+| complete | 187 |
+| partial | 37 |
 | prior-partial | 36 |
-| unreviewed | 6300 |
+| unreviewed | 6296 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -62,3 +62,7 @@ Reviewed six additional previously unreviewed exact public Git paths: mobile `th
 Three original exact Git objects (icon source `c70f222a`, its original TAP test `01618db9`, refusal helper `eb5d3ce9`) were independently reproduced by `git hash-object`. On isolated Linux Node **22.16.0**, the unchanged **original** `thread-icon.test.mts` passed **3/3** and two separately authored refusal helper tests passed **2/2**, combined **5/5**. Do not claim the 9,437-byte *original* thread-send-error suite ran: its remaining React/happy-dom/Expo and cross-session delivery tests were read but are **unexecuted** in this checkout. Likewise Node24, Expo, React Native renderer/VoiceOver, browser, PG17, protected CI, source merge and precise post-merge tests were not run.
 
 Current-main code search across all three repositories finds the refusal formatter only in its own original test, not in a product caller. This is a *dead-export candidate* requiring real Expo/Metro import-graph and dynamic-loader proof, not permission to delete. Cloud's pinned `vendor/mikka@82d285ed` `thread-send-error.test.mts` blob `ef5e52fb` lacks the newer public baseline `52f618aa` group-revocation/delayed-failure concurrency segment, although its production formatter blob matches. The Cloud pinned vendor is not automatically current public main. The mobile trace adapter reuses existing protocol origin-limited trace headers; public and private avatars implement the shared mobile slot contract and independent accessibility/motion requirements, none substitutes Cloudflare native runtime. F, G-015/G-046 and production/Signer/Device Owners untouched.
+
+## 2026-11-18 subsequent Mobile Stop/OTA contract continuation
+
+Four additional fixed original files were fully read and traced: `apps/mobile/lib/stop.ts`, `apps/mobile/tests/stop.test.mts`, `apps/mobile/lib/useStop.ts`, `apps/mobile/lib/updates.ts`. All four have baseline/main/Cloud gitlink source identity except `updates.ts`, where current main changed only a source comment (`对话`→`线程`) and must prevail at integration. Original exact `stop.ts` and `stop.test.mts` SHA were independently recreated using `git hash-object`; unchanged 5-case native original Node **22.16.0** TAP suite passed **5/5**. `STOP_CAP_MS=10000` is an explicit user-visible Stop timeout and retry display contract, not a redundant Cloudflare server-side timer; the hook needs real double-tap/late ACK validation and the native `expo-updates` foreground prefetch needs Expo lifecycle/device acceptance before any removal. No product runtime code, F or other G Owner touched. Cumulative for this automation turn: ten new reviews (4 complete, 6 partial), isolated Node22 **10/10** tests (8 cases from two unchanged original test files and two newly authored helper cases), fixed public code status now **187 complete / 37 partial / 36 prior-partial / 6296 unreviewed**, reviews.jsonl **246 unique**. These counts are not Node24/Expo/PG17/CI/production evidence.
