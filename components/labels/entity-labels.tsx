@@ -1,7 +1,7 @@
 'use client'
 
 import type { ComponentType, ReactNode, SVGProps } from 'react'
-import { Box, type LucideIcon } from 'lucide-react'
+import { Box, type IconGlyph } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { modelProvider, type ModelProvider } from '@/lib/execution-settings-view'
 
@@ -14,7 +14,7 @@ import { ClaudeCodeMark, ClaudeMark, CodexMark, CursorMark, OpenAIMark } from '.
  * items from these instead of drawing icon + text by hand.
  */
 
-type Mark = ComponentType<SVGProps<SVGSVGElement>> | LucideIcon
+type Mark = ComponentType<SVGProps<SVGSVGElement>> | IconGlyph
 
 function EntityLabel({ icon: Icon, children, muted }: { icon: Mark; children: ReactNode; muted?: boolean }) {
   return <span className={cn('inline-flex min-w-0 items-center gap-1.5', muted && 'text-muted-foreground')}>

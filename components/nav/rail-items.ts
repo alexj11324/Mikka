@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react'
 import type { ChatNavEntry, ChatTarget } from './bot-list'
 import type { WorkspacePage } from '@/components/workspace/page-loaders'
-import { Columns3, GitPullRequest, House, Lightbulb } from 'lucide-react'
+import { Columns3, GitPullRequest, House, Lightbulb } from '@/components/icons'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactFilled, Columns3Filled, HouseFilled, LightbulbFilled, PlugCircle, PlugCircleFilled } from '@/components/icons/rail-filled-icons'
 

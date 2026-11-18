@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { SearchIcon } from "lucide-react"
+import { Search } from "@/components/icons"
 import { cn } from "cn"
 
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
@@ -21,7 +21,7 @@ function SearchInput({ className, ...props }: React.ComponentProps<"input">) {
       )}
     >
       <InputGroupAddon>
-        <SearchIcon aria-hidden="true" />
+        <Search aria-hidden="true" />
       </InputGroupAddon>
       <InputGroupInput autoComplete="off" {...props} />
     </InputGroup>

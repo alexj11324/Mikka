@@ -3,7 +3,7 @@
 // The default thread-header slot (docs/ui-overlay.md): the thread panel's header row and status line as the
 // community layer draws them.
 import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowLeft, Ellipsis, Square, SquareKanban, X } from 'lucide-react'
+import { ArrowLeft, Ellipsis, Square, SquareKanban, X } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ThreadStatus } from '@/components/workspace/thread-status-icon'

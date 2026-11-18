@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { AppWindow, ChevronRight, FileText, type LucideProps } from 'lucide-react'
+import { AppWindow, ChevronRight, FileText, type IconProps } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { BotAvatar, colorFor } from '@/components/nav/bot-avatar'
@@ -10,7 +10,7 @@ import type { ArtifactSummary, ArtifactVersionInfo } from '@/lib/artifacts/types
 import type { ArtifactKind } from '@/lib/db/schema'
 import { cn } from '@/lib/utils'
 
-export function ArtifactKindIcon({ kind, ...props }: { kind: ArtifactKind } & LucideProps) {
+export function ArtifactKindIcon({ kind, ...props }: { kind: ArtifactKind } & IconProps) {
   const Icon = kind === 'html' ? AppWindow : FileText
   return <Icon aria-hidden="true" {...props} />
 }

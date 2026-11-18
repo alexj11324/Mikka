@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Check, Copy } from 'lucide-react'
+import { Check, Copy } from '@/components/icons'
 import { MessageAction } from '@/components/ai-elements/message'
 
 /** Actions under a message (`MessageActions`): shown while its `group/message` is hovered or focused, always on a touch screen. */

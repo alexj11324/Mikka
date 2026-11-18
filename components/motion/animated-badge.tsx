@@ -2,14 +2,14 @@
 // beui.dev/components/motion/animated-badge
 
 import {
-  AlertTriangle,
+  TriangleAlert,
   Check,
   Circle,
   Info,
   LoaderCircle,
   X,
-  type LucideIcon,
-} from "lucide-react";
+  type IconGlyph,
+} from "@/components/icons";
 import {
   AnimatePresence,
   motion,
@@ -63,11 +63,11 @@ const ICON_CLASS: Record<AnimatedBadgeSize, string> = {
   md: "h-3.5 w-3.5",
 };
 
-const ICONS: Record<AnimatedBadgeStatus, LucideIcon> = {
+const ICONS: Record<AnimatedBadgeStatus, IconGlyph> = {
   neutral: Circle,
   info: Info,
   success: Check,
-  warning: AlertTriangle,
+  warning: TriangleAlert,
   danger: X,
   loading: LoaderCircle,
 };

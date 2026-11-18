@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
-import { CircleArrowDown, SquarePen } from 'lucide-react'
+import { CircleArrowDown, SquarePen } from '@/components/icons'
 import { RAIL_ITEMS, type RailProps } from '@/components/nav/rail-items'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'

@@ -10,7 +10,7 @@ import {
   LoaderCircle,
   MessageSquareText,
   X,
-} from "lucide-react";
+} from "@/components/icons";
 import { AnimatePresence, motion } from "motion/react";
 import { useReducedMotion } from "@/lib/hooks/use-reduced-motion";
 import { useCallback, useEffect, useRef, useState } from "react";

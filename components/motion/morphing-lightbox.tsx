@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 // beui.dev/components/motion/image-viewer
 
-import { ChevronLeft, ChevronRight, Minus, Plus, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Minus, Plus, X } from "@/components/icons";
 import {
   type HTMLMotionProps,
   type Variants,

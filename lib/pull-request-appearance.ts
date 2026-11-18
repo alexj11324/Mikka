@@ -1,4 +1,4 @@
-import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from 'lucide-react'
+import { GitMerge, GitPullRequest, GitPullRequestClosed, GitPullRequestDraft } from '@/components/icons'
 
 export const PULL_REQUEST_COLORS = {
   open: 'text-github-pr-open',

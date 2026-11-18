@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Flag, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { Flag, Plus, Trash2, ChevronDown } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import type { ProjectDraft } from '@/lib/project-input'
 import { Button } from '@/components/ui/button'

@@ -1,4 +1,4 @@
-import { GlobeIcon } from 'lucide-react'
+import { Globe } from '@/components/icons'
 import type { SVGProps } from 'react'
 
 // Cloudflare cloud mark (Figma 367:7529, Mobile/SourceIcon/cloudflare).
@@ -14,5 +14,5 @@ function Cloudflare(props: SVGProps<SVGSVGElement>) {
 /** No size of its own: inside a Button the Button sizes it; elsewhere the caller passes className. */
 export function SiteIcon({ origin, ...props }: { origin: string; className?: string; 'data-icon'?: 'inline-start' }) {
   const host = new URL(origin).hostname
-  return host === 'cloudflare.com' || host.endsWith('.cloudflare.com') ? <Cloudflare {...props} /> : <GlobeIcon {...props} />
+  return host === 'cloudflare.com' || host.endsWith('.cloudflare.com') ? <Cloudflare {...props} /> : <Globe {...props} />
 }

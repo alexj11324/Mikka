@@ -1,7 +1,7 @@
 'use client'
 
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Cloud, Copy, Laptop, Server } from 'lucide-react'
+import { Cloud, Copy, Laptop, Server } from '@/components/icons'
 import { toast } from 'sonner'
 import { useThreadMachine } from '@/hooks/use-thread-run-reads'
 import { Button } from '@/components/ui/button'

@@ -3,14 +3,14 @@ import {
   Circle,
   FileText,
   Globe2,
-  ImageIcon,
+  Image,
   MessageSquare,
   PencilLine,
   Search,
   Brain,
   SquareTerminal,
   Wrench,
-} from "lucide-react";
+} from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { EASE_OUT, SPRING_LAYOUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
@@ -208,7 +208,7 @@ function TraceIcon({ kind }: { kind: AgentActivityTrace["kind"] }) {
   if (kind === "message") return <MessageSquare className="size-4" />;
   if (kind === "write") return <PencilLine className="size-4" />;
   if (kind === "run") return <SquareTerminal className="size-4" />;
-  if (kind === "read") return <ImageIcon className="size-4" />;
+  if (kind === "read") return <Image className="size-4" />;
   return <Wrench className="size-4" />;
 }
 

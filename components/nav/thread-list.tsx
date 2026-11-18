@@ -1,7 +1,7 @@
 'use client'
 
 import { Skeleton } from '@/components/ui/skeleton'
-import { ChevronRight, Hash, Laptop, Server } from 'lucide-react'
+import { ChevronRight, Hash, Laptop, Server } from '@/components/icons'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'

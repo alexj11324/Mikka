@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ChevronLeft, ChevronRight, CircleCheck, CircleX, Download, FileText, Play, Server, SquareTerminal, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, CircleCheck, CircleX, Download, FileText, Play, Server, SquareTerminal, X } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'

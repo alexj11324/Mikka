@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale, useTranslations } from 'next-intl'
-import { Download } from 'lucide-react'
+import { Download } from '@/components/icons'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { SettingsLoading } from '@/components/settings/primitives'

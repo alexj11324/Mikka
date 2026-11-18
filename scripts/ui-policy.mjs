@@ -109,6 +109,11 @@ export const UI_SWEEP_PENDING = new Map([
   ['components/settings/secrets-settings.tsx', 'style/nested-frame'],
 ])
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx', 'components/slots/thread-header.tsx']
+// 2026-11-18-1900: Mikka's own UI draws affectUI's Hugeicons family through `policy.glyphLibrary`. A task's status icon
+// keeps lucide (2026-11-13-1405), in these three files only, so the status glyph is never drawn by another family.
+const ICON_SETS = ['lucide-react', '@remixicon/react', '@hugeicons/react', '@hugeicons/core-free-icons']
+const STATUS_ICON_FILES = new Set(['components/icons/index.tsx', 'components/workspace/task-state-icon.tsx', 'components/workspace/status-icons.tsx', 'components/workspace/issue-properties.ts'])
+const isIconSource = (from, policy) => from === policy.iconLibrary || from === policy.glyphLibrary
 
 export function auditSource(file, text, policy) {
   const ruleExempt = HORIZONTAL_RULE_EXEMPT_FILES.includes(file)
@@ -138,11 +143,13 @@ export function auditSource(file, text, policy) {
       }
       // next/font/local 的字体文件与 CSS 变量在调用处对照 typography.localFonts 校验。
       if (/^(?:@base-ui\/|@radix-ui\/|radix-ui$|react\/jsx-runtime|react\/jsx-dev-runtime)/.test(from)) add(node, 'components/no-primitive-bypass', '业务代码只组合已下载组件，不直接使用底层 primitives 或 JSX runtime。')
-      if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && from !== policy.iconLibrary) add(node, 'icons/library', `仅使用配置的 ${policy.iconLibrary}。`)
+      if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && !isIconSource(from, policy)) add(node, 'icons/library', `仅使用 ${policy.iconLibrary}，Mikka 自己的界面用 ${policy.glyphLibrary}（2026-11-18-1900）。`)
+      // 2026-11-18-1900: Mikka 自己的界面只画一套图标。任务状态图标（含它们的颜色和形状）继续是 lucide。
+      if (!isIconSource(from, policy) && ICON_SETS.includes(from) && !STATUS_ICON_FILES.has(file)) add(node, 'icons/glyph-set', `Mikka 自己的图标来自 ${policy.glyphLibrary}；${from} 只留给任务状态图标（2026-11-18-1900）。`)
       // R-71 (unslop): no sparkle for "AI"; thinking is Brain, a bot is Bot.
       // R-52 (Alex 2026-11-04): a circle is a task, a bubble is a thread; the thread's icon never borrows a circle.
       if (from === policy.iconLibrary && file === 'components/workspace/thread-status-icon.tsx') for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Circle|LoaderCircle|Hand)/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/thread-not-circle', '线程用对话气泡加状态色点，不用圆圈图标；圆圈只表示任务（R-52）。')
-      if (from === policy.iconLibrary) for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Sparkles?|WandSparkles)(?:Icon)?$/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/no-sparkle', 'AI 不用闪光图标（R-71）：思考用 Brain，Bot 用 Bot。')
+      if (isIconSource(from, policy)) for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Sparkles?|WandSparkles)(?:Icon)?$/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/no-sparkle', 'AI 不用闪光图标（R-71）：思考用 Brain，Bot 用 Bot。')
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const entries = variables.get(node.name.text) ?? []
@@ -250,7 +257,7 @@ export function auditSource(file, text, policy) {
     element.children.forEach(walk)
     return found
   }
-  const searchIcon = o => ['Search', 'SearchIcon'].includes(o.tagName.getText(source)) && imports.get(o.tagName.getText(source))?.from === policy.iconLibrary
+  const searchIcon = o => ['Search', 'SearchIcon'].includes(o.tagName.getText(source)) && isIconSource(imports.get(o.tagName.getText(source))?.from, policy)
   const hasSearchIcon = nodes => {
     let found = false
     const walk = n => { const o = opening(n); if (o && searchIcon(o)) found = true; if (!found) ts.forEachChild(n, walk) }
@@ -339,13 +346,13 @@ export function auditSource(file, text, policy) {
             if (overlays.test(name) && /^-?z-/.test(base)) add(classAttr, 'style/overlay-stacking', '浮层组件自行管理层叠，不指定 z-index。')
             if (base.startsWith('w-') && bases.includes(`h-${base.slice(2)}`)) add(classAttr, 'style/size-shorthand', `相同宽高使用 size-${base.slice(2)}。`)
           }
-          const icon = imports.get(raw)?.from === policy.iconLibrary
+          const icon = isIconSource(imports.get(raw)?.from, policy)
           const hostEntry = imports.get(parents[0] ?? '')
           const hostIsLibrary = !!hostEntry && /^@\/components\/(?:ui|reui)\//.test(hostEntry.from)
           if (icon && hostIsLibrary && bases.some(b => /^(?:size|w|h)-/.test(b))) add(classAttr, 'icons/no-size-override', '组件内部的图标由组件决定尺寸。')
         }
       }
-      const icon = imports.get(raw)?.from === policy.iconLibrary
+      const icon = isIconSource(imports.get(raw)?.from, policy)
       // Icon-only buttons (size="icon*") have no text to sit beside, so inline-start/end would only add padding.
       const iconOnlyButton = () => {
         for (let up = node.parent; up; up = up.parent) {

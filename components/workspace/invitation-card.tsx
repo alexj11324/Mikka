@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Users } from 'lucide-react'
+import { LoaderCircle, Users } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import { acceptWorkspaceInvitation } from '@/app/actions/workspace'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -56,7 +56,7 @@ export function InvitationCard({ token, email }: { token: string; email: string 
     </CardContent>
     <CardFooter className="flex flex-col gap-3">
       {!joined && token && (email ? <>
-        <Button className="w-full" disabled={pending} onClick={() => void accept()}>{pending && <Loader2 className="animate-spin" data-icon="inline-start" />}{t('accept')}</Button>
+        <Button className="w-full" disabled={pending} onClick={() => void accept()}>{pending && <LoaderCircle className="animate-spin" data-icon="inline-start" />}{t('accept')}</Button>
         <Button variant="ghost" disabled={pending} onClick={() => void switchAccount()}>{t('switchAccount')}</Button>
       </> : <>
         <Link href={`/sign-in?next=${encodeURIComponent(next)}`} className={buttonVariants({ className: 'w-full' })}>{t('signInToAccept')}</Link>
@@ -102,7 +102,7 @@ export function OrganizationInvitationCard({ token, email }: { token: string; em
       {joined && !serverOnly ? <Link href="/settings?section=organization" className={buttonVariants({ className: 'w-full' })}>{t('openOrganization')}</Link>
         : !joined && token && (email ? <>
           <Button className="w-full" disabled={pending} onClick={() => void accept()}>
-            {pending && <Loader2 className="animate-spin" data-icon="inline-start" />}{t('accept')}
+            {pending && <LoaderCircle className="animate-spin" data-icon="inline-start" />}{t('accept')}
           </Button>
           <Button variant="ghost" disabled={pending} onClick={() => void switchAccount()}>{invite('switchAccount')}</Button>
         </> : <>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Loader2, X } from "lucide-react";
+import { Check, LoaderCircle, X } from "@/components/icons";
 import {
   AnimatePresence,
   motion,
@@ -215,7 +215,7 @@ export const StatefulButton = forwardRef<HTMLButtonElement, StatefulButtonProps>
         <AnimatePresence initial={false}>
           {state === "loading" ? (
             <IconSlot keyId="loading-icon">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <LoaderCircle className="h-4 w-4 animate-spin" />
             </IconSlot>
           ) : null}
           {state === "success" ? (

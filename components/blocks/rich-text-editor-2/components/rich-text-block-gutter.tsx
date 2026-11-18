@@ -43,7 +43,7 @@ import {
   type BlockMenuState,
 } from "./rich-text-block-menu"
 import { keepEditorFocus, ShortcutKeys } from "./rich-text-toolbar"
-import { PlusIcon, GripVerticalIcon } from "lucide-react"
+import { Plus, GripVertical } from "@/components/icons"
 
 // Room between the gutter and the text, and how far below the last row a
 // pointer still counts as on it (the widest gap between blocks is 40px).
@@ -487,7 +487,7 @@ export function RichTextBlockGutter({
             />
           }
         >
-          <PlusIcon aria-hidden="true" />
+          <Plus aria-hidden="true" />
         </TooltipTrigger>
         <TooltipContent>
           <span className="flex flex-col items-start gap-0.5">
@@ -532,7 +532,7 @@ export function RichTextBlockGutter({
                 />
               }
             >
-              <GripVerticalIcon aria-hidden="true" />
+              <GripVertical aria-hidden="true" />
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent>

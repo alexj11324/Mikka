@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { ShortcutKeys } from "./rich-text-toolbar"
-import { KeyboardIcon } from "lucide-react"
+import { Keyboard } from "@/components/icons"
 
 const KEY_SHORTCUTS = [
   { label: "Bold", keys: ["mod", "B"] },
@@ -48,7 +48,7 @@ export function RichTextShortcuts() {
           <Button variant="ghost" size="sm" className="text-muted-foreground" />
         }
       >
-        <KeyboardIcon aria-hidden="true" />
+        <Keyboard aria-hidden="true" />
         <span className="max-sm:sr-only">Shortcuts</span>
       </PopoverTrigger>
       <PopoverContent

@@ -3,7 +3,7 @@
 import { useId } from 'react'
 import type { LinearLabelOption } from '@/lib/linear-sync/client'
 import { useTranslations } from 'next-intl'
-import { Plus, X } from 'lucide-react'
+import { Plus, X } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'

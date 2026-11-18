@@ -3,7 +3,7 @@
 import { Fragment, useState, type MouseEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from 'next-intl'
-import { ChevronDown, Ellipsis, Pin, Plus, X } from 'lucide-react'
+import { ChevronDown, Ellipsis, Pin, Plus, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { organizeAutomation, pinAutomation, restoreAutomation } from '@/app/actions/automations'
 import { listWorkspaceBots } from '@/app/actions/bots'

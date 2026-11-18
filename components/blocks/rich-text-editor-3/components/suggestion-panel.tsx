@@ -48,7 +48,7 @@ import {
   type SuggestionResolution,
 } from "./rich-text-changes"
 import { SuggestionRow } from "./suggestion-row"
-import { MoreHorizontalIcon, CheckCheckIcon, CircleXIcon, XIcon } from "lucide-react"
+import { MoreHorizontal, CheckCheck, CircleX, X } from "@/components/icons"
 
 const MARKUP_VIEWS: { value: RichTextMarkupView; label: string }[] = [
   { value: "all", label: "All markup" },
@@ -186,20 +186,20 @@ export function SuggestionPanel({
           />
         }
       >
-        <MoreHorizontalIcon aria-hidden="true" />
+        <MoreHorizontal aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuGroup>
           <DropdownMenuLabel>All Suggestions</DropdownMenuLabel>
           <DropdownMenuItem onClick={() => onResolveAll("accept")}>
-            <CheckCheckIcon aria-hidden="true" />
+            <CheckCheck aria-hidden="true" />
             Accept All
           </DropdownMenuItem>
           <DropdownMenuItem
             variant="destructive"
             onClick={() => onResolveAll("reject")}
           >
-            <CircleXIcon aria-hidden="true" />
+            <CircleX aria-hidden="true" />
             Reject All
           </DropdownMenuItem>
         </DropdownMenuGroup>
@@ -237,7 +237,7 @@ export function SuggestionPanel({
       <Empty>
         <EmptyHeader>
           <EmptyMedia variant="icon">
-            <CheckCheckIcon aria-hidden="true" />
+            <CheckCheck aria-hidden="true" />
           </EmptyMedia>
           <EmptyTitle>No Open Suggestions</EmptyTitle>
           <EmptyDescription>
@@ -292,7 +292,7 @@ export function SuggestionPanel({
                   />
                 }
               >
-                <XIcon aria-hidden="true" />
+                <X aria-hidden="true" />
               </TooltipTrigger>
               <TooltipContent>Close</TooltipContent>
             </Tooltip>

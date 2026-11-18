@@ -3,7 +3,7 @@
 import NextLink from 'next/link'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { AudioLines, Download, FileText, ImageIcon, RotateCw, X } from 'lucide-react'
+import { AudioLines, Download, FileText, Image, RotateCw, X } from '@/components/icons'
 import {
   Attachment,
   AttachmentAction,
@@ -39,7 +39,7 @@ function FileCard({
   })
   const name = data?.name ?? file.name
   const icon = data?.mediaType.startsWith('image/') ? (
-    <ImageIcon />
+    <Image />
   ) : data?.mediaType.startsWith('audio/') ? (
     <AudioLines />
   ) : (
