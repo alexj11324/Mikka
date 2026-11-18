@@ -7,8 +7,7 @@ import { finalizeBuild } from './finalize-build.mjs'
 import { assertApiBuildConfiguration } from '../build-contract.mjs'
 
 const root = fileURLToPath(new URL('../../..', import.meta.url))
-const preset = process.env.NITRO_PRESET || (process.env.VERCEL ? 'vercel' : 'node-server')
-if (!['node-server', 'vercel'].includes(preset)) throw new Error('API_BUILD_PRESET_UNSUPPORTED')
+const preset = 'node-server'
 const revision = process.env.MIKKA_BUILD_REVISION || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
 if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('API_BUILD_SHA_REQUIRED')
 execFileSync(process.execPath, ['apps/api/scripts/generate-routes.mjs'], { cwd: root, stdio: 'inherit' })
@@ -19,14 +18,12 @@ await writeFile(join(root, 'apps/api/generated/spa.ts'), `// Generated from the 
 const nitro = await createNitro({ rootDir: root, preset })
 try {
   assertApiBuildConfiguration(nitro, root)
-  if (preset === 'node-server') {
-    // One compilation graph supplies both the standard listener and the
-    // explicitly non-listening Docker adapter; do not build another app copy.
-    nitro.options.rolldownConfig = {
-      ...nitro.options.rolldownConfig,
-      input: { index: nitro.options.entry, 'docker-entry': join(root, 'apps/api/runtime/docker-entry.ts') },
-      output: { entryFileNames: '[name].mjs' },
-    }
+  // One compilation graph supplies both the standard listener and the
+  // explicitly non-listening Docker adapter; do not build another app copy.
+  nitro.options.rolldownConfig = {
+    ...nitro.options.rolldownConfig,
+    input: { index: nitro.options.entry, 'docker-entry': join(root, 'apps/api/runtime/docker-entry.ts') },
+    output: { entryFileNames: '[name].mjs' },
   }
   await prepare(nitro)
   await copyPublicAssets(nitro)

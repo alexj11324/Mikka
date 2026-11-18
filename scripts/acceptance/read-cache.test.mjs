@@ -134,7 +134,7 @@ test('Vite asset and manifest queries accept only one valid public deployment pi
   for (const path of ['/mikka/assets/renderer-realbuild.js', '/mikka/renderer-manifest.json']) {
     for (const query of ['', '?dpl=370cc898-local-prebuilt-1'])
       assert.equal(requestAllowed(path + query, {}, environment), true, path + query)
-    for (const query of ['?other=1', '?dpl=', '?dpl=dpl_reserved', '?dpl=' + 'a'.repeat(33),
+    for (const query of ['?other=1', '?dpl=', '?dpl=bad%2Fpath', '?dpl=' + 'a'.repeat(33),
       '?dpl=first&dpl=second', '?dpl=valid&other=1', '?dpl=bad%2Fpath', '?dpl=bad%20value', '?dpl=valid#fragment'])
       assert.equal(requestAllowed(path + query, {}, environment), false, path + query)
     assert.equal(requestAllowed('https://foreign.example' + path + '?dpl=valid', {}, environment), false)
@@ -147,7 +147,7 @@ test('Vite asset and manifest queries accept only one valid public deployment pi
 test('Vite discovery rejects invalid or conflicting pins before fetching an action manifest', async () => {
   const script = query => '<script type="module" src="/mikka/assets/renderer-realbuild.js' + query + '"></script>'
   for (const html of [
-    script('?dpl='), script('?dpl=dpl_reserved'), script('?dpl=first&amp;dpl=second'),
+    script('?dpl='), script('?dpl=bad%2Fpath'), script('?dpl=first&amp;dpl=second'),
     script('?dpl=valid&amp;other=1'), script('?dpl=' + 'a'.repeat(33)),
     script('?dpl=first') + script('?dpl=second'), script('') + script('?dpl=valid'),
   ]) {

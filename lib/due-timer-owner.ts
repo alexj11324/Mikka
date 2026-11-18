@@ -40,7 +40,7 @@ const lifetimeSuccessor = (identity: RecoveryTimerIdentity, run: { runId: string
   identity.predecessorRunId === run.runId && candidate.attributes?.$parentRunId === run.runId && run.runId !== identity.runId && lifetimeElapsed(run)
 
 /** This migration is deliberately not enabled in preview or for other jobs. */
-export const productionRecoveryTimer = () => process.env.VERCEL_ENV === 'production'
+export const productionRecoveryTimer = () => process.env.MIKKA_DEPLOYMENT_STAGE === 'production' || process.env.MIKKA_DEPLOYMENT_ENVIRONMENT === 'production'
 
 async function runtime() {
   const world = await (await import('workflow/runtime')).getWorld()

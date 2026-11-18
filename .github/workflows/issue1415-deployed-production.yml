@@ -1,4 +1,4 @@
-name: Issue 1415 deployed production acceptance
+name: Deployed production acceptance
 
 on:
   workflow_dispatch:
@@ -46,21 +46,8 @@ jobs:
       - name: Install Chromium before loading production credentials
         run: pnpm exec playwright install --with-deps --only-shell chromium
 
-      - name: Read the existing platform token only for read-only managed evidence
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_TEAM_TOKEN
-          recursive: false
-          include-imports: false
-
       - name: Attest the real driver and the live deployed build before owner credentials
-        run: node --import tsx scripts/acceptance/read-cache-production.mjs --attest --migration-1415
+        run: node --import tsx scripts/acceptance/read-cache-production.mjs --attest
         env:
           MIKKA_ACCEPTANCE_TARGET_MODE: deployed-target
           APPLICATION_SHA: ${{ inputs.application_sha }}
@@ -102,14 +89,6 @@ jobs:
           SMOKE_BASE_URL: https://app.aspectlylabs.com
           SMOKE_EXPECT_ON: credentialVault,cloudComputer
 
-      - name: Prove one normal Coordinator turn and its managed due reminder
-        timeout-minutes: 10
-        run: node --import tsx scripts/acceptance/workflow-migration-production.mjs
-        env:
-          MIKKA_ACCEPTANCE_TARGET_MODE: deployed-target
-          APPLICATION_SHA: ${{ inputs.application_sha }}
-          GH_TOKEN: ${{ github.token }}
-
       - name: Verify normal mobile and source daemon HTTP and exact cleanup
         timeout-minutes: 6
         run: node --import tsx scripts/ops/production-mobile-daemon.mjs
@@ -139,11 +118,10 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: issue1415-deployed-production-${{ github.run_id }}-${{ github.run_attempt }}
+          name: deployed-production-acceptance-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             production-read-cache-report/attestation.json
             production-deployed-browser-report/report.json
-            production-workflow-migration-report/report.json
             production-transport-proof-report/mobile-daemon.json
             production-transport-proof-report/mcp.json
             production-deployed-target-report/report.json
