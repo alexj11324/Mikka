@@ -38,7 +38,7 @@ export function normalizeHref(value: string) {
 }
 
 function removeLink(editor: Editor | null) {
-  editor?.chain().focus().extendMarkRange("link").unsetLink().run()
+  return editor?.chain().focus().extendMarkRange("link").unsetLink().run() ?? false
 }
 
 interface LinkFormProps {
@@ -69,8 +69,9 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
     const { empty } = editor.state.selection
 
     // With nothing selected, the address becomes the link text itself.
+    let applied: boolean
     if (empty && !editor.isActive("link")) {
-      editor
+      applied = editor
         .chain()
         .focus()
         .insertContent({
@@ -80,7 +81,7 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
         })
         .run()
     } else {
-      editor
+      applied = editor
         .chain()
         .focus()
         .extendMarkRange("link")
@@ -88,6 +89,8 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
         .run()
     }
 
+    // Keep the form open when Tiptap rejects the command.
+    if (!applied) return
     onDone()
   }
 
@@ -128,8 +131,7 @@ function LinkForm({ editor, href, inputRef, onDone }: LinkFormProps) {
                 size="icon-xs"
                 aria-label="Remove link"
                 onClick={() => {
-                  removeLink(editor)
-                  onDone()
+                  if (removeLink(editor)) onDone()
                 }}
               >
                 <Link2OffIcon aria-hidden="true" />
