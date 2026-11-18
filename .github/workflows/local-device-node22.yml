@@ -69,6 +69,27 @@ jobs:
         run: |
           node --version
           pnpm build:app
+      - name: Install Chromium for isolated MVP browser acceptance
+        if: matrix.node == '24'
+        run: |
+          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
+          pnpm exec playwright install --with-deps chromium
+      - name: Run isolated MVP Playwright acceptance
+        if: matrix.node == '24'
+        run: pnpm test:e2e:mvp
+        env:
+          MIKKA_MVP_E2E: '1'
+          MIKKA_TEST_MODE: '1'
+      - name: Preserve MVP browser results and screenshots
+        if: always() && matrix.node == '24'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mikka-mvp-playwright-${{ github.run_id }}
+          path: |
+            mvp-test-results/
+            playwright-mvp-report/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Start compiled app and packaged Eve and check their real HTTP routes
         run: node scripts/runtime-compatibility-smoke.mjs
       - name: Startup contracts and Eve unit tests
