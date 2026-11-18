@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { cp, lstat, mkdir, readFile, readdir, realpath, rm, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { cp, lstat, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { dirname, join, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { gzip } from 'node:zlib'
 import { build } from 'esbuild'

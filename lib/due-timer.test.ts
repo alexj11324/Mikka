@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
 import { armDueTimer, dueTimerTransport, forgetCheckedDueTimers, type DueTimerHolder } from './due-timer'
+import { productionRecoveryTimer } from './due-timer-owner'
 import { wakeTransport } from './workflow-wake'
 
 const deployment = process.env.MIKKA_DEPLOYMENT_ID, deploymentEnv = process.env.MIKKA_DEPLOYMENT_STAGE, environment = process.env.MIKKA_DEPLOYMENT_ENVIRONMENT
@@ -119,4 +120,26 @@ test('production run recovery is left to its own owner handover (#1403): never c
   assert.equal(looked.includes('due-timer:run-recovery'), false, 'run recovery is not even looked up')
   assert.deepEqual(timer.calls, [])
   assert.equal(timer.live()?.runId, 'run-old')
+})
+
+
+test('production recovery ownership uses Mikka deployment configuration, not legacy Vercel flags', () => {
+  const names = ['MIKKA_DEPLOYMENT_STAGE', 'MIKKA_DEPLOYMENT_ENVIRONMENT', 'VERCEL', 'VERCEL_ENV'] as const
+  const previous = Object.fromEntries(names.map(name => [name, process.env[name]]))
+  try {
+    delete process.env.MIKKA_DEPLOYMENT_STAGE
+    delete process.env.MIKKA_DEPLOYMENT_ENVIRONMENT
+    process.env.VERCEL = '1'
+    process.env.VERCEL_ENV = 'production'
+    assert.equal(productionRecoveryTimer(), false)
+    process.env.MIKKA_DEPLOYMENT_ENVIRONMENT = 'preview'
+    assert.equal(productionRecoveryTimer(), false)
+    process.env.MIKKA_DEPLOYMENT_STAGE = 'production'
+    assert.equal(productionRecoveryTimer(), true)
+  } finally {
+    for (const name of names) {
+      const value = previous[name]
+      if (value === undefined) delete process.env[name]; else process.env[name] = value
+    }
+  }
 })

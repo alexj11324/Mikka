@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { execFileSync } from 'node:child_process'
-import { cp, mkdtemp, rm } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { frontendConfig } from '../vite.config.mjs'
 import { browserModule } from './test-module.mjs'
@@ -9,6 +9,7 @@ import { browserModule } from './test-module.mjs'
 const checkout = process.cwd()
 
 async function overlayFixture(run) {
+  await mkdir(join(checkout, 'node_modules/.cache'), { recursive: true })
   const fixture = await mkdtemp(join(checkout, 'node_modules/.cache/mikka-ui-overlay-fixture-'))
   try {
     await cp(join(checkout, 'components/slots'), join(fixture, 'slots'), { recursive: true })

@@ -5,8 +5,8 @@ import { lstat, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 import test from 'node:test'
-import { compileTracing, finalizeBuild } from './finalize-build.mjs'
-import { createCapturePosterBinary, POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFEST, POSTER_BINARY_MAX_BYTES,
+import { finalizeBuild } from './finalize-build.mjs'
+import { createCapturePosterBinary, POSTER_BINARY_ARCHIVE, POSTER_BINARY_MANIFEST,
   POSTER_BINARY_RESOURCE, POSTER_LICENSE_FILES, POSTER_RUNTIME_DIRECTORY } from '../../../lib/captures/poster-binary.mjs'
 
 const exec = promisify(execFile)

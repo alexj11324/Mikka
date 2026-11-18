@@ -29,5 +29,5 @@ try {
   await copyPublicAssets(nitro)
   await build(nitro)
   const result = await finalizeBuild({ root, output: nitro.options.output.dir, preset, revision })
-  console.log(JSON.stringify({ status: 'built', revision, preset, functions: result.functions.length, resources: result.resources.length }))
+  console.log(JSON.stringify({ status: 'built', revision, preset, resources: result.resources.length }))
 } finally { await nitro.close() }
