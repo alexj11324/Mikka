@@ -46,7 +46,7 @@ export function NewGroupDialog({ purpose, open, onOpenChange, workspaceId, bots,
     if (!open || devices) return
     let live = true
     fetch(withBasePath('/api/devices'), { credentials: 'same-origin' })
-      .then(response => response.ok ? response.json() as Promise<{ items?: DeviceOption[] }> : { items: [] })
+      .then(async response => response.ok ? await response.json() as { items?: DeviceOption[] } : { items: [] })
       .then(body => { if (live) setRoster(body.items ?? []) })
       .catch(() => { if (live) setRoster([]) })
     return () => { live = false }
