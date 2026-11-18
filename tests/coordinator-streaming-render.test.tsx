@@ -159,7 +159,7 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     assert.equal(thinking?.getAttribute('data-activity-thinking'), 'active')
     assert.equal(thinking?.querySelector('[data-slot="trace-title"]')?.textContent, 'Thinking')
     assert.equal(thinking?.querySelector('[data-slot="trace-line"]')?.getAttribute('data-status'), 'running')
-    assert.ok(thinking?.querySelector('svg.lucide-loader-circle.animate-spin'), 'a spinner while it thinks')
+    assert.ok(thinking?.querySelector('svg.animate-spin'), 'a spinner while it thinks')
     await settle(() => /Check the login/.test(text()))
     assert.match(text(), /Check the login/, 'the running row is open, so its words show as they stream')
     assert.equal(group()?.getAttribute('data-activity-group'), 'running')
@@ -186,7 +186,7 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Dispatch Factory task', 'nothing succeeded: the line names the failed call')
     await view.render(<ReplyActivity tools={[...tools, { call: 'c5', name: 'get_issue', state: 'done' as const }]} />)
     assert.equal(group()?.getAttribute('data-activity-group'), 'error')
-    assert.ok(group()?.querySelector('svg.lucide-circle-alert'), 'a failure is an icon, a colour and a word together (R-87)')
+    assert.ok(group()?.querySelector('[data-slot="trace-icon"] svg.text-destructive-foreground'), 'a failure is an icon, a colour and a word together (R-87)')
     // Only what succeeded is said as done: the dispatch that never returned and the Factory call that answered an error
     // are only in the failure count, never 「Dispatched」 (R-83).
     assert.equal(group()?.querySelector('[data-slot="trace-title"]')?.textContent, 'Created 1 task · Looked up tasks')
@@ -201,7 +201,7 @@ test('a reply draws its thinking and its tools as shadcn Trace rows: several cal
     await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 3 }} />)
     assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-activity-thinking'), 'done')
     assert.equal(text(), 'Thought for 3 seconds')
-    assert.ok(view.container.querySelector('[data-activity-thinking] svg.lucide-circle-check'), 'a check once it stops')
+    assert.ok(view.container.querySelector('[data-activity-thinking] [data-slot="trace-icon"] svg'), 'a check once it stops')
     await view.render(<ReplyActivity tools={[]} thought />)
     assert.equal(text(), 'Thought', 'a stored reply knows only that it thought')
     await view.render(<ReplyActivity tools={[]} />)
@@ -223,7 +223,7 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
     // Live, finished, with what the model thought: the Trace row's trigger with its chevron, closed until opened.
     await view.render(<ReplyActivity tools={[]} thinking={{ active: false, seconds: 4, text: 'Check the login redirect first.' }} />)
     assert.equal(view.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'readable')
-    assert.ok(trigger().querySelector('svg.lucide-chevron-right'), 'it shows the chevron')
+    assert.ok(trigger().querySelector('[data-slot="trace-icon"] svg'), 'it shows the chevron')
     assert.doesNotMatch(content(), /login redirect/, 'closed by default')
     await act(async () => { trigger().click() })
     await settle(() => /login redirect/.test(content()))
@@ -249,7 +249,7 @@ test('readable reasoning opens under 「思考了 N 秒」, live and stored alik
       await plain.render(<ReplyActivity tools={[]} {...props} />)
       assert.equal(plain.container.querySelector('[data-activity-thinking]')?.getAttribute('data-reasoning'), 'none')
       assert.equal(plain.container.querySelector('[data-activity-thinking] button'), null, 'no trigger')
-      assert.equal(plain.container.querySelector('svg.lucide-chevron-right'), null, 'no chevron')
+      assert.equal(plain.container.querySelector('[data-slot="trace-icon"] svg'), null, 'no chevron')
       assert.equal(plain.container.querySelector('[data-slot="trace-collapsible-content"]'), null)
       await plain.unmount()
     }
