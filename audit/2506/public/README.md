@@ -5,9 +5,9 @@ This repository's review queue is pinned to `b19eed9081d9858686d57547e7afcec73d6
 | Code path status | Count at this ledger revision |
 |---|---:|
 | complete | 186 |
-| partial | 47 |
+| partial | 52 |
 | prior-partial | 36 |
-| unreviewed | 6287 |
+| unreviewed | 6282 |
 
 A partial entry has evidence for specific behavior/symbols. Only complete entries count toward the semantic numerator. Unreviewed and prior-partial paths remain in the queue. Non-code inputs can change execution and remain in scope; file classification changes when consumers prove they should be treated as implementation. The manifest does not certify that an asset is unreferenced or that any generated path matches its source. All base-to-tip changes must be reconciled separately before closure.
 
@@ -106,3 +106,12 @@ The `ApiCache` and `useApiRead` code paths independently protect account/workspa
 **Current main integration safeguard:** original G `useApi.ts@a8a01331` predates main `ed13256a`, which exports native `onAppForeground` for `features/chat/model/use-thread-read-end.ts` and the chat screen. Existing G source [`9a9004b1`](https://github.com/alexj11324/Mikka/commit/9a9004b11114235b645dee8376f597da5e6f40ad) restores that **exact same current-main blob**, retaining subscription cleanup and the foreground refresh contract without adding another mechanism. Main/Cloud pinned vendor remain different versions; no assumption that the old vendor inherits this change.
 
 The fixed 7,996 tracked-path denominator and 6,556 code-path denominator are unchanged. Original CSV rows and JSONL now show **186 complete / 47 partial / 36 prior-partial / 6,287 unreviewed**, **260 distinct review records**. Full three-repository fixed-source semantic reviews, all main deltas, vendor consumers, genuine CI, ordinary protected merge and exact merged-SHA and Cloudflare migration/physical deletion acceptance remain outstanding. The original G-015 Owner and #1954 / Cloud #155 production-signing-device Owner retain their scope; F #2300 remains untouched.
+
+
+## 2026-11-18 fixed mobile chat-time and color-token source contracts
+
+On the existing public G branch, five previously unreviewed immutable code paths were read in full and traced to real public consumers, with independent fixed/blob records in `reviews.jsonl` and their original CSV shards: `apps/mobile/lib/{chat-time,tokens}.ts`, `apps/mobile/styles/tokens.css`, and the original `apps/mobile/tests/{chat-time,theme-tokens}.test.mts`. Every fixed blob is identical on the observed public main `80ce7391d5a55089b871f89aa2af96fb4a7a1077`, this G branch before audit-only edits, and Cloud's **fixed** `vendor/mikka@82d285edd2dfc9ee95622ec4a22c58436bffc255`. This does **not** certify all current downstream callers in the Cloud outer repo or any future main additions.
+
+The chat clock uses a 15-minute or local-calendar-day separator for actual personal/group message lists; it is UI grouping, not a duplicate Cloudflare timer or Worker polling. The original bilingual/invalid-time TAP test was read but **not executed**. Local-day/DST and actual Expo render need further verification. The 26 native color tokens are consumed by `lib/theme.ts` (iOS system/dynamic colors, web CSS variables, Android light) and `global.css` (Uniwind/HeroUI/beUI). A scoped read-only V8 check of the *actual fixed source strings*, matching the original test rule, compared 31 annotated light and 31 dark CSS variables to token declarations: **62/62 values equal, zero mismatches**. This is not the original Node TAP runner or installed CSS/browser/Expo check. Preserve both distinct platform presentation contracts; **all five statuses remain partial** pending locked Node24 TAP, CSS build, contrast/browser/Expo and official protected CI.
+
+This pass updates two existing CSV shards and the original JSONL/README only, no product runtime code, no Cloudflare worker/SDK changes, no F or other G Owner edits. Fixed code census is now **6556 = 186 complete + 52 partial + 36 prior-partial + 6282 unreviewed**; JSONL has **265 path-unique** records (some non-code). Native Cloudflare Container API migration and deletion of `@cloudflare/containers` remain G-015's independently owned unresolved acceptance, with [official class migration](https://developers.cloudflare.com/containers/guides/migrate-to-durable-object-container-api/) (last updated Nov 9, 2026) distinct from [scheduling-policy migration](https://developers.cloudflare.com/containers/guides/migrate-to-durable-object-scheduling-policy/) (last updated Nov 14, 2026). The latter requires a replacement app/namespace and state plan; do not assume the lockfile supports its full runtime contract without testing. No protected merge, exact merge-SHA acceptance or live production validation is implied by this audit.
