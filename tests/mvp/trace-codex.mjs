@@ -66,7 +66,7 @@ export function createTraceGitHubBinary(directory) {
 
 /** Local command/version checks only: no login, service request or DB write. */
 export function checkTracePrerequisites(directory) {
-  if (process.versions.node.split('.')[0] !== '24') throw new Error('NODE_24_REQUIRED')
+  if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('NODE_22_REQUIRED')
   const command = (file, args, code, additions = {}) => {
     try { return execFileSync(file, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 15_000,
       env: { PATH: process.env.PATH, HOME: process.env.HOME, NODE_OPTIONS: '', COREPACK_ENABLE_NETWORK: '0', COREPACK_ENABLE_DOWNLOAD_PROMPT: '0', ...additions } }).trim() }

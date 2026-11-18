@@ -13,7 +13,7 @@ export async function buildCloudflareWorld(workload, output) {
   await mkdir(dirname(outfile), { recursive: true })
   await build({
     entryPoints: [fileURLToPath(new URL('../packages/eve-cloudflare-world/src/' + entries[workload] + '.mjs', import.meta.url))],
-    outfile, bundle: true, format: 'esm', platform: 'node', target: 'node24',
+    outfile, bundle: true, format: 'esm', platform: 'node', target: 'node22',
     banner: { js: "import { createRequire as createBundledRequire } from 'node:module'; const require = createBundledRequire(import.meta.url);" },
   })
   return outfile

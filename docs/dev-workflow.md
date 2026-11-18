@@ -48,8 +48,8 @@ For production screenshots of a UI change, run
 `NITRO_PRESET=node-server pnpm build:app`, then `pnpm start` in cloud Linux
 with the isolated database configured. The build
 emits the Vite frontend and Nitro Node server into `.output`. Startup validates
-`.output/mikka-build.json` and serves the compiled application. Node 24 is
-required. `pnpm build` also builds the subscription worker, generates the Agent
+`.output/mikka-build.json` and serves the compiled application. Node 22 (latest
+22.x) and Node 24 are supported; the manifest records the build runtime. `pnpm build` also builds the subscription worker, generates the Agent
 UI, runs type checks and invokes migrations. The official Web release is built
 by `cloudflare-api-image.yml` and deployed to Cloudflare
 ([build source of truth](operations/build-source-of-truth.md)); Vercel is retired.
@@ -64,8 +64,11 @@ One command sets up a container: `eval "$(scripts/dev/bootstrap-local.sh)"`
 the cloud environment's setup script so every session starts ready. It
 provides:
 
-- **Node 24**, the version family required by the runtime and CI. The separate
-  Node 22 compatibility workflow covers its selected source tests only.
+- **Node 22 and 24** are supported throughout the app, Eve, API and daemon.
+  Bootstrap defaults to **24** from `.node-version`; production images stay on 24.
+  CI runs selected core/integration unit and database suites on both versions.
+  `local-device-node22.yml` also builds and starts the app and packaged Eve on
+  both versions; it retains the daemon/installer compatibility tests.
 - **PostgreSQL 17** at `127.0.0.1:5432`, database `mikka_e2e`; migrations with
   `pnpm migrate` (it runs by itself when every target is a loopback database;
   a remote database off Vercel still needs `MIGRATE=1` and `--allow-remote`).

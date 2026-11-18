@@ -43,7 +43,7 @@ export function buildEnvironment(env) {
 }
 
 export async function runMarketingCi({ env = process.env, verify = false, publicRoot = root } = {}) {
-  if (!verify) assert.ok(process.version.startsWith('v24.'), 'MARKETING_PUBLIC_CI_NODE_24_REQUIRED')
+  if (!verify) assert.ok(Number(process.versions.node.split('.')[0]) >= 22, 'MARKETING_PUBLIC_CI_NODE_22_REQUIRED')
   publicRoot = await realpath(publicRoot)
   assert.ok(git(publicRoot, ['rev-parse', '--show-toplevel']) === publicRoot
     && hasGitHubOrigin(git(publicRoot, ['remote', 'get-url', 'origin']), repository), 'MARKETING_PUBLIC_CI_REPOSITORY_REQUIRED')

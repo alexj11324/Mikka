@@ -1,0 +1,12 @@
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -725,7 +725,7 @@
+     }
+   },
+   "engines": {
+-    "node": ">=24"
++    "node": ">=22"
+   },
+   "eve": {
+     "builtInExtensions": {
