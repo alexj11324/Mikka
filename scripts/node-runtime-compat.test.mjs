@@ -62,3 +62,39 @@ test('CI installs, builds and starts both real runtimes without a daemon-only du
   assert.equal(action.inputs['node-version'].default, '24')
   assert.equal(action.runs.steps.find(step => step.uses?.startsWith('actions/setup-node@')).with['node-version'], '${{ inputs.node-version }}')
 })
+
+test('pinned Eve development cleanup works without Node 24 resource-management globals', () => {
+  const workspace = load('pnpm-workspace.yaml')
+  assert.equal(workspace.packageExtensions['eve@1.0.0-rc.9'].dependencies['core-js-pure'], '3.51.0')
+  const source = read('node_modules/eve/dist/src/internal/nitro/host/start-development-server.js')
+  assert.match(source, /import AsyncDisposableStack from "core-js-pure\/actual\/async-disposable-stack\/index.js"/)
+  assert.match(source, /import SuppressedError from "core-js-pure\/actual\/suppressed-error.js"/)
+  const code = `
+    import assert from 'node:assert/strict'
+    import {createRequire} from 'node:module'
+    import {realpathSync} from 'node:fs'
+    import {fileURLToPath} from 'node:url'
+    delete globalThis.AsyncDisposableStack
+    delete globalThis.SuppressedError
+    const require=createRequire(realpathSync(fileURLToPath(${JSON.stringify(new URL('../node_modules/eve/package.json', import.meta.url).href)})))
+    const Stack=require('core-js-pure/actual/async-disposable-stack/index.js')
+    const Suppressed=require('core-js-pure/actual/suppressed-error.js')
+    const seen=[], stack=new Stack()
+    stack.defer(async()=>{await Promise.resolve();seen.push('first')})
+    stack.defer(()=>seen.push('second'))
+    const owned=stack.move()
+    await stack.disposeAsync()
+    assert.deepEqual(seen,[])
+    await owned.disposeAsync()
+    await owned.disposeAsync()
+    assert.deepEqual(seen,['second','first'])
+    const failed=new Stack(), first=Error('first'), second=Error('second')
+    failed.defer(()=>{throw first})
+    failed.defer(async()=>{throw second})
+    await assert.rejects(failed.disposeAsync(),error=>error instanceof Suppressed && error.error===first && error.suppressed===second)
+    assert.equal(globalThis.AsyncDisposableStack,undefined)
+    assert.equal(globalThis.SuppressedError,undefined)
+  `
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', code], { cwd: root, encoding: 'utf8', timeout: 10_000 })
+  assert.equal(result.status, 0, result.stderr)
+})

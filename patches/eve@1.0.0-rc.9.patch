@@ -10,3 +10,9 @@ diff --git a/package.json b/package.json
    },
    "eve": {
      "builtInExtensions": {
+diff --git a/dist/src/internal/nitro/host/start-development-server.js b/dist/src/internal/nitro/host/start-development-server.js
+--- a/dist/src/internal/nitro/host/start-development-server.js
++++ b/dist/src/internal/nitro/host/start-development-server.js
+@@ -0,0 +1,2 @@
++import AsyncDisposableStack from "core-js-pure/actual/async-disposable-stack/index.js";
++import SuppressedError from "core-js-pure/actual/suppressed-error.js";
