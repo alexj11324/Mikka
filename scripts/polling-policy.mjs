@@ -385,10 +385,6 @@ export const pollingAllowlist = {
     "the 1 s elapsed clock of a reply in progress; the chat and its proposals are pushed (lib/live.ts)",
     1,
   ),
-  "components/version-guard.tsx": ui(
-    "checks the public build metadata once a minute (decision 2026-11-03-1437); no database read",
-    1,
-  ),
 };
 
 const delayCall =
