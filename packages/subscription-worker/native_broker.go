@@ -62,6 +62,8 @@ func (w *Worker) NativeStream(ctx context.Context, epoch int64, request NativeRe
 	if len(request.Body) > 262144 || json.Unmarshal(request.Body, &body) != nil || !modelPattern.MatchString(body.Model) || len(request.Headers) > 32 {
 		return ErrUnsupported
 	}
+	ctx, stopAuthority, eventDriven := w.watchActiveAuthority(ctx)
+	defer stopAuthority()
 	if err := w.authorizeRuntime(ctx, epoch, "native", body.Model); err != nil {
 		return err
 	}
@@ -121,25 +123,30 @@ func (w *Worker) NativeStream(ctx context.Context, epoch int64, request NativeRe
 	// Check revocation even while upstream is silent; closing IPC also cancels.
 	done := make(chan struct{})
 	defer close(done)
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-done:
-				return
-			case <-callCtx.Done():
-				return
-			case <-ticker.C:
-				if w.authorizeRuntime(callCtx, epoch, "native_active", body.Model) != nil {
-					cancel()
+	if !eventDriven {
+		go func() {
+			ticker := time.NewTicker(time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-done:
 					return
+				case <-callCtx.Done():
+					return
+				case <-ticker.C:
+					if w.authorizeRuntime(callCtx, epoch, "native_active", body.Model) != nil {
+						cancel()
+						return
+					}
 				}
 			}
-		}
-	}()
+		}()
+	}
 	response, err := client.Do(upstream)
 	if err != nil {
+		if callCtx.Err() != nil {
+			return ErrUnavailable
+		}
 		kind := "network_error"
 		if callCtx.Err() == context.DeadlineExceeded {
 			kind = "timeout_error"
@@ -158,6 +165,9 @@ func (w *Worker) NativeStream(ctx context.Context, epoch int64, request NativeRe
 	if contentType != "text/event-stream" && contentType != "application/json" {
 		return ErrProvider
 	}
+	if callCtx.Err() != nil {
+		return ErrUnavailable
+	}
 	if err = head(contentType); err != nil {
 		return ErrUnavailable
 	}
@@ -171,7 +181,11 @@ func (w *Worker) NativeStream(ctx context.Context, epoch int64, request NativeRe
 		if bytes.Contains(carry, []byte(token)) {
 			return ErrIntegrity
 		}
-		if w.authorizeRuntime(ctx, r.Epoch, "native_active", body.Model) != nil {
+		if eventDriven {
+			if callCtx.Err() != nil {
+				return ErrUnavailable
+			}
+		} else if w.authorizeRuntime(ctx, r.Epoch, "native_active", body.Model) != nil {
 			return ErrUnavailable
 		}
 		flush := len(carry) - len(token) + 1
@@ -179,6 +193,9 @@ func (w *Worker) NativeStream(ctx context.Context, epoch int64, request NativeRe
 			flush = len(carry)
 		}
 		if flush > 0 {
+			if callCtx.Err() != nil {
+				return ErrUnavailable
+			}
 			if emit(carry[:flush]) != nil {
 				return ErrUnavailable
 			}

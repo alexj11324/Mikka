@@ -2,14 +2,17 @@ package worker
 
 import (
 	"context"
+	"time"
+
 	exec "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
 	translator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
-	"time"
 )
 
 // Streams one explicitly selected credential. Closing IPC cancels the provider
 // context. No account pool, replay/retry or billing fallback exists here.
 func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload []byte, emit func([]byte) error) error {
+	ctx, stopAuthority, eventDriven := w.watchActiveAuthority(ctx)
+	defer stopAuthority()
 	authorizeDone := timingSpan(ctx, timingAuthorize)
 	err := w.authorizeRuntime(ctx, epoch, "model", model)
 	authorizeDone()
@@ -38,18 +41,26 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 	result, err := w.Executor.ExecuteStream(execCtx, a, exec.Request{Model: model, Payload: payload, Format: translator.FormatOpenAI}, exec.Options{Stream: true, SourceFormat: translator.FormatOpenAI, ResponseFormat: translator.FormatOpenAI})
 	executorDone()
 	if err != nil {
+		if ctx.Err() != nil {
+			return ErrUnavailable
+		}
 		return executionFailure(err)
 	}
 	if result == nil || result.Chunks == nil {
 		requestFailure(w.Scope.Provider, "stream", "stream_unavailable", 0, 0)
 		return ErrProvider
 	}
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
+	var ticker *time.Ticker
+	var tickerC <-chan time.Time
+	if !eventDriven {
+		ticker = time.NewTicker(time.Second)
+		tickerC = ticker.C
+		defer ticker.Stop()
+	}
 	firstChunk := true
 	for {
 		select {
-		case <-ticker.C:
+		case <-tickerC:
 			if err = w.activeRuntime(ctx, r.Epoch, model); err != nil {
 				return err
 			}
@@ -70,12 +81,17 @@ func (w *Worker) Stream(ctx context.Context, epoch int64, model string, payload 
 			if firstChunk {
 				firstGuardDone = timingSpan(ctx, timingFirstChunkGuard)
 			}
-			err = w.activeRuntime(ctx, r.Epoch, model)
+			if !eventDriven {
+				err = w.activeRuntime(ctx, r.Epoch, model)
+			}
 			if firstGuardDone != nil {
 				firstGuardDone()
 			}
 			if err != nil {
 				return err
+			}
+			if ctx.Err() != nil {
+				return ErrUnavailable
 			}
 			err = emit(chunk.Payload)
 			if firstChunk {
