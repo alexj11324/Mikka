@@ -54,13 +54,9 @@ import { threadPromptView } from '@/lib/thread-prompt'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
-import { actAs } from '@/lib/acting-user'
+import { actAs, requireUser } from '@/lib/acting-user'
 
-async function getUserId(): Promise<string> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
-}
+const getUserId = async () => (await requireUser()).id
 
 async function getWorkspaceReader() {
   const session = await auth.api.getSession({ headers: await headers() })

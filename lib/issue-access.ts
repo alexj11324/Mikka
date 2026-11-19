@@ -19,14 +19,9 @@ type LockIssue = Pick<Issue, 'id' | 'userId' | 'workspaceId' | 'ownershipState' 
 type IssueAccess<T = Issue> = { issue: T; teamId: string | null }
 type RequestIssueAccess<T = Issue> = IssueAccess<T> & { user: Awaited<ReturnType<typeof requireUser>> }
 
-export async function requireUser() {
-  // Explicit-user readers (including verified webhooks) do not need to
-  // initialize session/OAuth state merely by importing this module.
-  const { currentUser } = await import('@/lib/acting-user')
-  const user = await currentUser()
-  if (!user) throw new ActionFailureError('authRequired')
-  return user
-}
+// The canonical home is lib/acting-user.ts, which owns actAs and the request-log
+// attribution; this re-export keeps the ~40 existing importers working.
+export { requireUser } from '@/lib/acting-user'
 
 export async function requireIssueAccess(id: string, includeDeleted = false) {
   return requireRequestIssue(id, includeDeleted, false)
