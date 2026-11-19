@@ -80,7 +80,7 @@ jobs:
         with:
           ffmpeg-github-token: ${{ github.token }}
       - name: Verify the bounded read-only driver
-        run: node --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs
+        run: node --import tsx --test scripts/acceptance/read-cache.test.mjs scripts/acceptance/run-read-cache.test.mjs
       - name: Generate ephemeral test-only authentication secret
         run: |
           node --input-type=commonjs - <<'NODE'
