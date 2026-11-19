@@ -3601,5 +3601,33 @@
     "behavior": "Lists the signed-in person's own live, dispatchable local devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
     "test": "lib/devices/dispatchable.test.ts",
     "suite": "test:lib-units"
+  },
+  "lib/acting-user.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve the acting person for a server action or route from the installation's own session or an explicit actAs principal, including the token's workspace scope and the request-log attribution. No external service.",
+    "test": "lib/task-work-read.test.ts",
+    "suite": "test:factory-activity"
+  },
+  "lib/link-preview-batch.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bounds how many links one batched preview request carries. A constant shared by the web and desktop clients; no installation dependency.",
+    "test": "components/workspace/group-chat-revalidation.test.tsx",
+    "suite": "test:groups"
+  },
+  "app/actions/link-preview.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fetch a public web page's Open Graph title, summary and image for a signed-in person's chat citation. Private and loopback addresses are refused, so the installation never becomes an open proxy.",
+    "test": "components/workspace/group-chat-revalidation.test.tsx",
+    "suite": "test:groups"
+  },
+  "lib/issue-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve the signed-in or acting person and authorize a task read against the installation's own PostgreSQL records, including workspace membership, token scope and Enterprise principal.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
   }
 }

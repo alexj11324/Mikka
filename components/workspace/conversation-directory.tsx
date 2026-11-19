@@ -13,7 +13,7 @@ import { listConversations } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/ui/search-input'
 import { Label } from '@/components/ui/label'
-import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { GitPullRequest, MessageSquare } from '@/components/icons'
@@ -114,12 +114,21 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
     {writeError && <p role="alert">{t('writeError')}</p>}
     {error && <div role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={() => void mutate()}>{t('retry')}</Button></div>}
     {!error && !data && <DirectorySkeleton label={t('loading')} />}
-    {data && !rows.length && !more && !error && <Empty className="min-h-64 border-0">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">{pullsOnly ? <GitPullRequest aria-hidden="true" /> : <MessageSquare aria-hidden="true" />}</EmptyMedia>
-        <EmptyTitle>{t('empty')}</EmptyTitle>
-      </EmptyHeader>
-    </Empty>}
+    {data && !rows.length && !more && !error && (() => {
+      // R-96: "nothing here" and "nothing matches the filters" are two states,
+      // each with the one action that resolves it. This directory has no create
+      // path (the rail owns that), so only the filtered state gets a button.
+      const filtered = Boolean(query) || state !== 'all' || archived || pullState !== 'all'
+      return <Empty className="min-h-64 border-0">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">{pullsOnly ? <GitPullRequest aria-hidden="true" /> : <MessageSquare aria-hidden="true" />}</EmptyMedia>
+          <EmptyTitle>{filtered ? t('empty') : t('emptyTitle')}</EmptyTitle>
+        </EmptyHeader>
+        {filtered && <EmptyContent>
+          <Button size="sm" variant="outline" onClick={() => { setSearch(''); setState('all'); setArchived(false); setPullState('all') }}>{t('clearFilters')}</Button>
+        </EmptyContent>}
+      </Empty>
+    })()}
     <ul className="flex flex-col gap-2">
       {pullsOnly ? directoryPullRequests(rows, pullState).map(({ pull, conversations }) => {
         const ref = pullRequestRef(pull.url)

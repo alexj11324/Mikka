@@ -49,7 +49,7 @@ importers:
         specifier: ^3.0.75
         version: 3.0.75(zod@4.6.7)
       '@base-ui/react':
-        specifier: latest
+        specifier: 1.9.0
         version: 1.9.0(@date-fns/tz@1.2.0)(@types/react@19.3.0)(date-fns@4.1.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@better-auth/core':
         specifier: 1.7.12
@@ -259,7 +259,7 @@ importers:
         specifier: ^4.43.0
         version: 4.43.0(ai@7.0.148(zod@4.6.7))(workflow@5.2.3(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.10.0)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(typescript@5.9.3)(ws@8.22.0))(zod@4.6.7)
       class-variance-authority:
-        specifier: latest
+        specifier: 0.7.1
         version: 0.7.1
       clsx:
         specifier: ^2.1.1
@@ -268,8 +268,8 @@ importers:
         specifier: ^1.1.1
         version: 1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       cn:
-        specifier: latest
-        version: 0.5.2
+        specifier: 0.5.0
+        version: 0.5.0
       cookie:
         specifier: 1.1.1
         version: 1.1.1
@@ -303,9 +303,6 @@ importers:
       ffmpeg-static:
         specifier: 5.3.0
         version: 5.3.0(patch_hash=7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b)
-      file-type:
-        specifier: ^22.3.0
-        version: 22.3.0
       free-email-domains:
         specifier: 1.16.2
         version: 1.16.2
@@ -325,8 +322,8 @@ importers:
         specifier: ^0.16.47
         version: 0.16.47
       lucide-react:
-        specifier: latest
-        version: 1.75.0(@types/react@19.3.0)(react@19.3.1)
+        specifier: 1.60.0
+        version: 1.60.0(@types/react@19.3.0)(react@19.3.1)
       mcp-handler:
         specifier: 2.3.0
         version: 2.3.0(@modelcontextprotocol/server@2.3.1)(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
@@ -349,7 +346,7 @@ importers:
         specifier: ^4.14.9
         version: 4.14.9(@swc/helpers@0.5.23)(@types/react@19.3.0)(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)
       next-themes:
-        specifier: latest
+        specifier: 0.4.6
         version: 0.4.6(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       nodemailer:
         specifier: 10.3.1
@@ -397,8 +394,8 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0
       shadcn:
-        specifier: latest
-        version: 4.23.0
+        specifier: 4.22.1
+        version: 4.22.1(@cfworker/json-schema@4.1.1)
       sharp:
         specifier: ^0.35.5
         version: 0.35.5(@types/node@25.9.9)
@@ -421,20 +418,17 @@ importers:
         specifier: ^3.7.0
         version: 3.7.0
       tw-animate-css:
-        specifier: latest
+        specifier: 1.4.0
         version: 1.4.0
       undici:
-        specifier: 7.24.5
-        version: 7.24.5
+        specifier: 7.30.1
+        version: 7.30.1
       unstorage:
         specifier: 2.0.0-beta.0
         version: 2.0.0-beta.0
       use-intl:
         specifier: 4.14.9
         version: 4.14.9(@types/react@19.3.0)(react@19.3.1)
-      vaul:
-        specifier: ^1.1.2
-        version: 1.1.2(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       workflow:
         specifier: 5.2.3
         version: 5.2.3(@aws-sdk/credential-provider-web-identity@3.972.49)(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2))(reflect-metadata@0.2.2)(rxjs@7.8.2))(@opentelemetry/api@1.10.0)(@swc/cli@0.8.1(@swc/core@1.15.3(@swc/helpers@0.5.23))(chokidar@5.0.0))(@swc/core@1.15.3(@swc/helpers@0.5.23))(@swc/helpers@0.5.23)(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react@19.3.1)(typescript@5.9.3)(ws@8.22.0)
@@ -4513,8 +4507,8 @@ packages:
       react:
         optional: true
 
-  '@shadcn/registry@0.2.1':
-    resolution: {integrity: sha512-wMvZ3DGdnhCwtpeFbwKybSGfCcP52bZX77jMKgZvupmirgyA5KRLlkeQXkI2RGHIaD8TX2iWe2wcIEjjqzg2FQ==}
+  '@shadcn/registry@0.2.0':
+    resolution: {integrity: sha512-m3TeqU/+av2kgOLfESHkWzsmhuQuY4NXZd5Y1Rd4lzy4IX3JJ5+k2mYfkq6OT8oMuk2W4GQPAkO7+CC7KlpSbw==}
     engines: {node: '>=20.18.1'}
 
   '@shikijs/core@4.5.0':
@@ -6577,8 +6571,8 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
-  cn@0.5.2:
-    resolution: {integrity: sha512-wm10E6iuJ37rALOw3D+3cfaXXZSLNMh2uxpQn3dNICqfJM59yXqgbA9/9Iiz155j5kYNLdK6WreNdW3NQtx3OQ==}
+  cn@0.5.0:
+    resolution: {integrity: sha512-JGEixZEpfFXm1P5uXwvEobOFLlHwIWi5v4tjd1ZwfiYmcEilkuD2l+054rvJcYCR1B+uVThHeUbgmNz1FwuxuA==}
     engines: {node: '>=22'}
     hasBin: true
 
@@ -9297,8 +9291,8 @@ packages:
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
-  lucide-react@1.75.0:
-    resolution: {integrity: sha512-piesXAZIXru9d5lHBoM6cPHOBs5+QkMx+3EXwG3xWJ7qdViuz92JtYN0u9jMB6jt+2WbQrwhvJGdMwGnL3EOfA==}
+  lucide-react@1.60.0:
+    resolution: {integrity: sha512-UqxOW0FgAfDyb9VmjKb6/BkOzW6yfhf/QNboKtS2NDsscnNRW2CDzlyhbMKBQ1ontmcxuIDqHJ2AVgFR3NI+GA==}
     peerDependencies:
       '@types/react': '*'
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
@@ -11359,8 +11353,8 @@ packages:
     resolution: {integrity: sha512-TPbeg0b7ylrswdGCji8FRGFAKuqbpQlLbL8SOle3j1iHSs5Ob5mhvMAxWN2UItOjgALAB5Zp3fmMfj8mbWvXKw==}
     engines: {node: '>=10'}
 
-  shadcn@4.23.0:
-    resolution: {integrity: sha512-lKgq7QPFgkV/6EOrMCwvEn7ZAw/YnM/grhxzJmK4cZdw3E4F3Ut2EmWvrn2E+vzJp1y/76mxU185OSkXo9Ff+Q==}
+  shadcn@4.22.1:
+    resolution: {integrity: sha512-LbB4Lro+b0qSVki/tgL5edtKylEnXe1ppxMJC12d7NHPgaT+eSgJGMQULwP72V7X9tbiUq7xfx3VDAfB7jdGoA==}
     engines: {node: '>=20.18.1'}
     hasBin: true
 
@@ -11975,10 +11969,6 @@ packages:
     resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
     engines: {node: '>=18.17'}
 
-  undici@7.24.5:
-    resolution: {integrity: sha512-3IWdCpjgxp15CbJnsi/Y9TCDE7HWVN19j1hmzVhoAkY/+CJx449tVxT5wZc1Gwg8J+P0LWvzlBzxYRnHJ+1i7Q==}
-    engines: {node: '>=20.18.1'}
-
   undici@7.29.0:
     resolution: {integrity: sha512-IDxfleLmmbSskfWSUATiN1nfn2rDuvnMOqb5CWR92iIfojA0Ud+ulOAAEQ57LPr9rWmsreUyf5lwyao+7GNNVw==}
     engines: {node: '>=20.18.1'}
@@ -12174,12 +12164,6 @@ packages:
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
-
-  vaul@1.1.2:
-    resolution: {integrity: sha512-ZFkClGpWyI2WUQjdLJ/BaGuV6AVQiJ3uELGk3OYtP+B6yCO7Cmn9vPFXVJkRaGkOJu3m8bQMgtyzNHixULceQA==}
-    peerDependencies:
-      react: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
-      react-dom: ^16.8 || ^17.0 || ^18.0 || ^19.0.0 || ^19.0.0-rc
 
   vfile-location@5.0.3:
     resolution: {integrity: sha512-5yXvWDEgqeiYiBe1lbxYF7UMAIm/IcopxMHrMQDq3nvKcjPKIhZklUKL+AE7J7uApI4kwe2snsK+eI6UTj9EHg==}
@@ -12667,7 +12651,7 @@ snapshots:
       '@react-types/shared': 3.37.0(react@19.3.1)
       '@spectrum-icons/ui': 3.7.2(@adobe/react-spectrum@3.47.7(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@spectrum-icons/workflow': 4.3.2(@adobe/react-spectrum@3.47.7(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@swc/helpers': 0.5.23
+      '@swc/helpers': 0.5.15
       client-only: 0.0.1
       clsx: 2.1.1
       react: 19.3.1
@@ -12726,7 +12710,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
-      undici: 7.30.2
+      undici: 7.30.1
       zod: 4.6.7
 
   '@ai-sdk/provider-utils@5.0.65(zod@4.6.7)':
@@ -12735,7 +12719,7 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       '@workflow/serde': 4.1.0
       eventsource-parser: 3.1.1
-      undici: 7.30.0
+      undici: 7.30.1
       zod: 4.6.7
 
   '@ai-sdk/provider@4.0.28':
@@ -13635,11 +13619,11 @@ snapshots:
       '@composio/json-schema-to-zod': 0.4.0(zod@4.6.7)
       '@types/json-schema': 7.0.15
       is-fs-case-sensitive: 2.0.0
-      openai: 7.42.0(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.7)
+      openai: 7.42.0(@smithy/signature-v4@5.7.4)(undici@7.30.1)(ws@8.22.0)(zod@4.6.7)
       picocolors: 1.1.1
       pusher-js: 8.6.0
       semver: 7.8.5
-      undici: 7.30.0
+      undici: 7.30.1
       zod: 4.6.7
       zod-to-json-schema: 3.25.2(zod@4.6.7)
     transitivePeerDependencies:
@@ -13719,7 +13703,7 @@ snapshots:
       open: 8.4.2
       picomatch: 4.0.7
       systeminformation: 5.33.16
-      undici: 7.24.5
+      undici: 7.30.1
       which: 4.0.0
       yocto-spinner: 1.2.2
 
@@ -13766,7 +13750,7 @@ snapshots:
       semver: 7.8.5
       sumchecker: 3.0.1
     optionalDependencies:
-      undici: 7.24.5
+      undici: 7.30.1
     transitivePeerDependencies:
       - supports-color
 
@@ -14389,7 +14373,7 @@ snapshots:
       lightningcss: 1.33.0
       noxcturnal: 0.1.11
       picomatch: 4.0.7
-      postcss: 8.5.32
+      postcss: 8.5.31
       resolve-from: 5.0.0
     optionalDependencies:
       expo: 58.0.22(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.16)(expo-router@58.0.29)(react-dom@19.3.1(react@19.3.1))(react-native-web@0.21.4(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-native-worklets@0.13.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.1))(react@19.3.1))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.1))(react@19.3.1)(typescript@5.9.3)
@@ -14427,7 +14411,7 @@ snapshots:
       lightningcss: 1.33.0
       noxcturnal: 0.1.11
       picomatch: 4.0.7
-      postcss: 8.5.32
+      postcss: 8.5.31
       resolve-from: 5.0.0
     optionalDependencies:
       expo: 58.0.22(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.16)(expo-router@58.0.29)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
@@ -14888,11 +14872,11 @@ snapshots:
 
   '@internationalized/number@3.6.9':
     dependencies:
-      '@swc/helpers': 0.5.23
+      '@swc/helpers': 0.5.15
 
   '@internationalized/string@3.2.10':
     dependencies:
-      '@swc/helpers': 0.5.23
+      '@swc/helpers': 0.5.15
 
   '@isaacs/fs-minipass@4.0.1':
     dependencies:
@@ -16831,7 +16815,7 @@ snapshots:
       '@types/react': 19.3.0
       react: 19.3.1
 
-  '@shadcn/registry@0.2.1':
+  '@shadcn/registry@0.2.0':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/parser': 7.29.9
@@ -16854,7 +16838,7 @@ snapshots:
       stringify-object: 5.0.0
       tsconfig-paths: 4.2.0
       type-fest: 4.41.0
-      undici: 7.30.2
+      undici: 7.30.1
       zod: 4.6.7
     transitivePeerDependencies:
       - supports-color
@@ -17005,7 +16989,7 @@ snapshots:
       '@adobe/react-spectrum': 3.47.7(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@adobe/react-spectrum-ui': 1.2.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@babel/runtime': 7.29.10
-      '@swc/helpers': 0.5.23
+      '@swc/helpers': 0.5.15
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 
@@ -17013,7 +16997,7 @@ snapshots:
     dependencies:
       '@adobe/react-spectrum': 3.47.7(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@adobe/react-spectrum-workflow': 2.3.5(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      '@swc/helpers': 0.5.23
+      '@swc/helpers': 0.5.15
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
 
@@ -19470,7 +19454,7 @@ snapshots:
 
   cn@0.2.6: {}
 
-  cn@0.5.2: {}
+  cn@0.5.0: {}
 
   code-block-writer@13.0.3: {}
 
@@ -22355,7 +22339,7 @@ snapshots:
     dependencies:
       react: 19.3.1
 
-  lucide-react@1.75.0(@types/react@19.3.0)(react@19.3.1):
+  lucide-react@1.60.0(@types/react@19.3.0)(react@19.3.1):
     dependencies:
       react: 19.3.1
     optionalDependencies:
@@ -23718,10 +23702,10 @@ snapshots:
       is-docker: 2.2.1
       is-wsl: 2.2.0
 
-  openai@7.42.0(@smithy/signature-v4@5.7.4)(undici@7.30.0)(ws@8.22.0)(zod@4.6.7):
+  openai@7.42.0(@smithy/signature-v4@5.7.4)(undici@7.30.1)(ws@8.22.0)(zod@4.6.7):
     optionalDependencies:
       '@smithy/signature-v4': 5.7.4
-      undici: 7.30.0
+      undici: 7.30.1
       ws: 8.22.0
       zod: 4.6.7
 
@@ -24360,7 +24344,7 @@ snapshots:
       '@internationalized/date': 3.12.4
       '@internationalized/string': 3.2.10
       '@react-types/shared': 3.37.0(react@19.3.1)
-      '@swc/helpers': 0.5.23
+      '@swc/helpers': 0.5.15
       client-only: 0.0.1
       react: 19.3.1
       react-aria: 3.53.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -24374,7 +24358,7 @@ snapshots:
       '@internationalized/number': 3.6.9
       '@internationalized/string': 3.2.10
       '@react-types/shared': 3.37.0(react@19.3.1)
-      '@swc/helpers': 0.5.23
+      '@swc/helpers': 0.5.15
       aria-hidden: 1.2.6
       clsx: 2.1.1
       react: 19.3.1
@@ -24764,7 +24748,7 @@ snapshots:
       '@internationalized/number': 3.6.9
       '@internationalized/string': 3.2.10
       '@react-types/shared': 3.37.0(react@19.3.1)
-      '@swc/helpers': 0.5.23
+      '@swc/helpers': 0.5.15
       react: 19.3.1
       use-sync-external-store: 1.7.0(react@19.3.1)
 
@@ -25268,15 +25252,15 @@ snapshots:
 
   sf-symbols-typescript@2.2.0: {}
 
-  shadcn@4.23.0:
+  shadcn@4.22.1(@cfworker/json-schema@4.1.1):
     dependencies:
       '@babel/core': 7.29.7
       '@babel/parser': 7.29.9
       '@babel/plugin-transform-typescript': 7.29.9(@babel/core@7.29.7)
       '@babel/preset-typescript': 7.29.7(@babel/core@7.29.7)
       '@dotenvx/dotenvx': 1.75.1
-      '@modelcontextprotocol/server': 2.3.1
-      '@shadcn/registry': 0.2.1
+      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
+      '@shadcn/registry': 0.2.0
       '@types/validate-npm-package-name': 4.0.2
       browserslist: 4.29.4
       cn: 0.2.6
@@ -25291,7 +25275,7 @@ snapshots:
       kleur: 4.1.5
       open: 11.0.4
       ora: 8.2.0
-      postcss: 8.5.31
+      postcss: 8.5.32
       postcss-selector-parser: 7.1.7
       prompts: 2.4.2
       recast: 0.23.21
@@ -25299,10 +25283,11 @@ snapshots:
       stringify-object: 5.0.0
       ts-morph: 26.0.0
       tsconfig-paths: 4.2.0
-      undici: 7.30.2
+      undici: 7.30.1
       validate-npm-package-name: 7.0.2
       zod: 4.6.7
     transitivePeerDependencies:
+      - '@cfworker/json-schema'
       - babel-plugin-macros
       - supports-color
 
@@ -25955,8 +25940,6 @@ snapshots:
 
   undici@6.29.1: {}
 
-  undici@7.24.5: {}
-
   undici@7.29.0: {}
 
   undici@7.29.1: {}
@@ -26144,15 +26127,6 @@ snapshots:
   validate-npm-package-name@7.0.2: {}
 
   vary@1.1.2: {}
-
-  vaul@1.1.2(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
-    dependencies:
-      '@radix-ui/react-dialog': 1.3.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      react: 19.3.1
-      react-dom: 19.3.1(react@19.3.1)
-    transitivePeerDependencies:
-      - '@types/react'
-      - '@types/react-dom'
 
   vfile-location@5.0.3:
     dependencies:
