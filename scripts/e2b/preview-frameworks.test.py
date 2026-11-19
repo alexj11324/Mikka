@@ -13,6 +13,7 @@ import re
 import shutil
 import signal
 import socket
+import subprocess
 import tempfile
 import time
 import unittest
@@ -20,6 +21,7 @@ import unittest
 from aiohttp import ClientSession, DummyCookieJar, ClientTimeout, WSMsgType
 
 REPO = Path(__file__).resolve().parents[2]
+FIXTURE = REPO / 'scripts/e2b/fixtures/preview-frameworks'
 spec = importlib.util.spec_from_file_location('gateway', Path(__file__).with_name('preview-gateway.py'))
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -29,8 +31,20 @@ class FrameworkAcceptance(unittest.IsolatedAsyncioTestCase):
     async def check_framework(self, framework):
         with tempfile.TemporaryDirectory(prefix=f'mikka-preview-{framework}-') as temporary:
             root = Path(temporary)
-            (root / 'node_modules').symlink_to(REPO / 'node_modules', target_is_directory=True)
-            (root / 'package.json').write_text(json.dumps({'name': 'mikka-preview-fixture', 'private': True}))
+            # The fixed fixture owns these third-party frameworks. The product no
+            # longer ships Next, and this lockfile is what keeps the version this
+            # acceptance proves reproducible instead of borrowed from whatever the
+            # workspace happens to have installed. The sandbox acceptance scripts
+            # hand the same fixture to a real sandbox for the same reason.
+            for name in ('package.json', 'package-lock.json'):
+                shutil.copy(FIXTURE / name, root / name)
+            npm = shutil.which('npm')
+            self.assertIsNotNone(npm, 'npm is required to install the fixed framework fixture')
+            installed = subprocess.run([npm, 'ci', '--no-audit', '--no-fund'], cwd=root,
+                stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                env={'PATH': os.environ['PATH'], 'HOME': temporary, 'NO_COLOR': '1'})
+            self.assertEqual(installed.returncode, 0,
+                'The fixed framework fixture did not install:\n' + installed.stdout[-4000:])
             (root / 'authority').mkdir(mode=0o700)
             with socket.socket() as reserving:
                 reserving.bind(('127.0.0.1', 0))
@@ -41,15 +55,15 @@ class FrameworkAcceptance(unittest.IsolatedAsyncioTestCase):
                 (root / 'app/layout.jsx').write_text('export default function Layout({children}){return <html><body>{children}</body></html>}')
                 changed = root / 'app/page.jsx'
                 changed.write_text('export default function Page(){return <main>mikka-preview-next-v1</main>}')
-                command = [node, str(REPO / 'node_modules/next/dist/bin/next'), 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', str(port)]
+                command = [node, str(root / 'node_modules/next/dist/bin/next'), 'dev', '--webpack', '--hostname', '127.0.0.1', '--port', str(port)]
             else:
-                binaries = sorted((REPO / 'node_modules/.pnpm').glob('vite@*/node_modules/vite/bin/vite.js'))
-                if not binaries:
-                    self.fail('The frozen Vite dependency is required')
+                vite = root / 'node_modules/vite/bin/vite.js'
+                if not vite.exists():
+                    self.fail('The fixed fixture must install Vite')
                 (root / 'index.html').write_text('<main>mikka-preview-vite-v1</main><script type="module" src="/main.js"></script>')
                 changed = root / 'main.js'
                 changed.write_text('export const version = 1; if (import.meta.hot) import.meta.hot.accept();')
-                command = [node, str(binaries[0]), '--host', '127.0.0.1', '--port', str(port), '--strictPort']
+                command = [node, str(vite), '--host', '127.0.0.1', '--port', str(port), '--strictPort']
             process = await asyncio.create_subprocess_exec(*command, cwd=root, stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, start_new_session=True,
                 env={'PATH': os.environ['PATH'], 'HOME': temporary, 'NO_COLOR': '1'})
