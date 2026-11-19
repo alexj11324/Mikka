@@ -136,14 +136,15 @@ test('rejects stale DNS, rollback, a legacy gateway serving the same SHA, and cl
 test('Desktop binds its own original attempt, installer ancestry, overlay and serving gateway before publication', async () => {
   const installer = '9'.repeat(40)
   const run = { path: '.github/workflows/desktop-release.yml', head_sha: installer }
-  const env = { GITHUB_SHA: installer, MIKKA_UI_OVERLAY_SHA: overlay }
+  const env = { GITHUB_SHA: installer, MIKKA_DESKTOP_SOURCE: installer, MIKKA_UI_OVERLAY_SHA: overlay }
   const good = fixture({ env, run, elapsed: 5400000 })
   assert.deepEqual(await good.desktop(), { product, releasePin, overlay })
-  assert.ok(good.calls.some(path => path.includes('/compare/')))
+  assert.ok(good.calls.some(path => path.endsWith('/compare/' + installer + '...' + product)))
   await assert.rejects(good.verify(), /runIdentity/)
   const exact = fixture({ run: { ...run, head_sha: product } })
   assert.deepEqual(await exact.desktop(), { product, releasePin, overlay })
-  assert.ok(!exact.calls.some(path => path.includes('/compare/')))
+  // Built from the served commit itself: no installer ancestry comparison, only the served-on-main check.
+  assert.ok(!exact.calls.some(path => path.endsWith('...' + product)))
   for (const [change, code] of [
     [{ run: { ...run, path: workflow } }, 'runIdentity'],
     [{ run: { ...run, head_sha: product } }, 'runIdentity'],
@@ -153,14 +154,14 @@ test('Desktop binds its own original attempt, installer ancestry, overlay and se
     [{ env: { ...env, MIKKA_UI_OVERLAY_SHA: 'a'.repeat(40) } }, 'desktopOverlay'],
     [{ comparison: { merge_base_commit: { sha: product }, status: 'diverged', behind_by: 1 } }, 'desktopSource'],
     [{ comparison: { base_commit: { sha: product } } }, 'invalidCommitComparison'],
-    [{ main: installer }, 'mainChanged'],
+    [{ served: { status: 'diverged' } }, 'servedOnMain'],
     [{ headers: { 'x-vercel-id': 'old' } }, 'gatewayVersion'],
     [{ elapsed: 4 * 3600000 }, 'approvalWindow'],
   ]) await assert.rejects(fixture({ env, run, ...change }).desktop(), new RegExp(code))
   await assert.rejects(fixture({ run: { path: '.github/workflows/desktop-release.yml' } }).verify(), /runIdentity/)
 })
 
-test('the paid builder and subscriptions run only behind the Cloudflare receipt, with no Vercel publisher', () => {
+test('the paid builder and publication run only behind the Cloudflare receipt, with no Vercel publisher', () => {
   const read = name => readFileSync(new URL('../../.github/workflows/' + name, import.meta.url), 'utf8')
   const parent = read('e2b-official-runtime.yml'), child = read('e2b-runtime-release.yml')
   const gate = 'run: node scripts/release/cloudflare-promoted-web.mjs'
@@ -168,7 +169,7 @@ test('the paid builder and subscriptions run only behind the Cloudflare receipt,
   assert.ok(verify > parent.indexOf('  web-ready:') && verify < parent.indexOf('  release:'))
   assert.ok(trigger > parent.indexOf('  check:') && trigger < parent.indexOf('  web-ready:'))
   const paid = child.indexOf('    uses: ./.github/workflows/e2b-template.yml')
-  const proof = child.indexOf('run: node scripts/e2b/validate-template-subscriptions.mjs')
+  const proof = child.indexOf('run: cp "$RUNNER_TEMP/e2b-candidates/candidates.json" "$RUNNER_TEMP/accepted.json"')
   const first = child.indexOf(gate), second = child.indexOf(gate, first + 1), third = child.indexOf(gate, second + 1)
   assert.ok(first >= 0 && first < paid && paid < second && second < proof && proof < third && third < child.indexOf('--publish-verified'))
   assert.match(child, /id: release[\s\S]*node scripts\/e2b\/runtime-report\.mjs reference\n          node scripts\/release\/cloudflare-promoted-web\.mjs/)
@@ -228,8 +229,11 @@ test('a successful gateway observation that serves current main starts both rele
 
   const started = fixture({ observation, event, env })
   assert.deepEqual(await started.trigger(workflow), { ready:true, receipt:'actions:99:1', product,
-    reason:'Cloudflare serves current main ' + product })
+    reason:'Cloudflare serves ' + product + ' on main' })
   assert.equal((await fixture({ observation, event, env }).trigger(desktop)).ready, true)
+  // Desktop builds the served commit: a later merge to main does not hold it back; a commit off main does.
+  assert.equal((await fixture({ observation, event, env, main:'a'.repeat(40) }).trigger(desktop)).ready, true)
+  assert.equal((await fixture({ observation, event, env, served:{ status:'diverged' } }).trigger(desktop)).ready, false)
 
   // The started consumer verifies exactly that observation, under its own workflow_run identity.
   const chainedEnv = { ...env, CLOUDFLARE_RECEIPT:'actions:99:1' }, consumer = { actor, triggering_actor:actor, event:'workflow_run' }
@@ -247,6 +251,7 @@ test('a successful gateway observation that serves current main starts both rele
     [{ event:{ workflow_run:{ ...run, path:'.github/workflows/other.yml' } } }, /not a successful Cloudflare deployment/],
     [{ env:{ ...env, GITHUB_EVENT_NAME:'push' } }, /not a successful Cloudflare deployment/],
     [{ observation:{ run, jobs:{ total_count:1, jobs:[jobs.jobs[0]] } } }, /does not change what is served/],
+    [{ observation:{ run, jobs:{ total_count:2, jobs:[jobs.jobs[0], { ...jobs.jobs[1], name:'Serving release ${{ needs.deploy-application.outputs.serving-release }}', conclusion:'skipped' }] } } }, /does not change what is served/],
     [{ main:'a'.repeat(40) }, /but main is a{40}/],
     [{ env:{ ...env, GITHUB_SHA:'a'.repeat(40) } }, /but main is/],
   ]) {

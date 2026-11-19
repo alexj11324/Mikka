@@ -19,13 +19,14 @@ type LockIssue = Pick<Issue, 'id' | 'userId' | 'workspaceId' | 'ownershipState' 
 type IssueAccess<T = Issue> = { issue: T; teamId: string | null }
 type RequestIssueAccess<T = Issue> = IssueAccess<T> & { user: Awaited<ReturnType<typeof requireUser>> }
 
+// The canonical home is lib/acting-user.ts, which owns actAs and the request-log
+// attribution. The import stays dynamic on purpose: explicit-user readers
+// (including verified webhooks) must not initialize session/OAuth state merely
+// by importing this module. This wrapper must also be a real function rather
+// than `export { requireUser } from …`, because this module calls it below.
 export async function requireUser() {
-  // Explicit-user readers (including verified webhooks) do not need to
-  // initialize session/OAuth state merely by importing this module.
-  const { currentUser } = await import('@/lib/acting-user')
-  const user = await currentUser()
-  if (!user) throw new ActionFailureError('authRequired')
-  return user
+  const { requireUser: canonical } = await import('@/lib/acting-user')
+  return canonical()
 }
 
 export async function requireIssueAccess(id: string, includeDeleted = false) {

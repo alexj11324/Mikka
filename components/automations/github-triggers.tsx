@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Plus, X } from 'lucide-react'
+import { Plus, X } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -25,7 +25,7 @@ export function GitHubTriggers({ workspaceId, userId, value, onChange, repositor
       const choices = trigger.repositories.length === 1 && !repositories.includes(trigger.repositories[0]!) ? [trigger.repositories[0]!, ...repositories] : repositories
       return <div key={index} role="group" aria-label={t('item', { number: index + 1 })} className="flex flex-col gap-2 rounded-xl bg-muted/40 p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <NativeSelect aria-label={t('event')} value={trigger.event} disabled={disabled} onChange={event => {
+          <NativeSelect size="sm" aria-label={t('event')} value={trigger.event} disabled={disabled} onChange={event => {
             const next = event.target.value as GitHubTriggerEvent
             update(index, { event: next, ...(supportsPullAuthors(next) ? {} : { pullAuthors: '' }) })
           }}>
@@ -33,7 +33,7 @@ export function GitHubTriggers({ workspaceId, userId, value, onChange, repositor
           </NativeSelect>
           {trigger.repositories.length > 1
             ? <span className="text-sm text-muted-foreground">{trigger.repositories.map(repositoryName).join(', ')}</span>
-            : <NativeSelect aria-label={t('repository')} value={trigger.repositories[0] ?? ''} disabled={disabled} onChange={event => update(index, { repositories: event.target.value ? [event.target.value] : [] })}>
+            : <NativeSelect size="sm" aria-label={t('repository')} value={trigger.repositories[0] ?? ''} disabled={disabled} onChange={event => update(index, { repositories: event.target.value ? [event.target.value] : [] })}>
               <NativeSelectOption value="" disabled>{t('repository')}</NativeSelectOption>
               {choices.map(key => <NativeSelectOption key={key} value={key}>{repositoryName(key)}</NativeSelectOption>)}
             </NativeSelect>}

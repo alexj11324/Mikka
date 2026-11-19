@@ -3,18 +3,22 @@ import { type ReactElement, type ReactNode, useEffect, useMemo, useRef, useState
 import { FlatList, Image, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import * as WebBrowser from 'expo-web-browser'
 import { Puzzle } from 'lucide-react-native'
-import { SourceIcon, Spinner } from '@/components/icons'
+import { SourceIcon } from '@/components/icons'
 import { NavBar, underBar } from '@/components/NavBar'
 import { Segmented } from '@/components/Segmented'
 import { Symbol } from '@/components/Symbol'
 import { Text } from '@/components/Text'
 import { api } from '@/lib/api'
+import { mobileMessages } from '@/lib/messages'
 import { usePluginConnections } from '../use-plugin-connections'
 import type { SkillsPage, StoreCatalog } from '@/lib/types'
 import { useApi, useRefresh } from '@/lib/useApi'
 import { openOnWeb } from '@/lib/web'
 import { colors, GROUP_INSET } from '@/lib/theme'
+import { EmptyState, ListLoading } from '@/shared/components/empty-state'
 import { ListSectionHeader } from '@/shared/components/list-section'
+
+const copy = mobileMessages.Plugins
 
 type Tab = 'apps' | 'skills'
 type Entry = { id: string; name: string; description: string; iconUrl: string | null; own?: boolean }
@@ -42,7 +46,7 @@ export function PluginsScreen() {
   const [query, setQuery] = useState('')
   return (
     <View style={styles.screen}>
-      <NavBar title="插件" large search={{ placeholder: tab === 'apps' ? '搜索应用' : '搜索技能', onChange: setQuery }} />
+      <NavBar title={copy.title} large search={{ placeholder: tab === 'apps' ? copy.searchAppsPlaceholder : copy.searchPlaceholder, onChange: setQuery }} />
       {tab === 'apps' ? <Apps query={query} header={<Header tab={tab} setTab={setTab} />} />
         : <Skills query={query} header={<Header tab={tab} setTab={setTab} />} />}
     </View>
@@ -52,7 +56,7 @@ export function PluginsScreen() {
 function Header({ tab, setTab }: { tab: Tab; setTab: (tab: Tab) => void }) {
   return (
     <View style={styles.header}>
-      <Segmented options={[{ value: 'apps', label: '应用' }, { value: 'skills', label: '技能' }]} value={tab} onChange={setTab} />
+      <Segmented options={[{ value: 'apps', label: copy.appsTab }, { value: 'skills', label: copy.skillsTab }]} value={tab} onChange={setTab} />
     </View>
   )
 }
@@ -66,12 +70,12 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
   const stateText = (entry: Entry) => {
     if (connected.has(entry.id)) {
       const state = connections.snapshot?.states?.[entry.id]
-      if (state === 'needsReconnect') return '需要重新连接'
-      if (state === 'paused') return '已暂停'
-      return state === 'active' ? '已连接' : '已关联，状态未知'
+      if (state === 'needsReconnect') return copy.state.needsReconnect
+      if (state === 'paused') return copy.state.paused
+      return state === 'active' ? copy.state.connected : copy.state.unknown
     }
-    if (connections.snapshot?.paused?.includes(entry.id)) return '同步已暂停'
-    if (connections.error && (!connections.snapshot || connections.snapshot.failed.some(failure => failure.source === (entry.own ? entry.id : 'composio')))) return '连接状态未知'
+    if (connections.snapshot?.paused?.includes(entry.id)) return copy.state.syncPaused
+    if (connections.error && (!connections.snapshot || connections.snapshot.failed.some(failure => failure.source === (entry.own ? entry.id : 'composio')))) return copy.state.statusUnknown
     return null
   }
   const byId = new Map<string, Entry>([...OWN, ...(catalog.data?.apps ?? [])].map(app => [app.id, app]))
@@ -85,9 +89,9 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
     }
     const mine: Entry[] = [...connected].map(id => byId.get(id) ?? { id, name: id, description: '', iconUrl: null })
     return [
-      { title: '已连接', items: mine },
-      { title: '热门', items: [...OWN, ...entries(catalog.data?.popular ?? [])].filter(app => !connected.has(app.id)) },
-      { title: '新品推荐', items: entries(catalog.data?.latest ?? []).filter(app => !connected.has(app.id)) },
+      { title: copy.state.connected, items: mine },
+      { title: copy.popular, items: [...OWN, ...entries(catalog.data?.popular ?? [])].filter(app => !connected.has(app.id)) },
+      { title: copy.latest, items: entries(catalog.data?.latest ?? []).filter(app => !connected.has(app.id)) },
       // Every other app, in Composio's own categories (as the web store): the whole live catalogue, not only its top.
       ...(catalog.data?.categories ?? []).map(category => ({ title: category.name, items: entries(category.apps).filter(app => !connected.has(app.id)) })),
     ].filter(section => section.items.length)
@@ -111,15 +115,16 @@ function Apps({ query, header }: { query: string; header: ReactElement }) {
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl {...refresh} />}
-      ListHeaderComponent={<>{header}<ReadNotice error={catalog.error || connections.error} hasData={catalog.error ? Boolean(catalog.data) : connections.hasRetainedData} label={catalog.error ? "应用目录" : connections.noticeLabel} onRetry={reload} /></>}
+      ListHeaderComponent={<>{header}<ReadNotice error={catalog.error || connections.error} hasData={catalog.error ? Boolean(catalog.data) : connections.hasRetainedData} label={catalog.error ? copy.storeDirectory : connections.noticeLabel} onRetry={reload} /></>}
       contentContainerStyle={styles.list}
-      ListEmptyComponent={catalog.loading ? <View style={styles.center}><Spinner /></View>
-        : <Text style={styles.note}>{catalog.error ? '应用加载失败' : needle ? `没有找到「${query.trim()}」` : catalog.data?.configured === false ? '应用商店未配置' : '没有应用'}</Text>}
+      ListEmptyComponent={catalog.loading ? <ListLoading />
+        : <EmptyState icon={<Puzzle size={20} color={colors.secondary} strokeWidth={1.8} />}
+          title={catalog.error ? copy.storeLoadFailed : needle ? copy.noAppsForQuery.replace('{query}', query.trim()) : catalog.data?.configured === false ? copy.storeNotConfigured : copy.noAppsYet} />}
       renderItem={({ item: row }) => 'title' in row ? <ListSectionHeader title={row.title} grouped /> : (
-        <GroupRow place={row.place} label={[row.item.name, stateText(row.item)].filter(Boolean).join('，')} onPress={() => void open(row.item.id)}>
+        <GroupRow place={row.place} label={[row.item.name, stateText(row.item)].filter(Boolean).join(mobileMessages.Workspace.activity.separator)} onPress={() => void open(row.item.id)}>
           <AppIcon entry={row.item} />
           <Text style={styles.name} numberOfLines={1}>{row.item.name}</Text>
-          {stateText(row.item) === '已连接' ? <View style={styles.connected} /> : stateText(row.item) ? <Text style={styles.state}>{stateText(row.item)}</Text> : null}
+          {stateText(row.item) === copy.state.connected ? <View style={styles.connected} /> : stateText(row.item) ? <Text style={styles.state}>{stateText(row.item)}</Text> : null}
           <Symbol name="chevron.right" size={13} color={colors.tertiary} />
         </GroupRow>
       )}
@@ -184,19 +189,20 @@ function Skills({ query, header }: { query: string; header: ReactElement }) {
       keyboardDismissMode="on-drag"
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl {...refresh} />}
-      ListHeaderComponent={<>{header}<ReadNotice error={failed} hasData={pages.length > 0} label="技能" onRetry={() => load(failedPage.current)} /></>}
+      ListHeaderComponent={<>{header}<ReadNotice error={failed} hasData={pages.length > 0} label={copy.skillsTab} onRetry={() => load(failedPage.current)} /></>}
       contentContainerStyle={styles.list}
       onEndReachedThreshold={0.6}
       onEndReached={() => { if (hasMore && !loading && !failed) void load(pages.length) }}
-      ListFooterComponent={loading && skills.length ? <View style={styles.center}><Spinner /></View> : undefined}
-      ListEmptyComponent={loading ? <View style={styles.center}><Spinner /></View>
-        : failed ? undefined : <Text style={styles.note}>{debounced.length === 1 ? '再多输入一个字' : debounced ? `没有找到「${debounced}」` : '没有技能'}</Text>}
+      ListFooterComponent={loading && skills.length ? <ListLoading /> : undefined}
+      ListEmptyComponent={loading ? <ListLoading />
+        : failed ? undefined : <EmptyState icon={<Puzzle size={20} color={colors.secondary} strokeWidth={1.8} />}
+          title={debounced.length === 1 ? copy.typeMore : debounced ? copy.noSkillsForQuery.replace('{query}', debounced) : copy.noSkillsYet} />}
       renderItem={({ item, index }) => (
         <GroupRow place={place(index, skills.length)} label={item.name} onPress={() => void WebBrowser.openBrowserAsync(item.url)}>
           <View style={[styles.icon, styles.iconBlank]}><Symbol name="sparkles" size={16} color={colors.secondary} web={<Puzzle size={16} color={colors.secondary} />} /></View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
-            <Text style={styles.detail} numberOfLines={1}>{item.source} · {item.installs.toLocaleString()} 次安装</Text>
+            <Text style={styles.detail} numberOfLines={1}>{item.source} · {copy.installCount.replace('{count}', item.installs.toLocaleString())}</Text>
           </View>
           <Symbol name="arrow.up.right" size={12} color={colors.tertiary} />
         </GroupRow>
@@ -219,6 +225,4 @@ const styles = StyleSheet.create({
   detail: { fontSize: 13, color: colors.secondary, marginTop: 2 },
   state: { fontSize: 14, color: colors.secondary },
   connected: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success },
-  center: { paddingVertical: 32, alignItems: 'center' },
-  note: { textAlign: 'center', color: colors.secondary, marginTop: 32, fontSize: 15 },
 })

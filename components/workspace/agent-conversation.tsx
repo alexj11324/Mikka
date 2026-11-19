@@ -2,7 +2,7 @@
 
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { Fragment, type ReactNode } from 'react'
-import { User } from 'lucide-react'
+import { User } from '@/components/icons'
 import { MessageBubble, MessageBubbleContent } from '@/components/agents/message-bubble'
 import { Message, MessageAvatar, MessageContent, MessageFooter, MessageGroup, MessageHeader } from '@/components/agents/message'
 import { MessageScroller } from '@/components/agents/message-scroller'

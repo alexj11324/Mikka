@@ -2,6 +2,10 @@ import type { CancelledAutomationRun, WebhookBatch, WebhookBatchClosure } from '
 import { isDeepStrictEqual } from 'node:util'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import { sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { issues } from '../db/schema'
+import { issueVisibilityPredicate } from '../issue-visibility-policy'
 import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type DispatchTask, type EventTrigger, type ScheduledRead } from './contract'
 import { describeGitHubEvent, triggerMatches, type GitHubAutomationEvent } from './github-events'
 import { describeLinearEvent, linearTriggerMatches, type LinearAutomationEvent } from './linear-events'
@@ -235,9 +239,20 @@ export class ScheduleStore {
             nextCursor: rows.length > limit ? page[limit-1]!.page_cursor : null,
           }
         }
-        const seen=await tx.query(`SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,result,error,trigger,started_at,finished_at,reported_at,
-          (${cancellableRun} AND version=$2) AS can_cancel
-          FROM schedule_occurrences WHERE schedule_id=$1 ORDER BY due_at DESC LIMIT 100`,[row.id,row.version])
+        // A run remains part of its Workspace's history when the Task it
+        // produced or read changes audience. Its stored Task snapshot follows
+        // the current content ACL, including for the schedule creator/admin.
+        const taskVisible = issueVisibilityPredicate(actor.ownerId, { allowedIds: [], workspaceIds: row.workspace_id ? [row.workspace_id] : [] })
+        const result = privileged ? sql`CASE
+          WHEN o.definition#>>'{task,kind}' NOT IN ('dispatch_task','issue_snapshot') THEN o.result
+          WHEN EXISTS (SELECT 1 FROM ${issues} WHERE ${issues.id}=CASE
+            WHEN pg_input_is_valid(o.result->>'id','uuid') THEN (o.result->>'id')::uuid END
+            AND ${taskVisible}) THEN o.result
+          END` : sql`NULL`
+        const seen = await drizzle(tx).execute(sql`SELECT id,schedule_id,operation_id,event_id,version,due_at,status,attempts,
+          ${result} AS result,error,trigger,started_at,finished_at,reported_at,
+          (${sql.raw(cancellableRun)} AND version=${row.version}) AS can_cancel
+          FROM schedule_occurrences o WHERE schedule_id=${row.id} ORDER BY due_at DESC LIMIT 100`)
         return {occurrences:privileged?seen.rows:seen.rows.map(o=>({...o,operation_id:null,event_id:null,result:null,error:null,trigger:null,can_cancel:false}))}
       }
       if(cmd.action==='cancel_run'){

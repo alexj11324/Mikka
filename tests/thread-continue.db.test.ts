@@ -54,7 +54,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query('DELETE FROM account WHERE "userId" = ANY($1)', [users])
     await Promise.all([pool.end(), appPool.end(), workspacePool.end()])
   })
-  const person = async () => {
+  const person = async (registerTask = false) => {
     const id = await seedUser(pool, 'thread-continue')
     users.push(id)
     const githubAccountId = String(++githubAccount)
@@ -69,11 +69,11 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota) VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'synthetic-subject',$6,$7)`,
       [connection, id, ws.id, `synthetic-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .2, resetsAt: null }] })])
     await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), id, ws.id, connection])
-    const issueId = await seedIssue(pool, id, ws.id)
+    const issueId = await seedIssue(pool, id, ws.id, { registered: registerTask })
     await pool.query(`UPDATE issues SET content=$2::jsonb WHERE id=$1`, [issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 2000 + users.length } } })])
     // A computer that takes part (参与调度) and runs gpt-5.
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'MacBook','local','laptop',true,now(),$3)`, [deviceId, id, JSON.stringify(mac)])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'MacBook','local','laptop',true,now(),$3,now())`, [deviceId, id, JSON.stringify(mac)])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), id, deviceId, `codex-${deviceId.slice(0, 8)}`])
     const botId = await chatBotId(id, null, ws.id)
     return { id, issueId, botId, ws, connection, deviceId }
@@ -98,12 +98,12 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   }
 
   const a = await person()
-  const first = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
+  const first = await steps.dispatchRun(a.id, { model: { harness: 'codex' as const }, issueId: a.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, a.botId) as unknown as { runId: string; thread: string }
   assert.equal(first.thread, 'new', JSON.stringify(first))
 
   await t.test('explicit interrupt fences exactly the selected live attempt and survives a lost owner acknowledgement', async () => {
     const owner = await person()
-    const initial = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
     const run = initial.runId, requestId = randomUUID(), text = 'Stop this attempt and use the revised target.'
     await pool.query("UPDATE agent_runs SET status='running' WHERE id=$1", [run])
     const { threadDeliveryView } = await import('../lib/thread-delivery-queue')
@@ -152,7 +152,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('a supported continuation freezes the selected model and subscription, including across a lost acknowledgement', async () => {
     const b = await person()
-    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: 'picked:' + randomUUID() }, undefined, b.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: 'picked:' + randomUUID() }, undefined, b.botId) as unknown as { runId: string }
     const second = 'gpt-5.1', id = randomUUID()
     const choice = { model: second, source: { kind: 'subscription' as const, connectionId: b.connection } }
     const { threadModelMenu } = await import('../lib/thread-model-menu')
@@ -181,7 +181,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   await t.test('a dispatch records its entry and a person continuation is an app entry', async () => {
     const c = await person()
     const originRef = { kind: 'telegram' as const, chatId: '42', messageId: 7 }
-    const initial = await steps.dispatchRun(c.id, {
+    const initial = await steps.dispatchRun(c.id, { model: { harness: 'codex' as const },
       issueId: c.issueId, repo: 'octo/repo', requestKey: `origin:${randomUUID()}`, origin: 'telegram', originRef,
     }, undefined, c.botId) as unknown as { runId: string }
     const [stored] = (await pool.query('SELECT origin,"originRef" FROM agent_runs WHERE id=$1', [initial.runId])).rows
@@ -195,7 +195,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('a lost reply and concurrent retries reuse one owner submission, epoch, run and message', async () => {
     const b = await person()
-    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `submission:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `submission:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     await end(initial.runId, 'succeeded')
     const requestId = randomUUID(), text = 'Continue with exactly 74 bytes; this is one submitted request.'
     const accepted = await sendThreadMessage(b.id, initial.runId, text, 'user', requestId)
@@ -220,7 +220,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await assert.rejects(sendThreadMessage(b.id, initial.runId, 'Changed payload.', 'user', requestId), { code: 'submissionConflict' })
     const otherIssue = await seedIssue(pool, b.id, b.ws.id)
     await pool.query('UPDATE issues SET content=$2::jsonb WHERE id=$1', [otherIssue, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 9000 + users.length } } })])
-    const other = await steps.dispatchRun(b.id, { issueId: otherIssue, repo: 'octo/repo', requestKey: `other:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const other = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: otherIssue, repo: 'octo/repo', requestKey: `other:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     assert.ok(other.runId, JSON.stringify(other))
     await assert.rejects(sendThreadMessage(b.id, other.runId, text, 'user', requestId), { code: 'submissionConflict' })
     const nextId = randomUUID()
@@ -280,7 +280,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
         await finishQuestionWake(pool, actor, runId, intent, workflowId, false)
         return workflowId
       })
-      const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `question:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+      const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `question:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
       assert.ok(initial.runId, JSON.stringify(initial))
       const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
       // Preserve the historical personal task path with its null Bot scope.
@@ -302,8 +302,8 @@ test('a message to an ended thread runs it again in the same thread; only its ow
         subscription: { id: originRun.agentDefinition.subscription.bindingId,
           modelId: originRun.agentDefinition.subscription.modelId, route: originRun.agentDefinition.subscription.route },
       })
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses)
-        VALUES ($1,$2,'Question task VM','cloud',true,now(),$3)`, [childDevice, b.id, JSON.stringify(mac)])
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt")
+        VALUES ($1,$2,'Question task VM','cloud',true,now(),$3,now())`, [childDevice, b.id, JSON.stringify(mac)])
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch")
         VALUES ($1,$2,$3,$4,NULL,'main')`, [childRepo, childDevice, b.id, `/isolated/question-${initial.runId}`])
       await pool.query('UPDATE agent_runs SET "deviceId"=$2,"deviceRepoId"=$3,"agentDefinition"=$4,"baseBranch"=\'main\' WHERE id=$1',
@@ -547,7 +547,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   await t.test('working thread queue persists owner input, fences cancellation and dispatches once after completion', async () => {
     const { cancelQueuedThreadReply, deliverQueuedThreadReply, threadDeliveryView } = await import('../lib/thread-delivery-queue')
     const owner = await person()
-    const initial = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
     const run = initial.runId
     const push = (text: string, id = randomUUID()) => sendThreadMessage(owner.id, run, text, 'user', id, 'queue')
     const req = randomUUID()
@@ -579,7 +579,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('native steer requires current device support and exposes refused or acknowledged delivery on that same device', async () => {
     const owner = await person()
-    const initial = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
     const run = initial.runId
     const { rows: [row] } = await pool.query(`UPDATE agent_runs SET status='running',"agentDefinition"=coalesce("agentDefinition",'{}'::jsonb)||'{"harness":"codex"}'::jsonb WHERE id=$1 RETURNING "deviceId"`,[run])
     const { threadDeliveryView } = await import('../lib/thread-delivery-queue')
@@ -609,7 +609,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
   await t.test('editing and rerunning preserve original output, bind the new run before claim and switch without dispatch', async () => {
     const { createReplyVersion,readReplyVersions } = await import('../lib/thread-reply-versions')
     const owner=await person()
-    const initial=await steps.dispatchRun(owner.id,{issueId:owner.issueId,repo:'octo/repo',requestKey:`dispatch:${randomUUID()}`},undefined,owner.botId) as unknown as {runId:string}
+    const initial=await steps.dispatchRun(owner.id,{ model: { harness: 'codex' as const },issueId:owner.issueId,repo:'octo/repo',requestKey:`dispatch:${randomUUID()}`},undefined,owner.botId) as unknown as {runId:string}
     const run=initial.runId, anchor=randomUUID()
     await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,origin,"deliveredAt","createdAt") VALUES($1,$2,$3,'Original instructions.','owner',now(),now()-interval '2 minutes')`,[anchor,run,owner.id])
     await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES($1,$2,1,'{"type":"text-delta","id":"answer1","delta":"Original answer."}',now()-interval '1 minute')`,[randomUUID(),run])
@@ -660,7 +660,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('concurrent immediate and queued requests with the same ID commit one intent', async () => {
     const owner = await person()
-    const initial = await steps.dispatchRun(owner.id, { issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
     const requestId = randomUUID(), text = 'Same client request from two windows.'
     const results = await Promise.allSettled([
       sendThreadMessage(owner.id, initial.runId, text, 'user', requestId, 'queue'),
@@ -743,7 +743,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('ordinary text cannot cancel a blocked original-session task or queue a fresh continuation', async () => {
     const b = await person()
-    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `strict:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `strict:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
     const failedId = randomUUID(), failedAttemptId = randomUUID(), questionId = randomUUID(), originalSession = `original:${initial.runId}`
     const continuation = { questionId, originRunId: initial.runId, originSessionId: originalSession, followUp: 'Previously answered question', requireSessionResume: true }
@@ -782,7 +782,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const { latestTaskRun } = await import('../lib/thread-dispatch')
     const fixture = async (executeCount: number, atExecution = false, legacyReview = false) => {
       const b = await person()
-      const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `budget:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+      const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `budget:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
       assert.ok(initial.runId, JSON.stringify(initial))
       const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
       if (legacyReview) {
@@ -947,7 +947,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.equal(Buffer.byteLength(newText), 74)
     const body = { type: 'doc', attrs: { mikka: { number: 4400 } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Initial exact 53-byte file: ' + JSON.stringify(oldText) }] }] }
     await pool.query('UPDATE issues SET content=$2 WHERE id=$1', [b.issueId, JSON.stringify(body)])
-    const initial = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `first:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `first:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     const oldTask = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [initial.runId])).rows[0]
     const oldCandidateId = randomUUID()
     // A synthetic accepted ledger is the immutable first-epoch fixture. Only
@@ -1085,7 +1085,7 @@ test('a message to an ended thread runs it again in the same thread; only its ow
 
   await t.test('a thread another thread replaced cannot run again', async () => {
     const b = await person()
-    const old = await steps.dispatchRun(b.id, { issueId: b.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
+    const old = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
     await end(old.runId, 'succeeded')
     // A newer thread on the same task (the person asked for a new one).
     const newer = randomUUID()
@@ -1093,4 +1093,19 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     await pool.query(`UPDATE agent_runs SET "threadReplacedBy"=$1 WHERE id=$2`, [newer, old.runId])
     await assert.rejects(sendThreadMessage(b.id, old.runId, 'Again.'), { code: 'threadReplaced' })
   })
+  await t.test('a scheduled occurrence resumes its completed standing thread once and replays the same Run', async () => {
+    const owner = await person(true)
+    const original = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    await end(original.runId, 'succeeded')
+    await observeFixtureAllowance(owner)
+    const { continueStandingTask } = await import('../lib/schedules/standing-task')
+    const occurrence = randomUUID()
+    const send = () => continueStandingTask(owner.id, owner.ws.id, owner.issueId, 'Continue the completed standing Task.', occurrence)
+    const first = await send()
+    assert.notEqual(first.runId, original.runId)
+    assert.deepEqual(await send(), first)
+    const { rows } = await pool.query('SELECT id,status,"continuesRunId" FROM agent_runs WHERE "issueId"=$1 AND "continuesRunId"=$2', [owner.issueId, original.runId])
+    assert.deepEqual(rows, [{ id: first.runId, status: 'queued', continuesRunId: original.runId }])
+  })
+
 })

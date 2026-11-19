@@ -50,7 +50,7 @@ export function verifyConfiguration(env) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  if (!process.version.startsWith('v24.')) throw new Error('CLOUDFLARE_API_NODE24_REQUIRED')
+  if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('CLOUDFLARE_API_NODE22_REQUIRED')
   const evidence = JSON.parse(await readFile('mikka-build.json', 'utf8'))
   verifyBusinessWorld(evidence, await readFile('world-business.mjs'))
   if (process.argv[2] === 'verify-image') {

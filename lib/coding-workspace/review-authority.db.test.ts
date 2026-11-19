@@ -41,7 +41,7 @@ test('task review: current owner, session, tenant and immutable physical checkou
     const botId = await seedBot(pool, workspaceId, userId), agentId = await seedAgent(pool, userId)
     const deviceId = randomUUID(), repoId = randomUUID(), deviceTokenId = randomUUID(), runId = randomUUID()
     const remoteKey = 'v2/github.com/mikka-ci/review-fixture', sandboxId = sponsored ? 'a'.repeat(64) : `synthetic-${randomUUID()}`, worktreePath = sponsored ? `/workspace/worktrees/${runId}` : `/home/user/.mikka/worktrees/${runId}`
-    await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt") VALUES($1,$2,\'Review fixture\',\'cloud\',true,now())', [deviceId, userId])
+    await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt","sessionOpenedAt") VALUES($1,$2,\'Review fixture\',\'cloud\',true,now(),now())', [deviceId, userId])
     await pool.query('INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl") VALUES($1,$2,$3,$4,\'https://github.com/mikka-ci/review-fixture.git\')', [repoId, deviceId, userId, remoteKey])
     await pool.query('INSERT INTO device_tokens(id,"userId","tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES($1::uuid,$2,$1::text,$3,$4,now()+interval \'1 hour\')', [deviceTokenId, userId, deviceId, workspaceId])
     const definition = { executionIdentity:{workspaceId, ...(sponsored ? {billingAccount:{runtime:{kind:'cloudflare_sponsored'}}} : {})},

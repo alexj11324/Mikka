@@ -33,7 +33,7 @@
 | **Machine (电脑)** | Where an Agent runs: **Mikka Cloud** (a sandbox on the run owner's own E2B key) or a **device** (a personal computer running the desktop app, or a server running the daemon). Both are **runners** with one contract (§3). |
 | **Mikka Cloud** | The cloud machine. It is a **machine**, never a model. Mikka hosts no sandbox of its own. |
 | **Environment** | Where the task executes. Its own cloud VM can be retained across authorized attempts; local runs keep their task worktree (§5). |
-| **Lease** | A machine's time-limited claim on a run, renewed by heartbeat (ADR 0012). |
+| **Lease** | A machine's claim on a run. It lasts as long as the device session that claimed it and ends when that session closes (ADR 0012, [decision 2026-11-17-2215](decisions/2026-11-17-2215-device-session-no-heartbeat.md)). |
 
 Never write 「Mikka Cloud」 for the hosted model, and never write
 「Mikka 默认」 for the machine.
@@ -48,11 +48,8 @@ section), the machine (§4) and concurrency (§5).
 flowchart TD
   start([New run: bot B, owner O, workspace W]) --> own{One of O's credentials<br/>valid, and allowed in W?}
   own -- yes --> mine[Use O's credential]
-  own -- no --> share{Another member's credential<br/>shared in W with 分享给团队成员?<br/>Claude first}
-  share -- yes --> other[Use that share]
-  share -- no --> hosted[Mikka 默认<br/>W's credits]
+  own -- no --> hosted[Mikka 默认<br/>W's credits]
   mine --> freeze[[Frozen for the whole run]]
-  other --> freeze
   hosted --> freeze
 ```
 
@@ -61,9 +58,9 @@ flowchart TD
    belongs to, with no switch and no admin limit ([2026-11-01-2240-own-credentials-always-usable](decisions/2026-11-01-2240-own-credentials-always-usable.md)). If several qualify, the bot's saved choice wins;
    after that a subscription comes before an API key, and Claude comes before
    ChatGPT/Codex.
-2. **Otherwise another member's credential** shared in this workspace with
-   「分享给团队成员」 ticked, Claude first.
-3. **Otherwise Mikka 默认**, through the usual hosted admission (§7).
+2. **Otherwise Mikka 默认**, through the usual hosted admission (§7). A
+   subscription serves its owner only; no other member's subscription is ever
+   used ([2026-11-17-1400-subscriptions-owner-only](decisions/2026-11-17-1400-subscriptions-owner-only.md)).
 
 Rules that hold everywhere:
 
@@ -71,8 +68,7 @@ Rules that hold everywhere:
   credential gets Mikka 默认.
 - **No switch mid-run.** A run frozen on a credential that disappears stops,
   with the subscription line and 重试. A credential disappears when it is
-  disconnected, revoked, paused, its share is withdrawn (for other members'
-  bots), its owner leaves, or the admin turns 「分享给团队成员」 off there.
+  disconnected, revoked or paused, or its owner leaves the workspace.
 - **Quota exhausted.** The run that hit the limit stops; it never switches.
   - When 「订阅额度用完后，自动改用 API Key」 is on (the default) and the owner has
     a compatible API key for the same frozen model, the next run uses that API key. The chat says so
@@ -189,10 +185,12 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
 
 1. A machine the run asks for is used as asked: a thread continuing in its
    environment, a device-only source event, or a device the person picked.
-2. Otherwise the model the person picked; else, for a new thread, the
-   dispatching chat's own model when a thread can run it (a subscription or
-   API-key model); else 优先使用的模型 in order. An Agent 配置 never sets the
-   model. There is no automatic routing
+2. Every dispatch names its Agent (Claude Code or Codex); one that does not is
+   refused with `agentRequired` and creates no run, and nothing picks a default
+   Agent ([2026-11-17-1800](decisions/2026-11-17-1800-one-agent-per-thread.md)).
+   A thread keeps that Agent for life. The model is the one the person picked;
+   else that Agent's 优先使用的模型 in order, never the other Agent's. An Agent
+   配置 never sets the model. There is no automatic routing
    ([2026-11-15-1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md)).
    运行位置 decides where, trying places in order and moving on only when
    no allowed model runs in the one before
@@ -201,7 +199,8 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
    server, then a computer. Among the devices with 参与调度 on that can run
    the entry, the one with the fewest unfinished runs goes first, then the one
    that joined first ([1530](decisions/2026-11-02-1530-local-server-first.md)).
-   A cloud that fails to start the run hands it to a server, then a computer.
+   A cloud that fails to start the run hands it to a server, then a computer,
+   on the same Agent.
    The 运行位置 line in 模型与订阅 writes the order and names where a run
    goes now (会先用 云端 / <设备名>).
 3. Otherwise 立即警告: no run is created and the bot at once shows the action
@@ -216,8 +215,11 @@ not report the model ([1400](decisions/2026-11-02-1400-model-order-dispatch.md),
 can discover an empty balance, refused credentials or a provider outage only
 after a real model request; a successful model-list request does not prove it
 can run. That run ends with its original model frozen. The host creates a new
-run from the latest allowed preferences, excluding entries already tried for
-this task and rechecking credential and machine authority. An explicitly
+run from the latest allowed preferences of the thread's own Agent, excluding
+entries already tried for this task and rechecking credential and machine
+authority. It never moves the thread to the other Agent: with nothing left on
+its Agent the run stops with the coded reason
+([2026-11-17-1800](decisions/2026-11-17-1800-one-agent-per-thread.md)). An explicitly
 selected model stays selected and gets the unavailable card. Older quota-only
 runs keep the quota recovery in §2.
 
@@ -267,8 +269,8 @@ not block a person viewing or taking over their own Bot's desktop
 
 The server admits the run and freezes its model, credential, machine and
 payer. During machine preparation or the initial claim it delivers that
-assignment and the credentials the task needs. The runner executes directly,
-renews its scheduling lease through the existing heartbeat, and reports
+assignment and the credentials the task needs. The runner executes directly
+while it holds its device session, which keeps its scheduling lease, and reports
 completion. A persisted stop is delivered through the control channel; cloud
 reclamation is also available when the task must end.
 
@@ -282,8 +284,9 @@ reclamation is also available when the task must end.
 - **Concurrency.** Threads run in parallel. The runs of one thread run one at
   a time. There are no Mikka machine caps: the owner's own E2B account sets
   the limit.
-- **Leases.** A claimed run holds a lease that the heartbeat renews. When a
-  lease runs out because the machine is gone, the run is placed again by §4,
+- **Leases.** A claimed run holds a lease for as long as its device's gateway
+  session stays open; the gateway's `disconnected` report ends it. When a
+  lease ends because the machine is gone, the run is placed again by §4,
   keeping its frozen model and credential.
 - **No machine.** A run is created only once a machine is chosen; with none,
   the bot warns at once with the action card (§4).
@@ -302,12 +305,12 @@ remove this responsibility. Its slow recovery sweep recovers lost wakeups.
 
 Execution leases, estimated running compute, monitor duration and paused data
 retention are separate clocks. The monitor's 12-hour limit performs a final
-state read and hands responsibility to the recovery owner. A run's 12-hour
-compute budget requests a stop; paused time does not consume that budget.
-This is a budget for the admitted run, not the lifetime of the task's VM. A
-new authorized continuation run receives its own budget while the previous
-run retains its compute record. Heartbeat renewal and Workflow replay do not
-reset a run's budget, and a stopped run cannot silently restart itself.
+state read and hands responsibility to the recovery owner. E2B runs on the
+person's own key, so Mikka sets no compute budget on it (2026-11-17): a run is
+never stopped for its running time. The machine pauses right after its run
+ends, after two minutes idle and unclaimed, and on the 15-minute provider
+timeout as a safety net; paused machines are kept 7 days (1 hour once the task
+is closed). Heartbeat renewal and Workflow replay never restart a stopped run.
 Missing leases use the existing lease recovery, and the Factory watchdog
 continues to distinguish progress from a healthy heartbeat.
 
@@ -454,7 +457,7 @@ external bill.
 | MVP | Later |
 | --- | --- |
 | A personal workspace for everyone; team workspaces beside it | — |
-| Account-level subscriptions, API keys and custom providers on 「模型与订阅」; own credentials usable in every workspace with no switch; 「分享给团队成员」, which an admin can switch off | Per-member spend caps |
+| Account-level subscriptions, API keys and custom providers on 「模型与订阅」; own credentials usable in every workspace with no switch; subscriptions serve their owner only (2026-11-17); 「分享给团队成员」 for API keys, which an admin can switch off | Per-member spend caps |
 | Model order of §2; Mikka 默认 when there is nothing else; no mid-run switch; 「订阅额度用完后，自动改用 API Key」; a popup when nothing is left | — |
 | Model → Agent mapping with a per-model override | — |
 | Mikka Cloud on each person's own E2B key, with no Mikka caps | — |

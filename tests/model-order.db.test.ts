@@ -65,9 +65,9 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
   const device = async (ownerId: string, harnesses: object[], enabled = true, over: { name?: string; online?: boolean; server?: boolean; joinedMinutesAgo?: number } = {}) => {
     const id = randomUUID()
     const report = harnesses.map(info => ({ subscriptionBroker: true, ...info }))
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"deviceType","createdAt") VALUES ($1,$2,$5,'local',$3,$6,$4,$7,$8)`,
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"deviceType","createdAt","sessionOpenedAt") VALUES ($1,$2,$5,'local',$3,$6,$4,$7,$8,CASE WHEN $9::boolean THEN $6::timestamptz END)`,
       [id, ownerId, enabled, JSON.stringify(report), over.name ?? 'Laptop', over.online === false ? new Date(Date.now() - 3_600_000) : new Date(),
-        over.server ? 'server' : 'laptop', new Date(Date.now() - (over.joinedMinutesAgo ?? 0) * 60_000)])
+        over.server ? 'server' : 'laptop', new Date(Date.now() - (over.joinedMinutesAgo ?? 0) * 60_000), over.online !== false])
     const agents: Record<string, string> = {}
     for (const info of harnesses as { harness: string }[]) {
       agents[info.harness] = randomUUID()
@@ -144,31 +144,26 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     t.diagnostic(JSON.stringify({ kind: 'order_projection_pg_query_budget', allowed, full: fullStatements.length, context: contextStatements.length, saved }))
   })
 
-  await t.test('prompt order facts freshly enforce shared-owner membership, grants, policy and binding epochs', async () => {
-    const scope = await person('order-context-borrower')
-    const lender = await person('order-context-lender')
+  await t.test('prompt order facts offer only the owner\'s own subscription and freshly enforce its pause and epoch', async () => {
+    const scope = await person('order-context-owner')
+    const teammate = await person('order-context-teammate')
     const unrelated = await person('order-context-unrelated')
-    const connection = await subscribe(lender, 'claude', ['claude-haiku-5-5'])
+    const own = await subscribe(scope, 'claude', ['claude-haiku-5-5'])
+    const theirs = await subscribe(teammate, 'claude', ['claude-haiku-5-5'])
     await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
     await order.changeOrder(pool, unrelated, { kind: 'location', location: 'local' })
-    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [scope.workspaceId, lender.ownerId, `${lender.ownerId}@example.invalid`])
-    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [lender.ownerId, scope.workspaceId])
-    const offered = async (checked = scope) => (await order.orderView(pool, checked, async () => [], 'context')).candidates.some(row => row.source.kind === 'subscription' && row.source.connectionId === connection)
-    assert.equal(await offered(), true)
-    assert.equal(await offered(unrelated), false, 'a different owner and workspace cannot inherit these facts')
-    for (const revoke of ['share', 'policy', 'member', 'pause', 'epoch'] as const) {
-      if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2', [lender.ownerId, scope.workspaceId])
-      else if (revoke === 'policy') await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)', [scope.workspaceId])
-      else if (revoke === 'member') await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [scope.workspaceId, lender.ownerId])
-      else if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [connection])
-      else await pool.query('UPDATE byos_connections SET epoch=2 WHERE id=$1', [connection])
-      assert.equal(await offered(), false, `${revoke}: no prior projection bypasses a fresh refusal`)
-      if (revoke === 'share') await pool.query('UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"=$1 AND "workspaceId"=$2', [lender.ownerId, scope.workspaceId])
-      else if (revoke === 'policy') await pool.query('DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1', [scope.workspaceId])
-      else if (revoke === 'member') await pool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [scope.workspaceId, lender.ownerId])
-      else if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [connection])
-      else await pool.query('UPDATE byos_connections SET epoch=1 WHERE id=$1', [connection])
-      assert.equal(await offered(), true, `${revoke}: a subsequent invocation is fresh rather than a cached refusal`)
+    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [scope.workspaceId, teammate.ownerId, `${teammate.ownerId}@example.invalid`])
+    const offered = async (connection: string, checked = scope) => (await order.orderView(pool, checked, async () => [], 'context')).candidates.some(row => row.source.kind === 'subscription' && row.source.connectionId === connection)
+    assert.equal(await offered(own), true)
+    assert.equal(await offered(theirs), false, 'a teammate\'s subscription is never offered (decision 2026-11-17)')
+    assert.equal(await offered(own, unrelated), false, 'a different owner and workspace cannot inherit these facts')
+    for (const revoke of ['pause', 'epoch'] as const) {
+      if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=true WHERE id=$1', [own])
+      else await pool.query('UPDATE byos_connections SET epoch=2 WHERE id=$1', [own])
+      assert.equal(await offered(own), false, `${revoke}: no prior projection bypasses a fresh refusal`)
+      if (revoke === 'pause') await pool.query('UPDATE byos_connections SET paused=false WHERE id=$1', [own])
+      else await pool.query('UPDATE byos_connections SET epoch=1 WHERE id=$1', [own])
+      assert.equal(await offered(own), true, `${revoke}: a subsequent invocation is fresh rather than a cached refusal`)
     }
   })
 
@@ -535,7 +530,7 @@ test('model order: default fill, edits, and dispatch in order', { skip: !dbUrl }
     const next = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([firstName(view), next.kind === 'device' && next.deviceId], ['instance-b', later.id])
     // Both servers offline: the computer.
-    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '1 hour' WHERE id = ANY($1)`, [[server.id, later.id]])
+    await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '1 hour',"sessionClosedAt"=clock_timestamp() WHERE id = ANY($1)`, [[server.id, later.id]])
     view = await order.orderView(pool, scope)
     const fallback = await resolveModelDispatch(pool, ctx)
     assert.deepEqual([firstName(view), fallback.kind === 'device' && fallback.deviceId], ['Mac', mac.id])

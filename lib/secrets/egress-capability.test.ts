@@ -24,7 +24,7 @@ test('sealed grants keep the value opaque, preserve scope/revision, and use fres
   assert.notEqual(first.capability, second.capability)
   assert.equal(first.name, input.name)
   assert.equal(first.origin, input.http.origin)
-  assert.equal(first.expiresAt, new Date(now + EGRESS_CAPABILITY_TTL_MS).toISOString())
+  assert.equal(first.expiresAt, new Date(input.leaseExpiresAt as number).toISOString(), 'the grant expires with the run lease')
   for (const value of [first.capability, Buffer.from(first.capability.split('.')[1], 'base64url').toString('latin1')])
     assert.ok(!value.includes(input.secret))
   const opened = openEgressCapability(first.capability, binding, now, env)
@@ -45,7 +45,7 @@ test('owner, workspace, repository, run, device, credential and attempt all rema
   assert.equal(openEgressCapability(personal.capability, { workspaceId: null, repository: null }, now, env).workspaceId, null)
 })
 
-test('expiry is the smaller of 90 seconds and the current lease, with no grace or self-renewal', () => {
+test('expiry is the run lease, bounded by the session lease, with no grace or self-renewal', () => {
   const grant = issue({ leaseExpiresAt: now + 12_345 })
   assert.equal(openEgressCapability(grant.capability, binding, now + 12_344, env).expiresAt, now + 12_345)
   assert.throws(() => openEgressCapability(grant.capability, binding, now + 12_345, env), reason('expired_capability'))
@@ -54,6 +54,7 @@ test('expiry is the smaller of 90 seconds and the current lease, with no grace o
   assert.throws(() => issueEgressCapability({ ...input, leaseExpiresAt: 'bad' }, now, env), reason('expired_capability'))
   assert.equal(issueEgressCapability({ ...input, leaseExpiresAt: new Date(now + 2_000) }, now, env).expiresAt, new Date(now + 2_000).toISOString())
   assert.equal(issueEgressCapability({ ...input, leaseExpiresAt: new Date(now + 3_000).toISOString() }, now, env).expiresAt, new Date(now + 3_000).toISOString())
+  assert.equal(issue({ leaseExpiresAt: now + EGRESS_CAPABILITY_TTL_MS + 60_000 }).expiresAt, new Date(now + EGRESS_CAPABILITY_TTL_MS).toISOString(), 'never beyond the session lease bound')
 })
 
 test('tampering, alternate framing, the wrong encryption key and unrelated ciphertext all fail closed', () => {

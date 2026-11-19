@@ -31,6 +31,8 @@ mock.module(new URL('../slots/new-task.tsx', import.meta.url).href, { namedExpor
       disabled={props.chooseIntent!.disabled} onClick={() => props.chooseIntent!.onChange(value)}>{value}</Button>)}
     {props.intent !== 'create_only' && props.profile.choices.map(choice => <Button key={choice.value} data-option={choice.value}
       disabled={choice.disabled || props.profile.disabled} onClick={() => props.profile.onChange(choice.value)}>{choice.label}</Button>)}
+    {props.agent.choices.map(choice => <Button key={choice.value} data-agent={choice.value} data-picked={choice.value === props.agent.value}
+      disabled={props.agent.disabled} onClick={() => props.agent.onChange(choice.value)}>{choice.label}</Button>)}
     <Button data-more={props.more.checked} onClick={() => props.more.onChange(!props.more.checked)}>Shell.newTaskDialog.createMore</Button>
     <Textarea data-text value={props.text} onChange={event => props.onText(event.target.value)} />
     <Button aria-keyshortcuts="Control+Enter Meta+Enter" disabled={!props.canSubmit || props.sending} onClick={props.onSubmit}>Shell.newTaskDialog.create</Button>
@@ -117,7 +119,12 @@ beforeEach(() => {
 })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
-const render = async (node: ReactNode) => { await act(async () => root.render(node)) }
+// The person picks the Agent (nothing is preselected); most cases pick Codex right after the window opens.
+const pickAgent = async (value: 'claude_code' | 'codex' = 'codex') => {
+  const button = container.querySelector<HTMLButtonElement>(`[data-agent="${value}"]`)
+  if (button) await act(async () => button.click())
+}
+const render = async (node: ReactNode, agent = true) => { await act(async () => root.render(node)); if (agent) await pickAgent() }
 const option = (value: string) => container.querySelector<HTMLButtonElement>(`[data-option="${value}"]`)!
 const create = () => [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === 'Shell.newTaskDialog.create')!
 const dialog = () => <NewTaskDialog open onOpenChange={() => {}} workspaceId={workspaceId} initialText="Perform this one fixture task." />
@@ -191,7 +198,20 @@ test('a written title is sent as taskTitle beside the description', async () => 
   await act(async () => create().click())
   assert.equal(submitted.length, 1)
   assert.equal(submitted[0].context?.taskTitle, 'Fix the login redirect')
-  assert.equal(submitted[0].text, 'Shell.newTaskDialog.prompt')
+  assert.equal(submitted[0].text, 'Shell.newTaskDialog.promptWithContext', 'the request names the picked Agent')
+})
+
+test('nothing is preselected: create waits for an Agent, and the picked one goes in the task command', async () => {
+  await render(dialog(), false)
+  assert.equal(container.querySelector('[data-picked="true"]'), null, 'no Agent is preselected')
+  assert.equal(create().disabled, true, 'no Agent, no dispatch')
+  await act(async () => create().click())
+  assert.equal(submitted.length, 0)
+  await pickAgent('claude_code')
+  assert.equal(create().disabled, false)
+  await act(async () => create().click())
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].context?.taskCommand?.agent, 'claude_code')
 })
 
 test('without a title nothing changes: no taskTitle key in the context', async () => {
@@ -208,7 +228,7 @@ test('a title alone enables submit and becomes the request text', async () => {
   assert.equal(create().disabled, false)
   await act(async () => create().click())
   assert.equal(submitted.length, 1)
-  assert.equal(submitted[0].text, 'Shell.newTaskDialog.prompt', 'the request text is built from the title')
+  assert.equal(submitted[0].text, 'Shell.newTaskDialog.promptWithContext', 'the request text is built from the title and the Agent')
   assert.equal(submitted[0].context?.taskTitle, 'Only a title')
 })
 
@@ -249,7 +269,7 @@ test('the same form explicitly switches to dispatch and sends only its selected 
   await act(async () => container.querySelector<HTMLButtonElement>('button[aria-keyshortcuts]')!.click())
   assert.equal(manualCommands.length, 0)
   assert.equal(submitted.length, 1)
-  assert.deepEqual(submitted[0].context?.taskCommand, { version: 1, intent: 'create_and_dispatch', description: 'Run now.' })
+  assert.deepEqual(submitted[0].context?.taskCommand, { version: 1, intent: 'create_and_dispatch', description: 'Run now.', agent: 'codex' })
   assert.equal(submitted[0].context?.expectedWorkspaceId, workspaceId)
 })
 

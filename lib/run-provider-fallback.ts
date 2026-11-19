@@ -13,7 +13,7 @@ import { workerDefinitionDigest } from './agent-kit/worker-digest'
 import { digest } from './agent-kit/definition'
 import { executionIdentitySchema, freezeExecutionIdentity, type ExecutionIdentity } from './execution-identity'
 import { entryKey, type OrderEntry, type SkippedEntry } from './model-order-plan'
-import { credentialStates, dispatchOrder, orderCandidates, readOrder } from './model-order'
+import { credentialStates, orderCandidates, readOrder } from './model-order'
 import { bindAgentToConnection, modelUnavailableCard, resolveModelDispatch, type ModelDispatch } from './model-dispatch'
 import type { ModelRoutingSnapshot } from './model-routing'
 import { modelFallbackRecordSchema, type ModelFallbackChoice, type ModelFallbackRecord } from './run-model-fallback-view'
@@ -38,6 +38,10 @@ type Continuation = { runId: string; previousRunId: string; deviceId: string; cl
 // JSONB cannot store NUL separators used by the in-memory dispatch key.
 const attemptKey = (entry: OrderEntry) => encodeURIComponent(entryKey(entry))
 const choice = (entry: OrderEntry): ModelFallbackChoice => ({ harness: entry.harness, model: entry.model, source: entry.source.kind })
+/** A thread keeps one Agent for life (decision 2026-11-17-1800): its Profile's,
+ * else its dispatch entry's, else the run's own. A retry never takes the other. */
+const threadHarness = (run: Run): OrderEntry['harness'] => profileHarness(run.agentDefinition?.agentProfile)
+  ?? run.agentDefinition?.modelDispatch?.entry?.harness ?? (run.agentDefinition?.harness === 'codex' ? 'codex' : 'claude_code')
 const record = (run: Run): ModelFallbackRecord | undefined => {
   const value = modelFallbackRecordSchema.safeParse((run.report as Record<string, unknown> | null)?.modelFallback)
   return value.success ? value.data : undefined
@@ -178,7 +182,9 @@ function reasonLine(reason: string): string {
 }
 
 async function unavailableRecord(pool: Pool, scope: Scope, run: Run, attempted: Set<string>, skipped: SkippedEntry[] = [], ownerPinned = false): Promise<ModelFallbackRecord> {
-  const candidates = await orderCandidates(pool, scope), { entries } = await readOrder(pool, scope, candidates)
+  const candidates = await orderCandidates(pool, scope), harness = threadHarness(run)
+  // Only this thread's own Agent's list: the other Agent is never offered as a way out.
+  const entries = (await readOrder(pool, scope, candidates)).entries.filter(entry => entry.harness === harness)
   const states = await credentialStates(pool, scope, entries, candidates, undefined, { probe: false })
   const receipt = record(run) ?? pendingProviderFallback(run, providerFailureSchema.parse(run.report?.providerFailure))
   const picked = ownerPinned || run.agentDefinition?.modelDispatch?.mode !== 'preference'
@@ -358,9 +364,10 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
 
 async function recoverAuthorizedProviderFailure(pool: Pool, source: Run, initial: ModelFallbackRecord): Promise<Continuation | null> {
   const userId = source.userId
-  // The order dispatch tried (优先使用的 Agent's list first, decision 2026-11-05-0400), so what came before this run is what was tried.
-  const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope)
-  const attempted = await attemptedEntries(pool, source, dispatchOrder(stored.entries, stored.preferredHarness))
+  // The thread's own Agent's list, in order: what came before this run is what was tried.
+  // The other Agent's list is never a fallback (decision 2026-11-17-1800).
+  const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope), harness = threadHarness(source)
+  const attempted = await attemptedEntries(pool, source, stored.entries.filter(entry => entry.harness === harness))
   // The Owner requested these checks on their original subscription/model.
   // Keep the historical preference snapshot intact; the host receipt pins
   // this round before any alternate model selection or runtime preparation.
@@ -380,8 +387,7 @@ async function recoverAuthorizedProviderFailure(pool: Pool, source: Run, initial
   const skipped: SkippedEntry[] = []
   for (let index = 0; index <= stored.entries.length; index++) {
     const selected: ModelDispatch = await resolveModelDispatch(pool, scope, null, location, source.agentDefinition.pinnedDeviceId ?? ((monitor || checkpointUnavailable) && origin.kind === 'local' ? source.deviceId ?? undefined : undefined),
-      { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop',
-        ...(profileHarness(source.agentDefinition.agentProfile) ? { harness: profileHarness(source.agentDefinition.agentProfile) } : {}) })
+      { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop', harness })
     if (selected.kind === 'none') return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [...skipped, ...selected.skipped ?? []]))
     attempted.add(attemptKey(selected.entry))
     try {

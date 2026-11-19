@@ -9,7 +9,6 @@ import { taskActivityChanged } from '../factory/activity-live'
 export const THREAD_MACHINE_IDLE_MS = 2 * 60_000
 export const THREAD_MACHINE_PROVIDER_MS = 15 * 60_000
 export const THREAD_MACHINE_REFRESH_MS = 5 * 60_000
-export const THREAD_MACHINE_BUDGET_MS = 12 * 60 * 60_000
 export const THREAD_MACHINE_RETENTION_MS = 7 * 24 * 60 * 60_000
 export const CLOSED_TASK_RETENTION_MS = 60 * 60_000
 export const THREAD_MACHINE_STOP_GRACE_MS = 30_000
@@ -66,14 +65,9 @@ const fenceOf = (row: ThreadLifecycleRow): ThreadMachineFence => ({ epoch: row.e
 const pendingCreation = (row: ThreadLifecycleRow) => Boolean(row.workerLeaseId || row.workerLeaseUntil
   || row.lifecycle.phase === 'create_requested' || row.lifecycle.phase === 'restore_requested' || row.lifecycle.creationMissingAt != null)
 
-/** A paused interval is not execution time. Recalculate after resume from the
- * persisted billed time instead of expiring a week-old wall-clock deadline. */
-export function threadMachineExecutionDeadline(row: ThreadLifecycleRow, now: number): number {
-  const elapsed = row.state === 'running' && row.runningSince ? Math.max(0, now - at(row.runningSince)) : 0
-  return now + Math.max(0, THREAD_MACHINE_BUDGET_MS - Number(row.computeSeconds) * 1_000 - elapsed)
-}
-
-type StopCause = 'task_closed' | 'execution_budget' | 'execution_lease_lost' | 'provider_paused'
+// E2B runs on the user's own key: Mikka sets no execution budget on it. A machine
+// pauses when its run ends or it sits unclaimed, and the provider timeout pauses it as a safety net.
+type StopCause = 'task_closed' | 'execution_lease_lost' | 'provider_paused'
 type Decision = { action: 'stop' | 'recover'; at: number; reason: StopCause }
   | { action: 'keep' | 'pause' | 'retire' | 'wait' | 'missing'; at: number | null; reason: string }
 
@@ -113,16 +107,15 @@ export function threadMachineLifecycleDecision(row: ThreadLifecycleRow, provider
   const reviewing = live(row.reviewExpiresAt ?? null, now) && !row.stopRequestedAt && !row.taskClosed
     && row.stopReason !== 'device_lost' && row.safeExit
     && (['succeeded', 'failed'].includes(row.status) || quotaWait)
-    && threadMachineExecutionDeadline(row, now) > now
   if (reviewing && row.lifecycle.phase === 'review_resume_requested')
     return { action: 'wait', at: at(row.reviewExpiresAt!), reason: 'human_review_resume' }
   if (reviewing && provider?.state === 'running') return { action: 'keep',
-    at: Math.min(at(row.reviewExpiresAt!), threadMachineExecutionDeadline(row, now)), reason: 'human_review' }
+    at: at(row.reviewExpiresAt!), reason: 'human_review' }
   if (quotaWait && !row.taskClosed && provider?.state === 'running') return row.safeExit
     ? { action: 'pause', at: now, reason: 'quota_wait' }
     : { action: 'wait', at: provider.endAt && provider.endAt > now ? provider.endAt : null, reason: 'quota_safe_point_unverified' }
-  if (!terminal && (row.taskClosed || threadMachineExecutionDeadline(row, now) <= now))
-    return { action: 'stop', at: now + THREAD_MACHINE_STOP_GRACE_MS, reason: row.taskClosed ? 'task_closed' : 'execution_budget' }
+  if (!terminal && row.taskClosed)
+    return { action: 'stop', at: now + THREAD_MACHINE_STOP_GRACE_MS, reason: 'task_closed' }
   if (!terminal && !quotaWait && row.status !== 'queued' && !live(row.leaseExpiresAt, now))
     return { action: 'recover', at: now + THREAD_MACHINE_STOP_GRACE_MS, reason: 'execution_lease_lost' }
   if (!terminal && !quotaWait && row.status !== 'queued' && provider?.state === 'paused')
@@ -143,8 +136,7 @@ export function threadMachineLifecycleDecision(row: ThreadLifecycleRow, provider
     const idleAt = at(row.lastActiveAt) + THREAD_MACHINE_IDLE_MS
     return { action: now >= idleAt ? 'pause' : 'keep', at: Math.min(idleAt, now + THREAD_MACHINE_REFRESH_MS), reason: 'unclaimed_idle' }
   }
-  return { action: 'keep', at: Math.min(now + THREAD_MACHINE_REFRESH_MS,
-    row.stopRequestedAt ? Infinity : threadMachineExecutionDeadline(row, now)), reason: row.stopRequestedAt ? 'stop_pending' : 'active_run' }
+  return { action: 'keep', at: now + THREAD_MACHINE_REFRESH_MS, reason: row.stopRequestedAt ? 'stop_pending' : 'active_run' }
 }
 
 async function requestLifecycleStop(pool: Pool, actor: Actor, row: ThreadLifecycleRow, cause: StopCause, claimId: string, now: number): Promise<boolean> {
@@ -172,12 +164,10 @@ async function requestLifecycleStop(pool: Pool, actor: Actor, row: ThreadLifecyc
             AND (r."leaseExpiresAt" IS NULL OR r."leaseExpiresAt"<=to_timestamp($8::double precision/1000))
           WHEN 'task_closed' THEN m."issueId" IS NOT NULL AND (i.id IS NULL OR i.status IN ('done','canceled','duplicate')
             OR i.content->'attrs'->'mikka'->>'deletedAt' IS NOT NULL)
-          WHEN 'execution_budget' THEN m."computeSeconds"*1000+CASE WHEN m.state='running' THEN
-            COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (to_timestamp($8::double precision/1000)-m."runningSince")))*1000,0) ELSE 0 END >= $9::double precision
           WHEN 'provider_paused' THEN m.state='paused' AND r.status<>'queued'
             AND NOT (r.status='paused' AND r."pauseReason" IS NOT DISTINCT FROM 'quota_exhausted')
           ELSE false END
-      RETURNING r."deviceId"`, [row.runId, actor.userId, actor.workspaceId, row.epoch, row.sandboxId, claimId, cause, now, THREAD_MACHINE_BUDGET_MS])
+      RETURNING r."deviceId"`, [row.runId, actor.userId, actor.workspaceId, row.epoch, row.sandboxId, claimId, cause, now])
     if (!stopped.rowCount) { await client.query('COMMIT'); return false }
     const [{ runChanged }, { runListChanged }, { notifyDeviceWork, runControlChanged }] = await Promise.all([
       import('@/lib/live/panels'), import('@/lib/live/lists'), import('@/lib/device-gateway-notify'),
@@ -291,8 +281,7 @@ export async function reconcileThreadMachine(pool: Pool, actor: Actor, runId: st
       }
       await deps.provider.keepAlive(row.sandboxId!, actor.userId, THREAD_MACHINE_PROVIDER_MS)
       providerOutcome = 'timeout_renewed'
-      const next = await finish({ phase: reason === 'human_review' ? 'review_resumed' : reason === 'provisioning' ? 'provisioning' : 'active', reason, failures: 0, providerDeadline: deps.now() + THREAD_MACHINE_PROVIDER_MS,
-        executionDeadline: threadMachineExecutionDeadline(row, now) }, due, client)
+      const next = await finish({ phase: reason === 'human_review' ? 'review_resumed' : reason === 'provisioning' ? 'provisioning' : 'active', reason, failures: 0, providerDeadline: deps.now() + THREAD_MACHINE_PROVIDER_MS }, due, client)
       await client.query('COMMIT')
       committedTransition?.()
       committedTransition = undefined

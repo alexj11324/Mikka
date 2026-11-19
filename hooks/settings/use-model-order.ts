@@ -9,7 +9,6 @@ import { arrayMove } from '@dnd-kit/sortable'
 import { changeModelOrder, checkModelOrderQuota, type getModelOrder } from '@/app/actions/model-order'
 import { useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
 import type { OrderRow, OrderView } from '@/lib/model-order'
-import type { OrderHarness } from '@/lib/model-order-plan'
 import { settingsRead } from '@/lib/settings-read'
 import { settingsKeys } from '@/lib/swr/keys'
 import { useLiveKey } from '@/hooks/use-live-key'
@@ -38,13 +37,10 @@ export function useModelOrder(workspaceId: string) {
   const [unsaved, setUnsaved] = useState<{ id: string; to: number } | null>(null)
   const [pending, setPending] = useState(false)
   const data = order.data && !order.data.error ? order.data : null
-  // One Agent's list at a time (decision 2026-11-05-0400): 优先使用的 Agent picks it; each keeps its own order.
+  // One Agent's list at a time: the Agent switch picks which one is shown. Each Agent keeps its own order, and
+  // a task only ever uses the list of the Agent it was dispatched to; the other is never a fallback (decision 2026-11-17-1800).
   const shown = data ? data.entries.filter(entry => entry.harness === data.preferredHarness) : []
   const offered = data ? data.candidates.filter(candidate => candidate.harness === data.preferredHarness) : []
-  // The other Agent's list is the fallback dispatch takes after this one (decision 2026-11-05-0400).
-  const other: OrderHarness = data?.preferredHarness === 'codex' ? 'claude_code' : 'codex'
-  const backup = data ? data.entries.filter(entry => entry.harness === other) : []
-  const offeredOther = data ? data.candidates.filter(candidate => candidate.harness === other) : []
   // A subscription connected, paused or read again elsewhere: this list re-reads (no polling).
   useLiveKey('model_settings', workspaceId, [unstable_serialize(modelOrderKey(workspaceId))], workspaceId, { minIntervalMs: 2_000 })
 
@@ -106,7 +102,7 @@ export function useModelOrder(workspaceId: string) {
   }
 
   const loadError = order.data?.error || order.error ? actionError(order.data?.error) : null
-  return { data, loadError, e2b, pending, failed, unsaved, shown, offered, other, backup, offeredOther, checkQuota, save, move, remove, reload: order.mutate }
+  return { data, loadError, e2b, pending, failed, unsaved, shown, offered, checkQuota, save, move, remove, reload: order.mutate }
 }
 
 /**

@@ -49,10 +49,10 @@ application and real Google login required by #1556/#1557.
 
 ## Existing Mikka cloud compatibility
 
-The separate `Mikka cloud core compatibility` workflow starts after a
-successful main `Web deploy`. Its real `workflow_run` guard verifies the exact
-current main commit, the public `/mikka/api/version`, the completed publication
-job and its cloud-edition/build/upload/version steps. It runs only while at
+The separate `Mikka cloud core compatibility` workflow is dispatched on main
+after a release. Per-service releases publish no Web deploy run, so its guard
+verifies only the exact current main commit and that the public
+`/mikka/api/version` serves it. It runs only while at
 least one of #1560, #1561, #1562 or #1556 remains open. An all-closed result is an
 explicit skip, before owner credentials; a stale or unproven target cannot
 start the business checks. The target is checked again after cleanup.

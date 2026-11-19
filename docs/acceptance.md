@@ -21,8 +21,8 @@ disposable database use `acquireTestAccounts` in
 `scripts/test-accounts/session.mjs` and `pool.mjs`. Those harnesses provision
 owner/peer fixtures through normal email sign-up/sign-in and verify the real
 session. Follow their lease renewal, release and evidence auditing. Their
-results establish the isolated fixture path, while shared-team subscriptions
-require the shared-account check.
+results establish the isolated fixture path. Subscriptions serve their owner
+only (decision 2026-11-17-1400), so subscription checks use the account's own.
 
 The shared adapter implements `isolated-ci` for loopback application targets
 and `isolated-docker` for the separately bound Docker environment. Both keep
@@ -280,7 +280,7 @@ After the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
 
 The [2026-11-07 production acceptance decision](design/decisions/2026-11-07-1400-production-acceptance-scope.md)
 calls for automatic sign-in, a Coordinator message and task dispatch after each
-Web deploy. The implemented `production-smoke.yml` job runs
+Web release. The implemented `production-smoke.yml` job runs
 `scripts/ops/production-smoke.mjs`, which signs in and reads the shell,
 capabilities and shared-team Coordinator runtime. `AGENTS.md` records that
 implementation and keeps messaging and dispatch in separate live acceptance

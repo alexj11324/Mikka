@@ -62,7 +62,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   const codex = await subscribe(scope, 'codex', ['gpt-6-luna'])
   const foreignSource = await subscribe(foreign, 'codex', ['gpt-6-luna'])
   const deviceId = randomUUID(), agents = { claude_code: randomUUID(), codex: randomUUID() }
-  await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,\'Profile fixture\',\'local\',true,now(),$3)', [deviceId, scope.ownerId, JSON.stringify([
+  await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,\'Profile fixture\',\'local\',true,now(),$3,now())', [deviceId, scope.ownerId, JSON.stringify([
     { harness: 'claude_code', installed: true, models: ['claude-haiku-5-5'], subscriptionBroker: true }, { harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true },
   ])])
   for (const harness of ['claude_code', 'codex'] as const) await pool.query('INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,$4)', [agents[harness], scope.ownerId, deviceId, harness])
@@ -86,7 +86,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   t.beforeEach(async () => {
     await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb($2::text),false) WHERE id=ANY($1::uuid[])`,
       [[claude, exactClaude, codex, foreignSource], new Date().toISOString()])
-    await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+    await pool.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [deviceId])
   })
 
   await t.test('fixed Profile source filtering matches the complete catalogue on real rows and keeps its source lock', async t => {
@@ -133,7 +133,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const fetch = globalThis.fetch
     globalThis.fetch = async () => { providerCalls++; throw new Error('fixed target must not call a provider') }
     try {
-      for (const [name, selection, expectedQueries] of [['own subscription', ownSelection, 5], ['shared subscription', sharedSelection, 6], ['own key', ownKey, 5], ['shared key', sharedKey, 6]] as const) await t.test(name, async t => {
+      for (const [name, selection, expectedQueries] of [['own subscription', ownSelection, 5], ['own key', ownKey, 5], ['shared key', sharedKey, 6]] as const) await t.test(name, async t => {
         const original = await inspect(selection, true), fixed = await inspect(selection, false)
         assert.deepEqual(original.result, { ok: true }); assert.deepEqual(fixed.result, original.result)
         assert.equal(fixed.statements.length, expectedQueries)
@@ -166,6 +166,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
         await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [own, JSON.stringify({ revision: '0', models: ['unrelated-model'] })])
         try { await compare(ownSelection, 'accepted') } finally { await pool.query('UPDATE byos_connections SET "modelCatalog"=$2 WHERE id=$1', [own, JSON.stringify({ revision: '1', models: ['fixed-entry-model', 'unrelated-model'] })]) }
       })
+      await t.test('a teammate\'s subscription is refused (decision 2026-11-17)', async () => { await compare(sharedSelection) })
       await t.test('the shared owner must still be an active member', async () => {
         await pool.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [who.workspaceId, payor.ownerId])
         try { await compare(sharedSelection) } finally { await pool.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [who.workspaceId, payor.ownerId]) }
@@ -214,7 +215,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
       resolve: async (...args) => {
         await new Promise(resolve => setTimeout(resolve, 21_000))
         // The real daemon keeps reporting presence while catalogue work waits.
-        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+        await pool.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [deviceId])
         return resolveModelDispatch(...args)
       },
     })
@@ -283,7 +284,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
       resolve: async () => ['93.184.216.34'],
     })
     const device = randomUUID(), runtimeAgents = { claude_code: randomUUID(), codex: randomUUID() }
-    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,\'Default Profile fixture\',\'local\',true,now(),$3)', [device, who.ownerId, JSON.stringify([
+    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,\'Default Profile fixture\',\'local\',true,now(),$3,now())', [device, who.ownerId, JSON.stringify([
       { harness: 'claude_code', installed: true, models: ['deepseek-flash', 'claude-haiku-5-5'], subscriptionBroker: true },
       { harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true },
     ])])
@@ -559,7 +560,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
   const outerFixture = async (name: string, custom = false) => {
     const who = await person(`profiles-outer-${name}`), sourceId = await subscribe(who, 'codex', ['gpt-6-luna'])
     const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Outer transaction','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Outer transaction','local',true,now(),$3,now())`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Outer transaction','codex')`, [agentId, who.ownerId, device])
     const profile = custom ? await store.create(who, content('Outer role')) : undefined
     const select = (tx: import('pg').PoolClient) => profiles.resolveAgentProfileDispatch(new Proxy(pool, { get(target, key) {
@@ -697,7 +698,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const who = await person(`profiles-planning-${change}`)
     const sourceId = await subscribe(who, 'codex', ['gpt-6-luna'])
     const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Planning boundary','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Planning boundary','local',true,now(),$3,now())`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Planning boundary','codex')`, [agentId, who.ownerId, device])
     const input = content('Planning role')
     const profile = change.startsWith('default-') ? undefined : await store.create(who, input)
@@ -728,92 +729,21 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "userId"=$1', [who.ownerId])).rowCount, 0)
   })
 
-  for (const mode of ['default', 'custom', 'edited-concurrently'] as const) await t.test(mode === 'edited-concurrently' ? 'shared-source dispatch and Profile edits serialize without membership lock cycles' : `${mode} dispatch authorizes a shared source without holding a conflicting membership lease`, async () => {
-    const who = await person(`profiles-shared-${mode}`)
-    const sourceOwner = await seedUser(pool, `profiles-shared-source-${mode}`); owners.push(sourceOwner)
+  for (const mode of ['default', 'custom'] as const) await t.test(`${mode} dispatch never selects a teammate's subscription`, async () => {
+    const who = await person(`profiles-teammate-${mode}`)
+    const sourceOwner = await seedUser(pool, `profiles-teammate-source-${mode}`); owners.push(sourceOwner)
     await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'member','active')`, [who.workspaceId, sourceOwner, `${sourceOwner}@example.invalid`])
-    const connectionId = await subscribe({ ...who, ownerId: sourceOwner }, 'codex', ['gpt-6-luna'])
-    await pool.query('INSERT INTO workspace_subscription_shares ("ownerId","workspaceId","allowOthers") VALUES ($1,$2,true)', [sourceOwner, who.workspaceId])
+    await subscribe({ ...who, ownerId: sourceOwner }, 'codex', ['gpt-6-luna'])
     const device = randomUUID(), agentId = randomUUID(), taskIssue = await seedIssue(pool, who.ownerId, who.workspaceId)
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Shared source','local',true,now(),$3)`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
-    await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Shared source','codex')`, [agentId, who.ownerId, device])
-    const input = content('Shared role')
-    const profile = mode === 'default' ? undefined : await store.create(who, input)
-    if (mode === 'edited-concurrently') {
-      const { acquireWorkspaceMembership } = await import('../workspace-membership-guard')
-      // Only the editor's APP statement is bounded for failure cleanup. The
-      // production membership guard retains its real 20-second deadline.
-      const editorPool = new Pool({ connectionString: dbUrl, max: 1, options: '-c lock_timeout=1000' })
-      let memberReady!: (pid: number) => void, releaseEditor!: () => void
-      const acquired = new Promise<number>(resolve => { memberReady = resolve })
-      const proceed = new Promise<void>(resolve => { releaseEditor = resolve })
-      const editor = new profiles.AgentProfileStore(editorPool, { membership: async identity => {
-        const member = await acquireWorkspaceMembership(workspacePool, { workspaceId: identity.workspaceId, userId: identity.ownerId })
-        assert.ok(member.workspaceClient)
-        const { rows: [backend] } = await member.workspaceClient.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')
-        memberReady(backend.pid)
-        await proceed
-        return member
-      } })
-      let editing: ReturnType<typeof editor.update> | undefined
-      const dispatch = profiles.resolveAgentProfileDispatch(pool, who, { issueId: taskIssue, location: 'local', profileId: profile!.id }, {
-        resolve: async (...args) => {
-          const target = await resolveModelDispatch(...args)
-          editing = editor.update(who, profile!.id, profile!.version, { ...input, instructions: 'Edited while shared-source admission is authorizing membership.' })
-          void editing.catch(() => {})
-          await acquired
-          return target
-        },
-      })
-      let dispatchFinished = false
-      const result = dispatch.then(value => ({ value, error: undefined }), (error: unknown) => ({ value: undefined, error })).finally(() => { dispatchFinished = true })
-      try {
-        const memberPid = await acquired
-        let blocked = false
-        for (let attempt = 0; attempt < 200; attempt++) {
-          blocked = (await pool.query<{ blocked: boolean }>('SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1::int=ANY(pg_blocking_pids(pid))) AS blocked', [memberPid])).rows[0].blocked
-          if (blocked || dispatchFinished) break
-          await new Promise(resolve => setTimeout(resolve, 10))
-        }
-        assert.equal(blocked || dispatchFinished, true, 'shared admission reaches either its authorization boundary or a completed result')
-        releaseEditor()
-        const updated = await editing!
-        assert.equal(updated.version, profile!.version + 1)
-        const outcome = await result
-        if (outcome.error) {
-          assert.ok(outcome.error instanceof profiles.AgentProfileError)
-          assert.equal(outcome.error.code, 'agentProfileVersionConflict')
-          assert.equal((await pool.query('SELECT 1 FROM byos_bindings WHERE "consumerId"=$1', [agentId])).rowCount, 0)
-        } else {
-          const selected = outcome.value; assert.ok(selected)
-          assert.equal(selected.agentProfile?.version, profile!.version)
-          assert.equal(selected.agentProfile?.digest, profile!.digest)
-          if (selected.target.kind !== 'device') assert.fail('the serialized dispatch selects the authorized device')
-          const binding = (await pool.query('SELECT "ownerId","consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
-          assert.equal(binding.ownerId, sourceOwner)
-          assert.equal(binding.consumerId, agentId)
-          assert.equal(binding.connectionId, connectionId)
-          assert.equal(binding.modelId, selected.target.model)
-          await assert.rejects(profiles.assertProfileSelection(pool, who, selected.agentProfile!), { code: 'agentProfileVersionConflict' })
-        }
-        assert.equal((await pool.query('SELECT 1 FROM agent_runs WHERE "userId"=$1', [who.ownerId])).rowCount, 0)
-      } finally {
-        releaseEditor()
-        await Promise.allSettled([editing, result])
-        await editorPool.end()
-      }
-      return
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Teammate source','local',true,now(),$3,now())`, [device, who.ownerId, JSON.stringify([{ harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true }])])
+    await pool.query(`INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,'Teammate source','codex')`, [agentId, who.ownerId, device])
+    const profile = mode === 'default' ? undefined : await store.create(who, content('Teammate role'))
+    const selected = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: taskIssue, location: 'local', profileId: profile?.id }).catch(() => undefined)
+    if (selected?.target.kind === 'device' && selected.target.subscriptionBindingId) {
+      const binding = (await pool.query('SELECT "ownerId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
+      assert.equal(binding?.ownerId, who.ownerId)
     }
-    const selected = await profiles.resolveAgentProfileDispatch(pool, who, { issueId: taskIssue, location: 'local', profileId: profile?.id })
-    if (selected.target.kind !== 'device') assert.fail('the shared source should select the authorized executor')
-    assert.equal(selected.agentProfile?.source, mode === 'default' ? 'default' : 'explicit')
-    assert.deepEqual(selected.target.entry.source, { kind: 'subscription', connectionId })
-    const binding = (await pool.query('SELECT "ownerId","workspaceId","consumerId","connectionId","modelId" FROM byos_bindings WHERE id=$1', [selected.target.subscriptionBindingId])).rows[0]
-    assert.equal(binding.ownerId, sourceOwner)
-    assert.equal(binding.workspaceId, who.workspaceId)
-    assert.equal(binding.consumerId, agentId)
-    assert.equal(binding.connectionId, connectionId)
-    assert.equal(binding.modelId, selected.target.model)
+    assert.equal((await pool.query('SELECT 1 FROM byos_bindings WHERE "ownerId"=$1 AND "consumerId"=$2', [sourceOwner, agentId])).rowCount, 0, 'no binding on a teammate\'s subscription')
   })
 
   await t.test('subscription authorization requires the parent workspace and an active matching member', async () => {
@@ -1053,7 +983,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const machines: { id: string; agentId: string; repoId: string }[] = []
     for (const name of ['A', 'B']) {
       const id = randomUUID(), agentId = randomUUID(), repoId = randomUUID()
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"protocolVersion") VALUES ($1,$2,$3,'local',true,now(),$4,$5)`, [id, who.ownerId, name, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, models: ['gpt-6-luna'] }]), DAEMON_PROTOCOL_VERSION])
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"protocolVersion","sessionOpenedAt") VALUES ($1,$2,$3,'local',true,now(),$4,$5,now())`, [id, who.ownerId, name, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, models: ['gpt-6-luna'] }]), DAEMON_PROTOCOL_VERSION])
       await pool.query(`INSERT INTO agents(id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,'codex')`, [agentId, who.ownerId, id, name])
       await pool.query(`INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES ($1,$2,$3,$4,$5,'main')`, [repoId, who.ownerId, id, repository.key, repository.remoteUrl])
       machines.push({ id, agentId, repoId })
@@ -1181,7 +1111,7 @@ test('Agent Profiles: real PostgreSQL isolation, immutable versions, exact-sourc
     const who = await person('profiles-per-agent')
     const ownClaude = await subscribe(who, 'claude', ['claude-haiku-5-5']), ownCodex = await subscribe(who, 'codex', ['gpt-6-luna'])
     const machine = randomUUID()
-    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,\'Per-Agent fixture\',\'local\',true,now(),$3)', [machine, who.ownerId, JSON.stringify([
+    await pool.query('INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,\'Per-Agent fixture\',\'local\',true,now(),$3,now())', [machine, who.ownerId, JSON.stringify([
       { harness: 'claude_code', installed: true, models: ['claude-haiku-5-5'], subscriptionBroker: true }, { harness: 'codex', installed: true, models: ['gpt-6-luna'], subscriptionBroker: true },
     ])])
     for (const harness of ['claude_code', 'codex'] as const) await pool.query('INSERT INTO agents (id,"userId","deviceId",name,harness) VALUES ($1,$2,$3,$4,$4)', [randomUUID(), who.ownerId, machine, harness])

@@ -126,11 +126,12 @@ export async function openChatBotId(user: { id: string; email: string; name: str
  * workspace with this workspace's Coordinator first, marked `coordinator`.
  */
 export async function listOwnerBots(ownerId: string, workspaceId: string) {
-  const [{ db }, { bots }, { and, asc, desc, eq, sql }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm')])
+  const [{ db }, { bots }, { and, asc, desc, eq, isNull, sql }] = await Promise.all([import('@/lib/db'), import('@/lib/db/schema'), import('drizzle-orm')])
   const { botId } = await coordinatorBot(ownerId, workspaceId)
   const isCoordinator = sql<boolean>`${bots.id} = ${botId}`
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator }).from(bots)
-    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId)))
+    // An archived bot leaves the person's lists (lib/bot-lifecycle.ts); its chat stays reachable by address.
+    .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId), isNull(bots.archivedAt)))
     .orderBy(desc(isCoordinator), asc(bots.createdAt))
 }
 

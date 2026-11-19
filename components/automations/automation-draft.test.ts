@@ -3,11 +3,19 @@ import assert from 'node:assert/strict'
 import { cronShape, definitionFrom, draftFrom, emptyDraft, foldNeeded, instant, wallTime } from './automation-draft'
 
 const now = new Date('2026-10-20T12:00:00Z')
-const filled = (patch = {}) => ({ ...emptyDraft('America/New_York', now), title: 'Morning triage', prompt: 'Triage new issues', ...patch })
+const filled = (patch = {}) => ({ ...emptyDraft('America/New_York', now), title: 'Morning triage', prompt: 'Triage new issues', agent: 'codex' as const, ...patch })
 
 test('a new draft needs a name and a request before it saves', () => {
   assert.deepEqual(definitionFrom(emptyDraft('UTC', now), now), { missing: 'title' })
   assert.deepEqual(definitionFrom({ ...emptyDraft('UTC', now), title: 'x' }, now), { missing: 'prompt' })
+})
+
+test('a task automation names its Agent: none chosen, it does not save; the Agent round-trips', () => {
+  assert.deepEqual(definitionFrom(filled({ agent: null }), now), { missing: 'agent' })
+  const saved = definitionFrom(filled({ agent: 'claude_code' }), now)
+  assert.ok('definition' in saved)
+  assert.equal(saved.definition.task.kind === 'dispatch_task' && saved.definition.task.agent, 'claude_code')
+  assert.equal(draftFrom(saved.definition, now).agent, 'claude_code')
 })
 
 test('a daily time that repeats when daylight saving ends waits for the person to choose', () => {
@@ -25,7 +33,7 @@ test('schedule off saves a manual automation; the task carries Bot, machine and 
   const result = definitionFrom(filled({ scheduleOn: false, botId: '7c1b8f0e-1d2a-4c55-9a0e-3b9f1f1d2a11', machine: 'cloud', profileId: 'p1', taskTitle: ' Daily ' }), now)
   assert.ok('definition' in result)
   assert.deepEqual(result.definition.timing, { kind: 'manual' })
-  assert.deepEqual(result.definition.task, { kind: 'dispatch_task', botId: '7c1b8f0e-1d2a-4c55-9a0e-3b9f1f1d2a11', prompt: 'Triage new issues', title: 'Daily', destination: { kind: 'cloud' }, profileId: 'p1' })
+  assert.deepEqual(result.definition.task, { kind: 'dispatch_task', botId: '7c1b8f0e-1d2a-4c55-9a0e-3b9f1f1d2a11', prompt: 'Triage new issues', title: 'Daily', destination: { kind: 'cloud' }, profileId: 'p1', agent: 'codex' })
 })
 
 test('once and interval read wall time in the automation zone and round-trip', () => {

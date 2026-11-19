@@ -91,6 +91,8 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       overlay-sha: ${{ steps.promoted.outputs.overlay-sha }}
+      # The served commit the installer is built from; main may have moved on since.
+      product: ${{ steps.promoted.outputs.product }}
       release: ${{ steps.promoted.outcome == 'success' }}
       receipt: ${{ github.event.inputs.cloudflare_receipt || steps.trigger.outputs.receipt }}
     steps:
@@ -107,14 +109,14 @@ jobs:
         with:
           node-version: 24
       # The Cloudflare deployment workflow promotes production Web after a push.
-      # The installer is built once that promotion serves current main, so it
-      # never ships ahead of the Web it talks to.
+      # The installer is built from the commit that promotion serves, once it is
+      # on main, so it never ships ahead of the Web it talks to.
       - name: Leave the installer to the Cloudflare promotion
         if: github.event_name == 'push'
         run: |
           echo "::notice title=Desktop waits for Cloudflare::This push builds nothing. The installer is built by itself once Cloudflare serves this commit."
           printf '### No installer from this push\n\nThe installer is built by itself when the Cloudflare gateway observation shows this commit being served (docs/operations/web-deploy.md).\n' >> "$GITHUB_STEP_SUMMARY"
-      - name: Use a Cloudflare gateway observation that serves current main
+      - name: Use a Cloudflare gateway observation whose served commit is on main
         id: trigger
         if: github.event_name == 'workflow_run'
         env:
@@ -159,9 +161,11 @@ jobs:
     env:
       RELEASE_VERSION: ${{ needs.preflight.outputs.version }}
       MIKKA_UI_OVERLAY_SHA: ${{ needs.preflight.outputs.overlay-sha }}
+      MIKKA_DESKTOP_SOURCE: ${{ needs.preflight.outputs.product }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          ref: ${{ needs.preflight.outputs.product }}
           persist-credentials: false
       - name: Verify production credential delivery boundaries
         run: node --test scripts/mobile-ota-credentials.test.mjs scripts/release/apple-credentials.test.mjs
@@ -383,7 +387,7 @@ jobs:
       - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: desktop-${{ env.RELEASE_VERSION }}
-          target_commitish: ${{ github.sha }}
+          target_commitish: ${{ needs.preflight.outputs.product }}
           name: Mikka Desktop ${{ env.RELEASE_VERSION }}
           draft: ${{ inputs.skip_notarization == true }}
           # electron-updater follows releases/latest; 'legacy' compares tags as text, so .9 outranked .31.

@@ -6,6 +6,7 @@ import { createOnlyCommand, dispatchReceiptInput } from '@/lib/task-create-comma
 import { taskListPageInput } from '@/lib/task-list-page'
 import { taskPresentationsInput } from '@/lib/task-presentation-input'
 import { z } from 'zod'
+import { threadHistoryInput, threadHistoryPosition } from '@/lib/thread-history'
 import { projectInput, projectPatch } from '@/lib/project-input'
 import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
 import { ISSUE_STATUS_CODES, ISSUE_PRIORITY_CODES } from '@/lib/issue-meta'
@@ -147,7 +148,9 @@ export const desktopActionSchemas = {
   'agents.pollTaskDetail': tuple(uuid, version.optional(), object({ version: version.optional(), positions: listPositions(51).optional() }).optional()),
   'agents.pollIssueThreads': tuple(uuid, bool.optional(), object({ version: version.optional(), positions: listPositions(51).optional() }).optional()),
   'agents.findThreadIssue': oneId,
-  'agents.getIssueThread': tuple(uuid.nullable(), uuid, object({ chain: text(4000), runId: uuid.nullable(), seq: count, runs: count, count }).nullish()),
+  'agents.getIssueThread': tuple(uuid.nullable(), uuid, z.union([object({ chain: text(4000), runId: uuid.nullable(), seq: count, runs: count, count }), threadHistoryInput]).nullish()),
+  'agents.getIssueThreadContext': tuple(uuid.nullable(), uuid),
+  'agents.getOlderIssueThread': tuple(uuid.nullable(), uuid, threadHistoryPosition),
   'agents.getThreadChanges': tuple(uuid.nullable(), uuid),
   'agents.getThreadMachine': tuple(uuid.nullable(), uuid),
   'agents.getThreadInstructions': tuple(uuid.nullable(), uuid),
@@ -167,6 +170,7 @@ export const desktopActionSchemas = {
   'app-policy.updateAppPolicy': tuple(setAppPolicyInput, workspace),
   'artifacts.listArtifacts': none,
   'artifacts.listRunArtifacts': oneId,
+  'artifacts.listTaskArtifacts': oneId,
   'artifacts.getArtifact': oneId,
   'artifacts.getArtifactText': tuple(uuid, positive),
   'artifacts.shareArtifact': oneId,
@@ -185,6 +189,9 @@ export const desktopActionSchemas = {
   'bots.pollBots': inWorkspace,
   'bots.createBot': tuple(object({ name: text(200).trim().min(1), color: text(50).min(1), shape: text(50).min(1), model: text(1000).nullish(), repository: text(2048).nullish() }), workspace),
   'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() }), workspace),
+  'bots.archiveBot': tuple(uuid, bool, workspace),
+  'bots.deleteBot': tuple(uuid, workspace),
+  'bots.listArchivedOwnBots': inWorkspace,
   'bots.listWorkspaceBots': inWorkspace,
   'bots.getWorkspaceBotDefaults': inWorkspace,
   'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional() }), workspace),
@@ -275,6 +282,7 @@ export const desktopActionSchemas = {
   'linear-sync.retryLinearDelivery': oneId,
   'linear-sync.disconnectLinearAccount': none,
   'link-preview.getLinkPreview': tuple(z.url({ protocol: /^https?$/ }).max(2048)),
+  'link-preview.getLinkPreviews': tuple(z.array(z.url({ protocol: /^https?$/ }).max(2048)).max(200)),
   'memory.getMemory': none,
   'memory.setMemory': tuple(bool),
   'memory.clearMemory': none,
@@ -310,8 +318,6 @@ export const desktopActionSchemas = {
   'pending-actions.decidePendingAction': tuple(uuid, bool),
   'personal-policy.getSharePolicy': inWorkspace,
   'personal-policy.updateSharePolicy': tuple(bool, workspace),
-  'personal-policy.getSubscriptionShare': inWorkspace,
-  'personal-policy.updateSubscriptionShare': tuple(object({ shared: bool, allowOthers: bool.optional() }), workspace),
   'personal-policy.getCreditShare': inWorkspace,
   'personal-policy.updateCreditShare': tuple(bool, workspace),
   'personal-policy.getPaymentDesignation': inWorkspace,

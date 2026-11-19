@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { MIN_DAEMON_VERSION, SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
-import { cachedDaemonVersions, daemonRequestTooOld, daemonUpgradeResponse, daemonUpdateControlRequest, daemonTooOld, daemonVersions, newerDaemonRelease, readLatestDaemonVersion, resetDaemonVersionCacheForTest } from './daemon-release'
+import { DEVICE_SESSION_HEADER, DEVICE_SESSION_VERSION, MIN_DAEMON_VERSION, SOURCE_DAEMON_VERSION } from '@mikka/protocol/device'
+import { daemonRequestTooOld, daemonUpgradeResponse, daemonTooOld, daemonVersions, deviceSessionSupported, readLatestDaemonVersion, resetDaemonVersionCacheForTest } from './daemon-release'
 import daemonPackage from '../packages/daemon/package.json' with { type: 'json' }
 
 const registry = (body: unknown, status = 200) => (async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch
@@ -40,34 +40,6 @@ test('the source version is the daemon package\'s own', () => {
   assert.equal(daemonPackage.version, SOURCE_DAEMON_VERSION)
 })
 
-test('a long-poll reads the cached release without waiting; a stale cache refreshes in the background', async () => {
-  resetDaemonVersionCacheForTest()
-  let reads = 0, release!: (version: string | undefined) => void
-  const read = () => { reads++; return new Promise<string | undefined>(resolve => { release = resolve }) }
-  assert.equal(cachedDaemonVersions(0, read), undefined, 'nothing cached yet: no answer, one read started')
-  assert.equal(cachedDaemonVersions(1, read), undefined)
-  assert.equal(reads, 1, 'concurrent checks share the one read')
-  release('0.0.500'); await new Promise(resolve => setImmediate(resolve))
-  assert.deepEqual(cachedDaemonVersions(2, read), { min: MIN_DAEMON_VERSION, latest: '0.0.500' })
-  assert.equal(reads, 1)
-  assert.deepEqual(cachedDaemonVersions(300_001, read), { min: MIN_DAEMON_VERSION, latest: '0.0.500' }, 'stale: the old answer now, a refresh in the background')
-  assert.equal(reads, 2)
-  release('0.0.501'); await new Promise(resolve => setImmediate(resolve))
-  assert.equal(cachedDaemonVersions(300_002, read)?.latest, '0.0.501')
-  resetDaemonVersionCacheForTest()
-})
-
-test('a release is news only when newer than what the daemon already knows', () => {
-  const versions = { min: MIN_DAEMON_VERSION, latest: '0.0.500' }
-  assert.equal(newerDaemonRelease(versions, '0.0.499'), true)
-  assert.equal(newerDaemonRelease(versions, '0.0.500'), false)
-  assert.equal(newerDaemonRelease(versions, '0.0.501'), false)
-  assert.equal(newerDaemonRelease({ min: MIN_DAEMON_VERSION }, '0.0.499'), false)
-  assert.equal(newerDaemonRelease(undefined, '0.0.499'), false)
-  assert.equal(newerDaemonRelease(versions, 'garbage'), false)
-})
-
-
 test('device admission requires a fixed binary independently of the login credential', async () => {
   for (const version of ['0.0.329', '0.0.455', 'garbage', null]) assert.equal(daemonRequestTooOld(version), true)
   assert.equal(daemonRequestTooOld(MIN_DAEMON_VERSION), false)
@@ -81,11 +53,30 @@ test('device admission requires a fixed binary independently of the login creden
 })
 
 
-test('only update control traffic remains available to an authenticated idle old daemon', () => {
-  const request = (method: string, path: string) => new Request(`https://app.example/mikka${path}`, { method })
-  assert.equal(daemonUpdateControlRequest(request('POST', '/v1/devices/fixture/heartbeat')), true)
-  assert.equal(daemonUpdateControlRequest(request('GET', '/v1/devices/fixture/commands')), true)
-  assert.equal(daemonUpdateControlRequest(request('POST', '/v1/devices/fixture/commands/ack')), false)
-  for (const path of ['/v1/devices/register', '/v1/devices/fixture/repos', '/v1/devices/fixture/runs', '/v1/devices/fixture/computer'])
-    assert.equal(daemonUpdateControlRequest(request('POST', path)), false)
+test('only a daemon that holds a device session is admitted; there is no update channel or run grace', () => {
+  const request = (method: string, path: string, session?: string) => new Request(`https://app.example/mikka${path}`,
+    { method, headers: session === undefined ? {} : { [DEVICE_SESSION_HEADER]: session } })
+  for (const [method, path] of [['POST', '/v1/devices/fixture/report'], ['GET', '/v1/devices/fixture/commands'], ['GET', '/v1/devices/fixture/gateway'],
+    ['POST', '/v1/devices/register'], ['POST', '/v1/runs/00000000-0000-4000-8000-000000000001/events']]) {
+    assert.equal(deviceSessionSupported(request(method, path)), false, `${path} without the header`)
+    assert.equal(deviceSessionSupported(request(method, path, String(DEVICE_SESSION_VERSION))), true, path)
+  }
+  for (const value of ['0', '', 'yes', '1.5', '-1', '9999999']) assert.equal(deviceSessionSupported(request('GET', '/v1/devices/fixture/commands', value)), false, value)
+  assert.equal(deviceSessionSupported(request('GET', '/v1/devices/fixture/commands', String(DEVICE_SESSION_VERSION + 1))), true, 'a newer daemon')
+})
+
+test('the 426 body names the latest release this instance already knows, and never calls out', async () => {
+  resetDaemonVersionCacheForTest()
+  let reads = 0
+  const read = async () => { reads++; return '0.0.900' }
+  const first = await daemonUpgradeResponse(0).json()
+  assert.deepEqual([first.code, first.daemonVersions], ['daemonUpgradeRequired', { min: MIN_DAEMON_VERSION }], 'nothing known yet: answered at once')
+  assert.equal(reads, 0, 'a refusal never starts a read')
+  // A report or commands answer learns the release; the next refusal names it.
+  await daemonVersions(1, read)
+  const next = await daemonUpgradeResponse(2).json()
+  assert.deepEqual(next.daemonVersions, { min: MIN_DAEMON_VERSION, latest: '0.0.900' })
+  assert.equal(reads, 1)
+  assert.equal(next.code, 'daemonUpgradeRequired')
+  resetDaemonVersionCacheForTest()
 })

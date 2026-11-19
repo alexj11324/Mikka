@@ -94,7 +94,7 @@ export function useApiKeys(workspaceId: string) {
     } catch { return actionError() }
   }
 
-  return { data, loadError, pending, failed, share, setFeature, refetch, remove, add, setAfterQuota }
+  return { data, loadError, pending, failed, share, setFeature, refetch, reload: () => keys.mutate(), remove, add, setAfterQuota }
 }
 
 /**

@@ -20,14 +20,16 @@ export async function readCompiledBuild(root, { expectedRevision, env = process.
     if (!info.isFile() || info.isSymbolicLink() || !(await realpath(path)).startsWith(`${root}${sep}`)) fail('APP_COMPILED_FILE_INVALID')
   }
   const built = JSON.parse(await readFile(manifestPath, 'utf8'))
+  const nodeVersion = typeof built.node === 'string' && /^v(\d+)\.\d+\.\d+(?:[-+][\w.-]+)?$/.exec(built.node)
   if (built.version !== 1 || built.preset !== 'node-server' || built.basePath !== '/mikka'
-    || !sha.test(built.revision) || typeof built.node !== 'string' || !built.node.startsWith('v24.') || typeof built.appBuild !== 'string' || !built.appBuild
+    || !sha.test(built.revision) || !nodeVersion || Number(nodeVersion[1]) < 22
+    || typeof built.appBuild !== 'string' || !built.appBuild
     || !digest.test(built.lockSha256) || !digest.test(built.routesSha256) || !digest.test(built.tracingSha256)
     || typeof built.testDeploymentSha !== 'string'
     || (built.testDeploymentSha && built.testDeploymentSha !== built.revision)) fail('APP_COMPILED_MANIFEST_INVALID')
   const expected = expectedRevision ?? env.MIKKA_TEST_DEPLOYMENT_SHA
   if (expected !== undefined && (!sha.test(expected) || built.revision !== expected || built.testDeploymentSha !== expected)) fail('APP_COMPILED_REVISION_MISMATCH')
-  if (!process.version.startsWith('v24.')) fail('APP_NODE_24_REQUIRED')
+  if (Number(process.versions.node.split('.')[0]) < 22) fail('APP_NODE_22_REQUIRED')
   return built
 }
 

@@ -1,4 +1,5 @@
 """Publish step of build-template.py, against a fake E2B API (no network, no SDK)."""
+import base64
 import importlib.util
 import io
 import copy
@@ -6,6 +7,7 @@ from contextlib import redirect_stderr
 import hashlib
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -672,11 +674,17 @@ with fixture.root_file_metadata():
                     self.assertLess(reached.index('control_installed'), reached.index('worker_exec'))
                 self.assertNotIn('synthetic-private-stage-value', result.stdout + result.stderr)
 
+    def test_fence_check_runs_the_daemon_check_inline_independent_of_the_worker(self):
+        command = bt.fence_check_command()
+        self.assertNotIn('/opt/mikka/worker', command)
+        encoded = re.search(r'b64decode\(\\?"([A-Za-z0-9+/=]+)\\?"\)', command).group(1)
+        self.assertEqual(base64.b64decode(encoded), bt.FENCE_CHECK.read_bytes())
+
     def test_ready_diagnostics_preserve_each_failed_predicate_and_short_circuit(self):
         cases = [(kind, None, 0) for kind in bt.KINDS]
         cases += [('claude', phase, code) for phase, code in (
             ('pid_file', 1), ('pid_read', 1), ('pid_alive', 1), ('worker_waiting', 1),
-            ('ingress_ready', 17), ('bootstrap_absent', 1), ('device_absent', 1), ('official_files', 31))]
+            ('ingress_ready', 17), ('control_fence', 23), ('bootstrap_absent', 1), ('device_absent', 1), ('official_files', 31))]
         cases += [('desktop', 'viewer_key_absent', 1), ('desktop', 'viewer_unauthorized', 1)]
         for kind, failure, code in cases:
             with self.subTest(kind=kind, failure=failure), tempfile.TemporaryDirectory(prefix='mikka-ready-stage-') as temp:
@@ -698,6 +706,10 @@ with fixture.root_file_metadata():
                 curl = binary / 'curl'
                 curl.write_text('#!/bin/sh\nprintf ' + ('403' if failure == 'viewer_unauthorized' else '401') + '\n')
                 curl.chmod(0o700)
+                runuser = binary / 'runuser'
+                runuser.write_text('#!/bin/sh\n[ "$1" = -u ] && [ "$2" = user ] && [ "$3" = -- ] && [ "$4" = python3 ] && [ "$5" = -I ] || exit 97\nexit '
+                                   + str(code if failure == 'control_fence' else 0) + '\n')
+                runuser.chmod(0o700)
                 command = bt.prebuilt_ready_command(kind).replace('/opt/mikka', str(runtime))
                 command = command.replace('/home/user/.mikka', str(home)).replace('/run/mikka-viewer', str(viewer))
                 command = command.replace('"/proc/$mikka_preloaded_pid/cmdline"', shlex.quote(str(cmdline)))
@@ -719,34 +731,8 @@ with fixture.root_file_metadata():
         report = {'sourceCommit': 'a' * 40, 'workerSha': 'b' * 40, 'templates': {
             kind: {'templateId': 'tpl-' + kind, 'buildId': 'build-' + kind, 'baseTemplate': kind, 'preinstalled': True,
                    'conservation': conservation(kind)} for kind in bt.KINDS}}
-        with self.assertRaisesRegex(ValueError, 'release_subscription_acceptance_missing'):
-            bt.verify_release_evidence(report)
-        report['subscriptionAcceptance'] = {
-            kind: {'status': 'passed', 'templateId': 'tpl-' + kind, 'sourceCommit': report['sourceCommit'],
-                   'workerSha': report['workerSha'], 'harness': harness, 'model': model, 'credentialRoute': 'subscription',
-                   'officialBinarySha256': 'e' * 64, 'officialCliVersion': 'fixture-version',
-                   'bootstrapAcceptance': bootstrap_acceptance('run-' + kind, harness),
-                   'agentAcceptance': {'runIdHash': hashlib.sha256(('run-' + kind).encode()).hexdigest()[:16], 'harness': harness,
-                                       'kind': 'claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack', 'at': 1100, 'ms': 100},
-                   'runtimeAuthorization': {'source': 'http_server_link', 'scope': 'daemon_http_server_link_and_task_fetch',
-                                            'complete': True, 'truncated': False, 'extraRemoteCalls': 0,
-                                            'hostAuthorizationComplete': True, 'allFirstPartyHttpComplete': False,
-                                            'basis': 'host_authorization_census_and_closed_mcp_business_paths',
-                                            'mcpHttpTiming': mcp_timing('run-' + kind, harness), 'observedProviderEvents': 1,
-                                            'officialDelivery': 'best_effort_not_a_complete_call_count'},
-                   'replyVerifiedAfterTool': True, 'toolEvidence': {'toolCallHash': 'd' * 16, 'outcome': 'ok'},
-                   'replyVerified': True, 'runId': 'run-' + kind, 'deviceId': 'device-' + kind}
-            for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]}
+        # Build-time checks only: no subscription run is needed to publish (E2B runs on the user's own key).
         self.assertIs(bt.verify_release_evidence(report), report)
-        for field, value in [('bootstrapAcceptance', None), ('bootstrapAcceptance', bootstrap_acceptance('foreign', 'codex')), ('templateId', 'old-template'), ('sourceCommit', 'c' * 40), ('credentialRoute', 'api_key'), ('replyVerified', False), ('model', 'other'),
-                             ('replyVerifiedAfterTool', None), ('replyVerifiedAfterTool', False), ('toolEvidence', None),
-                             ('toolEvidence', {'toolCallHash': 'd' * 16, 'outcome': 'error'}),
-                             ('toolEvidence', {'toolCallHash': 'raw-id', 'outcome': 'ok'}),
-                             ('toolEvidence', {'toolCallHash': 'd' * 16, 'outcome': 'ok', 'providerText': 'must-not-pass'})]:
-            invalid = json.loads(json.dumps(report))
-            invalid['subscriptionAcceptance']['codex'][field] = value
-            with self.assertRaisesRegex(ValueError, 'release_subscription_acceptance_missing codex'):
-                bt.verify_release_evidence(invalid)
         invalid = json.loads(json.dumps(report))
         invalid['templates']['desktop']['conservation']['after']['sha256'] = 'e' * 64
         with self.assertRaisesRegex(ValueError, 'release_conservation_invalid desktop'):

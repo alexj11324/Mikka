@@ -235,7 +235,8 @@ fails startup with `SELF_HOSTED_ORIGIN_INVALID` before database migration.
 
 Realtime updates use the server's built-in gateway. Allow WebSocket upgrades
 for `/mikka/v1/live/<channel>/socket` and the device gateway paths through your
-reverse proxy. Authenticated `/api/live/ticket` responses contain the actual
+reverse proxy. A device works only while it holds its gateway socket: a server
+without a device gateway has no devices, and there is no polling fallback. Authenticated `/api/live/ticket` responses contain the actual
 socket address; keep the base path when validating or opening it. See
 [self-hosted realtime and scheduling](self-hosting-realtime.md) for replica and
 external-Worker configuration.
@@ -301,7 +302,7 @@ In **Settings → Models and subscriptions**, add your own provider API key, or 
 
 To supply the server's default OpenAI-compatible model, set `MIKKA_DEFAULT_MODEL_BASE_URL`, `MIKKA_DEFAULT_MODEL_API_KEY`, and `MIKKA_DEFAULT_MODEL_ID`. Use the provider's API base, including its version path where required. Provider charges go to your account. Without a configured default model, choose one of your own available models.
 
-Connect your own computer or server using the commands shown in Mikka's **Devices** settings. Copied commands always include `--server` with the current origin and `/mikka` path. The daemon's standalone CLI keeps its existing official-server default, so retain the flag for a self-hosted installation.
+Connect your own computer or server using the commands shown in Mikka's **Devices** settings. Copied commands always include `--server` with the current origin and `/mikka` path. The daemon's standalone CLI keeps its existing official-server default, so retain the flag for a self-hosted installation. A daemon too old to hold a device session is refused on every device route (`426 daemonUpgradeRequired`); update it and sign in again ([decision 2026-11-17-2215](design/decisions/2026-11-17-2215-device-session-no-heartbeat.md)).
 
 For an E2B cloud computer, save your own E2B key in your account. This does not buy Mikka-hosted compute and does not charge Mikka credits.
 

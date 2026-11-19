@@ -5,7 +5,8 @@ const previousBase = process.env.MIKKA_BASE_PATH
 process.env.MIKKA_BASE_PATH = '/mikka'
 const {
   deleteDriveFile, driveFileURL, driveHeadKey, driveHistoryKey, driveVolumesKey, DriveRequestError,
-  readDriveFileHistory, readDriveSkills, readDriveVolumes, restoreDriveVersion, uploadDriveFiles,
+  readDriveFileHistory, readDriveSkills, readDriveVolumes, readOrganizationDriveScopes, readOrganizationDriveVolumes,
+  restoreDriveVersion, uploadDriveFiles,
 } = await import('./client')
 if (previousBase === undefined) delete process.env.MIKKA_BASE_PATH
 else process.env.MIKKA_BASE_PATH = previousBase
@@ -39,6 +40,23 @@ test('Skill metadata pages keep the explicit Drive location and literal continua
     })
     return Response.json({ skills: [], nextCursor: null })
   })
+})
+
+test('organization Drive addresses preserve combined scope filters, paging and explicit archive selection', async () => {
+  const seen: URL[] = []
+  const send: typeof fetch = async (input, init) => {
+    seen.push(new URL(String(input), 'https://example.invalid'))
+    assert.equal(init?.credentials, 'same-origin')
+    return Response.json([])
+  }
+  await readOrganizationDriveVolumes('org', { projectId: 'project', userId: 'user + 1', exactScope: true, archived: false }, send)
+  await readOrganizationDriveVolumes('org', { exactScope: false }, send)
+  await readOrganizationDriveScopes('org', { projectId: 'project', page: 2 }, send)
+  assert.deepEqual(seen.map(url => [url.pathname, Object.fromEntries(url.searchParams)]), [
+    ['/mikka/api/organizations/org/drive', { projectId: 'project', userId: 'user + 1', exactScope: 'true', archived: 'false' }],
+    ['/mikka/api/organizations/org/drive', {}],
+    ['/mikka/api/organizations/org/drive-scopes', { projectId: 'project', page: '2' }],
+  ])
 })
 
 test('Workspace Files select the team location independently of private and Project caches', () => {

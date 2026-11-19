@@ -168,7 +168,11 @@ test('workflow uses public manual main qualification and uploads the single rece
   assert.match(workflow, /on:\n  workflow_dispatch:\n    inputs:\n      cloud_source_sha:/)
   assert.match(workflow, /permissions:\n  contents: read\njobs:/)
   assert.match(workflow, /if: github.repository == 'alexj11324\/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs\/heads\/main'/)
-  assert.match(workflow, /runs-on: ubuntu-latest/)
+  // The stage runs PostgreSQL 17's initdb from the pinned PGDG noble (24.04)
+  // packages, so the image is pinned to that release: `ubuntu-latest` moved to
+  // 26.04 on 2026-11-19 and the stage failed before any product check ran.
+  assert.match(workflow, /runs-on: ubuntu-24\.04/)
+  assert.doesNotMatch(workflow, /runs-on: ubuntu-latest/)
   assert.match(workflow, /node-version: 24\.22\.1/)
   assert.match(workflow, /corepack prepare pnpm@10\.34\.3 --activate/)
   assert.match(workflow, /MIKKA_CLOUD_SOURCE_SHA: \$\{\{ inputs.cloud_source_sha }}/)

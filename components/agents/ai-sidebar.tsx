@@ -10,11 +10,11 @@ import {
   Folder,
   FolderInput,
   FolderOpen,
-  type LucideIcon,
+  type IconGlyph,
   MoreHorizontal,
   Pencil,
   Undo2,
-} from "lucide-react";
+} from "@/components/icons";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   type DragEvent,
@@ -309,7 +309,7 @@ function ResourceMenuAction({
   onSelect,
   children,
 }: {
-  icon: LucideIcon;
+  icon: IconGlyph;
   onSelect: () => void;
   children: ReactNode;
 }) {

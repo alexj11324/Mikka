@@ -199,7 +199,7 @@ beforeEach(() => {
 const cloudTaskSource = (): RequestSource => ({ userId: owner, botId, issueId, kind: 'user_message', deliveredAt: new Date(),
   payload: { taskDestination: { kind: 'cloud' }, profileId } })
 const dispatchRepository = (target?: 'cloud', eventId: string | undefined = sourceEventId) => dispatchRun(owner,
-  { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', ...(target ? { target } : {}) }, undefined, botId, undefined, eventId)
+  { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', model: { harness: 'codex' }, ...(target ? { target } : {}) }, undefined, botId, undefined, eventId)
 
 for (const target of ['cloud', undefined] as const) test(`a bound task-form source keeps the selected cloud placement with ${target ?? 'omitted'} model target`, async () => {
   requestSource = cloudTaskSource()
@@ -250,13 +250,16 @@ test('ordinary existing-issue chat retains automatic placement and its selected 
   assert.equal(input?.allowLocalRecovery, true)
 })
 
-test('a new thread that follows its chat model records that it followed; a named model does not', async () => {
-  // Decision 2026-11-15-1630: the thread shows 「跟随主线程」, not the person's pick.
+test('a new thread without an Agent is refused with agentRequired; the chat\'s own model is never a default', async () => {
+  // Decision 2026-11-17-1800 (superseding 2026-11-15-1630's 「跟随主线程」): every dispatch names its Agent.
   requestSource = { ...cloudTaskSource(), issueId: null, payload: {} }
   followedModel = { harness: 'codex', model }
-  assert.ok('runId' in await dispatchRepository())
-  assert.equal((queued.get('coordinator:rule:cloud-form-call')?.modelDispatch as { followed?: true })?.followed, true)
-  queued.clear()
+  assert.deepEqual(await dispatchRun(owner, { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call' }, undefined, botId, undefined, sourceEventId),
+    { error: 'agentRequired', issueId })
+  assert.equal(queued.size, 0)
+  assert.deepEqual(calls, [], 'nothing is prepared or queued')
+  assert.deepEqual(await dispatchThread(owner, { botId, issueId }, 'no-agent-call'), { error: 'agentRequired', issueId })
+  assert.equal(queued.size, 0)
   assert.ok('runId' in await dispatchRun(owner, { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', model: { harness: 'codex', model } }, undefined, botId, undefined, sourceEventId))
   assert.equal((queued.get('coordinator:rule:cloud-form-call')?.modelDispatch as { followed?: true })?.followed, undefined)
 })

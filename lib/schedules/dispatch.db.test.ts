@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import { Pool } from 'pg'
 import type { CancelledAutomationRun } from './automation-view'
-import { dbUrl, seedBot, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
+import { dbUrl, seedAgent, seedBot, seedProject, seedProjectTasks, seedRun, seedTeam, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import type { Command, Definition, GitHubEventTrigger } from './contract'
 import type { WebhookBatch, WebhookBatchClosure } from './automation-view'
 
@@ -639,6 +639,43 @@ test('dispatch_task automations run as their creator through the existing create
     assert.equal(changes, 4)
   })
 
+  await t.test('a standing Task in a Project receives once and pauses when its creator loses Project steering', async () => {
+    const selected = definition(builder)
+    assert.ok(selected.task.kind === 'dispatch_task')
+    const { schedule } = await create({ ...selected, eachRun: 'same_task' })
+    const first = await runNow(schedule)
+    await tick()
+    const taskId = (await occurrence(first.occurrence.id)).result!.id
+    const team = await seedTeam(fixture, workspace.id, member)
+    const projectId = await seedProject(fixture, member, [{ teamId: team.id, workspaceId: workspace.id }])
+    await seedProjectTasks(fixture, projectId, [taskId])
+    await fixture.query(`UPDATE resource_access_policies SET "parentKind"='project',"parentId"=$1 WHERE kind='task' AND id=$2`, [projectId, taskId])
+    const agentId = await seedAgent(fixture, owner)
+    const run = await seedRun(fixture, { userId: owner, workspaceId: workspace.id, issueId: taskId, agentId, status: 'running' })
+
+    const second = await runNow(schedule)
+    await tick()
+    assert.equal((await occurrence(second.occurrence.id)).status, 'succeeded')
+    // The first accepted occurrence stays anchored even if a later turn now
+    // leads the same thread. The old receipt, not a second message, wins.
+    await fixture.query(`UPDATE agent_runs SET status='succeeded',"finishedAt"=now() WHERE id=$1`, [run])
+    const next = await seedRun(fixture, { userId: owner, workspaceId: workspace.id, issueId: taskId, agentId, status: 'running' })
+    await fixture.query('UPDATE agent_runs SET "continuesRunId"=$1 WHERE id=$2', [run, next])
+    const replay = await runtime.automationSeams.dispatch!({ ownerId: owner, workspaceId: workspace.id, scheduleId: schedule.id,
+      occurrenceId: second.occurrence.id, single: true, task: selected.task })
+    assert.equal(replay.runId, run)
+    assert.equal((await fixture.query('SELECT count(*)::int n FROM run_messages WHERE "runId"=ANY($1::uuid[])', [[run, next]])).rows[0].n, 1)
+    const { changeResourceAccess } = await import('../resource-access/store')
+    await changeResourceAccess(member, { kind: 'project', id: projectId, workspaceId: workspace.id },
+      { expectedRevision: 1, visibility: 'private', grants: [{ subjectId: owner, capabilities: ['canReadContent'] }], confirmExpansion: true })
+    const third = await runNow(schedule)
+    await tick()
+    const denied = await occurrence(third.occurrence.id)
+    assert.deepEqual([denied.status, denied.error], ['failed', 'scheduleStandingTaskUnavailable'])
+    assert.equal((await fixture.query('SELECT status FROM user_schedules WHERE id=$1', [schedule.id])).rows[0].status, 'paused')
+    assert.equal((await fixture.query('SELECT count(*)::int n FROM run_messages WHERE "runId"=$1', [run])).rows[0].n, 1)
+  })
+
   await t.test('追加到同一个任务: later runs add to the first run’s task; a deleted task pauses the automation', async () => {
     const standing = (await create({ ...definition(builder), maxConcurrent: 3, eachRun: 'same_task' })).schedule
     const first = await runNow(standing)
@@ -660,8 +697,14 @@ test('dispatch_task automations run as their creator through the existing create
     assert.deepEqual([added.result!.id, (added.result as { continued?: boolean }).continued], [taskId, true])
     assert.equal(Number((await fixture.query('SELECT count(*) FROM run_messages WHERE "runId"=$1', [run])).rows[0].count), 1, 'the request reached the running thread once')
     assert.equal(Number((await fixture.query(`SELECT count(*) FROM schedule_occurrences WHERE schedule_id=$1 AND result ? 'eventId'`, [standing.id])).rows[0].count), 1, 'one task in all')
+    const history = () => page<{ occurrences: Occurrence[] }>(owner, chat, { action: 'history', scheduleId: standing.id })
+    const beforeDelete = (await history()).occurrences.find(entry => entry.id === second.occurrence.id)
+    assert.equal(beforeDelete?.result?.id, taskId, 'the creator sees their accessible Task result')
     await fixture.query('DELETE FROM agent_runs WHERE id=$1', [run])
     await fixture.query('DELETE FROM issues WHERE id=$1', [taskId])
+    const afterDelete = (await history()).occurrences.find(entry => entry.id === second.occurrence.id)
+    assert.equal(afterDelete?.status, 'succeeded', 'an earlier successful run remains visible')
+    assert.equal(afterDelete?.result, null, 'deleting the Task removes its snapshot from future history reads')
     const current = (await fixture.query<{ version: number }>('SELECT version FROM user_schedules WHERE id=$1', [standing.id])).rows[0]!
     const third = await runNow({ ...standing, version: current.version })
     await tick()

@@ -113,7 +113,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const firstSection = useRef(section)
   const switched = useRef(false)
   if (section !== firstSection.current) switched.current = true
-  const enter = switched.current ? 'animate-in fade-in-0 duration-150 motion-reduce:animate-none' : undefined
+  const enter = switched.current ? 'animate-in fade-in-0 duration-(--motion-fast) motion-reduce:animate-none' : undefined
 
   return <>
     <SettingsSidebar section={section} activeSection={activeSection} admin={admin} personal={!team} billing={billing} cloudAdmin={cloudAdmin} workspaceName={workspace?.workspace.name} selectedTeamId={selectedTeamId} workspaceId={workspaceId} onSectionChange={setSection} onIntent={next => { if (!preview && (next !== 'billing' || billing)) prefetchSettingsSection(next, resolvedWorkspaceId, cache, mutate) }} onRail={onRail} />

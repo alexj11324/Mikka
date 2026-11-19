@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/motion/alert
 
-import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from "lucide-react";
+import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from "@/components/icons";
 import { AnimatePresence, type HTMLMotionProps, motion, useReducedMotion } from "motion/react";
 import {
   createContext,
@@ -51,9 +51,9 @@ const VARIANT_CLASS: Record<AlertVariant, string> = {
 const VARIANT_ICON = {
   default: Info,
   info: Info,
-  success: CheckCircle2,
+  success: CircleCheck,
   warning: TriangleAlert,
-  destructive: AlertCircle,
+  destructive: CircleAlert,
 };
 
 export interface AlertProps extends Omit<HTMLMotionProps<"div">, "initial" | "animate" | "exit" | "layout" | "transition" | "role"> {
@@ -145,7 +145,7 @@ export function Alert({
                 layout={!reduce}
                 transition={{ opacity: { duration: 0.18, ease: EASE_OUT }, transform: { duration: 0.2, ease: EASE_OUT }, layout: SPRING_LAYOUT }}
                 style={{ ...style, ...gate.style, originY: 0, transitionTimingFunction: EASE_OUT_CSS }}
-                className={cn("relative w-full rounded-xl p-4 text-sm transition-colors duration-200", VARIANT_CLASS[variant], className)}
+                className={cn("relative w-full rounded-xl p-4 text-sm transition-colors duration-(--motion-base)", VARIANT_CLASS[variant], className)}
               >
                 <motion.div
                   layout={reduce ? false : "position"}

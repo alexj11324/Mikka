@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { ArrowLeft, Play } from 'lucide-react'
+import { ArrowLeft, Play } from '@/components/icons'
 import { listDevices } from '@/app/actions/agents'
 import { getWorkspaceBotDefaults, listBotsForWorkspace } from '@/app/actions/bots'
 import { automationLinearLabels, automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
@@ -40,6 +40,7 @@ import { LinearTriggers } from './linear-triggers'
 import { SlackTriggers } from './slack-triggers'
 import { AutomationUsagePanel } from './automation-usage'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
+import { harnessName } from '@/components/labels/entity-labels'
 
 const zones = (() => { try { return Intl.supportedValuesOf('timeZone') } catch { return ['UTC'] } })()
 const localZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' } catch { return 'UTC' } }
@@ -79,6 +80,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   }, [current, dirty, baseline?.version])
   const stale = Boolean(current && baseline && dirty && current.version !== baseline.version)
   const requestId = useRef(crypto.randomUUID())
+  const pendingRun = useRef<{ scope: string; requestId: string } | null>(null)
   const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver'>(null)
   const [cancellingRun, setCancellingRun] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -87,7 +89,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
 
   const { data: bots = [] } = useSWR(workspaceId ? ['bots', 'workspace', workspaceId] as const : null,
     ([, , shown]) => listBotsForWorkspace(shown), { revalidateOnFocus: false })
-  const { data: devices = [] } = useSWR('devices', listDevices, { revalidateOnFocus: false })
+  const { data: devices = [], error: devicesError } = useSWR('devices', listDevices, { revalidateOnFocus: false })
   const workspaceBots = useWorkspaceBotNames(workspaceId)
   // The workspace's installed repositories, the ones a GitHub trigger may name (any member may read them).
   const { data: repositories = [] } = useSWR(workspaceId ? ['automation-repositories', workspaceId] as const : null, async ([, shown]) => {
@@ -168,7 +170,17 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     if (!current || !canManage || busy) return
     setBusy('run')
     try {
-      const result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: crypto.randomUUID() }, workspaceId ?? undefined)
+      const scope = JSON.stringify([userId, workspaceId, current.id, current.version])
+      if (pendingRun.current?.scope !== scope) pendingRun.current = { scope, requestId: crypto.randomUUID() }
+      let result: Awaited<ReturnType<typeof runAutomationNow>>
+      try {
+        result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: pendingRun.current.requestId }, workspaceId ?? undefined)
+      } catch {
+        // The server may already have recorded this run. Retry that same request until it answers.
+        toast.error(t('runUnconfirmed'))
+        return
+      }
+      pendingRun.current = null
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       toast.success(t('started'))
       await history.mutate()
@@ -234,6 +246,10 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </div>
     </header>
 
+    {/* Every control below is disabled for a non-owner, so the reason is said once, here, rather than
+        left to a grey field that never explains itself. */}
+    {!canManage && <p role="status" className="px-6 pt-1 text-sm text-muted-foreground">{t('viewOnly')}</p>}
+
     <FieldSet disabled={!canManage} className="contents">
     {!draft.otherTask && <SettingsSection id="automation-settings" title={t('settings')}>
       {field(t('bot'), <NativeSelect aria-label={t('bot')} value={draft.botId ?? ''} onChange={event => set({ botId: event.target.value || null })}>
@@ -246,6 +262,15 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
         <NativeSelectOption value="cloud">{t('machineCloud')}</NativeSelectOption>
         {draft.machine === 'cloudflare' && <NativeSelectOption value="cloudflare">{t('machineCloud')}</NativeSelectOption>}
         {localDevices.map(device => <NativeSelectOption key={device.id} value={device.id}>{device.name}</NativeSelectOption>)}
+        {/* A failed read leaves the list empty; without this the only machine
+            choices are the two defaults, with nothing saying why the person's
+            own devices are missing. */}
+        {devicesError && <NativeSelectOption value="" disabled>{t('devicesError')}</NativeSelectOption>}
+      </NativeSelect>)}
+      {field(t('agent'), <NativeSelect aria-label={t('agent')} value={draft.agent ?? ''} onChange={event => set({ agent: event.target.value === 'claude_code' || event.target.value === 'codex' ? event.target.value : null })}>
+        <NativeSelectOption value="" disabled>{t('agentNone')}</NativeSelectOption>
+        <NativeSelectOption value="claude_code">{harnessName('claude_code')}</NativeSelectOption>
+        <NativeSelectOption value="codex">{harnessName('codex')}</NativeSelectOption>
       </NativeSelect>)}
       {field(t('profile'), <NativeSelect aria-label={t('profile')} value={draft.profileId} disabled={!workspaceId} onChange={event => set({ profileId: event.target.value })}>
         {profileChoices.choices.map(choice => <NativeSelectOption key={choice.value} value={choice.value} disabled={'disabled' in choice && choice.disabled}>{choice.label}</NativeSelectOption>)}
@@ -389,7 +414,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     <AlertDialog open={confirmTakeOver} onOpenChange={open => { if (!busy) setConfirmTakeOver(open) }}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{t('takeOverTitle')}</AlertDialogTitle><AlertDialogDescription>{t('takeOverBody', { name: creator })}</AlertDialogDescription></AlertDialogHeader>
-        <AlertDialogFooter><AlertDialogCancel disabled={busy === 'takeOver'}>{t('cancel')}</AlertDialogCancel><AlertDialogAction disabled={busy === 'takeOver'} onClick={() => { void takeOver() }}>{t('takeOver')}</AlertDialogAction></AlertDialogFooter>
+        <AlertDialogFooter><AlertDialogCancel disabled={busy === 'takeOver'}>{t('cancel')}</AlertDialogCancel><AlertDialogAction variant="default" disabled={busy === 'takeOver'} onClick={() => { void takeOver() }}>{t('takeOver')}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   </EditorFrame>
@@ -416,6 +441,7 @@ function RunRow({ run, timezone, onCancel, cancelling }: { run: AutomationRun; t
   const task = runTask(run)
   const at = run.started_at ?? run.due_at
   const reason = run.error ? (t.has(`runErrors.${run.error}` as never) ? t(`runErrors.${run.error}` as never) : tErrors.has(run.error as never) ? tErrors(run.error as never) : run.error) : null
+  // control-size-exempt: a run's own line — time, badge and one small cancel; not a toolbar of controls.
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
     <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{when(at, timezone)}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>

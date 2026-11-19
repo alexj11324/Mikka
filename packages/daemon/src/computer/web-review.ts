@@ -1,6 +1,7 @@
 import type { LocalComputerDecision, LocalComputerRequest } from '@mikka/protocol/computer'
 import type { ComputerBroker } from './broker.mjs'
 import type { DeviceWorkSignal } from '../device-work-signal'
+import { ServerUnreachableError } from '../errors'
 /** The device remains the only execution authority. Server decisions never supply operation arguments. */
 export async function applyWebComputerDecisions(broker: ComputerBroker, decisions: LocalComputerDecision[]) {
   for (const decision of decisions) {
@@ -23,11 +24,6 @@ export async function syncWebComputerReviews(broker: ComputerBroker, deviceId: s
   await applyWebComputerDecisions(broker, decisions)
 }
 
-/** The server accepts a person's decision only on a request this device showed
- * in the last 10 s (lib/computer/reviews.ts), so a pending request is re-sent
- * at least this often even when nothing changed. */
-export const REVIEW_PRESENCE_MS = 5_000
-
 /** What identifies a broker snapshot: a sync is news only when this changes. */
 function snapshotKey(requests: { id: string; digest: string }[]) {
   return requests.map(row => `${row.id}:${row.digest}`).sort().join(',')
@@ -36,45 +32,51 @@ function snapshotKey(requests: { id: string; digest: string }[]) {
 /** A worker owns this loop for its lifetime. A failed upload cannot approve a
  * call; retrying preserves the original pending request and digest.
  *
- * The broker is checked locally every `intervalMs`. The server is asked only
- * when something changed (#1212): the pending set, a gateway push (a person
- * decided in the web), or the presence refresh above. Against a server that
- * does not push review decisions, or while the gateway is down, a pending
- * request is synced every `intervalMs` as before, so a decision still lands
- * within a second. */
-export async function pollWebComputerReviews(broker: ComputerBroker, deviceId: string, link: { syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]> }, signal: AbortSignal, intervalMs = 1000, pushes?: DeviceWorkSignal, presenceMs = REVIEW_PRESENCE_MS) {
+ * Nothing here runs on a timer (decision 2026-11-17-2215). The server is asked
+ * only while the device session is open, and only when something happened:
+ * the broker's pending set changed, the gateway pushed (a person decided in
+ * the web), or the socket opened (a push may have been lost while it was
+ * down). A sync the server could not take asks for a redial through
+ * `onUnreachable`; the reopened socket syncs again. */
+export async function followWebComputerReviews(broker: ComputerBroker, deviceId: string, link: { syncComputerReviews?(deviceId: string, requests: LocalComputerRequest[], signal?: AbortSignal): Promise<LocalComputerDecision[]> }, signal: AbortSignal, pushes: DeviceWorkSignal, onUnreachable?: () => void) {
   if (!link.syncComputerReviews) throw new Error('Computer review transport unavailable')
-  // Clear stale server requests once on startup and after a nonempty snapshot:
-  // an empty snapshot differs from the last one synced. A failed upload may
-  // have reached the server, so the same snapshot is retried until it succeeds.
-  // Empty brokers still check locally at the existing cadence.
-  let pushed = false
+  // Clear stale server requests once on the first open and after a nonempty
+  // snapshot: an empty snapshot differs from the last one synced.
+  let pushed = true
+  let changed = true
   let synced: string | undefined
-  let syncedAt = 0
-  const unsubscribe = pushes?.subscribe(() => { pushed = true })
+  let wake: (() => void) | null = null
+  const nudge = () => { const done = wake; wake = null; done?.() }
+  const offPush = pushes.subscribe(() => { pushed = true; nudge() })
+  const offBroker = broker.onPendingChange(() => { changed = true; nudge() })
+  const onAbort = () => nudge()
+  signal.addEventListener('abort', onAbort, { once: true })
   try {
     while (!signal.aborted) {
-      const snapshot = broker.list() as LocalComputerRequest[]
-      const pending = snapshot.length > 0
-      const key = snapshotKey(snapshot)
-      const everyCheck = (pushes?.mode('computerReviews') ?? 'legacy') !== 'push'
-      if (key !== synced || (pending && (pushed || everyCheck || Date.now() - syncedAt >= presenceMs))) {
+      if (pushes.live && (pushed || changed)) {
+        const snapshot = broker.list() as LocalComputerRequest[]
+        const key = snapshotKey(snapshot)
+        if (key !== synced || (pushed && snapshot.length > 0)) {
+          pushed = false
+          changed = false
+          try {
+            await syncWebComputerReviews(broker, deviceId, link, signal)
+            synced = key
+          } catch (error) {
+            // Pending calls remain unapproved; the next push, change or open retries.
+            if (error instanceof ServerUnreachableError) onUnreachable?.()
+          }
+          continue
+        }
         pushed = false
-        try {
-          await syncWebComputerReviews(broker, deviceId, link, signal)
-          synced = key
-          syncedAt = Date.now()
-        } catch { /* pending calls remain unapproved; failed cleanup retries */ }
+        changed = false
       }
       if (signal.aborted) break
-      // A push ends the local wait early: the decision is applied now, not on the next check.
-      if (pushes) await pushes.next(intervalMs, signal)
-      else await new Promise<void>(resolve => {
-        const done = () => { clearTimeout(timer); signal.removeEventListener('abort', done); resolve() }
-        const timer = setTimeout(done, intervalMs)
-        signal.addEventListener('abort', done, { once: true })
-        if (signal.aborted) done()
-      })
+      await new Promise<void>(resolve => { wake = resolve; if (signal.aborted) nudge() })
     }
-  } finally { unsubscribe?.() }
+  } finally {
+    offPush()
+    offBroker()
+    signal.removeEventListener('abort', onAbort)
+  }
 }

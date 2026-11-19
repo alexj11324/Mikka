@@ -76,6 +76,13 @@ test('path policy rejects traversal, encoded delimiters, absolute targets and un
   assert.equal(allowedApiPath('/api/settings/issue-prefix/extra', 'GET'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'GET'), true)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'POST'), false)
+  // 收件箱 reads its authorized page and writes its lifecycle commands; nothing
+  // else about it is reachable, and the count query rides the same GET.
+  assert.equal(allowedApiPath('/api/inbox', 'GET'), true)
+  assert.equal(allowedApiPath('/api/inbox', 'POST'), true)
+  assert.equal(allowedApiPath('/api/inbox', 'HEAD'), true, 'HEAD reads as GET')
+  for (const method of ['PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath('/api/inbox', method), false, method)
+  assert.equal(allowedApiPath('/api/inbox/extra', 'GET'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token/metadata', 'GET'), false)
   assert.equal(allowedApiPath(`/api/bots/${identity.user.id}/computer/viewer`, 'POST'), false)
   assert.equal(allowedApiPath(`/api/bots/${identity.user.id}/computer/takeover`, 'POST'), false)
@@ -86,12 +93,15 @@ test('path policy rejects traversal, encoded delimiters, absolute targets and un
 test('private Drive forwarding has exact identifiers, paths and HTTP methods', () => {
   const volume = 'vol_01ARZ3NDEKTSV4RRFFQ69G5FAV', version = 'vver_01ARZ3NDEKTSV4RRFFQ69G5FAW'
   const routes: [string, string[]][] = [
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive-skills', ['GET']],
     ['/api/drive/scopes', ['GET']],
     ['/api/drive/shares', ['GET']],
     ['/api/drive/shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844', ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive-shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844', ['PATCH', 'DELETE']],
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/restore', ['POST']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions', ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000', ['GET']],
+    [`/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/versions/vver_01J00000000000000000000000/files/${'a'.repeat(64)}`, ['GET']],
     ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/file-versions', ['GET']],
     ['/api/drive/volumes', ['GET', 'POST']],
     [`/api/drive/volumes/${volume}`, ['GET']],
@@ -99,6 +109,7 @@ test('private Drive forwarding has exact identifiers, paths and HTTP methods', (
     [`/api/drive/volumes/${volume}/versions`, ['GET']],
     [`/api/drive/volumes/${volume}/versions/${version}`, ['GET']],
     [`/api/drive/volumes/${volume}/shares`, ['GET', 'POST']],
+    ['/api/organizations/7107d7b1-b9e5-45ec-9ffc-ee62c45da3c1/drive/vol_01J00000000000000000000000/shares', ['GET', 'POST']],
     [`/api/drive/volumes/${volume}/shares/4bd6cdd3-9660-48ed-9db1-15f98f5bb844`, ['GET', 'PATCH', 'DELETE']],
     [`/api/drive/volumes/${volume}/blobs`, ['POST']],
     [`/api/drive/volumes/${volume}/entries`, ['PATCH']],
@@ -135,6 +146,17 @@ test('Factory flow accepts only a strict UUID and its two declared methods', () 
   assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
 })
 
+test('Factory activity and its media are read-only under a strict task UUID', () => {
+  const task = identity.user.id
+  for (const path of [`/api/factory/tasks/${task}/activity`, `/api/factory/tasks/${task}/media/${task}`]) {
+    assert.equal(allowedApiPath(path, 'GET'), true, path)
+    for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
+    assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
+  }
+  assert.equal(allowedApiPath('/api/factory/tasks/task_1/activity', 'GET'), false)
+  assert.equal(allowedApiPath(`/api/factory/tasks/${task}/media/`, 'GET'), false)
+})
+
 test('service identity management forwards only its declared human-session methods and UUID paths', () => {
   const workspace = 'ab81a708-013c-4e44-9ab2-a500bd59f381'
   const identity = 'ebb7878e-6918-4b68-9300-d956761b5011'
@@ -160,7 +182,9 @@ test('organization lifecycle, workspace binding and service keys use their decla
   const collection = overview + '/api-keys'
   for (const method of ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) {
     assert.equal(allowedApiPath('/api/organizations', method), ['GET', 'POST'].includes(method))
-    assert.equal(allowedApiPath(overview, method), ['GET', 'PATCH', 'DELETE'].includes(method))
+    assert.equal(allowedApiPath('/api/organizations/deleted', method), method === 'GET')
+    assert.equal(allowedApiPath('/api/organizations/deleted/extra', method), false)
+    assert.equal(allowedApiPath(overview, method), ['GET', 'PUT', 'PATCH', 'DELETE'].includes(method))
     assert.equal(allowedApiPath(overview + '/workspaces', method), ['POST', 'DELETE'].includes(method))
     assert.equal(allowedApiPath(collection, method), method === 'GET')
     assert.equal(allowedApiPath(collection + '/' + key, method), method === 'PATCH')
@@ -196,6 +220,16 @@ test('Organization Files forwards only a signed directory read', () => {
     assert.equal(allowedApiPath(path, method), method === 'GET')
     assert.equal(allowedApiPath(path + '/all', method), false)
     assert.equal(allowedApiPath('/api/organizations/unknown/drive-shares', method), false)
+  }
+})
+
+test('Organization Drive catalogs allow GET for the exact Organization path', () => {
+  for (const resource of ['drive', 'drive-scopes']) {
+    const path = '/api/organizations/' + identity.user.id + '/' + resource
+    for (const method of ['GET', 'POST', 'PATCH', 'DELETE']) {
+      assert.equal(allowedApiPath(path, method), method === 'GET')
+      assert.equal(allowedApiPath(path + '/all', method), false)
+    }
   }
 })
 

@@ -9,7 +9,7 @@ import { pathToFileURL } from 'node:url'
 import { encode, decode } from '../../lib/desktop-rpc/wire.ts'
 import { USER_ERROR_CODES } from '../../packages/protocol/src/user-error-codes.ts'
 import { createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace,
-  chooseSharedChatModel, startupFailure } from './cloud-startup.mjs'
+  chooseOwnChatModel, startupFailure } from './cloud-startup.mjs'
 import { CORE_ORIGIN, assertCoreProductionTarget, attestCoreProduction, coreTargetFailure } from './self-hosted-production-target.mjs'
 import { selectMemoryProduction, memorySelectionFailure } from './memory-production-target.mjs'
 import { reviewPendingMemoryFixture, memoryPendingFailure } from './memory-production-pending.mjs'
@@ -156,7 +156,7 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
     boundaries: { notificationInjected: false, databaseAccess: false, profileWrites: false, sharedModelOrderWrites: false,
       existingPendingReviewed: false, botDeletion: 'no_normal_owner_delete_api',
       factDeletion: 'normal_soft_delete_tombstone', undoRetention: 'two_minutes_then_existing_hourly_purge',
-      modelIdentity: 'fixed_shared_subscription_selection_and_completed_bot_reply_not_native_runtime_attestation' } }
+      modelIdentity: 'fixed_own_subscription_selection_and_completed_bot_reply_not_native_runtime_attestation' } }
   let client, account, ownerId, originalWorkspaceId, selectedWorkspaceId, initial, originalCookie = '', source, phase = 'target'
   let factId, createAttempted = false, signInAttempted = false, closing = false, cleaning = 0, deadline = 0, target = attestation
   let marker, requestId, subject, challenge
@@ -411,7 +411,7 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
           check(read.id === bot.id && read.name === botName, 'fixture_binding_failed')
           botId = bot.id; ownedBots.set(botId, botName)
           await checkpoint('bot_created_' + sample.harness)
-          await chooseSharedChatModel(client, botId, sample.harness)
+          await chooseOwnChatModel(client, botId, sample.harness)
           const chosen = await rpc('execution-settings.getBotModelMenu', [botId])
           const exactModel = current => current?.kind === 'subscription' && current.chosen === true
             && current.provider === sample.provider && current.modelId === sample.model && current.fallback === undefined
@@ -433,7 +433,7 @@ export async function runMemoryProduction({ env = process.env, event, attestatio
           await pin(); result.status = 'passed'
         } catch (error) {
           result.failure = failure(error)
-          if (result.failure.code === 'model_unavailable' || ['startup_shared_chat_model_ambiguous', 'startup_shared_chat_model_unavailable'].includes(result.failure.code)) result.status = 'blocked'
+          if (result.failure.code === 'model_unavailable' || ['startup_own_chat_model_ambiguous', 'startup_own_chat_model_unavailable'].includes(result.failure.code)) result.status = 'blocked'
           // A provider failure can explain an unanswered prompt. It cannot
           // downgrade a proven post-reply usage/target/selection defect.
           if (botId && promptSent && !result.reply) {

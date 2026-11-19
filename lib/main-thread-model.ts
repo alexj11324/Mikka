@@ -6,8 +6,9 @@ type Query = Pick<Pool, 'query'>
 export interface MainThreadModel { harness: OrderHarness; model: string }
 
 /**
- * The model a new task follows when nobody named one (decision 2026-11-15-1630):
- * the model of the chat that dispatches it, the Coordinator's or a Bot's.
+ * The runnable model of a chat, the Coordinator's or a Bot's. Dispatch no longer
+ * uses it as a default: every dispatch names its Agent (decision 2026-11-17-1800,
+ * superseding 2026-11-15-1630's 「跟随主线程」).
  *
  * Only a model a thread can run counts: a subscription or API-key model that is
  * one of the person's task candidates, or a chat's Mikka 额度 model
@@ -31,13 +32,11 @@ export async function mainThreadModel(pool: Query, scope: { ownerId: string; wor
       const { harnessFor } = await import('./model-catalog')
       return { harness: harnessFor(credits), model: credits }
     }
-    // The person's own choice row names the binding. A teammate's shared
-    // subscription is bound to this Bot under the subscription owner's id, so
-    // the binding is read by this workspace and Bot; the candidate below must
-    // still be one this person's 优先使用的模型 offers.
+    // The person's own choice row names their own binding: a subscription
+    // serves its owner only (decision 2026-11-17).
     const { rows: [binding] } = await pool.query<{ connectionId: string; modelId: string }>(
-      'SELECT "connectionId"::text AS "connectionId","modelId" FROM byos_bindings WHERE id=$1 AND "workspaceId"=$3 AND ("ownerId"=$2 OR "consumerId"=$4)',
-      [preference.selected, scope.ownerId, scope.workspaceId, botId ?? 'coordinator'])
+      'SELECT "connectionId"::text AS "connectionId","modelId" FROM byos_bindings WHERE id=$1 AND "ownerId"=$2',
+      [preference.selected, scope.ownerId])
     if (!binding) return null
     match = candidate => candidate.source.kind === 'subscription' && candidate.source.connectionId === binding.connectionId && candidate.model === binding.modelId
   }

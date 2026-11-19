@@ -5,7 +5,6 @@ import { afterDatabaseCommit, captureDatabaseQuery } from '../db/commit-effects'
 import { armDueTimerAfterCommit, armDueTimerSoon } from '../due-timer'
 import { ReviewAuthorityError, type TaskReviewAuthority } from './review-authority'
 import { readIssueMetadata } from '../issue-metadata'
-import { THREAD_MACHINE_BUDGET_MS } from '../cloud-computer/thread-lifecycle'
 import { taskThreadRunPredicate } from '../task-thread-run'
 
 export const REVIEW_SESSION_MS = 5 * 60_000
@@ -38,10 +37,7 @@ export async function beginReviewSession(authority: TaskReviewAuthority,
   [authority.runId, authority.ownerId, authority.workspaceId, authority.sandboxId, authority.machineEpoch, authority.machineOperationId])
   if (!clock) throw new ReviewAuthorityError('review_machine_gone')
   const now = clock.now.getTime()
-  const elapsed = clock.state === 'running' && clock.runningSince ? Math.max(0, now - clock.runningSince.getTime()) : 0
-  const remaining = THREAD_MACHINE_BUDGET_MS - Number(clock.computeSeconds) * 1_000 - elapsed
-  if (remaining <= 0) throw new ReviewAuthorityError('review_machine_gone')
-  const deadline = Math.min(now + REVIEW_SESSION_MS, now + remaining, authority.credentialExpiresAt ? Date.parse(authority.credentialExpiresAt) : Infinity,
+  const deadline = Math.min(now + REVIEW_SESSION_MS, authority.credentialExpiresAt ? Date.parse(authority.credentialExpiresAt) : Infinity,
     options.expiresAt ? Date.parse(options.expiresAt) : Infinity)
   if (!Number.isFinite(deadline) || deadline <= now) throw new ReviewAuthorityError('review_auth_required')
   const { rows } = await client.query<StoredLease>('SELECT * FROM coding_review_sessions WHERE "runId"=$1 ORDER BY kind FOR UPDATE', [authority.runId])

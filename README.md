@@ -122,9 +122,12 @@ Commercial licenses are available from Aspectly Labs at [legal@aspectlylabs.com]
 
 Mikka is proudly developed with support from the [Codex for Open Source](https://openai.com/form/codex-for-oss/) program.
 
-A heartfelt thank-you to OpenAI and the Codex team for providing Mikka's maintainer with six months of ChatGPT Pro access. This support gives us more room to explore ambitious ideas, improve engineering and user experience, and give back to the open-source community.
+<a href="https://neon.com">
+  <img src="docs/assets/neon-logo.svg" alt="Neon" width="160">
+</a>
 
-Mikka is an independent open-source project and is not affiliated with or endorsed by OpenAI. The OpenAI name and logo are trademarks of OpenAI.
+Thanks to [Neon](https://neon.com) for supporting Mikka through the Neon Open
+Source Program.
 
 ## License
 

@@ -25,7 +25,9 @@ export function personalProjectSelectionFor(reader: { id: string }, workspaceId:
     if (!change) return current
     if (change.projectId && !projects.some(project => project.id === change.projectId)) throw new GovernanceError('not_found')
     const save = async () => {
-      if (change.projectId === projectId) return current
+      // The visible Project can be null in a sibling Workspace while the
+      // member still has a saved Organization-wide choice to clear.
+      if (change.projectId === (saved?.projectId ?? null)) return current
       if (current.revision !== change.expectedRevision) throw new GovernanceError('project_selection_changed')
       const values = { defaultProjectId: change.projectId, selectionRevision: current.revision + 1 }
       await tx.insert(defaults).values({ organizationId, userId: reader.id, visibility: 'shared', ...values })

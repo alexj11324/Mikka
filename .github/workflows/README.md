@@ -12,9 +12,8 @@ bindings. Current workflow files define the triggers and selected coverage.
 - Keep `UI policy (strict)` and `Production build and browser interactions`
   successful for non-documentation PRs; the latter gates the selected isolated PostgreSQL suites across 1–4 dynamic
   shards. Full inventory validation runs even when DB execution is skipped. Despite its name, CI
-  does not build the production Web release artifact. The legacy `web-deploy.yml`
-  workflow (currently disabled for new Vercel publication) describes the original
-  **public-root** official build and its private read-only Overlay checkout.
+  does not build the production Web release artifact. The retired Vercel
+  `web-deploy.yml` workflow was removed on 2026-11-17.
   Current Cloudflare native CI and the transitionary private-triggered OCI issuer
   are **different** operations; neither changes long-term public build ownership.
   See [build-source-of-truth.md](../../docs/operations/build-source-of-truth.md).
@@ -27,6 +26,11 @@ bindings. Current workflow files define the triggers and selected coverage.
 - All four existing required names remain intact. Do not silently replace
   them with a new aggregate check until the GitHub branch-protection settings
   have been migrated and verified.
+
+`local-device-node22.yml` now runs an actual app/Eve build and startup smoke
+on Node 22 and 24, retaining the daemon and installer tests. The core,
+integration and PG17 database jobs above also run the selected suites on both
+majors; the original Node 24 protected-check names stay unchanged.
 
 ## Focused governance acceptance and superseded PR runs
 
@@ -83,8 +87,7 @@ for proof that a ready PR is safe to merge.
   `e2b-byos`, `site-search`, `ssh-device-backend`, `unattended-sandbox`) run on
   pull requests only, selected by trusted dependencies or their existing path filters; each can still be run
   by hand (`workflow_dispatch`). Production Web is promoted through the
-  Cloudflare deployment workflow; the Vercel `web-deploy.yml` is disabled and
-  no release workflow waits for it.
+  Cloudflare deployment workflow; Vercel publication was removed on 2026-11-17.
 - `publish-daemon.yml` uses daemon/package-input path filters.
   `desktop-release.yml` also watches the shared frontend, UI and API inputs.
   On a push it builds nothing and leaves a note in the run summary. The
@@ -252,15 +255,10 @@ Public and fork PRs build without the private repository, and that build only
 has to compile; no workflow screenshots it. (`community-settings-ui.yml`,
 which captured that build's settings pages, was removed on 2026-11-08.)
 
-`web-deploy.yml` and `desktop-release.yml` alone read the private UI through
-Infisical OIDC and `HOSTED_UI_READ_KEY` (`prod:/platform`, GitHub read-only deploy key on
-`alexj11324/mikka-hosted-ui` only). They set `MIKKA_UI_OVERLAY_DIR` and record
-`MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build with the default slots
-without either variable or any private secret. The production Web job checks
-public main plus private main on each main update, including docs-only pushes. Private main pushes dispatch
-the official Web job again with `overlay-refresh: true`, so docs-only changes
-cannot skip an overlay rebuild; bundled UI/release input changes also dispatch desktop with the expected
-overlay SHA, while private documentation-only pushes refresh Web only. No schedule is involved.
+`cloudflare-api-image.yml` and `desktop-release.yml` alone read the private UI, with the
+GitHub read-only deploy key `HOSTED_UI_READ_KEY` on `alexj11324/mikka-hosted-ui` only. They set
+`MIKKA_UI_OVERLAY_DIR` and record `MIKKA_UI_OVERLAY_SHA`; public and fork PRs still build with the
+default slots without either variable or any private secret.
 
 Web verifies `/mikka/api/version`'s `build` and `overlaySha`. Desktop uses the
 existing matching-Web source gate and checks out **that Web overlay SHA**, then

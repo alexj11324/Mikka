@@ -40,6 +40,17 @@ The official package supports `WORKFLOW_POSTGRES_WORKER_CONCURRENCY` and
 connection limit. Eve's guide recommends at least concurrency plus two
 connections.
 
+The package's default poll interval is 500 ms per worker, so 50 idle workers
+query the database about 100 times a second. The host sets
+`WORKFLOW_POSTGRES_POLL_INTERVAL_MS` to `5000`; LISTEN/NOTIFY still wakes idle
+workers as soon as a job is added. A deployment can override it with
+`EVE_ENV_WORKFLOW_POSTGRES_POLL_INTERVAL_MS`. Keep the concurrency at 50: the
+package documents a deadlock at 10.
+
+Each release runs its own Eve Container, and the host never sleeps. Stop a
+release's Container with `stopForOwner` once no gateway release serves it,
+otherwise every release keeps polling the database.
+
 The named service `EveService` forwards the native protocol at
 `https://eve.internal/eve/v1/*`. Postgres queue delivery stays inside the
 Container. The ingress blocks external workflow queue callbacks, as required by

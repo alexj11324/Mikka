@@ -3,18 +3,17 @@
 import { useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
-import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
+import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from '@/components/icons'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
-import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
+import { FieldLegend, FieldSet } from '@/components/ui/field'
 import { Label } from '@/components/ui/label'
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { E2BKeyDialog } from '@/components/settings/e2b-key-dialog'
 import { DispatchOrder } from '@/components/settings/dispatch-order'
@@ -43,13 +42,13 @@ const sourceKey = (item: Pick<OrderCandidate, 'harness' | 'model' | 'source'>) =
 export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const t = useTranslations('Settings.modelOrder')
   const commonT = useTranslations('Common')
-  const { data, loadError, e2b, pending, failed, unsaved, shown, offered, other, backup, offeredOther, checkQuota, save, move, remove, reload } = useModelOrder(workspaceId)
+  const { data, loadError, e2b, pending, failed, unsaved, shown, offered, checkQuota, save, move, remove, reload } = useModelOrder(workspaceId)
   const [adding, setAdding] = useState(false)
   const [keyOpen, setKeyOpen] = useState(false)
   const keyDialog = usePresence(keyOpen)
 
-  if (loadError) return <FieldError>{loadError}</FieldError>
-  if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><p role="status" className="px-5 py-4 text-sm text-muted-foreground">{t('loading')}</p></SettingsSection>
+  if (loadError) return <SettingsSection id="model-order-heading" title={t('title')}><SettingsSaveError message={loadError} retryLabel={commonT('retry')} onRetry={() => { void reload() }} /></SettingsSection>
+  if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><SettingsLoading label={t('loading')} rows={2} bare /></SettingsSection>
 
   // The order each location tries (decision 2026-11-02-2330) is drawn as a chain, not a sentence (Alex, 2026-11-06).
   const noKey = data.location === 'cloud' && e2b.configured === false
@@ -84,8 +83,8 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
         </span>
       </SettingRow>}
     </SettingsSection>
-    {/* What a task dispatched to an Agent runs on (Alex, 2026-11-02): the preferred Agent and the models in
-        order, one card. Bot chats pick their own model; this is a preference order, not a permission. */}
+    {/* What a task dispatched to an Agent runs on (Alex, 2026-11-02): each Agent's models in order, one Agent's list
+        shown at a time. A task uses only its own Agent's list, never the other's (decision 2026-11-17-1800). Bot chats pick their own model; this is a preference order, not a permission. */}
     <SettingsSection id="model-order-heading" title={t('title')} description={t('description')}
       action={shown.length > 0 && <Button type="button" {...settingsSectionAction} disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button>}>
       <SettingRow title={t('preferredAgent')} description={t('preferredAgentHint')}>
@@ -101,18 +100,14 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
           {offered.length > 0
             ? <><p className="text-sm text-muted-foreground">{data.entries.length ? t('emptyAgent', { agent: harnessName(data.preferredHarness) }) : t('empty')}</p>
               <Button type="button" disabled={pending} onClick={() => setAdding(true)}>{t('add')}</Button></>
-            // Nothing for this Agent, models for the other: tasks go there; one button makes it the 优先使用的 Agent.
-            : offeredOther.length > 0 ? <><p className="text-sm text-muted-foreground">{t('emptyUseOther', { agent: harnessName(data.preferredHarness), other: harnessName(other) })}</p>
-              <Button type="button" disabled={pending} onClick={() => void save({ kind: 'preferred', harness: other }, { ...data, preferredHarness: other })}>{t('switchAgent', { agent: harnessName(other) })}</Button></>
             : <><p className="text-sm text-muted-foreground">{data.credentials === 0 ? t('emptyNoCredential') : t('emptyNoModels')}</p>
               <span className="flex flex-wrap justify-center gap-2">
                 <Button nativeButton={false} variant="secondary" render={<a href="#subscriptions-heading" />}>{t(data.credentials === 0 ? 'connectSubscription' : 'openSubscription')}</Button>
                 <Button nativeButton={false} variant="secondary" render={<a href="#api-keys-heading" />}>{t(data.credentials === 0 ? 'addApiKey' : 'openApiKey')}</Button>
               </span></>}
         </div>
-        : <OrderList rows={shown} pending={pending} unsaved={unsaved} preferred={data.preferredHarness} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
+        : <OrderList rows={shown} pending={pending} unsaved={unsaved} repair={repair} onMove={move} onRemove={row => { void remove(row) }}
           onAgent={(row, harness) => void save({ kind: 'harness', id: row.id, harness }, { ...data, entries: data.entries.map(entry => entry.id === row.id ? { ...entry, harness } : entry) })} />}
-      {shown.length > 0 && backup.length > 0 && <BackupList agent={other} rows={backup} />}
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={failed.retry} />}
     {adding && <AddModelsDialog candidates={offered} onClose={async picked => {
@@ -124,26 +119,7 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   </>
 }
 
-/** The other Agent's list, read-only and folded: dispatch's fallback once this Agent's models cannot run. */
-function BackupList({ agent, rows }: { agent: OrderHarness; rows: OrderRow[] }) {
-  const t = useTranslations('Settings.modelOrder')
-  return <Collapsible className="border-t border-border">
-    <CollapsibleTrigger render={<Button type="button" variant="ghost" className="group h-auto w-full justify-between rounded-none px-5 py-3 text-sm font-normal text-muted-foreground" />}>
-      {t('backup', { agent: harnessName(agent), count: rows.length })}<ChevronDown aria-hidden="true" className="transition-transform group-data-panel-open:rotate-180" />
-    </CollapsibleTrigger>
-    <CollapsibleContent>
-      <ol aria-label={t('backupList', { agent: harnessName(agent) })} className="flex flex-col divide-y divide-border">
-        {rows.map((row, index) => <li key={row.id} className="flex items-center gap-3 px-5 py-2.5 text-sm">
-          <span aria-hidden="true" className="w-4 shrink-0 text-center text-xs text-muted-foreground tabular-nums">{index + 1}</span>
-          <span className="min-w-0 flex-1 truncate">{row.model}</span>
-          <span className="shrink-0 text-xs text-muted-foreground">{row.source.kind === 'api_key' ? `${sourceName(t, row)} · ${t('billedByProvider')}` : sourceName(t, row)}</span>
-        </li>)}
-      </ol>
-    </CollapsibleContent>
-  </Collapsible>
-}
-
-function OrderList({ rows, pending, unsaved, preferred, repair, onMove, onRemove, onAgent }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; preferred: OrderHarness; repair: (row: OrderRow) => ReactNode; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void; onAgent: (row: OrderRow, harness: OrderHarness) => void }) {
+function OrderList({ rows, pending, unsaved, repair, onMove, onRemove, onAgent }: { rows: OrderRow[]; pending: boolean; unsaved: { id: string; to: number } | null; repair: (row: OrderRow) => ReactNode; onMove: (from: number, to: number) => void; onRemove: (row: OrderRow) => void; onAgent: (row: OrderRow, harness: OrderHarness) => void }) {
   const t = useTranslations('Settings.modelOrder')
   // No live reorder while dragging (the sortable strategy shows the shift): a live reorder moved the row under
   // the pointer, and a drop before dnd-kit re-measured landed on the stale target and put the row back (#1000).
@@ -163,14 +139,14 @@ function OrderList({ rows, pending, unsaved, preferred, repair, onMove, onRemove
       },
     }}>
     <KanbanColumnContent value="models" aria-label={t('title')} className="gap-0 divide-y divide-border" render={<ol />}>
-      {items.map((row, index) => <OrderItem key={row.id} row={row} index={index} last={index === items.length - 1} pending={pending} preferred={preferred} repair={repair(row)} onAgent={harness => onAgent(row, harness)}
+      {items.map((row, index) => <OrderItem key={row.id} row={row} index={index} last={index === items.length - 1} pending={pending} repair={repair(row)} onAgent={harness => onAgent(row, harness)}
         retry={unsaved?.id === row.id ? () => onMove(index, Math.min(unsaved.to, items.length - 1)) : undefined}
         onFirst={() => onMove(index, 0)} onUp={() => onMove(index, index - 1)} onDown={() => onMove(index, index + 1)} onRemove={() => onRemove(row)} />)}
     </KanbanColumnContent>
   </Kanban>
 }
 
-function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; preferred: OrderHarness; repair?: ReactNode; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
+function OrderItem({ row, index, last, pending, repair, retry, onAgent, onFirst, onUp, onDown, onRemove }: { row: OrderRow; index: number; last: boolean; pending: boolean; repair?: ReactNode; retry?: () => void; onAgent: (harness: OrderHarness) => void; onFirst: () => void; onUp: () => void; onDown: () => void; onRemove: () => void }) {
   const t = useTranslations('Settings.modelOrder')
   const commonT = useTranslations('Common')
   const { status, checking, warn } = useOrderRowStatus()(row, Boolean(retry))
@@ -190,7 +166,7 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
     </span>
     {/* The row's controls: beside the model where they fit, on their own line on a phone, so the name is never cut to a letter. */}
     <span className="ml-auto flex shrink-0 items-center gap-3">
-    {/* A model both Agents run: its Agent here, 优先 marking the preferred one (Harness draft). */}
+    {/* A model both Agents run: which Agent's list it belongs to (Harness draft). */}
     {row.agents.length > 1 && <DropdownMenu>
       <DropdownMenuTrigger disabled={pending} render={<Button variant="secondary" size="sm" aria-label={t('agentMenu', { model: row.model, agent: harnessName(row.harness) })} />}>
         {harnessName(row.harness)}<ChevronDown aria-hidden="true" data-icon="inline-end" />
@@ -200,7 +176,7 @@ function OrderItem({ row, index, last, pending, preferred, repair, retry, onAgen
           <DropdownMenuLabel>{t('agentSection')}</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={row.harness} onValueChange={value => { if ((value === 'claude_code' || value === 'codex') && value !== row.harness) onAgent(value) }}>
             {row.agents.map(agent => <DropdownMenuRadioItem key={agent} value={agent}>
-              <span className="flex-1">{harnessName(agent)}</span>{agent === preferred && <span className="text-xs text-muted-foreground">{t('preferredMark')}</span>}
+              <span className="flex-1">{harnessName(agent)}</span>
             </DropdownMenuRadioItem>)}
           </DropdownMenuRadioGroup>
         </DropdownMenuGroup>

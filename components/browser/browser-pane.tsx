@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
-import { ArrowLeft, ArrowRight, ArrowUp, RotateCw, SquareDashedMousePointer, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUp, RotateCw, SquareDashedMousePointer, X } from '@/components/icons'
 import { ELEMENT_ROLES, FRAME_SCRIPT, type ElementRole, type FromFrame, type ToFrame } from '@mikka/protocol/artifact-frame'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'

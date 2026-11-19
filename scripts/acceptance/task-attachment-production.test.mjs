@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { accept, scopeHashes, target } from './task-attachment-production.mjs'
 
-const env = { GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main',
+const env = { GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REF: 'refs/heads/main',
   GITHUB_SHA: 'a'.repeat(40), ATTACHMENT_EXPECTED_SHA: 'a'.repeat(40), GITHUB_RUN_ID: '42', GITHUB_RUN_ATTEMPT: '1',
   SMOKE_OWNER_EMAIL: 'qa+mikka-smoke@example.invalid', SMOKE_OWNER_PASSWORD: 'dummy password' }
 const owner = 'local-test-owner', workspace = 'local-test-team', original = 'local-original'
@@ -87,8 +87,8 @@ test('live revision, owner, team, retained task and exact uploaded bytes pass; u
   for (const privateValue of [env.SMOKE_OWNER_EMAIL, env.SMOKE_OWNER_PASSWORD, theCase.id, theCase.caseId,
     theCase.harness, f.issue.title, other.name, original, marker, productWrites(f)[0].path.split('=').at(-1)]) assert.ok(!serialized.includes(privateValue))
 })
-test('a branch, PR, dispatch, wrong repository, stale SHA or invalid run refuses before any request', async () => {
-  for (const invalid of [{ GITHUB_REF: 'refs/heads/topic' }, { GITHUB_EVENT_NAME:'pull_request' }, { GITHUB_EVENT_NAME:'workflow_dispatch' },
+test('a branch, PR, workflow_run, wrong repository, stale SHA or invalid run refuses before any request', async () => {
+  for (const invalid of [{ GITHUB_REF: 'refs/heads/topic' }, { GITHUB_EVENT_NAME:'pull_request' }, { GITHUB_EVENT_NAME:'workflow_run' },
     { GITHUB_REPOSITORY: 'other/Mikka' }, { ATTACHMENT_EXPECTED_SHA: 'b'.repeat(40) }, { GITHUB_RUN_ID:'0' }, { GITHUB_RUN_ATTEMPT:'x' }]) {
     const f = fixture(), r = await f.execute(invalid); assert.equal(r.failure,'target_refused'); assert.equal(f.calls.length, 0)
   }

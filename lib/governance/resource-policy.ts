@@ -102,7 +102,6 @@ export async function decideOrganizationResourceApproval(organizationId: string,
 export async function retryOrganizationPolicyOutbox(organizationId?: string) {
   const { workspacePool } = await import('@/lib/workspace-db')
   const { rows } = await workspacePool.query<{ id: string; organizationId: string; workspaceIds: string[]; changes: { modelCredentials: boolean; mcp: boolean; modelProviders: boolean } }>('select id,"organizationId","workspaceIds",changes from mikka_organization_policy_outbox where "deliveredAt" is null and ($1::uuid is null or "organizationId"=$1) order by "createdAt",id limit 50', [organizationId ?? null])
-  const { stopRunsUsingSubscriptions } = await import('@/lib/personal-policy')
   const { stopRunsUsingApiKeys } = await import('@/lib/model-api-key-runs')
   const { workspaceResourcePolicy } = await import('./resource-access')
   const { stopRunsForPolicyChange, notifyStoppedPolicyRuns } = await import('@/lib/run-policy-stop')
@@ -111,7 +110,6 @@ export async function retryOrganizationPolicyOutbox(organizationId?: string) {
       const policy = await workspaceResourcePolicy(workspaceId).catch(() => null)
       if (!policy || policy.organizationId !== receipt.organizationId) continue
       if (receipt.changes.modelCredentials) {
-        await stopRunsUsingSubscriptions(pool, { workspaceId, othersOnly: true })
         await stopRunsUsingApiKeys(pool, { workspaceId, othersOnly: true })
       }
       if (receipt.changes.mcp) {

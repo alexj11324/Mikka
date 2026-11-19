@@ -82,7 +82,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     // An installation row an earlier build recorded; admission no longer reads it (decision 2026-11-02-1600).
     await recordPushGrant(pool, id, normalizeRepository(remote).key)
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Laptop','local',true,$3,now(),$4)`,
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Laptop','local',true,$3,now(),$4,now())`,
       [deviceId, id, DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'claude_code', installed: true, toolApproval: true }, { harness: 'codex', installed: true, toolApproval: true }])])
     const agents: Record<'claude_code' | 'codex', string> = { claude_code: randomUUID(), codex: randomUUID() }
     for (const [harness, agentId] of Object.entries(agents)) await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)', [agentId, id, deviceId, harness, `${harness}-${agentId.slice(0, 8)}`])
@@ -92,7 +92,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   }
   const definition = async (runId: string) => (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0].agentDefinition
   const claim = (deviceId: string, runId: string, token: string, credentialHeader = true, environmentHeader = false) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${deviceId}/runs/${runId}/claim`, {
-    method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', ...(credentialHeader ? { [MODEL_CREDENTIAL_HEADER]: '1' } : {}), ...(environmentHeader ? { [PROJECT_ENVIRONMENT_HEADER]: '1' } : {}) },
+    method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', ...(credentialHeader ? { [MODEL_CREDENTIAL_HEADER]: '1' } : {}), ...(environmentHeader ? { [PROJECT_ENVIRONMENT_HEADER]: '1' } : {}) },
   }), { params: Promise.resolve({ deviceId, runId }) })
   const recorded = async (runId: string) => (await pool.query('SELECT "keyId" FROM model_api_key_runs WHERE "runId"=$1', [runId])).rows[0]?.keyId ?? null
   /** A connected Claude subscription bound to the person's Claude Code Agent. */
@@ -690,10 +690,10 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const accepted = await claim(p.deviceId, next, p.token)
     assert.equal(accepted.status, 200, await accepted.text())
 
-    // The heartbeat answer names the releases; a failed automatic update is kept until the daemon clears it.
-    const heartbeatRoute = await import('../app/v1/devices/[deviceId]/heartbeat/route')
-    const beat = (body: Record<string, unknown>) => heartbeatRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/heartbeat`, {
-      method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${p.token}` }, body: JSON.stringify({ harnesses: [], runs: [], worktreeDiskBytes: 0, ...body }),
+    // The report answer names the releases; a failed automatic update is kept until the daemon clears it.
+    const reportRoute = await import('../app/v1/devices/[deviceId]/report/route')
+    const beat = (body: Record<string, unknown>) => reportRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/report`, {
+      method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${p.token}` }, body: JSON.stringify({ harnesses: [], ...body }),
     }), { params: Promise.resolve({ deviceId: p.deviceId }) })
     const stored = async () => (await pool.query('SELECT "updateFailure" FROM devices WHERE id=$1', [p.deviceId])).rows[0].updateFailure
     const failure = { version: '0.0.331', code: 'install_failed', at: '2026-11-02T21:00:00.000Z' }

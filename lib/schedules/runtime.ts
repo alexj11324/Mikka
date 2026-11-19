@@ -64,19 +64,12 @@ export const automationSeams:AutomationSeams={
     if(single){
       const standing=(await pool.query<{id:string}>(`SELECT result->>'id' id FROM schedule_occurrences WHERE schedule_id=$1 AND id<>$2 AND status='succeeded' AND result ? 'eventId' AND result->>'requestedBy'=$3 ORDER BY created_at LIMIT 1`,[scheduleId,occurrenceId,ownerId])).rows[0]
       if(standing){
-        const issue=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i LEFT JOIN task_creation_receipts r ON r."taskId"=i.id AND r."userId"=$2
-          WHERE i.id=$1 AND i."workspaceId"=$3`,[standing.id,ownerId,workspaceId])).rows[0]
-        if(!issue)throw new ScheduleError('scheduleStandingTaskUnavailable',403)
-        const run=(await pool.query<{id:string}>(`SELECT id FROM agent_runs WHERE "issueId"=$1 AND "userId"=$2 ORDER BY "createdAt" DESC LIMIT 1`,[standing.id,ownerId])).rows[0]
-        // The Bot has not started the task yet: retried shortly, never a second task.
-        if(!run)throw new ScheduleError('scheduleStandingTaskNotStarted',503)
-        const {sendThreadMessage}=await import('@/lib/thread-continue')
-        const sent=await sendThreadMessage(ownerId,run.id,text,'user',occurrenceId)
-        return {id:standing.id,title:issue.title,status:issue.status,identifier:issue.identifier,runId:sent.runId,continued:true as const}
+        const { continueStandingTask } = await import('./standing-task')
+        return continueStandingTask(ownerId, workspaceId, standing.id, text, occurrenceId)
       }
     }
     const {eventId}=await recordPersonalSubmission(db,ownerId,text,{botId,submissionId:occurrenceId,
-      taskCommand:{version:1,intent:'create_and_dispatch',description:text},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event&&source==='slack'?{slack:true as const}:event?{event:true as const}:{})},
+      taskCommand:{version:1,intent:'create_and_dispatch',description:text,...(task.agent?{agent:task.agent}:{})},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event&&source==='slack'?{slack:true as const}:event?{event:true as const}:{})},
       ...(task.title?{taskTitle:task.title}:{}),...(task.destination?{taskDestination:task.destination}:{}),...(task.profileId?{profileId:task.profileId}:{})})
     const created=await createIssueFromRequest(ownerId,{sourceEventId:eventId,title:task.title??task.prompt.split(/\r?\n/,1)[0]!.slice(0,200)})
     const row=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i

@@ -107,7 +107,7 @@ test("thread filesystem snapshots park once and restore only the same task machi
     const markTokenUsed = async (sandboxId: string) => recordingSandbox(sandboxId, async bootstrap => {
       await pool.query(`UPDATE device_tokens SET "lastUsedAt"=clock_timestamp() WHERE "boundDeviceId"=$1 AND "tokenHash"=$2 AND "revokedAt" IS NULL`,
         [bootstrap.deviceId, createHash('sha256').update(bootstrap.credential).digest('hex')]);
-      await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1', [bootstrap.deviceId]);
+      await pool.query('UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1', [bootstrap.deviceId]);
     });
     const fakeProvider = (overrides: Partial<typeof threadMachineProvider> = {}) => {
       const calls: string[] = [];

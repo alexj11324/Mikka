@@ -186,7 +186,7 @@ export class SubscriptionService {
       try { await this.member(ownerId, row.workspaceId); await this.member(String(row.ownerId), row.workspaceId, ownerId) }
       catch { throw new SubscriptionRefusal('account_unavailable') }
     }
-    // The use belongs to the credential's owner: the run owner, or the member who shared it (分享给团队成员).
+    // The use belongs to the credential's owner, who is always the run owner (decision 2026-11-17-1400).
     return {ownerId:String(row.ownerId),workspaceId:row.workspaceId,consumerId:row.consumerId,bindingId:row.id,execution:'native',runId} as const
   }
   async nativeContext(use: SubscriptionUse, signal?: AbortSignal, requireModelCatalogue = false) {

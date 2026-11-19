@@ -30,3 +30,11 @@ patchedDependencies:
   '@novnc/novnc@1.6.0': patches/@novnc__novnc@1.6.0.patch
   '@better-auth/sso@1.7.12': patches/@better-auth__sso@1.7.12.patch
   ffmpeg-static@5.3.0: patches/ffmpeg-static@5.3.0.patch
+  # Eve CLI reads this engine range; actual build/start is tested on 22 and 24.
+  eve@1.0.0-rc.9: patches/eve@1.0.0-rc.9.patch
+
+# Eve development cleanup uses explicit resource management, absent on Node 22.
+packageExtensions:
+  eve@1.0.0-rc.9:
+    dependencies:
+      core-js-pure: 3.51.0

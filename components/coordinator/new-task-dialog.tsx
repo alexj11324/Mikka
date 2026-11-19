@@ -12,6 +12,8 @@ import { backlogTaskDraft } from '@/lib/task-create-form'
 import { TASK_TITLE_MAX } from '@/lib/task-title-input'
 import { useCoordinatorSubmit } from './use-coordinator-submit'
 import type { TaskDestination } from '@/lib/task-destination'
+import type { TaskAgent } from '@/lib/task-create-command'
+import { harnessName } from '@/components/labels/entity-labels'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { AccessChangeDialog } from '@/components/workspace/issue-metadata-controls'
 import { Alert, AlertTitle } from '@/components/ui/alert'
@@ -104,6 +106,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   // 继续新建: after a create the window stays, cleared, with the same machine, Bot and profile, for the next task.
   const [more, setMore] = useState(false)
   const [picked, setPicked] = useState<string | null>(null)
+  // 交给哪个 Agent: the person picks one; nothing is preselected and the task keeps it for life (decision 2026-11-17-1800).
+  const [agent, setAgent] = useState<TaskAgent | null>(null)
   const profiles = useAgentProfiles(workspaceId, dispatching, picked ? (picked === 'cloud' || picked === 'cloudflare') ? { location: 'cloud' } : { location: 'local', deviceId: picked } : undefined)
   const [profilePick, setProfilePick] = useState<{ workspaceId: string; id: string } | null>(null)
   const profileId = profilePick?.workspaceId === workspaceId ? profilePick?.id : undefined
@@ -164,9 +168,9 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   async function submit(confirmedFingerprint?: string) {
     const name = title.trim()
     const text = draft.trim() || name
-    const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, picked, botPick, profileId])
+    const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, picked, botPick, profileId, agent])
     const confirmAccess = confirmedFingerprint === fingerprint
-    if (!text || pending.current || projectPicker.pending || attachments.locked || (only && !workspaceId) || (!only && (!available || !profileAllowed || botPick && !handler))) return
+    if (!text || pending.current || projectPicker.pending || attachments.locked || (only && !workspaceId) || (!only && (!available || !profileAllowed || !agent || botPick && !handler))) return
     // A task on Mikka 额度 (its chat's model, or a Cloudflare machine) with nothing to pay opens 选择套餐 instead (decision 2026-11-15-1900).
     // Claim the submit before the paywall's balance read, so a second click cannot slip in while it runs.
     pending.current = true
@@ -190,15 +194,15 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
         onCreated?.(result.taskId)
         return
       }
-      const key = JSON.stringify([workspaceId, teamId, projectId, text, name, picked, project ?? null, handler?.id ?? null, profileId ?? null])
+      const key = JSON.stringify([workspaceId, teamId, projectId, text, name, picked, project ?? null, handler?.id ?? null, profileId ?? null, agent])
       if (composed.current?.key !== key) {
         const destination = pickedTaskDestination(picked)
-        const context = [destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
+        const context = [agent && t('contextAgent', { agent: harnessName(agent) }), destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
         composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }),
           ...(name ? { taskTitle: name } : {}),
           ...(destination ? { taskDestination: destination } : {}) }
       }
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, taskTitle: composed.current.taskTitle, expectedWorkspaceId: workspaceId, ...(confirmAccess ? { confirmTaskAccess: true } : {}), ...(workspaceId ? { taskCommand: { version: 1, intent: 'create_and_dispatch', description: text, ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}) } } : {}) })
+      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, taskTitle: composed.current.taskTitle, expectedWorkspaceId: workspaceId, ...(confirmAccess ? { confirmTaskAccess: true } : {}), ...(workspaceId ? { taskCommand: { version: 1, intent: 'create_and_dispatch', description: text, ...(agent ? { agent } : {}), ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}) } } : {}) })
       if (outcome.kind === 'rejected' && outcome.error === 'accessChangeConfirmationRequired') { setAccessChange({ fingerprint, tasks: 1 }); return }
       if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
       if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
@@ -208,6 +212,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
       void mutate('coordinator-chat')
       if (more) { toast.success(t('created')); if (outcome.task) onAdded?.(); return }
       setPicked(null)
+      setAgent(null)
       setProfilePick(null)
       onOpenChange(false)
       if (outcome.task && onCreated) onCreated(outcome.task.taskId)
@@ -246,8 +251,9 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
       machines={only ? [] : [slotMachine(defaults, 'default'), slotMachine(cloud, 'cloud'), ...sponsored.map(item => slotMachine(item, 'cloud')), ...own.map(item => slotMachine(item, 'own'))]} machine={picked ?? 'auto'} onMachine={pick}
       bots={!only && botChoices.length > 0 ? [{ id: null, name: 'Coordinator', avatar: <CoordinatorAvatar size="row" /> }, ...botChoices.map(bot => ({ id: bot.id, name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> }))] : []}
       bot={handler?.id ?? null} onBot={setBotPick}
+      agent={{ value: agent, choices: (['claude_code', 'codex'] as const).map(value => ({ value, label: harnessName(value) })), onChange: setAgent, disabled: sending }}
       profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
-      intent={only || chooseIntent ? intent : undefined} chooseIntent={chooseIntent} more={{ checked: more, onChange: setMore }} notices={notices} sending={sending} canSubmit={!projectPicker.pending && (only ? Boolean(workspaceId) : available && profileAllowed && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
+      intent={only || chooseIntent ? intent : undefined} chooseIntent={chooseIntent} more={{ checked: more, onChange: setMore }} notices={notices} sending={sending} canSubmit={!projectPicker.pending && (only ? Boolean(workspaceId) : available && profileAllowed && !!agent && (!botPick || !!handler)) && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
     {keyDialogNode}
     {accessChange && <AccessChangeDialog change={accessChange} pending={sending} onCancel={() => setAccessChange(null)} onConfirm={async () => {
       const current = accessChange

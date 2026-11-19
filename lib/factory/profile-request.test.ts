@@ -41,7 +41,7 @@ test('without a task-form choice the Coordinator may choose one of the owner\'s 
 })
 
 test('task placement and Profile share the same authenticated source read', async () => {
-  for (const taskDestination of [{ kind: 'cloud' }, { kind: 'device', deviceId: id(7) }] as const) {
+  for (const taskDestination of [{ kind: 'cloud' }, { kind: 'device', deviceId: id(7) }, { kind: 'device', deviceId: id(7), agentId: id(8) }] as const) {
     let reads = 0
     const database = source({ profileId: id(5), taskDestination }, () => { reads++ })
     assert.deepEqual(await requestedTaskSelection(database, scope, id(4), id(6)), { profileId: id(5), taskDestination })

@@ -431,6 +431,36 @@
     "kind": "core",
     "env": {}
   },
+  "core-coding-workspace-review-runtime": {
+    "command": "pnpm test:coding-workspace-review-runtime",
+    "kind": "core",
+    "env": {}
+  },
+  "core-drive": {
+    "command": "pnpm test:drive",
+    "kind": "core",
+    "env": {}
+  },
+  "core-github-pulls": {
+    "command": "pnpm test:github-pulls",
+    "kind": "core",
+    "env": {}
+  },
+  "core-model-gateway-litellm": {
+    "command": "pnpm test:model-gateway-litellm",
+    "kind": "core",
+    "env": {}
+  },
+  "core-factory-query-http": {
+    "command": "pnpm test:factory-query-http",
+    "kind": "core",
+    "env": {}
+  },
+  "core-factory-monitor-http": {
+    "command": "pnpm test:factory-monitor-http",
+    "kind": "core",
+    "env": {}
+  },
   "integration-factory-activity": {
     "command": "pnpm test:factory-activity",
     "kind": "integration",

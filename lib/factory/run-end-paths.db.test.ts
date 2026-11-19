@@ -49,7 +49,7 @@ test("cancel and thread end reach a terminal run, then afterRunEnded finalizes t
     // Keep fixture sources out of the Coordinator's legacy null-Bot backfill.
     const cloudBotId = randomUUID();
     await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,'owner',$2,'Startup fixture')`, [cloudBotId, workspaceId]);
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses) VALUES ($1,'owner','Disposable',now(),'[{"harness":"codex","installed":true}]')`, [deviceId]);
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,'owner','Disposable',now(),'[{"harness":"codex","installed":true}]',now())`, [deviceId]);
     await pool.query(`INSERT INTO agents (id,"userId",name,harness,"deviceId") VALUES ($1,'owner','Fixture','codex',$2)`, [agentId, deviceId]);
     await pool.query(`INSERT INTO device_repos (id,"deviceId","userId","repoPath") VALUES ($1,$2,'owner','/fixture/repo')`, [repoId, deviceId]);
     const authorize = async (user: string, issue: string, tx: PoolClient) =>

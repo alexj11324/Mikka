@@ -36,7 +36,7 @@ re-checked for this page.
 
 **A workspace is the tenant; team-only means "exists only between people".**
 Members, invitations, teams, roles and 团队权限, member audit, shared credits,
-card designation and seats, 分享给团队成员, bots of people who left, and
+card designation and seats, 分享给团队成员 for API keys (subscriptions are never shared, 2026-11-17-1400), bots of people who left, and
 transfer are team-only (T2). Anything a single person needs to run their own
 bots and threads (secrets and environment, models and subscriptions, devices,
 connections, usage, billing) is present in a personal workspace too.
@@ -82,7 +82,7 @@ referenced by id (DDD).
 | Connection | Link to an outside app | Connection · account | `composio_accounts.userId` (`schema.ts:727-741`), `github_connections.userId` (`:399`), `linear_connections.userId` (`:169`), `telegram_links` | 插件 › an app | 插件, and 设置 › 连接 (same `PluginsView`) | 插件 rail page |
 | App policy | The workspace's allow/ask/deny per app; 团队权限 › 允许使用的应用 still narrows which apps a Bot may use | Workspace · workspace | `workspace_computer_policies.external_write_permissions` (legacy `workspace_app_policies.workspaceId` is still enforced) | — | 设置 › 应用与运行权限; 设置 › 团队权限 | 设置 › 应用与运行权限; 设置 › 团队权限 |
 | Secret / env var | Value injected into the workspace's runs | Secret · workspace | `workspace_secrets (workspaceId, scopeType, scopeRef, createdBy)` (`lib/db/secrets-schema.ts:8-23`); injected by `loadWorkspaceRuntimeSecrets` (`lib/secrets/runtime.ts:20`) | 设置 › 密钥与环境 (`lib/secrets/store.ts:124`) | 设置 › 密钥与环境 | 设置 › 密钥与环境 |
-| Model credential | Subscription login or API key | Credentials · account | `byos_connections.ownerId` (+ legacy `workspaceId`), `model_api_keys.ownerId`, `user_e2b_keys.userId`; shares `workspace_subscription_shares`, `model_api_key_shares` (drizzle `20261027164503`, `20261101021000`, `20261101020201`) | 设置 › 模型与订阅 | 设置 › 模型与订阅 (shares: team only) | 设置 › 模型与订阅; bot model chip (R-11) |
+| Model credential | Subscription login or API key | Credentials · account | `byos_connections.ownerId` (+ legacy `workspaceId`), `model_api_keys.ownerId`, `user_e2b_keys.userId`; shares `model_api_key_shares` (subscriptions are owner-only since 2026-11-17-1400; `workspace_subscription_shares` is retired) (drizzle `20261027164503`, `20261101021000`, `20261101020201`) | 设置 › 模型与订阅 | 设置 › 模型与订阅 (shares: team only) | 设置 › 模型与订阅; bot model chip (R-11) |
 | Credits, allowance, billing | What a workspace spends and pays | Billing · workspace | `workspace_billing`, `workspace_credit_grants` (`schema.ts:1151-1180`), `hosted_allowances`, `hosted_usage` (drizzle `20261030230000`); `workspace_payment_designations`, `workspace_credit_shares` (team) | Stripe webhook (`lib/billing/service.ts:145`); allowance on verification | 设置 › 用量, 计费 | 设置 › 用量, 计费 |
 | Notifications | Pushes and alerts about runs and chats | Account · account | `user_preferences` switches (`components/settings/notifications-settings.tsx:9`), `mobile_push_tokens.userId` (`schema.ts:1071`) | — | 设置 › 通知 | Web: none; desktop: system notification and Dock badge for 等你 (`platforms.md`); phone: push |
 | Memory | Facts about the person | Account · account | `user_facts.userId` (`schema.ts:664`) | Extracted from chats | 设置 › 记忆与建议 | 设置 › 记忆与建议 |
@@ -171,7 +171,7 @@ terms) and tenancy rule.
 | 通知 (`notifications`) | Account | Account | T6 | Account | The person's pushes |
 | 记忆与建议 (`memory`) | Account | Account (profile memory) | T6; 2310 | Account | Facts about the person |
 | 连接 (`connections`) | Account | Connection | T6; 2240 | Account | Runs only the owner's bots |
-| 模型与订阅 (`models`) | Account credentials; per-person workspace thread defaults; 分享给团队成员 team-only | Model credential; share | T6, T2 | Matches (`settings-view.tsx:153`) | Credential is the person's, the share is between people |
+| 模型与订阅 (`models`) | Account credentials; per-person workspace thread defaults; 分享给团队成员 for API keys, team-only (subscriptions are never shared) | Model credential; share | T6, T2 | Matches (`settings-view.tsx:153`) | Credential is the person's, the share is between people |
 | 密钥与登录 (`logins`) | Account | Account | T6 | Account | Saved logins are the person's |
 | 数据与隐私 (`privacy`) | Account | Account | T6 | Account | Export and deletion of the person |
 | 设备 (`computers`) | Account | Device | T6 | Account | The person's machines |

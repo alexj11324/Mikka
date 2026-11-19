@@ -55,7 +55,7 @@ test('only the two exact merged issue PR deploys authorize automatic active acce
   ]) assert.throws(() => mergeGuard({ ...guard(), ...changed }), /merge_scope_rejected/)
 })
 
-function deploymentFetch({ build = SHA, after = build, compared, runs = [{ ...deployed(), head_sha: SHA }] } = {}) {
+function deploymentFetch({ build = SHA, after = build, compared } = {}) {
   const calls = []
   let versions = 0
   return { calls, fetchImpl: async (input, init) => {
@@ -70,21 +70,17 @@ function deploymentFetch({ build = SHA, after = build, compared, runs = [{ ...de
     }
     assert.equal(url.origin, 'https://api.github.com')
     assert.equal(init.headers.authorization, 'Bearer private-github-token')
-    if (url.pathname.includes('/compare/')) {
-      const [base, head] = url.pathname.split('/compare/')[1].split('...')
-      assert.equal(head, build)
-      return Response.json(compared?.(base) ?? { status: 'ahead', base_commit: { sha: base }, merge_base_commit: { sha: base } })
-    }
-    assert.equal(url.pathname, `/repos/${REPOSITORY}/actions/workflows/web-deploy.yml/runs`)
-    assert.equal(url.searchParams.get('head_sha'), build)
-    return Response.json({ workflow_runs: runs })
+    assert.ok(url.pathname.includes('/compare/'))
+    const [base, head] = url.pathname.split('/compare/')[1].split('...')
+    assert.equal(head, build)
+    return Response.json(compared?.(base) ?? { status: 'ahead', base_commit: { sha: base }, merge_base_commit: { sha: base } })
   } }
 }
 
-test('the real production revision is bound to both authorized ancestors and its own successful Web deploy', async () => {
+test('the real production revision is bound to both authorized ancestors', async () => {
   const fixture = deploymentFetch()
   const result = await resolveAcceptanceDeployment({ guard: boundGuard(), githubToken: 'private-github-token', fetchImpl: fixture.fetchImpl })
-  assert.deepEqual(result, { ...boundGuard(), revision: SHA, webDeployRunId: 100 })
+  assert.deepEqual(result, { ...boundGuard(), revision: SHA })
   assert.equal(fixture.calls.filter(call => call.url.includes('/compare/')).length, 2)
   assert.equal(fixture.calls.filter(call => call.url.includes('/mikka/api/version')).length, 2)
   assert.ok(!JSON.stringify(result).includes('private-github-token'))
@@ -119,15 +115,7 @@ test('selecting the original feature guard still requires production to contain 
   assert.ok(!fixture.calls.some(call => call.url.includes('/actions/')))
 })
 
-test('only the exact application deployment can be bound and a mid-attestation promotion fails closed', async () => {
-  for (const changed of [
-    { head_sha: FEATURE_SHA }, { status: 'in_progress', conclusion: null }, { conclusion: 'failure' },
-    { head_repository: { full_name: 'someone/fork' } }, { event: 'workflow_dispatch' }, { head_branch: 'another' },
-    { name: 'Other workflow' }, { path: '.github/workflows/another.yml' }, { id: 0 },
-  ]) {
-    const fixture = deploymentFetch({ runs: [{ ...deployed(), head_sha: SHA, ...changed }] })
-    await assert.rejects(resolveAcceptanceDeployment({ guard: boundGuard(), githubToken: 'private-github-token', fetchImpl: fixture.fetchImpl }), /web_deploy/)
-  }
+test('a mid-attestation promotion fails closed', async () => {
   const fixture = deploymentFetch({ after: 'd'.repeat(40) })
   await assert.rejects(resolveAcceptanceDeployment({ guard: boundGuard(), githubToken: 'private-github-token', fetchImpl: fixture.fetchImpl }), /build_mismatch/)
 })
@@ -361,7 +349,7 @@ function preflightFetch({ missingDeepseek = false, codexOnlyDefault = false,
 const env = () => ({ SMOKE_OWNER_EMAIL: 'test+mikka-smoke-provider@example.invalid', SMOKE_OWNER_PASSWORD: 'private-password',
   MIKKA_EXPECTED_DEPLOYMENT_SHA: SHA, MIKKA_FEATURE_MERGE_SHA: FEATURE_SHA,
   MIKKA_ACCEPTANCE_GUARD_PR: String(ACCEPTANCE_PULL_REQUEST), MIKKA_ACCEPTANCE_GUARD_MERGE_SHA: GUARD_SHA,
-  MIKKA_ACCEPTANCE_DRIVER_SHA: GUARD_SHA, MIKKA_WEB_DEPLOY_RUN_ID: '100',
+  MIKKA_ACCEPTANCE_DRIVER_SHA: GUARD_SHA,
   MIKKA_WORKER_RELEASE_PROOF: 'same_sha_official_runtime', MIKKA_WORKER_RELEASE_SHA: SHA, MIKKA_WORKER_RELEASE_RUN_ID: '101' })
 
 test('real HTTP preflight creates no task, Bot, key, binding or order and still checks both subscriptions when DeepSeek is missing', async () => {
@@ -373,7 +361,6 @@ test('real HTTP preflight creates no task, Bot, key, binding or order and still 
   assert.equal(report.guardMergeSha, GUARD_SHA)
   assert.equal(report.driverRevision, GUARD_SHA)
   assert.equal(report.revision, SHA)
-  assert.deepEqual(report.webDeploy, { sha: SHA, runId: 100 })
   assert.deepEqual(report.workerRelease, { ready: true, kind: 'same_sha_official_runtime', sha: SHA, runId: 101 })
   assert.deepEqual(report.cases.map(item => item.status), ['blocked', 'ready', 'ready'])
   assert.equal(report.cases[0].code, 'source_missing')

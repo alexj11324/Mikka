@@ -1,6 +1,9 @@
 const uuid = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/
 const repository = /^v2\/github\.com\/[a-z0-9_.-]+\/[a-z0-9_.-]+$/i
-export const MAX_RUN_MS = 15 * 60_000
+// One number, no tiers (as Capy's Pro): concurrent task machines per workspace.
+// A machine runs as long as Mikka 额度 pays for it (decision 2026-11-15-1900 rule 7);
+// the API's prepaid lease (expiresAt) is its only deadline.
+export const WORKSPACE_MACHINES = 25
 export const CHECKPOINT_TIME_MS = 60_000
 
 // Only the Mikka API service binding may construct this lease after checking the
@@ -37,8 +40,7 @@ export function sameGrant(a, b) {
   return Boolean(a && b && workspaceName(a) === workspaceName(b) && a.runId === b.runId && a.operationId === b.operationId)
 }
 
-export function liveUntil(grant, now, hardDeadline) {
-  const until = Math.min(grant.expiresAt, hardDeadline)
-  if (until <= now) throw new Error('Task machine lease expired')
-  return until
+export function liveUntil(grant, now) {
+  if (grant.expiresAt <= now) throw new Error('Task machine lease expired')
+  return grant.expiresAt
 }

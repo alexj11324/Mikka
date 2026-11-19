@@ -151,7 +151,7 @@ async function observations() {
 
 async function setup() {
   assertDevLocal(process.env)
-  assert.equal(Number(process.versions.node.split('.')[0]), 24, 'Use Node 24')
+  assert.ok(Number(process.versions.node.split('.')[0]) >= 22, 'Use Node 22 or newer')
   for (const name of ['CI', 'GITHUB_ACTIONS', 'RUNNER_ENVIRONMENT', 'GITHUB_RUN_ID']) assert.ok(!process.env[name], 'Local acceptance must not impersonate CI')
   await privateDirectory(directory)
   for (const name of ['BETTER_AUTH_SECRET', 'DEEPSEEK_API_KEY', 'INFISICAL_CLIENT_SECRET']) if (process.env[name]) secrets.add(process.env[name])

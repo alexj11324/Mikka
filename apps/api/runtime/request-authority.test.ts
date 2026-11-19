@@ -38,7 +38,7 @@ async function officialAdapter() {
   assert.match(sourceText, /toNodeHandler\(/)
   const result = await build({
     stdin: { contents: `export { default } from ${JSON.stringify(source)}; export { setApplication } from 'nitro/app'`, resolveDir: nitro },
-    bundle: true, write: false, platform: 'node', format: 'esm', target: 'node24',
+    bundle: true, write: false, platform: 'node', format: 'esm', target: 'node22',
     define: { 'import.meta._websocket': 'false' }, logLevel: 'silent',
     plugins: [{ name: 'local-application-slot', setup(builder) {
       builder.onResolve({ filter: /^(?:nitro\/app|#nitro\/virtual\/polyfills|#nitro\/runtime\/app)$/ }, args => ({ path: args.path, namespace: 'application-slot' }))

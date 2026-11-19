@@ -90,6 +90,7 @@ export function DeviceAuthorization({ account, initialCode }: { account: string;
   const title = state === 'approved' ? t('approved') : state === 'denied' ? t('denied') : t('title')
   return <main className="flex min-h-svh w-full flex-col bg-background text-foreground">
     <header className="flex items-center px-5 py-5 sm:px-8 sm:py-6 lg:px-10"><AuthLogo /></header>
+    {/* control-size-exempt: a centring section around one card, not a row of controls. */}
     <section className="flex flex-1 items-center justify-center px-5 py-10 sm:px-8 sm:py-16" aria-label={t('title')}>
       <Card className="w-full max-w-[24.5rem] gap-5 p-6">
         <CardHeader className="gap-1 p-0">

@@ -1,66 +1,13 @@
-// Production web build on GitHub Actions (docs/operations/web-deploy.md).
-// `vercel pull` writes the production environment to .vercel/.env.production.local,
-// but Vercel returns "sensitive" variables empty. The job reads prod:/vercel from
-// Infisical (the source Vercel production is synced from) and this fills every
-// pulled key that came back empty, so the build sees what a Vercel build saw. It
-// also pins the Git identity the migration guard checks and refuses to build
-// with a required value missing. The deployment's runtime environment still
-// comes from the Vercel project; nothing here is uploaded as configuration.
-import { readFileSync, writeFileSync } from 'node:fs'
-import { pathToFileURL } from 'node:url'
+// Release evidence for the Web Cloudflare serves: GitHub reads, the current-main fence,
+// Desktop source ancestry and the exact-source wait used by acceptance drivers.
 import { setTimeout as sleep } from 'node:timers/promises'
-import { shouldSkip } from '../vercel-ignore-build.mjs'
 
-/** Must be non-empty in the final build environment: inlined client keys, the migration targets, the worker build. */
-export const REQUIRED = ['MIKKA_DATABASE_URL', 'DATABASE_URL', 'NEXT_PUBLIC_POSTHOG_KEY', 'NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY',
-  'BETTER_AUTH_SECRET', 'BETTER_AUTH_URL', 'MIKKA_BUILD_BYOS_WORKER', 'NEXT_PUBLIC_COMPUTER_ENABLED']
-
-const LINE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/
 const SHA = /^[a-f0-9]{40}$/
 export const PRODUCTION_VERSION_URL = 'https://app.aspectlylabs.com/mikka/api/version'
 const REPOSITORY = 'alexj11324/Mikka'
 const WEB_WORKFLOW = '.github/workflows/web-deploy.yml'
 const BUILD_STEPS = ['Build (runs migrations last, as the Vercel build did)',
   'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
-
-function parse(text) {
-  const entries = new Map()
-  for (const line of text.split('\n')) {
-    const match = LINE.exec(line)
-    if (!match) continue
-    const raw = match[2].trim()
-    let value = raw
-    if (raw.startsWith('"') && raw.endsWith('"') && raw.length >= 2) {
-      try { value = JSON.parse(raw) } catch { value = raw.slice(1, -1) }
-    } else if (raw.startsWith("'") && raw.endsWith("'") && raw.length >= 2) value = raw.slice(1, -1)
-    entries.set(match[1], value)
-  }
-  return entries
-}
-
-/** Resolves production values; throws with variable names only, never values. */
-export function buildEnvironmentValues(text, job) {
-  if (!SHA.test(job.GITHUB_SHA ?? '')) throw Error('webDeploy:commitShaRequired')
-  const entries = parse(text)
-  // Only keys the production environment defines, and only where Vercel withheld the value.
-  for (const [key, value] of entries) if (!value && job[key]) entries.set(key, job[key])
-  entries.set('VERCEL_GIT_PROVIDER', 'github')
-  entries.set('VERCEL_GIT_REPO_OWNER', 'alexj11324')
-  entries.set('VERCEL_GIT_REPO_SLUG', 'Mikka')
-  entries.set('VERCEL_GIT_COMMIT_REF', 'main')
-  entries.set('VERCEL_GIT_COMMIT_SHA', job.GITHUB_SHA)
-  if (entries.get('VERCEL_ENV') !== 'production') throw Error('webDeploy:productionEnvironmentRequired')
-  const missing = REQUIRED.filter(key => !entries.get(key))
-  if (missing.length) throw Error(`webDeploy:missing:${missing.join(',')}`)
-  return Object.fromEntries(entries)
-}
-
-/** The build file uses JSON string values; the direct build reuses the object
- * above rather than interpreting those escapes with a different dotenv parser. */
-export function buildEnvironment(text, job) {
-  return Object.entries(buildEnvironmentValues(text, job))
-    .map(([key, value]) => `${key}=${JSON.stringify(value)}`).join('\n') + '\n'
-}
 
 /** Current production deployment's commit, read through the public alias. */
 export async function productionSha({ token, fetchImpl = fetch }) {
@@ -198,72 +145,4 @@ export async function waitForWebDeployment({ expectedBuild, expectedOverlay, tok
     if (remaining() > 0) await wait(Math.min(intervalMs, remaining()))
   }
   throw Error('webDeploy:matchingWebDeploymentTimedOut')
-}
-
-export async function deploymentPlan({ expectedBuild, runtimeRefresh = false, token, fetchImpl = fetch, classify = shouldSkip }) {
-  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
-  // A prior attempt may have written env and then failed its build. The explicit
-  // refresh reuses the validated runtime pair and must still build that source.
-  if (runtimeRefresh) return { skip: false, reason: 'verified runtime refresh' }
-  const previous = await productionSha({ token, fetchImpl })
-  return classify({ VERCEL_ENV: 'production', VERCEL_GIT_PREVIOUS_SHA: previous, VERCEL_GIT_COMMIT_SHA: expectedBuild })
-}
-
-/** Verify the public application while this job still owns the deployment
- * queue. Deployment metadata alone does not prove what the public route serves. */
-export async function verifyProductionBuild({ expectedBuild, fetchImpl = fetch, maxWaitMs = 120_000,
-  intervalMs = 2_000, now = () => performance.now(), wait = sleep }) {
-  if (!SHA.test(expectedBuild ?? '')) throw Error('webDeploy:commitShaRequired')
-  if (!Number.isFinite(maxWaitMs) || maxWaitMs <= 0 || !Number.isFinite(intervalMs) || intervalMs <= 0) {
-    throw Error('webDeploy:invalidVerificationWait')
-  }
-  const started = now()
-  let status = 'unavailable', build = 'unavailable', attempts = 0
-  while (now() - started < maxWaitMs) {
-    attempts++
-    try {
-      const remaining = maxWaitMs - (now() - started)
-      if (remaining <= 0) break
-      const response = await fetchImpl(PRODUCTION_VERSION_URL, {
-        cache: 'no-store', headers: { 'cache-control': 'no-cache' },
-        signal: AbortSignal.timeout(Math.max(1, Math.min(10_000, Math.ceil(remaining)))),
-      })
-      status = String(response.status)
-      build = 'unavailable'
-      if (response.ok) {
-        const value = await response.json()
-        build = SHA.test(value?.build ?? '') ? value.build : 'invalid'
-        if (build === expectedBuild && now() - started < maxWaitMs) return { url: PRODUCTION_VERSION_URL, build, status: response.status,
-          verifiedAt: new Date().toISOString(), attempts }
-      } else await response.body?.cancel()
-    } catch {
-      // Public error bodies and transport messages are not deployment evidence.
-      status = 'unavailable'; build = 'unavailable'
-    }
-    const remaining = maxWaitMs - (now() - started)
-    if (remaining > 0) await wait(Math.min(intervalMs, remaining))
-  }
-  throw Error(`webDeploy:productionVersionUnverified:expected=${expectedBuild}:status=${status}:build=${build}:attempts=${attempts}`)
-}
-
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const [command, file] = process.argv.slice(2)
-  if (command === 'env') {
-    writeFileSync(file, buildEnvironment(readFileSync(file, 'utf8'), process.env), { mode: 0o600 })
-    console.log('Build environment ready')
-  } else if (command === 'skip') {
-    // Same documentation-only rule Vercel's Ignored Build Step used, against what production serves now.
-    const { skip, reason } = await deploymentPlan({ expectedBuild: process.env.GITHUB_SHA, token: process.env.VERCEL_TOKEN,
-      runtimeRefresh: process.env.RUNTIME_REFRESH === 'true' })
-    console.log(`${skip ? 'Skipping' : 'Building'}: ${reason}`)
-    if (process.env.GITHUB_OUTPUT) writeFileSync(process.env.GITHUB_OUTPUT, `skip=${skip}\n`, { flag: 'a' })
-  } else if (command === 'main') {
-    await assertCurrentMain({ expectedBuild: process.env.GITHUB_SHA, token: process.env.GITHUB_TOKEN })
-    console.log('Current main matches this release')
-  } else if (command === 'verify') {
-    const result = await verifyProductionBuild({ expectedBuild: process.env.GITHUB_SHA })
-    console.log(JSON.stringify({ event: 'production_version_verified', ...result }))
-    if (process.env.GITHUB_STEP_SUMMARY) writeFileSync(process.env.GITHUB_STEP_SUMMARY,
-      `\n### Public production version verified\n${result.url}\n\nBuild: \`${result.build}\`\n\nUTC: ${result.verifiedAt}\n`, { flag: 'a' })
-  } else throw Error('usage: web-deploy.mjs env <file> | skip | main | verify')
 }

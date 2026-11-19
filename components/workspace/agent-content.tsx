@@ -3,7 +3,7 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { AgentTextBubble } from './agent-text-bubble'
 import { useIsStreaming } from '@openuidev/react-lang'
-import { Bot, CircleCheck, CircleHelp, Code, ListTodo, LoaderCircle, MessageSquareText, Quote } from 'lucide-react'
+import { Bot, CircleCheck, CircleHelp, Code, ListTodo, LoaderCircle, MessageSquareText, Quote } from '@/components/icons'
 import { StreamingResponse } from '@/components/agents/streaming-response'
 import { AgentMarkdown } from './agent-markdown'
 import { AgentCodeBlock } from './agent-code-block'

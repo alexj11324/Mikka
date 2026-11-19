@@ -13,6 +13,8 @@ export const RENDERER_CSP = [
 
 const ID = '[A-Za-z0-9_-]{1,128}'
 const FACTORY_FLOW = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/flow$/i
+/** The Artifact page's task folder: the task's activity and the captures it links. Read-only. */
+const FACTORY_ACTIVITY = /^\/api\/factory\/tasks\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/(?:activity|media\/[A-Za-z0-9_-]{1,128})$/i
 const BILLING_MANAGEMENT = /^\/api\/(?:workspaces|organizations)\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\/billing$/i
 const DRIVE_VOLUME_ID = 'vol_[0-9A-HJKMNP-TV-Z]{26}'
 const DRIVE_VERSION_ID = 'vver_[0-9A-HJKMNP-TV-Z]{26}'
@@ -31,11 +33,14 @@ const DRIVE_ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/entries$`), ['PATCH']],
   [new RegExp(`^/api/drive/volumes/${DRIVE_VOLUME_ID}/(?:restore|archive|unarchive)$`), ['POST']],
 ]
+const ORGANIZATION_DRIVE_RESTORE = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/restore$`)
+const ORGANIZATION_VOLUME_SHARES = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/shares$`)
 const ORGANIZATION_DRIVE_VERSIONS = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/versions(?:/${DRIVE_VERSION_ID})?$`)
+const ORGANIZATION_VERSION_FILE = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/versions/${DRIVE_VERSION_ID}/files/[a-f0-9]{64}$`)
 const ORGANIZATION_FILE_HISTORY = new RegExp(`^/api/organizations/${UUID}/drive/${DRIVE_VOLUME_ID}/file-versions$`)
 const ORGANIZATION_FILE_SHARE = new RegExp(`^/api/organizations/${UUID}/drive-shares/${UUID}$`)
 const ORGANIZATION_OVERVIEW = new RegExp(`^/api/organizations/${UUID}$`)
-const ORGANIZATION_FILE_LINKS = new RegExp(`^/api/organizations/${UUID}/drive-shares$`)
+const ORGANIZATION_FILES = new RegExp(`^/api/organizations/${UUID}/(?:drive-shares|drive-scopes|drive-skills|drive)$`)
 const ORGANIZATION_KEYS = new RegExp(`^/api/organizations/${UUID}/api-keys$`)
 const ORGANIZATION_WORKSPACES = new RegExp(`^/api/organizations/${UUID}/workspaces$`)
 const ORGANIZATION_POLICY = new RegExp(`^/api/organizations/${UUID}/policy$`)
@@ -70,7 +75,9 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/(workspace|workspace\/switcher|search|issues\/search|skills|skills\/search|teams\/directory)$/, ['GET']],
   [/^\/api\/settings\/(?:password|sessions|preferences|saved-logins|workspace-general|transfer-targets|deletion-impact|app-policy|share-policy|secrets|e2b-key|usage|billing|credit-billing|card-verification|audit|model-order|bots|workspace-bots|api-keys|environments)$/, ['GET']],
   [/^\/api\/agent-cli-policy$/, ['GET', 'POST']],
-  [/^\/api\/(bots|conversations|subscriptions|subscriptions\/usage|pending-actions|approved-writes|suggestions|computer\/events|agent\/sessions\/active)$/, ['GET', 'POST']],
+  // 收件箱 (Inbox) reads its page and writes its lifecycle commands here; both
+  // are authorized per reader and workspace inside the handler.
+  [/^\/api\/(bots|conversations|subscriptions|subscriptions\/usage|pending-actions|approved-writes|inbox|suggestions|computer\/events|agent\/sessions\/active)$/, ['GET', 'POST']],
   [/^\/api\/(coordinator\/(?:runtime|messages|attention))$/, ['GET', 'POST', 'DELETE']],
   [/^\/api\/(chat\/attachments|integrations\/mcp|integrations\/mcp\/shares|credentials|device-tokens)$/, ['GET', 'POST', 'PATCH', 'DELETE']],
   [/^\/api\/(agent\/images|agent\/sessions|devices\/hosts)$/, ['GET']],
@@ -103,20 +110,24 @@ export function normalizedRendererPath(value: string): string | null {
 }
 
 export function allowedApiPath(path: string, method: string): boolean {
-  if (ORGANIZATION_DRIVE_VERSIONS.test(path) || ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
+  if (ORGANIZATION_VOLUME_SHARES.test(path)) return method === 'GET' || method === 'POST'
+  if (ORGANIZATION_DRIVE_RESTORE.test(path)) return method === 'POST'
+  if (ORGANIZATION_DRIVE_VERSIONS.test(path) || ORGANIZATION_VERSION_FILE.test(path) || ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
   if (ORGANIZATION_FILE_SHARE.test(path)) return method === 'PATCH' || method === 'DELETE'
   if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
   if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
   // This human approval/read surface has exactly its declared methods. Do not
   // inherit the wider CRUD family or the generic asset HEAD allowance.
   if (FACTORY_FLOW.test(path)) return method === 'GET' || method === 'POST'
+  if (FACTORY_ACTIVITY.test(path)) return method === 'GET'
   if (BILLING_MANAGEMENT.test(path)) return method === 'GET' || method === 'POST'
   if (path.startsWith('/api/workspaces/') && path.includes('/service-identities')) {
     return SERVICE_IDENTITY_ROUTES.some(([route, mutation]) => route.test(path) && (method === 'GET' || method === mutation))
   }
-  if (WORKSPACE_GOVERNANCE.test(path) || ORGANIZATION_KEYS.test(path) || ORGANIZATION_FILE_LINKS.test(path)) return method === 'GET'
+  if (WORKSPACE_GOVERNANCE.test(path) || ORGANIZATION_KEYS.test(path) || ORGANIZATION_FILES.test(path)) return method === 'GET'
   if (path === '/api/organizations') return method === 'GET' || method === 'POST'
-  if (ORGANIZATION_OVERVIEW.test(path)) return method === 'GET' || method === 'PATCH' || method === 'DELETE'
+  if (path === '/api/organizations/deleted') return method === 'GET'
+  if (ORGANIZATION_OVERVIEW.test(path)) return method === 'GET' || method === 'PUT' || method === 'PATCH' || method === 'DELETE'
   if (ORGANIZATION_WORKSPACES.test(path)) return method === 'POST' || method === 'DELETE'
   if (path === '/api/me/joinable-organizations' || path === '/api/me/invitations') return method === 'GET'
   if (ORGANIZATION_POLICY.test(path)) return method === 'GET' || method === 'PATCH'

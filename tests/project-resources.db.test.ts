@@ -67,6 +67,21 @@ test('Project repository/environment policy on real PostgreSQL', { skip: !dbUrl 
     await rejects(resources.withProjectExecution({ ...request, runtime: 'cloud' }, async value => value), 'projectEnvironmentUnavailable')
     await rejects(resources.withProjectExecution({ ...request, harness: 'claude_code' }, async value => value), 'projectEnvironmentUnavailable')
   })
+  await t.test('Organization reads the current Project variable through its active Workspace attachment', async () => {
+    const governance = await import('../lib/governance/organizations')
+    const { rows: [user] } = await connection.query('select id,name,email from "user" where id=$1', [owner])
+    const org = await governance.createOrganization(user, { name: 'Environment variable scope' })
+    const input = { organizationId: org.id, projectId, name: 'FEATURE_MODE' }
+    await governance.attachOrganizationWorkspace(org.id, workspace.id, owner)
+    assert.deepEqual(await resources.readOrganizationProjectEnvironmentVariable(owner, input), { name: 'FEATURE_MODE', value: 'test' })
+    const { GovernanceError } = await import('../lib/governance/errors')
+    const missing = (error: unknown) => error instanceof GovernanceError && error.detail === 'not_found'
+    await assert.rejects(resources.readOrganizationProjectEnvironmentVariable(member, input), missing)
+    await governance.addOrganizationMember(org.id, owner, { userId: member, role: 'member' })
+    assert.deepEqual(await resources.readOrganizationProjectEnvironmentVariable(member, input), { name: 'FEATURE_MODE', value: 'test' })
+    await governance.detachOrganizationWorkspace(org.id, workspace.id, owner)
+    await assert.rejects(resources.readOrganizationProjectEnvironmentVariable(owner, input), missing)
+  })
   await t.test('incremental repository adds keep existing metadata and serialize without duplicate revisions or audits', async () => {
     const id = randomUUID()
     await connection.query(`insert into workspace_projects(id,"userId","workspaceId",name,summary,description,status,priority,lead,team,"startDate","targetDate","issueIds",revision)

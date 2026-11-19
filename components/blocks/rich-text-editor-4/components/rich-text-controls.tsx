@@ -29,7 +29,7 @@ import {
   RichTextToolbarGroup,
   useShortcutLabel,
 } from "./rich-text-toolbar"
-import { Undo2Icon, Redo2Icon, TypeIcon, Heading1Icon, Heading2Icon, Heading3Icon, ChevronDownIcon, ListIcon, ListOrderedIcon, ListTodoIcon, TextQuoteIcon, SquareCodeIcon, MinusIcon, BoldIcon, ItalicIcon, UnderlineIcon, StrikethroughIcon, CodeIcon, AlignLeftIcon, AlignCenterIcon, AlignRightIcon, AlignJustifyIcon } from "lucide-react"
+import { Undo2, Redo2, Type, Heading1, Heading2, Heading3, ChevronDown, List, ListOrdered, ListTodo, TextQuote, SquareCode, Minus, Bold, Italic, Underline, Strikethrough, Code, AlignLeft, AlignCenter, AlignRight, AlignJustify } from "@/components/icons"
 
 interface ControlProps {
   editor: Editor | null
@@ -50,7 +50,7 @@ export function RichTextHistory({ editor, state }: ControlProps) {
         disabled={!state.canUndo}
         onClick={() => editor?.chain().focus().undo().run()}
       >
-        <Undo2Icon aria-hidden="true" />
+        <Undo2 aria-hidden="true" />
       </RichTextButton>
       <RichTextButton
         label="Redo"
@@ -58,7 +58,7 @@ export function RichTextHistory({ editor, state }: ControlProps) {
         disabled={!state.canRedo}
         onClick={() => editor?.chain().focus().redo().run()}
       >
-        <Redo2Icon aria-hidden="true" />
+        <Redo2 aria-hidden="true" />
       </RichTextButton>
     </RichTextToolbarGroup>
   )
@@ -78,7 +78,7 @@ const BLOCK_TYPES: BlockTypeOption[] = [
     label: "Text",
     keys: ["mod", "alt", "0"],
     icon: (
-      <TypeIcon aria-hidden="true" />
+      <Type aria-hidden="true" />
     ),
   },
   {
@@ -86,7 +86,7 @@ const BLOCK_TYPES: BlockTypeOption[] = [
     label: "Heading 1",
     keys: ["mod", "alt", "1"],
     icon: (
-      <Heading1Icon aria-hidden="true" />
+      <Heading1 aria-hidden="true" />
     ),
   },
   {
@@ -94,7 +94,7 @@ const BLOCK_TYPES: BlockTypeOption[] = [
     label: "Heading 2",
     keys: ["mod", "alt", "2"],
     icon: (
-      <Heading2Icon aria-hidden="true" />
+      <Heading2 aria-hidden="true" />
     ),
   },
   {
@@ -102,7 +102,7 @@ const BLOCK_TYPES: BlockTypeOption[] = [
     label: "Heading 3",
     keys: ["mod", "alt", "3"],
     icon: (
-      <Heading3Icon aria-hidden="true" />
+      <Heading3 aria-hidden="true" />
     ),
   },
 ]
@@ -146,7 +146,7 @@ export function RichTextBlockTypeMenu({ editor, state }: ControlProps) {
       >
         <span className="flex sm:hidden">{current.icon}</span>
         <span className="truncate max-sm:hidden">{current.label}</span>
-        <ChevronDownIcon aria-hidden="true" className="opacity-60" />
+        <ChevronDown aria-hidden="true" className="opacity-60" />
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
@@ -190,7 +190,7 @@ export function RichTextListToggles({ editor, state }: ControlProps) {
         disabled={!state.editable}
         onToggle={() => editor?.chain().focus().toggleBulletList().run()}
       >
-        <ListIcon aria-hidden="true" />
+        <List aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
         label="Numbered list"
@@ -199,7 +199,7 @@ export function RichTextListToggles({ editor, state }: ControlProps) {
         disabled={!state.editable}
         onToggle={() => editor?.chain().focus().toggleOrderedList().run()}
       >
-        <ListOrderedIcon aria-hidden="true" />
+        <ListOrdered aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
         label="Task list"
@@ -208,7 +208,7 @@ export function RichTextListToggles({ editor, state }: ControlProps) {
         disabled={!state.editable}
         onToggle={() => editor?.chain().focus().toggleTaskList().run()}
       >
-        <ListTodoIcon aria-hidden="true" />
+        <ListTodo aria-hidden="true" />
       </RichTextToggle>
     </RichTextToolbarGroup>
   )
@@ -224,7 +224,7 @@ export function RichTextBlockToggles({ editor, state }: ControlProps) {
         disabled={!state.editable}
         onToggle={() => editor?.chain().focus().toggleBlockquote().run()}
       >
-        <TextQuoteIcon aria-hidden="true" />
+        <TextQuote aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
         label="Code block"
@@ -233,14 +233,14 @@ export function RichTextBlockToggles({ editor, state }: ControlProps) {
         disabled={!state.editable}
         onToggle={() => editor?.chain().focus().toggleCodeBlock().run()}
       >
-        <SquareCodeIcon aria-hidden="true" />
+        <SquareCode aria-hidden="true" />
       </RichTextToggle>
       <RichTextButton
         label="Divider"
         disabled={!state.editable}
         onClick={() => editor?.chain().focus().setHorizontalRule().run()}
       >
-        <MinusIcon aria-hidden="true" />
+        <Minus aria-hidden="true" />
       </RichTextButton>
     </RichTextToolbarGroup>
   )
@@ -258,7 +258,7 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
         disabled={disabled}
         onToggle={() => editor?.chain().focus().toggleBold().run()}
       >
-        <BoldIcon aria-hidden="true" />
+        <Bold aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
         label="Italic"
@@ -267,7 +267,7 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
         disabled={disabled}
         onToggle={() => editor?.chain().focus().toggleItalic().run()}
       >
-        <ItalicIcon aria-hidden="true" />
+        <Italic aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
         label="Underline"
@@ -276,7 +276,7 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
         disabled={disabled}
         onToggle={() => editor?.chain().focus().toggleUnderline().run()}
       >
-        <UnderlineIcon aria-hidden="true" />
+        <Underline aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
         label="Strikethrough"
@@ -285,7 +285,7 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
         disabled={disabled}
         onToggle={() => editor?.chain().focus().toggleStrike().run()}
       >
-        <StrikethroughIcon aria-hidden="true" />
+        <Strikethrough aria-hidden="true" />
       </RichTextToggle>
       <RichTextToggle
         label="Inline code"
@@ -294,7 +294,7 @@ export function RichTextMarkToggles({ editor, state }: ControlProps) {
         disabled={!state.canCode}
         onToggle={() => editor?.chain().focus().toggleCode().run()}
       >
-        <CodeIcon aria-hidden="true" />
+        <Code aria-hidden="true" />
       </RichTextToggle>
     </RichTextToolbarGroup>
   )
@@ -317,16 +317,16 @@ const ALIGN_KEYS: Record<RichTextAlign, string> = {
 // Whole static nodes per key, so the trigger can mirror the current value.
 const ALIGN_ICONS: Record<RichTextAlign, ReactNode> = {
   left: (
-    <AlignLeftIcon aria-hidden="true" />
+    <AlignLeft aria-hidden="true" />
   ),
   center: (
-    <AlignCenterIcon aria-hidden="true" />
+    <AlignCenter aria-hidden="true" />
   ),
   right: (
-    <AlignRightIcon aria-hidden="true" />
+    <AlignRight aria-hidden="true" />
   ),
   justify: (
-    <AlignJustifyIcon aria-hidden="true" />
+    <AlignJustify aria-hidden="true" />
   ),
 }
 
@@ -353,7 +353,7 @@ export function RichTextAlignMenu({ editor, state }: ControlProps) {
             }
           >
             {ALIGN_ICONS[state.align]}
-            <ChevronDownIcon aria-hidden="true" className="opacity-60" />
+            <ChevronDown aria-hidden="true" className="opacity-60" />
           </DropdownMenuTrigger>
         </TooltipTrigger>
         <TooltipContent>Alignment</TooltipContent>

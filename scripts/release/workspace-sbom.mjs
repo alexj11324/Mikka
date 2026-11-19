@@ -49,7 +49,7 @@ export async function workspaceSbom(trees, { sourceSha, bundledEntries = [], rea
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [input, output] = process.argv.slice(2)
   if (!input || !output) throw Error('releaseSbomFilesRequired')
-  const bom = await workspaceSbom(JSON.parse(await readFile(input, 'utf8')), { sourceSha: process.env.GITHUB_SHA, bundledEntries: ['electron', 'electron-updater', '@mikka/daemon', '@mikka/protocol'] })
+  const bom = await workspaceSbom(JSON.parse(await readFile(input, 'utf8')), { sourceSha: (process.env.MIKKA_DESKTOP_SOURCE || process.env.GITHUB_SHA), bundledEntries: ['electron', 'electron-updater', '@mikka/daemon', '@mikka/protocol'] })
   await writeFile(output, JSON.stringify(bom, null, 2) + '\n')
-  console.log(JSON.stringify({ sourceSha: process.env.GITHUB_SHA, components: bom.components.length }))
+  console.log(JSON.stringify({ sourceSha: (process.env.MIKKA_DESKTOP_SOURCE || process.env.GITHUB_SHA), components: bom.components.length }))
 }

@@ -1,8 +1,7 @@
 # Origins and the OAuth proxy
 
-> Mikka's own pull requests and branches have no Vercel Preview: Vercel builds
-> nothing from Git (`vercel.json` `git.deploymentEnabled`), every build runs on
-> GitHub Actions, and only `main` deploys, to production
+> Mikka's own pull requests and branches have no preview deployment: every build
+> runs on GitHub Actions, and only `main` deploys, to production
 > ([decision 2026-11-05-1632](design/decisions/2026-11-05-1632-no-vercel-preview.md)).
 > Verify a change before merge in CI or with `pnpm build:app` + `pnpm start` in a
 > cloud Linux or Docker sandbox against an isolated database

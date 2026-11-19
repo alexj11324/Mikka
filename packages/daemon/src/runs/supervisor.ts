@@ -14,10 +14,12 @@ import { runCriterion, reviewVerdict, runVisualEvidence } from "@mikka/protocol/
 // issue's next step; the daemon never writes issue state. A session that
 // just ends is `turn_ended`, not success.
 //
-// Liveness: each active run has a server lease (renewed by the device
-// heartbeat) and a watchdog on `lastProgressAt`. `check()` stops a run whose
-// lease expired (`device_lost`) or that made no progress for `stallMs`
-// (`timeout`).
+// Liveness: a claimed run is held while the device session socket is open
+// (decision 2026-11-17-2215). When the socket drops, every held run gets a
+// local deadline of the drop plus DEVICE_SESSION_LOCAL_GRACE_MS; a socket that
+// opens again first clears it. `check()` stops a run past that deadline (or
+// its server lease) as `device_lost`, and one that made no progress for
+// `stallMs` as `timeout`. Nothing is renewed over HTTP.
 //
 // Stopping the daemon never waits on an adapter: each run races its next
 // session event against an abort signal, and `stop()` gives runs a bounded
@@ -38,7 +40,6 @@ import { quotaStopApplies } from "./quota-exhausted"
 import { runApps, runMcp } from '../agents/run-apps'
 import { startTaskSecretBridge, type TaskSecretBridge } from '../task-secret-bridge'
 import { taskExecutionEnv } from '../task-env'
-import type { TaskSecretAccess } from '@mikka/protocol/task-secrets'
 import { materializeChatFiles } from '../agents/chat-files'
 import { splitChatFiles, type ChatFileDownload } from '@mikka/protocol/chat-attachments'
 import { fixedCheckSnapshot } from "./check"
@@ -69,7 +70,6 @@ import {
   runStateForStop,
   runCheckpointReceiptSchema,
   type HandoffReport,
-  type HeartbeatRun,
   type Harness,
   type RunCheckpoint,
   type RunCheckpointReceipt,
@@ -111,7 +111,7 @@ import type { Logger } from "../log"
 import type { Outbox, OutboxItem } from "../outbox"
 import { pushDecision, runPolicy } from "../permissions"
 import {
-  DEFAULT_LEASE_MS,
+  DEVICE_SESSION_LOCAL_GRACE_MS,
   type DeviceRepo,
   type RunAssignment,
 } from "../server-link"
@@ -273,8 +273,10 @@ export const CHECKPOINT_EVERY_MS = 2 * 60_000
 
 export class RunSupervisor {
   private active = new Map<string, ActiveRun>()
-  /** Lease expiry per run (ms); runs without a server lease are absent. */
+  /** Server lease expiry per held run (ms); runs without a server lease are absent. */
   private leases = new Map<string, number>()
+  /** Set while the device session socket is down: when held runs lose their lease. */
+  private sessionDeadline: number | null = null
   private stopping = false
   /** Runs with an assistant message in progress (`start` sent, no `finish`). */
   private openMessages = new Set<string>()
@@ -306,10 +308,10 @@ export class RunSupervisor {
   }
 
   private liveness(runId: string) {
-    const lease = this.leases.get(runId)
+    const lease = this.leaseExpiry(runId)
     const run = this.active.get(runId)
     return {
-      ...(lease !== undefined
+      ...(lease !== undefined && Number.isFinite(lease)
         ? { leaseExpiresAt: new Date(lease).toISOString() }
         : {}),
       ...(run
@@ -318,54 +320,38 @@ export class RunSupervisor {
     }
   }
 
-  /** Per-run part of the device heartbeat. */
-  heartbeatRuns(): HeartbeatRun[] {
-    return [...this.active].map(([runId, run]) => ({
-      runId,
-      lastProgressAt: new Date(run.lastProgressAt).toISOString(),
-      ...(this.deps.journal.get(runId)?.assignment.taskSecrets?.grants.length ? {
-        secretCapabilities: this.deps.journal.get(runId)!.assignment.taskSecrets!.grants.map(grant => grant.capability),
-      } : {}),
-    }))
+  /**
+   * When a held run's local lease ends: its server lease, or the session
+   * deadline while the socket is down. Undefined for a run the server never
+   * leased (local dev runs); Infinity while the session is open.
+   */
+  private leaseExpiry(runId: string): number | undefined {
+    const lease = this.leases.get(runId)
+    if (lease === undefined) return undefined
+    return Math.min(lease, this.sessionDeadline ?? Number.POSITIVE_INFINITY)
   }
 
-  /** The heartbeat response is trusted server data. Never persist its bearers. */
-  renewTaskSecrets(values: Record<string, TaskSecretAccess> | undefined) {
-    for (const [runId, access] of Object.entries(values ?? {})) {
-      const active = this.active.get(runId)
-      const assignment = this.deps.journal.get(runId)?.assignment
-      if (!active || active.forcedStop || !assignment?.taskSecrets || access.endpoint !== assignment.taskSecrets.endpoint) continue
-      // Unavailable names were fixed at claim. Any delivery change stops this
-      // run; renewal need not reload the rest of the owner's Secret inventory.
-      assignment.taskSecrets = { ...access, unavailable: assignment.taskSecrets.unavailable }
-      for (const grant of access.grants) this.addCredential(runId, 'TASK_SECRET_CAPABILITY', grant.capability)
-    }
-  }
-
-  /** Applies leases renewed by the server's heartbeat answer. */
-  renewLeases(leases: Record<string, string>) {
-    for (const [runId, expiry] of Object.entries(leases)) {
-      if (this.active.has(runId)) this.leases.set(runId, Date.parse(expiry))
-    }
+  /** The device session socket opened: held runs keep their lease while it stays open. */
+  sessionOpened() {
+    this.sessionDeadline = null
   }
 
   /**
-   * Stops the runs the server says this device no longer holds. Runs without
-   * a server lease (local dev runs) were never the server's to take back.
+   * The device session socket is down since `at`. Held runs stop as
+   * `device_lost` once it stays down for DEVICE_SESSION_LOCAL_GRACE_MS; a
+   * later drop never extends an earlier deadline.
    */
-  revokeLeases(runIds: readonly string[]) {
-    for (const runId of runIds) {
-      const run = this.active.get(runId)
-      if (run && !run.forcedStop && this.leases.has(runId))
-        this.forceStop(runId, run, "device_lost")
-    }
+  sessionClosed(at = Date.now()) {
+    if (this.sessionDeadline !== null) return
+    this.sessionDeadline = at + DEVICE_SESSION_LOCAL_GRACE_MS
   }
 
   /**
    * Saves the work in progress of runs that had a tool call since their last
    * checkpoint, or none for `CHECKPOINT_EVERY_MS`, through `save`. The
-   * daemon calls it after each heartbeat; a failed save is tried again on
-   * the next one.
+   * daemon calls it from its local timer while the device session is open;
+   * a tree that did not change since the last checkpoint is not sent, so an
+   * idle run makes no request. A failed save is tried again on the next call.
    */
   async saveCheckpoints(
     save: (runId: string, checkpoint: RunCheckpoint) => Promise<RunCheckpointReceipt | void>,
@@ -383,7 +369,7 @@ export class RunSupervisor {
 
   private async saveCheckpoint(runId: string, run: ActiveRun,
     save: (runId: string, checkpoint: RunCheckpoint) => Promise<RunCheckpointReceipt | void>, now = Date.now(), force = false): Promise<boolean> {
-    // A heartbeat may already be uploading an older tree. Its upload must
+    // A periodic save may already be uploading an older tree. Its upload must
     // finish before the terminal one, so it cannot overwrite the final state.
     if (run.checkpointing) await run.checkpointing
     const entry = this.deps.journal.get(runId)
@@ -440,12 +426,12 @@ export class RunSupervisor {
     return checkpoint
   }
 
-  /** Lease and watchdog pass; the daemon calls it on every tick. */
+  /** Local lease and watchdog pass; the daemon calls it from its local timer (no request). */
   check(now = Date.now()) {
     const stallMs = this.deps.stallMs ?? DEFAULT_STALL_MS
     for (const [runId, run] of this.active) {
       if (run.forcedStop) continue
-      const lease = this.leases.get(runId)
+      const lease = this.leaseExpiry(runId)
       if (lease !== undefined && now > lease) {
         this.forceStop(runId, run, "device_lost")
       } else if (now - run.lastProgressAt > stallMs) {
@@ -600,10 +586,10 @@ export class RunSupervisor {
     return [...this.active.keys()]
   }
 
-  /** Computer operations require a live run and a current server lease. */
+  /** Computer operations require a live run and a current local lease. */
   computerRunAllowed(runId: string): boolean {
     const run = this.active.get(runId)
-    const lease = this.leases.get(runId)
+    const lease = this.leaseExpiry(runId)
     return !this.stopping && Boolean(run && !run.cancelRequested && lease !== undefined && lease > Date.now())
   }
 
@@ -742,9 +728,11 @@ export class RunSupervisor {
         this.finish(entry.assignment.runId, 'error', 'The run stopped with the daemon; its API key is not kept. Retry the thread.')
         continue
       }
-      // The old lease is stale; give the first heartbeat time to renew it.
+      // Held again while the session lasts: it must open within the local
+      // grace (sessionClosed at startup), and its first read delivers the
+      // stop for a run the server took back meanwhile.
       if (entry.assignment.leaseExpiresAt)
-        this.leases.set(entry.assignment.runId, Date.now() + DEFAULT_LEASE_MS)
+        this.leases.set(entry.assignment.runId, Number.POSITIVE_INFINITY)
       this.launch(entry.assignment.runId, repo)
     }
   }
@@ -759,7 +747,7 @@ export class RunSupervisor {
     const check = () => assertMailboxRunAuthority({ held: this.active.get(runId) === run,
       state: this.deps.journal.get(runId)?.state,
       stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted,
-      lease: this.leases.get(runId) })
+      lease: this.leaseExpiry(runId) })
     check()
     // This fixed notice grants no action authority. Avoid waiting on a human
     // control handback here, which would block the same poll's stop channel.
@@ -1184,7 +1172,7 @@ export class RunSupervisor {
   /** Only the local lease and pushed stop state govern host finishing work. */
   private assertFinishingRunLive(runId: string, signal: AbortSignal) {
     const run = this.active.get(runId)
-    const lease = this.leases.get(runId)
+    const lease = this.leaseExpiry(runId)
     if (run && !run.forcedStop && lease !== undefined && lease <= Date.now())
       this.forceStop(runId, run, "device_lost")
     signal.throwIfAborted()
@@ -1560,7 +1548,7 @@ export class RunSupervisor {
     }
     await policyReady
     verifySkillAssignment(assignment)
-    if (assignment.skillReceipt && (this.leases.get(runId)??0)<=Date.now())
+    if (assignment.skillReceipt && (this.leaseExpiry(runId)??0)<=Date.now())
       throw new Error('Receipted Skill assignment requires a current server lease')
     if(assignment.skillReceipt?.artifact.registryId==='mikka-team') {
       if(!this.deps.revalidateSkillAssignment)throw new Error('Current team Skill authorization unavailable')
@@ -1595,7 +1583,7 @@ export class RunSupervisor {
     run.repositoryPreparing?.allowEffects()
 
     const checkMailbox = () => {
-      const lease = this.leases.get(runId)
+      const lease = this.leaseExpiry(runId)
       const current = this.deps.journal.get(runId)
       assertMailboxRunAuthority({ held: this.active.get(runId) === run, state: current?.state, stopped: this.stopping || run.cancelRequested || run.abort.signal.aborted, lease })
     }

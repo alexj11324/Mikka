@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test, { after, before, type TestContext } from 'node:test'
 import { Pool } from 'pg'
-import { botUnreadCounts, handleRead, originAllowed, requestHost, resolveMessage, type ReadRequest } from './conversation-reads-store'
+import { botReadState, botUnreadCounts, handleRead, originAllowed, requestHost, resolveMessage, type ReadRequest } from './conversation-reads-store'
 
 // Pure checks always run. DB checks need a reachable MIKKA_DATABASE_URL whose
 // schema already has conversation_reads (applied by scripts/migrate.mjs; the
@@ -168,6 +168,12 @@ test("a bot's chat keeps its own read position and unread count", async t => {
   assert.deepEqual([...await botUnreadCounts(pool!, alice, [aliceBot, bobBot])], [[aliceBot, 1]])
   assert.deepEqual(await post('2', { conversationId: writer }), { status: 200, body: { lastReadMessageId: ids.w2, lastReadPosition: 2, unreadCount: 0 } }, "position 2 is the bot's own message 2")
   assert.equal((await botUnreadCounts(pool!, alice, [aliceBot])).get(aliceBot), 0)
+  // The same read carries the person's own preferences, only for the bots they changed.
+  assert.deepEqual([...(await botReadState(pool!, alice, [aliceBot, bobBot])).preferences], [])
+  await pool!.query(`INSERT INTO chat_preferences ("userId","chatKey",pinned,muted,hidden,"pinOrder") VALUES ($1,$2,true,false,true,3)`, [alice, aliceBot])
+  try {
+    assert.deepEqual([...(await botReadState(pool!, alice, [aliceBot, bobBot])).preferences], [[aliceBot, { pinned: true, muted: false, hidden: true, pinOrder: 3 }]])
+  } finally { await pool!.query(`DELETE FROM chat_preferences WHERE "userId"=$1 AND "chatKey"=$2`, [alice, aliceBot]) }
   const coordinator = await handleRead(pool!, req({}))
   assert.notEqual((coordinator.body as { lastReadMessageId: string | null }).lastReadMessageId, ids.w2, "reading the bot's chat leaves the Coordinator's alone")
 })

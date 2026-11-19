@@ -227,3 +227,177 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 数据迁移的测试必须执行真实迁移文件（临时 schema + rollback 可隔离），不要复制 SQL 自证。
   2. 只为测试存在的 fail-open 缺省要改成 fail-closed：新 token 默认公开 scope，pre-M4 token 用显式 helper。
   3. 删除未接线模块的标准同样适用于新增 action：没有调用方就只留 store 函数 + 测试，等 UI 接入时再加 server action。
+
+## 2026-11-18 UI 审计：先看渲染，再谈 token；文案迁移要连带修测试和 locale
+
+- 纠正：第一轮 UI 审计只查了 token / class 名，漏掉了真正难看的版面缺陷（PR 列表行没有固定列，标题和状态互相挤）。用户拿截图指出后才发现「对齐」这一整类问题。
+- 规则：
+  1. 审计列表 / 表格页面时，必须逐列问「这一列有没有固定宽度」，不要只看 class 是否用了 token。
+  2. 控件高度这类跨组件一致性可以做成 CI 规则（`scripts/control-size-policy.mjs`），否则下次又会漂。
+- 纠正（文案迁移）：把移动端硬编码中文字面量搬进 catalog 后，一批测试挂了，因为断言写死了中文字面量，而本机 locale 是 en-US。
+- 规则：
+  1. 迁移文案时同步把测试改成从 catalog 读期望值，不要改成 `getMobileMessages('zh-CN')` 写死中文——那样只是把中文搬了个地方。
+  2. 顺手会暴露真 bug：`chat-failure.ts`、`run-error.ts`、`sign-in-error.ts`、`FailedReply.tsx` 直接 `import messages from 'messages/zh-CN.json'`，英文设备会显示中文。凡是移动端直接 import zh-CN 的地方都要改成 `mobileMessages`。
+  3. 新建文案 key 前先搜一遍现有 catalog：`MobileCore.replyRetry` 是我新加的重复命名空间，实际已有 `Coordinator.replyRetry` 在用。
+  4. 冻结基线（`scripts/mobile-i18n-baseline.mjs`）要双向校验：既拦新硬编码，也拦「已迁移但没删行」，否则清单不会真的只减不增。
+
+## 2026-11-18 收尾：移动端有自己的 typecheck，根 tsconfig 不覆盖
+
+- 纠正：我只跑了根 `npx tsrs --noEmit`，漏了 `npx tsrs --noEmit -p apps/mobile/tsconfig.json`。reviewer 一跑就发现 5 个错误：`import { Inbox }` 与 `function Inbox()` 重名（Metro 打包会直接炸）、`@expo/ui` 的 Button/Image 不接受 RN 的 `accessibilityLabel`/`accessibilityElementsHidden`（要走 modifiers 的 `accessibilityLabel()`/`accessibilityHidden()`）、以及 `MobileCore.send` 这个 key 根本不存在（应复用 `Coordinator.send`）。
+- 规则：
+  1. 这个仓库是 pnpm workspace，`apps/mobile` 有独立 tsconfig，改动涉及它时必须两个 typecheck 都跑。
+  2. 改移动端图标时先看 `lucide-react-native` 的导出名是否和本文件的组件/函数同名。
+  3. `@expo/ui/swift-ui` 的无障碍属性是 modifiers，不是 RN props。
+  4. 新增 catalog key 前先 `grep` 一遍同类 namespace：`Coordinator.pendingActions.*` 已经覆盖了 pending action 卡片的全部字段，我在 `MobileCore` 里重造了 23 个。
+  5. 新加的 policy 测试要接进 `package.json` 的 `test:ui-policy`，否则永远不会在 CI 里跑。
+
+## 2026-11-18 对比度不能手算，必须写成测试；`.pathname` 是本仓库的复发 bug
+
+- 纠正：`--tertiary` 第一版按「页面底」算到 4.85:1 就收工，深色实际 4.498:1（未取整比较会判失败），而真正承载它的 `bg-muted/80` chip 上只有 3.97:1。reviewer 自己算出来才发现。
+- 规则：
+  1. 颜色 token 的可读性写成 `scripts/contrast.test.mjs` 这种从 `globals.css` 解析、按 WCAG 公式计算的测试，并且要覆盖**实际承载它的表面**（页面、card、`bg-muted` 整体、`bg-muted/80` 合成色），不是只算页面底。
+  2. 新写的检查必须做一次变异验证（把旧值改回去，确认它会红），否则不知道它在测什么。
+  3. 报错里用三位小数：两位会把 4.498 显示成「4.50 needs 4.5」，看起来像测试自己坏了。
+- 纠正（复发 bug）：`lib/ui-overlay.test.mjs` 用 `new URL('..', import.meta.url).pathname` 当根目录，本 worktree 路径含空格，`readdirSync` 直接 `ENOENT` 到 `%20`。这已经是本会话第三次遇到（`mobile-i18n-baseline.mjs`、`message-gesture.test.mts`、现在这个）。
+- 规则：
+  1. 凡是把 URL 变成文件系统路径，一律 `fileURLToPath`；`pathname` 只用于 URL 语义。
+  2. 改完 policy 测试要跑**整条** `test:ui-policy` 命令串，而不是只跑自己新加的那几个文件——`ui-overlay.test.mjs` 就藏在这条命令串的末尾。
+
+## 2026-11-19 CI 才发现的测试：本机 locale 掩盖了「测试写死中文」
+
+- 现象：PR 推到 CI 后 `Core unit checks` 红，`lib/chat-failure.test.ts` 断言 `{text:'回复未完成，请重试'}`，而 CI 机器 locale 是 en-US，实际拿到 `'Reply did not finish. Please try again.'`。本机跑绿是因为本机 locale 是 zh-CN。
+- 根因：迁移实现（`apps/mobile/lib/chat-failure.ts` 改用 `mobileMessages`）时，只改了 `apps/mobile/tests/*.test.mts`，漏了根目录 `lib/chat-failure.test.ts`——它直接 import 移动端实现，属于同一批断言。
+- 规则：
+  1. 把「测试改成读 catalog」时，要按 `grep -rn "<中文原文>"` 全仓库扫一遍断言，不能只改报错的那一个目录；根 `lib/` 下也有直接测移动端实现的测试。
+  2. 本机 locale 会让这类测试假绿。判断标准是「断言里有没有字面量文案」，不是「本机跑没跑绿」。
+  3. 修完再推一次，等 CI 全绿再 merge；不要因为「本机绿」就认为改动无关。
+
+## 2026-11-19 一个布尔值管三个不相关的 UI 区块 = 回归温床
+
+- 现象：#2835 把「Bot 线程在主聊天打开」做成默认路径（`?mainThread=`），同一 commit 又把 `isConversation` 改成 `!mainThreadId && !selected && ...`。结果右栏、工作区 tab、窗口栏的「打开右栏」三处同时消失——它们都 gate 在同一个布尔值上。用户看到的就是「右侧边栏没有了」。
+- 根因：`isConversation` 的语义被偷换成了「中心是 chat 而不是 thread」，但三处消费方要的是「中心是不是一个会话」。
+- 规则：
+  1. 一个布尔值被三处不相关的 UI 读取时，先问它到底在回答什么问题；把「是不是会话」和「是 chat 还是 thread」拆成两个判断。
+  2. 布局回归必须用**渲染断言**锁住（`querySelector('[data-context-panel]')`），不能只测「页面没崩」。
+  3. 新写的回归测试要做变异验证：把旧代码放回去确认变红，否则不知道它在测什么。
+  4. 跨组件共享的 context 要从**叶子模块**导出，不要从已经 import 了消费方的模块里导出（会形成 cycle）——`conversation-panels-context.ts` 就是这么拆出来的。
+
+## 2026-11-19 跨层追踪：组件名 grep 会漏掉同文件导出的 hook
+
+- 现象：审计 public 层时判定 `LinearSettings` / `TelegramSettings` 是「孤儿组件」（全仓库无 import）。实际 hosted 层 `.hosted-ui/components/mikka/app-page.tsx:16,20` 用的是同文件导出的 `useLinearPlugin` / `useTelegramPlugin`，功能完全正常。
+- 根因：`grep -rn "LinearSettings"` 只搜组件名，且我习惯性排除了源文件自身（`grep -v "linear-settings.tsx"`），于是 hook 导出和同文件引用全被滤掉。
+- 规则：
+  1. 判定「组件是否被挂载」必须同时搜**组件名和同文件的 hook 导出**，且**不要排除源文件自身**——源文件里的 `export function useX` 是跨层契约的一部分。
+  2. slot 架构下，「public 层是 stub」不等于缺陷。`components/slots/settings-connections.tsx` 抛 `UI_SLOT_REQUIRES_OFFICIAL_CLIENT` 是设计，不是缺失；判缺陷前先确认 hosted 层是否实现了它。
+  3. 每个 `missing-affordance` 结论至少用两条独立检索路径验证（按名字、按导入、按调用点），单次 grep 的空结果不足以定性。
+
+## 2026-11-19 后端返回了字段 ≠ UI 使用了字段
+
+- 现象：记忆页「待确认」功能完全不可用。后端 `lib/profile/store.ts:94` 每条新事实都写 `reviewStatus: 'pending'`，`lib/profile/memory.ts:155` 也把它放在 `pending` 数组返回，但 `hooks/settings/use-memory-settings.ts` 只解构 `facts`，`pending` 从未进入渲染，`reviewFact` 零调用者。结果：用户永远看不到 Mikka 记住了什么，记忆永不生效，且无任何报错。
+- 根因：审查时看到「后端返回了 pending」就以为功能存在。实际上消费端漏了一个字段，而周围代码（`undoable` 已被 hosted 使用）看起来都很完整，掩盖了这个缺口。
+- 规则：
+  1. 判定「功能是否可用」必须走完 `后端返回 → hook 解构 → 组件渲染 → 用户可操作` 四步，任何一步断开都是缺陷。
+  2. 看到 `data.xxx` 被返回时，`grep` 一次 `xxx` 在 hook 和组件里的出现位置；只出现在服务端和类型定义里，就是死字段。
+  3. 静默失效最危险：没有报错、没有空状态提示、测试全绿。给这类修复补的测试必须做**变异验证**（删掉实现看测试是否变红），否则不知道测试在测什么。
+
+## 2026-11-19 "grep 不到 importer" 不能用来删依赖
+
+- 现象：审计把 `unstorage` 判成死依赖删掉（源码里 grep `unstorage` 零命中），CI 上 Nitro 构建全线失败：`unstorage is not installed. It is required for KV storage (nitro/kv)`。`lib/agent-images-server.ts:3` 用的是虚拟模块 `nitro/kv`，真正的包由 Nitro 在构建期注入。
+- 根因：把"源码里没有 import"等同于"运行时不需要"。框架的约定式/虚拟模块依赖（Nitro `nitro/kv`、Next 的 `next/font`、Vite 插件注入的包）永远不会出现在 grep 结果里。
+- 规则：
+  1. 删依赖前，除了 `grep 'from "<pkg>"'`，还要 `grep` 框架的虚拟模块名（`nitro/`、`next/`、`virtual:`、`\0` 前缀）和配置文件（`nitro.config.*`、`vite.config.*`、插件目录）。
+  2. 判断"真的没人用"要看 CI 的构建 job 是否绿，不看 grep。本机按 AGENTS.md 不能 build，所以这类改动的唯一门禁就是 CI——推之前明确写下"这一项本机无法验证"。
+  3. 同类：`vaul`（Radix Drawer 的封装，可能被 ui 组件按需引用）、`file-type`（可能被运行时动态 import）。删之前先 `git log -S` 看引入原因。
+
+## 2026-11-19 改了 action 的导出，就要同步改所有 mock
+
+- 现象：给 `app/actions/link-preview.ts` 新增 `getLinkPreviews` 后，`components/workspace/agent-citations.tsx` 具名导入它；但 `group-chat-view.test.tsx` 和 `read-retry-toasts.test.tsx` 里的 `mock.module` 只导出了 `getLinkPreview`，于是 6 个 `test:groups` 用例全部 `SyntaxError: does not provide an export named 'getLinkPreviews'`。
+- 根因：`mock.module` 是**整体替换**模块导出表，不是增量打补丁；给真实模块加导出，所有 mock 都必须跟着加。
+- 规则：
+  1. 给 `app/actions/*` 加导出的同一次改动里，跑 `grep -rn "app/actions/<name>" --include='*.test.ts*'`，把每个 mock 都补齐。
+  2. 改完至少跑一次包含这些测试的**完整 suite**（这里是 `pnpm test:groups`），而不是只跑自己新加的文件。
+
+## 2026-11-19 生成产物必须跟着源码一起提交
+
+- 现象：改了 `app/v1/runs/[runId]/captures/[captureId]/route.ts`，`apps/api/generated/routes.{json,ts}` 里该路由的 `sourceHash` 过期，CI 的 governance acceptance 报 `API_DEV_ROUTES_STALE`。
+- 规则：改 `app/api/**` 或 `app/v1/**` 下的 route 文件后，必须跑 `node apps/api/scripts/generate-routes.mjs` 并提交产物；`--check` 是本地可跑的（不违反 AGENTS.md 的 build 禁令）。
+
+## 2026-11-19 新增后端文件要声明 self-hosted 依赖
+
+- 现象：`scripts/ci/self-hosted-requirements.mjs` 要求每个**改动的**后端文件在 `config/self-hosted-requirements.json` 里声明 `mode` / `environment` / `behavior` / `test`（测试文件必须存在且在某个 suite 里）。漏了 4 个文件，`image` job 直接红。
+- 规则：改 `lib/**`、`app/{api,v1,actions}/**`、`apps/{api,eve}/**`、`workflows/**` 下任何文件后，本地先跑 `node scripts/ci/self-hosted-requirements.mjs`（这个不需要 build，可以本机跑）。
+
+## 2026-11-19 给模块加导出，要连 fixtures/ 和 scripts/ 一起查
+
+- 现象：把 `requireUser` 挪进 `lib/acting-user.ts` 后，`tests/fixtures/legacy-scope-runtime.mjs` 用 `registerHooks` 整体替换该模块，只导出了 `currentUser`/`actAs`。`lib/workspace-access.ts` 的新 import 链接失败，两个 `test:scope-policy` 用例报 `does not provide an export named 'requireUser'`。
+- 根因：第一次只 grep 了 `*.test.ts*` 里的 `mock.module`，漏了 `tests/fixtures/*.mjs` 的 `registerHooks` 文件级替换（这是本仓库第二种 mock 机制）。
+- 规则：
+  1. 给任何被 mock 的模块加导出后，搜索范围必须包含：`*.test.ts`、`*.test.tsx`、`*.test.mjs`、`tests/fixtures/*.mjs`、`scripts/**/*.mjs`。
+  2. 本仓库有两套 mock 机制：`mock.module()`（node:test）和 `registerHooks` + `resolve/load`（fixture 预加载）。后者用 `--import ./tests/fixtures/xxx.mjs` 挂上，grep 关键字是 `resolve(`/`load(` 里的文件路径。
+  3. fixture 里替换成"抛错"的模块（如 scope-store 的 acting-user）是有意的语义，补导出时要保持同样的抛错行为，不要图省事写成成功返回。
+
+## 2026-11-19 断环前先确认真的有静态环
+
+- 现象：我为了"断开 `workspace-access ↔ issue-access` 循环"，把 `workspace-access.ts` 的 `requireUser` 改成直接从 `lib/acting-user` 导入。结果 `workspace-access` 静态拉入 `lib/session.ts` → `next/headers`，打红了两个**故意 stub `next/headers`** 的测试（`lib/linear-sync/kill-switch.test.ts` 只 mock 了 `cookies`；`lib/personal-mailbox-producer.test.ts` 因此在测试结束后才初始化 Better Auth）。
+- 根因：原代码根本没有静态环——`issue-access → workspace-access` 是 `await import()`，动态 import 不构成 ESM 静态循环。我"断环"的前提是错的，改动纯属多余且有害。
+- 规则：
+  1. 断环前用 `grep -n "import" <两个文件>` 确认两边的边是**静态** `import` 还是 `await import()`。动态的那条不算环。
+  2. `lib/acting-user.ts` 静态依赖 `lib/session.ts` → `next/headers`。任何"只在特定路径下才需要 session"的模块（workspace-access、issue-access、各种只读 store）都应保持惰性引入，不要为了统一而改成静态 import。
+  3. 判断某模块是否引入 session 链：`grep -n "^import" lib/acting-user.ts` 看有没有 `lib/session`。有，就说明静态引入它会拉 session。
+
+## 2026-11-19 DB 测试在本机过、CI 并发下被 cancelledByParent
+
+- 现象：`lib/captures/store.db.test.ts` 本地单跑 3.7 秒通过；CI 的 DB runner 并发 4 个 suite 时跑了 32 秒，报 `cancelledByParent` + `Promise resolution is still pending but the event loop has already resolved`，连带把同一文件里后面的 cloud-computer 子测试也掐掉。
+- 根因：我在测试里加了 12 次额外数据库往返（建 user → 建 run → saveCapture → createShare → 删 user → 查 → 再插 user → 查 → 插 guard → 查 → 删 guard → 查 → 删 run → 删 user）。`saveCapture` 本身还要开 `withAccountWrite` 事务、写 activity、读回。共享 PG 连接池时这些被放大。
+- 规则：
+  1. DB 测试里模拟"账号消失"这类状态，优先**直接 INSERT/UPDATE 目标行**，不要走完整业务函数（`saveCapture` 的开销是直接 INSERT 的好几倍）。
+  2. 断言的顺序按规则的读法排：先"存在时能用"，再"删除请求关闭"，再"行没了关闭"。不要为了复用一个 token 而反复插入/删除。
+  3. 本机复现 CI 的 DB 测试：需要名为 `mikka_e2e` 的库（测试硬编码这个名字），`MIGRATE=1` 先跑 `scripts/migrate.mjs`，然后 `REQUIRE_DB=1` + 四个 URL 环境变量都指向它。
+  4. `run_captures` 有 CHECK `run_captures_ready_file`：`status='ready'` 时 `storageKey`、`size`、`sha256` 都必须非空，直接 INSERT 时要一起给。
+
+## 2026-11-19 收紧读口的过滤条件，必须同步改 fixture 的造数路径
+
+- 现象：给 `lib/profile/store.ts` 的 `profilePromptSection` 加了 `reviewStatus = 'approved'`（修复真实的安全缺口：设置页承诺"确认后才用于回答"，而 prompt 一直在读 pending 事实）。CI 红了 `test:user-facts-db` 里唯一一条仓库作用域用例 —— 它的 fixture 用 `recordFacts` 造数据，而 `recordFacts` 按设计写 `pending`，于是整个 prompt 段读成空串，`assert.match` 报 `actual: ''`。
+- 根因：过滤条件是**读口**改的，测试的**写口**（`recordFacts` → `pending`）没变。测试的名字讲的是"仓库作用域"，容易被误判成"这条断言过期了、改断言就行"，实际上应该补全 fixture 的**前置状态**。
+- 规则：
+  1. 给读函数加状态过滤后，第一件事是 `grep -rn "<读函数名>" --include='*.test.*'`，逐个看每个测试的造数走的是哪条写路径、写到什么状态。
+  2. 补前置状态用该状态的生产入口（这里是"审批"）；测试层拿不到业务入口时，在 fixture 里直接 `UPDATE` 该列，并在注释里写明这是 fixture 前置状态而非被测行为。
+  3. 顺手把新加的过滤条件本身变成断言（"还没审批时读出来必须是空"），否则这次修复没有任何回归保护。
+  4. 一个 DB suite 红会连带把 `Database checks (4/4)` 两个矩阵变体和聚合门 `Production build and browser interactions` 一起拖红。判断"到底红了几件事"，看日志里的 `test:<name> lifecycle] exit code=1` 有几条，不要按 job 数。
+
+## 2026-11-19 在 JSDoc 和它描述的函数之间插入新符号，等于把文档送给了新符号
+
+- 现象：修 `lib/run-recovery.ts` 的静默失败时，我把新的 `swept` 辅助函数直接插在 `recoverRuns` 的 JSDoc 结束处和 `recoverRuns` 之间。结果那段"Everything run recovery does …"的文档挂到了 `swept` 上，`recoverRuns` 变成无文档；`tsc`、lint、CI 全绿，只有 review 能看出来。
+- 根因：JSDoc 的归属由**相邻性**决定，不是由内容决定。插入点选在 `*/` 之后、函数之前，就破坏了归属。
+- 规则：
+  1. 在任何 `/** … */` 和它下面的 `export function` 之间不要插入任何东西 —— 包括注释块、常量、辅助函数。新辅助函数放到该 `*/` 之前（如果它服务于同一个导出）或放到该函数之后。
+  2. 改完用 `sed -n '<起点>,<终点>p' <file>` 肉眼看一遍：每个 `/**` 的正下方应该紧跟它描述的那个声明。
+  3. 这类问题 CI 抓不到，只有代码审查或人眼能抓 —— 属于"必须 review"的那一类，别指望门禁兜底。
+
+## 2026-11-19 `test:web-auth-db` 是 flake，不要当回归查
+
+- 现象：`tests/web-auth-handoff.db.test.ts` 的 `remote Web Workspace selection survives bearer-only HTTP and never broadens a tenant or PAT`（单条约 7 秒的重 HTTP+PG 用例）会间歇失败。本会话里出现三次：CI 报 `fetch failed` + 120s 超时；本地同样环境跑出 20/21；紧接着同参数重跑 29/29 全过。
+- 判断依据：**同输入重跑即绿** + 失败信息是网络层（`fetch failed`）而非断言不一致。本机复跑要带 `BETTER_AUTH_URL`，否则 `context.baseURL` 为空，`new URL('')` 会让 4 条用例报 `TypeError: Invalid URL` —— 那是环境缺失，不是代码问题。
+- 规则：
+  1. 看到这个 suite 红，先原地重跑一次再决定是否调查；不要顺着 workspace/PAT 的代码路径去改。
+  2. 本机跑 DB suite 必须按脚本原样调用（`bash -c "$(node -e "console.log(require('./package.json').scripts['<name>'])" )"`），漏掉 `--experimental-test-module-mocks` 或 `--import ./scripts/server-test.mjs` 会自己造出假失败。
+  3. 本地补齐的环境变量：`E2E_DATABASE_URL` / `MIKKA_DATABASE_URL` / `DATABASE_URL` / `WORKSPACE_DATABASE_URL` / `ORVILO_DATABASE_URL` 指向 `mikka_e2e`，外加 `BETTER_AUTH_URL` 和 `REQUIRE_DB=1`。
+
+## 2026-11-19 新接进 CI 的测试，"接上"不等于"跑过"
+
+- 现象：计划 006 把六个没被任何 CI 任务执行的 suite 接进了 `scripts/ci/tasks.json`。其中 `test:factory-query-http` 和 `test:factory-monitor-http` 少了全仓库其它 factory suite 都带的 `--import ./tests/support/server-only.mjs`，CI 一真正选中就报 `ERR_MODULE_NOT_FOUND: Cannot find package 'server-only' imported from lib/task-status-run-start.ts`。在 main 上它一直是绿的，因为 main 的 `Core unit checks` 日志里**这两个测试一次都没出现过** —— 任务按改动文件被选中，很久没匹配到相关改动。
+- 根因：这两个探测用例用 `FACTORY_QUERY_LOCAL_HTTP=1` 做 skip 守卫，本地默认跳过，跳过发生在运行测试体之前，所以本地永远走不到那条动态 import 链；`server-only` 本地甚至没装（Next 自己解析）。
+- 规则：
+  1. 把测试接进 CI 时，除了确认"文件在任务列表里"，还要确认**它在 CI 里真的被执行过**：翻一次该 job 的日志，grep 测试文件名，出现 0 次就是还没验证。
+  2. 新接的 suite 要照抄同目录其它 suite 的 `--import` 前缀，不要只写 `node --import tsx --test`。
+  3. 带 skip 守卫的集成测试，本地绿灯不构成证据 —— 只能靠 CI 或手动打开守卫跑。
+
+## 2026-11-19 解决冲突时整取一方，会静默吃掉另一方的同文件新增
+
+- 现象：`messages/en.json` / `zh-CN.json` 在合 main 时冲突，我用 `git checkout --theirs` 整取 main 版，然后只补回了自己记得的 `githubClearSearch`。结果本分支加的 `Automations.editor.devicesError` 和 `Settings.tokens.copyFailed` 被静默删掉，CI 的 `pnpm typecheck` 报两条 `TS2345`（消息键不在类型里）。`Source checks` 和 `site-search` 两个 job 报的是同一个错。
+- 根因：冲突解决只按"我记住的那几个键"做人工并集，没有把两侧的键集**算出来**比对。`check-i18n.mjs` 抓不到：它校验 en/zh 之间是否成对、占位符是否一致，不校验"代码里引用的键是否存在"——那是 typecheck 的职责。
+- 规则：
+  1. `messages/*.json` 冲突不要 `checkout --theirs` 了事。解决后用脚本算并集：
+     `flat(branch) | flat(main)` 与当前文件比对，必须 **missing 为空且 extra 为空**。
+  2. 任何"整取一方"的冲突解决，都要再 diff 一次该文件的**另一侧独有内容**（`git diff <theirs> <branch> -- <file>`），而不是回忆自己改过什么。
+  3. 大文件 JSON 插入键时，插在最后一个成员之前要给原最后一行补逗号；写完立刻 `json.loads` 校验再落盘。

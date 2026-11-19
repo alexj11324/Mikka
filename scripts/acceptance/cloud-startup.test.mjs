@@ -159,17 +159,17 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         }
         if (action === 'model-order.getModelOrder') {
           const candidates = Object.entries(models).map(([harness, model], index) => ({ harness, model, provider: harness === 'codex' ? 'codex' : 'claude',
-            credentialOwnerId: wrongSource ? (ownedCodex ? adminId : ownerId) : (ownedCodex ? ownerId : adminId), source: { kind: 'subscription', connectionId: id(50 + index) } }))
+            credentialOwnerId: wrongSource ? adminId : ownerId, source: { kind: 'subscription', connectionId: id(50 + index) } }))
           if (ambiguousSource) candidates.push({ ...candidates[0], source: { kind: 'subscription', connectionId: id(59) } })
           return rpc({ candidates, entries: candidates.map((candidate, index) => ({ ...candidate, id: `entry-${index}` })) })
         }
         if (action === 'execution-settings.getBotModelMenu' || action === 'execution-settings.chooseBotModel') {
           assert.equal(args[0], botId)
-          const groups = Object.entries(models).map(([harness, modelId], index) => ({ kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: ownedCodex ? undefined : 'Shared member',
+          const groups = Object.entries(models).map(([harness, modelId], index) => ({ kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: undefined,
             options: [{ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] }))
           const sharedGroups = groups.map((group, index) => ({ ...group, owner: 'Shared member', options: [{ ...group.options[0], id: id(70 + index) }] }))
-          const chatGroups = ownedCodex && ownedChatMenu === 'shared' ? sharedGroups
-            : ownedCodex && ownedChatMenu === 'both' ? [...sharedGroups, ...groups] : groups
+          const chatGroups = ownedChatMenu === 'shared' ? sharedGroups
+            : ownedChatMenu === 'both' ? [...sharedGroups, ...groups] : groups
           if (action === 'execution-settings.chooseBotModel') {
             if (withdrawShare) return rpc({ ok: false, error: 'executionAccountUnavailable' })
             chosenModel = chatGroups.flatMap(group => group.options).find(item => item.id === args[1])
@@ -188,7 +188,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           const input = JSON.parse(args[0].match(/参数如下：(.*)。使用/)[1])
           assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, !leaseAudit)
           assert.deepEqual(input.target, candidate ? { deviceId } : 'cloud')
-          assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
+          assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId, agentId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
           assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
           current.dispatchInput = input; current.harness = chosenModel?.provider === 'codex' ? 'codex' : 'claude_code'; current.profileId = input.profileId
           assert.equal(input.model, undefined)
@@ -237,8 +237,8 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         subscriptionRoute: current.harness === 'codex' ? 'codex_cli' : 'claude_code_cli', agentProfile: { profileId: current.profileId, version: 1, digest: wrongProfile ? 'f'.repeat(64) : profiles.get(current.profileId).digest, source: 'explicit' },
         executionIdentity: { version: 1, requester: ownerId, executionPrincipal: ownerId, botId, botOwner: ownerId, outputOwner: ownerId,
           workspaceId: wrongScope ? (ownedCodex ? workspace : personalWorkspace) : caseWorkspace, personalResourcePolicy: 'requester_only',
-          billingAccount: { model: { kind: 'subscription', ownerId: wrongPayer ? (ownedCodex ? adminId : ownerId) : (ownedCodex ? ownerId : adminId), resourceId: id(800) }, runtime: { kind: candidate ? 'local_device' : 'e2b', ownerId, resourceId: candidate ? deviceId : ownerId } },
-          resourceBindings: [{ kind: 'device', id: deviceId, ownerId, access: 'owner' }, { kind: 'subscription', id: id(800), ownerId: ownedCodex ? ownerId : adminId, access: ownedCodex ? 'owner' : 'workspace_share', revision: '2' }] } } })
+          billingAccount: { model: { kind: 'subscription', ownerId: wrongPayer ? adminId : ownerId, resourceId: id(800) }, runtime: { kind: candidate ? 'local_device' : 'e2b', ownerId, resourceId: candidate ? deviceId : ownerId } },
+          resourceBindings: [{ kind: 'device', id: deviceId, ownerId, access: 'owner' }, { kind: 'subscription', id: id(800), ownerId, access: 'owner', revision: '2' }] } } })
       if (path === '/api/live/ticket') return json({ url: 'wss://live.example/v1/live/opaque/socket', protocol: 'PRIVATE_LIVE_TICKET', expiresAt: epoch + 300000 })
       if (path === '/api/factory/tasks') return json({ contractVersion: 1, issueId: current.issueId, tasks: [{ id: current.taskId, issueId: current.issueId }] })
       if (path === `/api/factory/tasks/${current.taskId}`) {
@@ -347,7 +347,7 @@ test('an owned native profile does not authorize a Coordinator call through shar
   const report = await runCloudStartup(ownedCase, { env: ownedEnv, ...io })
   assert.equal(io.calls.filter(call => call.path === '/api/factory/agent-profiles' && call.init.method === 'POST').length, 1, 'the native profile already selected an owned source')
   assert.equal(report.status, 'failed')
-  assert.equal(report.samples[0].error, 'startup_owned_chat_model_ambiguous')
+  assert.equal(report.samples[0].error, 'startup_own_chat_model_ambiguous')
   assert.equal(report.samples[0].phase, 'chat_model_selection')
   assert.equal(io.calls.filter(call => call.init.body?.includes('execution-settings.chooseBotModel')).length, 0)
   assert.equal(io.calls.filter(call => call.init.body?.includes('coordinator.sendCoordinatorMessage')).length, 0)
@@ -732,15 +732,15 @@ test('SMOKE chooses the verified team without fixed IDs and accepts checking quo
   const report = await runCloudStartup(parseOptions(['--timeout-ms', '1000'], {}), { env, ...io })
   assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
   assert.equal(report.cleanup.workspaceRestored, true)
-  assert.ok(report.samples.every(sample => sample.execution.identity.subscriptionAccess[0] === 'workspace_share'))
+  assert.ok(report.samples.every(sample => sample.execution.identity.subscriptionAccess[0] === 'owner'))
   await assert.rejects(runCloudStartup(options(), { env: { ACME_DEMO_EMAIL: env.SMOKE_OWNER_EMAIL, ACME_DEMO_PASSWORD: env.SMOKE_OWNER_PASSWORD }, ...io }), /startup_smoke_account_required/)
 })
 
-test('foreign payer, workspace or frozen profile cannot satisfy the shared subscription receipt', async () => {
+test('foreign payer, workspace or frozen profile cannot satisfy the own subscription receipt', async () => {
   for (const failure of [{ wrongPayer: true }, { wrongScope: true }, { wrongProfile: true }]) {
     const io = fixture(failure), report = await runCloudStartup(options(), { env, ...io })
     assert.equal(report.status, 'failed')
-    assert.ok(report.samples.every(sample => sample.error === 'startup_shared_subscription_identity_mismatch'))
+    assert.ok(report.samples.every(sample => sample.error === 'startup_own_subscription_identity_mismatch'))
     assert.ok(io.samples.every(sample => sample.cancelled && sample.deleted && sample.machineEnded))
     assert.equal(report.cleanup.workspaceRestored, true)
     assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')

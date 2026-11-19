@@ -32,6 +32,10 @@ queued for a run, or cancelled. Its occurrence status is reported separately. Op
 `nextCursor` back unchanged for the next page. Individual webhook requests
 with batching off do not have a window. This view omits bodies and request
 keys. Omit `batches` to read ordinary occurrence history.
+A creator or Workspace administrator reading a stored Task result also needs
+current content access to that Task. Deleting the Task hides its snapshot
+while the occurrence keeps its status and timestamps. Restoring the Task
+makes the snapshot available again to readers who retain access.
 
 Request deduplication uses a frozen internal `request_origin` rather than the
 mutable `bot_id`. Two Bots can use the same SDK tool-call ID; removing either

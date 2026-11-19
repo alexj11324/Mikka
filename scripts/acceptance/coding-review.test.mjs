@@ -102,8 +102,8 @@ function driverFixture({ failedCleanup = false, loseBotResponse = false, invalid
     },
   }
   const candidates = [
-    ...(!missingClaude ? [{ harness: 'claude_code', model: 'claude-haiku-5-5', source: { kind: 'subscription', connectionId: id(30) }, credentialOwnerId: adminId }] : []),
-    { harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: id(31) }, credentialOwnerId: adminId },
+    ...(!missingClaude ? [{ harness: 'claude_code', model: 'claude-haiku-5-5', source: { kind: 'subscription', connectionId: id(30) }, credentialOwnerId: ownerId }] : []),
+    { harness: 'codex', model: 'gpt-6-luna', source: { kind: 'subscription', connectionId: id(31) }, credentialOwnerId: ownerId },
   ]
   const deps = { env: { SMOKE_OWNER_EMAIL: email, SMOKE_OWNER_PASSWORD: privateText }, clientFactory: () => client,
     attest: async () => ({ sourceCommit: source, workerSha: worker, workerSourceCommit: source, templates: options.templates }),
@@ -200,13 +200,13 @@ test('independent checker proof preserves the same shared subscription/model and
     agentProfile: { profileId: profile.id, version: 1, digest: profile.digest, source: 'decision' },
     executionIdentity: { version: 1, requester: ownerId, executionPrincipal: ownerId, botId: scope.botId, botOwner: ownerId, outputOwner: ownerId,
       workspaceId, personalResourcePolicy: 'requester_only', resourceBindings: [
-        { kind: 'device', id: id(65), ownerId, access: 'owner' }, { kind: 'subscription', id: id(66), ownerId: adminId, access: 'workspace_share', revision: '1' },
-      ], billingAccount: { model: { kind: 'subscription', ownerId: adminId, resourceId: id(66) }, runtime: { kind: 'e2b', ownerId, resourceId: ownerId } } } }
+        { kind: 'device', id: id(65), ownerId, access: 'owner' }, { kind: 'subscription', id: id(66), ownerId, access: 'owner', revision: '1' },
+      ], billingAccount: { model: { kind: 'subscription', ownerId, resourceId: id(66) }, runtime: { kind: 'e2b', ownerId, resourceId: ownerId } } } }
   const client = { json: async () => ({ run }) }
   await assert.rejects(subscriptionProof(client, { ...record }, scope, profile))
   const checked = { ...record }
   await subscriptionProof(client, checked, scope, profile, { profileSource: 'decision' })
-  assert.equal(checked.execution.model, 'gpt-6-luna'); assert.equal(checked.execution.sharedScope.verified, true)
+  assert.equal(checked.execution.model, 'gpt-6-luna'); assert.equal(checked.execution.ownerScope.verified, true)
   for (const mutation of [value => { value.model = 'gpt-6-pro' }, value => { value.executionIdentity.workspaceId = otherId },
     value => { value.executionIdentity.billingAccount.model.ownerId = 'other-owner' }, value => { value.agentProfile.source = 'explicit' }]) {
     const changed = structuredClone(run); mutation(changed)
