@@ -405,6 +405,8 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     const previous = Object.fromEntries(names.map(name => [name, process.env[name]]))
     const objects = new Map<string, Uint8Array>()
     let readFailure: 'denied' | 'offline' | null = null
+    let objectReads = 0
+    const ranges: (string | null)[] = []
     try {
       Object.assign(process.env, { R2_ACCOUNT_ID: 'synthetic', R2_ACCESS_KEY_ID: 'synthetic', R2_SECRET_ACCESS_KEY: 'synthetic', R2_ARTIFACTS_BUCKET: 'test' })
       globalThis.fetch = async (input, init) => {
@@ -418,10 +420,22 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
           return new Response(null, { status: 200 })
         }
         if (request.method === 'DELETE') { objects.delete(key); return new Response(null, { status: 204 }) }
+        if (request.method === 'HEAD') {
+          const stored = objects.get(key)
+          return stored ? new Response(null, { status: 200, headers: { 'content-length': String(stored.length) } }) : new Response(null, { status: 404 })
+        }
         if (readFailure === 'denied') return new Response(null, { status: 403 })
         if (readFailure === 'offline') throw new TypeError('fetch failed')
+        objectReads += 1
         const bytes = objects.get(key)
-        return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 })
+        if (!bytes) return new Response(null, { status: 404 })
+        const range = request.headers.get('range')
+        ranges.push(range)
+        // Like S3: a range wider than the object returns the whole thing.
+        const upper = Number(range?.match(/^bytes=0-(\d+)$/)?.[1])
+        return Number.isSafeInteger(upper) && upper + 1 < bytes.length
+          ? new Response(new Uint8Array(bytes.subarray(0, upper + 1)), { status: 206 })
+          : new Response(new Uint8Array(bytes))
       }
       const r2 = await store.beginUpload(local, { title: 'R2', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
       assert.ok(!('error' in r2) && r2.upload.target === 'storage')
@@ -439,8 +453,22 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
       readFailure = null
       const verified = await store.completeUpload(local, r2.captureId)
       assert.ok(!('error' in verified))
+      assert.ok(ranges.includes(`bytes=0-${PNG.length}`), 'the checked read is bounded by the announced size')
       await fetch(r2.upload.url, { method: 'PUT', headers: r2.upload.headers, body: swapped })
       assert.deepEqual((await store.readCapture(alice, r2.captureId))?.bytes, PNG, 'replayed signed PUT cannot replace verified evidence')
+      // A signed PUT that stored more than was announced is refused from the
+      // bucket's own metadata, before any byte of it reaches the server.
+      const oversized = await store.beginUpload(local, { title: 'Oversized', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+      assert.ok(!('error' in oversized) && oversized.upload.target === 'storage')
+      const stagingKey = new URL(oversized.upload.url).pathname
+      objects.set(stagingKey, new Uint8Array([...PNG, 0]))
+      const readsBefore = objectReads
+      const refused = await store.completeUpload(local, oversized.captureId)
+      assert.ok('error' in refused)
+      assert.equal(refused.message, `Expected ${PNG.length} bytes, got ${PNG.length + 1}.`)
+      assert.equal(objectReads, readsBefore, 'an oversized file is refused from its metadata, not by reading it')
+      assert.equal(objects.has(stagingKey), false, 'the refused staging object is deleted')
+      assert.equal((await pool.query('SELECT status FROM run_captures WHERE id=$1', [oversized.captureId])).rows[0].status, 'failed')
       const objectShare = await store.createCaptureShare(alice, r2.captureId)
       assert.ok(objectShare)
       const sharedObject = await measured(() => store.sharedCapture(objectShare.token))
