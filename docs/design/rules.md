@@ -510,7 +510,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   other family stands in for a status. Paid blocks keep their own icons
   ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
   A new glyph is a line in that file, not a new package (ui-policy
-  `icons/glyph-set`).
+  `icons/glyph-set`). Priority is the one mark Mikka draws itself: low, normal
+  and high are three bars on one baseline, rising one step each, in the set's
+  box and stroke (ui-policy `icons/priority-bars`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
   value read-only. A person's own subscriptions and API keys are not such a
