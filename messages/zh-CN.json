@@ -2768,7 +2768,8 @@
       "neverUsed": "从未使用",
       "expires": "{date} 过期",
       "noExpiry": "永不过期",
-      "expired": "已过期"
+      "expired": "已过期",
+      "copyFailed": "复制失败。请手动选中并复制"
     },
     "secrets": {
       "heading": "密钥",
@@ -8458,7 +8459,8 @@
         "noChannels": "Mikka 的 Slack 应用还看不到频道，先把它加进频道",
         "channelsError": "Slack 频道没加载出来"
       },
-      "viewOnly": "只有创建者能修改。需要的话接手它。"
+      "viewOnly": "只有创建者能修改。需要的话接手它。",
+      "devicesError": "设备加载失败"
     },
     "run": {
       "from": "由「{event}」触发 · {what}",
