@@ -13,7 +13,7 @@ let items: ApprovedWriteItem[] = [], legacy: PendingActionView[] = []
 const calls: Record<string, unknown>[] = [], oldDecisions: unknown[] = [], notices: string[] = []
 const translate = Object.assign((key: string) => key, { has: () => false })
 mock.module('posthog-js', { defaultExport: { onFeatureFlags: () => () => {}, getFeatureFlag: () => undefined } })
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate } })
 mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: { useSession: () => ({ data: { user: { id: viewerId }, session: { id: 'session-' + viewerId } }, isPending: false }) } } })
 mock.module(new URL('../app/actions/pending-actions.ts', import.meta.url).href, { namedExports: { decidePendingAction: async (id: string, approve: boolean) => { oldDecisions.push({ id, approve }); legacy = legacy.filter(item => item.id !== id); return { status: 'done' } } } })
 mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ children, disabled, onClick }: { children?: ReactNode; disabled?: boolean; onClick?: () => void }) => <button disabled={disabled} onClick={onClick}>{children}</button> } })

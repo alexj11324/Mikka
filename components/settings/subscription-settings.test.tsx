@@ -33,7 +33,7 @@ const mutate = async (value?: (current: State) => State) => {
 }
 const translate = (key: string) => key
 const mutateCached = async () => undefined
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time' }) } })
 mock.module('swr', { defaultExport: (key: readonly string[] | null) => ({ data: useSyncExternalStore(subscribe, key?.[0] === 'settings:subscriptions' ? snapshot : emptyUsage), mutate }), namedExports: {
   unstable_serialize: (key: unknown) => JSON.stringify(key), useSWRConfig: () => ({ mutate: mutateCached }),
 } })

@@ -17,7 +17,7 @@ mock.module('swr', { defaultExport: (key: unknown, fetcher: typeof fetchStatus, 
   return { data, isValidating: validating }
 }, namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: (...args: unknown[]) => { liveKeys.push(args) } } })
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: (namespace: string) => (key: string, args?: { state?: string }) => {
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string, args?: { state?: string }) => {
   if (namespace === 'Metadata.prState') return key
   if (key === 'manual') return `Manual: ${args?.state}`
   if (key === 'synced') return `GitHub: ${args?.state}`

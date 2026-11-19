@@ -12,7 +12,7 @@ let renderedQuery: unknown
 let requestedQuery: unknown
 let data: ConversationDirectoryPage[] | undefined
 const opened: string[] = []
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string) => key, useFormatter: () => ({ dateTime: () => 'Today' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key, useFormatter: () => ({ dateTime: () => 'Today' }) } })
 mock.module('swr', { defaultExport: () => ({}), namedExports: { useSWRConfig: () => ({}) } })
 mock.module('swr/infinite', { defaultExport: (getKey: (index: number, previous: null) => unknown[], fetchPage: (key: unknown[]) => unknown) => {
   const key = getKey(0, null)

@@ -5,7 +5,11 @@ registerHooks({
   resolve(specifier,context,next) {
     if(specifier==='@/lib/intl/i18n-server') return {url:'team-auth-fixture:intl',shortCircuit:true}
     if(specifier==='next/headers'||specifier==='@/lib/server-runtime/headers') return {url:'team-auth-fixture:headers',shortCircuit:true}
-    return next(specifier,context)
+    const resolved=next(specifier,context)
+    // tsx resolves the `@/` alias before this hook runs, so an aliased import
+    // arrives already turned into a file URL; match the resolved path too.
+    if(resolved.url.endsWith('/lib/server-runtime/headers.ts')) return {url:'team-auth-fixture:headers',shortCircuit:true}
+    return resolved
   },
   load(url,context,next) {
     if(url==='team-auth-fixture:intl') return {format:'module',source:'export async function getLocale(){return "en"} export async function getTranslations(){return Object.assign(key=>key,{has:()=>true})}',shortCircuit:true}

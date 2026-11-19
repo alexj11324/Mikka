@@ -8,7 +8,7 @@ import { contextUsageFromCounts, type ContextCharSources } from '@/lib/context-u
 
 // The real Chinese copy, so the test reads what the person sees.
 const zh = JSON.parse(readFileSync(new URL('../../messages/zh-CN.json', import.meta.url), 'utf8')) as Record<string, Record<string, unknown>>
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: (namespace: string) => (key: string, values: Record<string, unknown> = {}) => {
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string, values: Record<string, unknown> = {}) => {
   const text = key.split('.').reduce<unknown>((value, name) => (value as Record<string, unknown>)?.[name], zh[namespace])
   if (typeof text !== 'string') throw new Error(`missing copy: ${namespace}.${key}`)
   return text.replace(/\{(\w+)\}/g, (_, name: string) => String(values[name]))

@@ -86,7 +86,8 @@ export const claimWorkspacePool = { async query(sql, args) {
   p.membershipReads.push(args)
   return { rows: p.workspaceMemberAllowed ? args[1].map(userId => ({ userId })) : [] }
 } }
-const nextServer = import.meta.resolve('next/server')
+const realServer = new URL('../../lib/server-runtime/server.ts', import.meta.url).href
+const nextServer = realServer
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
 const actionError = new URL('../../lib/action-error.ts', import.meta.url).href
 const mailboxCapability = new URL('../../lib/personal-mailbox-capability.ts', import.meta.url).href
@@ -346,6 +347,9 @@ registerHooks({
     if(specifier==='server-only')return {url:'claim-fixture:empty',shortCircuit:true}
     if(specifier==='next/server')return {url:'claim-fixture:next-server',shortCircuit:true}
     const result=next(specifier,context)
+    // tsx resolves the `@/` alias first, so match the resolved path, not the specifier.
+    // The stub itself imports the real classes; let that one through.
+    if(result.url===realServer&&context.parentURL!=='claim-fixture:next-server')return {url:'claim-fixture:next-server',shortCircuit:true}
     for(const [suffix,source] of sources)if(result.url.endsWith(suffix))return {url:`claim-fixture:${encodeURIComponent(source)}`,shortCircuit:true}
     return result
   },

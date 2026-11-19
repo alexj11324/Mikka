@@ -7,7 +7,7 @@ import { Window } from 'happy-dom'
 
 let targets: unknown, impact: unknown, archived: unknown, profile: unknown
 const forbidden = async () => { throw new Error('Unexpected workspace mutation') }
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => (code?: string) => !code || code === 'generic' ? 'Read failed' : code } })
 mock.module('@/lib/settings-read', { namedExports: { settingsRead: async (read: string) => {
   const value = read === 'workspace-general' ? profile : read === 'transfer-targets' ? targets : impact

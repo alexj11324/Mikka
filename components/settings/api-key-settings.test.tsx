@@ -20,7 +20,7 @@ const listeners = new Set<() => void>()
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
 const snapshot = () => data
 
-mock.module('@/lib/intl/i18n-client', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en',
   useTranslations: () => {
     const t = (key: string) => key
     t.has = () => true

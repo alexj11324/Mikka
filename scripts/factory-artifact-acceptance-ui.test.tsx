@@ -35,7 +35,7 @@ mock.module('swr', { defaultExport: (key: string | readonly unknown[] | null) =>
 }, namedExports: { unstable_serialize: JSON.stringify, useSWRConfig: () => ({ cache, mutate: async (key: string) => { reloaded.push(key); onRevalidate?.(key) } }) } })
 // The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
 mock.module(new URL('../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
-mock.module('@/lib/intl/i18n-client', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en',
   useTranslations: (namespace: string) => (key: string, args?: Record<string, string | number>) => {
     const value = `${namespace}.${key}`.split('.').reduce((node, part) => node?.[part], messages)
     assert.equal(typeof value, 'string', `missing copy ${namespace}.${key}`)

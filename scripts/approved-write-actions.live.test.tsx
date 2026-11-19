@@ -12,7 +12,7 @@ const translate = Object.assign((key: string) => key, { has: () => false })
 let flag: boolean | undefined
 const flagListeners = new Set<() => void>()
 mock.module('posthog-js', { defaultExport: { getFeatureFlag: () => flag, onFeatureFlags: (notify: () => void) => { flagListeners.add(notify); return () => { flagListeners.delete(notify) } } } })
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate } })
 mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExports: { authClient: { useSession: () => ({ data: { user: { id: 'owner' }, session: { id: 'owner-session' } }, isPending: false }) } } })
 mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ children, disabled, onClick }: { children?: ReactNode; disabled?: boolean; onClick?: () => void }) => <button disabled={disabled} onClick={onClick}>{children}</button> } })
 mock.module('sonner', { namedExports: { toast: { error() {}, success() {} } } })

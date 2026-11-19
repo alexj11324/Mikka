@@ -24,7 +24,7 @@ mock.module(new URL('../lib/app-build.ts', import.meta.url).href, { namedExports
 let finishWake: (value: null) => void
 let failWake: (error: Error) => void
 const failures: string[] = []
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string) => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
 mock.module('sonner', { namedExports: { toast: { error: (message: string) => failures.push(message) } } })
 mock.module(new URL('../hooks/use-computer.ts', import.meta.url).href, { namedExports: {
   useComputer: () => ({ data: state, mutate: async () => { stateReads++; return state } }),

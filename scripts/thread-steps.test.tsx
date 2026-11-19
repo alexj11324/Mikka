@@ -12,7 +12,7 @@ const plural = (message: string, count: number) => {
   assert.ok(match, `a plain one/other plural: ${message}`)
   return (count === 1 ? match[1] : match[2]).replace('#', String(count))
 }
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string, args: { count: number }) => {
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string, args: { count: number }) => {
   assert.ok(['steps', 'stepsCommands', 'stepsTools'].includes(key), key)
   return plural(en[key], args.count)
 } } })

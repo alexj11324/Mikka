@@ -7,7 +7,7 @@ import { parseUnifiedDiff } from '@/lib/thread-changes'
 
 // The real Chinese copy, so the test reads what the person sees.
 const zh = JSON.parse(readFileSync(new URL('../../messages/zh-CN.json', import.meta.url), 'utf8')) as Record<string, Record<string, string>>
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: (namespace: string) => (key: string, values: Record<string, unknown> = {}) =>
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string, values: Record<string, unknown> = {}) =>
   zh[namespace][key].replace(/\{(\w+)\}/g, (_, name: string) => String(values[name])) } })
 // @pierre/diffs draws inside a shadow root on the client; record what each file hands it.
 type Drawn = { fileDiff: import('@pierre/diffs').FileDiffMetadata; options: Record<string, unknown> }

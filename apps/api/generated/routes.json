@@ -3087,7 +3087,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "37480f704533c60e9981974693b069fb15f26636b77799c2ca40b57875ba8965"
+      "sourceHash": "c55b5bc83e06e37d2d2cd6017f128b735970ef7c8a38b68177981d3162919f35"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/clear",
@@ -3096,7 +3096,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "23b80adf72bd6a329b09ff525115b5f814c522e1bae2ff7ea49200bd0b395571"
+      "sourceHash": "81720121935e7980e26a04f59982f2d4e9dc3c30f3758a165ca3cc9e4a1fc1af"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/governance",
@@ -3154,7 +3154,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "f3ac97e3f34e0e3183ea29af39900d96a0752de181b40c08371818ee5987035e"
+      "sourceHash": "91f918a1d0f1ad1552f5de27742e69a20d8f8a782a7e580b0c920f51c9f45e15"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/environment-variables/[name]/value",

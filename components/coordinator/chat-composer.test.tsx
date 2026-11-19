@@ -33,7 +33,7 @@ mock.module('sonner', { namedExports: { toast: {
   dismiss() { removalNotice = undefined },
 } } })
 mock.module('@/lib/intl/i18n-client', {
-  namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` },
+  namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` },
 })
 
 const browser = new Window({ url: 'https://fixture.example/mikka' })

@@ -14,7 +14,7 @@ let reads = 0
 let pendingRead: Promise<{ archiveIdleAfterDays: number }> | null = null
 const subscriptions = new Map<string, () => Promise<unknown>>()
 
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (key: string) => key, useFormatter: () => ({ dateTime: () => '' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key, useFormatter: () => ({ dateTime: () => '' }) } })
 const stub = (file: string, namedExports: Record<string, unknown>) => mock.module(new URL(file, import.meta.url).href, { namedExports })
 function readPreferences() { reads++; return pendingRead ?? { archiveIdleAfterDays: days } }
 stub('../../lib/settings-read.ts', { settingsRead: readPreferences })

@@ -15,7 +15,7 @@ const translator = (namespace: string) => (key: string) => {
   assert.equal(typeof value, 'string', `missing ${namespace}.${key}`)
   return value as string
 }
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: translator } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: translator } })
 let data: CloudConnectionView
 let readError: Error | undefined
 let read: () => Promise<CloudConnectionView>

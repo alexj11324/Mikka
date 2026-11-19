@@ -8,7 +8,7 @@ import type { AgentProfilesView, ProfileAvailability } from '../settings/factory
 
 const workspaceId = randomUUID()
 const translate = (key: string) => key
-mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate } })
 // Inspect the real picker/notice through a noninteractive projection of Select
 // disabled props. Popup interaction and layout stay in the production-build capture.
 let changeValue: (value: string) => void
