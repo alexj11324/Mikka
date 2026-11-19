@@ -20,7 +20,6 @@ const listeners = new Set<() => void>()
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
 const snapshot = () => data
 
-const translate = (key: string) => key
 mock.module('next-intl', { namedExports: {
   useTranslations: () => {
     const t = (key: string) => key
