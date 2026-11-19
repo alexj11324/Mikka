@@ -678,8 +678,11 @@ test('desktop forwards eve protocol headers and fences NDJSON bytes at account/w
   assert.equal(cancelled, true)
 })
 
-test('run environment settings forwarding permits only the exact read route', () => {
-  assert.equal(allowedApiPath('/api/settings/environments', 'GET'), true)
-  assert.equal(allowedApiPath('/api/settings/environments/extra', 'GET'), false)
-  for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath('/api/settings/environments', method), false)
+test('run environment and thread title settings forwarding permits only exact read routes', () => {
+  for (const path of ['/api/settings/environments', '/api/settings/thread-titles']) {
+    assert.equal(allowedApiPath(path, 'GET'), true, path)
+    assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
+    assert.equal(allowedApiPath(`${path}/`, 'GET'), false)
+    for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false)
+  }
 })
