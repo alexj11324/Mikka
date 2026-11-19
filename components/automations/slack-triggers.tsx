@@ -61,12 +61,12 @@ export function SlackTriggers({ workspaceId, userId, value, onChange, channels, 
       const selected = new Set(prefix.split(/[,，]/).map(id => id.trim()))
       return <div key={index} role="group" aria-label={t('item', { number: index + 1 })} className="flex flex-col gap-2 rounded-xl bg-muted/40 p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <NativeSelect aria-label={t('event')} value={trigger.event} disabled={disabled} onChange={event => update(index, { event: event.target.value as SlackTriggerEvent })}>
+          <NativeSelect size="sm" aria-label={t('event')} value={trigger.event} disabled={disabled} onChange={event => update(index, { event: event.target.value as SlackTriggerEvent })}>
             {SLACK_TRIGGER_EVENTS.map(event => <NativeSelectOption key={event} value={event}>{tEvent(event)}</NativeSelectOption>)}
           </NativeSelect>
           {trigger.channels.length > 1
             ? <span className="text-sm text-muted-foreground">{trigger.channels.map(label).join(', ')}</span>
-            : <NativeSelect aria-label={t('channel')} value={trigger.channels[0] ?? ''} disabled={disabled} onChange={event => update(index, { channels: event.target.value ? [event.target.value] : [] })}>
+            : <NativeSelect size="sm" aria-label={t('channel')} value={trigger.channels[0] ?? ''} disabled={disabled} onChange={event => update(index, { channels: event.target.value ? [event.target.value] : [] })}>
               <NativeSelectOption value="" disabled>{t('channel')}</NativeSelectOption>
               {trigger.channels[0] && !channels.some(channel => channel.id === trigger.channels[0]) && <NativeSelectOption value={trigger.channels[0]}>{trigger.channels[0]}</NativeSelectOption>}
               {channels.map(channel => <NativeSelectOption key={channel.id} value={channel.id}>{label(channel.id)}</NativeSelectOption>)}

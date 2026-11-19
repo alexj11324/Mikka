@@ -113,7 +113,7 @@ export function Card({
         data-selected={selected || undefined}
         className={cn(
           "relative flex flex-col rounded-2xl border text-card-foreground",
-          "transition-[border-color,box-shadow,background-color] duration-200",
+          "transition-[border-color,box-shadow,background-color] duration-(--motion-base)",
           VARIANT_CLASS[variant],
           ROOT_SIZE_CLASS[size],
           interactive && "cursor-pointer hover:border-border-strong has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-foreground",

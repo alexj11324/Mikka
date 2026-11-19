@@ -201,7 +201,7 @@ function QuestionInput({
   if (question.input === "select") {
     // The card clips its overflow, so make room under the field for the open panel.
     return (
-      <div className={cn("transition-[padding] duration-200 motion-reduce:transition-none", selectOpen && SELECT_ROOM[Math.min(question.options?.length ?? 1, SELECT_ROOM.length) - 1])}>
+      <div className={cn("transition-[padding] duration-(--motion-base) motion-reduce:transition-none", selectOpen && SELECT_ROOM[Math.min(question.options?.length ?? 1, SELECT_ROOM.length) - 1])}>
       <Select value={answer.selected[0] ?? ""} onValueChange={(value) => onChange({ selected: [value], custom: "" })} onOpenChange={setSelectOpen} disabled={disabled} className="w-full">
         <SelectTrigger><SelectValue placeholder={agentCopy.chooseOption} /></SelectTrigger>
         <SelectContent>

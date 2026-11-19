@@ -8,6 +8,12 @@ import { Window } from 'happy-dom'
 // TSX components load Lucide's require export; keep native SVG outside this DOM behavior fixture.
 const require = createRequire(import.meta.url)
 import type { PendingAction } from '../lib/types.ts'
+// The card's words come from the shared catalog (R-42), so the assertions read them back
+// rather than writing the Chinese in twice — this suite runs under whatever the device locale is.
+import { mobileMessages as messages } from '../lib/messages.ts'
+
+const copy = messages.MobileCore
+const actionCopy = messages.Coordinator.pendingActions
 
 type Decision = { status: 'done' | 'failed' | 'declined'; reason: string | null }
 const decisions: Array<{ path: string; approve: boolean }> = []
@@ -81,29 +87,29 @@ test('a confirmed approval replaces a stale cached card even when refreshing fai
   let rejectRefresh!: (reason: Error) => void
   reload = () => new Promise((_, reject) => { rejectRefresh = reject })
   await render()
-  const approve = presses.get('发送')!
+  const approve = presses.get(actionCopy.approveSend)!
   await act(async () => { approve(); approve() })
   assert.equal(decisions.length, 1, 'repeated events share the pending decision')
   assert.ok([...container.querySelectorAll('button')].every(button => button.disabled))
   await act(async () => finish({ status: 'done', reason: null }))
-  assert.match(container.textContent ?? '', /邮件已发送/)
+  assert.ok(container.textContent?.includes(actionCopy.sent))
   assert.deepEqual(buttons(), [], 'the receipt is shown before the refresh completes')
   await act(async () => rejectRefresh(new Error('offline')))
   await render([item])
-  assert.match(container.textContent ?? '', /邮件已发送/)
-  assert.doesNotMatch(container.textContent ?? '', /没发出去/)
+  assert.ok(container.textContent?.includes(actionCopy.sent))
+  assert.ok(!container.textContent?.includes(copy.sendFailedRetry))
   assert.deepEqual(buttons(), [], 'a retained server snapshot cannot restore approval buttons')
   await act(async () => approve())
   assert.equal(decisions.length, 1)
 })
 
 for (const result of [
-  { status: 'failed' as const, reason: 'Fixture refusal', line: '没做成：Fixture refusal' },
-  { status: 'declined' as const, reason: null, line: '已拒绝' },
+  { status: 'failed' as const, reason: 'Fixture refusal', line: actionCopy.failed.replace('{error}', 'Fixture refusal') },
+  { status: 'declined' as const, reason: null, line: copy.rejected },
 ]) test(`a ${result.status} decision keeps its terminal receipt over the stale pending item`, async () => {
   decision = async () => result
   await render()
-  await act(async () => presses.get(result.status === 'declined' ? '不要' : '发送')!())
+  await act(async () => presses.get(result.status === 'declined' ? actionCopy.decline : actionCopy.approveSend)!())
   await render([item])
   assert.ok(container.textContent?.includes(result.line))
   assert.deepEqual(buttons(), [])
@@ -114,22 +120,22 @@ for (const result of [
 test('an already handled or expired action stays closed when its read cannot refresh', async () => {
   decision = async () => { throw new ApiError(409) }
   await render()
-  await act(async () => presses.get('发送')!())
+  await act(async () => presses.get(actionCopy.approveSend)!())
   await render([item])
-  assert.match(container.textContent ?? '', /已处理或已过期/)
+  assert.ok(container.textContent?.includes(messages.Errors.pendingActionUnavailable))
   assert.deepEqual(buttons(), [])
 })
 
 test('an unconfirmed write failure keeps the proposal available for an explicit retry', async () => {
   decision = async () => { throw new Error('write offline') }
   await render()
-  await act(async () => presses.get('发送')!())
-  assert.match(container.textContent ?? '', /没发出去，再试一次/)
-  assert.deepEqual(buttons(), ['不要', '发送'])
+  await act(async () => presses.get(actionCopy.approveSend)!())
+  assert.ok(container.textContent?.includes(copy.sendFailedRetry))
+  assert.deepEqual(buttons(), [actionCopy.decline, actionCopy.approveSend])
   assert.ok([...container.querySelectorAll('button')].every(button => !button.disabled))
   decision = async () => ({ status: 'done', reason: null })
-  await act(async () => presses.get('发送')!())
+  await act(async () => presses.get(actionCopy.approveSend)!())
   assert.equal(decisions.length, 2)
-  assert.match(container.textContent ?? '', /邮件已发送/)
+  assert.ok(container.textContent?.includes(actionCopy.sent))
   assert.deepEqual(buttons(), [])
 })

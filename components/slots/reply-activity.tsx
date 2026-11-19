@@ -39,7 +39,7 @@ export function ActivityTool({ tool }: { tool: ActivityToolView }) {
     <TraceIcon>{running ? <LoaderCircle className="animate-spin" /> : failed ? <CircleAlert /> : tool.icon}</TraceIcon>
     <TraceTitle>
       {tool.title}
-      {tool.target && <span className={cn('ml-1.5', !failed && 'text-muted-foreground/70')}>{tool.target}</span>}
+      {tool.target && <span className={cn('ml-1.5', !failed && 'text-tertiary')}>{tool.target}</span>}
       {tool.why && <span className="ml-1.5">· {tool.why}</span>}
     </TraceTitle>
   </TraceLine>

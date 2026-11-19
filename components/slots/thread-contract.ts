@@ -97,7 +97,7 @@ export type ThreadScreenProps = {
   mark: ReactNode
   /** null while the first read is on its way. */
   entries: ThreadEntry[] | null
-  /** Shown in place of an empty conversation: the welcome being written, or starters. */
+  /** Shown in place of an empty conversation: the welcome being written. No starter cards (R-12). */
   empty?: ReactNode
   /** Older rows were added above the visible transcript. */
   historyPrepend?: number

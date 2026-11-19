@@ -33,6 +33,7 @@ export function AccountSettings({ user, onSignOut, signingOut }: SettingsAccount
   return <>
     <SettingsSection id="account-heading" title={t('heading')}>
       <SettingRow title={t('avatar')}>
+        {/* control-size-exempt: an avatar and its name block, no control in this row. */}
         <div className="flex items-center gap-3">
           <Avatar className="size-10">
             {shownImage && <AvatarImage src={shownImage} alt="" />}

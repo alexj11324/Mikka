@@ -312,6 +312,7 @@ function ViewerGitHubSettings(viewer: { userId: string | undefined; email: strin
     </SettingsSection></PageSection>}
 
     {connected && githubState && <PageSection id="github-repositories-heading" title={t('githubRepositoryAccess')}><SettingsSection>
+      {/* control-size-exempt: the row's main target is a stretched link button, and the trailing link is a row action, not a toolbar peer. */}
       <div className="relative flex items-center gap-3 py-3 pr-4 pl-5 transition-colors has-[[data-repositories]:hover]:bg-muted/50">
         {githubState.installed
           // The whole row opens the list (its hover covers the row); the GitHub link sits above it.

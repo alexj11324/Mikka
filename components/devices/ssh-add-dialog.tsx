@@ -20,7 +20,7 @@ function StepIcon({ state }: { state: StepState }) {
   if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success-foreground" />
   if (state === 'failed') return <X aria-hidden="true" className="size-4 text-destructive-foreground" />
   if (state === 'running') return <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-muted-foreground" />
-  return <Circle aria-hidden="true" className="size-4 text-muted-foreground/60" />
+  return <Circle aria-hidden="true" className="size-4 text-tertiary" />
 }
 
 /** #540 adds host details, the key type and cancel to the preload contract; older desktops send aliases only. */
@@ -183,7 +183,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
           {startError && <FieldError className="text-xs">{t('startFailed')}</FieldError>}
           {/* The fallback for a computer without SSH: run the three commands there. */}
           <Button variant="ghost" size="sm" className="-mx-2 self-start text-muted-foreground" aria-expanded={manual} onClick={() => setManual(value => !value)}>
-            {t('manual')}<ChevronDown data-icon="inline-end" className={cn('transition-transform duration-200 motion-reduce:transition-none', manual && 'rotate-180')} />
+            {t('manual')}<ChevronDown data-icon="inline-end" className={cn('transition-transform duration-(--motion-base) motion-reduce:transition-none', manual && 'rotate-180')} />
           </Button>
           {manual && <DaemonCommandList />}
         </div>

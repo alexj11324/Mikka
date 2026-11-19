@@ -31,7 +31,7 @@ function StepRow({ item }: { item: AgentActivityStep }) {
     <div className="flex min-h-7 items-start gap-2.5 rounded-md px-1.5 py-1">
       <span
         aria-hidden="true"
-        className="mt-0.5 grid size-4 shrink-0 place-items-center text-muted-foreground/70"
+        className="mt-0.5 grid size-4 shrink-0 place-items-center text-tertiary"
       >
         {state === "complete" ? (
           <Check className="size-4" strokeWidth={1.8} />
@@ -51,13 +51,13 @@ function StepRow({ item }: { item: AgentActivityStep }) {
       <span
         className={cn(
           "min-w-0 flex-1 leading-5",
-          state === "pending" ? "text-muted-foreground/55" : "text-foreground/90",
+          state === "pending" ? "text-tertiary" : "text-foreground/90",
         )}
       >
         {item.label}
       </span>
       {item.meta ? (
-        <span className="shrink-0 leading-5 text-muted-foreground/55">
+        <span className="shrink-0 leading-5 text-tertiary">
           {item.meta}
         </span>
       ) : null}
@@ -90,7 +90,7 @@ function SearchResultRow({
         {result.title}
       </span>
       {result.domain ? (
-        <span className="min-w-0 truncate text-muted-foreground/55">
+        <span className="min-w-0 truncate text-tertiary">
           {result.domain}
         </span>
       ) : null}
@@ -155,7 +155,7 @@ function SearchRow({ item }: { item: AgentActivitySearch }) {
             animate={visible}
             exit={exit}
             transition={transition}
-            className="px-1.5 py-1 pl-8 text-muted-foreground/55"
+            className="px-1.5 py-1 pl-8 text-tertiary"
           >
             +{item.moreCount} more
           </motion.div>
@@ -181,12 +181,12 @@ function ToolRow({ item }: { item: AgentActivityTool }) {
     <div className="flex min-h-8 min-w-0 items-center gap-2.5 rounded-md px-1.5 py-0.5 leading-5">
       <span
         aria-hidden="true"
-        className="grid size-4 shrink-0 place-items-center text-muted-foreground/70"
+        className="grid size-4 shrink-0 place-items-center text-tertiary"
       >
         <ActionIcon action={item.action} />
       </span>
       <span className="shrink-0 font-medium text-foreground/90">{action}</span>
-      <span className="min-w-0 flex-1 truncate rounded-lg bg-muted/80 px-2.5 py-1 font-mono text-xs text-muted-foreground/70">
+      <span className="min-w-0 flex-1 truncate rounded-lg bg-muted/80 px-2.5 py-1 font-mono text-xs text-tertiary">
         {item.target}
       </span>
       {typeof item.additions === "number" || typeof item.deletions === "number" ? (
@@ -217,13 +217,13 @@ function TraceRow({ item }: { item: AgentActivityTrace }) {
     <div className="grid min-h-8 grid-cols-[1rem_auto_minmax(0,1fr)] items-center gap-2.5 rounded-md px-1.5 py-0.5">
       <span
         aria-hidden="true"
-        className="grid size-4 place-items-center text-muted-foreground/70"
+        className="grid size-4 place-items-center text-tertiary"
       >
         {item.icon ?? <TraceIcon kind={item.kind} />}
       </span>
       <span className="font-medium text-foreground/90">{item.label}</span>
       {item.detail ? (
-        <span className="min-w-0 truncate rounded-lg bg-muted/80 px-2.5 py-1 font-mono text-xs text-muted-foreground/70">
+        <span className="min-w-0 truncate rounded-lg bg-muted/80 px-2.5 py-1 font-mono text-xs text-tertiary">
           {item.detail}
         </span>
       ) : (

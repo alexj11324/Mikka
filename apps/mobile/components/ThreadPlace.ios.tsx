@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import * as Clipboard from 'expo-clipboard'
 import { Button, HStack, Host, Image, Popover, Text, VStack } from '@expo/ui/swift-ui'
-import { buttonStyle, controlSize, font, foregroundStyle, padding, tint } from '@expo/ui/swift-ui/modifiers'
+import { accessibilityHidden, accessibilityLabel, buttonStyle, controlSize, font, foregroundStyle, padding, tint } from '@expo/ui/swift-ui/modifiers'
 import { api } from '@/lib/api'
 import { mobileMessages } from '@/lib/messages'
 import { colors } from '@/lib/theme'
@@ -24,8 +24,8 @@ export function ThreadPlace({ threadId, kind }: { threadId: string; kind: Thread
     <Host matchContents>
       <Popover isPresented={open} onIsPresentedChange={setOpen} arrowEdge="top">
         <Popover.Trigger>
-          <Button onPress={() => { void show() }} modifiers={[buttonStyle('borderless'), controlSize('mini'), tint(colors.secondary)]}>
-            <Image systemName={MACHINE_SYMBOL[kind]} size={11} />
+          <Button onPress={() => { void show() }} modifiers={[buttonStyle('borderless'), controlSize('mini'), tint(colors.secondary), accessibilityLabel(mobileMessages.ThreadRunPlace.kinds[kind])]}>
+            <Image systemName={MACHINE_SYMBOL[kind]} size={11} modifiers={[accessibilityHidden()]} />
           </Button>
         </Popover.Trigger>
         <Popover.Content>

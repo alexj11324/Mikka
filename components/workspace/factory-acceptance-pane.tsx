@@ -7,6 +7,7 @@ import { useLiveKey } from '@/hooks/use-live-key'
 import { useFormatter, useTranslations } from 'next-intl'
 import { CircleAlert, CircleCheck, CircleDashed, CircleX, Cloud, ExternalLink, Laptop, RefreshCw, Server } from '@/components/icons'
 import { Alert, AlertTitle } from '@/components/ui/alert'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useViewState } from '@/lib/hooks/view-state'
@@ -390,12 +391,24 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
         <span className="flex items-center gap-1.5 text-sm"><span className="flex size-4 [&_svg]:size-4"><PullRequestIcon state="merged" /></span>{merged?.finishedAt ? tReview('mergedAt', { time: time(merged.finishedAt) }) : tReview('state.merged')}</span>
         {pullRequestUrl && <Button size="sm" variant="ghost" nativeButton={false} render={<a href={pullRequestUrl} target="_blank" rel="noopener noreferrer" />}>{t('openOnGitHub')}</Button>}
       </>}
-      {confirming && kind === 'review' && <div className="absolute top-full right-4 z-20 mt-1 w-[min(30rem,calc(100%-2rem))]">
-        <ApprovalBar state={state} isSkill={false} busy={busy} canApprove={Boolean(evidence && pullRequestUrl)} onAccept={() => { void accept().finally(() => setConfirming(false)) }}
-          confirm={{ warn: unverified > 0, title: unverified > 0 ? (unverifiedNames ? tReview('confirmUnverified', { count: unverified, names: unverifiedNames }) : tReview('confirmUnverifiedCount', { count: unverified })) : tReview('confirmTitle'),
-            detail: detail?.delivery?.mergeAs ? tReview('mergeAs', { login: detail.delivery.mergeAs, base: detail.delivery.branch?.base ?? 'main' }) : tReview('mergeTo', { base: detail?.delivery?.branch?.base ?? 'main' }),
-            onCancel: () => setConfirming(false) }} />
-      </div>}
+      {/*
+        P4 (decision 2026-11-06-1615): 批准并合并 asks once more, naming what is still unverified and the account
+        and branch it merges as. A dialog, not a popover pinned under the button: it is a decision about to be
+        irreversible, so it takes focus, says its name and detail as title and description, and closes on Escape
+        (R-33's dialog radius; group-leave-action.tsx is the same shape).
+      */}
+      <AlertDialog open={confirming && kind === 'review'} onOpenChange={setConfirming}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{unverified > 0 ? (unverifiedNames ? tReview('confirmUnverified', { count: unverified, names: unverifiedNames }) : tReview('confirmUnverifiedCount', { count: unverified })) : tReview('confirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{detail?.delivery?.mergeAs ? tReview('mergeAs', { login: detail.delivery.mergeAs, base: detail.delivery.branch?.base ?? 'main' }) : tReview('mergeTo', { base: detail?.delivery?.branch?.base ?? 'main' })}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy}>{tReview('cancel')}</AlertDialogCancel>
+            <AlertDialogAction disabled={busy || !(evidence && pullRequestUrl)} aria-busy={busy} onClick={() => { void accept().finally(() => setConfirming(false)) }}>{busy ? <Spinner data-icon="inline-start" /> : null}{tReview('mergeConfirm')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
     // The report lead (drawn whether or not this decision is bound) states the problem; these are its actions.
     const bannerActions = kind === 'refused' && refusal ? <>
@@ -416,7 +429,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
       {evidence && <section aria-label={criteria.length ? t('criteria') : t('evidence')} className="flex flex-col gap-1">
         <h4 className="flex gap-1.5 pl-3 text-xs">
           <span className="font-medium text-muted-foreground">{criteria.length ? t('criteria') : t('evidence')}</span>
-          {criteria.length > 0 && <span className="text-muted-foreground/70">{criteria.filter(group => group.passed).length}/{criteria.length}</span>}
+          {criteria.length > 0 && <span className="text-tertiary">{criteria.filter(group => group.passed).length}/{criteria.length}</span>}
         </h4>
         {groups.length
           ? <ul className="flex flex-col gap-1">{groups.map((group, position) => <CriterionRow key={group.key} taskId={task.id} group={group} onOpen={index => setViewing({ group: position, index })} />)}</ul>
@@ -427,7 +440,7 @@ export function FactoryAcceptancePane({ task, onOpenThread, artifactBinding, art
         <ul className="flex flex-col gap-1">{results.map(row => <ResultLine key={row.stage} row={row} onOpenThread={onOpenThread} />)}</ul>
       </section>}
       {check?.status === 'blocked' && currentTask.reason && <RunErrorDetails code={currentTask.reason} />}
-      {!check && state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
+      {!check && state === 'failed' && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-(--motion-fast) motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertTitle>{t('publishFailed')}</AlertTitle></Alert></div>}
       {error && <FieldError className="text-xs">{t(ERROR_KEYS[error] ?? 'error')}</FieldError>}
       {checkError && [retryCheck?.key, recheck?.key].includes(checkError.key) && <FieldError className="text-xs">{t(checkError.unknown ? 'checkRetryUnknown' : 'checkRetryFailed')}</FieldError>}
     </div>}

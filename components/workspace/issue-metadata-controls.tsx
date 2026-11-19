@@ -190,7 +190,7 @@ export function AccessChangeDialog({ change, pending, onConfirm, onCancel }: { c
       </AlertDialogHeader>
       <AlertDialogFooter>
         <AlertDialogCancel disabled={pending}>{tCommon('cancel')}</AlertDialogCancel>
-        <AlertDialogAction disabled={pending} onClick={() => { void onConfirm() }}>{pending ? tCommon('saving') : tProperty('accessChangeConfirm')}</AlertDialogAction>
+        <AlertDialogAction variant="default" disabled={pending} onClick={() => { void onConfirm() }}>{pending ? tCommon('saving') : tProperty('accessChangeConfirm')}</AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>

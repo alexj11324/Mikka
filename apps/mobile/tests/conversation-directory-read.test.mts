@@ -26,6 +26,8 @@ let archivePending = false
 let settingReads = 0
 const reloadSettings = () => { settingReads++ }
 const none = () => null
+// lucide's native entry draws through react-native-svg, which has no bridge here.
+mock.module(createRequire(import.meta.url).resolve('lucide-react-native'), { namedExports: { GitPullRequest: none, MessageSquare: none } })
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL('../' + path, import.meta.url).href, { namedExports })
 mock.module('expo-router', { namedExports: { useRouter: () => ({ push: (path: string) => navigation.push(path) }), useLocalSearchParams: () => ({ view, ...linked }), useFocusEffect: (read: () => void) => useEffect(read, [read]) } })
 mock.module('react-native', { namedExports: {
@@ -51,6 +53,12 @@ stub('components/NavBar.tsx', { NavBar: none, underBar: {} })
 stub('components/ReadNotice.tsx', { ReadNotice: none })
 stub('components/Segmented.tsx', { Segmented: none })
 stub('components/Text.tsx', { Text: 'span' })
+// The list's empty state, inline as the two plain elements: its own icons module pulls in react-native-svg,
+// which has no native bridge here.
+stub('shared/components/empty-state.tsx', {
+  EmptyState: ({ title }: { title: string }) => createElement('p', null, title),
+  ListLoading: () => createElement('p', null, mobileMessages.Common.loading),
+})
 stub('lib/api.ts', { ApiError: Error, api: async (path: string, input: unknown) => {
   if (nextPage && path.startsWith('/api/mobile/conversations?')) { requested.push(path); return nextPage }
   writes.push({ path, input })

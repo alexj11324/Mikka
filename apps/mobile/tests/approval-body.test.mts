@@ -20,6 +20,8 @@ stub('../components/Symbol.tsx', { Symbol: () => null })
 stub('../lib/haptics.ts', { tap: () => {} })
 stub('../lib/theme.ts', { colors: { ink: '#000', secondary: '#333' } })
 const { PendingActions } = await import('../components/PendingActions')
+const { mobileMessages } = await import('../lib/messages')
+const copy = mobileMessages.Coordinator.pendingActions
 
 test('full long email and calendar description are visible before approval', () => {
   const body = Array.from({ length: 16 }, (_, index) => `line ${index + 1}`).join('\n')
@@ -29,6 +31,6 @@ test('full long email and calendar description are visible before approval', () 
   ]
   const html = renderToStaticMarkup(createElement(PendingActions, { items: items as never, reload: async () => {} }))
   assert.equal((html.match(/line 16/g) ?? []).length, 2)
-  assert.ok(html.indexOf('line 16') < html.indexOf('<button>发送</button>'))
-  assert.ok(html.lastIndexOf('line 16') < html.indexOf('<button>保存到日历</button>'))
+  assert.ok(html.indexOf('line 16') < html.indexOf(`<button>${copy.approveSend}</button>`))
+  assert.ok(html.lastIndexOf('line 16') < html.indexOf(`<button>${copy.approveSave}</button>`))
 })

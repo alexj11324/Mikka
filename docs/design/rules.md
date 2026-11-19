@@ -769,6 +769,81 @@ library's shipped look ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-
 The measured baseline these come from, and the Capy values they were compared
 against, are in [2026-11-18-1400](decisions/2026-11-18-1400-pr-surface-and-craft-baseline.md).
 
+- **R-99** Every control takes its height from one scale:
+  `--control-xs` (24), `--control-sm` (28), `--control-md` (32),
+  `--control-lg` (36), declared in `app/globals.css`. `Button`, `NativeSelect`,
+  `Input`, `InputGroup` and `SearchInput` all read those tokens, so a `size="sm"`
+  button and an `sm` select are the same height by construction.
+  A row of controls takes one step for all of them; two steps side by side
+  (a 28px button beside a 32px select) is the defect the tokens exist to
+  prevent, and `scripts/control-size-policy.mjs` fails it as
+  `layout/control-size`. A row that is not a toolbar — a run line of text with
+  its badge, a chip with its own clear button, a stretched row link — says so
+  with `control-size-exempt: <reason>` on its line or the two lines above.
+  Set the step with the `size` prop (`size="sm"`); a control with no `size` prop
+  (`Input`, `SearchInput`) takes the token class itself (`h-(--control-sm)`).
+  Prefer the token; a raw `h-7`/`h-8` is read as the same step by the policy but
+  drifts from the component's own padding and radius.
+  Source: Alex, 2026-11-18, on the PR page's ragged toolbar.
+- **R-100** Every page that is not a conversation shows its title at
+  `text-xl font-semibold` (20px, the 设置 page's size), as the one heading size
+  for a page. A section heading inside a page is `text-sm font-medium`; a
+  document's title is R-32's 24/32. The board, list, PR, project and overview
+  pages all use the same size so switching pages does not move the title.
+  Source: Alex, 2026-11-18, on five different sizes across pages that sit in
+  the same rail. 建议 keeps 24/32: R-55 makes it a briefing rather than a page
+  headline, and R-32 sets that size for it.
+- **R-101** A disabled control says why it cannot be pressed. A disabled button
+  takes no pointer events and the keyboard skips it, so the reason cannot be a
+  child of the control: wrap it in `components/ui/why-disabled.tsx`, which puts
+  the reason on the wrapper as `title` for a pointer and, for a single element
+  child, clones `aria-describedby` onto the control itself for a screen reader
+  (ARIA does not inherit that attribute from an ancestor; a fragment or a bare
+  string child gets only the `title`). A whole page that is read-only says
+  it once, in one visible line above the form, rather than leaving every field
+  grey. A control disabled because a field is still empty, or because a read is
+  still in flight, needs no prose; one disabled by a permission, a plan, a
+  missing connection or an owner does. Source: the 2026-11-18 audit, on the
+  automation editor greying every field for a non-owner without a word.
+- **R-102** A confirm dialog's action button defaults to `destructive`
+  (`AlertDialogAction`), because most of them guard something irreversible. A
+  dialog confirming a reversible write — save, restore, enable, share, take
+  over, archive with a restore list — passes `variant="default"` itself. Judge
+  by whether the person can undo it from the UI, not by the verb: an 「archive」
+  that deletes with no restore path is destructive, one beside a restore button
+  is not. Getting it wrong must fail towards the louder red, never towards a
+  calm primary button that deletes. Source: the 2026-11-18 audit, where 11 of
+  34 call sites had omitted the variant.
+- **R-103** Motion takes its length from one scale: `--motion-fast` (100ms, a
+  colour, an opacity, a pressed state), `--motion-base` (200ms, a panel or row
+  arriving), `--motion-slow` (320ms, a sheet or drawer travelling), declared in
+  `app/globals.css`. A business file writes `duration-(--motion-base)`, never
+  `duration-200`; `scripts/motion-policy.mjs` fails the raw ladder as
+  `motion/raw-duration`. An instant transition (`duration-0`, `duration-[0ms]`)
+  is not motion and passes. The vendored roots listed in `ui-policy.json` →
+  `componentRoots` are exempt — the policy reads that list rather than repeating
+  it, so a root added there does not fall outside the check. Source: the
+  2026-11-18 audit, on ten durations and eight curves across the tree.
+- **R-104** Text has three levels: `text-foreground` (the content),
+  `text-muted-foreground` (the supporting line) and `text-tertiary` (the quiet
+  one: a count, a separator, a unit). `text-tertiary` is `--tertiary` in
+  `app/globals.css`, a real colour per scheme that clears 4.5:1 on every surface
+  it is meant to sit on — the page, a card, a whole `bg-muted` fill, and the
+  `bg-muted/80` chip the activity rows draw (light 5.06 / 5.06 / 4.64 / 4.72,
+  dark 5.49 / 4.86 / 4.67 / 4.71), measured by `scripts/contrast.test.mjs` from
+  the tokens themselves. It does not clear 4.5:1 on a translucent `bg-control`
+  fill, so it is not used there; a control's own label is `text-foreground` or
+  `text-muted-foreground`. Write the level, not an opacity: `text-muted-foreground/70` and its siblings made two labels at the
+  same level look different. The vendored roots in `componentRoots` keep
+  whatever they shipped with. Source: the 2026-11-18 audit, on eight ad-hoc
+  opacities.
+- **R-105** There is one breakpoint scale, Tailwind's: `sm` 640, `md` 768,
+  `lg` 1024, `xl` 1280, `2xl` 1536. `app/globals.css` defines no custom
+  breakpoint and no second set of `@media` widths, so a `md:` means the same
+  thing on every page. A layout that needs a size between two of these changes
+  the layout, not the scale. Source: the 2026-11-18 audit; the tree already
+  honours this, and the rule pins it before someone adds a bespoke `@media`.
+
 ## Design review
 
 Hard checks for every design handed in (Figma or code), added after Alex's

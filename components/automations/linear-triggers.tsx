@@ -34,12 +34,12 @@ export function LinearTriggers({ value, onChange, teams, labels, onEditLabels, c
   return <div className="flex flex-col gap-3 px-5 pb-4">
     {value.map((trigger, index) => <div key={index} role="group" aria-label={t('item', { number: index + 1 })} className="flex flex-col gap-2 rounded-xl bg-muted/40 p-3">
       <div className="flex flex-wrap items-center gap-2">
-        <NativeSelect aria-label={t('event')} value={trigger.event} disabled={disabled} onChange={event => update(index, { event: event.target.value as LinearTriggerEvent })}>
+        <NativeSelect size="sm" aria-label={t('event')} value={trigger.event} disabled={disabled} onChange={event => update(index, { event: event.target.value as LinearTriggerEvent })}>
           {LINEAR_TRIGGER_EVENTS.map(event => <NativeSelectOption key={event} value={event}>{tEvent(event)}</NativeSelectOption>)}
         </NativeSelect>
         {trigger.teams.length > 1
           ? <span className="text-sm text-muted-foreground">{trigger.teams.map(label).join(', ')}</span>
-          : <NativeSelect aria-label={t('team')} value={trigger.teams[0] ?? ''} disabled={disabled} onChange={event => update(index, { teams: event.target.value ? [event.target.value] : [] })}>
+          : <NativeSelect size="sm" aria-label={t('team')} value={trigger.teams[0] ?? ''} disabled={disabled} onChange={event => update(index, { teams: event.target.value ? [event.target.value] : [] })}>
             <NativeSelectOption value="" disabled>{t('team')}</NativeSelectOption>
             {trigger.teams[0] && !teams.some(team => team.id === trigger.teams[0]) && <NativeSelectOption value={trigger.teams[0]}>{trigger.teams[0]}</NativeSelectOption>}
             {teams.map(team => <NativeSelectOption key={team.id} value={team.id}>{label(team.id)}</NativeSelectOption>)}
