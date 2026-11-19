@@ -14,7 +14,7 @@ import { readFreshSessionsInScope } from './fresh-session'
 const request = () => new Request('http://localhost/mikka/api/x', { headers: { cookie: 'session=old' } })
 
 test('a plain session read returns the session value, not the header wrapper', async () => {
-  const api = { getSession: async () => ({ user: { id: 'u' }, session: { id: 's' } }) }
+  const api = { getSession: async (_input?: unknown) => ({ user: { id: 'u' }, session: { id: 's' } }) }
   readFreshSessionsInScope(api)
   const scope = createRequestScope(request())
   const session = await runRequestScope(scope, () => api.getSession({ headers: scope.headers }))
@@ -25,7 +25,7 @@ test('a caller that asks for headers keeps the {headers, response} pair', async 
   // Browser RPC reads this pair directly: `result.response` is the session and
   // `result.headers` carries the Set-Cookie it forwards to the browser.
   const headers = new Headers({ 'set-cookie': 'session=renewed; Path=/mikka' })
-  const api = { getSession: async () => ({ headers, response: { user: { id: 'u' } } }) }
+  const api = { getSession: async (_input?: unknown) => ({ headers, response: { user: { id: 'u' } } }) }
   readFreshSessionsInScope(api)
   const scope = createRequestScope(request())
   const result = await runRequestScope(scope, () => api.getSession({ headers: scope.headers, returnHeaders: true })) as {
@@ -38,7 +38,7 @@ test('a caller that asks for headers keeps the {headers, response} pair', async 
 
 test('a caller that asks for a Response gets the Response untouched', async () => {
   const response = Response.json({ user: { id: 'u' } })
-  const api = { getSession: async () => response }
+  const api = { getSession: async (_input?: unknown) => response }
   readFreshSessionsInScope(api)
   const scope = createRequestScope(request())
   const result = await runRequestScope(scope, () => api.getSession({ headers: scope.headers, asResponse: true }))
@@ -47,7 +47,7 @@ test('a caller that asks for a Response gets the Response untouched', async () =
 
 test('the freshness flag reaches the session read as a query, and only there', async () => {
   const seen: { query?: Record<string, unknown> }[] = []
-  const api = { getSession: async (input: { query?: Record<string, unknown> }) => { seen.push(input); return null } }
+  const api = { getSession: async (input: { query?: Record<string, unknown>; headers?: Headers }) => { seen.push(input); return null } }
   readFreshSessionsInScope(api)
   const scope = createRequestScope(request())
   await runRequestScope(scope, () => api.getSession({ headers: scope.headers }))
@@ -58,7 +58,7 @@ test('the freshness flag reaches the session read as a query, and only there', a
 })
 
 test('a session read outside a request still returns its value', async () => {
-  const api = { getSession: async () => ({ user: { id: 'u' } }) }
+  const api = { getSession: async (_input?: unknown) => ({ user: { id: 'u' } }) }
   readFreshSessionsInScope(api)
   assert.deepEqual(await api.getSession({ headers: new Headers() }), { user: { id: 'u' } })
 })

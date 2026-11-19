@@ -6,7 +6,9 @@ import { desktopAuthentication } from './authentication'
 import { DESKTOP_SESSION_CACHE_HEADER } from './session-cache'
 
 test('bearer session reads strip cookies and always revalidate, leaving web cache behavior intact', async () => {
-  const seen: { headers?: Headers; query?: Record<string, unknown> }[] = []
+  // `returnHeaders` is read here to prove the wrapper never injects it: a caller
+  // that did not ask for the header pair must not receive one.
+  const seen: { headers?: Headers; query?: Record<string, unknown>; returnHeaders?: boolean }[] = []
   const api = { getSession: async (input: { headers?: Headers; query?: Record<string, unknown> }) => { seen.push(input); return null } }
   readFreshSessionsInScope(api)
   const headers = new Headers({ cookie: 'other-account=private', authorization: `Bearer ${'x'.repeat(32)}` })

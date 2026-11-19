@@ -5,9 +5,16 @@ import { renderToStaticMarkup } from 'react-dom/server'
 // The icon's label reads as its key.
 mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 let threadGroupOfRun: typeof import('./thread-status-icon')['threadGroupOfRun']
+// What a rendered icon draws: its svg's own path data, so the check names the glyph, not a library's class.
+const drawingOf = (html: string) => [...html.matchAll(/<path d="([^"]+)"/g)].map(match => match[1]).join('|')
+let BUBBLE = ''
 let ThreadStatusIcon: typeof import('./thread-status-icon')['ThreadStatusIcon']
 let ThreadStatus: typeof import('./thread-status-icon')['ThreadStatus']
-before(async () => { ({ threadGroupOfRun, ThreadStatusIcon, ThreadStatus } = await import('./thread-status-icon')) })
+before(async () => {
+  ;({ threadGroupOfRun, ThreadStatusIcon, ThreadStatus } = await import('./thread-status-icon'))
+  const { MessageCircle } = await import('@/components/icons')
+  BUBBLE = drawingOf(renderToStaticMarkup(<MessageCircle aria-hidden="true" />))
+})
 
 test('a card or chip shows the run\'s group: done is 已解决, blocked and failed 受阻', () => {
   assert.equal(threadGroupOfRun('running'), 'running')
@@ -31,8 +38,9 @@ test('a thread is a speech bubble with its group as a dot, never a circle like a
   for (const group of ['running', 'waiting', 'blocked', 'idle', 'resolved'] as const) {
     for (const small of [true, false]) {
       const html = renderToStaticMarkup(<ThreadStatusIcon group={group} small={small} />)
-      assert.match(html, /lucide-message-circle\b/)
-      assert.doesNotMatch(html, /lucide-circle|lucide-hand|lucide-loader/)
+      // The glyph is the bubble's own drawing (R-52), whatever family it is drawn in; never a task's circle.
+      assert.equal(drawingOf(html), BUBBLE, 'a thread is a speech bubble')
+      assert.doesNotMatch(html, /<circle\b/, 'never a task\'s status circle')
       assert.match(html, new RegExp(`data-thread-dot="${group}"`))
       assert.match(html, new RegExp(`aria-label="Shell\\.threads\\.state\\.${group}"`), 'the dot is never the only sign')
     }

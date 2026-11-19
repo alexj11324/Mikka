@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { BoxSelect, SquareDashedMousePointer, X } from 'lucide-react'
+import { BoxSelect, SquareDashedMousePointer, X } from '@/components/icons'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import { addBrowserNote, removeBrowserNotes, noteChipText, type BrowserNote } from '@/lib/browser/note'

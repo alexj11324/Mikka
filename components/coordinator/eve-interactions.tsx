@@ -34,7 +34,7 @@ function EveInteraction({ interaction, respond, resuming }: { interaction: Inter
       <ItemTitle>{request.prompt}</ItemTitle>
       {request.allowFreeform && <form onSubmit={event => { event.preventDefault(); if (text.trim()) void answer({ text: text.trim() }) }} className="flex gap-2">
         <FieldGroup><Field orientation="horizontal">
-          <Input value={text} onChange={event => setText(event.target.value)} aria-label={request.prompt} disabled={pending || resuming || Boolean(interaction.answer)} />
+          <Input className="h-(--control-sm)" value={text} onChange={event => setText(event.target.value)} aria-label={request.prompt} disabled={pending || resuming || Boolean(interaction.answer)} />
           <Button type="submit" size="sm" disabled={pending || resuming || !text.trim() || Boolean(interaction.answer)}>{t('submit')}</Button>
         </Field></FieldGroup>
       </form>}

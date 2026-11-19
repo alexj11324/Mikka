@@ -3,7 +3,7 @@
 import { Fragment, useState, type MouseEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { ChevronDown, Ellipsis, Pin, Plus, X } from 'lucide-react'
+import { ChevronDown, Ellipsis, Pin, Plus, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { organizeAutomation, pinAutomation, restoreAutomation } from '@/app/actions/automations'
 import { listWorkspaceBots } from '@/app/actions/bots'
@@ -125,11 +125,12 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
   return <section aria-labelledby="automations-title" className="flex min-h-0 flex-1 flex-col overflow-auto">
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
       <header className="flex items-center justify-between gap-3">
-        <h1 id="automations-title" className="text-lg font-semibold">{t('title')}</h1>
+        <h1 id="automations-title" className="text-xl font-semibold">{t('title')}</h1>
         {create}
       </header>
+      {/* control-size-exempt: the clear-tag button sits inside a badge chip, sized to the chip. */}
       <div className="flex flex-wrap items-center gap-2">
-        <SearchInput className="min-w-0 flex-1 sm:max-w-64" type="search" value={query} maxLength={120} aria-label={t('search')} placeholder={t('search')} onChange={event => setQuery(event.target.value)} />
+        <SearchInput className="h-(--control-sm) min-w-0 flex-1 sm:max-w-64" type="search" value={query} maxLength={120} aria-label={t('search')} placeholder={t('search')} onChange={event => setQuery(event.target.value)} />
         <ToggleGroup aria-label={t('filter.all')} size="sm" variant="segment" spacing={0.5} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'active' || next === 'paused' || next === 'deleted') setFilter(next) }}>
           {(['all', 'active', 'paused', 'deleted'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`filter.${value}`)}</ToggleGroupItem>)}
         </ToggleGroup>
@@ -143,7 +144,7 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
           </Empty>
             : <div className="flex flex-col gap-4">{groups.map(group => <section key={group.key} aria-label={group.label ?? undefined} className="flex flex-col gap-2">
               {group.label && <h2 className="flex items-center gap-1.5 px-1 text-sm font-medium text-muted-foreground">{group.key === 'pinned' && <Pin className="size-3.5" />}{group.label}</h2>}
-              <ItemGroup role="list" className="gap-0! overflow-hidden rounded-2xl border bg-card">
+              <ItemGroup role="list" className="gap-0! overflow-hidden rounded-xl border bg-card">
               {group.rows.map((row, index) => <Fragment key={row.id}>{index > 0 && <ItemSeparator className="my-0" />}<Item role="listitem" className="rounded-none hover:bg-accent/50" render={row.deleted ? undefined : <a href={href(row.id)} />} onClick={row.deleted ? undefined : (event: MouseEvent) => follow(event, row.id)}>
                 <ItemContent className="min-w-0">
                   <ItemTitle className="w-full truncate">{row.definition.title}</ItemTitle>

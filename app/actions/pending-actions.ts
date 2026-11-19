@@ -1,17 +1,12 @@
 'use server'
 
-import { headers } from '@/lib/server-runtime/headers'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
-import { auth } from '@/lib/auth'
+import { requireUser } from '@/lib/acting-user'
 import { decidePendingAction as decideForUser } from '@/lib/pending-actions'
 
-async function getUserId(): Promise<string> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
-}
+const getUserId = async () => (await requireUser()).id
 
 /** Approves (runs) or declines one proposal. */
 export async function decidePendingAction(id: string, approve: boolean): Promise<ActionResult<{ status: 'done' | 'failed' | 'declined' | 'running'; reason: string | null }>> {

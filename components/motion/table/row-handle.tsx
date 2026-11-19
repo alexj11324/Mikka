@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, ArrowUpToLine, MoreVertical, Trash2 } from "lucide-react";
+import { ArrowDownToLine, ArrowUpToLine, MoreVertical, Trash2 } from "@/components/icons";
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { TableMenu } from "./table-menu";

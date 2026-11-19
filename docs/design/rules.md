@@ -55,16 +55,17 @@ source wins in a conflict is in [`README.md`](README.md).
   button). Views that are not a conversation never get one: the task list
   and a bot's computer screen send instructions through the centre composer.
   An open thread is a conversation with the agent running it, so its detail
-  ends in that composer and what is typed there goes to that agent, whether
-  the thread is running or has ended (an ended one runs again, R-81), wherever
-  it opens: task page, thread column, Artifact window, phone. Only the legacy
-  agent archive is read-only
+  uses that composer in the task page, thread column and Artifact window.
+  It sends to the current authorized run. An independent review or verification
+  waiting for an answer uses the same composer. Send follows the run's reply
+  permission, and the legacy Agent archive is read-only
   ([decision](decisions/2026-11-02-0220-every-thread-ends-in-the-composer.md)).
 - **R-11** A bot's composer, the Coordinator's included, has one model chip
   (`BotModelPicker`) beside 「+」, saved per bot; it picks a model only, never
   an Agent. Settings has no per-bot model rows
-  ([decision](decisions/2026-10-31-2330-bot-model-picker.md)). A thread's
-  composer has none.
+  ([decision](decisions/2026-10-31-2330-bot-model-picker.md)). A run thread shows
+  one model control, using the continuation picker when enabled and the
+  recorded model's display name otherwise.
 - **R-12** No starter or suggestion cards in any chat ("试试从这些事情开始").
   Suggestions live only on the 建议 page (R-55). A new bot greets with one
   bubble and an A–D choice card.
@@ -221,6 +222,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   under the title come the code and how long ago, then the properties in one
   column (an icon and label, then the value, ▾ where it opens choices) in
   Capy's order; a property with nothing set is left out and the ⋯ menu sets it.
+  The bar carries one primary action — the task's own conversation, which is
+  where its work is (R-62, R-89); everything else in it is a tool or goes into
+  ⋯ (R-91). [2026-11-18-2030](decisions/2026-11-18-2030-task-page-surface.md)
 - **R-79** No breadcrumb, title bar or page header shows the workspace's
   name. There is one workspace on screen, the name cannot be clicked there,
   and it is shown and switched only from the avatar menu at the bottom left.
@@ -368,6 +372,8 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   - `agent_runs.outcome` supplies the ended run's judgement, based on its
     reply, status, task and PRs (`lib/run-outcome-judge.ts`). A finished
     process alone does not prove success.
+  - In the transcript, a finished run without a judged outcome or a request
+    for input shows its elapsed work time. See [thread activity status](decisions/2026-11-18-2036-thread-activity-status.md).
   - A run shows its own result icon where a run is listed (glossary: Run
     result), never the hand. Running uses the ring, waiting for the person
     uses pause, finished a check, failed a triangle, blocked an octagon, and
@@ -415,8 +421,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   `components/workspace/workspace-navigation.ts`; `scripts/navigation-policy.mjs`
   checks direct history writes and workspace links. A user move pushes
   history and a filter or tab replaces it. Back and forward restore each move.
-  - Bot and group chats open in the centre. 看板 contains tasks, projects and
-    teams. A task opened from 看板 or a link is a centre page. Its origin
+  - Bot and group chats open in the centre, as do threads selected under a Bot
+    in the sidebar ([Bot sidebar threads](decisions/2026-11-18-2024-bot-sidebar-threads.md)).
+    看板 contains tasks, projects and teams. A task opened from 看板 or a link is a centre page. Its origin
     crumb and close action return to the source, defaulting to 看板; ↑↓
     appear when it was opened from a list.
   - A chat task card, task chip or right-panel task row opens the task view
@@ -493,10 +500,22 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   products use for the same function (memory = book as in ChatGPT,
   notifications = bell, connectors = blocks as in Claude…). The spec or review
   page names the product for each. Rail icons: 主页 House, 建议 Lightbulb,
-  看板 Columns3, 插件 Blocks. Artifact is the one exception: it uses
-  Mikka's own stacked-cards icon (R-56), never lucide Copy or Library.
+  看板 Kanban, 插件 Blocks. Artifact is the one exception: it uses
+  Mikka's own stacked-cards icon (R-56), never Copy or Library.
   No sparkle for AI (unslop): thinking is Brain, a bot is Bot (ui-policy
   `icons/no-sparkle`).
+- **R-71a** Mikka's own UI draws one icon family: affectUI's Hugeicons, through
+  `components/icons/index.tsx` (`@/components/icons`), whose glyphs are stroke
+  2 in a 24 box in `currentColor` ([2026-11-18-1900](decisions/2026-11-18-1900-icons-hugeicons.md)).
+  A task's status icon is the one exception: `ISSUE_STATUSES` keeps its lucide
+  glyphs and `status-icons.tsx` its three rings
+  ([2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), and no
+  other family stands in for a status. Paid blocks keep their own icons
+  ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+  A new glyph is a line in that file, not a new package (ui-policy
+  `icons/glyph-set`). Priority is the one mark Mikka draws itself: low, normal
+  and high are three bars on one baseline, rising one step each, in the set's
+  box and stroke (ui-policy `icons/priority-bars`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
   value read-only. A person's own subscriptions and API keys are not such a
@@ -540,7 +559,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   device, a coding agent (harness), a model, a connected app or a provider
   account by name — rows, triggers, menu items, chips, thread headers,
   status lines — the icon comes first, then the name. Devices use their
-  type (laptop, server = lucide Server, 云端托管 = cloud) plus the online dot;
+  type (laptop, server = `Server`, 云端托管 = `Cloud`) plus the online dot;
   agents use their own brand mark (Claude Code, Codex, Cursor…); models use
   their provider's mark (Claude, OpenAI…); apps use the R-70 brand tile.
   Brand marks are the colored logo on its own, never set in a white disc or
@@ -585,7 +604,7 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   account's email (small, muted) with its workspaces under it (avatar, name,
   a check on the current one; about five show, more scroll), 创建工作区;
   then 设置 with its shortcut as one quiet text hint (⌘, not keycaps); then
-  添加账户 and 退出登录. Every action row leads with a muted lucide icon in
+  添加账户 and 退出登录. Every action row leads with a muted glyph in
   the same 20px box as the workspace avatars (创建工作区 `Plus`, 设置
   `Settings`, 添加账户 `UserPlus`, 退出登录 `LogOut`), so all rows share
   one text column. Menu text and item height are the defaults; the
@@ -723,6 +742,112 @@ library's shipped look ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-
   省略号的外边」). Secondary
   actions, branch names, counts and shortcut hints go into 「⋯」 or a
   tooltip, not a row of their own (Alex, 2026-11-08; [2026-11-08-1230](decisions/2026-11-08-1230-coding-workspace.md)).
+- **R-92** Lists have three sanctioned densities and nothing in between: a
+  one-line entry is 40px, a two-line entry is 50px (13/20 Medium title over a
+  12/18 quiet line), a group header is 32px. A skeleton is drawn at the height
+  of the row it replaces, so the list does not move when data lands. An entry's
+  own information set never depends on the window width: the priority order is
+  fixed and only the text truncates. Where Alex has named a surface to be
+  arranged as Capy's is, that arrangement wins over the shape below and the
+  tokens, type and colour stay ours: the PR list carries repository, number,
+  title, diff size, age and state on one line (Alex, 2026-11-18).
+- **R-93** An entry's own actions are disclosed, not permanent: they hold a
+  reserved slot at the row's end, start at `opacity-0`, and appear on
+  `group/row` hover or keyboard focus; a coarse pointer shows them always. The
+  slot keeps its width, so nothing shifts when the pointer crosses the list. A
+  selection control is disclosed the same way and stays visible once checked.
+- **R-94** One entry, one hover surface, one target. The hover and selected
+  fill sit on the row only (R-39); controls inside the row are its siblings and
+  keep their own feedback. No nested control carries a second background fill.
+- **R-95** A grouped list reads in the order the work is done, not in enum or
+  alphabetical order: pinned, then what needs attention, then what is running,
+  then what is ready, then history. The group header stays fixed while its rows
+  scroll under it.
+- **R-96** Every list state is drawn. "Nothing here" and "nothing matches the
+  filters" are two different states, each with the one action that resolves it
+  (R-41); loading is a skeleton, never a status string.
+- **R-97** A list, table, panel, row, menu or popover never takes a radius
+  above 12, and Mikka's own UI does not draw `rounded-3xl` (24) on those
+  surfaces. R-33's 14 stays for the approval and list card, and a dialog keeps
+  the radius the shipped modal draws ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
+
+The measured baseline these come from, and the Capy values they were compared
+against, are in [2026-11-18-1400](decisions/2026-11-18-1400-pr-surface-and-craft-baseline.md).
+
+- **R-99** Every control takes its height from one scale:
+  `--control-xs` (24), `--control-sm` (28), `--control-md` (32),
+  `--control-lg` (36), declared in `app/globals.css`. `Button`, `NativeSelect`,
+  `Input`, `InputGroup` and `SearchInput` all read those tokens, so a `size="sm"`
+  button and an `sm` select are the same height by construction.
+  A row of controls takes one step for all of them; two steps side by side
+  (a 28px button beside a 32px select) is the defect the tokens exist to
+  prevent, and `scripts/control-size-policy.mjs` fails it as
+  `layout/control-size`. A row that is not a toolbar — a run line of text with
+  its badge, a chip with its own clear button, a stretched row link — says so
+  with `control-size-exempt: <reason>` on its line or the two lines above.
+  Set the step with the `size` prop (`size="sm"`); a control with no `size` prop
+  (`Input`, `SearchInput`) takes the token class itself (`h-(--control-sm)`).
+  Prefer the token; a raw `h-7`/`h-8` is read as the same step by the policy but
+  drifts from the component's own padding and radius.
+  Source: Alex, 2026-11-18, on the PR page's ragged toolbar.
+- **R-100** Every page that is not a conversation shows its title at
+  `text-xl font-semibold` (20px, the 设置 page's size), as the one heading size
+  for a page. A section heading inside a page is `text-sm font-medium`; a
+  document's title is R-32's 24/32. The board, list, PR, project and overview
+  pages all use the same size so switching pages does not move the title.
+  Source: Alex, 2026-11-18, on five different sizes across pages that sit in
+  the same rail. 建议 keeps 24/32: R-55 makes it a briefing rather than a page
+  headline, and R-32 sets that size for it.
+- **R-101** A disabled control says why it cannot be pressed. A disabled button
+  takes no pointer events and the keyboard skips it, so the reason cannot be a
+  child of the control: wrap it in `components/ui/why-disabled.tsx`, which puts
+  the reason on the wrapper as `title` for a pointer and, for a single element
+  child, clones `aria-describedby` onto the control itself for a screen reader
+  (ARIA does not inherit that attribute from an ancestor; a fragment or a bare
+  string child gets only the `title`). A whole page that is read-only says
+  it once, in one visible line above the form, rather than leaving every field
+  grey. A control disabled because a field is still empty, or because a read is
+  still in flight, needs no prose; one disabled by a permission, a plan, a
+  missing connection or an owner does. Source: the 2026-11-18 audit, on the
+  automation editor greying every field for a non-owner without a word.
+- **R-102** A confirm dialog's action button defaults to `destructive`
+  (`AlertDialogAction`), because most of them guard something irreversible. A
+  dialog confirming a reversible write — save, restore, enable, share, take
+  over, archive with a restore list — passes `variant="default"` itself. Judge
+  by whether the person can undo it from the UI, not by the verb: an 「archive」
+  that deletes with no restore path is destructive, one beside a restore button
+  is not. Getting it wrong must fail towards the louder red, never towards a
+  calm primary button that deletes. Source: the 2026-11-18 audit, where 11 of
+  34 call sites had omitted the variant.
+- **R-103** Motion takes its length from one scale: `--motion-fast` (100ms, a
+  colour, an opacity, a pressed state), `--motion-base` (200ms, a panel or row
+  arriving), `--motion-slow` (320ms, a sheet or drawer travelling), declared in
+  `app/globals.css`. A business file writes `duration-(--motion-base)`, never
+  `duration-200`; `scripts/motion-policy.mjs` fails the raw ladder as
+  `motion/raw-duration`. An instant transition (`duration-0`, `duration-[0ms]`)
+  is not motion and passes. The vendored roots listed in `ui-policy.json` →
+  `componentRoots` are exempt — the policy reads that list rather than repeating
+  it, so a root added there does not fall outside the check. Source: the
+  2026-11-18 audit, on ten durations and eight curves across the tree.
+- **R-104** Text has three levels: `text-foreground` (the content),
+  `text-muted-foreground` (the supporting line) and `text-tertiary` (the quiet
+  one: a count, a separator, a unit). `text-tertiary` is `--tertiary` in
+  `app/globals.css`, a real colour per scheme that clears 4.5:1 on every surface
+  it is meant to sit on — the page, a card, a whole `bg-muted` fill, and the
+  `bg-muted/80` chip the activity rows draw (light 5.06 / 5.06 / 4.64 / 4.72,
+  dark 5.49 / 4.86 / 4.67 / 4.71), measured by `scripts/contrast.test.mjs` from
+  the tokens themselves. It does not clear 4.5:1 on a translucent `bg-control`
+  fill, so it is not used there; a control's own label is `text-foreground` or
+  `text-muted-foreground`. Write the level, not an opacity: `text-muted-foreground/70` and its siblings made two labels at the
+  same level look different. The vendored roots in `componentRoots` keep
+  whatever they shipped with. Source: the 2026-11-18 audit, on eight ad-hoc
+  opacities.
+- **R-105** There is one breakpoint scale, Tailwind's: `sm` 640, `md` 768,
+  `lg` 1024, `xl` 1280, `2xl` 1536. `app/globals.css` defines no custom
+  breakpoint and no second set of `@media` widths, so a `md:` means the same
+  thing on every page. A layout that needs a size between two of these changes
+  the layout, not the scale. Source: the 2026-11-18 audit; the tree already
+  honours this, and the rule pins it before someone adds a bespoke `@media`.
 
 ## Design review
 
@@ -732,13 +857,13 @@ review of the Factory redesign on 2026-11-04
 the chat tool group (`chat-tool-calls.md`). Each check is pass or fail; a
 design that fails any of them is sent back before it reaches Alex.
 
-- **R-84** A thread's conversation always uses the existing thread view
-  (`IssueThreadPanel`, drawn as its code renders it: the person's prompt
-  first, collapsible `ThreadSteps`, the agent's grey bubbles and its composer;
-  in `bare` mode, as inside the Artifact window, no header and no tabs),
-  wherever it appears: the Artifact window, the session view,
-  an inbox detail. A one-to-one bot chat uses the existing coordinator chat.
-  No design draws a third chat style or adds a new chat component.
+- **R-84** The Web and Electron views of a run thread use `IssueThreadPanel`
+  and the shared `ThreadScreen` for messages, references and the composer.
+  This applies in the task page, side pane, inbox and Artifact window at every
+  width. In `bare` mode the enclosing window supplies the header and tabs.
+  The chat header puts 改动 and 验收 in 更多. A delivered document opens from
+  its message chip. The task toolbar opens the task's Artifact collection.
+  A one-to-one bot chat uses `CoordinatorChat`.
 - **R-85** Deliverables (PR, diff, recording, screenshot, test output) live
   on the acceptance page (the Artifact window, R-56). Coding-task diffs, PR
   checks and review actions also live on the dedicated review page under

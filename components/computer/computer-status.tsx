@@ -1,6 +1,6 @@
 'use client'
 
-import { Hand, Moon } from 'lucide-react'
+import { Hand, Moon } from '@/components/icons'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Badge } from '@/components/reui/badge'
 import { Spinner } from '@/components/ui/spinner'

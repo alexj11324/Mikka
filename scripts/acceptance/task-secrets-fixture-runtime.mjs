@@ -165,7 +165,9 @@ export async function startFixture(config, clientSource, { listenHost = '0.0.0.0
     const input = new Request(`${config.egressOrigin}${request.url}`, { method: 'POST',
       headers: new Headers(Object.entries(request.headers).flatMap(([name, value]) => typeof value === 'string' ? [[name, value]] : [])), body: bytes })
     const result = await taskSecretEgressResponse(input, state.runId,
-      (envelope, expected, options) => executeEgressRequest(envelope, expected, { ...options, env: { WORKSPACE_SECRETS_KEY: state.key } }))
+      (envelope, expected, options) => executeEgressRequest(envelope, expected, { ...options, env: { WORKSPACE_SECRETS_KEY: state.key },
+        // The isolated fixture holds no database; the live-run check is the application route's.
+        bindingActive: async () => true }))
     response.writeHead(result.status, Object.fromEntries(result.headers)); response.end(Buffer.from(await result.arrayBuffer()))
   }
   for (const server of [upstream, egress]) { server.headersTimeout = 10_000; server.requestTimeout = 30_000; server.maxHeadersCount = 32 }

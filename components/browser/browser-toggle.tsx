@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Globe } from 'lucide-react'
+import { Globe } from '@/components/icons'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'

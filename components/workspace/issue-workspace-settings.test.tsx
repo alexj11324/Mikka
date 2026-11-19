@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import type { ComputerThread } from '@/components/computer/computer-agents'
 import type { SettingsFrameProps } from '@/components/slots/settings-frame-contract'
 import { browserAddressRequest, consumeBrowserAddress, openBrowserAddress } from '@/lib/browser/navigation'
+import { useConversationPanels as useThreadPanelContext } from '@/components/coordinator/conversation-panels-context'
 
 const nothing = () => {}
 const empty = () => null
@@ -113,13 +114,27 @@ for (const [file, names] of [
   ['../nav/new-bot-dialog.tsx', ['NewBotDialog']],
   ['../onboarding/onboarding.tsx', ['Onboarding']],
   ['./issue-list.tsx', ['IssueList']],
-  ['../nav/context-panel.tsx', ['ContextPanel']],
   ['../nav/group-panel.tsx', ['GroupPanel']], ['../nav/conversation-pill.tsx', ['ConversationPillButton']],
   ['../nav/group-avatar.tsx', ['GroupPillAvatar']],
-  ['./thread-column.tsx', ['ThreadColumn']], ['./task-column.tsx', ['TaskColumn']],
+  ['./task-column.tsx', ['TaskColumn']],
   ['../plugins/plugins-view.tsx', ['PluginsPage']], ['../suggestions/suggestion-feed.tsx', ['SuggestionFeed', 'SuggestionsRefresh', 'useSuggestionCount']],
   ['../artifacts/artifact-library.tsx', ['ArtifactLibrary']], ['./legacy-chat-archive.tsx', ['LegacyChatArchive']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, name === 'useSuggestionCount' ? () => 0 : empty])) })
+// 概览 is the right column this page owns; it renders a marker so a test can see the column is there at all,
+// which is what #2835 broke by gating it on `isConversation`.
+mock.module(new URL('../nav/context-panel.tsx', import.meta.url).href, { namedExports: {
+  ContextPanel: ({ conversation }: { conversation?: { name: string } }) => <aside data-context-panel={conversation?.name ?? 'coordinator'} />,
+} })
+// A thread opened in the centre (#2835) is still a conversation: it must keep the same right column, and hand its
+// work area up when the frame owns the panel. The hook is read from its own leaf module, so this stub does not
+// depend on the dynamically imported conversation-panels.tsx below.
+let reportedPanels: import('@/components/slots/thread-contract').ThreadScreenProps['panels']
+mock.module(new URL('./thread-column.tsx', import.meta.url).href, { namedExports: {
+  ThreadColumn: ({ main }: { main?: boolean }) => {
+    reportedPanels = useThreadPanelContext()
+    return <section data-main-thread={main ? '' : undefined} />
+  },
+} })
 mock.module(new URL('./board-page.tsx', import.meta.url).href, { namedExports: {
   BoardPage: ({ onUpdated, onBusyChange }: { onUpdated: () => Promise<unknown>; onBusyChange: (busy: boolean) => void }) => <section data-team-board-visible="">
     {probeEmbeddedAck && <EmbeddedSaveProbe />}
@@ -285,6 +300,28 @@ test('a narrow board opens an explicitly requested preview in the existing brows
   await act(async () => assert.equal(openBrowserAddress('/preview'), true))
   assert.equal(container.querySelectorAll('[data-browser-pane]').length, 1)
   assert.ok(container.querySelector('[data-panel-sheet] [data-browser-pane]'))
+})
+
+test('a thread opened in the centre keeps the right column', async () => {
+  // #2835 made a Bot's sidebar thread open in the centre (`?mainThread=`), and gated `isConversation` on the
+  // absence of one: every column below is gated on that single value, so the thread lost 概览 entirely.
+  // The open-source frame draws that column itself (FRAME_OWNS_PANEL false), which is what this asserts.
+  const runId = '00000000-0000-4000-8000-000000000031'
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&mainThread=${runId}`)
+  await act(async () => root.render(<IssueWorkspace user={user} />))
+  assert.ok(container.querySelector('[data-main-thread]'), 'the thread is the centre page')
+  assert.ok(container.querySelector('[data-context-panel]'), 'and the right column is still beside it')
+})
+
+test('a thread opened in the centre hands its work area to a frame that owns the panel', async () => {
+  // The hosted shell draws the Overview as a tab of the conversation's own work area (FRAME_OWNS_PANEL). That tab
+  // reaches the thread through the panels context, so the thread's branch has to provide it too.
+  const runId = '00000000-0000-4000-8000-000000000032'
+  browser.history.replaceState({}, '', `/?workspace=workspace-one&account=active&mainThread=${runId}`)
+  await act(async () => root.render(<OfficialIssueWorkspace user={user} />))
+  assert.ok(container.querySelector('[data-main-thread]'), 'the thread is the centre page')
+  assert.ok(reportedPanels, 'and the frame was handed the Overview tab')
+  assert.deepEqual(reportedPanels?.tabs.map(tab => tab.id), ['overview', 'browser'])
 })
 
 test('an explicit Bot mounts only its own composer after its roster resolves', async () => {

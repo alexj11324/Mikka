@@ -1,7 +1,7 @@
 'use client'
 
 import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
-import { Download } from 'lucide-react'
+import { Download } from '@/components/icons'
 import { SettingsSection } from '@/components/settings/primitives'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'

@@ -3,7 +3,7 @@
 import { useState, type FormEvent, type FormEventHandler, type ReactNode } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Link } from '@/i18n/navigation'
-import { ArrowRightIcon, Loader2Icon, LockKeyholeIcon, MailIcon, UserIcon } from 'lucide-react'
+import { ArrowRight, LoaderCircle, LockKeyhole, Mail, User } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
@@ -105,12 +105,12 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
       <CardContent className="flex flex-col gap-6 px-7 pb-7 sm:px-9 sm:pb-8">
         {(oauthEnabled || notice) && <div className="flex flex-col gap-3">
           {googleEnabled && <Button type="button" variant="outline" className={cn('w-full justify-center px-4', FIELD)} disabled={pending} onClick={onGoogleSignIn}>
-            {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <Google className="size-4" />}
+            {pending ? <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <Google className="size-4" />}
             {t('continueGoogle')}
           </Button>}
           {showGoogleLinkHint && <p className="text-muted-foreground text-xs leading-5">{t('googleLinkHint')}</p>}
           {githubEnabled && <Button type="button" variant="outline" className={cn('w-full justify-center px-4', FIELD)} disabled={pending} onClick={onGitHubSignIn}>
-            {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <>
+            {pending ? <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-start" /> : <>
               <span aria-hidden="true" className="dark:hidden"><GithubLight className="size-4" /></span>
               <span aria-hidden="true" className="hidden dark:block"><GithubDark className="size-4" /></span>
             </>}
@@ -135,7 +135,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
             {registering && <Field data-disabled={pending} data-invalid={Boolean(fieldErrors.name)} className="gap-2">
               <FieldLabel htmlFor="name">{t('name')}</FieldLabel>
               <InputGroup className={FIELD}>
-                <InputGroupAddon><UserIcon aria-hidden="true" /></InputGroupAddon>
+                <InputGroupAddon><User aria-hidden="true" /></InputGroupAddon>
                 <InputGroupInput id="name" name="name" autoComplete="name" placeholder={t('namePlaceholder')} minLength={1} maxLength={80} required disabled={pending} {...invalidProps('name')} />
               </InputGroup>
               {fieldErrors.name && <FieldError id="name-error">{fieldErrors.name}</FieldError>}
@@ -143,7 +143,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
             <Field data-disabled={pending} data-invalid={Boolean(fieldErrors.email)} className="gap-2">
               <FieldLabel htmlFor="email">{t('email')}</FieldLabel>
               <InputGroup className={FIELD}>
-                <InputGroupAddon><MailIcon aria-hidden="true" /></InputGroupAddon>
+                <InputGroupAddon><Mail aria-hidden="true" /></InputGroupAddon>
                 <InputGroupInput id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required disabled={pending} {...invalidProps('email')} />
               </InputGroup>
               {fieldErrors.email && <FieldError id="email-error">{fieldErrors.email}</FieldError>}
@@ -154,7 +154,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
                 {!registering && <Link href="/forgot-password" className="-my-2.5 py-2.5 text-muted-foreground text-xs underline-offset-4 hover:underline">{t('forgotPassword')}</Link>}
               </div>
               <InputGroup className={FIELD}>
-                <InputGroupAddon><LockKeyholeIcon aria-hidden="true" /></InputGroupAddon>
+                <InputGroupAddon><LockKeyhole aria-hidden="true" /></InputGroupAddon>
                 <InputGroupInput id="password" name="password" type="password" autoComplete={registering ? 'new-password' : 'current-password'} placeholder={registering ? t('passwordPlaceholder') : undefined} minLength={8} maxLength={128} required disabled={pending} {...invalidProps('password')} />
               </InputGroup>
               {fieldErrors.password && <FieldError id="password-error">{fieldErrors.password}</FieldError>}
@@ -163,7 +163,7 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
           {turnstile}
           <Button type="submit" className={cn('w-full', FIELD)} disabled={pending}>
             {registering ? t('submitCreate') : t('submitSignIn')}
-            {pending ? <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-end" /> : <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />}
+            {pending ? <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-end" /> : <ArrowRight aria-hidden="true" data-icon="inline-end" />}
           </Button>
         </form>
         </> : error && <p id="auth-error" role="alert" className="text-destructive-foreground text-sm">{error}</p>}

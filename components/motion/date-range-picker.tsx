@@ -7,7 +7,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-} from "lucide-react";
+} from "@/components/icons";
 import {
   AnimatePresence,
   type HTMLMotionProps,
@@ -188,7 +188,7 @@ export function DateRangePickerSummary({
       </div>
       <ArrowRight
         size={14}
-        className="text-muted-foreground/60"
+        className="text-tertiary"
         aria-hidden="true"
       />
       <div className="min-w-0">

@@ -17,7 +17,6 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
   sandbox: AgentSandbox
   codexBinary?: string
   claudeBinary?: string
-  revocationPollMs?: number
 }): Promise<AgentSession> {
   const gate = requireRunToolApproval(options.runId, options.toolApproval)
   const traceAttributes = { 'mikka.run.id_hash': runIdHash(options.runId) }
@@ -75,7 +74,7 @@ export async function launchHostedSubscription(use: SubscriptionUse, options: St
       if (credentialCalls > 0 && access.credentialTransition && access.connection?.revision === revision) {
         authorizeSubscriptionUse({ ...use, execution: 'native' }, { ...access, connection: { ...access.connection, state: 'connected' } })
       } else authorizeSubscriptionUse({ ...use, execution: 'native' }, access)
-  }, host.revocationPollMs)
+  })
   const off = gate.onRevoke(() => { void session.cancel().catch(() => undefined).finally(cleanup) })
   function cleanup() { ended = true; offMonitor(); off(); gate.revoke() }
   return {

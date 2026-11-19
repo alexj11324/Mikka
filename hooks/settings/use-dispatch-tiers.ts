@@ -1,6 +1,6 @@
 'use client'
 
-import { Cloud, Laptop, Server } from 'lucide-react'
+import { Cloud, Laptop, Server } from '@/components/icons'
 import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { harnessName } from '@/components/labels/entity-labels'
 import type { OrderView } from '@/lib/model-order'

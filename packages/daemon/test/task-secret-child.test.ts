@@ -66,10 +66,11 @@ async function httpChild(options: StartOptions): Promise<ChildCapture> {
   return JSON.parse(stdout) as ChildCapture
 }
 
-it('a real supervisor child uses renewed opaque grants while native credentials and both journal generations stay protected', async () => {
+// Grants are checked at use for as long as the session lease holds (decision
+// 2026-11-17-2215): the daemon never renews them, so a run keeps its claimed one.
+it('a real supervisor child uses its claimed opaque grant for the whole run while native credentials and both journal generations stay protected', async () => {
   const canary = `third-party-canary-${randomBytes(24).toString('hex')}`
   const initialCapability = `opaque-initial-${randomBytes(32).toString('base64url')}`
-  const renewedCapability = `opaque-renewed-${randomBytes(32).toString('base64url')}`
   const authorized = new Map([[initialCapability, canary]])
   const egressCalls: Array<{ capability: string; method: string; path: string; headers: Array<[string, string]>; bodyBase64: string }> = []
   const providerCalls: Array<{ authorization: string | undefined; body: string }> = []
@@ -167,14 +168,7 @@ it('a real supervisor child uses renewed opaque grants while native credentials 
   cleanups.push(async () => { continueRun.resolve(); await supervisor.stop(); await outbox.close() })
   supervisor.start(assignment)
   await Promise.race([firstChild.promise, supervisor.idle().then(() => { throw new Error('Run ended before the HTTP child reported its environment') })])
-  const beforeRenewal = readFileSync(file, 'utf8')
-  expect(supervisor.heartbeatRuns().find(run => run.runId === runId)?.secretCapabilities).toEqual([initialCapability])
-  const renewed = taskSecretAccessSchema.parse({ ...access, grants: [{ ...access.grants[0], capability: renewedCapability,
-    expiresAt: new Date(Date.now() + 600_000).toISOString() }] })
-  authorized.delete(initialCapability)
-  authorized.set(renewedCapability, canary)
-  supervisor.renewTaskSecrets({ [runId]: renewed })
-  expect(supervisor.heartbeatRuns().find(run => run.runId === runId)?.secretCapabilities).toEqual([renewedCapability])
+  const beforeSecondCall = readFileSync(file, 'utf8')
   continueRun.resolve()
   await supervisor.idle()
   await outbox.close()
@@ -189,15 +183,15 @@ it('a real supervisor child uses renewed opaque grants while native credentials 
     expect(capture.env.SDK_KEY).toBe('mikka-protected')
     expect(capture.env.MIKKA_SECRET_ENDPOINTS).toBe(starts[0].taskSecretEnv?.MIKKA_SECRET_ENDPOINTS)
     expect(Object.keys(capture.env).filter(name => /SECRET|(?:TOKEN|API_KEY)$/.test(name))).toEqual(['MIKKA_SECRET_ENDPOINTS'])
-    for (const hidden of [canary, initialCapability, renewedCapability, nativeModel, nativeGit])
+    for (const hidden of [canary, initialCapability, nativeModel, nativeGit])
       expect(JSON.stringify(capture).includes(hidden), 'The HTTP child received a hidden credential').toBe(false)
   }
-  expect(egressCalls.map(call => call.capability)).toEqual([initialCapability, renewedCapability])
+  expect(egressCalls.map(call => call.capability)).toEqual([initialCapability, initialCapability])
   expect(providerCalls).toEqual(Array.from({ length: 2 }, () => ({ authorization: `Bearer ${canary}`, body: '{"source":"real-node-child"}' })))
   expect(starts[0].credential).toEqual({ kind: 'api_key', key: nativeModel })
   expect(starts[0].github?.token).toBe(nativeGit)
-  const persisted = beforeRenewal + readFileSync(file, 'utf8') + readFileSync(join(outboxDir, `${runId}.jsonl`), 'utf8')
-  for (const hidden of [canary, initialCapability, renewedCapability, nativeModel, nativeGit])
+  const persisted = beforeSecondCall + readFileSync(file, 'utf8') + readFileSync(join(outboxDir, `${runId}.jsonl`), 'utf8')
+  for (const hidden of [canary, initialCapability, nativeModel, nativeGit])
     expect(persisted.includes(hidden), 'A credential was written to the journal or outbox').toBe(false)
   const restored = new RunJournal(file).get(runId)!
   expect(restored.taskSecretsWithheld).toBe(true)

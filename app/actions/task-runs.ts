@@ -8,10 +8,9 @@ import { singleFlight } from '@/lib/single-flight'
 import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
 
 import { createHash } from 'node:crypto'
-import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
 import { headers } from '@/lib/server-runtime/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
-import { deviceOnlineStates } from '@/lib/device-presence'
+import { deviceOnlineStates, deviceSessionOpen } from '@/lib/device-presence'
 import { gatewayConfig } from '@/lib/builtin-gateway/config'
 import { ActionFailureError } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
@@ -155,25 +154,20 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     const context = await loadWorkspaceContext(undefined, session.user)
     const observedAt = Date.now()
     const begun = await beginWorkspaceListRead(session.user.id, context.workspace.id, ['thread_list'])
-    // Only queued local work can show "waiting for device". Ask the gateway
-    // on this user read, so an idle socket affects both the view and its hash.
+    // Only queued local work can show "waiting for device". Presence is the
+    // device session (lib/device-session.ts); the live channel watches it.
     const queuedDevices = gatewayConfig()
-      ? await db.selectDistinct({ id: devices.id, lastSeenAt: devices.lastSeenAt }).from(devices)
+      ? await db.selectDistinct({ id: devices.id, sessionOpenedAt: devices.sessionOpenedAt, sessionClosedAt: devices.sessionClosedAt }).from(devices)
         .innerJoin(agentRuns, eq(agentRuns.deviceId, devices.id))
         .where(and(eq(agentRuns.userId, session.user.id), eq(agentRuns.workspaceId, context.workspace.id), eq(devices.ownerId, session.user.id),
           eq(devices.kind, 'local'), eq(devices.enabled, true), eq(agentRuns.status, 'queued'),
           sql`${agentRuns.createdAt} > now() - ${runHistoryWindow}`))
       : []
-    const presence = await deviceOnlineStates(queuedDevices, observedAt)
-    const presenceDevices = queuedDevices.map((device): PresenceDevice => [device.id, presence.get(device.id) ?? false,
-      device.lastSeenAt && isDeviceOnline(device.lastSeenAt, observedAt) ? device.lastSeenAt.getTime() + DEVICE_ONLINE_WINDOW_MS : 0])
-    const onlineIds = [...presence].filter(([, online]) => online).map(([id]) => id)
-    const gatewayOffline = onlineIds.length ? sql`not (${inArray(devices.id, onlineIds)})` : sql`true`
-    // Hash the visible waiting state, not a raw heartbeat clock: an ordinary
-    // heartbeat must not invalidate every historic thread on that machine.
+    const presence = deviceOnlineStates(queuedDevices)
+    const presenceDevices = queuedDevices.map((device): PresenceDevice => [device.id, presence.get(device.id) ?? false, 0])
+    // Hash the visible waiting state, so only a session change invalidates it.
     const waitingForDevice = sql<boolean>`${devices.kind}='local' and ${agentRuns.status}='queued' and
-      (${devices.enabled} is false or (${gatewayOffline} and (${devices.lastSeenAt} is null or
-       ${devices.lastSeenAt}>statement_timestamp() OR ${devices.lastSeenAt}<statement_timestamp()-(${DEVICE_ONLINE_WINDOW_MS} * interval '1 millisecond'))))`
+      (${devices.enabled} is false or not ${deviceSessionOpen})`
     const snapshot = db.select({
       unread: threadUnread.as('unread'),
       id: agentRuns.id, botId: agentRuns.botId, agentName: runBotName.as('agentName'), issueId: agentRuns.issueId, prompt: sql<string>`left(${runTaskPrompt}, 200)`.as('prompt'), title: agentRuns.title,
@@ -202,7 +196,8 @@ async function readThreads(known?: string, previous?: ListPosition[]) {
     const live = withDevicePresence(await ownerListRead(session.user.id, [signature.expiresAt], observedAt, begun), presenceDevices, process.env, observedAt)
     // Device presence has its own bounded watcher prerequisite. Until that
     // route is ready, queued local work retains the shared slow fallback.
-    const presenceFallback = queuedDevices.length > 0
+    // A session change pushes thread_list (lib/device-session.ts): no fallback read.
+    const presenceFallback = false
     if (known === version) return { ...unchangedList(version), live, presenceFallback }
     // Reading the version first makes a concurrent edit visible on the next poll.
     const manifest = await db.select({ id: visible.id, version: sql<string>`md5(to_jsonb(thread_list_expiry)::text)` }).from(visible)
@@ -343,7 +338,7 @@ export async function listConversationSidebar() {
   const { reader, workspaceId } = await conversationActor()
   const { conversationSidebar } = await import('@/lib/conversation-directory')
   const { pool } = await import('@/lib/db')
-  return conversationSidebar(pool, reader, workspaceId)
+  return conversationSidebar(pool, reader, workspaceId, undefined, { nestChecks: true })
 }
 
 /** A workspace switch between composing and searching invalidates the old picker. */

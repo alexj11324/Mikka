@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { Archive, Pencil, Plus } from 'lucide-react'
+import { Archive, Pencil, Plus } from '@/components/icons'
 import type { EnvironmentView, EnvironmentsView } from '@/app/actions/environments'
 import { listProjectSetupVersions, rollbackProjectSetup, saveEnvironment, setProjectDefaultEnvironment } from '@/app/actions/project-resources'
 import type { EnvironmentConfiguration, ProjectSetupHistory } from '@/lib/project-resources/contracts'
@@ -128,7 +128,8 @@ export function EnvironmentsSettings({ workspaceId }: { workspaceId: string }) {
         <AlertDialogHeader><AlertDialogTitle>{t('archiveNamed', { name: archiving?.name ?? '' })}</AlertDialogTitle></AlertDialogHeader>
         {failure && <FieldError>{failure}<Button variant="link" size="sm" onClick={() => { setArchiving(null); setFailure(null); void list.mutate() }}>{common('refresh')}</Button></FieldError>}
         <AlertDialogFooter><AlertDialogCancel disabled={pending}>{common('cancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" disabled={pending} onClick={event => { event.preventDefault(); if (archiving) void archive(archiving) }}>{t('archive')}</AlertDialogAction>
+          {/* Reversible: the archived list above restores it, so this is a write, not a delete (R-102). */}
+          <AlertDialogAction variant="default" disabled={pending} onClick={event => { event.preventDefault(); if (archiving) void archive(archiving) }}>{t('archive')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -239,7 +240,7 @@ function SetupHistory({ workspaceId, projectId, environment, canRestore, onClose
       <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('confirmSetup', { revision: selected.version, name: environment.name })}</AlertDialogTitle></AlertDialogHeader>
         <p>{t('setupImpact', { count: selected.totalProjects })}</p>
         <AlertDialogFooter><AlertDialogCancel disabled={pending}>{common('cancel')}</AlertDialogCancel>
-          <AlertDialogAction disabled={pending} onClick={event => { event.preventDefault(); void restore() }}>{t('restoreSetup')}</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogAction variant="default" disabled={pending} onClick={event => { event.preventDefault(); void restore() }}>{t('restoreSetup')}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent></AlertDialog>}
   </DialogContent></Dialog>
 }

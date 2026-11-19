@@ -66,7 +66,7 @@ function machine(cloud = true) {
   const daemon = new Daemon({ dataDir: tempDir(), flavor: 'dev', link, credential: 'fixture-device',
     initialRunId: randomUUID(), hostedSubscriptions: true, e2bContainerRuntime: cloud,
     harnessBinaries: { claude_code: binary }, modelProbe: false, quotaSource: null,
-    heartbeatMs: 60_000, log: createLogger({ level: 'silent' }),
+   log: createLogger({ level: 'silent' }),
   })
   cleanups.push(async () => { await daemon.stop() })
   return { daemon, claim, register, softwareReads }

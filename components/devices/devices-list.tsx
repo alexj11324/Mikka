@@ -3,7 +3,7 @@
 import { SettingsLoading } from '@/components/settings/primitives'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
-import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
+import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from '@/components/icons'
 import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import type { DeviceView } from '@/app/actions/agents'
 import { HarnessLabel } from '@/components/labels/entity-labels'

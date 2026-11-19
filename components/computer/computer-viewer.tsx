@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Eye, Hand, Minimize2 } from 'lucide-react'
+import { Eye, Hand, Minimize2 } from '@/components/icons'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { useSWRConfig } from 'swr'

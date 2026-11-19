@@ -9,8 +9,8 @@ const belongs = async (id: string, device: string) => id === run && device === o
 const req = (path: string, init?: RequestInit) => new Request(`https://mikka.example${path}`, init)
 
 test('cloud device token admits only its own explicit daemon routes', async () => {
-  for (const path of [`/v1/devices/${own}/heartbeat`, `/mikka/v1/devices/${own}/runs`, `/v1/devices/${own}/runs/${run}/claim`, `/v1/runs/${run}/events`, `/v1/runs/${run}/tool-approval`, `/v1/runs/${run}/policy-snapshot?deviceId=${own}`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), true)
-  for (const path of [`/v1/devices/${other}/heartbeat`, `/v1/devices/${own}/runs/${other}/claim`, `/v1/runs/${other}/events`, `/v1/runs/${other}/tool-approval`, `/v1/runs/${other}/policy-snapshot?deviceId=${own}`, `/v1/devices/${own}/coordinator`, `/v1/devices/${own}/runs/${run}/future`, '/api/subscriptions', '/v1/devices/other']) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
+  for (const path of [`/v1/devices/${own}/report`, `/mikka/v1/devices/${own}/runs`, `/v1/devices/${own}/runs/${run}/claim`, `/v1/runs/${run}/events`, `/v1/runs/${run}/tool-approval`, `/v1/runs/${run}/policy-snapshot?deviceId=${own}`]) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), true)
+  for (const path of [`/v1/devices/${other}/report`, `/v1/devices/${own}/heartbeat`, `/v1/devices/${own}/runs/${other}/claim`, `/v1/runs/${other}/events`, `/v1/runs/${other}/tool-approval`, `/v1/runs/${other}/policy-snapshot?deviceId=${own}`, `/v1/devices/${own}/coordinator`, `/v1/devices/${own}/runs/${run}/future`, '/api/subscriptions', '/v1/devices/other']) assert.equal(await cloudDeviceScopeAllows(req(path), own, belongs), false)
 })
 test('a cloud device token mints the push gateway ticket of its own device only', async () => {
   // Without it the cloud daemon never joins the gateway and its live runs fall

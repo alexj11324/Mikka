@@ -8,8 +8,11 @@ import { api, ApiError } from '@/lib/api'
 import { tap } from '@/lib/haptics'
 import type { PendingAction } from '@/lib/types'
 import { colors } from '@/lib/theme'
+import { mobileMessages } from '@/lib/messages'
 
-const TITLE: Record<string, string> = { send_email: '发送邮件', create_calendar_event: '新建日程', update_calendar_event: '修改日程' }
+const A = mobileMessages.Coordinator.pendingActions
+const M = mobileMessages.MobileCore
+const TITLE: Record<string, string> = { send_email: A.send_email, create_calendar_event: A.create_calendar_event, update_calendar_event: A.update_calendar_event }
 
 /** "2026-10-27T10:00:00-07:00" → "2026-10-27 10:00 -07:00", as the web's card shows it (components/coordinator/pending-actions.tsx). */
 export function shownTime(value: unknown, timezone?: unknown) {
@@ -50,15 +53,16 @@ export function PendingActions({ items, focus, reload, onFocusLayout }: { items:
     try {
       const result = await api<{ status: 'done' | 'failed' | 'declined'; reason: string | null }>(`/api/mobile/pending-actions/${item.id}`, { method: 'POST', body: { approve } })
       if (result.status !== 'failed') tap()
-      if (result.status === 'done') remember(item.action === 'send_email' ? '邮件已发送' : '日历已更新')
-      else if (result.status === 'failed') remember(`没做成：${result.reason ?? ''}`, true)
-      else remember('已拒绝')
+      if (result.status === 'done') remember(item.action === 'send_email' ? A.sent : A.saved)
+      else if (result.status === 'failed') remember(mobileMessages.Coordinator.pendingActions.failed.replace('{error}', result.reason ?? ''), true)
+      else remember(M.rejected)
       await refresh()
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        remember('已处理或已过期')
+        // The server's own words for a decision another device already took.
+        remember(mobileMessages.Errors.pendingActionUnavailable)
         await refresh()
-      } else setErrors(current => ({ ...current, [item.id]: '没发出去，再试一次。' }))
+      } else setErrors(current => ({ ...current, [item.id]: M.sendFailedRetry }))
     } finally {
       inFlight.current = false
       setBusy(null)
@@ -70,7 +74,7 @@ export function PendingActions({ items, focus, reload, onFocusLayout }: { items:
   const missed = focus && !shown.has(focus) && !outcomes.some(outcome => outcome.item.id === focus)
 
   return (
-    <View style={{ gap: 12 }} accessibilityLabel="等你确认">
+    <View style={{ gap: 12 }} accessibilityLabel={A.label}>
       {outcomes.map(({ item, line, failed }) => (
         <View key={`done-${item.id}`} onLayout={item.id === focus ? event => onFocusLayout?.(event.nativeEvent.layout.y) : undefined}>
           <ChatCard highlighted={item.id === focus}>
@@ -79,7 +83,7 @@ export function PendingActions({ items, focus, reload, onFocusLayout }: { items:
           </ChatCard>
         </View>
       ))}
-      {missed ? <Text style={styles.missed} onLayout={event => onFocusLayout?.(event.nativeEvent.layout.y)}>这件事已处理或已过期。</Text> : null}
+      {missed ? <Text style={styles.missed} onLayout={event => onFocusLayout?.(event.nativeEvent.layout.y)}>{mobileMessages.Errors.pendingActionUnavailable}</Text> : null}
       {items.filter(item => !completed.has(item.id)).map(item => {
         const input = item.input
         const email = item.action === 'send_email'
@@ -91,26 +95,26 @@ export function PendingActions({ items, focus, reload, onFocusLayout }: { items:
               <View style={{ gap: 4 }}>
                 {email ? (
                   <>
-                    <Field label="收件人">{list(input.to)}</Field>
-                    <Field label="抄送">{list(input.cc)}</Field>
-                    <Field label="密送">{list(input.bcc)}</Field>
-                    <Field label="主题">{text(input.subject)}</Field>
+                    <Field label={A.to}>{list(input.to)}</Field>
+                    <Field label={A.cc}>{list(input.cc)}</Field>
+                    <Field label={A.bcc}>{list(input.bcc)}</Field>
+                    <Field label={A.subject}>{text(input.subject)}</Field>
                   </>
                 ) : (
                   <>
-                    {item.context ? <Field label="原日程">{[item.context.summary, [shownTime(item.context.start), shownTime(item.context.end)].filter(Boolean).join(' – ')].filter(Boolean).join(' · ')}</Field> : null}
-                    <Field label="标题">{text(input.summary)}</Field>
-                    <Field label="时间">{input.start || input.end ? [shownTime(input.start, input.timezone), shownTime(input.end)].filter(Boolean).join(' – ') : null}</Field>
-                    <Field label="地点">{text(input.location)}</Field>
-                    <Field label="参与者">{list(input.attendees)}</Field>
-                    {list(input.attendees) ? <Field label="通知">{input.notify_attendees === false ? '不通知' : '给参与者发邮件'}</Field> : null}
+                    {item.context ? <Field label={A.current}>{[item.context.summary, [shownTime(item.context.start), shownTime(item.context.end)].filter(Boolean).join(' – ')].filter(Boolean).join(' · ')}</Field> : null}
+                    <Field label={A.eventTitle}>{text(input.summary)}</Field>
+                    <Field label={A.time}>{input.start || input.end ? [shownTime(input.start, input.timezone), shownTime(input.end)].filter(Boolean).join(' – ') : null}</Field>
+                    <Field label={A.location}>{text(input.location)}</Field>
+                    <Field label={A.attendees}>{list(input.attendees)}</Field>
+                    {list(input.attendees) ? <Field label={A.notify}>{input.notify_attendees === false ? A.notifyNo : A.notifyYes}</Field> : null}
                   </>
                 )}
               </View>
               {body ? <View style={styles.body}><Text style={cardText.body}>{body}</Text></View> : null}
               <View style={styles.actions}>
-                <CardButton label="不要" disabled={busy !== null} onPress={() => void decide(item, false)} />
-                <CardButton primary label={email ? '发送' : '保存到日历'} disabled={busy !== null && busy !== item.id} busy={busy === item.id} onPress={() => void decide(item, true)} />
+                <CardButton label={A.decline} disabled={busy !== null} onPress={() => void decide(item, false)} />
+                <CardButton primary label={email ? A.approveSend : A.approveSave} disabled={busy !== null && busy !== item.id} busy={busy === item.id} onPress={() => void decide(item, true)} />
               </View>
               {errors[item.id] ? <Text style={cardText.error}>{errors[item.id]}</Text> : null}
             </ChatCard>

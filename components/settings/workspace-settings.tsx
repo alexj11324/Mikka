@@ -59,6 +59,7 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
   return <>
     <SettingsSection id="workspace-general">
       <SettingRow title={t('icon')}>
+        {/* control-size-exempt: the only Input here is the sr-only file picker; no visible field shares the row. */}
         <div className="flex items-center gap-2">
           {icon}
           <Input ref={fileRef} type="file" accept={WORKSPACE_ICON_TYPES.join(',')} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={event => void pickIcon(event)} />

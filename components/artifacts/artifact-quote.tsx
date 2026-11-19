@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { SquareDashedMousePointer, TextQuote, X } from 'lucide-react'
+import { SquareDashedMousePointer, TextQuote, X } from '@/components/icons'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import type { ArtifactQuote } from '@/lib/artifacts/quote'

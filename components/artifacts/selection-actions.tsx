@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { Copy, TextQuote } from 'lucide-react'
+import { Copy, TextQuote } from '@/components/icons'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent } from '@/components/ui/popover'

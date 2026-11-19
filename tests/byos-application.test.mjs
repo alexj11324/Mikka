@@ -295,9 +295,13 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       // host-scoped gate without approving any tool operation; production
       // assignments obtain their gate from the authenticated server link.
       options.toolApproval = new ToolApprovalGate(options.runId, { permission: () => 'deny', ask: async () => 'deny', isLive: () => true })
-      const launched = await service.launchNative('alice', consumerId, native.body.bindingId, hostedSubscriptionLauncher(options, { stateDir: runtime, sandbox: new NoSandbox(), codexBinary: binaryPath, claudeBinary: binaryPath, revocationPollMs: 30 }))
+      const launched = await service.launchNative('alice', consumerId, native.body.bindingId, hostedSubscriptionLauncher(options, { stateDir: runtime, sandbox: new NoSandbox(), codexBinary: binaryPath, claudeBinary: binaryPath }))
       sessions.push(launched)
-      if (provider === 'claude') assert.equal((await post({ action: 'disconnect', connectionId, revision })).status, 200)
+      if (provider === 'claude') {
+        assert.equal((await post({ action: 'disconnect', connectionId, revision })).status, 200)
+        // The server stops the run and pushes a run control; the daemon's push invalidates the gate (no poll).
+        options.toolApproval.invalidate()
+      }
       const events = []; for await (const event of launched.events()) events.push(event)
       assert.equal(events.at(-1).outcome, provider === 'codex' ? 'succeeded' : 'cancelled')
       assert.ok(!JSON.stringify(events).includes('fixture-access'))

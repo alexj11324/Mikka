@@ -1,7 +1,8 @@
 'use client'
 
 import { Skeleton } from '@/components/ui/skeleton'
-import { ChevronRight, Hash, Laptop, Server } from 'lucide-react'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { ChevronRight, Hash, Inbox, Laptop, Server } from '@/components/icons'
 import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import type { listIssues } from '@/app/actions/issues'
 import type { Thread } from '@/app/actions/task-runs'
@@ -115,7 +116,13 @@ export function ThreadList({ threads, issues, all = false, loading = false, stat
   const now = useNow({ updateInterval: 60_000 })
   const tCommon = useTranslations('Common')
   if (!threads.length && loading) return <div role="status" aria-label={tCommon('loading')} className="flex flex-col gap-2 px-1 py-2">{[0, 1, 2].map(row => <Skeleton key={row} className="h-11 w-full rounded-lg" />)}</div>
-  if (!threads.length) return <p className="px-2 py-6 text-center text-xs text-muted-foreground">{t('empty')}</p>
+  // The same empty-state shape as every other list (R-41): an icon, one line, in the panel's own width.
+  if (!threads.length) return <Empty className="border-0 py-6">
+    <EmptyHeader>
+      <EmptyMedia variant="icon"><Inbox aria-hidden="true" /></EmptyMedia>
+      <EmptyTitle>{t('empty')}</EmptyTitle>
+    </EmptyHeader>
+  </Empty>
   const groups = groupThreads(threads, id => issues.find(issue => issue.id === id))
   const rows = (list: ThreadRowOf<Thread>[], group: ThreadGroup) => <ul className="flex flex-col gap-2">{list.map(thread => <ThreadRow key={thread.id} thread={thread} group={group} issues={issues} all={all} now={now} onOpenThread={onOpenThread} />)}</ul>
   return <div role="group" aria-label={t('title')} className="flex flex-col gap-3">

@@ -101,8 +101,10 @@ export type FramedTaskProps = {
   syncNotice: string | null
   discussionSave?: DiscussionSave
   /** The description editor with what goes under it, and 活动 drawn by `renderActivity`. */
+  descriptionEditable?: boolean
   editor: (afterDescription: ReactNode, renderActivity: (discussions: IssueDiscussions) => ReactNode) => ReactNode
   acceptance: ReactNode
+  artifacts?: ReactNode
   versions: ActivityVersion[]
   historyFailed: (() => void) | null
   teamSnapshot?: TaskTeamSnapshot
@@ -381,8 +383,10 @@ export function FramedTask(props: FramedTaskProps) {
     favorite={menu.favorite}
     menu={{ items: menuItems, disabled: !readerMenu && menu.disabled, onOpen: loadOptions }}
     titleField={props.titleField} saveError={props.saveError} syncNotice={props.syncNotice}
+    descriptionEditable={props.descriptionEditable}
     description={({ afterDescription, activity }) => props.editor(afterDescription, current => { discussions.current = current; return activity(current) })}
     acceptance={props.acceptance}
+    artifacts={props.artifacts}
     copyLink={menu.copyLink}
     subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: connections.error ? async () => false : menu.createChild, disabled: locked || connections.pending || Boolean(connections.error), failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {

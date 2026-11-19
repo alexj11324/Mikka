@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, TerminalSquare } from 'lucide-react'
+import { Plus, SquareTerminal } from '@/components/icons'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { useSWRConfig } from 'swr'
 import { Button } from '@/components/ui/button'
@@ -40,7 +40,7 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
     <DialogContent closeLabel={commonT('close')} className="sm:max-w-xl" aria-describedby={undefined}>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <IconTile variant="frame" aria-hidden="true"><TerminalSquare /></IconTile>
+          <IconTile variant="frame" aria-hidden="true"><SquareTerminal /></IconTile>
           {reconnect ? t('reconnectTitle') : t('title')}
         </DialogTitle>
       </DialogHeader>

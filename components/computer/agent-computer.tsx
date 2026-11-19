@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { KeyRound, Maximize2 } from 'lucide-react'
+import { KeyRound, Maximize2 } from '@/components/icons'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'

@@ -24,6 +24,9 @@
       ],
       "@ui-slot/*": [
         "./components/slots/*"
+      ],
+      "mikka-real-react": [
+        "./node_modules/@types/react/index.d.ts"
       ]
     }
   },

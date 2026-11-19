@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { ArrowUpRight, LockIcon } from 'lucide-react'
+import { ArrowUpRight, Lock } from '@/components/icons'
 import { toast } from 'sonner'
 
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
@@ -98,7 +98,7 @@ function CredentialForm({ apps, target, onClose }: { apps: ConnectedApps; target
       {t('where')}<ArrowUpRight data-icon="inline-end" aria-hidden="true" />
     </a>}
     <DialogFooter className="items-center sm:justify-between">
-      <span className="flex items-center gap-1 text-xs text-muted-foreground"><LockIcon className="size-3" aria-hidden="true" />{t('securedBy')}<MikkaMarkSmall />Mikka</span>
+      <span className="flex items-center gap-1 text-xs text-muted-foreground"><Lock className="size-3" aria-hidden="true" />{t('securedBy')}<MikkaMarkSmall />Mikka</span>
       <div className="flex gap-2">
         <Button type="button" variant="secondary" disabled={busy} onClick={onClose}>{common('cancel')}</Button>
         <Button type="submit" disabled={busy || missing}>{busy ? common('saving') : t('submit')}</Button>

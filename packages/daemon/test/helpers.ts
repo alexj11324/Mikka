@@ -3,8 +3,19 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { execa } from "execa"
+import { DEVICE_SESSION_LOCAL_GRACE_MS } from "@mikka/protocol"
 
 const dirs: string[] = []
+
+/**
+ * The device session socket has been down longer than the local grace
+ * (decision 2026-11-17-2215). With `check`, held runs stop now as
+ * `device_lost`; without it, the next lease check finds the lease ended.
+ */
+export function loseDeviceSession(supervisor: { sessionClosed(at?: number): void; check(now?: number): void }, check = true) {
+  supervisor.sessionClosed(Date.now() - DEVICE_SESSION_LOCAL_GRACE_MS - 1)
+  if (check) supervisor.check()
+}
 
 export function tempDir(prefix = "orvd-"): string {
   // Short base path: Unix socket paths are limited to ~104 bytes on macOS.

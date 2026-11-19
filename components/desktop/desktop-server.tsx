@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { ServerIcon } from 'lucide-react'
+import { Server } from '@/components/icons'
 import type { BundledBridge, BundledServer, BundledServerProbe, BundledServerState } from '@mikka/protocol/bridge'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { useDesktopCapability } from '@/lib/platform/use-platform'
@@ -44,7 +44,7 @@ export function useServerLabel(): (server: BundledServer) => string {
 export function ServerName({ server }: { server: BundledServer }) {
   const label = useServerLabel()
   return <span className="inline-flex min-w-0 items-center gap-1.5">
-    <ServerIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+    <Server aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
     <span className="truncate">{label(server)}</span>
     {!server.cloud && <span className="truncate text-muted-foreground">{new URL(server.url).host}</span>}
   </span>
@@ -134,7 +134,7 @@ export function ServerChooser({ open, onOpenChange, current, saved = [], activeC
             {error && <FieldError>{error}</FieldError>}
           </Field>}
           {found && <Item variant="muted" size="sm" role="status">
-            <ItemMedia variant="icon"><ServerIcon aria-hidden="true" /></ItemMedia>
+            <ItemMedia variant="icon"><Server aria-hidden="true" /></ItemMedia>
             <ItemContent>
               <ItemTitle>{found.name}</ItemTitle>
               <ItemDescription>{t('version', { version: found.version ?? '' })}</ItemDescription>

@@ -29,7 +29,7 @@ it('preserves successful native completion when the adapter revokes its complete
   } finally {await session.cancel()}
 })
 
-it('cancels a standalone native session when its gate ceases to be live without an HTTP monitor', async () => {
+it('cancels a standalone native session when a push finds its gate no longer live', async () => {
   const { use, access } = subscriptionFixture('claude_code_cli')
   access.connection!.quota.observedAt = new Date().toISOString()
   let live = true
@@ -42,12 +42,13 @@ it('cancels a standalone native session when its gate ceases to be live without 
   }, {
     access:async()=>access, worker:{call:async<T>()=> await credential() as T},
     stateDir:tempDir('mikka-standalone-state-'), sandbox:new NoSandbox(),
-    claudeBinary:resolve(import.meta.dirname,'fakes/fake-claude-subscription.mjs'), revocationPollMs:25,
+    claudeBinary:resolve(import.meta.dirname,'fakes/fake-claude-subscription.mjs'),
   })
   const finished = (async () => { const events=[]; for await(const event of session.events()) events.push(event); return events })()
   try {
     expect(gate.revoked).toBe(false)
     live=false
+    gate.invalidate() // the pushed revocation
     await vi.waitFor(()=>expect(gate.revoked).toBe(true))
     const events=await finished
     expect(events.at(-1)).toMatchObject({type:'exit',outcome:'cancelled'})

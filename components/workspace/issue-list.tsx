@@ -1,6 +1,6 @@
 'use client'
 
-import { ListTodo, Plus } from 'lucide-react'
+import { ListTodo, Plus } from '@/components/icons'
 import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { cn } from '@/lib/utils'
 import type { listIssues } from '@/app/actions/issues'

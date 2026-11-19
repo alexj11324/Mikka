@@ -5,7 +5,7 @@ import useSWR from 'swr'
 import { withBasePath } from '@/lib/base-path'
 import type { InstalledSkill } from '@/lib/plugins/contracts'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { Archive, CircleAlert, CircleCheck, CircleSlash, Copy, MoreHorizontal, Pencil, Plus, Share2 } from 'lucide-react'
+import { Archive, CircleAlert, CircleCheck, CircleSlash, Copy, MoreHorizontal, Pencil, Plus, Share2 } from '@/components/icons'
 import type { AgentProfile } from '@/lib/factory/agent-profile-definition'
 import { AGENT_PROFILE_TEMPLATES } from '@/lib/factory/agent-profile-templates'
 import { ProfileMark, ProfileMarkPicker } from '@/components/labels/profile-mark'
@@ -83,6 +83,7 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
         {failure && <FieldError>{t(failure)}</FieldError>}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={!!pending}>{common('cancel')}</AlertDialogCancel>
+          {/* A DELETE with no archive list to restore from: destructive, not a benign write (R-102). */}
           <AlertDialogAction disabled={!!pending} onClick={event => { event.preventDefault(); if (archiving) void update(archiving, true) }}>{pending ? t('saving') : t('archive')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

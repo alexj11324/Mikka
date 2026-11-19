@@ -26,6 +26,8 @@ export async function setOwnedBotArchived(owner: Owner, botId: string, archived:
       RETURNING id`, [botId, owner.ownerId, owner.workspaceId, archived])
   if (!rows.length) throw new ActionFailureError('botNotFound')
   await botListChanged(pool, botId)
+  // An archived Bot's running work stops now; nothing rechecks it later (decision 2026-11-17-2215).
+  if (archived) await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ botId })
   return { id: botId, archived }
 }
 

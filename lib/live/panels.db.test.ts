@@ -313,7 +313,7 @@ test('panel notifications follow actual committed writes and persisted owner/wor
       const { createFactoryQuestions } = await import('../factory/questions/store')
       const deviceId = randomUUID(), repoId = randomUUID(), agentId = agentIds.get('owner')!
       devicePaths.add(`/v1/devices/${deviceId}/push`)
-      await databasePool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
+      await databasePool.query(`INSERT INTO devices(id,"ownerId",name,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,'owner','Fixture',now(),'[{"harness":"codex","installed":true}]',now())`, [deviceId])
       await databasePool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [agentId, deviceId])
       await databasePool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner','/fixture/repo')`, [repoId, deviceId])
       const authorize = async (owner: string, issueId: string, tx: import('pg').PoolClient) => (await tx.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issueId, owner])).rowCount === 1

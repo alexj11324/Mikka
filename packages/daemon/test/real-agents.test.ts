@@ -60,7 +60,6 @@ async function boot(server: MemoryServer, dataDir: string) {
     flavor: "dev",
     link,
     credential: "cred-real",
-    heartbeatMs: 1000,
   }).start()
   daemons.push(daemon)
   await daemon.syncWithServer()

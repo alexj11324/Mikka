@@ -1,7 +1,7 @@
 'use client'
 
 import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
-import { Cloud, Copy, Laptop, Server } from 'lucide-react'
+import { Cloud, Copy, Laptop, Server } from '@/components/icons'
 import { toast } from 'sonner'
 import { useThreadMachine } from '@/hooks/use-thread-run-reads'
 import { Button } from '@/components/ui/button'
@@ -101,7 +101,7 @@ export function ThreadRunPlace({ issueId, runId, status, harness, botName }: { i
       <HoverCardContent align="start" className="w-72 p-3"><MachineDetails machine={machine} /></HoverCardContent>
     </HoverCard>}
     {harness && agent && <Tooltip>
-      <TooltipTrigger render={<span tabIndex={0} className="flex size-7 items-center justify-center rounded-md outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" />}><HarnessMark harness={harness} /></TooltipTrigger>
+      <TooltipTrigger render={<span role="img" tabIndex={0} aria-label={botName ? `${agent} · ${botName}` : agent} className="flex size-7 items-center justify-center rounded-md outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" />}><HarnessMark harness={harness} /></TooltipTrigger>
       <TooltipContent side="bottom">{botName ? `${agent} · ${botName} ${threads('dispatched')}` : agent}</TooltipContent>
     </Tooltip>}
   </span>

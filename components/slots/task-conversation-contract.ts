@@ -10,6 +10,6 @@ export type TaskConversationProps = {
   name?: string
   onBack: () => void
   onClose?: () => void
-  onOpenThread: (runId: string) => void
+  onOpenThread: (runId: string, issueId?: string, name?: string) => void
   onOpenTask?: () => void
 }

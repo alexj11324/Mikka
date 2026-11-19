@@ -1,19 +1,14 @@
 'use server'
 
-import { headers } from '@/lib/server-runtime/headers'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
-import { auth } from '@/lib/auth'
+import { requireUser } from '@/lib/acting-user'
 import { createCaptureShare, revokeCaptureShares } from '@/lib/captures/store'
 
 // Share links for a thread's screenshots and recordings, as for artifacts:
 // the token comes back once, only its hash is kept, revoking ends it.
 
-async function getUserId(): Promise<string> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
-}
+const getUserId = async () => (await requireUser()).id
 
 /** A new share link for the capture, opened at /api/captures/shared/<token>. */
 export async function shareCapture(captureId: string): Promise<ActionResult<{ token: string }>> {

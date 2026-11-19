@@ -30,7 +30,7 @@ mock.module('swr', { defaultExport: (key: string | null) => {
   if (key === `/api/factory/tasks/${TASK}`) return { data: detail, mutate: async () => detail }
   if (key?.startsWith('/api/factory/tasks?issueId=')) return { data: { tasks: [task] }, isLoading: false, mutate: async () => undefined }
   return { data: undefined, mutate: async () => undefined }
-}, namedExports: { useSWRConfig: () => ({ mutate: async (key: string) => { reloaded.push(key) } }) } })
+}, namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key), useSWRConfig: () => ({ mutate: async (key: string) => { reloaded.push(key) } }) } })
 // The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
 mock.module(new URL('../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
 mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '', relativeTime: (at: Date, now: Date) => `${Math.round((now.getTime() - at.getTime()) / 3_600_000)} 小时前` }), useNow: () => new Date('2026-11-05T01:00:00.000Z') } })

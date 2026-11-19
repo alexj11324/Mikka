@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
 import { retryReply, replyRetryLine } from '../lib/reply-retry.ts'
+import { mobileMessages } from '../lib/messages.ts'
 
 test('the phone preserves confirmed retry outcomes even when refresh fails', async () => {
   for (const response of [{ queued: true }, { queued: false, reason: 'working' }, { queued: false, reason: 'nothingToRetry' }, { queued: false, reason: 'unavailable' }] as const) {
@@ -18,6 +18,8 @@ test('transport loss, explicit refusal and older replies never claim an enqueue'
 })
 
 test('retry result words match the web without showing raw errors', () => {
-  const copy = JSON.parse(readFileSync(new URL('../../../messages/zh-CN.json', import.meta.url), 'utf8')).Coordinator.replyRetry
+  // The phone reads its own catalog now (R-42), so compare against it rather than the Chinese one:
+  // this suite runs under whatever the device locale is.
+  const copy = mobileMessages.Coordinator.replyRetry
   for (const outcome of ['queued', 'working', 'nothingToRetry', 'unavailable', 'unconfirmed'] as const) assert.equal(replyRetryLine(outcome), copy[outcome])
 })

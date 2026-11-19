@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { CircleAlert } from 'lucide-react'
+import { CircleAlert } from '@/components/icons'
 import { failureMessageKey, type ChatFailure } from '@/lib/chat-failure'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'

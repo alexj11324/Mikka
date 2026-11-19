@@ -2,7 +2,7 @@
 
 import { Fragment } from 'react'
 import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 import { PersonAvatar } from '@/components/person-avatar'
 import { Button } from '@/components/ui/button'
 import { AgentSphere } from './issue-assignee-menu'

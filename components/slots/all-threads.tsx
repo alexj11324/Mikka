@@ -1,7 +1,7 @@
 'use client'
 
 // The default all-threads slot (docs/ui-overlay.md): 全部线程's button and its column.
-import { MessagesSquare, Search, X } from 'lucide-react'
+import { MessagesSquare, Search, X } from '@/components/icons'
 import { useViewScroll, useViewState } from '@/lib/hooks/view-state'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Badge } from '@/components/reui/badge'

@@ -12,7 +12,7 @@ import {
   RichTextToolbarGroup,
   RichTextToolbarSeparator,
 } from "./rich-text-toolbar"
-import { BoldIcon, ItalicIcon, UnderlineIcon, ListIcon, ListOrderedIcon } from "lucide-react"
+import { Bold, Italic, Underline, List, ListOrdered } from "@/components/icons"
 
 /** Strike, code, checklists and highlights would look like a redline but are
  * never tracked, so a contract drops their keys along with their buttons. */
@@ -73,7 +73,7 @@ export function ContractToolbar({
           disabled={disabled}
           onToggle={() => editor?.chain().focus().toggleBold().run()}
         >
-          <BoldIcon aria-hidden="true" />
+          <Bold aria-hidden="true" />
         </RichTextToggle>
         <RichTextToggle
           label="Italic"
@@ -82,7 +82,7 @@ export function ContractToolbar({
           disabled={disabled}
           onToggle={() => editor?.chain().focus().toggleItalic().run()}
         >
-          <ItalicIcon aria-hidden="true" />
+          <Italic aria-hidden="true" />
         </RichTextToggle>
         <RichTextToggle
           label="Underline"
@@ -91,7 +91,7 @@ export function ContractToolbar({
           disabled={disabled}
           onToggle={() => editor?.chain().focus().toggleUnderline().run()}
         >
-          <UnderlineIcon aria-hidden="true" />
+          <Underline aria-hidden="true" />
         </RichTextToggle>
         <RichTextLinkPopover
           editor={editor}
@@ -109,7 +109,7 @@ export function ContractToolbar({
           disabled={!state.editable}
           onToggle={() => editor?.chain().focus().toggleBulletList().run()}
         >
-          <ListIcon aria-hidden="true" />
+          <List aria-hidden="true" />
         </RichTextToggle>
         <RichTextToggle
           label="Numbered list"
@@ -118,7 +118,7 @@ export function ContractToolbar({
           disabled={!state.editable}
           onToggle={() => editor?.chain().focus().toggleOrderedList().run()}
         >
-          <ListOrderedIcon aria-hidden="true" />
+          <ListOrdered aria-hidden="true" />
         </RichTextToggle>
       </RichTextToolbarGroup>
       <RichTextToolbarSeparator />

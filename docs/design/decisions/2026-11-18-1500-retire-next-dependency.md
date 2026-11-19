@@ -42,6 +42,7 @@
 - **`scripts/dev-local/reviewed-local-evidence.mjs` 的 `next.config.mjs`**：历史 artifact 指纹必须能重算，删掉这个路径会静默改变所有历史指纹。
 - **两个 sandbox 验收脚本的 `next/dist/bin/next`**：它们启动第三方 Next fixture，框架由 fixture 自己安装。
 - **`scripts/ui-policy.mjs` / `base-path-policy.mjs` 里的 `next/font`、`next/link` 字符串**：它们是 lint 规则的被拒输入，且同样审计私有 overlay 仓。
+- **`ui-policy.json` 的 `runtimeRoots`**：`lib/client-runtime/`、`lib/server-runtime/` 是框架叶子（`Link`/`Script`/`dynamic`/`headers()`），渲染的是原语而不是产品界面。它们在 `apps/api/compat/**` 时本来就在 lint-ui 的 `apps/` 过滤名单之外；搬到 `lib/` 不能顺带把它们纳入业务 UI 规则——否则 `Script` 的 `document.createElement('script')` 和 `dynamic` 的 JSX runtime 都会撞上「业务代码不得手写 UI」。
 
 ## 验收
 

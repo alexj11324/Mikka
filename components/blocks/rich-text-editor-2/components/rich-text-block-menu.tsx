@@ -27,7 +27,7 @@ import {
 } from "./rich-text-block-actions"
 import { RICH_TEXT_BASIC_SLASH_ITEMS } from "./rich-text-slash-menu"
 import { useShortcutLabel } from "./rich-text-toolbar"
-import { RefreshCwIcon, CopyIcon, ArrowUpIcon, ArrowDownIcon, Trash2Icon } from "lucide-react"
+import { RefreshCw, Copy, ArrowUp, ArrowDown, Trash2 } from "@/components/icons"
 
 const TURN_INTO_IDS = new Set([
   "text",
@@ -180,7 +180,7 @@ export function RichTextBlockMenuItems({
         {menu.allowed.length ? (
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <RefreshCwIcon aria-hidden="true" />
+              <RefreshCw aria-hidden="true" />
               {t('turnInto')}
             </DropdownMenuSubTrigger>
             <DropdownMenuSubContent>
@@ -211,7 +211,7 @@ export function RichTextBlockMenuItems({
           </DropdownMenuSub>
         ) : null}
         <DropdownMenuItem onClick={() => runOnBlock(duplicateBlock)}>
-          <CopyIcon aria-hidden="true" />
+          <Copy aria-hidden="true" />
           {t('duplicate')}
           <MenuShortcut keys={["mod", "D"]} />
         </DropdownMenuItem>
@@ -219,7 +219,7 @@ export function RichTextBlockMenuItems({
           disabled={!menu.canUp}
           onClick={() => runOnBlock(moveBlockUp)}
         >
-          <ArrowUpIcon aria-hidden="true" />
+          <ArrowUp aria-hidden="true" />
           {t('moveUp')}
           <MenuShortcut keys={["mod", "shift", "↑"]} />
         </DropdownMenuItem>
@@ -227,14 +227,14 @@ export function RichTextBlockMenuItems({
           disabled={!menu.canDown}
           onClick={() => runOnBlock(moveBlockDown)}
         >
-          <ArrowDownIcon aria-hidden="true" />
+          <ArrowDown aria-hidden="true" />
           {t('moveDown')}
           <MenuShortcut keys={["mod", "shift", "↓"]} />
         </DropdownMenuItem>
       </DropdownMenuGroup>
       <DropdownMenuSeparator />
       <DropdownMenuItem variant="destructive" onClick={removeBlock}>
-        <Trash2Icon aria-hidden="true" />
+        <Trash2 aria-hidden="true" />
         {t('delete')}
       </DropdownMenuItem>
     </>

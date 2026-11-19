@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 import { auditBasePath } from './base-path-policy.mjs'
 import { navigationPolicyFiles } from './navigation-policy.mjs'
 const inspect = (source) => auditBasePath('components/example.tsx', source)
-const imports = "import NextLink from 'next/link'; import {withBasePath,BASE_PATH} from '@/lib/base-path';"
+const imports = "import NextLink from '@/lib/client-runtime/link'; import {withBasePath,BASE_PATH} from '@/lib/base-path';"
 
 test('framework links reject prefixed literals, helper calls and values passed through variables', () => {
   for (const code of [
@@ -21,7 +21,7 @@ test('framework links reject prefixed literals, helper calls and values passed t
 test('aliased Next and localized links cannot bypass the check', () => {
   assert.equal(
     inspect(
-      "import RouteLink from 'next/link'; import {withBasePath as prefix} from '@/lib/base-path'; const url=prefix('/api/file'); <RouteLink href={url}/>",
+      "import RouteLink from '@/lib/client-runtime/link'; import {withBasePath as prefix} from '@/lib/base-path'; const url=prefix('/api/file'); <RouteLink href={url}/>",
     ).length,
     1,
   )
@@ -33,7 +33,7 @@ test('aliased Next and localized links cannot bypass the check', () => {
 })
 test('router and redirect targets follow the same single-prefix rule', () => {
   const code =
-    "import {useRouter,redirect as go} from 'next/navigation'; import {withBasePath} from '@/lib/base-path'; const router=useRouter(); router.push(withBasePath('/settings')); router.replace('/mikka/settings'); go(withBasePath('/sign-in'));"
+    "import {useRouter,redirect as go} from '@/lib/client-runtime/navigation'; import {withBasePath} from '@/lib/base-path'; const router=useRouter(); router.push(withBasePath('/settings')); router.replace('/mikka/settings'); go(withBasePath('/sign-in'));"
   assert.equal(inspect(code).length, 3)
 })
 test('normal routes, native href/fetch, absolute URLs, comments and shadowed variables stay legal', () => {

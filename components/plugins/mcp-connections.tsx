@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import useSWR, { type SWRResponse } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { Plus, Trash2, UserRound } from 'lucide-react'
+import { Plus, Trash2, UserRound } from '@/components/icons'
 import { withBasePath } from '@/lib/base-path'
 import { settingsKeys } from '@/lib/swr/keys'
 import { ReadResponseError } from '@/lib/swr/retry'
@@ -133,7 +133,7 @@ export function McpConnections({ workspaceId, workspaceName, read }: {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{commonT('cancel')}</AlertDialogCancel>
-          <AlertDialogAction disabled={pending || Boolean(read.error)} onClick={() => { if (sharing) void share(sharing, true) }}>{t('confirmShare')}</AlertDialogAction>
+          <AlertDialogAction variant="default" disabled={pending || Boolean(read.error)} onClick={() => { if (sharing) void share(sharing, true) }}>{t('confirmShare')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -171,7 +171,7 @@ function McpToolList({ server, disabled }: { server: McpWorkspaceServerView; dis
     <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) latestRead.current++ }}>
       <DialogContent>
         <DialogHeader><DialogTitle>{t('serverTools', { name: server.name })}</DialogTitle></DialogHeader>
-        {state === 'loading' && <SettingsLoading label={t('loadingTools')} rows={1} />}
+        {state === 'loading' && <SettingsLoading label={t('loadingTools')} rows={1} bare />}
         {state === 'error' && <SettingsSaveError message={t('toolsFailed')} retryLabel={t('checkAgain')} onRetry={() => void read(cursor)} />}
         {state === 'ready' && page && <>
           {page.tools.length ? <ul className="max-h-64 overflow-y-auto text-sm">
@@ -242,8 +242,8 @@ function McpServerForm({ pending, onCancel, onCreate }: { pending: boolean; onCa
       <Field>
         <FieldLabel>{t(stdio ? 'variables' : 'headers')}</FieldLabel>
         {draft.values.map((row, index) => <div className="flex items-center gap-2" key={index}>
-          <Input aria-label={t('variableName', { index: index + 1 })} maxLength={128} required autoCapitalize="off" spellCheck={false} disabled={pending} value={row.name} onChange={event => changeValue(index, 'name', event.target.value)} />
-          <Input aria-label={t('variableValue', { index: index + 1 })} type="password" autoComplete="new-password" maxLength={4096} required disabled={pending} value={row.value} onChange={event => changeValue(index, 'value', event.target.value)} />
+          <Input className="h-(--control-sm)" aria-label={t('variableName', { index: index + 1 })} maxLength={128} required autoCapitalize="off" spellCheck={false} disabled={pending} value={row.name} onChange={event => changeValue(index, 'name', event.target.value)} />
+          <Input className="h-(--control-sm)" aria-label={t('variableValue', { index: index + 1 })} type="password" autoComplete="new-password" maxLength={4096} required disabled={pending} value={row.value} onChange={event => changeValue(index, 'value', event.target.value)} />
           <Button type="button" size="icon-sm" variant="ghost" disabled={pending} aria-label={t('removeVariable', { index: index + 1 })} onClick={() => change('values', draft.values.filter((_, i) => i !== index))}><Trash2 aria-hidden="true" /></Button>
         </div>)}
         <Button type="button" size="sm" variant="secondary" className="self-start" disabled={pending || draft.values.length >= 32} onClick={() => change('values', [...draft.values, { name: '', value: '' }])}><Plus data-icon="inline-start" aria-hidden="true" />{t(stdio ? 'addVariable' : 'addHeader')}</Button>

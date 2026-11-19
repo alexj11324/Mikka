@@ -1,6 +1,6 @@
-import messages from '../../../messages/zh-CN.json'
+import { mobileMessages } from './messages'
 
-const RUN_ERRORS = messages.RunErrors as Record<string, Record<string, string> & { default: string }>
+const RUN_ERRORS = mobileMessages.RunErrors as Record<string, Record<string, string> & { default: string }>
 
 /**
  * A run's stored error as a person reads it (decision 2026-11-05-0330): the stored error leads with `code (detail)`;

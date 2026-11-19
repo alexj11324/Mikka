@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
+import { SpanKind, context as traceContext, trace } from '@opentelemetry/api'
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
 import { Pool } from 'pg'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedRun, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { measured, readMetrics } from './helpers/read-metrics'
 
-type ReadOptions = { bearer?: string | null; workspaceId?: string | null; cookie?: string }
+type ReadOptions = { bearer?: string | null; workspaceId?: string | null; cookie?: string; headers?: Record<string, string> }
 
 const sqlState = (error: unknown): string | undefined => {
   if (!error || typeof error !== 'object') return undefined
@@ -114,6 +116,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     const req = new Request(origin + '/mikka' + path, { headers: {
       'x-mikka-locale': 'en', ...(bearer ? { authorization: 'Bearer ' + bearer } : {}),
       ...(selection ? { 'x-mikka-workspace-id': selection } : {}), ...(options.cookie ? { cookie: options.cookie } : {}),
+      ...options.headers,
     } })
     const scope = context.createRequestScope(req)
     try { return await context.runRequestScope(scope, () => handler(req)) }
@@ -446,6 +449,60 @@ test('mobile task endpoints with real task ACL, current workspace membership and
     assert.equal(closed.tasks.find((item: { id: string }) => item.id === issueId).group, 'done')
     assert.equal((await (await request(issueId)).json()).task.group, 'done')
   })
+  await t.test('one versioned list response includes canonical state and keeps the selected workspace boundary', async () => {
+    const path = '/api/mobile/tasks?presentation=1'
+    const response = await run(path, list, teamSelection)
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    assert.equal(body.presentationVersion, 1)
+    assert.equal(body.workspaceId, teamWorkspace.id)
+    assert.equal(body.next, null)
+    const visible = body.tasks.find((item: { id: string }) => item.id === issueId)
+    assert.deepEqual([visible.status, visible.group, visible.bot.id], ['done', 'done', bot])
+    assert.ok(body.tasks.every((item: { id: string }) => item.id !== secondTask && item.id !== personalTask))
+    const first = body.tasks[0]
+    const cursor = new URLSearchParams({ workspaceId: teamWorkspace.id, after: first.id, updatedAt: first.updatedAt })
+    const continuation = await run(path + '&' + cursor, list, teamSelection)
+    assert.equal(continuation.status, 200)
+    assert.deepEqual(await continuation.json(), { ...body, tasks: body.tasks.slice(1) })
+    assert.equal((await run(path, list, { bearer: peer.token, workspaceId: secondWorkspace.id })).status, 403)
+    assert.equal((await (await listRequest(teamSelection)).json()).presentationVersion, undefined)
+  })
+  await t.test('a recovered native read exports only the validated past failure in a retained error span', async () => {
+    const { createTracerProvider, SafeExporter } = await import('../lib/tracing/node')
+    const memory = new InMemorySpanExporter()
+    const provider = createTracerProvider({ exporter: new SafeExporter(memory), sampleRate: 0.000001, environment: 'dev' })
+    provider.register()
+    try {
+      const failedTraceId = '6abe308341a942df9b952484f9179a9b'
+      const report = { stage: 'list', reason: 'timeout', traceId: failedTraceId }
+      const path = '/api/mobile/tasks?presentation=1'
+      const send = (value: unknown, bearer?: string | null) => provider.getTracer('mobile-test').startActiveSpan('GET /api/mobile/tasks', { kind: SpanKind.SERVER }, async span => {
+        try {
+          return await run(path, list, { ...teamSelection, bearer, headers: {
+            'x-mikka-client-kind': 'mobile', 'x-mikka-app-version': '1.0.0',
+            'x-mikka-task-refresh-failure': JSON.stringify(value),
+          } })
+        } finally { span.end() }
+      })
+      assert.equal((await send(report)).status, 200)
+      assert.equal((await send({ ...report, error: 'private response text' })).status, 200)
+      assert.equal((await send(report, null)).status, 401)
+      await provider.forceFlush()
+      const failures = memory.getFinishedSpans().filter(span => span.name === 'mobile.tasks.refresh.failure')
+      assert.equal(failures.length, 1)
+      const { attributes } = failures[0]!
+      assert.equal(attributes['mikka.task_refresh.client_stage'], 'list')
+      assert.equal(attributes['mikka.task_refresh.reason'], 'timeout')
+      assert.equal(attributes['mikka.task_refresh.failed_trace_id'], failedTraceId)
+      assert.equal(attributes['mikka.app.version'], '1.0.0')
+      assert.doesNotMatch(JSON.stringify(attributes), /private response text/)
+    } finally {
+      await provider.shutdown()
+      trace.disable()
+      traceContext.disable()
+    }
+  })
   await t.test('without a thread, flags and dependencies preserve todo with matching reasons and visible identifiers', async () => {
     await pool.query(`update user_schedules set status='cancelled',next_at=null where id=$1`, [schedule])
     try {
@@ -565,7 +622,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       for (const value of [task, row]) assert.deepEqual([value.state, value.reason], [state, reason])
     }
     await compare('blocked', 'offline')
-    await pool.query('update devices set "lastSeenAt"=now() where id=$1', [device])
+    await pool.query('update devices set "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL where id=$1', [device])
     await compare('queued', null)
     await pool.query('update devices set enabled=false where id=$1', [device])
     await compare('blocked', 'offline')

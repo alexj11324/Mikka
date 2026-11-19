@@ -38,7 +38,7 @@ mock.module('swr', { defaultExport: (key: string | null) => {
   if (key.includes('view=ledger')) return { data: ledger, mutate: async () => { ledgerReloads++; if (refreshFails) throw new Error('ledger unavailable'); return ledger } }
   if (key.includes('/approval')) return { data: evidence }
   return list
-}, namedExports: { useSWRConfig: () => ({ cache, mutate: async (key: string) => {
+}, namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key), useSWRConfig: () => ({ cache, mutate: async (key: string) => {
   listReloadKeys.push(key)
   if (refreshFails) throw new Error('list unavailable')
   return list?.data

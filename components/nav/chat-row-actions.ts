@@ -18,11 +18,11 @@ export function chatPlace(target: ChatTarget): Partial<WorkspaceLocation> | null
   return null
 }
 
-/** A sidebar thread row's place: a Bot's conversation opens as its group page, a run as the thread beside the centre, a task with no run as the task. */
+/** A sidebar thread row's place: a group opens its chat, a run opens the main conversation, and a task with no run opens the task. */
 export function threadPlace(work: { kind?: 'run' | 'chat'; id: string; issueId: string | null; runs: readonly { id: string }[] }): Partial<WorkspaceLocation> {
   if (work.kind === 'chat') return { section: 'group', group: work.id }
   if (!work.kind && work.issueId === work.id && !work.runs.length) return { task: work.issueId }
-  return { thread: work.kind ? work.id : work.runs[0]?.id ?? work.id }
+  return { section: 'coordinator', mainThread: work.kind ? work.id : work.runs[0]?.id ?? work.id }
 }
 
 /** The address of a place in this app, as a link to copy or open. */

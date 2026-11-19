@@ -3,16 +3,16 @@
 import { useState, type ReactNode } from 'react'
 import Link from '@/lib/client-runtime/link'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from 'lucide-react'
+import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from '@/components/icons'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'
-import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { FieldError, FieldLegend, FieldSet } from '@/components/ui/field'
+import { FieldLegend, FieldSet } from '@/components/ui/field'
 import { Label } from '@/components/ui/label'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { E2BKeyDialog } from '@/components/settings/e2b-key-dialog'
@@ -47,8 +47,8 @@ export function ModelOrderSettings({ workspaceId }: { workspaceId: string }) {
   const [keyOpen, setKeyOpen] = useState(false)
   const keyDialog = usePresence(keyOpen)
 
-  if (loadError) return <FieldError>{loadError}</FieldError>
-  if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><p role="status" className="px-5 py-4 text-sm text-muted-foreground">{t('loading')}</p></SettingsSection>
+  if (loadError) return <SettingsSection id="model-order-heading" title={t('title')}><SettingsSaveError message={loadError} retryLabel={commonT('retry')} onRetry={() => { void reload() }} /></SettingsSection>
+  if (!data) return <SettingsSection id="model-order-heading" title={t('title')}><SettingsLoading label={t('loading')} rows={2} bare /></SettingsSection>
 
   // The order each location tries (decision 2026-11-02-2330) is drawn as a chain, not a sentence (Alex, 2026-11-06).
   const noKey = data.location === 'cloud' && e2b.configured === false

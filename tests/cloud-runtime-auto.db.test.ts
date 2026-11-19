@@ -55,7 +55,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
   botRuntimeProvisioner.provision = async (appDb: PgPool, actor: { userId: string; workspaceId: string }, botId: string) => {
     provisioned++
     const deviceId = randomUUID(), sandboxId = `sbx-${randomUUID()}`
-    await appDb.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt") VALUES ($1,$2,'Cloud computer','cloud',true,$3,now())`, [deviceId, actor.userId, JSON.stringify(harnesses)])
+    await appDb.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt","sessionOpenedAt") VALUES ($1,$2,'Cloud computer','cloud',true,$3,now(),now())`, [deviceId, actor.userId, JSON.stringify(harnesses)])
     await appDb.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId","sandboxId","deviceId",state,"runtimeReady") VALUES ($1,$2,$3,$4,$5,'running',true)`, [actor.workspaceId, actor.userId, randomUUID(), sandboxId, deviceId])
     await appDb.query(`INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)`, [botId, actor.workspaceId, actor.userId])
     const sandbox = { sandboxId, commands: { run: async () => ({ stdout: '', stderr: '', exitCode: 0 }) } }
@@ -249,7 +249,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     const beforeProvisioned = provisioned
     for (const [index, state] of ['sleeping', 'running'].entries()) {
       await pool.query('UPDATE cloud_machines SET state=$2 WHERE "ownerId"=$1', [a.id, state])
-      await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes' WHERE id=$1`, [parent.deviceId])
+      await pool.query(`UPDATE devices SET "lastSeenAt"=now()-interval '2 minutes',"sessionClosedAt"=clock_timestamp() WHERE id=$1`, [parent.deviceId])
       const parentState = async () => (await pool.query(`SELECT row_to_json(m) AS machine,row_to_json(d) AS device FROM cloud_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."ownerId"=$1 AND m."workspaceId"=$2`, [a.id, a.workspaceId])).rows[0]
       const before = await parentState()
       assert.ok(await ensureBotCloudRuntime(pool, { userId: a.id, workspaceId: a.workspaceId }, a.botId, { harness: 'codex' }, wake))
@@ -435,7 +435,7 @@ test('cloud runs: the bot runtime is created on dispatch, once; the kill switch 
     assert.equal(await count('SELECT count(*)::int AS n FROM bot_cloud_runtimes WHERE "botId"=$1', [n.botId]), 0)
     // 运行位置 云端 (the default) with no key, and their own server online (参与调度 on), its Codex reporting gpt-5: it takes the run.
     const server = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Server','local','server',true,now(),$3)`, [server, n.id, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }])])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Server','local','server',true,now(),$3,now())`, [server, n.id, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }])])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), n.id, server, `codex-${server.slice(0, 8)}`])
     const queued = await dispatch(n.id, n.issueId, n.botId) as unknown as { runId: string; status: string }
     assert.equal(queued.status, 'queued')

@@ -4,8 +4,10 @@ import { EGRESS_MAX_REQUEST_BYTES, executeEgressRequest, type EgressHttpRequest 
 const MAX_ENVELOPE = Math.ceil(EGRESS_MAX_REQUEST_BYTES / 3) * 4 + 128 * 1024
 const responseHeaders = { 'content-type': 'application/json', 'cache-control': 'private, no-store' }
 
-/** Capability-authenticated data plane: intentionally no database, session,
- * device authorization RPC or control-plane middleware imports. */
+/** Capability-authenticated data plane: no session, device authorization RPC
+ * or control-plane middleware. The application route injects its one database
+ * read, the live-run check at use (lib/secrets/egress-binding.ts, decision
+ * 2026-11-17-2215); without it `execute` refuses every request. */
 export async function taskSecretEgressResponse(request: Request, runId: string,
   execute: typeof executeEgressRequest = executeEgressRequest): Promise<Response> {
   const refuse = (detail: string, status: number) => new Response(JSON.stringify({ code: 'task_secret_unavailable', detail }), { status, headers: responseHeaders })

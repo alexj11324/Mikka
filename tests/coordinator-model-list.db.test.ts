@@ -62,12 +62,12 @@ test('allowed models: every entry in every Bot\'s cached prompt, and a model out
   await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
   // A computer whose Codex reported fx-codex-a and fx-codex-b.
   const deviceId = randomUUID()
-  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Fixture Mac','local','laptop',true,now(),$3)`,
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Fixture Mac','local','laptop',true,now(),$3,now())`,
     [deviceId, userId, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: true, modelSlots: [{ slot: 'a', model: 'fx-codex-a', name: 'A' }, { slot: 'b', model: 'fx-codex-b', name: 'B' }] }])])
   await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, deviceId, `codex-${deviceId.slice(0, 8)}`])
   // A legacy computer without subscription injection still needs an update.
   const oldId = randomUUID()
-  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"createdAt") VALUES ($1,$2,'Old Mac','local','laptop',true,now(),$3,now()-interval '1 day')`,
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"createdAt","sessionOpenedAt") VALUES ($1,$2,'Old Mac','local','laptop',true,now(),$3,now()-interval '1 day',now())`,
     [oldId, userId, JSON.stringify([{ harness: 'codex', installed: true, subscriptionBroker: false }])])
   await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [randomUUID(), userId, oldId, `codex-${oldId.slice(0, 8)}`])
   const listed = (await order.readOrder(pool, scope)).entries.map(entry => `${entry.harness}:${entry.model}`)
@@ -164,7 +164,7 @@ test('an untouched list keeps each Agent\'s default order over connected models,
   }
   const computer = async (ownerId: string, name: string, harnesses: object[]) => {
     const id = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,$3,'local','laptop',true,now(),$4)`, [id, ownerId, name, JSON.stringify(harnesses)])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,$3,'local','laptop',true,now(),$4,now())`, [id, ownerId, name, JSON.stringify(harnesses)])
     for (const info of harnesses as { harness: string }[]) await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)`, [randomUUID(), ownerId, id, info.harness, `${info.harness}-${id.slice(0, 8)}`])
     return id
   }

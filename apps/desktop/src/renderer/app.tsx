@@ -1,7 +1,7 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { IntlProvider, useTranslations } from '@/lib/intl/i18n-client'
 import { SWRConfig } from 'swr'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft } from '@/components/icons'
 import { toast } from 'sonner'
 import en from '@/messages/en.json'
 import zh from '@/messages/zh-CN.json'

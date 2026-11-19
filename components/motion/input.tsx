@@ -130,7 +130,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
                 : "idle"
         }
         className={cn(
-          "relative h-11 overflow-hidden rounded-full border transition-colors duration-200",
+          "relative h-11 overflow-hidden rounded-full border transition-colors duration-(--motion-base)",
           "border-border",
           focused && !hasError && "border-foreground/40 ring-2 ring-ring/40",
           hasError && "border-destructive ring-2 ring-destructive/25",
@@ -169,7 +169,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           }}
           className={cn(
             "peer h-full w-full bg-transparent text-base leading-6 text-foreground caret-foreground outline-none",
-            "placeholder:text-muted-foreground/60",
+            "placeholder:text-tertiary",
             leftIcon ? "pl-10" : "pl-3.5",
             rightSlot || success ? "pr-10" : "pr-3.5",
             disabled && "cursor-not-allowed",

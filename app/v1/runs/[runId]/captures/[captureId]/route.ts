@@ -22,9 +22,24 @@ async function handlePUT(request: Request, { params }: { params: Promise<{ runId
   if (!z.uuid().safeParse(captureId).success) return captureJson({ error: 'Unknown capture.' }, 404)
   const declared = Number(request.headers.get('content-length'))
   if (Number.isFinite(declared) && declared > INLINE_UPLOAD_MAX_BYTES) return captureJson({ error: 'Too large.' }, 413)
-  const bytes = new Uint8Array(await request.arrayBuffer())
-  if (bytes.length > INLINE_UPLOAD_MAX_BYTES) return captureJson({ error: 'Too large.' }, 413)
-  const result = await receiveUpload(found.owner, captureId, bytes)
+  // Read into one buffer of the fixed limit: a missing or wrong content-length
+  // must not let the body buffer past it, and an attacker-chosen chunk
+  // granularity (millions of one-byte reads) must not grow a parts array far
+  // past the byte limit. The shape is lib/coding-workspace/http.ts's reader.
+  const reader = request.body?.getReader()
+  if (!reader) return captureJson({ error: 'Unreadable body.' }, 400)
+  const body = Buffer.allocUnsafe(INLINE_UPLOAD_MAX_BYTES)
+  let size = 0
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      if (size + value.byteLength > INLINE_UPLOAD_MAX_BYTES) { await reader.cancel(); return captureJson({ error: 'Too large.' }, 413) }
+      body.set(value, size)
+      size += value.byteLength
+    }
+  } finally { reader.releaseLock() }
+  const result = await receiveUpload(found.owner, captureId, body.subarray(0, size))
   return 'error' in result ? captureFailure(result) : new Response(null, { status: 204 })
 }
 

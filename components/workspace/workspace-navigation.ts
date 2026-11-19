@@ -69,6 +69,8 @@ export type WorkspaceLocation = {
   project: string | null
   /** The task open in the centre. */
   issue: string | null
+  /** The run open as the main conversation from the Bot sidebar. */
+  mainThread?: string | null
   /** The task open in the right column, beside whatever is in the centre (decision 2026-11-07-2045): a thread opened from it sits over it, and ← comes back to it. */
   task: string | null
   /** The thread (its run id) open in the right column, beside whatever is in the centre (R-82). */
@@ -84,9 +86,9 @@ const TEAM_SECTIONS: readonly string[] = ['team-home', 'team-issues', 'team-proj
 /** Pages that can show one project. */
 const PROJECT_SECTIONS: readonly string[] = ['projects', 'team-projects'] satisfies readonly WorkspaceSection[]
 /** Keys this file owns besides `section`, in the order a new address writes them. */
-const PLACE_KEYS = ['bot','directoryBot', 'group', 'session', 'team', 'project', 'issue', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const PLACE_KEYS = ['bot','directoryBot', 'group', 'session', 'team', 'project', 'issue', 'mainThread', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
 /** What is in the centre; the thread sits beside it and the Artifact window over it. */
-const CENTRE_KEYS = ['section', 'bot','directoryBot', 'group', 'session', 'team', 'project', 'issue'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const CENTRE_KEYS = ['section', 'bot','directoryBot', 'group', 'session', 'team', 'project', 'issue', 'mainThread'] as const satisfies readonly (keyof WorkspaceLocation)[]
 
 /** A team page without a team is the workspace-wide page it would scope. */
 export function sectionFor(section: WorkspaceSection, team: string | null): WorkspaceSection {
@@ -110,6 +112,7 @@ export function readLocation(params: URLSearchParams): WorkspaceLocation {
     team: TEAM_SECTIONS.includes(section) ? team : null,
     project: PROJECT_SECTIONS.includes(section) ? id('project') : null,
     issue: id('issue'),
+    ...(section === 'coordinator' && !id('issue') && id('mainThread') ? { mainThread: id('mainThread') } : {}),
     task: id('task'),
     thread: id('thread'),
     artifact: id('artifact'),
@@ -147,6 +150,7 @@ function buildHref(current: URL, change: Partial<WorkspaceLocation>, nameCoordin
   if (next.section !== 'agent') next.session = null
   if (!TEAM_SECTIONS.includes(next.section)) next.team = null
   if (!PROJECT_SECTIONS.includes(next.section)) next.project = null
+  if (next.section !== 'coordinator' || next.issue || (next.bot !== before.bot && !('mainThread' in change))) next.mainThread = null
   const centreMoved = CENTRE_KEYS.some(key => next[key] !== before[key])
   // A thread sits beside the centre it was opened from; a new centre closes it unless the move names one.
   if (centreMoved && !('thread' in change)) next.thread = null
@@ -387,7 +391,7 @@ export function openSectionPage(section: WorkspaceSection) {
  * A chat's work area (the hosted chat, FRAME_OWNS_PANEL; decision 2026-11-10), while that chat is on screen: a task or
  * a thread opened from anywhere on the page opens as one of its tabs instead of a right column beside the chat.
  */
-export type WorkAreaOpener = { task: (issueId: string) => void; thread: (runId: string) => void }
+export type WorkAreaOpener = { task: (issueId: string) => void; thread: (runId: string, issueId?: string | null, name?: string) => void }
 let workArea: WorkAreaOpener | null = null
 
 /** The chat on screen hands over its work area; the returned function takes it back (on unmount). */
@@ -415,8 +419,13 @@ export function rememberMobileTask(task: { server: string; ref: string; target: 
 }
 
 /** Opens a thread in the right column beside what is in the centre (R-82), or in the chat's work area (setWorkAreaOpener). */
-export function openThread(runId: string) {
-  if (toWorkArea({ thread: runId })) return
+export function openThread(runId: string, issueId?: string | null, name?: string) {
+  const current = readLocation(new URL(window.location.href).searchParams)
+  if (current.mainThread === runId) {
+    if (current.thread) closeThread()
+    return
+  }
+  if (workArea) { workArea.thread(runId, issueId, name); return }
   const from = here()
   goTo({ thread: runId })
   // Remembers where it came from, so ← steps back to that list as the browser's back does.

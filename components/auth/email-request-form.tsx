@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { ArrowRightIcon, MailIcon } from 'lucide-react'
+import { ArrowRight, Mail } from '@/components/icons'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { AuthCard } from '@/components/blocks/auth-19/components/auth-card'
 import { Button } from '@/components/ui/button'
@@ -60,7 +60,7 @@ export function EmailRequestForm({ title, description, submitLabel, send, turnst
           <Field data-disabled={pending} className="gap-2">
             <FieldLabel htmlFor="email">{t('email')}</FieldLabel>
             <InputGroup>
-              <InputGroupAddon><MailIcon aria-hidden="true" /></InputGroupAddon>
+              <InputGroupAddon><Mail aria-hidden="true" /></InputGroupAddon>
               <InputGroupInput id="email" name="email" type="email" autoComplete="email" placeholder="you@example.com" required disabled={pending} />
             </InputGroup>
           </Field>
@@ -68,7 +68,7 @@ export function EmailRequestForm({ title, description, submitLabel, send, turnst
         {turnstile && <Turnstile ref={widget} onToken={setToken} />}
         <Button type="submit" variant={processed ? 'outline' : 'default'} className="w-full" disabled={pending || cooldown > 0}>
           {cooldown > 0 ? t('retryIn', { seconds: cooldown }) : processed ? t('resendLink') : submitLabel}
-          {pending ? <Spinner data-icon="inline-end" /> : !processed && cooldown === 0 && <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />}
+          {pending ? <Spinner data-icon="inline-end" /> : !processed && cooldown === 0 && <ArrowRight aria-hidden="true" data-icon="inline-end" />}
         </Button>
       </form>
       <p className="text-muted-foreground text-center text-xs">

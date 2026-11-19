@@ -3,8 +3,7 @@ import { useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ChevronDown, ChevronRight } from 'lucide-react-native'
-import { Spinner } from '@/components/icons'
+import { ChevronDown, ChevronRight, ListTodo } from 'lucide-react-native'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Text } from '@/components/Text'
 import { underBar } from '@/components/NavBar'
@@ -21,6 +20,7 @@ import { tasksLive } from '@/lib/live-keys'
 import { useHome } from '@/lib/home'
 import { tap } from '@/lib/haptics'
 import { colors, LIST_INSET, ROW_SURFACE_INSET, SPACE } from '@/lib/theme'
+import { EmptyState, ListLoading } from '@/shared/components/empty-state'
 import { rowState, taskListRows, type TaskFilter, type TaskListRow } from '../model/task-groups'
 import { readPresentedTasks } from '../model/task-presentation-read'
 import { BOARD_LABEL, GROUP_LABEL, STATE_LABEL, TaskGroupIcon, TaskStateIcon } from './task-icons'
@@ -81,7 +81,7 @@ export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFi
       contentContainerStyle={{ paddingBottom: insets.bottom + bottom }}
       ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />}
       ListFooterComponent={<TaskListContinuation paging={paging} />}
-      ListEmptyComponent={loading && !data ? <View style={styles.center}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>{mobileMessages.MobileCore.noTasks}</Text>}
+      ListEmptyComponent={loading && !data ? <ListLoading /> : error ? undefined : <EmptyState icon={<ListTodo size={20} color={colors.secondary} strokeWidth={1.8} />} title={mobileMessages.MobileCore.noTasks} />}
       renderItem={({ item }) => item.kind === 'section'
         ? <TaskGroupBar id={item.id} count={item.count} folded={item.folded} onToggle={() => toggle(item.id)} />
         : <TaskRowView task={item.task} />}
@@ -143,7 +143,6 @@ export function TaskRowView({ task }: { task: Task }) {
  * the first row's padding alone (about 12–15 pt) under the bar. */
 const styles = StyleSheet.create({
   center: { paddingTop: 40, alignItems: 'center' },
-  empty: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
   bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, marginHorizontal: ROW_SURFACE_INSET, marginTop: SPACE.section - SPACE.rowY, marginBottom: 0, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
   barTitle: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.secondary },
   barCount: { fontSize: 15, lineHeight: 20, color: colors.secondary, fontVariant: ['tabular-nums'] },

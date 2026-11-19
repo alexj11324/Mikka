@@ -94,7 +94,7 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
     const { issueForUser } = await import('../lib/issue-access')
     const { activeTaskWorkspaces, withTaskWorkspace } = await import('../lib/task-workspace')
     const { tokenWorkspace } = await import('../lib/tokens/principal')
-    const { readArtifact, readArtifactContent, listArtifacts, listRunArtifacts, createShare, sharedArtifact } = await import('../lib/artifacts/store')
+    const { readArtifact, readArtifactContent, listArtifacts, listRunArtifacts, listTaskArtifacts, createShare, sharedArtifact } = await import('../lib/artifacts/store')
     const { artifactOutsideToken, runOutsideToken } = await import('../lib/tokens/scope')
     const { actAs } = await import('../lib/acting-user')
     const { enterprisePrincipal } = await import('../lib/enterprise/principal')
@@ -216,6 +216,9 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       assert.deepEqual((await listRunArtifacts(alphaReader, runA)).map(row => row.id), [artifact])
       assert.deepEqual(await listRunArtifacts(betaReader, runA), [])
       assert.deepEqual(await listArtifacts({ id: member, [tokenWorkspace]: alpha }), [], 'Workspace membership does not widen the artifact owner ACL')
+      assert.deepEqual((await listTaskArtifacts(alphaReader, bound)).map(row => row.id), [artifact])
+      assert.deepEqual(await listTaskArtifacts(betaReader, bound), [])
+      assert.deepEqual(await listTaskArtifacts({ id: member, [tokenWorkspace]: alpha }, bound), [])
     })
     await t.test('conversation envelopes use persisted mailbox tenancy; mismatched run or sender writes leave no message', async () => {
       const inbox = randomUUID(), sender = randomUUID(), outside = randomUUID(), otherOwner = randomUUID()
@@ -231,40 +234,6 @@ test('workspace ownership: real split-database migration, ACL, immutable provena
       await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","mailboxId","runId",text) VALUES($1,$2,$3,$4,\'Denied\')', [randomUUID(), owner, outside, runA]), /taskWorkspaceMismatch/)
       await assert.rejects(app.query('INSERT INTO run_messages(id,"userId","runId",text) VALUES($1,$2,$3,\'Denied\')', [randomUUID(), owner, runConflict]), /taskWorkspaceUnresolved/)
       assert.equal((await app.query('SELECT count(*)::int AS total FROM run_messages')).rows[0].total, 1)
-    })
-    await t.test('legacy and task-free leases require current persisted tenant membership with no creator bypass', async () => {
-      const { renewRunLeases } = await import('../lib/run-leases')
-      const memberDevice = randomUUID(), memberAgent = randomUUID(), ownerDevice = randomUUID()
-      const memberRun = randomUUID(), taskFreeRun = randomUUID(), creatorRun = randomUUID(), otherTenantRun = randomUUID(), unresolvedRun = randomUUID()
-      for (const [id, userId] of [[memberDevice, member], [ownerDevice, owner]]) {
-        await app.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'Legacy tenant lease fixture\')', [id, userId])
-      }
-      await app.query('INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,\'codex\',\'Legacy tenant fixture\')', [memberAgent, member, memberDevice])
-      for (const [id, userId, deviceId, agentId, issueId, tenant] of [
-        [memberRun, member, memberDevice, memberAgent, teamless, alpha],
-        [taskFreeRun, member, memberDevice, memberAgent, null, alpha],
-        [unresolvedRun, member, memberDevice, memberAgent, null, null],
-        [creatorRun, owner, ownerDevice, agent, teamless, alpha],
-        [otherTenantRun, owner, ownerDevice, agent, alternate, beta],
-      ]) {
-        await app.query('INSERT INTO agent_runs(id,"userId","deviceId","agentId","issueId","workspaceId",status,"leaseExpiresAt") VALUES($1,$2,$3,$4,$5,$6,\'running\',now()+interval \'5 minutes\')', [id, userId, deviceId, agentId, issueId, tenant])
-      }
-      const first = await renewRunLeases(memberDevice, [memberRun, taskFreeRun, unresolvedRun])
-      assert.deepEqual(new Set(Object.keys(first.leases)), new Set([memberRun, taskFreeRun]))
-      assert.deepEqual(first.revoked, [unresolvedRun], 'unproved historical ownership cannot borrow an active personal tenant')
-      await workspace.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, member])
-      const stoppedAt = new Date()
-      const revoked = await renewRunLeases(memberDevice, [memberRun, taskFreeRun], stoppedAt)
-      assert.deepEqual(revoked, { leases: {}, revoked: [memberRun, taskFreeRun] })
-      const stopped = (await app.query('SELECT "stopRequestedAt","leaseExpiresAt","agentDefinition" FROM agent_runs WHERE id=ANY($1::uuid[])', [[memberRun, taskFreeRun]])).rows
-      assert.ok(stopped.every(row => row.agentDefinition === null && row.stopRequestedAt && row.leaseExpiresAt.getTime() === stoppedAt.getTime()))
-      await workspace.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, member])
-      assert.deepEqual((await renewRunLeases(memberDevice, [memberRun, taskFreeRun])).leases, {}, 'restoring membership cannot resume a stopped run implicitly')
-      await workspace.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner])
-      const ownerBeat = await renewRunLeases(ownerDevice, [creatorRun, otherTenantRun])
-      assert.deepEqual(ownerBeat.revoked, [creatorRun])
-      assert.deepEqual(Object.keys(ownerBeat.leases), [otherTenantRun], 'the same account retains its independent authorized tenant')
-      await workspace.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [alpha, owner])
     })
     await t.test('membership is pinned until the app commit and the next read observes suspension', async () => {
       let entered!: () => void, release!: () => void

@@ -4,6 +4,12 @@ import { act, createElement, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 
+// The panel's words come from the catalog (R-42), so the assertions read them back rather
+// than writing the Chinese twice: this suite runs under whatever the device locale is.
+import { mobileMessages } from '../lib/messages.ts'
+const copy = mobileMessages.MobileCore
+const subscriptionCopy = copy.failure
+
 const workspace = 'f778b9a0-ecec-4ade-97a6-b7aa4221a177'
 const opened: string[] = []
 let calls = 0, picks = 0, cloudCalls = 0, reply: () => Promise<unknown> = async () => ({ queued: true })
@@ -34,7 +40,7 @@ const click = async () => { await act(async () => container.querySelector('butto
 
 test('reconnect recovery opens subscription settings for the phone workspace without retrying', async () => {
   await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'subscription', notice: 'reconnect' }, botId: null, onQueued: () => {} })))
-  assert.equal(container.querySelector('button')?.textContent, '模型与订阅')
+  assert.equal(container.querySelector('button')?.textContent, mobileMessages.Coordinator.subscriptionRefusal.open)
   await click()
   assert.deepEqual(opened, [`/settings?section=models&workspace=${workspace}`])
   assert.equal(calls, 0)
@@ -42,7 +48,7 @@ test('reconnect recovery opens subscription settings for the phone workspace wit
 
 test('a rejected model uses the supplied native model menu directly', async () => {
   await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'subscription', notice: 'modelRejected' }, botId: 'fixture-bot', onQueued: () => {}, modelChoice: createElement('button', { onClick: () => { picks++ } }, 'fixture-native-menu') })))
-  assert.match(container.textContent ?? '', /模型请求被拒绝/)
+  assert.ok(container.textContent?.includes(subscriptionCopy.modelRejected))
   await click()
   assert.equal(picks, 1)
   assert.equal(calls, 0)
@@ -51,8 +57,8 @@ test('a rejected model uses the supplied native model menu directly', async () =
 
 test('API balance opens the existing model choice without offering retry or sending a request', async () => {
   await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'failed', reason: 'balance' }, botId: 'fixture-bot', onQueued: () => {}, modelChoice: createElement('button', { onClick: () => { picks++ } }, 'fixture-native-menu') })))
-  assert.match(container.textContent ?? '', /API 余额不足/)
-  assert.doesNotMatch(container.textContent ?? '', /重试|充值|request_id|doStreamStep/)
+  assert.ok(container.textContent?.includes(subscriptionCopy.apiBalance))
+  assert.doesNotMatch(container.textContent ?? '', new RegExp([copy.failure.subRetry, mobileMessages.Settings.cloud.topUp, 'request_id', 'doStreamStep'].join('|')))
   assert.equal(container.querySelectorAll('button').length, 1)
   await click()
   assert.equal(picks, 1)
@@ -67,8 +73,8 @@ test('retry keeps explicit processing feedback and rejects a burst of duplicate 
   await act(async () => { container.querySelector('button')!.click(); container.querySelector('button')!.click() })
   assert.equal(calls, 1)
   await act(async () => finish({ queued: false, reason: 'working' }))
-  assert.match(container.textContent ?? '', /订阅请求受限/)
-  assert.match(container.textContent ?? '', /回复正在处理/)
+  assert.ok(container.textContent?.includes(subscriptionCopy.subRateLimited))
+  assert.ok(container.textContent?.includes(mobileMessages.Coordinator.replyRetry.working))
   assert.doesNotMatch(container.textContent ?? '', /fixture-refresh-failure/)
 })
 
@@ -76,10 +82,10 @@ test('an explicit HTTP refusal is unavailable while lost transport stays unconfi
   reply = async () => { throw new FixtureApiError(403, 'fixture-private-provider-text') }
   await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'failed' }, botId: null, onQueued: () => {} })))
   await click()
-  assert.match(container.textContent ?? '', /回复暂不可重试/)
+  assert.ok(container.textContent?.includes(mobileMessages.Coordinator.replyRetry.unavailable))
   reply = async () => { throw new Error('fixture-private-provider-text') }
   await click()
-  assert.match(container.textContent ?? '', /重试未确认/)
+  assert.ok(container.textContent?.includes(mobileMessages.Coordinator.replyRetry.unconfirmed))
   assert.doesNotMatch(container.textContent ?? '', /fixture-private/)
 })
 
@@ -88,7 +94,7 @@ test('cloud quota offers its own billing action on tap, with no local billing or
   cloudOpen = () => new Promise(resolve => { finish = resolve })
   await act(async () => root.render(createElement(FailedReply, { failure: { kind: 'failed', cloudCode: 'cloud_quota_exhausted' }, botId: null, onQueued: () => {} })))
   assert.equal(container.querySelectorAll('button').length, 1)
-  assert.equal(container.querySelector('button')?.textContent, '去 Mikka Cloud 充值')
+  assert.equal(container.querySelector('button')?.textContent, mobileMessages.Settings.cloud.topUp)
   assert.equal(cloudCalls, 0)
   await act(async () => { container.querySelector('button')!.click(); container.querySelector('button')!.click() })
   assert.equal(cloudCalls, 1)

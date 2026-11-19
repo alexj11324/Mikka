@@ -1,11 +1,11 @@
 'use client'
 
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { Loader2Icon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Item, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { UserAvatar } from '@/components/user-avatar'
+import { Spinner } from '@/components/ui/spinner'
 
 export type SignedInAccount = { name?: string | null; email: string; image?: string | null }
 
@@ -43,7 +43,7 @@ export function DesktopAccountChoice({ account, continueHref, pending, error, on
             {t('continueAs', { name })}
           </Button>
           <Button type="button" variant="outline" className="w-full" disabled={pending} data-testid="desktop-switch-account" onClick={onSwitch}>
-            {pending && <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" />}
+            {pending && <Spinner aria-hidden="true" data-icon="inline-start" />}
             {t('switchAccount')}
           </Button>
         </div>

@@ -1,7 +1,7 @@
 'use client'
 
 // The default model-picker slot (docs/ui-overlay.md): the model chip in a bot's composer, the Coordinator's included.
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, RefreshCw } from '@/components/icons'
 import { Link } from '@/i18n/navigation'
 import { settingsHref } from '@/lib/settings-sections'
 import { Button } from '@/components/ui/button'

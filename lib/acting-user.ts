@@ -8,6 +8,7 @@ import { actingContext, type ActivityActor } from '@/lib/activity-actor'
 import { getSession } from '@/lib/session'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
+import { ActionFailureError } from '@/lib/action-error'
 
 // Who a server action acts for. Normally the signed-in session; an MCP tool,
 // which has a verified OAuth token instead of a session cookie, runs the same
@@ -48,5 +49,14 @@ export async function currentUser(): Promise<{ id: string; name: string; email: 
   const session = await getSession()
   const user = session ? Object.defineProperty({ ...session.user }, enterprisePrincipal, { value: { kind: 'session', sessionId: session.session.id } }) : null
   noteLogUser(user?.id)
+  return user
+}
+
+/** The acting user, or `authRequired`. The one entry every server action and
+ * route should use: it honours `actAs`, the token's workspace scope and
+ * request-log attribution, none of which a raw `auth.api.getSession` does. */
+export async function requireUser() {
+  const user = await currentUser()
+  if (!user) throw new ActionFailureError('authRequired')
   return user
 }

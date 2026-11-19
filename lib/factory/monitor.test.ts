@@ -261,9 +261,9 @@ test(
       const cached = ownerFixtures.get(owner);
       if (cached) {
         // This helper prepares an explicitly online Harness identity for the
-        // next scenario. Earlier scenarios can outlive the real heartbeat TTL.
+        // next scenario: an earlier scenario may have closed its session.
         const heartbeat = await pool.query(
-          'UPDATE devices SET "lastSeenAt"=clock_timestamp() WHERE id=$1 AND "ownerId"=$2',
+          'UPDATE devices SET "lastSeenAt"=clock_timestamp(),"sessionOpenedAt"=clock_timestamp(),"sessionClosedAt"=NULL WHERE id=$1 AND "ownerId"=$2',
           [cached.deviceId, owner],
         );
         assert.equal(heartbeat.rowCount, 1, "the owned fixture device still exists");
@@ -288,7 +288,7 @@ test(
         [randomUUID(), owner, "fixture-" + owner],
       );
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Local identity fixture',true,now(),'[{"harness":"codex","installed":true}]')`,
+        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt","sessionOpenedAt",harnesses) VALUES ($1,$2,'Local identity fixture',true,now(),now(),'[{"harness":"codex","installed":true}]')`,
         [f.deviceId, owner],
       );
       await pool.query(
@@ -749,28 +749,28 @@ test(
       assert.deepEqual((await pool.query('SELECT "externalTargetVerified","linearIssueId" FROM linear_issue_links WHERE "issueId"=$1', [issueId])).rows[0], { externalTargetVerified: true, linearIssueId });
       assert.equal((await pool.query('SELECT count(*)::int AS n FROM linear_sync_outbox WHERE "issueId"=$1', [issueId])).rows[0].n, 0, "an incoming import must not enqueue itself");
       await t.test(
-        "preparing the online fixture renews an expired heartbeat without changing its authority",
+        "preparing the online fixture reopens a closed session without changing its authority",
         async () => {
           const fixture = await ensureOwner("owner");
-          const stale = await pool.query(
-            `UPDATE devices SET "lastSeenAt"=clock_timestamp()-interval '61 seconds'
+          const closed = await pool.query(
+            `UPDATE devices SET "sessionClosedAt"=clock_timestamp()
              WHERE id=$1 AND "ownerId"=$2
-             RETURNING id,"ownerId",enabled,harnesses,"lastSeenAt"`,
+             RETURNING id,"ownerId",enabled,harnesses,"sessionOpenedAt","sessionClosedAt"`,
             [fixture.deviceId, "owner"],
           );
-          assert.equal(stale.rowCount, 1);
-          assert.equal(isDeviceOnline(stale.rows[0].lastSeenAt), false);
+          assert.equal(closed.rowCount, 1);
+          assert.equal(isDeviceOnline(closed.rows[0]), false);
           assert.equal(await ensureOwner("owner"), fixture);
-          const renewed = await pool.query(
-            'SELECT id,"ownerId",enabled,harnesses,"lastSeenAt" FROM devices WHERE id=$1 AND "ownerId"=$2',
+          const reopened = await pool.query(
+            'SELECT id,"ownerId",enabled,harnesses,"sessionOpenedAt","sessionClosedAt" FROM devices WHERE id=$1 AND "ownerId"=$2',
             [fixture.deviceId, "owner"],
           );
-          assert.equal(renewed.rowCount, 1);
-          const { lastSeenAt: previousHeartbeat, ...previousIdentity } = stale.rows[0];
-          const { lastSeenAt: currentHeartbeat, ...currentIdentity } = renewed.rows[0];
+          assert.equal(reopened.rowCount, 1);
+          const { sessionOpenedAt: previousOpen, sessionClosedAt: _closedAt, ...previousIdentity } = closed.rows[0];
+          const { sessionOpenedAt: currentOpen, sessionClosedAt: _reopened, ...currentIdentity } = reopened.rows[0];
           assert.deepEqual(currentIdentity, previousIdentity);
-          assert.ok(currentHeartbeat.getTime() > previousHeartbeat.getTime());
-          assert.equal(isDeviceOnline(currentHeartbeat), true);
+          assert.ok(currentOpen.getTime() > previousOpen.getTime());
+          assert.equal(isDeviceOnline(reopened.rows[0]), true);
         },
       );
       const first = await toMonitor("owner", issueId);
