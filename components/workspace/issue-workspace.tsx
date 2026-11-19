@@ -324,7 +324,9 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const [section, setSection] = useState<WorkspaceSection>(() => { const at = readLocation(params); return at.team || at.group ? at.section : initialSection })
   // Team Issues has its own authorized first page. Filtering the global first
   // 100 Task rows after pagination can incorrectly show an empty Team.
-  const teamPageKey = section === 'team-issues' && !teamsError && activeTeam ? ['team-issues-page', user.id, listWorkspaceId, activeTeam.id] : null
+  // A stable key keeps `refreshTaskPages` (a useCallback over it) stable too, so the dialogs below can be reused.
+  const teamPageKey = useMemo(() => section === 'team-issues' && !teamsError && activeTeam ? ['team-issues-page', user.id, listWorkspaceId, activeTeam.id] : null,
+    [section, teamsError, activeTeam, user.id, listWorkspaceId])
   const teamFirst = useSWR(teamPageKey, () => listWorkspaceTaskPage({ workspaceId: listWorkspaceId, teamId: activeTeam!.id, after: null }), {
     revalidateOnFocus: false, shouldRetryOnError: false, isPaused: () => listsPaused,
   })
@@ -707,7 +709,9 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     else toast.dismiss(id)
     return () => { toast.dismiss(id) }
   }, [listRetry, error, presentation.error, listErrorMessage, user.id])
-  const filtered = scopedTasks.filter(task => (view === 'all' || (view === 'mine' ? task.ownerId === user.id : view === 'shared' ? task.ownerId !== user.id : view === 'favorites' ? task.metadata.favoriteUserIds.includes(user.id) : view === 'following' ? task.metadata.subscriberUserIds.includes(user.id) : task.status === view)) && `${task.identifier ?? ''} ${task.title}`.toLowerCase().includes(query.trim().toLowerCase()))
+  // The whole list is filtered on every keystroke and every status change; nothing else in a render touches it.
+  const filtered = useMemo(() => scopedTasks.filter(task => (view === 'all' || (view === 'mine' ? task.ownerId === user.id : view === 'shared' ? task.ownerId !== user.id : view === 'favorites' ? task.metadata.favoriteUserIds.includes(user.id) : view === 'following' ? task.metadata.subscriberUserIds.includes(user.id) : task.status === view)) && `${task.identifier ?? ''} ${task.title}`.toLowerCase().includes(query.trim().toLowerCase())),
+    [scopedTasks, view, user.id, query])
 
   const viewTitle = view === 'all' ? t('allIssues') : view === 'mine' ? t('mine') : view === 'shared' ? t('shared') : view === 'favorites' ? t('favorites') : view === 'following' ? t('following') : statusLabel(view)
   const pagerId = pendingSelection !== undefined ? pendingSelection : selected
@@ -787,12 +791,19 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       conversation={activeBot ? { id: activeBot.id, name: activeBot.name, color: activeBot.color, shape: activeBot.shape, kind: 'bot' } : { id: coordinatorBot?.id, name: i18nText('Nav.coordinator'), kind: 'coordinator', updatedAt: botChatSummaries && coordinatorBot ? botChatSummaries.items[coordinatorBot.id]?.at ?? undefined : undefined }} /> },
     { id: 'browser' as const, title: i18nText('Browser.label'), content: <BrowserPane inTab onClose={() => showBrowser('closed')} /> },
   ] } : undefined
-  const savedSessions = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
-  for (const session of liveSessions) savedSessions.set(session.id, { ...session, preview: session.preview ?? savedSessions.get(session.id)?.preview })
-  const conversationSessions = [...savedSessions.values()]
+  // Stable while the live sessions stay put: the dialogs below read this, and a fresh array every render would rebuild them all.
+  const conversationSessions = useMemo(() => {
+    const saved = new Map((agentHistory?.sessions ?? []).map(session => [session.id, session]))
+    for (const session of liveSessions) saved.set(session.id, { ...session, preview: session.preview ?? saved.get(session.id)?.preview })
+    return [...saved.values()]
+  }, [agentHistory, liveSessions])
   const coordinatorSummary = coordinatorBot ? botChatSummaries?.items[coordinatorBot.id] : undefined
   const coordinatorUpdatedAt = coordinatorSummary?.at ?? undefined
-  const dialogs = <>
+  // Eight dialogs are mounted here, most of them closed, and every render used to re-render all of them.
+  // The block is reused unless a value it draws from moves. The handlers it holds (openChat, open, removeBot,
+  // navigateSection, notifyOtherGroupTabs…) are new on every render but read only this component's state, refs and
+  // setters, so every value they read is in the list below and a held one behaves as the current one would.
+  const dialogs = useMemo(() => <>
     {creationScopeReady && <NewTaskDialog readerId={user.id}
       key={JSON.stringify([user.id, listWorkspaceId, section, activeTeam?.id, selectedProject?.id, activeBot?.id])}
       workspaceId={listWorkspaceId} open={creating} initialBotId={activeBot?.id}
@@ -823,7 +834,9 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       onProject={id => { void leave(() => { applySelection(null); move({ ...changeSection('projects'), issue: null, project: id }); setTeamId(null); setProjectId(id) }) }} />}
     {/* One review page for the app (R1), whichever entry opened it; the default slot draws nothing. */}
     {review.taskId && <ReviewPage taskId={review.taskId} onClose={closeReview} />}
-  </>
+  </>, [creationScopeReady, user.id, listWorkspaceId, section, activeTeam?.id, selectedProject?.id, selectedProject?.name, activeBot?.id, activeBotId,
+    creating, typedAhead, refreshTaskPages, boardBusy, teamId, onboardingOpen, onboarding?.computer, bots, creation, reloadGroups, renamingThread, deletingBot,
+    leavingGroup, creatingBot, search.value, search.open, conversationSessions, coordinatorSummary, i18nText, tasks, projects, threads, reviewTarget, review.taskId]) // eslint-disable-line react-hooks/exhaustive-deps -- the callbacks it holds (openChat, open, removeBot, notifyOtherGroupTabs…) read only refs and setters of this component
   // Both Settings entry paths leave through the same mounted workspace shell.
   const leaveSettings = (destination: RailDestination) => {
     closeSettings()
@@ -862,14 +875,23 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const settingsContent = pathname.startsWith('/settings')
     ? <SettingsRouteContent user={user} defaultWorkspaceId={listWorkspaceId} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
     : <SettingsView initialSection={settingsTarget.section} linearNotice={linearNotice} inviteInitially={settingsTarget.invite} user={user} workspaceId={listWorkspaceId} googleEnabled={googleEnabled} onRail={leaveSettings} onSignOut={signOut} signingOut={signingOut} accountError={accountError} />
+  // The frame's two slots. Their own values decide when they change, so a keystroke in a list below does not walk
+  // the rail or the window bar again: React reuses the element and skips that subtree whole.
+  // The handlers they hold read this component's state and refs directly, so the lists below name those reads.
+  // The handlers themselves are new on every render; naming them instead would make both memos miss every time.
+  const windowBar = useMemo(() => FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser('column') } else showBrowser(rightTaken ? 'closed' : 'column') }} /></>} />,
+    [boardBusy, settingsShown, pathname, isConversation, Boolean(groupPanel), rightTaken, panelOpen, threadsView, threadsWaiting, tasksPending, browserShown, i18nText]) // eslint-disable-line react-hooks/exhaustive-deps -- openPanel, searchFromBar, showBrowser and browserFromSettings read exactly these, plus setters and module helpers
+  const railNav = useMemo(() => <IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} onPageIntent={preloadWorkspacePage} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: listWorkspaceId, entries: chatNav, archived: archivedNav, hidden: hiddenNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreation('group'), onNewConversation: () => setCreation('conversation') }} onSearch={searchFromBar} inboxCount={inboxCounts?.count ?? 0} />,
+    [settingsShown, rail, pathname, boardBusy, teamId, listWorkspaceId, chatNav, archivedNav, hiddenNav, user, signingOut, bots, inboxCounts?.count]) // eslint-disable-line react-hooks/exhaustive-deps -- onNavigate, onSettings, onSignOut, onBeforeChange, onSearch and onOpen read exactly these, plus refs, setters and module helpers
+
   // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
   // the default keeps the workspace frame mounted around settings (#1603).
   // Both visual frames share the workspace's pending notes and computer registry.
   return <ConversationReferenceTitles value={referenceTitles}><TaskPresentationsContext value={visiblePresentations}><TaskCardDataProvider key={JSON.stringify([user.id, listWorkspaceId])} ownerId={user.id} workspaceId={listWorkspaceId}><SignOutBoundary pending={signingOut}><EmbeddedTaskLifecycle value={embeddedLifecycle}><ComputerAgentsProvider><BrowserNotesProvider>{settingsShown && ownSettingsFrame
     ? <SettingsFrame user={user} onRail={leaveSettings} onBack={backFromSettings} onSearch={searchFromBar} onBrowser={browserFromSettings} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut}>{settingsContent}</SettingsFrame>
     : <AppFrame settings={settingsShown}
-    bar={FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser('column') } else showBrowser(rightTaken ? 'closed' : 'column') }} /></>} />}
-    rail={<IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} onPageIntent={preloadWorkspacePage} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: listWorkspaceId, entries: chatNav, archived: archivedNav, hidden: hiddenNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreation('group'), onNewConversation: () => setCreation('conversation') }} onSearch={searchFromBar} inboxCount={inboxCounts?.count ?? 0} />}>
+    bar={windowBar}
+    rail={railNav}>
     {settingsShown ? settingsContent
       : <>
     {/* An open issue's header carries its own list toggle, so the floating one would sit on top of it; every other page keeps the phone header and its list button. */}
