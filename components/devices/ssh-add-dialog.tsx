@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Circle, LoaderCircle, SquareTerminal, X } from '@/components/icons'
+import { Check, ChevronDown, Circle, SquareTerminal, X } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import { LOCAL_RECONNECT, LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 import type { DeviceView } from '@/app/actions/agents'
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
+import { Spinner } from '@/components/ui/spinner'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { cn } from '@/lib/utils'
 import { addedHost, stepStates, visibleSteps, type StepState } from '@/lib/device-ssh-view'
@@ -19,7 +20,7 @@ import { DaemonCommandList } from './connect-device-dialog'
 function StepIcon({ state }: { state: StepState }) {
   if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success-foreground" />
   if (state === 'failed') return <X aria-hidden="true" className="size-4 text-destructive-foreground" />
-  if (state === 'running') return <LoaderCircle aria-hidden="true" className="size-4 animate-spin text-muted-foreground" />
+  if (state === 'running') return <Spinner aria-hidden="true" className="text-muted-foreground" />
   return <Circle aria-hidden="true" className="size-4 text-tertiary" />
 }
 

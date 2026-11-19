@@ -121,7 +121,7 @@ export function E2BKeySettings({ workspaceId }: { workspaceId: string }) {
 
   return <>
     <SettingsSection id="e2b-heading" title={t('heading')}>
-      {!status.data && !status.error && <SettingsLoading label={t('loading')} rows={1} />}
+      {!status.data && !status.error && <SettingsLoading label={t('loading')} rows={1} bare />}
       {(status.error || status.data?.error) && <FieldError className="px-5 py-4">{actionError(status.data?.error)}</FieldError>}
       {data && state && <SettingRow title="E2B API Key" icon={<Cloud aria-hidden="true" className="size-4 text-muted-foreground" />}>
         <div className="flex items-center gap-3">

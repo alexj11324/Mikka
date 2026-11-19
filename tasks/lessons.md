@@ -354,3 +354,40 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   2. 断言的顺序按规则的读法排：先"存在时能用"，再"删除请求关闭"，再"行没了关闭"。不要为了复用一个 token 而反复插入/删除。
   3. 本机复现 CI 的 DB 测试：需要名为 `mikka_e2e` 的库（测试硬编码这个名字），`MIGRATE=1` 先跑 `scripts/migrate.mjs`，然后 `REQUIRE_DB=1` + 四个 URL 环境变量都指向它。
   4. `run_captures` 有 CHECK `run_captures_ready_file`：`status='ready'` 时 `storageKey`、`size`、`sha256` 都必须非空，直接 INSERT 时要一起给。
+
+## 2026-11-19 收紧读口的过滤条件，必须同步改 fixture 的造数路径
+
+- 现象：给 `lib/profile/store.ts` 的 `profilePromptSection` 加了 `reviewStatus = 'approved'`（修复真实的安全缺口：设置页承诺"确认后才用于回答"，而 prompt 一直在读 pending 事实）。CI 红了 `test:user-facts-db` 里唯一一条仓库作用域用例 —— 它的 fixture 用 `recordFacts` 造数据，而 `recordFacts` 按设计写 `pending`，于是整个 prompt 段读成空串，`assert.match` 报 `actual: ''`。
+- 根因：过滤条件是**读口**改的，测试的**写口**（`recordFacts` → `pending`）没变。测试的名字讲的是"仓库作用域"，容易被误判成"这条断言过期了、改断言就行"，实际上应该补全 fixture 的**前置状态**。
+- 规则：
+  1. 给读函数加状态过滤后，第一件事是 `grep -rn "<读函数名>" --include='*.test.*'`，逐个看每个测试的造数走的是哪条写路径、写到什么状态。
+  2. 补前置状态用该状态的生产入口（这里是"审批"）；测试层拿不到业务入口时，在 fixture 里直接 `UPDATE` 该列，并在注释里写明这是 fixture 前置状态而非被测行为。
+  3. 顺手把新加的过滤条件本身变成断言（"还没审批时读出来必须是空"），否则这次修复没有任何回归保护。
+  4. 一个 DB suite 红会连带把 `Database checks (4/4)` 两个矩阵变体和聚合门 `Production build and browser interactions` 一起拖红。判断"到底红了几件事"，看日志里的 `test:<name> lifecycle] exit code=1` 有几条，不要按 job 数。
+
+## 2026-11-19 在 JSDoc 和它描述的函数之间插入新符号，等于把文档送给了新符号
+
+- 现象：修 `lib/run-recovery.ts` 的静默失败时，我把新的 `swept` 辅助函数直接插在 `recoverRuns` 的 JSDoc 结束处和 `recoverRuns` 之间。结果那段"Everything run recovery does …"的文档挂到了 `swept` 上，`recoverRuns` 变成无文档；`tsc`、lint、CI 全绿，只有 review 能看出来。
+- 根因：JSDoc 的归属由**相邻性**决定，不是由内容决定。插入点选在 `*/` 之后、函数之前，就破坏了归属。
+- 规则：
+  1. 在任何 `/** … */` 和它下面的 `export function` 之间不要插入任何东西 —— 包括注释块、常量、辅助函数。新辅助函数放到该 `*/` 之前（如果它服务于同一个导出）或放到该函数之后。
+  2. 改完用 `sed -n '<起点>,<终点>p' <file>` 肉眼看一遍：每个 `/**` 的正下方应该紧跟它描述的那个声明。
+  3. 这类问题 CI 抓不到，只有代码审查或人眼能抓 —— 属于"必须 review"的那一类，别指望门禁兜底。
+
+## 2026-11-19 `test:web-auth-db` 是 flake，不要当回归查
+
+- 现象：`tests/web-auth-handoff.db.test.ts` 的 `remote Web Workspace selection survives bearer-only HTTP and never broadens a tenant or PAT`（单条约 7 秒的重 HTTP+PG 用例）会间歇失败。本会话里出现三次：CI 报 `fetch failed` + 120s 超时；本地同样环境跑出 20/21；紧接着同参数重跑 29/29 全过。
+- 判断依据：**同输入重跑即绿** + 失败信息是网络层（`fetch failed`）而非断言不一致。本机复跑要带 `BETTER_AUTH_URL`，否则 `context.baseURL` 为空，`new URL('')` 会让 4 条用例报 `TypeError: Invalid URL` —— 那是环境缺失，不是代码问题。
+- 规则：
+  1. 看到这个 suite 红，先原地重跑一次再决定是否调查；不要顺着 workspace/PAT 的代码路径去改。
+  2. 本机跑 DB suite 必须按脚本原样调用（`bash -c "$(node -e "console.log(require('./package.json').scripts['<name>'])" )"`），漏掉 `--experimental-test-module-mocks` 或 `--import ./scripts/server-test.mjs` 会自己造出假失败。
+  3. 本地补齐的环境变量：`E2E_DATABASE_URL` / `MIKKA_DATABASE_URL` / `DATABASE_URL` / `WORKSPACE_DATABASE_URL` / `ORVILO_DATABASE_URL` 指向 `mikka_e2e`，外加 `BETTER_AUTH_URL` 和 `REQUIRE_DB=1`。
+
+## 2026-11-19 新接进 CI 的测试，"接上"不等于"跑过"
+
+- 现象：计划 006 把六个没被任何 CI 任务执行的 suite 接进了 `scripts/ci/tasks.json`。其中 `test:factory-query-http` 和 `test:factory-monitor-http` 少了全仓库其它 factory suite 都带的 `--import ./tests/support/server-only.mjs`，CI 一真正选中就报 `ERR_MODULE_NOT_FOUND: Cannot find package 'server-only' imported from lib/task-status-run-start.ts`。在 main 上它一直是绿的，因为 main 的 `Core unit checks` 日志里**这两个测试一次都没出现过** —— 任务按改动文件被选中，很久没匹配到相关改动。
+- 根因：这两个探测用例用 `FACTORY_QUERY_LOCAL_HTTP=1` 做 skip 守卫，本地默认跳过，跳过发生在运行测试体之前，所以本地永远走不到那条动态 import 链；`server-only` 本地甚至没装（Next 自己解析）。
+- 规则：
+  1. 把测试接进 CI 时，除了确认"文件在任务列表里"，还要确认**它在 CI 里真的被执行过**：翻一次该 job 的日志，grep 测试文件名，出现 0 次就是还没验证。
+  2. 新接的 suite 要照抄同目录其它 suite 的 `--import` 前缀，不要只写 `node --import tsx --test`。
+  3. 带 skip 守卫的集成测试，本地绿灯不构成证据 —— 只能靠 CI 或手动打开守卫跑。

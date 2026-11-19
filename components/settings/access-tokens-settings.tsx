@@ -91,6 +91,7 @@ function CreateTokenDialog({ workspaceId, onDone, open = true, onOpenChangeCompl
   const [error, setError] = useState<string | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
   const expiryItems = (Object.keys(EXPIRY_DAYS) as Expiry[]).map(value => ({ value, label: t(`expiry.${value}`) }))
 
   async function create() {
@@ -110,7 +111,12 @@ function CreateTokenDialog({ workspaceId, onDone, open = true, onOpenChangeCompl
 
   async function copy() {
     if (!token) return
-    try { await navigator.clipboard.writeText(token); setCopied(true) } catch { setCopied(false) }
+    // This token is shown once. A silent failure leaves the person believing
+    // they copied it, then pasting an empty clipboard; say it did not work and
+    // leave the value selected so it can still be copied by hand. A later
+    // success clears the warning, so the two states never show together.
+    try { await navigator.clipboard.writeText(token); setCopied(true); setCopyFailed(false) }
+    catch { setCopied(false); setCopyFailed(true) }
   }
 
   return <Dialog open={open} onOpenChangeComplete={onOpenChangeComplete} onOpenChange={open => { if (!open && !pending) onDone() }}>
@@ -123,6 +129,7 @@ function CreateTokenDialog({ workspaceId, onDone, open = true, onOpenChangeCompl
             <InputGroupAddon align="inline-end"><InputGroupButton aria-label={t('copy')} onClick={() => void copy()}>{copied ? <Check /> : <Copy />}</InputGroupButton></InputGroupAddon>
           </InputGroup>
           <p className="text-muted-foreground">{t('shownOnce')}</p>
+          {copyFailed && <FieldError role="alert">{t('copyFailed')}</FieldError>}
         </div>
         : <div className="flex flex-col gap-3">
           <Label className="flex flex-col items-start gap-1.5">{t('name')}

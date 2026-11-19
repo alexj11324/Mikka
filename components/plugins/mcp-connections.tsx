@@ -171,7 +171,7 @@ function McpToolList({ server, disabled }: { server: McpWorkspaceServerView; dis
     <Dialog open={open} onOpenChange={value => { setOpen(value); if (!value) latestRead.current++ }}>
       <DialogContent>
         <DialogHeader><DialogTitle>{t('serverTools', { name: server.name })}</DialogTitle></DialogHeader>
-        {state === 'loading' && <SettingsLoading label={t('loadingTools')} rows={1} />}
+        {state === 'loading' && <SettingsLoading label={t('loadingTools')} rows={1} bare />}
         {state === 'error' && <SettingsSaveError message={t('toolsFailed')} retryLabel={t('checkAgain')} onRetry={() => void read(cursor)} />}
         {state === 'ready' && page && <>
           {page.tools.length ? <ul className="max-h-64 overflow-y-auto text-sm">
