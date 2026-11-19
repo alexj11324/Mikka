@@ -262,3 +262,12 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 - 规则：
   1. 凡是把 URL 变成文件系统路径，一律 `fileURLToPath`；`pathname` 只用于 URL 语义。
   2. 改完 policy 测试要跑**整条** `test:ui-policy` 命令串，而不是只跑自己新加的那几个文件——`ui-overlay.test.mjs` 就藏在这条命令串的末尾。
+
+## 2026-11-19 CI 才发现的测试：本机 locale 掩盖了「测试写死中文」
+
+- 现象：PR 推到 CI 后 `Core unit checks` 红，`lib/chat-failure.test.ts` 断言 `{text:'回复未完成，请重试'}`，而 CI 机器 locale 是 en-US，实际拿到 `'Reply did not finish. Please try again.'`。本机跑绿是因为本机 locale 是 zh-CN。
+- 根因：迁移实现（`apps/mobile/lib/chat-failure.ts` 改用 `mobileMessages`）时，只改了 `apps/mobile/tests/*.test.mts`，漏了根目录 `lib/chat-failure.test.ts`——它直接 import 移动端实现，属于同一批断言。
+- 规则：
+  1. 把「测试改成读 catalog」时，要按 `grep -rn "<中文原文>"` 全仓库扫一遍断言，不能只改报错的那一个目录；根 `lib/` 下也有直接测移动端实现的测试。
+  2. 本机 locale 会让这类测试假绿。判断标准是「断言里有没有字面量文案」，不是「本机跑没跑绿」。
+  3. 修完再推一次，等 CI 全绿再 merge；不要因为「本机绿」就认为改动无关。
