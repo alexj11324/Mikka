@@ -42,6 +42,7 @@ import { harnessLabel, threadTopologyKey, type IssueThreadsRead } from './issue-
 import { BotModelPicker } from '@/components/coordinator/bot-model-picker'
 import { choiceFromMenu, threadModelKey, type ThreadModelChoice } from '@/lib/thread-model-choice'
 import { ThreadScreen } from '@ui-slot/thread'
+import { useConversationPanels } from '@/components/coordinator/conversation-panels-context'
 import type { ThreadEntry, ThreadEntryPart } from '@/components/slots/thread-contract'
 import { atTheirTime } from '@/lib/thread-child-entries'
 import { HarnessMark, harnessName, ProviderMark } from '@/components/labels/entity-labels'
@@ -202,6 +203,10 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const viewingChanges = hasChanges && tab === 'changes'
   // The main thread surface reads contextual Artifact evidence.
   const tabbed = !bare && !transcriptOnly && !collect
+  // A conversation the page hands its work area to (FRAME_OWNS_PANEL) draws the Overview and the browser as tabs of
+  // that area instead of a column beside it. Only the centre page provides this; a thread in the right column, a
+  // task's own pane and the Artifact window are outside the provider and get none, so nothing stands beside them.
+  const panels = useConversationPanels()
   const [artifacts, setArtifacts] = useState<ThreadArtifactsRead | null>(null)
   const hasArtifacts = tabbed && !readRejected && (artifacts?.count ?? 0) > 0
   const viewingArtifacts = hasArtifacts && tab === 'artifacts'
@@ -630,6 +635,7 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
   const references = !composerUnavailable && referenceWorkspace && data?.thread.ownedByCurrentUser ? <ThreadReferencePicker draft={draft}
     workspaceId={referenceWorkspace} input={inputRef} onChange={setDraft} /> : null
   const conversation = data || beforeEntries?.length || afterEntries?.length ? <div data-slot="thread-conversation" className="flex min-h-0 flex-1 flex-col"><ThreadScreen botId={null} name={title} mark={author?.mark ?? null} readOnly={readOnly && !changeRequest} scrollRef={transcript} entries={atTheirTime([...beforeEntries ?? [], ...entries, ...afterEntries ?? [], ...!data ? [{ id: `${runId}:loading`, role: 'bot' as const, event: true as const, at: Date.now(), parts: [{ kind: 'text' as const, text: '', node: waiting }] }] : []], childEntries)}
+    panels={bare || transcriptOnly || collect ? undefined : panels}
     historyPrepend={historyPrepend}
     older={olderPosition ? { loading: olderState === 'loading', auto: olderState === 'idle', onLoad: () => { void loadOlder() } } : undefined}
     working={working} onStop={working && canStop ? () => { void stop() } : undefined}
