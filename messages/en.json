@@ -8337,6 +8337,7 @@
       "schedule": "On a schedule",
       "manual": "Run manually",
       "runNow": "Run now",
+      "runUnconfirmed": "Mikka couldn’t confirm this run. Choose Run now to retry.",
       "scheduleKind": {
         "once": "Once",
         "interval": "Every",

@@ -80,6 +80,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   }, [current, dirty, baseline?.version])
   const stale = Boolean(current && baseline && dirty && current.version !== baseline.version)
   const requestId = useRef(crypto.randomUUID())
+  const pendingRun = useRef<{ scope: string; requestId: string } | null>(null)
   const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver'>(null)
   const [cancellingRun, setCancellingRun] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -169,7 +170,17 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     if (!current || !canManage || busy) return
     setBusy('run')
     try {
-      const result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: crypto.randomUUID() }, workspaceId ?? undefined)
+      const scope = JSON.stringify([userId, workspaceId, current.id, current.version])
+      if (pendingRun.current?.scope !== scope) pendingRun.current = { scope, requestId: crypto.randomUUID() }
+      let result: Awaited<ReturnType<typeof runAutomationNow>>
+      try {
+        result = await runAutomationNow({ scheduleId: current.id, version: current.version, requestId: pendingRun.current.requestId }, workspaceId ?? undefined)
+      } catch {
+        // The server may already have recorded this run. Retry that same request until it answers.
+        toast.error(t('runUnconfirmed'))
+        return
+      }
+      pendingRun.current = null
       if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
       toast.success(t('started'))
       await history.mutate()

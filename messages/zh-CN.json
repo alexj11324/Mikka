@@ -8337,6 +8337,7 @@
       "schedule": "定时",
       "manual": "手动运行",
       "runNow": "立即运行",
+      "runUnconfirmed": "尚未收到运行确认。可以再次点击“立即运行”重试。",
       "scheduleKind": {
         "once": "一次",
         "interval": "每隔",
