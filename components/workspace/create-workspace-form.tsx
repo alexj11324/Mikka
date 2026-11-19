@@ -62,6 +62,6 @@ export function CreateWorkspaceForm() {
       </Field>
     </FieldGroup>
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-    <Button type="submit" size="lg" disabled={pending || !name.trim() || !slug.trim()}>{pending && <Spinner data-icon="inline-start" />}{pending ? i18nText("Invite.creating") : i18nText("FeatureCopy.c_d92d1b8d")}</Button>
+    <Button type="submit" size="lg" disabled={pending || !name.trim() || !slug.trim()}>{pending && <Spinner data-icon="inline-start" aria-hidden="true" />}{pending ? i18nText("Invite.creating") : i18nText("FeatureCopy.c_d92d1b8d")}</Button>
   </form>
 }

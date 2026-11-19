@@ -144,7 +144,6 @@ new UI; check remaining source and test references before a cleanup removes them
 | --- | --- | --- |
 | `components/agents/prompt-input.tsx` (`models`, `onModelChange`) | Its own model picker, not `BotModelPicker` (R-11) | A second model picker in a bot chat |
 | `components/workspace/agent-starters.tsx` | Starter cards (R-12) | "试试从这些事情开始" in a bot chat |
-| `components/workspace/agent-demo*.tsx` | Demo content | |
 | `components/app-sidebar.tsx`, `nav-main.tsx`, `nav-secondary.tsx` | shadcn sidebar shell, replaced by the Comma shell; no callers left, safe to delete | Shell that "looked like a wireframe" |
 | reUI Pro App Shell blocks (`app-shell-*`) | Extensible shells that do not fit Mikka (Alex 2026-10-23) | |
 | HeroUI gradient-sphere avatars for bots | Replaced by bloub (R-36) | |
