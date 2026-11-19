@@ -2136,6 +2136,8 @@
   },
   "Settings": {
     "teamOnlyNotice": "Members, Teams, Team permissions and Audit log are in shared workspaces",
+    "billingUnavailableNotice": "Billing is in Mikka Cloud",
+    "cloudUnavailableNotice": "Mikka Cloud is for a self-hosted server's admin",
     "unavailableTitle": "{title} is temporarily unavailable",
     "title": "Settings",
     "searchLabel": "Search settings",
@@ -2911,6 +2913,7 @@
         "presets": "Periods"
       },
       "loading": "Loading audit log",
+      "loadFailed": "Couldn't load the audit log",
       "filter": "Filter",
       "filters": {
         "all": "All",

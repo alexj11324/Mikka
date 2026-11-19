@@ -2136,6 +2136,8 @@
   },
   "Settings": {
     "teamOnlyNotice": "成员、团队、团队权限和审计日志只在共享工作区中",
+    "billingUnavailableNotice": "计费只在 Mikka 云服务中",
+    "cloudUnavailableNotice": "Mikka 云服务只对自托管服务器的管理员开放",
     "unavailableTitle": "{title}暂时不可用",
     "title": "设置",
     "searchLabel": "搜索设置",
@@ -2911,6 +2913,7 @@
         "presets": "常用范围"
       },
       "loading": "正在加载审计日志",
+      "loadFailed": "审计日志加载失败",
       "filter": "筛选",
       "filters": {
         "all": "全部",
