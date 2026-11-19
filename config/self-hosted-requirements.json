@@ -1939,6 +1939,13 @@
     "behavior": "The Cloudflare sandbox adapter requires an injected workspace binding and a scoped grant. Ordinary Compose installations do not supply the private binding.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/eve/host-authorization.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Sign the internal Eve scope with the host key supplied by the caller and the existing clock-skew allowance.",
+    "test": "lib/eve/auth.test.ts",
+    "suite": "test:eve"
+  },
   "lib/eve/product-definitions.ts": {
     "mode": "built-in",
     "environment": [],
