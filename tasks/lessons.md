@@ -281,3 +281,30 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   2. 布局回归必须用**渲染断言**锁住（`querySelector('[data-context-panel]')`），不能只测「页面没崩」。
   3. 新写的回归测试要做变异验证：把旧代码放回去确认变红，否则不知道它在测什么。
   4. 跨组件共享的 context 要从**叶子模块**导出，不要从已经 import 了消费方的模块里导出（会形成 cycle）——`conversation-panels-context.ts` 就是这么拆出来的。
+
+## 2026-11-19 "grep 不到 importer" 不能用来删依赖
+
+- 现象：审计把 `unstorage` 判成死依赖删掉（源码里 grep `unstorage` 零命中），CI 上 Nitro 构建全线失败：`unstorage is not installed. It is required for KV storage (nitro/kv)`。`lib/agent-images-server.ts:3` 用的是虚拟模块 `nitro/kv`，真正的包由 Nitro 在构建期注入。
+- 根因：把"源码里没有 import"等同于"运行时不需要"。框架的约定式/虚拟模块依赖（Nitro `nitro/kv`、Next 的 `next/font`、Vite 插件注入的包）永远不会出现在 grep 结果里。
+- 规则：
+  1. 删依赖前，除了 `grep 'from "<pkg>"'`，还要 `grep` 框架的虚拟模块名（`nitro/`、`next/`、`virtual:`、`\0` 前缀）和配置文件（`nitro.config.*`、`vite.config.*`、插件目录）。
+  2. 判断"真的没人用"要看 CI 的构建 job 是否绿，不看 grep。本机按 AGENTS.md 不能 build，所以这类改动的唯一门禁就是 CI——推之前明确写下"这一项本机无法验证"。
+  3. 同类：`vaul`（Radix Drawer 的封装，可能被 ui 组件按需引用）、`file-type`（可能被运行时动态 import）。删之前先 `git log -S` 看引入原因。
+
+## 2026-11-19 改了 action 的导出，就要同步改所有 mock
+
+- 现象：给 `app/actions/link-preview.ts` 新增 `getLinkPreviews` 后，`components/workspace/agent-citations.tsx` 具名导入它；但 `group-chat-view.test.tsx` 和 `read-retry-toasts.test.tsx` 里的 `mock.module` 只导出了 `getLinkPreview`，于是 6 个 `test:groups` 用例全部 `SyntaxError: does not provide an export named 'getLinkPreviews'`。
+- 根因：`mock.module` 是**整体替换**模块导出表，不是增量打补丁；给真实模块加导出，所有 mock 都必须跟着加。
+- 规则：
+  1. 给 `app/actions/*` 加导出的同一次改动里，跑 `grep -rn "app/actions/<name>" --include='*.test.ts*'`，把每个 mock 都补齐。
+  2. 改完至少跑一次包含这些测试的**完整 suite**（这里是 `pnpm test:groups`），而不是只跑自己新加的文件。
+
+## 2026-11-19 生成产物必须跟着源码一起提交
+
+- 现象：改了 `app/v1/runs/[runId]/captures/[captureId]/route.ts`，`apps/api/generated/routes.{json,ts}` 里该路由的 `sourceHash` 过期，CI 的 governance acceptance 报 `API_DEV_ROUTES_STALE`。
+- 规则：改 `app/api/**` 或 `app/v1/**` 下的 route 文件后，必须跑 `node apps/api/scripts/generate-routes.mjs` 并提交产物；`--check` 是本地可跑的（不违反 AGENTS.md 的 build 禁令）。
+
+## 2026-11-19 新增后端文件要声明 self-hosted 依赖
+
+- 现象：`scripts/ci/self-hosted-requirements.mjs` 要求每个**改动的**后端文件在 `config/self-hosted-requirements.json` 里声明 `mode` / `environment` / `behavior` / `test`（测试文件必须存在且在某个 suite 里）。漏了 4 个文件，`image` job 直接红。
+- 规则：改 `lib/**`、`app/{api,v1,actions}/**`、`apps/{api,eve}/**`、`workflows/**` 下任何文件后，本地先跑 `node scripts/ci/self-hosted-requirements.mjs`（这个不需要 build，可以本机跑）。
