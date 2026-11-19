@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { withDeviceRoute } from '@/lib/device-route'
-import { authenticateDevice } from '@/lib/device-link'
+import { admitsRunDeviceTokenSql, authenticateDevice } from '@/lib/device-link'
 import { isDeviceAuthorityError } from '@/lib/db/device-scope'
 import {
   authorizeFileScope,
@@ -30,7 +30,7 @@ async function handleGET(
       `SELECT r.prompt FROM agent_runs r
     JOIN devices d ON d.id=r."deviceId"
     WHERE r.id=$1 AND r."userId"=$2 AND r."deviceId"=$3 AND d."ownerId"=$2 AND d.enabled=true AND d."removedAt" IS NULL
-      AND (r."deviceTokenId" IS NULL OR r."deviceTokenId"=$4) AND r.status IN ('preparing','running','waiting_input','paused')
+      AND ${admitsRunDeviceTokenSql('r', '$4')} AND r.status IN ('preparing','running','waiting_input','paused')
       AND (position($5 in r.prompt)>0 OR EXISTS(SELECT 1 FROM run_messages m WHERE m."runId"=r.id AND m."userId"=$2 AND position($5 in m.text)>0))`,
       [runId, actor.userId, deviceId, actor.tokenId, `[mikka-file:${id}:`],
     )

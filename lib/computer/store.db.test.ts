@@ -76,7 +76,7 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await pool.query(bindingMigration); await pool.query(bindingMigration)
     await pool.query(await readFile(new URL('../../drizzle/20261030234636_run_human_control_pause.sql', import.meta.url), 'utf8'))
     await pool.query(await readFile(new URL('../../drizzle/20261101150000_run_quota_resets_at.sql', import.meta.url), 'utf8'))
-    await pool.query('ALTER TABLE agent_runs ADD COLUMN "sessionId" text')
+    await pool.query('ALTER TABLE agent_runs ADD COLUMN "sessionId" text, ADD COLUMN "deviceTokenId" uuid')
     await pool.query('ALTER TABLE agent_runs ADD COLUMN "machineAuthority" boolean NOT NULL DEFAULT false, ADD COLUMN cli_policy_hierarchy jsonb')
     await pool.query('CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text NOT NULL, name text NOT NULL DEFAULT \'test\', "nameLocked" boolean NOT NULL DEFAULT false, enabled boolean NOT NULL DEFAULT true, harnesses jsonb NOT NULL DEFAULT \'[]\', "lastSeenAt" timestamptz, "sessionOpenedAt" timestamptz, "sessionClosedAt" timestamptz); CREATE TABLE device_tokens (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL, "tokenHash" text NOT NULL, "lastUsedAt" timestamptz, "revokedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now())')
     const scopeMigration = await readFile(new URL('../../drizzle/20261027164511_cloud_device_scope.sql', import.meta.url), 'utf8')
@@ -192,12 +192,16 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     const renewalActor = { ...actor, deviceId: rotatedCredential.deviceId, tokenId }
     assert.equal(await renewCloudDeviceToken(pool, { ...renewalActor, workspaceId: otherWorkspace.workspaceId }), null)
     assert.equal(await renewCloudDeviceToken(pool, { ...renewalActor, userId: bob.userId }), null)
+    const leasedRun = randomUUID()
+    await pool.query('INSERT INTO agent_runs (id,"userId",status,"deviceId","deviceTokenId","workspaceId") VALUES ($1,$2,$3,$4,$5,$6)',
+      [leasedRun, actor.userId, 'running', rotatedCredential.deviceId, tokenId, actor.workspaceId])
     const renewals = await Promise.all([renewCloudDeviceToken(pool, renewalActor), renewCloudDeviceToken(pool, renewalActor)])
     assert.equal(renewals.filter(Boolean).length, 1, 'concurrent retries mint at most one replacement in the cooldown')
     const renewed = renewals.find(Boolean)!
-    const tokenState = await pool.query('SELECT "revokedAt","expiresAt" FROM device_tokens WHERE "tokenHash"=$1', [createHash('sha256').update(renewed).digest('hex')])
+    const tokenState = await pool.query('SELECT id,"revokedAt","expiresAt" FROM device_tokens WHERE "tokenHash"=$1', [createHash('sha256').update(renewed).digest('hex')])
     assert.equal(tokenState.rows[0].revokedAt, null)
     assert.ok(new Date(tokenState.rows[0].expiresAt).getTime() > Date.now() + 23 * 60 * 60_000)
+    assert.equal((await pool.query('SELECT "deviceTokenId" FROM agent_runs WHERE id=$1', [leasedRun])).rows[0].deviceTokenId, tokenState.rows[0].id)
     assert.equal((await pool.query('SELECT "revokedAt" FROM device_tokens WHERE id=$1', [tokenId])).rows[0].revokedAt, null, 'lost renewal responses leave the old token usable until expiry')
     {
       // A device request holds its own token row FOR SHARE (the authority fence) while the heartbeat

@@ -1,6 +1,7 @@
 import 'server-only'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
+import { LEASED_RUN_STATUSES } from '../run-retry'
 
 /** Rotate a credential for the trusted worker of an existing workspace
  * machine. The plaintext is returned only to the caller for delivery to the
@@ -56,8 +57,13 @@ export async function renewCloudDeviceToken(pool: Pool, actor: { userId: string;
       AND "revokedAt" IS NULL AND "expiresAt">now()+interval '23 hours' AND "createdAt">now()-interval '30 seconds' LIMIT 1`, [actor.deviceId, actor.workspaceId])
     if (recent.rowCount) { await client.query('COMMIT'); return null }
     const credential = `orv_${randomBytes(32).toString('base64url')}`
+    const nextTokenId = randomUUID()
     await client.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt")
-      VALUES ($1,$2,$3,$4,$5,$6,now()+interval '24 hours')`, [randomUUID(), actor.userId, 'Cloud computer worker', createHash('sha256').update(credential).digest('hex'), actor.deviceId, actor.workspaceId])
+      VALUES ($1,$2,$3,$4,$5,$6,now()+interval '24 hours')`, [nextTokenId, actor.userId, 'Cloud computer worker', createHash('sha256').update(credential).digest('hex'), actor.deviceId, actor.workspaceId])
+    await client.query(`UPDATE agent_runs SET "deviceTokenId"=$1
+      WHERE "deviceTokenId"=$2 AND "deviceId"=$3 AND "userId"=$4
+        AND "stopRequestedAt" IS NULL AND status=ANY($5::text[])`,
+      [nextTokenId, actor.tokenId, actor.deviceId, actor.userId, [...LEASED_RUN_STATUSES]])
     await client.query('COMMIT')
     return credential
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }

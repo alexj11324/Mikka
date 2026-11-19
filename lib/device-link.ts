@@ -41,6 +41,16 @@ export function hashDeviceToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
 
+/** Claim token, an unbound run, or a live sibling on the same bound device. */
+export function admitsRunDeviceTokenSql(run: string, token: string) {
+  return `(${run}."deviceTokenId" IS NULL OR ${run}."deviceTokenId"=${token} OR EXISTS (
+    SELECT 1 FROM device_tokens claimed JOIN device_tokens live ON live.id=${token}
+    WHERE claimed.id=${run}."deviceTokenId" AND live."userId"=${run}."userId"
+      AND live."boundDeviceId"=${run}."deviceId"
+      AND live."boundDeviceId" IS NOT DISTINCT FROM claimed."boundDeviceId"
+      AND live."revokedAt" IS NULL AND (live."expiresAt" IS NULL OR live."expiresAt">clock_timestamp())))`
+}
+
 /** Used by both the manual token action and the browser device grant. */
 export async function issueDeviceToken(userId: string, name = ''): Promise<string> {
   const token = newDeviceToken()

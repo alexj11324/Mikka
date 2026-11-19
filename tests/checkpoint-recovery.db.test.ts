@@ -101,6 +101,39 @@ test('checkpoint recovery availability persists through the actual authenticated
     assert.equal(response.status, 409)
     assert.equal((await stored()).files, 1)
   })
+  await t.test('a live successor on the same bound device replaces the snapshot; a different device still 409s', async () => {
+    const { hashDeviceToken, newDeviceToken } = await import('../lib/device-link')
+    await pool.query(`UPDATE devices SET kind='cloud' WHERE id=$1`, [deviceId])
+    await pool.query(`INSERT INTO cloud_machines ("workspaceId","ownerId","operationId",state,"deviceId") VALUES ($1,$2,$3,'running',$4)`,
+      [workspaceId, userId, randomUUID(), deviceId])
+    const claimedId = randomUUID(), successorId = randomUUID(), claimed = newDeviceToken(), successor = newDeviceToken()
+    await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES
+      ($1,$3,'claimed',$4,$5,$6,now()+interval '1 hour'),($2,$3,'successor',$7,$5,$6,now()+interval '1 hour')`,
+      [claimedId, successorId, userId, hashDeviceToken(claimed), deviceId, workspaceId, hashDeviceToken(successor)])
+    await pool.query('UPDATE agent_runs SET "deviceTokenId"=$2 WHERE id=$1', [runId, claimedId])
+    const checkpointWith = (bearer: string, value: RunCheckpoint) => POST(new Request(`http://localhost/mikka/v1/runs/${runId}/checkpoint`, {
+      method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${bearer}`, 'content-type': 'application/json' }, body: JSON.stringify(value),
+    }), { params: Promise.resolve({ runId }) })
+    const rotated = { ...checkpoint, files: 3, patch: gzipSync(Buffer.from('successor token snapshot\n')).toString('base64') }
+    assert.equal((await checkpointWith(successor, rotated)).status, 200)
+    assert.equal((await stored()).files, 3)
+    const otherDevice = randomUUID(), otherId = randomUUID(), other = newDeviceToken(), otherRun = randomUUID(), otherAgent = randomUUID()
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind) VALUES ($1,$2,'Other checkpoint device','cloud')`, [otherDevice, userId])
+    await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex',$4)`, [otherAgent, userId, otherDevice, `Other checkpoint ${otherRun}`])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId","workspaceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$5,'running',now()+interval '5 minutes')`,
+      [otherRun, userId, otherAgent, otherDevice, workspaceId])
+    await pool.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","sandboxId","snapshotId","operationId",state,"deviceId")
+      VALUES ($1,$2,$3,$4,'checkpoint-other',$5,'running',$6)`, [otherRun, workspaceId, userId, `checkpoint-other-${otherRun}`, randomUUID(), otherDevice])
+    await pool.query(`INSERT INTO device_tokens (id,"userId",name,"tokenHash","boundDeviceId","boundWorkspaceId","expiresAt") VALUES ($1,$2,'other',$3,$4,$5,now()+interval '1 hour')`,
+      [otherId, userId, hashDeviceToken(other), otherDevice, workspaceId])
+    await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [runId, otherDevice])
+    try {
+      assert.equal((await checkpointWith(other, { ...rotated, files: 4 })).status, 409)
+      assert.equal((await stored()).files, 3)
+    } finally {
+      await pool.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [runId, deviceId])
+    }
+  })
 
   for (const evidence of ['current receipt', 'replaced receipt', 'no receipt'] as const)
     await t.test(`automatic retirement follows the real upload with ${evidence}`, async () => {

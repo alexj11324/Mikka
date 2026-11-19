@@ -1,11 +1,11 @@
 import { withDeviceRoute } from '@/lib/device-route'
 import { NextResponse } from 'next/server'
-import { and, eq, gt, inArray, isNull, or } from 'drizzle-orm'
+import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { PoolClient } from 'pg'
 import { RUN_CHECKPOINT_MAX_BYTES, runCheckpointReceiptSchema, runCheckpointSchema } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
 import { agentRuns, devices } from '@/lib/db/schema'
-import { authenticateDevice } from '@/lib/device-link'
+import { admitsRunDeviceTokenSql, authenticateDevice } from '@/lib/device-link'
 import { LEASED_RUN_STATUSES } from '@/lib/run-retry'
 import { CheckpointUnmaskable, maskCheckpoint } from '@/lib/secrets/checkpoint'
 import { runSecretMasker, runWorkspaceId, secretMaskerFor } from '@/lib/secrets/runtime'
@@ -37,7 +37,12 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
     .from(agentRuns)
     .innerJoin(devices, eq(devices.id, agentRuns.deviceId))
     .where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, caller.userId), eq(devices.ownerId, caller.userId),
-      or(isNull(agentRuns.deviceTokenId), eq(agentRuns.deviceTokenId, caller.tokenId)),
+      sql`(${agentRuns.deviceTokenId} IS NULL OR ${agentRuns.deviceTokenId}=${caller.tokenId} OR EXISTS (
+        SELECT 1 FROM device_tokens claimed JOIN device_tokens live ON live.id=${caller.tokenId}
+        WHERE claimed.id=${agentRuns.deviceTokenId} AND live."userId"=${agentRuns.userId}
+          AND live."boundDeviceId"=${agentRuns.deviceId}
+          AND live."boundDeviceId" IS NOT DISTINCT FROM claimed."boundDeviceId"
+          AND live."revokedAt" IS NULL AND (live."expiresAt" IS NULL OR live."expiresAt">clock_timestamp())))`,
       ...(caller.scopeDeviceId ? [eq(agentRuns.deviceId, caller.scopeDeviceId)] : []),
       inArray(agentRuns.status, [...LEASED_RUN_STATUSES]), gt(agentRuns.leaseExpiresAt, new Date()), isNull(agentRuns.stopRequestedAt)))
     .limit(1)
@@ -66,7 +71,7 @@ async function handlePOST(request: Request, { params }: { params: Promise<{ runI
   const save = (client: PoolClient, protectedPatch: ReturnType<typeof maskCheckpoint<number>>) => client.query<{ runId: string; takenAt: Date }>(`WITH admitted AS (
     SELECT r.id,r."userId" FROM agent_runs r JOIN devices d ON d.id=r."deviceId"
     WHERE r.id=$1 AND r."userId"=$2 AND d."ownerId"=$2
-      AND (r."deviceTokenId" IS NULL OR r."deviceTokenId"=$9)
+      AND ${admitsRunDeviceTokenSql('r', '$9')}
       AND ($3::uuid IS NULL OR r."deviceId"=$3) AND r.status=ANY($4::text[])
       AND r."leaseExpiresAt">clock_timestamp() AND r."stopRequestedAt" IS NULL
     FOR SHARE OF r,d
