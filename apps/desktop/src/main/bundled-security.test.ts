@@ -63,6 +63,13 @@ test('path policy rejects traversal, encoded delimiters, absolute targets and un
   assert.equal(allowedApiPath('/api/settings/issue-prefix/extra', 'GET'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'GET'), true)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'POST'), false)
+  // 收件箱 reads its authorized page and writes its lifecycle commands; nothing
+  // else about it is reachable, and the count query rides the same GET.
+  assert.equal(allowedApiPath('/api/inbox', 'GET'), true)
+  assert.equal(allowedApiPath('/api/inbox', 'POST'), true)
+  assert.equal(allowedApiPath('/api/inbox', 'HEAD'), true, 'HEAD reads as GET')
+  for (const method of ['PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath('/api/inbox', method), false, method)
+  assert.equal(allowedApiPath('/api/inbox/extra', 'GET'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token/metadata', 'GET'), false)
   assert.equal(allowedApiPath(`/api/bots/${identity.user.id}/computer/viewer`, 'POST'), false)
   assert.equal(allowedApiPath(`/api/bots/${identity.user.id}/computer/takeover`, 'POST'), false)
