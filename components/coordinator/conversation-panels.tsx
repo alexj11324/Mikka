@@ -18,8 +18,10 @@ import { NAVIGATE_EVENT, navigate, openThread, readLocation, rememberWorkTab, se
  * The right-hand tabs a page hands its chat when the frame owns the panel (FRAME_OWNS_PANEL): the Overview
  * and the browser travel to the conversation's work area instead of a column beside it.
  */
-export const ConversationPanels = createContext<ThreadScreenProps['panels'] | undefined>(undefined)
-export const useConversationPanels = () => useContext(ConversationPanels)
+// The context itself is a leaf module (conversation-panels-context.ts): the thread panel reads it too, and
+// importing it from here would close a cycle through the panel this file imports.
+import { ConversationPanels, useConversationPanels } from './conversation-panels-context'
+export { ConversationPanels, useConversationPanels }
 
 // Load standalone work panes only when they are opened. The task conversation uses the same run renderer.
 const TaskDetail = dynamic(() => import('@/components/workspace/task-detail').then(module => module.TaskDetail), { loading: () => <TabLoading /> })
