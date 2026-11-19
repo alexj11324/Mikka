@@ -40,17 +40,19 @@ export function serverNoteSecrets(env: NodeJS.ProcessEnv = process.env): NoteSec
 // base64, the {"GITHUB_TOKEN":"..."} JSON form, keys split across words, and
 // provider tokens such as AKIA…, JWTs and xoxb-.
 export function maskFactoryNote(text: string, extra?: Masker | readonly NoteSecret[]): string {
-  // A resolved workspace Masker wins: it is the same gate every other Factory-
-  // adjacent exit already uses (lib/secrets/runtime.ts secretMaskerFor), so a
-  // saved workspace secret is masked here too, not only the built-in patterns.
-  if (typeof extra === "function") return redactFactoryCheckText(extra(text));
-  const secrets = extra ?? serverNoteSecrets();
+  // A resolved workspace Masker composes with the built-in pipeline instead of
+  // replacing it: the Masker knows saved workspace and user secrets, the
+  // pipeline knows the server's own E2B key and the NAME_KEY=value forms. Each
+  // alone leaves a gap — the Masker never reads process.env, and the pipeline
+  // never reads saved secrets.
+  const masker = typeof extra === "function" ? extra : undefined;
+  const secrets = masker || !Array.isArray(extra) ? serverNoteSecrets() : extra;
   const needles = new Map<string, string>();
   for (const { value } of secrets) {
     if ([...value].length < NOTE_MASK_MIN_LENGTH) continue;
     for (const form of forms(value)) if (form.length >= NOTE_MASK_MIN_LENGTH && !needles.has(form)) needles.set(form, "[secret]");
   }
-  let out = text;
+  let out = masker ? masker(text) : text;
   for (const [needle, label] of [...needles].sort((a, b) => b[0].length - a[0].length))
     out = out.replace(new RegExp(needlePattern(needle), "g"), label);
   // NAME_KEY=value / NAME_TOKEN: value forms the word-boundary patterns miss (E2B_API_KEY=…).

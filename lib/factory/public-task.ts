@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg'
+import { withDatabaseClient } from '@/lib/db'
 import { factoryFlowVersion, type FactoryBinding } from './contract'
 import { factoryBinding } from './dispatch'
 import { maskFactoryNote } from './note-mask'
@@ -65,13 +66,14 @@ export async function readFactoryTaskView(pool: Pool, store: Pick<ReturnType<typ
   try {
     await tx.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
     const task = await store.readTask(tx, userId, taskId)
-    // The Task's own tenant resolves the masker, so a saved workspace secret is
-    // masked here too, not only the built-in token patterns. It reads the
-    // workspace's secrets on its own connection: on a one-connection pool that
-    // would deadlock, so a failure falls back to the built-in patterns rather
-    // than making the read fail.
-    const mask = await secretMaskerFor({ workspaceId: task.workspaceId, ownerId: task.userId }).catch(() => undefined)
     if (factoryFlowVersion(task) === 2) {
+      // The Task's own tenant resolves the masker, so a saved workspace secret is
+      // masked here too, not only the built-in token patterns. It runs on the
+      // connection already held: secretMaskerFor reads through the global pool,
+      // and asking for a second connection while this transaction waits would
+      // starve a small pool. A failure is loud rather than a silent downgrade
+      // to the weaker built-in patterns (AGENTS.md "Keep error causes").
+      const mask = await withDatabaseClient(tx, () => secretMaskerFor({ workspaceId: task.workspaceId, ownerId: task.userId }))
       const flow = await readFactoryFlow(tx, task)
       const { rows } = await tx.query<Pick<FactoryAttempt, 'id' | 'stage' | 'status' | 'candidateId' | 'runId' | 'position' | 'reason' | 'evidence'> & { total: string }>(
         `SELECT id,stage,status,"candidateId","runId",position,reason,evidence,count(*) OVER() AS total

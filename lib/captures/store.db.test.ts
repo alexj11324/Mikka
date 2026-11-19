@@ -485,13 +485,30 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(await store.sharedCapture(`mks_${share!.token.slice(4)}`), null)
 
     // A kept capture outlives its owner's row (run_captures.userId has no foreign
-    // key), so a link must stop working once the account is gone.
-    const orphaned = await store.createCaptureShare(alice, saved.id)
+    // key), so a link must stop working once the account is gone. This uses its
+    // own account: deleting alice would cascade cloud_machines and bot_desktops
+    // and break the cloud-computer section below.
+    const ghost = `test-captures-ghost-${randomUUID()}`
+    await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [ghost, `${ghost}@example.com`])
+    const ghostRun = randomUUID()
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId",status) VALUES ($1,$2,$3,$4,'succeeded')`, [ghostRun, ghost, agentId, cloudDevice])
+    const ghostCapture = await store.saveCapture({ userId: ghost, runId: ghostRun, issueId: null, botId: null },
+      { bytes: PNG, title: 'Ghost', source: 'local' })
+    assert.ok(!('error' in ghostCapture))
+    const orphaned = await store.createCaptureShare(ghost, ghostCapture.id)
     assert.ok(orphaned)
-    await pool.query('DELETE FROM "user" WHERE id=$1', [alice])
+    await pool.query('DELETE FROM "user" WHERE id=$1', [ghost])
     try { assert.equal(await store.sharedCapture(orphaned!.token), null, 'a deleted account leaves no open back door') }
-    finally { await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [alice, `${alice}@example.com`]) }
+    finally { await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [ghost, `${ghost}@example.com`]) }
     assert.ok(await store.sharedCapture(orphaned!.token), 'the link works again once the account exists again')
+    // A requested deletion blocks the link before the row goes: the guard row
+    // exists for the whole deletion, and a link must not outlive the request.
+    await pool.query(`INSERT INTO account_deletion_guards ("subjectId","jobId") VALUES ($1,$2)`, [ghost, randomUUID()])
+    try { assert.equal(await store.sharedCapture(orphaned!.token), null, 'a pending deletion closes the link too') }
+    finally { await pool.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1', [ghost]) }
+    assert.ok(await store.sharedCapture(orphaned!.token), 'cancelling the deletion reopens it')
+    await pool.query('DELETE FROM agent_runs WHERE id=$1', [ghostRun])
+    await pool.query('DELETE FROM "user" WHERE id=$1', [ghost])
 
     // Cloud computer: the run's own desktop, through a fake E2B runtime.
     const calls: string[] = []
