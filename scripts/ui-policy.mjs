@@ -6,14 +6,14 @@ export function isComponentLibrarySource(file, policy) {
   return policy.componentRoots.some(root => file.startsWith(root))
 }
 
-/** The framework leaf this repository owns (`ui-policy.json` runtimeRoots): the
- * `Link`/`Script`/`dynamic` shims and the `headers()`/`NextResponse` server
- * runtime render primitives instead of product screens, so the business-UI
- * rules below do not apply. `apps/api/compat/**` was outside those rules by
- * virtue of living under `apps/`; moving the layer to `lib/` must not silently
- * put it under them. */
-export function isRuntimeSource(file, policy) {
-  return (policy.runtimeRoots?.paths ?? []).some(root => file.startsWith(root))
+// `Link`, `Script` and `dynamic` are the browser leaf this repository owns
+// (`ui-policy.json` frameworkShims, docs/design/decisions/2026-11-18-1500-retire-next-dependency.md).
+// A framework shim has to call the JSX factory and create elements by hand, which is exactly
+// what these two rules forbid in business code; every other rule still applies to them.
+const FRAMEWORK_SHIM_RULES = new Set(['components/no-element-factory', 'components/no-custom-implementation'])
+export function exemptFrameworkShims(file, diagnostics, policy) {
+  const roots = policy.frameworkShims?.paths ?? []
+  return roots.some(root => file === root || (root.endsWith('/') && file.startsWith(root))) ? diagnostics.filter(d => !FRAMEWORK_SHIM_RULES.has(d.rule)) : diagnostics
 }
 
 // Paid blocks keep their native colours and type (docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md):

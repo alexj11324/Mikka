@@ -29,7 +29,7 @@
 
 ### 不再有意义的东西
 
-- `export const dynamic = 'force-dynamic'` 与 `export const runtime = 'nodejs'`：`generate-routes.mjs` 只读 HTTP methods 和 `maxDuration`。删掉 305 处后路由清单仍是 368 条 / 485 个方法。
+- `export const dynamic = 'force-dynamic'` 与 `export const runtime = 'nodejs'`：`generate-routes.mjs` 只读 HTTP methods 和 `maxDuration`。删掉 305 处后路由清单不变（合并 main 后为 370 条 / 487 个方法）。
 - `instrumentation.ts`：`apps/api/runtime/tracing-start.ts` 已经在构建入口做同一件事。
 - `NEXT_PHASE` / `NEXT_DEPLOYMENT_ID` / `NEXT_TELEMETRY_DISABLED`。
 
@@ -42,7 +42,7 @@
 - **`scripts/dev-local/reviewed-local-evidence.mjs` 的 `next.config.mjs`**：历史 artifact 指纹必须能重算，删掉这个路径会静默改变所有历史指纹。
 - **两个 sandbox 验收脚本的 `next/dist/bin/next`**：它们启动第三方 Next fixture，框架由 fixture 自己安装。
 - **`scripts/ui-policy.mjs` / `base-path-policy.mjs` 里的 `next/font`、`next/link` 字符串**：它们是 lint 规则的被拒输入，且同样审计私有 overlay 仓。
-- **`ui-policy.json` 的 `runtimeRoots`**：`lib/client-runtime/`、`lib/server-runtime/` 是框架叶子（`Link`/`Script`/`dynamic`/`headers()`），渲染的是原语而不是产品界面。它们在 `apps/api/compat/**` 时本来就在 lint-ui 的 `apps/` 过滤名单之外；搬到 `lib/` 不能顺带把它们纳入业务 UI 规则——否则 `Script` 的 `document.createElement('script')` 和 `dynamic` 的 JSX runtime 都会撞上「业务代码不得手写 UI」。
+- **`ui-policy.json` 的 `frameworkShims`**：`lib/client-runtime/` 里只有两条规则需要让路——`Script` 必须自己 `document.createElement('script')`，撞 `components/no-custom-implementation`；`dynamic` 必须调用 JSX 工厂，撞 `components/no-element-factory`。只豁免这两条，样式、排版、动效、控件尺寸、交互和图标规则照旧适用；其余 `lib/server-runtime/*` 文件本来就没有诊断，不列入。`apps/api/compat/**` 时代的对应文件在 `apps/` 下不受这套规则管辖，搬到 `lib/` 后必须显式写出让路范围，而不是整目录排除。
 
 ## 验收
 

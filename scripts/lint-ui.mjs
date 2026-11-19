@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-import { auditSource, auditCss, isComponentLibrarySource, isRuntimeSource, exemptAsShipped } from './ui-policy.mjs'
+import { auditSource, auditCss, isComponentLibrarySource, exemptAsShipped, exemptFrameworkShims } from './ui-policy.mjs'
 import { auditActionBindings, auditInteractions } from './interaction-policy.mjs'
 import { auditSettingsSurface } from './settings-policy.mjs'
 import { auditIconButtons } from './icon-button-policy.mjs'
@@ -20,10 +20,10 @@ const diagnostics = verifyEntityContracts(file => {
 })
 const config = JSON.parse(readFileSync('components.json', 'utf8'))
 if (config.style !== policy.style || config.iconLibrary !== policy.iconLibrary.replace('-react', '')) diagnostics.push({ file: 'components.json', line: 1, column: 1, rule: 'policy/config-drift', message: '组件 base/style/iconLibrary 与 ui-policy.json 不一致；变更预设需同步审核策略。' })
-const businessFiles = files.filter(file => !isComponentLibrarySource(file, policy) && !isRuntimeSource(file, policy))
+const businessFiles = files.filter(file => !isComponentLibrarySource(file, policy))
 for (const file of businessFiles) {
   const text = readFileSync(file, 'utf8')
-  diagnostics.push(...exemptAsShipped(file, file.endsWith('.css') ? auditCss(file, text, policy) : auditSource(file, text, policy), policy))
+  diagnostics.push(...exemptFrameworkShims(file, exemptAsShipped(file, file.endsWith('.css') ? auditCss(file, text, policy) : auditSource(file, text, policy), policy), policy))
   if (!file.endsWith('.css')) diagnostics.push(...auditBasePath(file, text), ...auditEntityDetail(file, text), ...auditTaskEntry(file, text))
   if (/\.[jt]sx$/.test(file)) diagnostics.push(...auditSettingsSurface(file, text), ...auditSplitPanes(file, text), ...auditControlSizes(file, text), ...auditMotion(file, text))
 }
@@ -47,7 +47,7 @@ const counts = Object.fromEntries([...new Set(diagnostics.map(d => d.rule))].sor
 if (process.argv.includes('--json')) console.log(JSON.stringify({ files: businessFiles.length, libraryFiles: files.length - businessFiles.length, interactionFiles: interactionFiles.length, clientInteractionFiles: clientFiles.length, errors: diagnostics.length, counts, diagnostics }, null, 2))
 else {
   for (const diagnostic of diagnostics) console.error(`${diagnostic.file}:${diagnostic.line}:${diagnostic.column} error [${diagnostic.rule}] ${diagnostic.message}`)
-  console.log(`\nUI policy: ${businessFiles.length} business files, ${diagnostics.length} errors; ${files.length - businessFiles.length} non-business files excluded (component library, framework runtime).`)
+  console.log(`\nUI policy: ${businessFiles.length} business files, ${diagnostics.length} errors; ${files.length - businessFiles.length} component-library files excluded (no source verification).`)
   console.log(`Interaction policy: ${interactionFiles.length} files, including downloaded business blocks; plus ${clientFiles.length} native and renderer files checked for action bindings.`)
   console.log(JSON.stringify(counts, null, 2))
 }

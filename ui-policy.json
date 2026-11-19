@@ -12,11 +12,10 @@
     "components/agents/",
     "components/ai-elements/"
   ],
-  "runtimeRoots": {
-    "$comment": "The framework leaf this repository now owns: Link, Script, dynamic, headers(), NextResponse. These render primitives rather than product screens, so the business-UI rules below do not reach them — the same scope apps/api/compat/** had before the layer moved out of apps/. See docs/design/decisions/2026-11-18-1500-retire-next-dependency.md.",
+  "frameworkShims": {
+    "$comment": "Link, Script and dynamic are the browser leaf this repository owns after retiring Next.js. A framework shim must call the JSX factory and create DOM elements itself, which is what components/no-element-factory and components/no-custom-implementation forbid in business code. Files under these paths drop only those two rules; style, typography, motion, control-size, interaction and icon rules still apply. See docs/design/decisions/2026-11-18-1500-retire-next-dependency.md.",
     "paths": [
-      "lib/client-runtime/",
-      "lib/server-runtime/"
+      "lib/client-runtime/"
     ]
   },
   "asShipped": {
