@@ -113,8 +113,9 @@ function CreateTokenDialog({ workspaceId, onDone, open = true, onOpenChangeCompl
     if (!token) return
     // This token is shown once. A silent failure leaves the person believing
     // they copied it, then pasting an empty clipboard; say it did not work and
-    // leave the value selected so it can still be copied by hand.
-    try { await navigator.clipboard.writeText(token); setCopied(true) }
+    // leave the value selected so it can still be copied by hand. A later
+    // success clears the warning, so the two states never show together.
+    try { await navigator.clipboard.writeText(token); setCopied(true); setCopyFailed(false) }
     catch { setCopied(false); setCopyFailed(true) }
   }
 

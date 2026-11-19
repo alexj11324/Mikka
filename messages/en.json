@@ -2552,6 +2552,7 @@
       "githubAppOrganization": "Organization",
       "githubAppOrganizationName": "Organization name",
       "githubNoMatch": "No repository matches this search",
+      "githubClearSearch": "Clear search",
       "githubNoRepository": "No repositories yet. Authorize the GitHub App to see them here"
     },
     "slackInstallation": {

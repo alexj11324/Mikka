@@ -340,7 +340,7 @@ export function Onboarding({ computer = 'none', saveKey, workspaceId, onDone }: 
           {lines.map(line => line.from === 'bot'
             ? <motion.p key={line.id} className="text-md" initial={{ opacity: 0, y: reduce ? 0 : 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduce ? 0 : PACE.rise / 1000, ease: EASE_OUT }}>{line.text}</motion.p>
             : <motion.div key={line.id} className="flex justify-end" initial={{ opacity: 0, y: reduce ? 0 : 40, scale: reduce ? 1 : 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={reduce ? { duration: 0 } : BUBBLE_SPRING}>
-              <Bubble variant="secondary" align="end" className="max-w-[80%] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground"><BubbleContent className="rounded-2xl px-4 py-3">{line.text}</BubbleContent></Bubble>
+              <Bubble variant="secondary" align="end" className="max-w-[80%] *:data-[slot=bubble-content]:bg-sidebar-primary *:data-[slot=bubble-content]:text-sidebar-primary-foreground"><BubbleContent size="roomy">{line.text}</BubbleContent></Bubble>
             </motion.div>)}
         </AnimatePresence>
       </div>}

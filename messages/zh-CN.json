@@ -2552,6 +2552,7 @@
       "githubAppOrganization": "组织",
       "githubAppOrganizationName": "组织名",
       "githubNoMatch": "没有匹配的仓库",
+      "githubClearSearch": "清除搜索",
       "githubNoRepository": "还没有仓库。授权 GitHub App 后会显示在这里"
     },
     "slackInstallation": {

@@ -11,7 +11,6 @@ import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, 
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
 import { SourceAvatar, SourcesList, SourcesSummary, sourceTileClassName, type StreamingSource } from '@/components/ui/streaming-text'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Claude } from '@/components/ui/svgs/claude'
 import { Mikka } from '@/components/ui/svgs/mikka'
 import { OpenAI } from '@/components/ui/svgs/openai'
@@ -133,9 +132,19 @@ export function CitationSources({ text }: { text: string }) {
   </div>
 }
 
-/** The place of a task or thread chip whose task or thread is still being looked up; never its id or marker. */
+/**
+ * The place of a task or thread chip whose task or thread is still being looked
+ * up; never its id or marker.
+ *
+ * A `span`, not the shared `Skeleton`: this renders where a markdown link would,
+ * which react-markdown wraps in a `<p>` (components/workspace/agent-markdown.tsx
+ * registers `CitationAnchor` as the `a` renderer). `Skeleton` renders a `div`, and
+ * a `div` inside a `<p>` is invalid: the browser closes the paragraph when it
+ * re-parses the server HTML, so React 19 hydrates a different tree than it
+ * rendered. It keeps the skeleton's pulse and the chip's own colour token.
+ */
 export function PendingCitation() {
-  return <Skeleton aria-hidden="true" data-citation-pending="" className="mx-0.5 inline-block h-5 w-16 translate-y-[-1px] rounded-sm align-middle" />
+  return <span aria-hidden="true" data-citation-pending="" className="mx-0.5 inline-block h-5 w-16 translate-y-[-1px] animate-pulse rounded-[5px] bg-object-chip align-middle motion-reduce:animate-none" />
 }
 
 /**
