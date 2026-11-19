@@ -1,11 +1,10 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { notifiedToday } from '@/lib/attention/store'
-import { auth } from '@/lib/auth'
+import { requireUser } from '@/lib/acting-user'
 import { parsePreferencesPatch, readPreferences, savePreferences, type Preferences } from '@/lib/preferences'
 import { connectedComposioApps } from '@/lib/suggestions/sources'
 import { disabledSuggestionSources, isSuggestionSourceApp, SUGGESTION_SOURCE_APPS, writeSuggestionSource, type SuggestionSourceApp } from '@/lib/suggestions/source-settings'
@@ -14,11 +13,7 @@ import { isIanaTimeZone, readTimeZoneSetting, writeTimeZoneSetting, type TimeZon
 // Settings: 偏好设置, 通知 and 记忆与建议 (docs/settings-backend/prefs.md).
 // Every action reads the signed-in person from the session; none takes a user id.
 
-async function currentUserId(): Promise<string> {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user.id
-}
+const currentUserId = async () => (await requireUser()).id
 
 /** The notification, 偏好 and 记忆 settings the web Settings page shows (D16). */
 export async function getPreferences(): Promise<Preferences> {

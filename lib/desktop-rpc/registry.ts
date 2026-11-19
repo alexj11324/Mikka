@@ -205,6 +205,7 @@ const functions = {
   'linear-sync.retryLinearDelivery': actions15.retryLinearDelivery,
   'linear-sync.disconnectLinearAccount': actions15.disconnectLinearAccount,
   'link-preview.getLinkPreview': actions16.getLinkPreview,
+  'link-preview.getLinkPreviews': actions16.getLinkPreviews,
   'memory.getMemory': actions17.getMemory,
   'memory.setMemory': actions17.setMemory,
   'memory.clearMemory': actions17.clearMemory,

@@ -1,9 +1,8 @@
 'use server'
 
-import { headers } from 'next/headers'
-import { ActionFailureError, runAction } from '@/lib/action-error'
+import { runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
-import { auth } from '@/lib/auth'
+import { requireUser } from '@/lib/acting-user'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import type { ActivityFilter } from '@/lib/settings/activity-cursor'
 import { activityFor, type ActivityPage } from '@/lib/settings/activity'
@@ -12,15 +11,9 @@ import { deleteSavedLoginFor, replaceLoginPasswordFor, saveLoginFor, savedLoginU
 // Settings > saved logins and activity. Every read and write is scoped to the
 // signed-in person; ids from the client are only ever matched with that owner.
 
-async function getUser() {
-  const session = await auth.api.getSession({ headers: await headers() })
-  if (!session?.user) throw new ActionFailureError('authRequired')
-  return session.user
-}
+const getUser = requireUser
 
-async function getUserId(): Promise<string> {
-  return (await getUser()).id
-}
+const getUserId = async () => (await getUser()).id
 
 /** The person's saved logins: site, account and last use. Never a secret. */
 export async function listSavedLogins(): Promise<ActionResult<{ logins: SavedLogin[] }>> {

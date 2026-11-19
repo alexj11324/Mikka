@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
 import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { WhyDisabled } from '@/components/ui/why-disabled'
 import { Skeleton } from '@/components/ui/skeleton'
 import { claudeShowsCode, planName, readClipboardText, subscriptionSignInState, type SubscriptionUsageView } from '@/lib/subscription-ui'
 import { readSubscriptionUsage, readSubscriptions, subscriptionsKey, subscriptionUsageKey, useSubscriptions, type SubscriptionAttempt, type SubscriptionProvider } from '@/hooks/settings/use-subscriptions'
@@ -107,7 +108,7 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
                         {signInState === 'expired' ? t('signInExpired') : resumable && !signingIn ? t('unfinished') : reauth ? t('reauth') : paused ? t('paused') : t('notConnected')}
                       </span>}
                       {mine?.connectionId === connection.id && catching && <Button type="button" variant="ghost" size="sm" disabled={pending} onClick={cancel}>{t('cancel')}</Button>}
-                      {(reauth || !live || signingIn) && <SignInButton busy={signingIn} disabled={!canReconnect} label={t(resumable ? 'resume' : 'reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection, resumable) }} />}
+                      {(reauth || !live || signingIn) && <WhyDisabled reason={available ? undefined : t('unavailable')}><SignInButton busy={signingIn} disabled={!canReconnect} label={t(resumable ? 'resume' : 'reconnect')} busyLabel={t('connecting')} onClick={() => { void connect(provider, connection, resumable) }} /></WhyDisabled>}
                       {/* 启用, labelled like 设备's 参与调度: off, its models in 优先使用的模型 read 订阅已停用 and no run or chat uses it. */}
                       {live && !reauth && !signingIn && <Label className="flex items-center gap-2 font-normal text-muted-foreground">
                         <span aria-hidden="true" className="max-sm:hidden">{t('enabled')}</span>

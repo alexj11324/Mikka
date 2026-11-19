@@ -281,3 +281,58 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   2. 布局回归必须用**渲染断言**锁住（`querySelector('[data-context-panel]')`），不能只测「页面没崩」。
   3. 新写的回归测试要做变异验证：把旧代码放回去确认变红，否则不知道它在测什么。
   4. 跨组件共享的 context 要从**叶子模块**导出，不要从已经 import 了消费方的模块里导出（会形成 cycle）——`conversation-panels-context.ts` 就是这么拆出来的。
+
+## 2026-11-19 "grep 不到 importer" 不能用来删依赖
+
+- 现象：审计把 `unstorage` 判成死依赖删掉（源码里 grep `unstorage` 零命中），CI 上 Nitro 构建全线失败：`unstorage is not installed. It is required for KV storage (nitro/kv)`。`lib/agent-images-server.ts:3` 用的是虚拟模块 `nitro/kv`，真正的包由 Nitro 在构建期注入。
+- 根因：把"源码里没有 import"等同于"运行时不需要"。框架的约定式/虚拟模块依赖（Nitro `nitro/kv`、Next 的 `next/font`、Vite 插件注入的包）永远不会出现在 grep 结果里。
+- 规则：
+  1. 删依赖前，除了 `grep 'from "<pkg>"'`，还要 `grep` 框架的虚拟模块名（`nitro/`、`next/`、`virtual:`、`\0` 前缀）和配置文件（`nitro.config.*`、`vite.config.*`、插件目录）。
+  2. 判断"真的没人用"要看 CI 的构建 job 是否绿，不看 grep。本机按 AGENTS.md 不能 build，所以这类改动的唯一门禁就是 CI——推之前明确写下"这一项本机无法验证"。
+  3. 同类：`vaul`（Radix Drawer 的封装，可能被 ui 组件按需引用）、`file-type`（可能被运行时动态 import）。删之前先 `git log -S` 看引入原因。
+
+## 2026-11-19 改了 action 的导出，就要同步改所有 mock
+
+- 现象：给 `app/actions/link-preview.ts` 新增 `getLinkPreviews` 后，`components/workspace/agent-citations.tsx` 具名导入它；但 `group-chat-view.test.tsx` 和 `read-retry-toasts.test.tsx` 里的 `mock.module` 只导出了 `getLinkPreview`，于是 6 个 `test:groups` 用例全部 `SyntaxError: does not provide an export named 'getLinkPreviews'`。
+- 根因：`mock.module` 是**整体替换**模块导出表，不是增量打补丁；给真实模块加导出，所有 mock 都必须跟着加。
+- 规则：
+  1. 给 `app/actions/*` 加导出的同一次改动里，跑 `grep -rn "app/actions/<name>" --include='*.test.ts*'`，把每个 mock 都补齐。
+  2. 改完至少跑一次包含这些测试的**完整 suite**（这里是 `pnpm test:groups`），而不是只跑自己新加的文件。
+
+## 2026-11-19 生成产物必须跟着源码一起提交
+
+- 现象：改了 `app/v1/runs/[runId]/captures/[captureId]/route.ts`，`apps/api/generated/routes.{json,ts}` 里该路由的 `sourceHash` 过期，CI 的 governance acceptance 报 `API_DEV_ROUTES_STALE`。
+- 规则：改 `app/api/**` 或 `app/v1/**` 下的 route 文件后，必须跑 `node apps/api/scripts/generate-routes.mjs` 并提交产物；`--check` 是本地可跑的（不违反 AGENTS.md 的 build 禁令）。
+
+## 2026-11-19 新增后端文件要声明 self-hosted 依赖
+
+- 现象：`scripts/ci/self-hosted-requirements.mjs` 要求每个**改动的**后端文件在 `config/self-hosted-requirements.json` 里声明 `mode` / `environment` / `behavior` / `test`（测试文件必须存在且在某个 suite 里）。漏了 4 个文件，`image` job 直接红。
+- 规则：改 `lib/**`、`app/{api,v1,actions}/**`、`apps/{api,eve}/**`、`workflows/**` 下任何文件后，本地先跑 `node scripts/ci/self-hosted-requirements.mjs`（这个不需要 build，可以本机跑）。
+
+## 2026-11-19 给模块加导出，要连 fixtures/ 和 scripts/ 一起查
+
+- 现象：把 `requireUser` 挪进 `lib/acting-user.ts` 后，`tests/fixtures/legacy-scope-runtime.mjs` 用 `registerHooks` 整体替换该模块，只导出了 `currentUser`/`actAs`。`lib/workspace-access.ts` 的新 import 链接失败，两个 `test:scope-policy` 用例报 `does not provide an export named 'requireUser'`。
+- 根因：第一次只 grep 了 `*.test.ts*` 里的 `mock.module`，漏了 `tests/fixtures/*.mjs` 的 `registerHooks` 文件级替换（这是本仓库第二种 mock 机制）。
+- 规则：
+  1. 给任何被 mock 的模块加导出后，搜索范围必须包含：`*.test.ts`、`*.test.tsx`、`*.test.mjs`、`tests/fixtures/*.mjs`、`scripts/**/*.mjs`。
+  2. 本仓库有两套 mock 机制：`mock.module()`（node:test）和 `registerHooks` + `resolve/load`（fixture 预加载）。后者用 `--import ./tests/fixtures/xxx.mjs` 挂上，grep 关键字是 `resolve(`/`load(` 里的文件路径。
+  3. fixture 里替换成"抛错"的模块（如 scope-store 的 acting-user）是有意的语义，补导出时要保持同样的抛错行为，不要图省事写成成功返回。
+
+## 2026-11-19 断环前先确认真的有静态环
+
+- 现象：我为了"断开 `workspace-access ↔ issue-access` 循环"，把 `workspace-access.ts` 的 `requireUser` 改成直接从 `lib/acting-user` 导入。结果 `workspace-access` 静态拉入 `lib/session.ts` → `next/headers`，打红了两个**故意 stub `next/headers`** 的测试（`lib/linear-sync/kill-switch.test.ts` 只 mock 了 `cookies`；`lib/personal-mailbox-producer.test.ts` 因此在测试结束后才初始化 Better Auth）。
+- 根因：原代码根本没有静态环——`issue-access → workspace-access` 是 `await import()`，动态 import 不构成 ESM 静态循环。我"断环"的前提是错的，改动纯属多余且有害。
+- 规则：
+  1. 断环前用 `grep -n "import" <两个文件>` 确认两边的边是**静态** `import` 还是 `await import()`。动态的那条不算环。
+  2. `lib/acting-user.ts` 静态依赖 `lib/session.ts` → `next/headers`。任何"只在特定路径下才需要 session"的模块（workspace-access、issue-access、各种只读 store）都应保持惰性引入，不要为了统一而改成静态 import。
+  3. 判断某模块是否引入 session 链：`grep -n "^import" lib/acting-user.ts` 看有没有 `lib/session`。有，就说明静态引入它会拉 session。
+
+## 2026-11-19 DB 测试在本机过、CI 并发下被 cancelledByParent
+
+- 现象：`lib/captures/store.db.test.ts` 本地单跑 3.7 秒通过；CI 的 DB runner 并发 4 个 suite 时跑了 32 秒，报 `cancelledByParent` + `Promise resolution is still pending but the event loop has already resolved`，连带把同一文件里后面的 cloud-computer 子测试也掐掉。
+- 根因：我在测试里加了 12 次额外数据库往返（建 user → 建 run → saveCapture → createShare → 删 user → 查 → 再插 user → 查 → 插 guard → 查 → 删 guard → 查 → 删 run → 删 user）。`saveCapture` 本身还要开 `withAccountWrite` 事务、写 activity、读回。共享 PG 连接池时这些被放大。
+- 规则：
+  1. DB 测试里模拟"账号消失"这类状态，优先**直接 INSERT/UPDATE 目标行**，不要走完整业务函数（`saveCapture` 的开销是直接 INSERT 的好几倍）。
+  2. 断言的顺序按规则的读法排：先"存在时能用"，再"删除请求关闭"，再"行没了关闭"。不要为了复用一个 token 而反复插入/删除。
+  3. 本机复现 CI 的 DB 测试：需要名为 `mikka_e2e` 的库（测试硬编码这个名字），`MIGRATE=1` 先跑 `scripts/migrate.mjs`，然后 `REQUIRE_DB=1` + 四个 URL 环境变量都指向它。
+  4. `run_captures` 有 CHECK `run_captures_ready_file`：`status='ready'` 时 `storageKey`、`size`、`sha256` 都必须非空，直接 INSERT 时要一起给。
