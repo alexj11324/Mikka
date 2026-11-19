@@ -9,14 +9,6 @@ import { resumePendingGroupTurns } from '@/lib/group-conversations-route'
 import type { RunRecoverySweep } from '@/lib/run-recovery-due'
 
 /**
- * Everything run recovery does, for the run-recovery due timer (lib/due-timer.ts)
- * at its due time and for the slow reconciliation sweep (app/api/cron/run-recovery).
- * `groupTurns` runs the group-turn sweep: after the response in a request, inline
- * in a Workflow step (which has no request to run after). `only` limits the pass
- * to the sweeps whose work is due (lib/run-recovery-due.ts, #1371); a skipped
- * sweep reports null.
- */
-/**
  * A sweep that throws must not stop the others, but it must not vanish either:
  * the cron response reports `null` for a skipped sweep, so without a log a
  * sweep that fails every pass is indistinguishable from one that found nothing.
@@ -29,6 +21,14 @@ function swept<T>(name: string, work: Promise<T>): Promise<T | null> {
   })
 }
 
+/**
+ * Everything run recovery does, for the run-recovery due timer (lib/due-timer.ts)
+ * at its due time and for the slow reconciliation sweep (app/api/cron/run-recovery).
+ * `groupTurns` runs the group-turn sweep: after the response in a request, inline
+ * in a Workflow step (which has no request to run after). `only` limits the pass
+ * to the sweeps whose work is due (lib/run-recovery-due.ts, #1371); a skipped
+ * sweep reports null.
+ */
 export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => unknown, only?: ReadonlySet<RunRecoverySweep>) {
   const runs = (sweep: RunRecoverySweep) => !only || only.has(sweep)
   // Backstop for a lost `disconnected` report, in the cron sweep only (no `only`):
