@@ -8,16 +8,16 @@ Every finding below was **personally re-read in source** by the advisor before b
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Upgrade `undici` past its TLS-bypass advisories | P1 | S | — | TODO |
-| 002 | Make capture share links follow the issuer's current permission | P1 | S | — | TODO |
-| 003 | Stream the inline capture upload instead of buffering it | P1 | S | — | TODO |
-| 004 | Mask workspace secrets in Factory persisted text | P1 | M | — | TODO |
-| 005 | Give identity resolution one boundary; break the auth import cycle | P1 | M | — | TODO |
-| 006 | Run the six orphaned unit suites in CI | P1 | S | — | TODO |
-| 007 | Remove three unused dependencies and six `latest` pins | P2 | S | — | TODO |
-| 008 | Batch link-preview reads | P2 | S | — | TODO |
-| 009 | Give the conversation directory a real empty state (R-96) | P2 | S | — | TODO |
-| 010 | Enforce R-101 and translate the two hardcoded labels | P2 | M | — | TODO |
+| 001 | Upgrade `undici` past its TLS-bypass advisories | P1 | S | — | DONE (PR #2850) |
+| 002 | Make capture share links follow the issuer's current permission | P1 | S | — | DONE (PR #2850) |
+| 003 | Stream the inline capture upload instead of buffering it | P1 | S | — | DONE (PR #2850) |
+| 004 | Mask workspace secrets in Factory persisted text | P1 | M | — | DONE (PR #2850) |
+| 005 | Give identity resolution one boundary; break the auth import cycle | P1 | M | — | DONE (PR #2850) |
+| 006 | Run the six orphaned unit suites in CI | P1 | S | — | DONE (PR #2850) |
+| 007 | Remove three unused dependencies and six `latest` pins | P2 | S | — | DONE (PR #2850) |
+| 008 | Batch link-preview reads | P2 | S | — | DONE (PR #2850) |
+| 009 | Give the conversation directory a real empty state (R-96) | P2 | S | — | DONE (PR #2849) |
+| 010 | Enforce R-101 and translate the two hardcoded labels | P2 | M | — | DONE (PR #2849) |
 
 ## Dependency notes
 
