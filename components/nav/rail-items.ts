@@ -1,20 +1,24 @@
 import type { ComponentType } from 'react'
 import type { ChatNavEntry, ChatTarget } from './bot-list'
 import type { WorkspacePage } from '@/components/workspace/page-loaders'
-import { Columns3, GitPullRequest, House, Lightbulb } from '@/components/icons'
+import { CalendarClock, Columns3, GitPullRequest, House, Lightbulb } from '@/components/icons'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactFilled, Columns3Filled, HouseFilled, LightbulbFilled, PlugCircle, PlugCircleFilled } from '@/components/icons/rail-filled-icons'
 
-export type RailDestination = 'chats' | 'pulls' | 'suggestions' | 'board' | 'plugins' | 'artifacts'
+export type RailDestination = 'chats' | 'pulls' | 'automations' | 'suggestions' | 'board' | 'plugins' | 'artifacts'
 
 /** A lucide icon or one of ours drawn the same way (components/icons). */
 type RailIcon = ComponentType<{ className?: string; 'data-icon'?: string }>
 
 // 主页 (the bot chats), 建议, 任务 (one entry; 看板 and 列表 are its views, 2026-11-17-1500), plugins, Artifact. `selectedIcon` is the solid twin shown on the current item.
-export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'ArtifactsPage.category.pullRequests' | 'Nav.conversations' | 'Nav.suggestions' | 'Nav.tasks' | 'Nav.plugins' | 'Nav.artifacts' }[] = [
+export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: RailIcon; label: 'ArtifactsPage.category.pullRequests' | 'Nav.conversations' | 'Nav.suggestions' | 'Nav.tasks' | 'Nav.plugins' | 'Nav.artifacts' | 'Nav.automation' }[] = [
   { id: 'chats', icon: House, selectedIcon: HouseFilled, label: 'Nav.conversations' },
   { id: 'suggestions', icon: Lightbulb, selectedIcon: LightbulbFilled, label: 'Nav.suggestions' },
   { id: 'pulls', icon: GitPullRequest, selectedIcon: GitPullRequest, label: 'ArtifactsPage.category.pullRequests' },
+  // 自动化已是一整套功能 (components/automations, app/actions/automations.ts, the
+  // trigger webhooks) and reachable at `?section=automations`, but it had no way
+  // in from the rail — the one thing missing was this row.
+  { id: 'automations', icon: CalendarClock, selectedIcon: CalendarClock, label: 'Nav.automation' },
   { id: 'board', icon: Columns3, selectedIcon: Columns3Filled, label: 'Nav.tasks' },
   { id: 'plugins', icon: PlugCircle, selectedIcon: PlugCircleFilled, label: 'Nav.plugins' },
   { id: 'artifacts', icon: ArtifactIcon, selectedIcon: ArtifactFilled, label: 'Nav.artifacts' },

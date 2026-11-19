@@ -631,7 +631,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     } else if (destination === 'board') { if (navigateSection('all-issues')) setLayout('board') }
     else navigateSection(destination)
   }
-  const rail: RailDestination | null = section === 'conversations' ? 'chats' : section === 'pulls' ? 'pulls' : section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? section : ['all-issues', 'my-issues', 'projects'].includes(section) || section.startsWith('team-') ? 'board' : null
+  const rail: RailDestination | null = section === 'conversations' ? 'chats' : section === 'pulls' ? 'pulls' : section === 'automations' ? 'automations' : section === 'plugins' || section === 'suggestions' || section === 'artifacts' ? section : ['all-issues', 'my-issues', 'projects'].includes(section) || section.startsWith('team-') ? 'board' : null
   // The board (projects and team pages live under it, R-82), 建议 and Artifact keep only the rail on their left (MIK-45, Figma F2/F8).
   const fullPage = section === 'pulls' || section === 'conversations' || rail === 'board' || rail === 'suggestions' || rail === 'artifacts' || rail === 'plugins' || section === 'memory' || section === 'automations'
   // The Coordinator's bot row opens as the Coordinator's chat, never as a second bot.
