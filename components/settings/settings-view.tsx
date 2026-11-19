@@ -156,6 +156,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
     case 'preferences': return <><PreferencesSettings />{workspaceId && !preview && !workspaceError && <RestoreSetupChecklist key={workspaceId} workspaceId={workspaceId} />}</>
+    case 'threads': return workspaceId && !preview && !workspaceError ? <PreferencesSettings key={workspaceId} page="threads" workspaceId={workspaceId} workspaceName={workspaceName} /> : waiting ?? <FieldError>{t('workspaceUnavailable')}</FieldError>
     case 'notifications': return <NotificationSettings />
     case 'memory': return <MemorySettings />
     case 'bot-permissions': return <BotPermissionsSettings admin={admin} workspaceId={workspaceId} />

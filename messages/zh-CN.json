@@ -2172,6 +2172,10 @@
       "preferences": {
         "title": "偏好设置"
       },
+      "threads": {
+        "title": "线程",
+        "keywords": "线程标题 标题说明 重新生成 命名 工作区默认"
+      },
       "memory": {
         "title": "记忆与建议"
       },
@@ -3643,6 +3647,12 @@
     },
     "threadTitles": {
       "title": "线程标题",
+      "scope": {
+        "label": "线程设置范围",
+        "mine": "我的",
+        "workspace": "工作区"
+      },
+      "workspaceReadOnly": "工作区管理员可编辑",
       "instructions": "标题说明",
       "instructionsMine": "Mikka 给你发起的线程起名时，在工作区说明之外再遵循这些",
       "instructionsWorkspace": "Mikka 给这个工作区里每个线程起名时遵循这些",

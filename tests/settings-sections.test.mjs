@@ -3,7 +3,7 @@ import test from 'node:test'
 import { SETTINGS_SECTIONS, isSettingsSectionParam, resolveSettingsSection, settingsHref, visibleSettingsSections } from '../lib/settings-sections.ts'
 
 test('every v4 nav item has exactly one section, in Figma order (app permissions in the workspace group, 2026-11-10)', () => {
-  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'personal').map(s => s.id), ['account', 'security', 'preferences', 'notifications', 'memory', 'connections', 'models', 'logins', 'privacy', 'computers', 'developer'])
+  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'personal').map(s => s.id), ['account', 'security', 'preferences', 'threads', 'notifications', 'memory', 'connections', 'models', 'logins', 'privacy', 'computers', 'developer'])
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace').map(s => s.id), ['general', 'bot-permissions', 'members', 'teams', 'permissions', 'secrets', 'environments', 'audit', 'organization', 'usage', 'billing', 'cloud'])
 })
 
@@ -26,6 +26,8 @@ test('hrefs keep the workspace and use the routed paths for members and teams', 
   assert.equal(settingsHref('security', 'w1'), '/settings?workspace=w1&section=security')
   assert.equal(settingsHref('members', 'w1'), '/settings/members?workspace=w1')
   assert.equal(settingsHref('preferences'), '/settings?section=preferences')
+  assert.equal(settingsHref('threads', 'w1'), '/settings?workspace=w1&section=threads')
+  assert.equal(resolveSettingsSection('/settings', 'threads'), 'threads')
 })
 
 const UNBUILT = ['developer']
@@ -37,7 +39,7 @@ test('members do not see admin-only sections; admins see every built one', () =>
   assert.equal(member.includes('permissions'), false)
   // 计费: members see 付款 only (their card designation and credit share; C19).
   // 密钥与环境: members see every entry and write repository ones (decision 2026-11-02-2120).
-  for (const id of ['general', 'members', 'teams', 'computers', 'usage', 'billing', 'secrets']) assert.equal(member.includes(id), true, id)
+  for (const id of ['general', 'members', 'teams', 'computers', 'usage', 'billing', 'secrets', 'threads']) assert.equal(member.includes(id), true, id)
   for (const id of ['audit']) assert.equal(member.includes(id), false, id)
   assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !LAYER_ONLY.includes(s.id) && s.id !== 'cloud').map(s => s.id))
 })

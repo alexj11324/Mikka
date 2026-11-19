@@ -2172,6 +2172,10 @@
       "preferences": {
         "title": "Preferences"
       },
+      "threads": {
+        "title": "Threads",
+        "keywords": "thread titles title instructions regenerate naming workspace default"
+      },
       "memory": {
         "title": "Memory and suggestions"
       },
@@ -3643,6 +3647,12 @@
     },
     "threadTitles": {
       "title": "Thread titles",
+      "scope": {
+        "label": "Thread settings scope",
+        "mine": "Mine",
+        "workspace": "Workspace"
+      },
+      "workspaceReadOnly": "Workspace admins can edit",
       "instructions": "Title instructions",
       "instructionsMine": "How Mikka names the threads you start, on top of the workspace's instructions",
       "instructionsWorkspace": "How Mikka names every thread started in this workspace",

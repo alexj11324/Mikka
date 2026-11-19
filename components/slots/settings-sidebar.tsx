@@ -16,7 +16,7 @@ import { ResizablePane } from '@/components/ui/resizable-pane'
 import type { SettingsSidebarProps } from '@/components/slots/settings-sidebar-contract'
 
 const icons: Record<SettingsSectionId, IconGlyph> = {
-  account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks, 'bot-permissions': ShieldCheck,
+  account: UserRound, security: Shield, preferences: SlidersHorizontal, threads: FileText, notifications: Bell, memory: Brain, connections: Blocks, 'bot-permissions': ShieldCheck,
   models: Gauge, logins: KeyRound, privacy: Lock, computers: Monitor, developer: SquareTerminal,
   general: Building2, members: Users, teams: SquareUserRound, permissions: CircleCheck, secrets: HardDrive, environments: Container,
   audit: FileText, organization: Landmark, usage: ChartColumn, billing: CreditCard, cloud: Blocks,

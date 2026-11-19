@@ -4,7 +4,7 @@
  * exists in one place only.
  */
 export type SettingsSectionId =
-  | 'account' | 'security' | 'preferences' | 'notifications' | 'memory' | 'connections' | 'bot-permissions' | 'models'
+  | 'account' | 'security' | 'preferences' | 'threads' | 'notifications' | 'memory' | 'connections' | 'bot-permissions' | 'models'
   | 'logins' | 'privacy' | 'computers' | 'developer'
   | 'general' | 'members' | 'teams' | 'permissions' | 'secrets' | 'environments' | 'audit' | 'organization' | 'usage' | 'billing' | 'cloud'
 
@@ -29,6 +29,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'account', group: 'personal', title: 'Account' },
   { id: 'security', group: 'personal', title: 'Security' },
   { id: 'preferences', group: 'personal', title: 'Preferences' },
+  { id: 'threads', group: 'personal', title: 'Threads' },
   { id: 'notifications', group: 'personal', title: 'Notifications' },
   { id: 'memory', group: 'personal', title: 'Memory' },
   { id: 'connections', group: 'personal', title: 'Connections' },

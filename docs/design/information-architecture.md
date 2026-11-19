@@ -168,6 +168,7 @@ terms) and tenancy rule.
 | 账户 (`account`) | Account | Account | T6 | Account | Identity |
 | 安全 (`security`) | Account | Account | T6 | Account | Sign-in |
 | 偏好设置 (`preferences`) | Account | Account | T6 | Account; 重新播放引导 moves here (#890) | The person's own |
+| 线程 (`threads`) | Person in the current Workspace; Workspace defaults | Thread title settings | T1, T6 | One Mine / named workspace selector; members read Workspace, admins edit | One destination for thread-title instructions and regeneration triggers; both scopes retain the Settings URL's workspace |
 | 通知 (`notifications`) | Account | Account | T6 | Account | The person's pushes |
 | 记忆与建议 (`memory`) | Account | Account (profile memory) | T6; 2310 | Account | Facts about the person |
 | 连接 (`connections`) | Account | Connection | T6; 2240 | Account | Runs only the owner's bots |
@@ -193,6 +194,21 @@ related settings by type" (account group vs workspace group); IA-7 (show few
 options: a personal workspace hides only what cannot apply); PM:`empty-nav-state`
 (a destination that does not apply is explained, not silently hidden: the
 personal 常规 row 「个人工作区不能删除」 in #895).
+
+### Thread settings within the page
+
+Settings › Threads groups the person's and workspace's title settings under
+**Mine** and the current workspace's name in the shipped `SegmentedControl`.
+Mine is a per-person preference in the selected workspace. Its instructions add to the workspace instructions,
+and its regeneration trigger can inherit the workspace default. Members read
+Workspace settings through disabled controls and a read-only state; only admins
+edit them. The workspace remains explicit in
+the Settings URL when opening or switching sections.
+
+The title controls move out of Preferences and General. Preferences retains
+ordinary personal settings, and General retains workspace identity and danger
+actions. This changes their location, not their ownership or save actions. See
+the [Threads settings decision](decisions/2026-11-19-threads-settings.md).
 
 ### Model settings within the page
 
