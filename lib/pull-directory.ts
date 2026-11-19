@@ -53,6 +53,28 @@ export const pullPageInput = z.strictObject({
   view: z.enum(pullViews).default("open"),
 });
 
+/** The query for one pull request's changed files (app/api/integrations/github/repositories/pulls/files). */
+export const pullFilesQuery = z.strictObject({
+  repo: pullPageInput.shape.repo,
+  number: z
+    .string()
+    .regex(/^[1-9]\d{0,9}$/)
+    .refine((value) => Number.isSafeInteger(Number(value)), "invalid number"),
+});
+
+/**
+ * A row's pull request as the review page opens it: `repo` holds `owner/name` on
+ * the row, and the page needs the two halves apart. Null when the row does not
+ * name a repository, so nothing offers a review it cannot read.
+ */
+export function pullReviewRef(
+  pull: Pick<PullDirectoryRow, "repo" | "number">,
+): { owner: string; repo: string; number: number } | null {
+  const [owner, name, ...rest] = pull.repo.split("/");
+  if (!owner || !name || rest.length) return null;
+  return { owner, repo: name, number: pull.number };
+}
+
 export function pullDirectoryState(pull: PullDirectoryRow): PullState {
   if (
     pull.state === "merged" ||

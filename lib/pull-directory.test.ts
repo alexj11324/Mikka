@@ -5,7 +5,9 @@ import {
   groupDirectoryPulls,
   linkedPullDirectory,
   pullDirectoryState,
+  pullFilesQuery,
   pullPageInput,
+  pullReviewRef,
   type PullDirectoryRow,
 } from "./pull-directory";
 const row = (changes: Partial<PullDirectoryRow> = {}): PullDirectoryRow => ({
@@ -175,5 +177,33 @@ test("input bounds reject URLs, arbitrary states, huge cursors and path traversa
     repo: "Owner/Repo",
     cursor: null,
     view: "open",
+  });
+});
+
+test("a row's pull request opens by its reference, never by its URL", () => {
+  assert.deepEqual(pullReviewRef({ repo: "Owner/Repo", number: 7 }), {
+    owner: "Owner",
+    repo: "Repo",
+    number: 7,
+  });
+  // A row that does not name a repository offers no review it could not read.
+  assert.equal(pullReviewRef({ repo: "Repo", number: 7 }), null);
+  assert.equal(pullReviewRef({ repo: "Owner/Repo/Sub", number: 7 }), null);
+  for (const query of [
+    { repo: "Owner/Repo", number: "0" },
+    { repo: "Owner/Repo", number: "-7" },
+    { repo: "Owner/Repo", number: "7.5" },
+    { repo: "Owner/Repo", number: "https://github.com/Owner/Repo/pull/7" },
+    { repo: "Owner/Repo", number: 7 },
+    { repo: "Owner/Repo", number: "7", cursor: "next" },
+  ])
+    assert.equal(
+      pullFilesQuery.safeParse(query).success,
+      false,
+      String(query.number),
+    );
+  assert.deepEqual(pullFilesQuery.parse({ repo: "Owner/Repo", number: "7" }), {
+    repo: "Owner/Repo",
+    number: "7",
   });
 });
