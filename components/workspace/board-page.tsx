@@ -266,7 +266,8 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
 
   return <div className="flex min-h-0 flex-1">
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-      <h1 id={titleId} className="sr-only">{t('title')}</h1>
+      {/* R-100: the page's title, at the size 设置 and the other rail pages use, so switching pages does not move it. */}
+      <h1 id={titleId} className="shrink-0 px-6 pt-4 text-xl font-semibold text-foreground">{t('title')}</h1>
       {readNotice ?? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks }}
         view={view} onView={next => update({ view: next })} scopes={scopes} scope="all" onScope={() => {}}
         filterItems={filterItems} filterCount={activeFilters.length} sortItems={sortItems} tools={<span className="flex items-center gap-1 max-md:hidden">{refreshButton}{panelButton}</span>}

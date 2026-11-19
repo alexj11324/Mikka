@@ -4,6 +4,12 @@
 // conditions that are on as chips you can remove where you read them, the
 // group-by control, and a quiet ⋯ for refresh, the reading views and the saved
 // views (decision 2026-11-18-1400; Alex, 2026-11-18 「你应该跟他修成一样的才对吧」).
+// The row stays one family, as the board's toolbar and 自动化's are: the search
+// and the group-by control take a `--control` fill with no stroke, the group-by
+// selection is the row's one filled segment (R-31), and every action beside them
+// is ghost until it is on (R-99: one step, 28px, for the whole row — the search
+// names `h-(--control-sm)` because the size policy reads the call site, not the
+// component's own default).
 import { useState } from "react";
 import { Bookmark, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react";
 import { useTranslations } from "@/lib/intl/i18n-client";
@@ -40,6 +46,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { SearchInput } from "@/components/ui/search-input";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const stateKeys: Record<PullState, `states.${PullState}`> = {
   ready: "states.ready",
@@ -56,6 +63,9 @@ const groupKeys: Record<PullGroup, `groups.${PullGroup}`> = {
   author: "groups.author",
   none: "groups.none",
 };
+/** The grouping a segmented control reports back, read against the list it was built from. */
+const groupingValue = (value: string | undefined) =>
+  pullGroups.find((group) => group === value);
 
 export function activeFilterCount(filters: PullFilters, repo: string) {
   return [
@@ -114,7 +124,7 @@ export function PullFilterBar({
   if (filters.linked) chips.push({ key: "linked", label: t("linkedOnly"), clear: { linked: false } });
   return (
     <div className="flex flex-col gap-2 px-4 pb-2">
-      {/* control-size-exempt: the filter bar mixes a 28px search with 24px chips inside the filter popover; the chips are not toolbar peers. */}
+      {/* control-size-exempt: the row's 24px control is the remove-view icon inside a saved-view menu row, not a peer of the 28px toolbar controls beside it. */}
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <FieldGroup className="min-w-44 max-w-96 flex-1">
           <Field className="gap-0">
@@ -223,19 +233,23 @@ export function PullFilterBar({
             </div>
           </PopoverContent>
         </Popover>
-        <NativeSelect
-          size="sm"
+        <ToggleGroup
           aria-label={t("grouping")}
-          value={grouping}
-          onChange={(event) => onGrouping(event.target.value as PullGroup)}
-          className="w-fit"
+          size="sm"
+          variant="segment"
+          spacing={0.5}
+          value={[grouping]}
+          onValueChange={(values) => {
+            const next = groupingValue(values[0]);
+            if (next) onGrouping(next);
+          }}
         >
           {pullGroups.map((group) => (
-            <NativeSelectOption key={group} value={group}>
+            <ToggleGroupItem key={group} value={group}>
               {t(groupKeys[group])}
-            </NativeSelectOption>
+            </ToggleGroupItem>
           ))}
-        </NativeSelect>
+        </ToggleGroup>
         <span className="ms-auto text-xs tabular-nums text-muted-foreground">
           {shown === total ? t("countAll", { count: total }) : t("countShown", { shown, count: total })}
         </span>

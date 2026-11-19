@@ -700,8 +700,11 @@
   },
   "apps/api/scripts/dev.mjs": {
     "mode": "built-in",
-    "environment": [],
-    "behavior": "The development server uses Nitro's native drain during worker replacement so admitted requests can finish with their original worker.",
+    "environment": [
+      "MIKKA_UI_OVERLAY_DIR",
+      "MIKKA_LOCAL_TEST_ACCOUNTS"
+    ],
+    "behavior": "The development server uses Nitro’s native drain during worker replacement so admitted requests can finish with their original worker, and before it listens it prepares a loopback database, the official UI overlay’s dependencies and one local development account.",
     "test": "apps/api/runtime/dev-tracing.test.mjs"
   },
   "apps/api/scripts/finalize-build.mjs": {
@@ -3622,5 +3625,38 @@
     "behavior": "Resolve the signed-in or acting person and authorize a task read against the installation's own PostgreSQL records, including workspace membership, token scope and Enterprise principal.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261119165111_agent_runs_status_lease_idx.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Indexes agent_runs on (status, leaseExpiresAt) so the due-timer recovery sweep and the lease reclaim stop scanning the table once per pass and once per owner. Schema only; the installation database serves it.",
+    "test": "lib/run-recovery-due.db.test.ts",
+    "suite": "test:run-recovery-db"
+  },
+  "lib/account/billing-cleanup.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Cancels a deleted account’s Stripe subscription before its workspace row is removed, so the installation stops billing a person who no longer has an account. Needs no installation dependency when the workspace has no customer.",
+    "test": "lib/account/owner-cleanup.db.test.ts",
+    "suite": "test:account-db"
+  },
+  "lib/link-preview.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fetches a link preview from a public address only. Every connection resolves the host and refuses a private answer at dial time, so the installation never reaches an internal or metadata address on a person’s behalf.",
+    "test": "lib/link-preview.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "apps/api/scripts/dev-preflight.mjs": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "E2E_DATABASE_URL",
+      "MIKKA_UI_OVERLAY_DIR",
+      "MIKKA_LOCAL_TEST_ACCOUNTS"
+    ],
+    "behavior": "Prepares what pnpm dev needs before anything listens: a loopback PostgreSQL database created and migrated, the official UI overlay’s own dependencies installed when missing, and one development account whose password is generated on the machine and kept in a gitignored file. Refuses to create a database anywhere but this machine.",
+    "test": "apps/api/scripts/dev-preflight.test.mjs"
   }
 }

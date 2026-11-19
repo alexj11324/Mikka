@@ -3,7 +3,7 @@
 import { Fragment, useState, type MouseEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { ChevronDown, Ellipsis, Pin, Plus, X } from '@/components/icons'
+import { CalendarClock, ChevronDown, Ellipsis, Pin, Plus, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { organizeAutomation, pinAutomation, restoreAutomation } from '@/app/actions/automations'
 import { listWorkspaceBots } from '@/app/actions/bots'
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionError } from '@/lib/use-action-error'
-import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@/components/ui/item'
 import { SearchInput } from '@/components/ui/search-input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -125,7 +125,7 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
   return <section aria-labelledby="automations-title" className="flex min-h-0 flex-1 flex-col overflow-auto">
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
       <header className="flex items-center justify-between gap-3">
-        <h1 id="automations-title" className="text-xl font-semibold">{t('title')}</h1>
+        <h1 id="automations-title" className="text-xl font-semibold text-foreground">{t('title')}</h1>
         {create}
       </header>
       {/* control-size-exempt: the clear-tag button sits inside a badge chip, sized to the chip. */}
@@ -138,8 +138,8 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
       </div>
       {error && !data ? <InlineLoadError message={t('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2].map(index => <Skeleton key={index} className="h-16 w-full rounded-xl" />)}</div>
-          : !visible.length ? <Empty className="border">
-            <EmptyHeader><EmptyTitle>{filter === 'deleted' ? t('emptyDeleted') : automations.length ? t('emptyFiltered') : t('empty')}</EmptyTitle></EmptyHeader>
+          : !visible.length ? <Empty className="min-h-72">
+            <EmptyHeader><EmptyMedia variant="icon"><CalendarClock aria-hidden="true" /></EmptyMedia><EmptyTitle>{filter === 'deleted' ? t('emptyDeleted') : automations.length ? t('emptyFiltered') : t('empty')}</EmptyTitle></EmptyHeader>
             {filter !== 'deleted' && !automations.length && <EmptyContent>{create}</EmptyContent>}
           </Empty>
             : <div className="flex flex-col gap-4">{groups.map(group => <section key={group.key} aria-label={group.label ?? undefined} className="flex flex-col gap-2">

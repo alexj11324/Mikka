@@ -174,9 +174,11 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       await lease.query('UPDATE account_deletion_jobs SET stage=\'external_pending\',"updatedAt"=now() WHERE id=$1', [id])
       let report: AccountCleanupReport
       try {
+        // The plan frozen in prepare() names the workspaces that go, so their paid plans are
+        // cancelled here, before any row this job removes can make the charge unreachable.
         const result = await withDatabaseClient(lease, () => options.externalCleanup
           ? options.externalCleanup(job.subjectUserId, main)
-          : cleanupAccountConnections(job.subjectUserId, main, { id, client: lease }))
+          : cleanupAccountConnections(job.subjectUserId, main, { id, client: lease }, job.plan?.solo ?? []))
         report = Array.isArray(result) ? { blockedReasons: result, warnings: [] } : result
       } catch { report = { blockedReasons: ['external_cleanup_failed'], warnings: [] } }
       assertHeld()
