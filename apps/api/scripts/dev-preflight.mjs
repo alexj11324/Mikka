@@ -97,9 +97,16 @@ export async function prepareDevelopment({ root, env = process.env, log = () => 
 
   const created = serverUp ? false : await ensureDatabase(databaseUrl)
   if (created) log(`[dev] created database ${new URL(databaseUrl).pathname.slice(1)}`)
-  if (created || !(await migrated(databaseUrl))) {
+  if (created) {
     log('[dev] applying migrations')
     migrate(root, databaseUrl)
+  } else if (!(await migrated(databaseUrl))) {
+    // A database this process did not create belongs to whoever named it: a CI
+    // runner migrates its own, and a restricted role cannot even see the ledger
+    // that would say so. Migrating it from here failed with a plain "relation
+    // already exists" and took the server down before it listened, so name the
+    // command instead of guessing at the schema.
+    log(`[dev] the schema of ${new URL(databaseUrl).pathname.slice(1)} is not this process's to migrate; run \`pnpm migrate\` if it is out of date`)
   }
 
   const overlayDirectory = env.MIKKA_UI_OVERLAY_DIR?.trim() || (existsSync(join(root, '.hosted-ui')) ? '.hosted-ui' : '')

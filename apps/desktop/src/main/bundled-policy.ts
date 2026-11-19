@@ -62,6 +62,8 @@ const SERVICE_IDENTITY_ROUTES: ReadonlyArray<readonly [RegExp, string]> = [
 ]
 /** Route families are enumerated; there is deliberately no generic /api/* forwarding. */
 const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
+  [new RegExp(`^/api/workspaces/${UUID}/devices/${UUID}/project-checkout(?:/clear)?$`), ['POST']],
+  [new RegExp(`^/api/workspaces/${UUID}/projects/${UUID}/device-checkouts$`), ['GET']],
   [/^\/api\/agents\/eve\/v1\/session$/, ['POST']],
   [new RegExp(`^/api/agents/eve/v1/session/${ID}$`), ['GET', 'POST']],
   [new RegExp(`^/api/agents/eve/v1/session/${ID}/(?:cancel|compact|clear|end|reset)$`), ['POST']],
