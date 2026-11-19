@@ -52,7 +52,7 @@ export function LocalSetupStatus({ onOnline }: { onOnline: () => void }) {
     <ItemMedia>
       {state.status === 'online' ? <Check aria-hidden="true" className="text-success-foreground" />
         : state.status === 'failed' ? <X aria-hidden="true" className="text-destructive-foreground" />
-          : <Spinner aria-hidden="true" />}
+          : <Spinner aria-hidden="true" className="text-muted-foreground" />}
     </ItemMedia>
     <ItemContent className="min-w-0">
       <ItemTitle>{state.status === 'online' ? t('local.online') : state.status === 'failed' ? t('local.failed') : t('local.adding')}</ItemTitle>

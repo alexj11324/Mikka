@@ -20,7 +20,7 @@ import { DaemonCommandList } from './connect-device-dialog'
 function StepIcon({ state }: { state: StepState }) {
   if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success-foreground" />
   if (state === 'failed') return <X aria-hidden="true" className="size-4 text-destructive-foreground" />
-  if (state === 'running') return <Spinner aria-hidden="true" />
+  if (state === 'running') return <Spinner aria-hidden="true" className="text-muted-foreground" />
   return <Circle aria-hidden="true" className="size-4 text-tertiary" />
 }
 
