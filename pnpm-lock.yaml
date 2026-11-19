@@ -29,7 +29,7 @@ patchedDependencies:
     hash: 7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b
     path: patches/ffmpeg-static@5.3.0.patch
   graphile-worker@0.16.6:
-    hash: 2083f044d5fe42e1c316aeec4ec91d104b995e929dab61ae7eec0a19cfadab0e
+    hash: 7fcd34e117441d09f9b44e5076590243984ca998fdda8df59b398928b03937d7
     path: patches/graphile-worker@0.16.6.patch
 
 importers:
