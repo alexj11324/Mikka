@@ -205,7 +205,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: &native_runtime |
           pnpm exec playwright install --with-deps chromium
-          sudo apt-get install -y xvfb dbus-x11 gnome-keyring libsecret-1-0
+          sudo apt-get install -y xvfb xdotool x11-utils imagemagick tesseract-ocr dbus-x11 gnome-keyring libsecret-1-0
           node apps/desktop/scripts/install-electron.mjs
       - name: Build one packaged acceptance desktop with an independent default server
         if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
@@ -395,6 +395,8 @@ jobs:
         env:
           MIKKA_UI_OVERLAY_SHA: ${{ inputs.overlay_sha }}
           MIKKA_DESKTOP_PROTOCOL_ONLY: 'false'
+          MIKKA_TEST_X11_DIRECTORY_DIALOG: '1'
+          LANG: C.UTF-8
           MIKKA_DESKTOP_EXECUTABLE: ${{ github.workspace }}/apps/desktop/release-acceptance/linux-unpacked/mikka-selfhost-acceptance
         run: *native_check
         timeout-minutes: 5

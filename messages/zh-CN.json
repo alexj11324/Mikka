@@ -1903,6 +1903,19 @@
     "backToAccessible": "返回可访问的工作区"
   },
   "Projects": {
+    "deviceCheckouts": {
+      "title": "我的本地目录",
+      "empty": "尚未选择目录。",
+      "desktopEmpty": "在 Mikka 桌面版中选择目录。",
+      "choose": "选择 Git 目录",
+      "link": "连接这台电脑",
+      "linkFailed": "未能将这台电脑连接到工作区。",
+      "notRepo": "请选择 Git 仓库内的目录。",
+      "readFailed": "无法加载你的目录。",
+      "writeFailed": "未能保存目录更改，请重试。",
+      "device": "设备",
+      "clearFor": "移除{device}上的目录"
+    },
     "dependencies": {
       "title": "依赖仓库",
       "empty": "暂无可显示的仓库。",
