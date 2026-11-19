@@ -155,7 +155,7 @@ export async function profilePromptSection(userId: string, used: readonly string
   const rows = await db.select({
     kind: userFacts.kind, subject: userFacts.subject, repository: userFacts.repository, confidence: userFacts.confidence,
     lastSeenAt: userFacts.lastSeenAt, userEdited: userFacts.userEdited,
-  }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'))).limit(500)
+  }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'), eq(userFacts.reviewStatus, 'approved'))).limit(500)
   return profileSection(promptFacts(rows as PromptFact[], used))
 }
 

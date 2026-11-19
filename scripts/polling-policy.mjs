@@ -54,7 +54,6 @@ export const pollingAllowlist = {
   // UI timers: read no data.
   'components/motion/loader.tsx': ui('loader animation frames', 3),
   'components/ui/thinking-loader-clean.tsx': ui('thinking loader animation', 1),
-  'components/workspace/agent-demo.tsx': ui('types out the demo code', 1),
   'components/onboarding/onboarding.tsx': ui('onboarding waits up to 5 s for data another hook is already loading; no read of its own', 2),
   'apps/mobile/components/beui/components/loader/loader.tsx': ui('loader animation frames', 3),
   'apps/mobile/components/beui/components/loading-states/agent-progress.tsx': ui('progress animation', 1),
