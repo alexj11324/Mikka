@@ -2772,7 +2772,7 @@
       "expires": "Expires {date}",
       "noExpiry": "Never expires",
       "expired": "Expired",
-      "copyFailed": "Could not copy. Select the key and copy it by hand"
+      "copyFailed": "Could not copy. Select the token and copy it by hand"
     },
     "secrets": {
       "heading": "Secrets",

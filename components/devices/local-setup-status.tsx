@@ -49,7 +49,9 @@ export function LocalSetupStatus({ onOnline }: { onOnline: () => void }) {
   const steps = stepStates(state)
   const current = STEPS.find(step => steps[step] === 'running' || steps[step] === 'failed')
   return <Item variant="outline" role="status" aria-live="polite" className="rounded-xl bg-card px-3.5 py-3">
-    <ItemMedia>
+    {/* variant="icon" is what normalises an unclassed glyph to the spinner's size;
+        a size-* class here would be overridden by the icon policy instead. */}
+    <ItemMedia variant="icon">
       {state.status === 'online' ? <Check aria-hidden="true" className="text-success-foreground" />
         : state.status === 'failed' ? <X aria-hidden="true" className="text-destructive-foreground" />
           : <Spinner aria-hidden="true" className="text-muted-foreground" />}

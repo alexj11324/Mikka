@@ -16,8 +16,8 @@ Every finding below was **personally re-read in source** by the advisor before b
 | 006 | Run the six orphaned unit suites in CI | P1 | S | — | DONE (PR #2850) |
 | 007 | Remove three unused dependencies and six `latest` pins | P2 | S | — | DONE (PR #2850) |
 | 008 | Batch link-preview reads | P2 | S | — | DONE (PR #2850) |
-| 009 | Give the conversation directory a real empty state (R-96) | P2 | S | — | DONE (PR #2849) |
-| 010 | Enforce R-101 and translate the two hardcoded labels | P2 | M | — | DONE (PR #2849) |
+| 009 | Give the conversation directory a real empty state (R-96) | P2 | S | — | DONE (PR #2850) |
+| 010 | Enforce R-101 and translate the two hardcoded labels | P2 | M | — | DONE (PR #2850) |
 
 ## Dependency notes
 
