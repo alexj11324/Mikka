@@ -212,7 +212,7 @@ export function GroupChatView({ group, userId, people, ownedBots, onLeft }: {
     {namedChat
       ? <ThreadHeader standalone issueId={null} runId={group.id} title={group.title || t('untitled')} headingRef={titleHeading}
           onTitleChanged={() => { void refreshCache(botKeys.groups(userId, group.workspaceId)) }}
-          onStop={null} place={null} acceptanceBadge={null} identity={null} artifact={null} tabs={null} wraps={false} />
+          onStop={null} place={null} acceptanceBadge={null} identity={null} />
       : <ConversationPill name={group.title || t('untitled')} avatar={<GroupAvatar title={group.title || t('untitled')} members={members} />} />}
     {onLeft && !refused && !accessRejected && mayLeaveGroup(members, userId)
       ? <div className="flex h-14 shrink-0 items-center justify-end px-4">

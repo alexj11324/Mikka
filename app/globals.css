@@ -56,6 +56,10 @@
 --color-secondary-foreground: var(--secondary-foreground);
 --color-muted: var(--mk-muted, var(--muted));
 --color-muted-foreground: var(--muted-foreground);
+/* The third text level (R-104). Before it, a quieter-than-muted label was written as one of
+   eight ad-hoc opacities (muted-foreground/35 … /80), so two labels at the same level looked
+   different. `text-tertiary` is the level below `text-muted-foreground`. */
+--color-tertiary: var(--tertiary);
 --color-accent: var(--mk-accent, var(--accent));
 --color-accent-foreground: var(--accent-foreground);
 --color-destructive: var(--destructive);
@@ -150,6 +154,20 @@
 --color-line: var(--line);
 --color-line-strong: var(--line-strong);
 --radius-control: 8px;
+/* One height scale for every control (Button, NativeSelect, Input, InputGroup, SearchInput).
+   A mixed row is the defect these tokens exist to prevent (R-99): two controls side by side
+   must take the same step, so a 28px button can never sit next to a 32px select. */
+--control-xs: 1.5rem;   /* 24px */
+--control-sm: 1.75rem;  /* 28px */
+--control-md: 2rem;     /* 32px */
+--control-lg: 2.25rem;  /* 36px */
+/* One motion scale (R-103). Before it, the tree held ten durations (0/100/150/200/250/300/
+   350/400/450/1000) and eight curves, so two panels that opened together did not feel like
+   one product. Three durations cover every case: a state change, a surface arriving, and a
+   deliberate travel. */
+--motion-fast: 100ms;    /* colour, opacity, a pressed state */
+--motion-base: 200ms;    /* a panel, popover or row arriving */
+--motion-slow: 320ms;    /* a sheet or a drawer travelling */
 --ease-link: cubic-bezier(0.16, 1, 0.3, 1);
 --shadow-hairline: 0 0 0 1px var(--line);
 }
@@ -225,6 +243,9 @@
 --secondary-foreground: oklch(0.205 0 0);
 --muted: oklch(0.97 0 0);
 --muted-foreground: oklch(0.49 0 0);
+/* R-104's third level: 5.06:1 on the page and 4.64:1 on a `bg-muted` fill, still a
+   visible step below `--muted-foreground` (0.49) so the two levels read apart. */
+--tertiary: oklch(0.54 0 0);
 --accent: oklch(0.97 0 0);
 --accent-foreground: oklch(0.205 0 0);
 --destructive: oklch(0.577 0.245 27.325);
@@ -316,6 +337,9 @@
 --secondary-foreground: oklch(0.985 0 0);
 --muted: oklch(0.269 0 0);
 --muted-foreground: oklch(0.708 0 0);
+/* 5.49:1 on the page (rgb(24 24 24)), 4.86:1 on a card and 4.67:1 on a `bg-muted` fill,
+   so the quiet level stays legible where it sits on a surface, not only on the page (R-104). */
+--tertiary: oklch(0.65 0 0);
 --accent: oklch(0.269 0 0);
 --accent-foreground: oklch(0.985 0 0);
 --destructive: oklch(0.704 0.191 22.216);

@@ -10,6 +10,14 @@ import { connectKind, type ConnectKind } from './connect-kind'
 export type StoreCategory = { id: string; name: string }
 /** `connect`: one click (managed), the person's own credentials, nothing to connect, or not connectable from Mikka yet. */
 export type StoreApp = { id: string; name: string; description: string; iconUrl: string | null; categories: StoreCategory[]; createdAt: string | null; connect: ConnectKind }
+/** A clearly equivalent API-key variant (e.g. ahrefs_mcp → ahrefs) when Composio exposes exactly one. */
+export function findCredentialAlternative(app: Pick<StoreApp, 'id' | 'connect'>, apps: readonly Pick<StoreApp, 'id' | 'name' | 'connect'>[]) {
+  if (app.connect !== 'oauthSetupRequired') return null
+  const provider = (id: string) => id.replace(/_(?:mcp|basic|api)$/i, '')
+  const matches = apps.filter(candidate => candidate.id !== app.id && candidate.connect === 'credentials' && provider(candidate.id) === provider(app.id))
+  return matches.length === 1 ? { id: matches[0].id, name: matches[0].name } : null
+}
+
 export type StoreCatalog = {
   /** In Composio's usage order (`sort_by=usage`), most used first. */
   apps: StoreApp[]

@@ -2,7 +2,7 @@
 
 // The default thread-card slot (docs/ui-overlay.md): what a reply dispatched, as a card in the chat.
 import { useTranslations } from 'next-intl'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight } from '@/components/icons'
 import { runThreadName, type RunSource } from '@/lib/coordinator/citations'
 import { machineName, runInfoParts } from '@/lib/run-info-view'
 import { Button } from '@/components/ui/button'

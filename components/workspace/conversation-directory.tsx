@@ -13,15 +13,36 @@ import { listConversations } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/ui/search-input'
 import { Label } from '@/components/ui/label'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
+import { Skeleton } from '@/components/ui/skeleton'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { GitPullRequest, MessageSquare } from '@/components/icons'
+import { cn } from '@/lib/utils'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { archiveIdleDays, directoryConversationKey, directoryTaskNumbers, type DirectoryState } from '@/lib/conversation-directory-input'
 import { PullRequestsBadge, pullRequestRef } from './pull-requests-badge'
+import { PULL_REQUEST_COLORS } from '@/lib/pull-request-appearance'
 import { directoryPullRequests, directoryPullStates as pullStates } from '@/lib/directory-pulls'
 import { openGroupConversation, openTask, openThread } from './workspace-navigation'
 
 type Page = Awaited<ReturnType<typeof listConversations>>
 const states = ['all', 'working', 'waiting', 'idle', 'failed'] as const
+
+/** The rows' shape while the first page loads, so the list does not jump when it arrives. */
+function DirectorySkeleton({ label }: { label: string }) {
+  // role="status" is the live region that announces the wait; aria-hidden would take it
+  // out of the accessible tree and silence it, so the rows alone are hidden instead.
+  return <div role="status" className="flex flex-col gap-2">
+    <span className="sr-only">{label}</span>
+    <div aria-hidden="true" className="flex flex-col gap-2">
+      {[0, 1, 2, 3].map(row => <div key={row} className="flex items-center gap-2 py-2">
+        <Skeleton className="h-4 min-w-0 flex-1 rounded-sm" />
+        <Skeleton className="h-4 w-16 rounded-sm" />
+        <Skeleton className="h-4 w-24 rounded-sm" />
+      </div>)}
+    </div>
+  </div>
+}
 
 export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 0, pullsOnly = false }: { ownerId: string; workspaceId: string | null; botId: string | null; revision?: number; pullsOnly?: boolean }) {
   const t = useTranslations('ConversationDirectory')
@@ -79,10 +100,12 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
       : prefs.error && <p role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={() => void prefs.mutate()}>{t('retry')}</Button></p>}
     <SearchInput type="search" value={search} maxLength={120} aria-label={t('search')} placeholder={t('search')}
       onChange={event => setSearch(event.target.value)} />
+    {/* Every control in this row takes the same step (R-99): the old mix of 28px
+        buttons beside a 32px select is what made the toolbar look broken. */}
     <div className="flex flex-wrap items-center gap-2">
       {!pullsOnly && states.map(value => <Button key={value} size="sm" variant={value === state ? 'secondary' : 'ghost'}
         aria-pressed={value === state} onClick={() => setState(value)}>{t(value)}</Button>)}
-      <NativeSelect aria-label={categories('pullRequests')} value={pullState} onChange={event => setPullState(event.target.value as typeof pullState)}>
+      <NativeSelect size="sm" aria-label={categories('pullRequests')} value={pullState} onChange={event => setPullState(event.target.value as typeof pullState)}>
         {pullStates.map(value => <NativeSelectOption value={value} key={value}>{value === 'all' ? categories('pullRequests') : prLabel(value)}</NativeSelectOption>)}
       </NativeSelect>
       {!pullsOnly && <Button size="sm" variant="outline" aria-pressed={archived} onClick={() => setArchived(!archived)}>{t('archived')}</Button>}
@@ -90,31 +113,51 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
     </div>
     {writeError && <p role="alert">{t('writeError')}</p>}
     {error && <div role="alert">{t('loadError')} <Button size="sm" variant="ghost" onClick={() => void mutate()}>{t('retry')}</Button></div>}
-    {!error && !data && <p role="status">{t('loading')}</p>}
-    {data && !rows.length && !more && !error && <p role="status">{t('empty')}</p>}
+    {!error && !data && <DirectorySkeleton label={t('loading')} />}
+    {data && !rows.length && !more && !error && <Empty className="min-h-64 border-0">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">{pullsOnly ? <GitPullRequest aria-hidden="true" /> : <MessageSquare aria-hidden="true" />}</EmptyMedia>
+        <EmptyTitle>{t('empty')}</EmptyTitle>
+      </EmptyHeader>
+    </Empty>}
     <ul className="flex flex-col gap-2">
       {pullsOnly ? directoryPullRequests(rows, pullState).map(({ pull, conversations }) => {
         const ref = pullRequestRef(pull.url)
         const tasks = new Map(conversations.flatMap(row => row.issueId ? [[row.issueId, row.identifier || row.taskTitle] as const] : []))
-        return <li key={pull.url} className="flex flex-wrap items-center gap-2 py-2">
-          <a href={pull.url} target="_blank" rel="noopener noreferrer" className="break-words font-medium underline-offset-2 hover:underline">
-            {pull.title && <>{pull.title} · </>}{ref.repo} #{ref.number}
-          </a>
-          <span>{prLabel(pull.state)}</span>
-          {pull.additions !== undefined && pull.deletions !== undefined && <bdi>+{pull.additions} −{pull.deletions}</bdi>}
-          <div className="flex basis-full flex-wrap items-center gap-2">
-            {conversations.map(row => <Button key={directoryConversationKey(row)} variant="ghost" onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}>{row.title || t('untitled')}</Button>)}
-            {[...tasks].map(([id, label]) => <Button key={id} size="sm" variant="link" onClick={() => openTask(id)}>{label}</Button>)}
+        // One line per pull, the same fixed columns as a task row: the title is
+        // the only column that gives, so the edges never wander (R-97's list model).
+        return <li key={pull.url} className="flex flex-col gap-1 rounded-lg px-2 py-2 hover:bg-control">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className={cn('size-2 shrink-0 rounded-full bg-current', PULL_REQUEST_COLORS[pull.state as keyof typeof PULL_REQUEST_COLORS] ?? 'text-muted-foreground')} aria-hidden="true" />
+            <a href={pull.url} target="_blank" rel="noopener noreferrer" title={pull.title ?? `${ref.repo} #${ref.number}`}
+              className="min-w-0 flex-1 truncate font-medium underline-offset-2 hover:underline">
+              {pull.title && <>{pull.title} · </>}{ref.repo} #{ref.number}
+            </a>
+            {pull.additions !== undefined && pull.deletions !== undefined && <bdi className="shrink-0 text-xs tabular-nums">
+              <span className="text-github-pr-open">+{pull.additions}</span>{' '}<span className="text-github-pr-closed">−{pull.deletions}</span>
+            </bdi>}
+            <span className="w-16 shrink-0 text-end text-xs text-muted-foreground">{prLabel(pull.state)}</span>
           </div>
+          {conversations.length > 0 && <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 ps-4">
+            {conversations.map(row => <Button key={directoryConversationKey(row)} variant="link" size="sm" className="h-auto min-w-0 p-0 font-normal"
+              onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}>
+              <span className="truncate">{row.title || t('untitled')}</span>
+            </Button>)}
+            {[...tasks].map(([id, label]) => <Button key={id} size="sm" variant="link" className="h-auto p-0" onClick={() => openTask(id)}>{label}</Button>)}
+          </div>}
         </li>
-      }) : rows.map(row => <li key={directoryConversationKey(row)} className="flex items-center gap-2"><Button variant="ghost" type="button" onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}
-        className="h-auto min-w-0 flex-1 flex-wrap justify-start gap-x-3 gap-y-1 py-3 text-start">
-        <span className="min-w-0 flex-1 break-words font-medium">{row.title || t('untitled')}</span>
-        {row.unread && <span className="size-2 rounded-full bg-primary" role="img" aria-label={t('unread')} />}
-        {directoryTaskNumbers(row).map(({ key, identifier }) => <bdi key={key}>{identifier}</bdi>)}
-        <PullRequestsBadge pullRequests={row.pulls} />
-        <span>{t(row.state)}</span><time dateTime={row.at}>{format.dateTime(new Date(row.at), { dateStyle: 'medium', timeStyle: 'short' })}</time>
-      </Button>
+      }) : rows.map(row => <li key={directoryConversationKey(row)} className="flex min-w-0 items-center gap-2">
+        <Button variant="ghost" size="sm" type="button" onClick={() => row.kind === 'chat' ? openGroupConversation(row.id) : openThread(row.id)}
+          className="h-auto min-h-11 min-w-0 flex-1 items-center justify-start gap-x-3 py-2 text-start">
+          {row.unread && <span className="size-2 shrink-0 rounded-full bg-primary" role="img" aria-label={t('unread')} />}
+          <span className="min-w-0 flex-1 truncate font-medium">{row.title || t('untitled')}</span>
+          {directoryTaskNumbers(row).length > 0 && <span className="flex shrink-0 items-center gap-1">
+            {directoryTaskNumbers(row).map(({ key, identifier }) => <bdi key={key} className="text-xs text-muted-foreground tabular-nums">{identifier}</bdi>)}
+          </span>}
+          <PullRequestsBadge pullRequests={row.pulls} />
+          <span className="w-16 shrink-0 text-end text-xs text-muted-foreground">{t(row.state)}</span>
+          <time className="w-24 shrink-0 text-end text-xs text-muted-foreground tabular-nums" dateTime={row.at}>{format.dateTime(new Date(row.at), { month: 'short', day: 'numeric' })}</time>
+        </Button>
         {!row.unread && <Button size="sm" variant="ghost" disabled={writing} onClick={() => void mark(row.kind === 'chat' ? { action: 'unread', chatId: row.id } : { action: 'unread', runId: row.id })}>{t('markUnread')}</Button>}
       </li>)}
     </ul>

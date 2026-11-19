@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from 'next-intl'
 import { createAuthClient } from 'better-auth/react'
 import { oauthProviderClient } from '@better-auth/oauth-provider/client'
-import { Loader2Icon } from 'lucide-react'
+import { LoaderCircle } from '@/components/icons'
 import { AuthLogo } from '@/components/blocks/auth-19/components/auth-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,11 +52,11 @@ export function OAuthConsent({ clientName, clientUri, account }: { clientName: s
           </CardContent>
           <CardFooter className="flex gap-3 px-7 pt-5 pb-7 sm:px-9 sm:pb-8">
             <Button type="button" variant="outline" className="flex-1" disabled={pending !== null} onClick={() => answer(false)}>
-              {pending === 'deny' && <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" />}
+              {pending === 'deny' && <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-start" />}
               {t('deny')}
             </Button>
             <Button type="button" className="flex-1" disabled={pending !== null} onClick={() => answer(true)}>
-              {pending === 'allow' && <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" />}
+              {pending === 'allow' && <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-start" />}
               {t('allow')}
             </Button>
           </CardFooter>

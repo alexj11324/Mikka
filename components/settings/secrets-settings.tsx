@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { Cloud, Ellipsis, EyeIcon, EyeOffIcon, FileUp, Plus } from 'lucide-react'
+import { Cloud, Ellipsis, Eye, EyeOff, FileUp, Plus } from '@/components/icons'
 import { E2BKeyDialog, useE2BKeyStatus } from '@/components/settings/e2b-key-dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -201,7 +201,7 @@ function SecretSheet({ workspaceId, workspaceName, role, secret, onClose, open =
             <InputGroup>
               <InputGroupInput id="secret-value" type={reveal ? 'text' : 'password'} value={value} autoComplete="new-password" spellCheck={false} aria-invalid={error ? true : undefined} disabled={pending !== null} onChange={event => { setValue(event.target.value); setError(null) }} />
               <InputGroupAddon align="inline-end">
-                <InputGroupButton size="icon-xs" aria-label={reveal ? card('hidePassword') : card('showPassword')} aria-pressed={reveal} onClick={() => setReveal(on => !on)}>{reveal ? <EyeOffIcon /> : <EyeIcon />}</InputGroupButton>
+                <InputGroupButton size="icon-xs" aria-label={reveal ? card('hidePassword') : card('showPassword')} aria-pressed={reveal} onClick={() => setReveal(on => !on)}>{reveal ? <EyeOff /> : <Eye />}</InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
             {error && <FieldError>{error}</FieldError>}
@@ -229,7 +229,7 @@ function SecretSheet({ workspaceId, workspaceName, role, secret, onClose, open =
           <AlertDialogCancel>{commonT('cancel')}</AlertDialogCancel>
           {confirm === 'delete'
             ? <AlertDialogAction variant="destructive" onClick={() => void remove()}>{commonT('delete')}</AlertDialogAction>
-            : <AlertDialogAction onClick={() => void save()}>{commonT('save')}</AlertDialogAction>}
+            : <AlertDialogAction variant="default" onClick={() => void save()}>{commonT('save')}</AlertDialogAction>}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -316,7 +316,7 @@ function BulkSheet({ workspaceId, workspaceName, role, onClose, open = true, onO
         <AlertDialogHeader><AlertDialogTitle>{t('confirmWorkspaceMany', { workspace: workspaceName ?? t('workspaceGroup'), count })}</AlertDialogTitle></AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{commonT('cancel')}</AlertDialogCancel>
-          <AlertDialogAction onClick={() => void save()}>{t('addCount', { count })}</AlertDialogAction>
+          <AlertDialogAction variant="default" onClick={() => void save()}>{t('addCount', { count })}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

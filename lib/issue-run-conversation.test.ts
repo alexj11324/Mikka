@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chainChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, runSummaryText, runSummaryView, threadItems } from './issue-run-conversation'
+import { chainChunks, runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, runSummaryText, runSummaryView, threadItems, threadStepOutput } from './issue-run-conversation'
 import { createSecretMasker, withCredentialMasking } from './secrets/mask'
 import { maskStreamedChunks } from './secrets/stream-mask'
 
@@ -15,9 +15,22 @@ function resultStep(output: unknown, toolDurationMs?: unknown) {
 
 test('successful commands expose output and the measured duration, independent of batch insert time', () => {
   assert.deepEqual(resultStep('3 tests passed\n', 1250), {
-    id: 'cmd', name: 'bash', detail: 'pnpm test', failed: false, output: '3 tests passed\n', ms: 1250,
+    id: 'cmd', name: 'bash', detail: 'pnpm test', command: 'pnpm test', failed: false, output: '3 tests passed\n', ms: 1250,
   })
-  assert.equal(resultStep({ exitCode: 0, output: 'ok' }, 0).output, '{\n  "exitCode": 0,\n  "output": "ok"\n}')
+  const succeeded = resultStep({ exitCode: 0, output: 'ok\n' }, 0)
+  assert.equal(succeeded.exitCode, 0)
+  assert.equal(succeeded.output, '{\n  "exitCode": 0,\n  "output": "ok\\n"\n}')
+  assert.equal(threadStepOutput(succeeded), 'ok\n')
+  const failed = resultStep({ exitCode: 2, output: 'failure output' })
+  assert.equal(failed.failed, true)
+  assert.equal(failed.exitCode, 2)
+  assert.equal(threadStepOutput(failed), 'failure output')
+  assert.equal(threadStepOutput(resultStep('plain output\n')), 'plain output\n')
+  const printedJson = '{"exitCode":3,"output":"printed as JSON"}'
+  assert.equal(threadStepOutput(resultStep(printedJson)), printedJson)
+  const unknownExit = resultStep({ exitCode: null, output: '' })
+  assert.equal(unknownExit.exitCode, null)
+  assert.equal(threadStepOutput(unknownExit), '')
   assert.equal(resultStep('', 0).ms, 0)
   for (const value of [undefined, null, -1, NaN, Infinity, '1250']) assert.ok(!('ms' in resultStep('ok', value)))
   for (const value of [undefined, null]) assert.ok(!('output' in resultStep(value)))
@@ -136,7 +149,7 @@ test('a folded steps line keeps each tool call so it can open: name, what it ran
   assert.ok(steps.kind === 'steps')
   assert.equal(steps.count, 4)
   assert.deepEqual(steps.steps.slice(0, 2), [
-    { id: '1', name: 'Bash', detail: 'pnpm test --watch=false', failed: true },
+    { id: '1', name: 'Bash', detail: 'pnpm test --watch=false', command: 'pnpm   test\n --watch=false', failed: true },
     { id: '2', name: 'apply_patch', detail: 'a.ts, b.ts', failed: false },
   ])
   assert.equal(steps.steps[2].detail?.length, 200)

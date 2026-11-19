@@ -32,7 +32,7 @@
 4. **展开后逐条显示**，每条一行：类型图标 + 「动词 + 对象」：
    - 「查看任务 ALEX-45」「派发线程 · 在 Mikka-handoff 创建测试文件」「搜索网页“shadcn trace”」「读取邮件 · 周报」「运行 Factory」
    - 对象来自工具 `input` 预览里的已知字段（`identifier`/`title`/`query`/`name`/`repo`…），取不到就只写动词；**绝不写「使用工具」**：未登记的工具显示其可读化的工具名（`github_call` → 「GitHub · repos/get」）。
-5. **图标按类型**（lucide，同一套颜色 `text-muted-foreground`）：查看/读取 `Eye`/`FileText`，搜索 `Search`，创建/修改 `Pencil`/`Plus`，派发线程 `Send`，消息/邮件 `Mail`/`MessageSquare`，日历 `Calendar`，网页/浏览器 `Globe`，记忆 `Brain`，GitHub `GitHubIcon`，其他 `Wrench`。失败的那一条图标换成 `CircleAlert` 红色。
+5. **图标按类型**（`@/components/icons`，同一套颜色 `text-muted-foreground`，见 [2026-11-18-1900](decisions/2026-11-18-1900-icons-hugeicons.md)）：查看/读取 `Eye`/`FileText`，搜索 `Search`，创建/修改 `Pencil`/`Plus`，派发线程 `Send`，消息/邮件 `Mail`/`MessageSquare`，日历 `Calendar`，网页/浏览器 `Globe`，记忆 `Brain`，GitHub `GitHubIcon`，其他 `Wrench`。失败的那一条图标换成 `CircleAlert` 红色。
 6. **失败判定**：`state === 'error'`，**或** 输出预览是带 `error` / `ok:false` 键的 JSON（前端解析，见 §6 的后端建议）。
    - 失败行：红色图标 + 标题后跟原因，「运行 Factory · 没有找到 Factory」。
    - 原因：已知错误码映射成中文（`factoryNotFound` → 没有找到 Factory，`notFound`、`forbidden`、`rateLimited`、`timeout`…，表放 `messages/*.json` `Coordinator.activity.errors`）；未知原因显示「没执行成功，已跳过」；原始码留在「原始数据」内

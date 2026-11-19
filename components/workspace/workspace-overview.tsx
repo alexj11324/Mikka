@@ -1,7 +1,7 @@
 'use client'
 import { useTranslations } from 'next-intl'
 
-import { Inbox, Star, Bell } from 'lucide-react'
+import { Inbox, Star, Bell } from '@/components/icons'
 import useSWR, { unstable_serialize } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { InlineLoadError } from '@/components/load-error'
@@ -30,7 +30,7 @@ export function WorkspaceOverview({ section, workspaceId, onView, tasks, userId,
   if (section === 'agent') return <LegacyChatArchive key={userId} userId={userId} initialHistory={initialAgentHistory} request={agentRequest} onActive={onAgentActive} onSessions={onAgentSessions} />
   if (section === 'inbox') {
     const following = tasks.filter(task => task.metadata.subscriberUserIds.includes(userId))
-    return <section aria-label={i18nText("IssueDetail.menu.subscribe")} className="flex flex-col gap-6 px-5 py-8"><header className="flex flex-col gap-2"><h1 className="text-lg font-semibold">{i18nText("Overview.followingTitle")}</h1></header>{following.length ? <IssueList issues={following} searching onOpen={onOpen} onCreate={() => onView('all')} /> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Inbox /></EmptyMedia><EmptyTitle>{i18nText("Overview.noFollowingTitle")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={() => onView('all')}>{i18nText("Overview.viewAllTasks")}</Button></Empty>}</section>
+    return <section aria-label={i18nText("IssueDetail.menu.subscribe")} className="flex flex-col gap-6 px-5 py-8"><header className="flex flex-col gap-2"><h1 className="text-xl font-semibold">{i18nText("Overview.followingTitle")}</h1></header>{following.length ? <IssueList issues={following} searching onOpen={onOpen} onCreate={() => onView('all')} /> : <Empty><EmptyHeader><EmptyMedia variant="icon"><Inbox /></EmptyMedia><EmptyTitle>{i18nText("Overview.noFollowingTitle")}</EmptyTitle></EmptyHeader><Button variant="outline" onClick={() => onView('all')}>{i18nText("Overview.viewAllTasks")}</Button></Empty>}</section>
   }
   // A bot's chat is the Coordinator's harness under the bot's name; an open thread sits beside it (R-82).
   // A frame that owns the header (the hosted shell) draws no floating pill: the thread names itself in its own head.

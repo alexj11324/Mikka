@@ -17,7 +17,7 @@ import { ModeSelect, type EditorMode } from "./mode-select"
 import { useRichTextChangesPosition } from "./rich-text-changes"
 import { useRichTextState } from "./rich-text-state"
 import { formatChangeTime, PersonAvatar } from "./value-faces"
-import { ListChecksIcon } from "lucide-react"
+import { ListChecks } from "@/components/icons"
 
 const SHARED_WITH = `Shared with ${new Intl.ListFormat("en-US").format(
   PEOPLE.map((person) => person.name)
@@ -125,7 +125,7 @@ export function ContractHeader({
               aria-label={`Suggestions, ${open} open`}
               onClick={onOpenSuggestions}
             >
-              <ListChecksIcon aria-hidden="true" />
+              <ListChecks aria-hidden="true" />
               <span className="max-sm:sr-only">Suggestions</span>
               <span className="text-muted-foreground tabular-nums">{open}</span>
             </Button>

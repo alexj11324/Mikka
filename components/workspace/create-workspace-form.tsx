@@ -2,7 +2,7 @@
 import { useLocale, useTranslations } from 'next-intl'
 
 import { useRef, useState, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
+import { LoaderCircle } from '@/components/icons'
 import { toast } from 'sonner'
 import { createWorkspace } from '@/app/actions/workspace'
 import { getPathname } from '@/i18n/navigation'
@@ -62,6 +62,6 @@ export function CreateWorkspaceForm() {
       </Field>
     </FieldGroup>
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-    <Button type="submit" size="lg" disabled={pending || !name.trim() || !slug.trim()}>{pending && <Loader2 className="animate-spin" data-icon="inline-start" />}{pending ? i18nText("Invite.creating") : i18nText("FeatureCopy.c_d92d1b8d")}</Button>
+    <Button type="submit" size="lg" disabled={pending || !name.trim() || !slug.trim()}>{pending && <LoaderCircle className="animate-spin" data-icon="inline-start" />}{pending ? i18nText("Invite.creating") : i18nText("FeatureCopy.c_d92d1b8d")}</Button>
   </form>
 }

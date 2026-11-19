@@ -2,20 +2,20 @@
 
 import { useRef, useState } from 'react'
 import { useClipboardCopy } from '@/hooks/use-clipboard-copy'
-import { Check, Copy, MoreHorizontal, RefreshCw, TriangleAlert } from 'lucide-react'
+import { Check, Copy, MoreHorizontal, RefreshCw, TriangleAlert } from '@/components/icons'
 import { useFormatter, useTranslations } from 'next-intl'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Progress } from '@/components/ui/progress'
 import { Spinner } from '@/components/ui/spinner'
 import { Switch } from '@/components/ui/switch'
 import { Claude } from '@/components/ui/svgs/claude'
 import { OpenAI } from '@/components/ui/svgs/openai'
-import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { Skeleton } from '@/components/ui/skeleton'
 import { claudeShowsCode, planName, readClipboardText, subscriptionSignInState, type SubscriptionUsageView } from '@/lib/subscription-ui'
 import { readSubscriptionUsage, readSubscriptions, subscriptionsKey, subscriptionUsageKey, useSubscriptions, type SubscriptionAttempt, type SubscriptionProvider } from '@/hooks/settings/use-subscriptions'
@@ -34,12 +34,13 @@ const logos = { codex: OpenAI, claude: Claude } as const
 /** `heading` replaces the section title where the rows appear outside Settings (the first-run guide's 绑定订阅). */
 export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: string; heading?: string }) {
   const t = useTranslations('Settings.subscriptions')
-  const { state, loadFailed, attempt, callback, setCallback, catching, pending, starting, error, notice, now, usage, usageLoading, reloadUsage, refreshingModels, refreshModels, connect, finishCallback, cancel, disconnect, setPaused, remove, startAgain } = useSubscriptions(workspaceId)
+  const commonT = useTranslations('Common')
+  const { state, loadFailed, attempt, callback, setCallback, catching, pending, starting, error, notice, now, usage, usageLoading, reloadUsage, refreshingModels, refreshModels, reload, connect, finishCallback, cancel, disconnect, setPaused, remove, startAgain } = useSubscriptions(workspaceId)
   // 断开连接 asks first, like deleting an API key (A1).
   const [disconnecting, setDisconnecting] = useState<{ id: string; provider: Provider; revision: number; label: string } | null>(null)
 
 
-  const status = loadFailed ? <FieldError className="px-1">{t('loadFailed')}</FieldError>
+  const status = loadFailed ? <SettingsSaveError message={t('loadFailed')} retryLabel={commonT('retry')} onRetry={() => { void reload() }} />
     : !state ? null
       : !state.enabled ? <p role="status" className="px-1 text-sm text-muted-foreground">{t('serviceOff')}</p> : null
   // First visit only: rows the size of the provider rows, so nothing moves when the list arrives.
@@ -92,7 +93,7 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
                 const canReconnect = available && !pending && !attempt
                 return <div key={connection.id} id={`subscription-${connection.id}`} tabIndex={-1} className="flex scroll-mt-6 flex-col gap-3 px-5 py-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className={cn('flex min-w-0 items-center gap-3 transition-opacity duration-150', paused && 'opacity-50')}>
+                    <div className={cn('flex min-w-0 items-center gap-3 transition-opacity duration-(--motion-fast)', paused && 'opacity-50')}>
                       <Logo className={cn('size-5 shrink-0 text-foreground', provider === 'claude' && 'text-brand-claude')} />
                       <div className="flex min-w-0 flex-col">
                         <span className="truncate text-sm font-medium">{account ?? product}</span>
@@ -125,7 +126,7 @@ export function SubscriptionSettings({ workspaceId, heading }: { workspaceId: st
                       </DropdownMenu>
                     </div>
                   </div>
-                  {(live || reauth) && <div className={cn('flex flex-col gap-2 transition-opacity duration-150 sm:pl-8', paused && 'opacity-50')}>
+                  {(live || reauth) && <div className={cn('flex flex-col gap-2 transition-opacity duration-(--motion-fast) sm:pl-8', paused && 'opacity-50')}>
                     {failed
                       ? <span className="flex items-center gap-2 text-xs text-muted-foreground">{t('quotaUnavailable')}<Button type="button" variant="secondary" size="xs" disabled={usageLoading} onClick={reloadUsage}>{t('retry')}</Button></span>
                       : read && read.windows.length > 0 && <QuotaMeters windows={read.windows} now={now} />}
@@ -195,7 +196,7 @@ function SignInPanel({ attempt, callback, pending, onCallback, onFinish, onCance
     </ol>}
     <FieldGroup><Field><FieldLabel htmlFor="subscription-callback">{t(showsCode ? 'codeLabel' : 'callbackLabel')}</FieldLabel>
       <div className="flex items-center gap-2">
-        <Input ref={input} id="subscription-callback" value={callback} placeholder={t(showsCode ? 'codePlaceholder' : 'callbackPlaceholder')} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} maxLength={8192} onChange={event => onCallback(event.target.value)} />
+        <Input className="h-(--control-sm)" ref={input} id="subscription-callback" value={callback} placeholder={t(showsCode ? 'codePlaceholder' : 'callbackPlaceholder')} autoComplete="off" autoCapitalize="off" autoCorrect="off" spellCheck={false} maxLength={8192} onChange={event => onCallback(event.target.value)} />
         <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => { void readClipboardText().then(text => { if (text) onCallback(text); else input.current?.focus() }) }}>{t('paste')}</Button>
       </div>
     </Field></FieldGroup>

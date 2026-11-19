@@ -4,7 +4,7 @@ import { ReadResponseError } from '@/lib/swr/retry'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowUpRight, Blocks, ChevronDown, ChevronRight, Ellipsis, Plus } from 'lucide-react'
+import { ArrowUpRight, Blocks, ChevronDown, ChevronRight, Ellipsis, Plus } from '@/components/icons'
 import { toast } from 'sonner'
 
 import { APP_ICONS } from '@/components/plugins/app-icons'
@@ -21,10 +21,11 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
+import { WhyDisabled } from '@/components/ui/why-disabled'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appState, needsReconnect } from '@/lib/composio-account-state'
 import { composioConnectRedirect, type ConnectedAccountView as AccountView } from '@/lib/composio-accounts'
-import type { StoreApp, StoreCatalog } from '@/lib/plugins/catalog'
+import { findCredentialAlternative, type StoreApp, type StoreCatalog } from '@/lib/plugins/catalog'
 import type { AppDetail, AppTool } from '@/lib/plugins/app-detail'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
 import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
@@ -295,12 +296,6 @@ export function useConnectedApps(enabled = true) {
 
 export type ConnectedApps = ReturnType<typeof useConnectedApps>
 
-/** A disabled button takes no pointer events, so its reason sits on a wrapper. */
-function WhyDisabled({ reason, fill = false, children }: { reason?: string; fill?: boolean; children: ReactNode }) {
-  if (!reason) return children
-  return <span title={reason} className={cn('inline-flex', fill && 'w-full')}>{children}</span>
-}
-
 /**
  * Setup and result lines above the list or the detail page. Loading is read out only:
  * a visible line would push the list down and then let it jump up when the accounts arrive.
@@ -433,6 +428,8 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   const { name, iconUrl } = useAppInfo()(app)
   // Composio's own page data, for everyone, connected or not.
   const detail = useAppDetail(app)
+  const catalog = useStoreCatalog()
+  const credentialAlternative = detail.data ? findCredentialAlternative({ id: app, connect: detail.data.auth.kind }, catalog.data?.apps ?? []) : null
   // 开发者 only where Mikka already knows it; Composio does not say.
   const about = Object.hasOwn(APP_ABOUT, app) ? APP_ABOUT[app] : null
   const website = detail.data?.website ?? about?.website ?? null
@@ -444,10 +441,10 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   // How it connects: Composio's OAuth, the person's own key in a form, or nothing to connect.
   const kind = detail.data?.auth.kind ?? null
   const withKey = kind === 'credentials'
-  const canAdd = withKey ? apps.canEnterKey : apps.canLink
+  const canAdd = withKey ? apps.canEnterKey : kind === 'managed' && apps.canLink
   const [keyTarget, setKeyTarget] = useState<CredentialTarget | null>(null)
-  const add = () => { if (withKey) setKeyTarget({ app }); else void apps.connect(app) }
-  const reconnect = (accountId: string) => { if (withKey) setKeyTarget({ app, replaceAccountId: accountId }); else void apps.reconnect(accountId) }
+  const add = () => { if (withKey) setKeyTarget({ app }); else if (kind === 'managed') void apps.connect(app) }
+  const reconnect = (accountId: string) => { if (withKey) setKeyTarget({ app, replaceAccountId: accountId }); else if (kind === 'managed') void apps.reconnect(accountId) }
   const makeDefault = (account: ConnectedAccountView) => {
     const title = accountName(account)
     void apps.makeDefault(account.id).then(ok => { if (ok) toast.success(t('madeDefault', { account: title })) })
@@ -473,7 +470,7 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   /** What the confirmation says will happen. */
   const disconnectText = (account: ConnectedAccountView) => takeoverText(accounts, account.id) ?? t('disconnectConsequence', { name })
   return {
-    name, iconUrl, accounts, several, detail, about, website, busy, kind, withKey, canAdd, keyTarget, setKeyTarget,
+    name, iconUrl, accounts, several, detail, about, website, busy, kind, withKey, canAdd, credentialAlternative, keyTarget, setKeyTarget,
     accountName, statusLabel, needsReconnect, add, reconnect, makeDefault, toggle, disconnect, disconnectText,
   }
 }

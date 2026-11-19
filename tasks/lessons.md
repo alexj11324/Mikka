@@ -227,3 +227,47 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 数据迁移的测试必须执行真实迁移文件（临时 schema + rollback 可隔离），不要复制 SQL 自证。
   2. 只为测试存在的 fail-open 缺省要改成 fail-closed：新 token 默认公开 scope，pre-M4 token 用显式 helper。
   3. 删除未接线模块的标准同样适用于新增 action：没有调用方就只留 store 函数 + 测试，等 UI 接入时再加 server action。
+
+## 2026-11-18 UI 审计：先看渲染，再谈 token；文案迁移要连带修测试和 locale
+
+- 纠正：第一轮 UI 审计只查了 token / class 名，漏掉了真正难看的版面缺陷（PR 列表行没有固定列，标题和状态互相挤）。用户拿截图指出后才发现「对齐」这一整类问题。
+- 规则：
+  1. 审计列表 / 表格页面时，必须逐列问「这一列有没有固定宽度」，不要只看 class 是否用了 token。
+  2. 控件高度这类跨组件一致性可以做成 CI 规则（`scripts/control-size-policy.mjs`），否则下次又会漂。
+- 纠正（文案迁移）：把移动端硬编码中文字面量搬进 catalog 后，一批测试挂了，因为断言写死了中文字面量，而本机 locale 是 en-US。
+- 规则：
+  1. 迁移文案时同步把测试改成从 catalog 读期望值，不要改成 `getMobileMessages('zh-CN')` 写死中文——那样只是把中文搬了个地方。
+  2. 顺手会暴露真 bug：`chat-failure.ts`、`run-error.ts`、`sign-in-error.ts`、`FailedReply.tsx` 直接 `import messages from 'messages/zh-CN.json'`，英文设备会显示中文。凡是移动端直接 import zh-CN 的地方都要改成 `mobileMessages`。
+  3. 新建文案 key 前先搜一遍现有 catalog：`MobileCore.replyRetry` 是我新加的重复命名空间，实际已有 `Coordinator.replyRetry` 在用。
+  4. 冻结基线（`scripts/mobile-i18n-baseline.mjs`）要双向校验：既拦新硬编码，也拦「已迁移但没删行」，否则清单不会真的只减不增。
+
+## 2026-11-18 收尾：移动端有自己的 typecheck，根 tsconfig 不覆盖
+
+- 纠正：我只跑了根 `npx tsrs --noEmit`，漏了 `npx tsrs --noEmit -p apps/mobile/tsconfig.json`。reviewer 一跑就发现 5 个错误：`import { Inbox }` 与 `function Inbox()` 重名（Metro 打包会直接炸）、`@expo/ui` 的 Button/Image 不接受 RN 的 `accessibilityLabel`/`accessibilityElementsHidden`（要走 modifiers 的 `accessibilityLabel()`/`accessibilityHidden()`）、以及 `MobileCore.send` 这个 key 根本不存在（应复用 `Coordinator.send`）。
+- 规则：
+  1. 这个仓库是 pnpm workspace，`apps/mobile` 有独立 tsconfig，改动涉及它时必须两个 typecheck 都跑。
+  2. 改移动端图标时先看 `lucide-react-native` 的导出名是否和本文件的组件/函数同名。
+  3. `@expo/ui/swift-ui` 的无障碍属性是 modifiers，不是 RN props。
+  4. 新增 catalog key 前先 `grep` 一遍同类 namespace：`Coordinator.pendingActions.*` 已经覆盖了 pending action 卡片的全部字段，我在 `MobileCore` 里重造了 23 个。
+  5. 新加的 policy 测试要接进 `package.json` 的 `test:ui-policy`，否则永远不会在 CI 里跑。
+
+## 2026-11-18 对比度不能手算，必须写成测试；`.pathname` 是本仓库的复发 bug
+
+- 纠正：`--tertiary` 第一版按「页面底」算到 4.85:1 就收工，深色实际 4.498:1（未取整比较会判失败），而真正承载它的 `bg-muted/80` chip 上只有 3.97:1。reviewer 自己算出来才发现。
+- 规则：
+  1. 颜色 token 的可读性写成 `scripts/contrast.test.mjs` 这种从 `globals.css` 解析、按 WCAG 公式计算的测试，并且要覆盖**实际承载它的表面**（页面、card、`bg-muted` 整体、`bg-muted/80` 合成色），不是只算页面底。
+  2. 新写的检查必须做一次变异验证（把旧值改回去，确认它会红），否则不知道它在测什么。
+  3. 报错里用三位小数：两位会把 4.498 显示成「4.50 needs 4.5」，看起来像测试自己坏了。
+- 纠正（复发 bug）：`lib/ui-overlay.test.mjs` 用 `new URL('..', import.meta.url).pathname` 当根目录，本 worktree 路径含空格，`readdirSync` 直接 `ENOENT` 到 `%20`。这已经是本会话第三次遇到（`mobile-i18n-baseline.mjs`、`message-gesture.test.mts`、现在这个）。
+- 规则：
+  1. 凡是把 URL 变成文件系统路径，一律 `fileURLToPath`；`pathname` 只用于 URL 语义。
+  2. 改完 policy 测试要跑**整条** `test:ui-policy` 命令串，而不是只跑自己新加的那几个文件——`ui-overlay.test.mjs` 就藏在这条命令串的末尾。
+
+## 2026-11-19 CI 才发现的测试：本机 locale 掩盖了「测试写死中文」
+
+- 现象：PR 推到 CI 后 `Core unit checks` 红，`lib/chat-failure.test.ts` 断言 `{text:'回复未完成，请重试'}`，而 CI 机器 locale 是 en-US，实际拿到 `'Reply did not finish. Please try again.'`。本机跑绿是因为本机 locale 是 zh-CN。
+- 根因：迁移实现（`apps/mobile/lib/chat-failure.ts` 改用 `mobileMessages`）时，只改了 `apps/mobile/tests/*.test.mts`，漏了根目录 `lib/chat-failure.test.ts`——它直接 import 移动端实现，属于同一批断言。
+- 规则：
+  1. 把「测试改成读 catalog」时，要按 `grep -rn "<中文原文>"` 全仓库扫一遍断言，不能只改报错的那一个目录；根 `lib/` 下也有直接测移动端实现的测试。
+  2. 本机 locale 会让这类测试假绿。判断标准是「断言里有没有字面量文案」，不是「本机跑没跑绿」。
+  3. 修完再推一次，等 CI 全绿再 merge；不要因为「本机绿」就认为改动无关。

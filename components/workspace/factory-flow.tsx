@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Ban, Check, CircleAlert, CircleX, ClipboardList, ExternalLink, FileCheck, GitMerge, GitPullRequest, MessageCircleQuestion, RefreshCw, TriangleAlert, type LucideIcon } from 'lucide-react'
+import { Ban, Check, CircleAlert, CircleX, ClipboardList, ExternalLink, FileCheck, GitMerge, GitPullRequest, MessageCircleQuestion, RefreshCw, TriangleAlert, type IconGlyph } from '@/components/icons'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Item, ItemActions, ItemContent, ItemDescription } from '@/components/ui/item'
@@ -40,7 +40,7 @@ export function useFactoryFlow(taskId: string, detail: AcceptanceDetail | undefi
   return { ...result, flow: enabled ? readFlow(result.data) : null }
 }
 
-const NEEDS_YOU_ICONS: Record<NeedsYouKind, LucideIcon> = {
+const NEEDS_YOU_ICONS: Record<NeedsYouKind, IconGlyph> = {
   spec_review: ClipboardList, question: MessageCircleQuestion, pr_review: GitPullRequest, blocked: CircleAlert, failed: CircleX,
 }
 

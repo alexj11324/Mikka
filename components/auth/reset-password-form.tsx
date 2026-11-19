@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef, useState, type FormEvent } from 'react'
 import { useTranslations } from 'next-intl'
-import { ArrowRightIcon, LockKeyholeIcon } from 'lucide-react'
+import { ArrowRight, LockKeyhole } from '@/components/icons'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { AuthCard } from '@/components/blocks/auth-19/components/auth-card'
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -86,21 +86,21 @@ export function ResetPasswordForm() {
           <Field data-disabled={pending || stage === 'reading'} className="gap-2">
             <FieldLabel htmlFor="password">{t('newPassword')}</FieldLabel>
             <InputGroup>
-              <InputGroupAddon><LockKeyholeIcon aria-hidden="true" /></InputGroupAddon>
+              <InputGroupAddon><LockKeyhole aria-hidden="true" /></InputGroupAddon>
               <InputGroupInput id="password" name="password" type="password" autoComplete="new-password" placeholder={t('passwordPlaceholder')} minLength={PASSWORD_MIN_LENGTH} maxLength={PASSWORD_MAX_LENGTH} required disabled={pending || stage === 'reading'} />
             </InputGroup>
           </Field>
           <Field data-disabled={pending || stage === 'reading'} className="gap-2">
             <FieldLabel htmlFor="confirmation">{t('confirmPassword')}</FieldLabel>
             <InputGroup>
-              <InputGroupAddon><LockKeyholeIcon aria-hidden="true" /></InputGroupAddon>
+              <InputGroupAddon><LockKeyhole aria-hidden="true" /></InputGroupAddon>
               <InputGroupInput id="confirmation" name="confirmation" type="password" autoComplete="new-password" minLength={PASSWORD_MIN_LENGTH} maxLength={PASSWORD_MAX_LENGTH} required disabled={pending || stage === 'reading'} />
             </InputGroup>
           </Field>
         </FieldGroup>
         <Button type="submit" className="w-full" disabled={pending || stage === 'reading' || cooldown > 0}>
           {cooldown > 0 ? t('retryIn', { seconds: cooldown }) : t('submitReset')}
-          {pending ? <Spinner data-icon="inline-end" /> : cooldown === 0 && <ArrowRightIcon aria-hidden="true" data-icon="inline-end" />}
+          {pending ? <Spinner data-icon="inline-end" /> : cooldown === 0 && <ArrowRight aria-hidden="true" data-icon="inline-end" />}
         </Button>
       </form>
     </AuthCard>

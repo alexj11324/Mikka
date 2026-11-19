@@ -338,7 +338,7 @@ export async function listConversationSidebar() {
   const { reader, workspaceId } = await conversationActor()
   const { conversationSidebar } = await import('@/lib/conversation-directory')
   const { pool } = await import('@/lib/db')
-  return conversationSidebar(pool, reader, workspaceId)
+  return conversationSidebar(pool, reader, workspaceId, undefined, { nestChecks: true })
 }
 
 /** A workspace switch between composing and searching invalidates the old picker. */

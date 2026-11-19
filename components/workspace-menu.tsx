@@ -2,7 +2,7 @@
 import { useTranslations } from 'next-intl'
 
 import { useState } from 'react'
-import { Check, ChevronDown, LogOut, Plus, Settings, UserPlus, type LucideIcon } from 'lucide-react'
+import { Check, ChevronDown, LogOut, Plus, Settings, UserPlus, type IconGlyph } from '@/components/icons'
 import { useWorkspaceSwitcher } from '@/hooks/use-workspace-switcher'
 import { useShortcutLabel } from '@/components/shortcut-keys'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -39,7 +39,7 @@ function ItemAvatar({ name }: { name: string }) {
 }
 
 /** An action row's icon, in a 20px box like the workspace avatars so every row's text starts on one column. */
-function ItemIcon({ icon: Icon }: { icon: LucideIcon }) {
+function ItemIcon({ icon: Icon }: { icon: IconGlyph }) {
   return <span aria-hidden="true" className="flex size-5 items-center justify-center text-muted-foreground"><Icon /></span>
 }
 

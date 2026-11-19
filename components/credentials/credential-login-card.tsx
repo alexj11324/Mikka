@@ -1,6 +1,6 @@
 'use client'
 
-import { CircleCheckIcon, EyeIcon, EyeOffIcon, LockIcon, XIcon } from 'lucide-react'
+import { CircleCheck, Eye, EyeOff, Lock, X } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
@@ -94,7 +94,7 @@ export function CredentialLoginCard({ prefix, origin, name, onSignedIn }: { pref
   if (step === 'done') return <Item variant="muted" data-testid="credential-login-done">
     <ItemMedia><SiteIcon origin={origin} className="size-5" /></ItemMedia>
     <ItemContent><ItemTitle>{t('signedIn', { site: name })}</ItemTitle></ItemContent>
-    <ItemActions><CircleCheckIcon className="text-success-foreground" /></ItemActions>
+    <ItemActions><CircleCheck className="text-success-foreground" /></ItemActions>
   </Item>
 
   const passwordInvalid = view?.kind === 'rejected' && view.field === 'password'
@@ -115,7 +115,7 @@ export function CredentialLoginCard({ prefix, origin, name, onSignedIn }: { pref
   return <Card size="sm" data-testid="credential-login-card">
     <CardHeader>
       <CardTitle><span className="flex items-center gap-2.5"><SiteIcon origin={origin} className="size-5" />{title}</span></CardTitle>
-      <CardAction><Button type="button" variant="secondary" size="icon-sm" aria-label={t('close')} disabled={pending} onClick={close}><XIcon data-icon="inline-start" /></Button></CardAction>
+      <CardAction><Button type="button" variant="secondary" size="icon-sm" aria-label={t('close')} disabled={pending} onClick={close}><X data-icon="inline-start" /></Button></CardAction>
     </CardHeader>
     <CardContent>
       {step === 'password' ? <form onSubmit={submitPassword} autoComplete="off">
@@ -129,7 +129,7 @@ export function CredentialLoginCard({ prefix, origin, name, onSignedIn }: { pref
             <InputGroup>
               <InputGroupInput id="credential-login-password" type={reveal ? 'text' : 'password'} autoComplete="off" spellCheck={false} aria-invalid={passwordInvalid || undefined} value={password} onChange={event => { setPassword(event.target.value); clearProblem() }} disabled={pending} required />
               <InputGroupAddon align="inline-end">
-                <InputGroupButton size="icon-xs" aria-label={reveal ? t('hidePassword') : t('showPassword')} aria-pressed={reveal} onClick={() => setReveal(value => !value)}>{reveal ? <EyeOffIcon /> : <EyeIcon />}</InputGroupButton>
+                <InputGroupButton size="icon-xs" aria-label={reveal ? t('hidePassword') : t('showPassword')} aria-pressed={reveal} onClick={() => setReveal(value => !value)}>{reveal ? <EyeOff /> : <Eye />}</InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
             {fieldError}
@@ -156,7 +156,7 @@ export function CredentialLoginCard({ prefix, origin, name, onSignedIn }: { pref
       </form>}
     </CardContent>
     <CardFooter>
-      <span className="flex w-full items-center justify-center gap-1 text-xs text-muted-foreground"><LockIcon className="size-3" />{t('securedBy')}<MikkaMarkSmall />Mikka</span>
+      <span className="flex w-full items-center justify-center gap-1 text-xs text-muted-foreground"><Lock className="size-3" />{t('securedBy')}<MikkaMarkSmall />Mikka</span>
     </CardFooter>
   </Card>
 }

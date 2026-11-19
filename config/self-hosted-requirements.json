@@ -41,6 +41,13 @@
     "test": "tests/thread-continue.db.test.ts",
     "suite": "test:bot-threads-db"
   },
+  "app/actions/artifacts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List artifacts for a task using the signed-in reader's existing workspace, task and artifact authorization in the installation PostgreSQL database.",
+    "test": "tests/task-workspace-governance.db.test.ts",
+    "suite": "test:visibility-db"
+  },
   "app/actions/issues.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1577,6 +1584,20 @@
     "test": "lib/thread-artifacts.test.ts",
     "suite": "test:lib-units"
   },
+  "lib/thread-history-read.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Page conversation chunks and message keys from the installation PostgreSQL database for the authorized run chain selected by the thread action.",
+    "test": "tests/thread-detail-bytes.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
+  "lib/thread-history.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate and type the history page cursor and bound each page without any external service.",
+    "test": "tests/thread-detail-bytes.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
   "lib/thread-title-schedule.ts": {
     "mode": "built-in",
     "environment": [],
@@ -2259,6 +2280,13 @@
     "test": "components/workspace/issue-relations.test.tsx",
     "suite": "test:view-state"
   },
+  "lib/issue-run-conversation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project recorded commands and exit status from existing thread chunks. The thread preserves the serialized result for other clients and applies credential masking to displayed command and output text.",
+    "test": "lib/issue-run-conversation.test.ts",
+    "suite": "test:issues"
+  },
   "lib/issue-threads.ts": {
     "mode": "built-in",
     "environment": [],
@@ -2325,6 +2353,13 @@
     "behavior": "Accept only a validated Task or immutable receipt and an opaque rendezvous on the configured HTTPS server.",
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
+  },
+  "lib/mobile-task-refresh.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Version the existing native task list and validate bounded failure metadata. The list works without an observability exporter.",
+    "test": "tests/mobile-tasks.db.test.ts",
+    "suite": "test:workspace-admin-db"
   },
   "lib/mobile-web-scope.ts": {
     "mode": "built-in",

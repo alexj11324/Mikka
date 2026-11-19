@@ -3,7 +3,7 @@
 import { GATEWAY_FEATURES } from '@/lib/model-gateway/features'
 import { useState, type ReactNode } from 'react'
 import { useTranslations } from 'next-intl'
-import { KeyRound, TriangleAlert } from 'lucide-react'
+import { KeyRound, TriangleAlert } from '@/components/icons'
 import { SettingRow, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -42,7 +42,7 @@ export function useApiKeyList(workspaceId: string) {
   const t = useTranslations('Settings.apiKeys')
   const shareT = useTranslations('Settings.subscriptionShare')
   const commonT = useTranslations('Common')
-  const { data, loadError, pending, failed, share: saveShare, setFeature, refetch, remove: removeKey, add } = useApiKeys(workspaceId)
+  const { data, loadError, pending, failed, share: saveShare, setFeature, refetch, reload, remove: removeKey, add } = useApiKeys(workspaceId)
   const [adding, setAdding] = useState(false)
   const [sharing, setSharing] = useState<Key | null>(null)
   const [removing, setRemoving] = useState<Key | null>(null)
@@ -77,7 +77,7 @@ export function useApiKeyList(workspaceId: string) {
       <Button type="button" variant="ghost" size="sm" disabled={pending} aria-label={t('removeLabel', { name: title(key) })} onClick={() => setRemoving(key)}>{commonT('delete')}</Button>
     </span>
   </SettingRow></div>)
-  if (loadError) rows.push(<div key="error" className="px-5 py-4"><FieldError>{loadError}</FieldError></div>)
+  if (loadError) rows.push(<div key="error" className="px-5 py-4"><SettingsSaveError message={loadError} retryLabel={commonT('retry')} onRetry={() => { void reload() }} /></div>)
 
   const action = <Button type="button" {...settingsSectionAction} disabled={!data} onClick={() => setAdding(true)}>{t('add')}</Button>
   const section = <SettingsSection id="api-keys-heading" title={t('sectionTitle')} action={action}>
@@ -100,7 +100,7 @@ export function useApiKeyList(workspaceId: string) {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={pending}>{shareT('cancel')}</AlertDialogCancel>
-          <AlertDialogAction disabled={pending} onClick={() => { if (sharing) void share(sharing, true) }}>{shareT('othersConfirm')}</AlertDialogAction>
+          <AlertDialogAction variant="default" disabled={pending} onClick={() => { if (sharing) void share(sharing, true) }}>{shareT('othersConfirm')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

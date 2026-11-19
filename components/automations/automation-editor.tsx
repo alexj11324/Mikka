@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { ArrowLeft, Play } from 'lucide-react'
+import { ArrowLeft, Play } from '@/components/icons'
 import { listDevices } from '@/app/actions/agents'
 import { getWorkspaceBotDefaults, listBotsForWorkspace } from '@/app/actions/bots'
 import { automationLinearLabels, automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
@@ -235,6 +235,10 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       </div>
     </header>
 
+    {/* Every control below is disabled for a non-owner, so the reason is said once, here, rather than
+        left to a grey field that never explains itself. */}
+    {!canManage && <p role="status" className="px-6 pt-1 text-sm text-muted-foreground">{t('viewOnly')}</p>}
+
     <FieldSet disabled={!canManage} className="contents">
     {!draft.otherTask && <SettingsSection id="automation-settings" title={t('settings')}>
       {field(t('bot'), <NativeSelect aria-label={t('bot')} value={draft.botId ?? ''} onChange={event => set({ botId: event.target.value || null })}>
@@ -395,7 +399,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     <AlertDialog open={confirmTakeOver} onOpenChange={open => { if (!busy) setConfirmTakeOver(open) }}>
       <AlertDialogContent>
         <AlertDialogHeader><AlertDialogTitle>{t('takeOverTitle')}</AlertDialogTitle><AlertDialogDescription>{t('takeOverBody', { name: creator })}</AlertDialogDescription></AlertDialogHeader>
-        <AlertDialogFooter><AlertDialogCancel disabled={busy === 'takeOver'}>{t('cancel')}</AlertDialogCancel><AlertDialogAction disabled={busy === 'takeOver'} onClick={() => { void takeOver() }}>{t('takeOver')}</AlertDialogAction></AlertDialogFooter>
+        <AlertDialogFooter><AlertDialogCancel disabled={busy === 'takeOver'}>{t('cancel')}</AlertDialogCancel><AlertDialogAction variant="default" disabled={busy === 'takeOver'} onClick={() => { void takeOver() }}>{t('takeOver')}</AlertDialogAction></AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
   </EditorFrame>
@@ -422,6 +426,7 @@ function RunRow({ run, timezone, onCancel, cancelling }: { run: AutomationRun; t
   const task = runTask(run)
   const at = run.started_at ?? run.due_at
   const reason = run.error ? (t.has(`runErrors.${run.error}` as never) ? t(`runErrors.${run.error}` as never) : tErrors.has(run.error as never) ? tErrors(run.error as never) : run.error) : null
+  // control-size-exempt: a run's own line — time, badge and one small cancel; not a toolbar of controls.
   return <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-3 text-sm">
     <time className="tabular-nums text-muted-foreground" dateTime={new Date(at).toISOString()}>{when(at, timezone)}</time>
     <Badge variant={runVariant[run.status]}>{t(`run.${run.status}`)}</Badge>

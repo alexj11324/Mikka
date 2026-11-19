@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useAnimate, useReducedMotion } from 'motion/react'
 import { useLocale, useTranslations } from 'next-intl'
 import useSWR, { useSWRConfig } from 'swr'
-import { CheckIcon } from 'lucide-react'
+import { Check } from '@/components/icons'
 import { createBot, listBots, type BotView } from '@/app/actions/bots'
 import { completeOnboarding } from '@/app/actions/onboarding'
 import { BOT_MOOD_SECONDS, BotAvatar, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE, type BotColor, type BotMood, type BotShape } from '@/components/nav/bot-avatar'
@@ -437,7 +437,7 @@ function AppRow({ app, connected, pending, disabled, onConnect }: { app: StoreAp
     </ItemContent>
     <ItemActions>
       {connected
-        ? <span className="flex items-center gap-1 text-sm text-muted-foreground"><CheckIcon aria-hidden="true" className="size-4" />{t('connected')}</span>
+        ? <span className="flex items-center gap-1 text-sm text-muted-foreground"><Check aria-hidden="true" className="size-4" />{t('connected')}</span>
         : <Button size="sm" variant="outline" disabled={disabled} onClick={onConnect}>{pending && <Spinner data-icon="inline-start" />}{t('connect')}</Button>}
     </ItemActions>
   </Item>
