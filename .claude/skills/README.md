@@ -98,9 +98,85 @@ Why the other skills were removed was recorded in the 2026-10-29 SaaS skill revi
 ## Updating
 
 Replace a whole skill directory from a new pinned upstream commit, update the
-table above, and keep the upstream license in `../skill-licenses/`. Do not add
-a skill that ships executable scripts or tells the agent to invoke skills
-unconditionally.
+table above, and keep the upstream license in `../skill-licenses/`. A vendored
+skill keeps its upstream `scripts/` and other support files. Do not add a skill
+that tells the agent to invoke skills unconditionally.
+
+## Capy Explore catalog (vendored 2026-11-19)
+
+169 skills taken from Capy's public Explore catalog (`https://capy.ai/explore?tab=skill`),
+one directory per skill, complete with each skill's own `references/`, `scripts/`
+and assets. Each entry is pinned to the upstream commit Capy's listing recorded.
+The catalog covers the technologies Mikka agents meet inside customer
+repositories, not only Mikka's own stack.
+
+Four names Capy lists were already vendored here from the same upstream and were
+skipped: `codebase-design`, `handoff`, `pr`, `react-native-skills`.
+
+| Source repository | Commit | Skills |
+| --- | --- | --- |
+| [ClickHouse/agent-skills](https://github.com/ClickHouse/agent-skills) | `356a8c1b9a7392adb389a132f5ad3fec38532a03` | `clickhouse-architecture-advisor`, `clickhouse-best-practices` |
+| [Dynatrace/dynatrace-for-ai](https://github.com/Dynatrace/dynatrace-for-ai) | `4f9aa71f9802aa6db0a4069ae5619eb3392ff411` | `dt-dql-essentials` |
+| [PostHog/skills](https://github.com/PostHog/skills) | `4ffcd7c0cc069f62124c55943ee72330cf8e526c` | `posthog-instrument-error-tracking`, `posthog-instrument-integration`, `posthog-instrument-llm-analytics` |
+| [RevenueCat/rc-claude-code-plugin](https://github.com/RevenueCat/rc-claude-code-plugin) | `ccfc038185ec457b2ac9077f3bbf1ba947a44dbb` | `integrate-revenuecat` |
+| [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills) | `1be8e34187e34647bb83adc3a1323b26ae6f6abe` | `api-and-interface-design`, `ci-cd-and-automation`, `code-simplification`, `deprecation-and-migration`, `documentation-and-adrs`, `git-workflow-and-versioning`, `spec-driven-development` |
+| [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) | `4eb71d92a39cab44ad40ac9d8a6a5ccb4029d6c2` | `docker-patterns`, `kubernetes-patterns` |
+| [angular/skills](https://github.com/angular/skills) | `0dfaf19affce74c8530d67616c0c0b5a2d71a972` | `angular-developer`, `angular-new-app` |
+| [anthropics/skills](https://github.com/anthropics/skills) | `683bc88e56f3e09ba94f7055977f3d3aa499f202` | `frontend-design`, `mcp-builder`, `skill-creator` |
+| [anthropics/skills](https://github.com/anthropics/skills) | `dbd4588f9e1033efb41dad4bef2f7947c8993d44` | `internal-comms` |
+| [anthropics/skills](https://github.com/anthropics/skills) | `e4bb5d960d87126ff3b3a8af1a104b7db67560ba` | `algorithmic-art`, `brand-guidelines`, `discernment-nudge`, `doc-coauthoring`, `docx`, `pdf`, `pptx`, `slack-gif-creator`, `xlsx` |
+| [apollographql/skills](https://github.com/apollographql/skills) | `5f02fcfcebec678e2e55777b639e32346622a963` | `apollo-client`, `apollo-federation`, `apollo-server` |
+| [appwrite/agent-skills](https://github.com/appwrite/agent-skills) | `a062e60a3e4d63b29002066c2f4b3e05ef6dcc44` | `appwrite-typescript` |
+| [aws/agent-toolkit-for-aws](https://github.com/aws/agent-toolkit-for-aws) | `2cb0fa1c2e668e1bb075028800b6b27efb95779e` | `amazon-dynamodb`, `aws-cdk`, `aws-cloudformation`, `aws-iam`, `debugging-lambda-timeouts`, `securing-s3-buckets` |
+| [buildkite/skills](https://github.com/buildkite/skills) | `50c85f20d409485b1445888983116b2f130e1630` | `buildkite-migration` |
+| [callstackincubator/agent-skills](https://github.com/callstackincubator/agent-skills) | `59e9d17446a248b21d86f078fcd0bd2d36db1ca4` | `react-navigation`, `upgrading-react-native` |
+| [clerk/skills](https://github.com/clerk/skills) | `a02dbd2a933b8929525129a6cb9dcf6ed66d0adf` | `clerk-nextjs-patterns`, `clerk-setup` |
+| [cloudflare/skills](https://github.com/cloudflare/skills) | `c430dd965cea3a8faf0ef035e3b3d73b38518081` | `cloudflare-agents-sdk`, `cloudflare-durable-objects`, `cloudflare-email-service`, `cloudflare-web-perf`, `cloudflare-workers-best-practices`, `wrangler` |
+| [cockroachdb/claude-plugin](https://github.com/cockroachdb/claude-plugin) | `df34a85848cdae38914ff13a5e70fcbd0d41db99` | `cockroachdb-sql` |
+| [designed-by-ai/skills](https://github.com/designed-by-ai/skills) | `03c20aec6dcedb5fabfb03dc37982eb52ef19ed6` | `design-mobile-apps` |
+| [dotnet/skills](https://github.com/dotnet/skills) | `1d40f95ed0f2cdedfa4c9b2614b7c2035a4323cb` | `analyzing-dotnet-performance`, `dotnet-coverage-analysis`, `dotnet-microbenchmarking`, `dotnet-migrate-nullable-references`, `dotnet-test-anti-patterns`, `migrate-xunit-to-xunit-v3`, `msbuild-antipatterns`, `optimizing-ef-core-queries` |
+| [elastic/agent-skills](https://github.com/elastic/agent-skills) | `baa511126ba2dc37b52e273b52734f8e4e0d323c` | `elasticsearch-esql`, `elasticsearch-index-design` |
+| [emilkowalski/skills](https://github.com/emilkowalski/skills) | `e8a175de22ae1e49370fc144c1f3bb9aeedf988d` | `break-ui`, `emil-design-eng` |
+| [expo/skills](https://github.com/expo/skills) | `d4f484024fec15196bfd3c272e953e3f983972cf` | `eas-update`, `eas-workflows` |
+| [firebase/agent-skills](https://github.com/firebase/agent-skills) | `b5735e5baa0d874cb97a23e26ebe93e4501797b9` | `firebase-auth-basics`, `firebase-basics`, `firebase-crashlytics`, `firebase-firestore`, `firebase-hosting-basics`, `firebase-security-rules-auditor` |
+| [firecrawl/skills](https://github.com/firecrawl/skills) | `5348e9ed68062cff515f741eb61de92eeb509d12` | `firecrawl-build` |
+| [flutter/agent-plugins](https://github.com/flutter/agent-plugins) | `0ef3972f93e2baa4156ba1cbb1e515cd53079c68` | `dart-add-unit-test`, `dart-use-pattern-matching`, `flutter-add-widget-test`, `flutter-apply-architecture-best-practices`, `flutter-fix-layout-issues` |
+| [get-convex/agent-skills](https://github.com/get-convex/agent-skills) | `2cfe645c87f971242cfc8ef3eb53662cbec26a53` | `convex`, `convex-authz` |
+| [getsentry/sentry-for-ai](https://github.com/getsentry/sentry-for-ai) | `c2313d3a826d56249e70623313bdc27ce5fca8b6` | `sentry-instrument`, `sentry-setup-releases` |
+| [getsentry/skills](https://github.com/getsentry/skills) | `d18b7aa8ba878354e5c348310230e652f7690f9c` | `sentry-iterate-pr` |
+| [google-gemini/gemini-skills](https://github.com/google-gemini/gemini-skills) | `832c8f94114dc343d86ff27296fe9335b45affa0` | `gemini-api-dev` |
+| [google/rust-skills](https://github.com/google/rust-skills) | `4b4f8b25d19c5ad3ad78b23c4c55ac35adad75a3` | `unsafe-rust-review` |
+| [google/skills](https://github.com/google/skills) | `4b940dd4b5f5759794cc257266cb8cb7524b7a66` | `cloud-logging-query-generation`, `google-cloud-iam-troubleshooting`, `google-cloud-run-basics` |
+| [grafana/skills](https://github.com/grafana/skills) | `1ccacf29049fde66637fe01ab93a83a772da323b` | `k6`, `promql` |
+| [hashicorp/agent-skills](https://github.com/hashicorp/agent-skills) | `f706481af9b8fedb66de909f6243ad29601afa0c` | `terraform-stacks`, `terraform-style-guide`, `terraform-test` |
+| [heygen-com/hyperframes](https://github.com/heygen-com/hyperframes) | `028ab75535c1c7f2f4df1d0ad6296da221f319b3` | `hyperframes-cli` |
+| [inngest/inngest-skills](https://github.com/inngest/inngest-skills) | `082798a627bbe9c3ed3a6638a9f56116a035f122` | `inngest-durable-functions`, `inngest-setup` |
+| [livekit/agent-skills](https://github.com/livekit/agent-skills) | `35c95dfbaf73d039fefc966d76ddb0d5005f85a2` | `building-livekit-agents` |
+| [mattpocock/skills](https://github.com/mattpocock/skills) | `49dd158d1076134a641b33efb035946536778336` | `setup-pre-commit` |
+| [microsoft/skills](https://github.com/microsoft/skills) | `d5741a1e9325adead3a28d1d203bb69283907e06` | `azure-cost-optimization`, `azure-diagnostics`, `deep-wiki-onboarding`, `entra-app-registration`, `kql` |
+| [mongodb/agent-skills](https://github.com/mongodb/agent-skills) | `c370a63b27075008a92134686b24af3817edeb00` | `mongodb-connection`, `mongodb-query-optimizer`, `mongodb-schema-design` |
+| [muratcankoylan/Agent-Skills-for-Context-Engineering](https://github.com/muratcankoylan/Agent-Skills-for-Context-Engineering) | `58b55a8921758d13453b440704fb1b5b208c0b0e` | `agent-tool-design`, `context-compression` |
+| [neondatabase/agent-skills](https://github.com/neondatabase/agent-skills) | `bfd013c352ed31b57a573e4f60263afc5fdd7f7a` | `neon-postgres`, `neon-postgres-egress-optimizer` |
+| [netlify/context-and-tools](https://github.com/netlify/context-and-tools) | `b5894c0e1c16d924dd5b28546b11c2de650fce7e` | `netlify-config`, `netlify-edge-functions`, `netlify-functions` |
+| [openai/skills](https://github.com/openai/skills) | `49f948faa9258a0c61caceaf225e179651397431` | `chatgpt-apps`, `cli-creator`, `security-best-practices`, `security-ownership-map`, `security-threat-model` |
+| [prisma/skills](https://github.com/prisma/skills) | `be16a8740d01363d13552b317042431ee8dfc581` | `prisma-client-api`, `prisma-upgrade-v7` |
+| [pulumi/agent-skills](https://github.com/pulumi/agent-skills) | `2517e28e4bc029424e9c9ee48016394296be0f6a` | `pulumi-best-practices`, `pulumi-component`, `pulumi-terraform-to-pulumi` |
+| [railwayapp/railway-skills](https://github.com/railwayapp/railway-skills) | `dab1c2a516348c4866d9e706d807dd302fd9a002` | `use-railway` |
+| [resend/resend-skills](https://github.com/resend/resend-skills) | `f943baf634c1d761cd8b883febe44c4a0d8a525f` | `react-email`, `resend` |
+| [stripe/ai](https://github.com/stripe/ai) | `e9deec62821ca59aa6ca18b4d243c9ced389cd54` | `stripe-best-practices`, `upgrade-stripe` |
+| [supabase/agent-skills](https://github.com/supabase/agent-skills) | `c9be0e931b7930f7d02126d04774d904c381e7d7` | `supabase`, `supabase-postgres-best-practices` |
+| [sveltejs/ai-tools](https://github.com/sveltejs/ai-tools) | `6b5d0dab3c9c083387247ab20dc684573481076b` | `svelte-code-writer`, `svelte-core-bestpractices` |
+| [tavily-ai/skills](https://github.com/tavily-ai/skills) | `778122e5f9c680f541eeceda5a5b36405eb7980c` | `tavily-best-practices` |
+| [temporalio/agent-skills](https://github.com/temporalio/agent-skills) | `be14524789f3c6e457d8e731af4932e42234c8ea` | `temporal-cloud-setup` |
+| [trailofbits/skills](https://github.com/trailofbits/skills) | `442fc9d6c89b1e937e6f7a477e7071ea75fcbea4` | `agentic-actions-auditor`, `audit-context-building`, `differential-review`, `fp-check`, `modern-python`, `mutation-testing`, `property-based-testing`, `sharp-edges`, `supply-chain-risk-auditor`, `trailofbits-codeql`, `trailofbits-semgrep`, `variant-analysis` |
+| [twilio/skills](https://github.com/twilio/skills) | `8aba46fb65dc8d9a20f4b301a68352064b4159a5` | `twilio-migrate-messaging-to-verify` |
+| [upstash/skills](https://github.com/upstash/skills) | `b0850d0abedb81269e2ea07e755e9488c3d65d39` | `upstash-qstash-js`, `upstash-redis-js` |
+| [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) | `b06e2533ba9b3823b8a96c859d455cb55f4d7893` | `agent-browser` |
+| [vercel-labs/agent-skills](https://github.com/vercel-labs/agent-skills) | `063bee94c3f4df8453406c830b0a7df0f2860278` | `vercel-cli-with-tokens`, `vercel-composition-patterns`, `vercel-react-best-practices`, `vercel-react-view-transitions` |
+| [vercel-labs/skills](https://github.com/vercel-labs/skills) | `50894c1d98bc45ca1ab127213e59d6525065b5e7` | `find-skills` |
+| [vercel-labs/vercel-byoc](https://github.com/vercel-labs/vercel-byoc) | `ac67517bd9e6cd9f211a929755b51fcfcdd13b62` | `vercel-byoc` |
+| [workos/skills](https://github.com/workos/skills) | `f1095c8dab9ca509e660275de177001c85cb3a66` | `workos` |
+| [wshobson/agents](https://github.com/wshobson/agents) | `46891e7e60da0e52baf1050b7b6391b64e84c6d9` | `bash-defensive-patterns`, `changelog-automation`, `dependency-upgrade`, `e2e-testing-patterns`, `git-advanced-workflows`, `postgresql-table-design`, `postmortem-writing`, `python-testing-patterns`, `sql-optimization-patterns`, `typescript-advanced-types` |
 
 ## Mikka UX-quality skill adapters (2026-11-12)
 
