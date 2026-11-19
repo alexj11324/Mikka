@@ -1306,6 +1306,111 @@
     "test": "lib/audit/events.test.ts",
     "suite": "test:audit"
   },
+  "lib/auth-cookies.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Carry Better Auth's renewed session cookies into the request's cookie journal so the transport commits them, replacing the framework integration's after hook.",
+    "test": "lib/auth-cookies.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/dynamic.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Load a component on first render behind the caller's loading boundary. There is no server render to skip, so the deployment needs no configuration.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/link.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Render an application route as an anchor that navigates in place, adding the deployment base path exactly once. Modified clicks, downloads and external URLs stay with the browser.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/localized-navigation.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Navigate with the active locale applied to the href, and keep an explicit locale choice in the NEXT_LOCALE cookie under the deployment base path.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/location.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read and write the browser's location as router state, stripping the deployment base path and separating locale segments. An installation that serves auth as a server document keeps those links on the server entry.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose the browser router hooks. Route assets are already in the bundle, so a prefetch resolves without any server read.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/script.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Load a third-party script once per key and re-announce readiness on each mount. No installation configuration and no server runtime are involved.",
+    "test": "components/auth/turnstile.test.tsx",
+    "suite": "test:signup-turnstile"
+  },
+  "lib/intl/i18n-client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose the client translation hooks directly over use-intl instead of a framework package. Messages are bundled, so no installation value is read.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/intl/i18n-server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Translate on the server from the locale of the request in scope, falling back to the default locale when the request carries none.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-only.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Mark a module as server-only so the browser build rejects it. This replaces the framework marker package; the build enforces the boundary, not the deployment.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/headers.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current request's headers and cookie jar from the request scope. Headers stay read-only and cookie writes are journalled until the response boundary commits them.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/localized-navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Build locale-prefixed redirect targets for server code, agreeing with the browser helper on every application path.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Raise a redirect or not-found answer from nested handler code as a marker the request dispatcher turns into the matching HTTP response.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/react.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Serve the server graph's React entry, replacing only cache with the request-scoped memo so one request's reads are never shared with another.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Provide the server request and response types, including the deployment base path on the request URL and the after-work queue bound to the request scope.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
   "lib/auth-error.ts": {
     "mode": "built-in",
     "environment": [],
