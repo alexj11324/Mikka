@@ -317,3 +317,12 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 给任何被 mock 的模块加导出后，搜索范围必须包含：`*.test.ts`、`*.test.tsx`、`*.test.mjs`、`tests/fixtures/*.mjs`、`scripts/**/*.mjs`。
   2. 本仓库有两套 mock 机制：`mock.module()`（node:test）和 `registerHooks` + `resolve/load`（fixture 预加载）。后者用 `--import ./tests/fixtures/xxx.mjs` 挂上，grep 关键字是 `resolve(`/`load(` 里的文件路径。
   3. fixture 里替换成"抛错"的模块（如 scope-store 的 acting-user）是有意的语义，补导出时要保持同样的抛错行为，不要图省事写成成功返回。
+
+## 2026-11-19 断环前先确认真的有静态环
+
+- 现象：我为了"断开 `workspace-access ↔ issue-access` 循环"，把 `workspace-access.ts` 的 `requireUser` 改成直接从 `lib/acting-user` 导入。结果 `workspace-access` 静态拉入 `lib/session.ts` → `next/headers`，打红了两个**故意 stub `next/headers`** 的测试（`lib/linear-sync/kill-switch.test.ts` 只 mock 了 `cookies`；`lib/personal-mailbox-producer.test.ts` 因此在测试结束后才初始化 Better Auth）。
+- 根因：原代码根本没有静态环——`issue-access → workspace-access` 是 `await import()`，动态 import 不构成 ESM 静态循环。我"断环"的前提是错的，改动纯属多余且有害。
+- 规则：
+  1. 断环前用 `grep -n "import" <两个文件>` 确认两边的边是**静态** `import` 还是 `await import()`。动态的那条不算环。
+  2. `lib/acting-user.ts` 静态依赖 `lib/session.ts` → `next/headers`。任何"只在特定路径下才需要 session"的模块（workspace-access、issue-access、各种只读 store）都应保持惰性引入，不要为了统一而改成静态 import。
+  3. 判断某模块是否引入 session 链：`grep -n "^import" lib/acting-user.ts` 看有没有 `lib/session`。有，就说明静态引入它会拉 session。
