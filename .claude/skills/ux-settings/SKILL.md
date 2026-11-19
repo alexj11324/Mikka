@@ -17,7 +17,7 @@ This is a **generative** skill. Settings is a pattern users know — the job is 
 2. **Apply the always-true core** — relevance, grouping, plain labels, visible status, destructive-last, clear save feedback.
 3. **Surface the context-dependent decisions** (autosave vs. Save button, search, advanced split, confirmation/2FA) with trade-offs.
 
-Then it **hands off to `ux-heuristics-audit`, `ux-accessibility-audit`, `ux-aesthetics-audit`, `ux-microcopy-audit`, `ux-information-architecture-audit`, `ux-dark-patterns-audit`, and `ux-mobile-responsiveness-audit`** for validation.
+Then it **hands off to `ux-heuristics`, `ux-accessibility-audit`, `ux-aesthetics-audit`, `ux-microcopy-audit`, `ux-information-architecture-audit`, `ux-dark-patterns-audit`, and `ux-mobile-responsiveness-audit`** for validation.
 
 Scope & composition (per `docs/orchestration-policy.md` §9): this skill covers the **settings page and its save model** and composes lower-scope skills rather than re-deriving them. **Core children (built as part of the page):** the **choice of control** (toggle vs. checkbox vs. radio vs. slider) via `ux-selection-controls`. **Peers that own a sub-part (defer):** the **search input itself** to `ux-search` and **notification-preference depth** to `ux-notifications-and-toasts` (they own those sub-parts if reached). **Inherit, don't regenerate:** under an existing design system, take color/type/spacing from its tokens — only set those when designing from scratch.
 
@@ -77,7 +77,7 @@ Ask if not known; state the assumption if proceeding without an answer:
 
 After generating or revising, hand the result to the audit lenses rather than declaring it done. These are **candidate** lenses — posture is set by `docs/orchestration-policy.md`, or route the whole thing through `ux-design-review`. Here, **`heuristics`, `microcopy`, and `dark-patterns` are Tier A (auto-run); `accessibility`, `aesthetics`, `information-architecture`, and `mobile-responsiveness` are Tier B (offered)** — under an existing design system `aesthetics` is suppressed and `accessibility` narrows to usage; `mobile-responsiveness` applies only on mobile. If the user invoked this skill for one specific thing, respect that scope.
 
-- **`ux-heuristics-audit`** *(Tier A)* — visibility of system status (current values, save state), user control & freedom (leave without saving, Undo), error prevention (confirm sensitive/destructive changes), recognition over recall.
+- **`ux-heuristics`** *(Tier A)* — visibility of system status (current values, save state), user control & freedom (leave without saving, Undo), error prevention (confirm sensitive/destructive changes), recognition over recall.
 - **`ux-accessibility-audit`** *(Tier B — offer; narrow under a design system)* — control labels and states announced, target sizes, focus order, contrast on status indicators.
 - **`ux-aesthetics-audit`** *(Tier B — offer; suppress under a design system)* — grouping legibility, white space over divider-line noise, a scannable hierarchy rather than a flat list.
 - **`ux-microcopy-audit`** *(Tier A)* — this skill leans hard on copy: plain labels, action-based toggle labels, helper text, and confirmation-dialog headings/CTAs.
