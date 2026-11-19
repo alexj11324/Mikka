@@ -37,10 +37,11 @@ export function createViewStore(scope: string | null) {
       if (scope) {
         try { window.sessionStorage.setItem(storageKey(key), JSON.stringify(value)) } catch { /* storage unavailable */ }
       }
-      // Copy out first: a listener may unsubscribe itself while it runs.
+      // Copy out first: a listener may unsubscribe another while it runs, and
+      // iterating the live Set would then skip whichever one sat after it.
       const forKey = cellListeners.get(key)
-      if (forKey) for (const listener of [...forKey]) listener()
-      if (anyListeners.size) for (const listener of [...anyListeners]) listener()
+      if (forKey) for (const listener of Array.from(forKey)) listener()
+      if (anyListeners.size) for (const listener of Array.from(anyListeners)) listener()
     },
     /** Subscribe to one cell. Every `useViewState` reader takes this path. */
     subscribeKey(key: string, listener: () => void) {

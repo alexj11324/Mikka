@@ -1,4 +1,4 @@
-import { CircleDashed, Circle, CircleDot, CirclePause, CircleCheck, CircleX, Minus } from '@/components/icons'
+import { CircleDashed, CirclePause, CircleCheck, CircleX, Minus } from '@/components/icons'
 import { PRIORITY_ICONS, STATUS_ICONS } from './state-mark'
 
 // A project's status and priority are drawn from the one mark registry (`lib/state-mark.ts`), so 已完成, 已取消 and
