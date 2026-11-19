@@ -326,3 +326,13 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 断环前用 `grep -n "import" <两个文件>` 确认两边的边是**静态** `import` 还是 `await import()`。动态的那条不算环。
   2. `lib/acting-user.ts` 静态依赖 `lib/session.ts` → `next/headers`。任何"只在特定路径下才需要 session"的模块（workspace-access、issue-access、各种只读 store）都应保持惰性引入，不要为了统一而改成静态 import。
   3. 判断某模块是否引入 session 链：`grep -n "^import" lib/acting-user.ts` 看有没有 `lib/session`。有，就说明静态引入它会拉 session。
+
+## 2026-11-19 DB 测试在本机过、CI 并发下被 cancelledByParent
+
+- 现象：`lib/captures/store.db.test.ts` 本地单跑 3.7 秒通过；CI 的 DB runner 并发 4 个 suite 时跑了 32 秒，报 `cancelledByParent` + `Promise resolution is still pending but the event loop has already resolved`，连带把同一文件里后面的 cloud-computer 子测试也掐掉。
+- 根因：我在测试里加了 12 次额外数据库往返（建 user → 建 run → saveCapture → createShare → 删 user → 查 → 再插 user → 查 → 插 guard → 查 → 删 guard → 查 → 删 run → 删 user）。`saveCapture` 本身还要开 `withAccountWrite` 事务、写 activity、读回。共享 PG 连接池时这些被放大。
+- 规则：
+  1. DB 测试里模拟"账号消失"这类状态，优先**直接 INSERT/UPDATE 目标行**，不要走完整业务函数（`saveCapture` 的开销是直接 INSERT 的好几倍）。
+  2. 断言的顺序按规则的读法排：先"存在时能用"，再"删除请求关闭"，再"行没了关闭"。不要为了复用一个 token 而反复插入/删除。
+  3. 本机复现 CI 的 DB 测试：需要名为 `mikka_e2e` 的库（测试硬编码这个名字），`MIGRATE=1` 先跑 `scripts/migrate.mjs`，然后 `REQUIRE_DB=1` + 四个 URL 环境变量都指向它。
+  4. `run_captures` 有 CHECK `run_captures_ready_file`：`status='ready'` 时 `storageKey`、`size`、`sha256` 都必须非空，直接 INSERT 时要一起给。
