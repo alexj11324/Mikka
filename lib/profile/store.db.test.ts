@@ -155,6 +155,16 @@ dbTest('facts are scoped to a repository, so one project\'s habits stay out of a
     // All three are the person's own profile: 记忆 shows every one of them.
     assert.equal((await store.listFacts(owner)).length, 3)
 
+    // A recorded fact arrives `pending`, and the settings copy promises a fact is
+    // used for answers only after the person confirms it (lib/profile/memory.ts's
+    // review action is what approves one). The prompt states none of them yet.
+    assert.equal(await store.profilePromptSection(owner, ['acme/widget']), '',
+      'a pending fact never reaches the prompt')
+    // Approve them the way 记忆's review action would, so the rest of this test
+    // exercises the read path a confirmed profile actually travels.
+    await db.update(schema.userFacts).set({ reviewStatus: 'approved' })
+      .where(and(eq(schema.userFacts.userId, owner), eq(schema.userFacts.state, 'active')))
+
     // A chat working in one repository is told that repository's facts and the person's, never the other's.
     const inWidget = await store.profilePromptSection(owner, ['acme/widget'])
     const inGadget = await store.profilePromptSection(owner, ['acme/gadget'])
