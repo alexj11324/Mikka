@@ -1,10 +1,14 @@
-import { CircleDashed, Circle, CircleDot, CirclePause, CircleCheck, CircleX, Minus, SignalHigh, SignalMedium, SignalLow, CircleAlert } from '@/components/icons'
+import { CircleDashed, Circle, CircleDot, CirclePause, CircleCheck, CircleX, Minus } from '@/components/icons'
+import { PRIORITY_ICONS, STATUS_ICONS } from './state-mark'
+
+// A project's status and priority are drawn from the one mark registry (`lib/state-mark.ts`), so 已完成, 已取消 and
+// 紧急 look the same wherever they appear; `none` has no mark and keeps its dash.
 export const PROJECT_PRIORITIES = [
   { value: 'none', icon: Minus },
-  { value: 'urgent', icon: CircleAlert },
-  { value: 'high', icon: SignalHigh },
-  { value: 'normal', icon: SignalMedium },
-  { value: 'low', icon: SignalLow },
+  { value: 'urgent', icon: PRIORITY_ICONS.urgent },
+  { value: 'high', icon: PRIORITY_ICONS.high },
+  { value: 'normal', icon: PRIORITY_ICONS.normal },
+  { value: 'low', icon: PRIORITY_ICONS.low },
 ] as const
 export const PROJECT_COLORS = [
   { value: 'green', className: 'text-success-foreground', surface: 'bg-success/10' },
@@ -35,10 +39,11 @@ export function projectTaskCounts(project: Project, tasks: readonly { id: string
   return linked.length === ids.size ? { total: linked.length, done: linked.filter(task => task.status === 'done').length } : null
 }
 export const PROJECT_STATUSES = [
-  { value: 'backlog', icon: CircleDashed },
-  { value: 'planned', icon: Circle },
-  { value: 'started', icon: CircleDot },
-  { value: 'paused', icon: CirclePause },
-  { value: 'completed', icon: CircleCheck },
-  { value: 'canceled', icon: CircleX },
+  { value: 'backlog', icon: STATUS_ICONS.backlog },
+  { value: 'planned', icon: STATUS_ICONS.todo },
+  { value: 'started', icon: STATUS_ICONS.doing },
+  { value: 'paused', icon: STATUS_ICONS.review },
+  // 已完成 and 已取消 are the task statuses' own marks: one status, one drawing (decision 2026-11-19-1600).
+  { value: 'completed', icon: STATUS_ICONS.done },
+  { value: 'canceled', icon: STATUS_ICONS.canceled },
 ] as const

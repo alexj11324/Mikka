@@ -362,9 +362,18 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
     the person set since the work was asked for: Agent starts → 进行中;
     submitted for review or PR delivered → 评审中; last delivered PR merged,
     or accepted by the Factory → 已完成 (`lib/task-status-advance.ts`).
-  - Status icons take R-34's colours: 进行中 warning, 评审中 info, 已完成
-    success, the rest grey. The Agent mark is warning while working, info
-    when waiting, destructive on error. No status dots, corner marks or
+  - Status icons take R-34's colours as Capy 0.9.2 and Linear order them:
+    进行中 warning, 评审中 success (green), 已完成 info (the violet), the rest
+    grey ([2026-11-19-1630](decisions/2026-11-19-1630-one-mark-registry.md)).
+    Every state mark is one row of one registry, `lib/state-mark.ts`
+    (`MARK_SHAPE_NAMES`, `MARK_TONE_NAMES`, the six domains' tables): a
+    surface calls that domain's resolver and draws the mark it returns, and no
+    component chooses a shape or a colour of its own. A mark's colour is
+    `stateMarkTone(mark)`, which the chip, the dot beside it and the badge all
+    read. A thread draws its group from the same table; it is no longer a
+    bubble with a corner dot (2026-11-19-1630 replaces the 2026-11-04 clause
+    in `../chat-tool-calls.md` §2.5). The Agent mark is warning while working,
+    info when waiting, destructive on error. No status dots, corner marks or
     badges.
   - `agent_runs.outcome` supplies the ended run's judgement, based on its
     reply, status, task and PRs (`lib/run-outcome-judge.ts`). A finished
@@ -504,9 +513,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
 - **R-71a** Mikka's own UI draws one icon family: affectUI's Hugeicons, through
   `components/icons/index.tsx` (`@/components/icons`), whose glyphs are stroke
   2 in a 24 box in `currentColor` ([2026-11-18-1900](decisions/2026-11-18-1900-icons-hugeicons.md)).
-  A task's status icon is the one exception: `ISSUE_STATUSES` keeps its lucide
-  glyphs and `status-icons.tsx` its three rings
-  ([2026-11-13-1405](decisions/2026-11-13-1405-one-task-status.md)), and no
+  A task's status icon is the one exception: `ISSUE_STATUSES` keeps its own glyphs, drawn in the status
+  registry `lib/state-mark.ts` / `components/workspace/state-mark.tsx`
+  ([2026-11-19-1630](decisions/2026-11-19-1630-one-mark-registry.md)), and no
   other family stands in for a status. Paid blocks keep their own icons
   ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
   A new glyph is a line in that file, not a new package (ui-policy

@@ -196,7 +196,7 @@ function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityC
     <ContextMenuSub>
       <ContextMenuSubTrigger disabled={disabled}><Flag />{tCard('priority')}<ContextMenuShortcut>P</ContextMenuShortcut></ContextMenuSubTrigger>
       <ContextMenuSubContent><ContextMenuRadioGroup value={task.priority} onValueChange={value => onPriorityChange(task, String(value))}>
-        {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon {...option.iconProps} />{option.label}</ContextMenuRadioItem>)}
+        {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon />{option.label}</ContextMenuRadioItem>)}
       </ContextMenuRadioGroup></ContextMenuSubContent>
     </ContextMenuSub>
     <ContextMenuItem disabled={disabled} onClick={() => ask('assignee')}><CircleUserRound />{tCard('assignee')}<ContextMenuShortcut>A</ContextMenuShortcut></ContextMenuItem>

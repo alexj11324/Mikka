@@ -180,7 +180,7 @@ export function IssueCitation({ issue, onOpen }: { issue: IssueSource; onOpen: (
         <InlineCitationMeta>
           {status && <span data-task-status-label={status}><TaskStatusIcon status={status} />{statusLabel(status)}</span>}
           {indicator && <span data-run-indicator-label={indicator}>{runLabel(indicator)}</span>}
-          {priority && <span><priority.icon {...priority.iconProps} />{tIssue(`priority.${priority.value}`)}</span>}
+          {priority && <span><priority.icon />{tIssue(`priority.${priority.value}`)}</span>}
         </InlineCitationMeta>
       </InlineCitationBody>
     </InlineCitationContent>

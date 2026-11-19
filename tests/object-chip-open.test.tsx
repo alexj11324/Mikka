@@ -78,7 +78,7 @@ test('a task chip uses the same authorized presentation as its detail, including
     await act(async () => { chips[3].click(); chips[5].click() })
     assert.deepEqual(opened, [ids[3], ids[5]])
     assert.deepEqual(chips.map(chip => chip.textContent), ['ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'ZHIX-5', 'Ship it'])
-    assert.equal(chips[0].querySelector('svg')?.getAttribute('viewBox'), '0 0 12 12', '进行中 is the status ring, whatever the run does')
+    assert.equal(chips[0].querySelector('svg')?.getAttribute('data-mark'), 'half', '进行中 is the status mark, whatever the run does')
     assert.equal(chips[6].getAttribute('aria-label'), 'Open task: Ship it')
   } finally {
     await act(async () => { root.unmount() })
