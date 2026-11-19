@@ -264,15 +264,18 @@ func TestPlainModelTransportTimingKeepsRealTLSReuseAndOriginalTerminal(t *testin
 }
 
 func TestPlainModelTransportTimingCancellationDoesNotWaitForNewEvidence(t *testing.T) {
-	entered, stopped := make(chan struct{}), make(chan struct{})
+	entered, stopped, release := make(chan struct{}), make(chan struct{}), make(chan struct{})
 	server := httptest.NewTLSServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		// Consume the real POST so the HTTP/1 server can observe connection cancellation.
 		_, _ = io.Copy(io.Discard, r.Body)
 		close(entered)
 		<-r.Context().Done()
 		close(stopped)
+		// Do not let the server send an implicit 200 while cancellation is in flight.
+		<-release
 	}))
 	defer server.Close()
+	defer close(release)
 	target, _ := url.Parse(server.URL)
 	base := server.Client().Transport
 	model := CPAPlainModel{Provider: "claude", Client: &http.Client{Transport: roundTripFunc(func(request *http.Request) (*http.Response, error) {
