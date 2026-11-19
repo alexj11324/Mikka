@@ -1,5 +1,5 @@
 import 'server-only'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { start } from 'workflow/api'

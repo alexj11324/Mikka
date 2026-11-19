@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import useSWR, { unstable_serialize } from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { harnessName } from '@/components/labels/entity-labels'
 import { arrayMove } from '@dnd-kit/sortable'
 import { changeModelOrder, checkModelOrderQuota, type getModelOrder } from '@/app/actions/model-order'

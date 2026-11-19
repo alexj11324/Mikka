@@ -2,9 +2,9 @@
 
 import { TaskConversation } from '@ui-slot/task-conversation'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import dynamic from 'next/dynamic'
+import dynamic from '@/lib/client-runtime/dynamic'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { authClient } from '@/lib/auth-client'
 import { findThreadIssue } from '@/app/actions/agents'
 import { useIssueThreadRead } from '@/hooks/use-issue-thread-read'

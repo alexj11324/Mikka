@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { MessageCircle } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'

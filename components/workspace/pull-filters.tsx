@@ -12,7 +12,7 @@
 // component's own default).
 import { useState } from "react";
 import { Bookmark, Plus, RefreshCw, SlidersHorizontal, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { cn } from "cn";
 import { withBasePath } from "@/lib/base-path";
 import {

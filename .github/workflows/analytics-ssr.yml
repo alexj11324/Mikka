@@ -52,7 +52,6 @@ jobs:
       BETTER_AUTH_URL: http://localhost:3186
       BETTER_AUTH_SECRET: synthetic-ssr-regression-secret-not-a-real-credential
       NEXT_PUBLIC_POSTHOG_KEY: phc_synthetic_ssr_regression
-      NEXT_TELEMETRY_DISABLED: '1'
       MIGRATE: '0'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

@@ -13,7 +13,7 @@ const at = (path: string) => new URL(`../${path}`, import.meta.url).href
 const noop = () => {}
 const unexpected = () => { throw new Error('this read-only render must not call a server action') }
 const translate = Object.assign((key: string, values?: Record<string, unknown>) => `${key}${values ? ` ${Object.values(values).join(' ')}` : ''}`, { has: () => true })
-mock.module('next-intl', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: {
   useTranslations: () => translate, useLocale: () => 'en', useMessages: () => ({ IssueDetail: { work: { states: {} } }, GroupTask: { stage: {}, status: {} } }),
   useFormatter: () => ({ dateTime: () => '08:00', relativeTime: () => 'now' }), useNow: () => new Date('2026-11-10T08:00:00Z'),
 } })

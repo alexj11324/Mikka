@@ -29,13 +29,16 @@ export function auditBasePath(file, source) {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const module = node.moduleSpecifier.text,
         clause = node.importClause
-      if (module === 'next/link' && clause?.name) links.add(clause.name.text)
+      // The application's own link modules carry the same contract the
+      // framework link did; both spellings are checked so a stray old import
+      // is still caught.
+      if (/(?:^|\/)link$/.test(module) && clause?.name) links.add(clause.name.text)
       if (clause?.namedBindings && ts.isNamedImports(clause.namedBindings))
         for (const element of clause.namedBindings.elements) {
           const name = element.name.text,
             imported = element.propertyName?.text ?? name
-          if (/^(?:next\/(?:link|navigation|router)|(?:@\/)?i18n\/navigation)$/.test(module)) {
-            if (imported === 'Link' || (imported === 'default' && module === 'next/link')) links.add(name)
+          if (/^(?:next\/(?:link|navigation|router)|(?:@\/)?i18n\/navigation|@\/lib\/client-runtime\/(?:link|navigation|localized-navigation))$/.test(module)) {
+            if (imported === 'Link' || (imported === 'default' && /(?:^|\/)(?:link|next-link)$/.test(module))) links.add(name)
             if (imported === 'redirect' || imported === 'permanentRedirect') redirects.add(name)
             if (imported === 'useRouter') routerHooks.add(name)
           }

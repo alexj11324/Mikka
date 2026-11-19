@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type MouseEvent } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { ChevronDown, Download, Globe, History, MessageSquare, SquareDashedMousePointer, X } from '@/components/icons'
 import { getArtifact, getArtifactText } from '@/app/actions/artifacts'

@@ -3,7 +3,6 @@ import { pool } from '@/lib/db'
 import { forbiddenOrigin, json, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { pushSession, removePushBinding, withPushSession } from '@/lib/mobile-push-session'
 
-export const dynamic = 'force-dynamic'
 
 const changes = z.object({ label: z.string().trim().min(1).max(80) }).strict()
 

@@ -2,7 +2,7 @@
 
 import { Fragment, useState, type MouseEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { CalendarClock, ChevronDown, Ellipsis, Pin, Plus, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { organizeAutomation, pinAutomation, restoreAutomation } from '@/app/actions/automations'

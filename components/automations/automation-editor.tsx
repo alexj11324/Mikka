@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { ArrowLeft, Play } from '@/components/icons'
 import { listDevices } from '@/app/actions/agents'

@@ -3,7 +3,7 @@
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { Children, createContext, isValidElement, memo, use, useMemo, type ComponentProps, type ReactNode } from 'react'
 import { AgentCodeBlock } from './agent-code-block'
-import dynamic from 'next/dynamic'
+import dynamic from '@/lib/client-runtime/dynamic'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { cn } from '@/lib/utils'

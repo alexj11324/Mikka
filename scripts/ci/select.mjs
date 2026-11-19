@@ -17,7 +17,7 @@ export function area(file) {
   if (file.startsWith('packages/daemon/')) return 'daemon'
   if (file.startsWith('packages/subscription-worker/')) return 'e2b/runtime'
   if (file.startsWith('packages/')) return 'protocol/shared'
-  if (/^(?:components|hooks|i18n|messages|public|apps\/frontend)\/|^app\/(?:\[locale\]|fonts|globals)/.test(file)) return 'frontend/web'
+  if (/^(?:components|hooks|i18n|messages|public|apps\/frontend)\/|^app\/(?:fonts|globals)/.test(file)) return 'frontend/web'
   if (/^(?:lib|app|apps\/api)\//.test(file)) return 'api/factory/coordinator'
   if (file.startsWith('drizzle/')) return 'database/migrations'
   if (/^(?:Dockerfile|docker-compose|tests\/self-hosted)/.test(file)) return 'self-hosted/image'
@@ -70,7 +70,7 @@ export async function select(plan, changes, { force = false } = {}) {
     mobile: !docs && (full || selected.has('@mikka/mobile') || areas.includes('mobile')),
     desktop: !docs && (full || selected.has('@mikka/desktop') || areas.includes('desktop')),
     image: !docs && (full || areas.includes('self-hosted/image') || files.some(isSelfHostedBackendInput) || files.some(f => area(f) === 'api/factory/coordinator' && !/\.(?:test|spec)\.[^.]+$/.test(f))),
-    analytics: !docs && (full || files.some(f => /analytics|posthog|instrumentation|^apps\/frontend\/|^app\/\[locale\]\/layout/.test(f))),
+    analytics: !docs && (full || files.some(f => /analytics|posthog|instrumentation|^apps\/frontend\/|^app\/globals/.test(f))),
   }
   return { version: 1, full, docs_only: docs, areas, reasons, affected, units,
     unit_tasks: units.map(id => ({ project: id, target: `ci-tasks:${id.slice(3)}`, command: tasks[id.slice(3)].command.trim(), reason: full ? 'full validation' : always.test(tasks[id.slice(3)].command) || id === 'ci-core-triage' ? 'mandatory source/security policy' : 'Nx reverse dependency' })),

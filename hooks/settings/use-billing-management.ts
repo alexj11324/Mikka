@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
-import { useLocale } from 'next-intl'
+import { useLocale } from '@/lib/intl/i18n-client'
 import { useActionError } from '@/lib/use-action-error'
 import { billingManagementRequest, BillingManagementError, billingManagementPath } from '@/lib/billing/management-client'
 import type { BillingManagementOperation, BillingManagementView, BillingScope } from '@/lib/billing/management-contract'

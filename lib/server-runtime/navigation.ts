@@ -1,3 +1,10 @@
+/**
+ * Redirect and not-found answers from inside a handler.
+ *
+ * A route handler cannot return a location directly from nested code, so these
+ * throw; the dispatcher in `apps/api/src/application.ts` turns the marker into
+ * the matching HTTP response.
+ */
 export class NavigationResponse extends Error {
   constructor(readonly status: number, readonly location?: string) { super('API_NAVIGATION_RESPONSE') }
 }

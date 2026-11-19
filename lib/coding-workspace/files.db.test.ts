@@ -43,10 +43,10 @@ test('coding workspace: real PostgreSQL authority, push delivery and daemon sour
     for (const name of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql'))))
       await pool.query(await readFile(new URL(name, directory), 'utf8'))
     // Supply Next's request context without replacing API authentication.
-    const next = await import('next/server')
-    mock.module('next/server', { namedExports: { ...next, after() {} } })
-    mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+    const next = await import('@/lib/server-runtime/server')
+    mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after() {} } })
+    mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {} }) } })
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
     // Only external gateway delivery is replaced. SQL, LISTEN/NOTIFY, source
     // authority, secret masking and the daemon filesystem handler stay real.
     const wakes: string[] = [], wakeBarriers = new Map<string, Promise<void>>()

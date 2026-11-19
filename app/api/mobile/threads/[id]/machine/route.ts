@@ -7,7 +7,6 @@ import { readRunChain } from '@/lib/run-chain'
 import { runOutsideToken } from '@/lib/tokens/scope'
 import { readThreadMachine } from '@/lib/thread-machine-view'
 
-export const dynamic = 'force-dynamic'
 
 type Params = { params: Promise<{ id: string }> }
 

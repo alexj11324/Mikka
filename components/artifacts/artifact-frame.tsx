@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ELEMENT_ROLES, type ElementRole, type FromFrame, type ToFrame } from '@mikka/protocol/artifact-frame'
 import { selectedWebServer, webSelectionVersion } from '@/lib/web-connection/selection'
 import { WebConnectionError } from '@/lib/web-connection/client'

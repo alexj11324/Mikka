@@ -33,7 +33,7 @@ const inserted: Record<string, unknown>[] = []
 let defaults = { defaultModel: 'codex' as string | null, defaultRepository: 'acme/app' as string | null }
 
 before(async () => {
-  mock.module('next/headers', { namedExports: {
+  mock.module('@/lib/server-runtime/headers', { namedExports: {
     cookies: async () => ({ set: (name: string, value: string) => cookieJar.set(name, value), delete: (name: string) => cookieJar.delete(name), get: (name: string) => cookieJar.has(name) ? { value: cookieJar.get(name) } : undefined }),
     headers: async () => new Headers(),
   } })

@@ -1,4 +1,3 @@
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -160,7 +159,7 @@ test('Telegram command reads retain issued numbers, personal binding and exact h
   const { seedPersonalWorkspace } = await import('./support/workspace-admin-db')
   const { createTranslator } = await import('use-intl/core')
   const messages = JSON.parse(await readFile(new URL('../messages/en.json', import.meta.url), 'utf8'))
-  const translations = mock.module('next-intl/server', { namedExports: {
+  const translations = mock.module('@/lib/intl/i18n-server', { namedExports: {
     getLocale: async () => 'en',
     getTranslations: async () => createTranslator({ locale: 'en', messages, namespace: 'TelegramBot' }),
   } })
@@ -383,7 +382,7 @@ test('identifier reads reuse immutable authorized rows across mixed workspace ba
     // and repository catalog at this UI boundary; database/naming code stays real.
     const { createTranslator } = await import('use-intl/core')
     const messages = JSON.parse(await readFile(new URL('../messages/en.json', import.meta.url), 'utf8'))
-    const translations = mock.module('next-intl/server', { namedExports: {
+    const translations = mock.module('@/lib/intl/i18n-server', { namedExports: {
       getLocale: async () => 'en',
       getTranslations: async () => createTranslator({ locale: 'en', messages, namespace: 'TelegramBot' }),
     } })

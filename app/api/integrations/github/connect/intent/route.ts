@@ -4,7 +4,6 @@ import { freshSessionRoute } from '@/lib/fresh-session'
 import { createConnectIntent, loopbackStart, readConnectIntent } from '@/lib/github/connect-intent'
 import { withRequestLog } from '@/lib/request-log'
 
-export const runtime = 'nodejs'
 const headers = { 'Cache-Control': 'private, no-store' }
 
 /** The desktop app's Link GitHub: a one-time token naming the app's own account, for the browser it opens. */

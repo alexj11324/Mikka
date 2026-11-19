@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Users } from '@/components/icons'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { acceptWorkspaceInvitation } from '@/app/actions/workspace'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'

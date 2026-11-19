@@ -4,7 +4,6 @@ import { reviewHttp } from '@/lib/coding-workspace/diff/http'
 import { readGitHubReview } from '@/lib/coding-workspace/diff/github-native'
 import { deliverGitHubReview } from '@/lib/coding-workspace/diff/github-delivery'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 const query = githubReviewQuery.extend({ workspaceId: z.uuid().optional(), repoId: z.uuid() })
 const command = z.strictObject({ workspaceId: z.uuid().optional(), repoId: z.uuid(), mutation: githubReviewMutation })

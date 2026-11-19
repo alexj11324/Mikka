@@ -20,8 +20,8 @@ const SESSION = { 'x-mikka-device-session': '1' }
 let nextMocked = false
 async function mockNextServer() {
   if (nextMocked) return
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
   nextMocked = true
 }
 

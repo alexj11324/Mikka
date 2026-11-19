@@ -61,11 +61,11 @@ test('monitor mappings use actual owner/scope authorization, GitHub readback and
     await pool.end();await(await import('../lib/db')).pool.end();await(await import('../lib/workspace-db')).workspacePool.end()
   })
   const context=await import('../apps/api/src/context')
-  const framework=await import('next/headers')
-  mock.module('next/headers',{namedExports:{...framework,
+  const framework=await import('@/lib/server-runtime/headers')
+  mock.module('@/lib/server-runtime/headers',{namedExports:{...framework,
     headers:async()=>context.requireRequestScope().headers,cookies:async()=>context.requireRequestScope().cookies}})
-  const next=await import('next/server')
-  mock.module('next/server',{namedExports:{...next,after:(work:()=>unknown)=>context.requireRequestScope().after.add(work)}})
+  const next=await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server',{namedExports:{...next,after:(work:()=>unknown)=>context.requireRequestScope().after.add(work)}})
   const {auth}=await import('../lib/auth')
   const nativeTokens=new Map<string,string>()
   for(const id of [owner,peer]){

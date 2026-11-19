@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { InlineLoadError } from '@/components/load-error'
 import { SettingsSection } from '@/components/settings/primitives'
 import { Skeleton } from '@/components/ui/skeleton'

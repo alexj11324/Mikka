@@ -4,7 +4,6 @@ import { modelAdmission } from '@/lib/model-admission/runtime'
 import { createModelAdmissionHandler } from '@/lib/model-admission/http'
 import { humanSessionHeaders } from '@/lib/desktop-rpc/handler'
 
-export const dynamic = 'force-dynamic'
 const handle = createModelAdmissionHandler({
   store: modelAdmission,
   async principal(request, workspaceId) {

@@ -10,7 +10,7 @@ import { freezeWorkerDefinition } from './agent-kit/worker'
 import { mailboxInputs } from '@mikka/protocol/mailbox'
 import { overrideDeploymentSwitch } from './deployment-switches'
 import { createApiHandler } from '../apps/api/src/application'
-import * as apiServer from '../apps/api/compat/server'
+import * as apiServer from '../lib/server-runtime/server'
 
 // Actual exported HTTP handler, runtime namespace resolver, strict action
 // parser and store. Token verification and SQL are controlled fixtures, not
@@ -113,7 +113,7 @@ for (const path of ['./mcp/actions.ts', './mcp/tools.ts', './mcp/artifacts.ts'])
 mock.module(new URL('./composio.ts', import.meta.url).href, { namedExports: { runComposioAction: () => { throw Error('Provider forbidden') } } })
 // Production aliases next/server to this compatibility module. Exercise MCP
 // through the real API scope so retained tool callbacks own their after work.
-mock.module('next/server', { namedExports: apiServer })
+mock.module('@/lib/server-runtime/server', { namedExports: apiServer })
 let POST: typeof import('../app/v1/mailbox/route').POST
 let mcpPOST: typeof import('../app/api/mcp/route').POST
 const originalFetch = globalThis.fetch, originalConnect = net.Socket.prototype.connect

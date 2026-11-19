@@ -6,7 +6,7 @@
 // diff is reviewed. Nothing here repeats the row (decision 2026-11-18-1400).
 import { useState } from "react";
 import { Copy, ExternalLink, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { cn } from "cn";
 import { compactAge } from "@/components/nav/compact-age";
 import { Button } from "@/components/ui/button";

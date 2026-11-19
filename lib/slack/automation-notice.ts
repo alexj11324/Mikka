@@ -1,5 +1,5 @@
 import 'server-only'
-import { createTranslator } from 'next-intl'
+import { createTranslator } from '@/lib/intl/i18n-server'
 import { pool } from '@/lib/db'
 import { BASE_PATH } from '@/lib/base-path'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'

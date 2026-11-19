@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from 'react'
 import useSWR, { type SWRResponse } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Plus, Trash2, UserRound } from '@/components/icons'
 import { withBasePath } from '@/lib/base-path'
 import { settingsKeys } from '@/lib/swr/keys'

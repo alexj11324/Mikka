@@ -3,7 +3,6 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { ActionFailureError } from '@/lib/action-error'
 import { preferencesPatch, readPreferences, savePreferences } from '@/lib/preferences'
 
-export const dynamic = 'force-dynamic'
 
 /** `GET /api/mobile/preferences`: the 通知 and 记忆 settings. */
 async function handleGET(request: Request) {

@@ -5,7 +5,7 @@ import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import type { BotView } from '@/app/actions/bots'
 
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
 // Avatar rendering is outside this asynchronous form lifetime regression.
 mock.module(new URL('./bot-avatar.tsx', import.meta.url).href, { namedExports: { BotAvatar: () => <span aria-hidden="true" /> } })
 const browser = new Window({ url: 'https://mikka.test/mikka' })

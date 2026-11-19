@@ -1,5 +1,5 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useRef, useState } from 'react'
 import { SettingsLink as Link } from '@/components/settings/settings-link'

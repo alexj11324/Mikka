@@ -3,7 +3,7 @@
 import { BotPermissionsSettings } from './bot-permissions'
 import { Component, type ReactNode, useEffect, useRef, useState } from 'react'
 import { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { cn } from '@/lib/utils'
 import { SettingsContentFrame } from '@ui-slot/settings-content'
 import { ApiAndSubscriptions } from '@ui-slot/settings-models'

@@ -4,7 +4,6 @@ import { gitEnvelope, gitHttp } from '@/lib/coding-workspace/git/http'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 const command = gitEnvelope.extend({ operationId: z.uuid(), undoOf: z.uuid() })
 

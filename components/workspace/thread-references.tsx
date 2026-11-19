@@ -1,7 +1,7 @@
 'use client'
 
 import { useContext, useEffect, useRef, useState, type RefObject } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { findThreadReferences } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { withBasePath } from '@/lib/base-path'

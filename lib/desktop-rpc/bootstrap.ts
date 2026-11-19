@@ -1,5 +1,5 @@
 import 'server-only'
-import { cookies, headers } from 'next/headers'
+import { cookies, headers } from '@/lib/server-runtime/headers'
 import { workspaceSelection } from '@/lib/workspace-selection'
 import { withFreshSession } from '@/lib/fresh-session'
 import { auth, googleEnabled, githubSignInEnabled } from '@/lib/auth'

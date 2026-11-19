@@ -6,7 +6,6 @@ import { workspaceSelection } from '@/lib/workspace-selection'
 import { mobileTask } from '@/lib/mobile-tasks'
 import { ActionFailureError } from '@/lib/action-error'
 
-export const dynamic = 'force-dynamic'
 
 /** Read one task and its attempts; raw run errors remain on /api/mobile/threads/:id. */
 async function handleGET(request: Request, { params }: { params: Promise<{ id: string }> }) {

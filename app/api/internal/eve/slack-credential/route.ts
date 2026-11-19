@@ -8,7 +8,6 @@ import { installationCredential } from '@/lib/slack/installation-store'
 import { slackTeamId, slackUserId } from '@/lib/slack/install-provider'
 import { withRequestLog } from '@/lib/request-log'
 
-export const runtime = 'nodejs'
 const shape = z
   .object({
     installationId: z.uuid(),

@@ -33,7 +33,7 @@ mock.module('swr', { defaultExport: (key: string | null) => {
 }, namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key), useSWRConfig: () => ({ mutate: async (key: string) => { reloaded.push(key) } }) } })
 // The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
 mock.module(new URL('../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
-mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '', relativeTime: (at: Date, now: Date) => `${Math.round((now.getTime() - at.getTime()) / 3_600_000)} 小时前` }), useNow: () => new Date('2026-11-05T01:00:00.000Z') } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '', relativeTime: (at: Date, now: Date) => `${Math.round((now.getTime() - at.getTime()) / 3_600_000)} 小时前` }), useNow: () => new Date('2026-11-05T01:00:00.000Z') } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 mock.module(new URL('../components/workspace/workspace-navigation.ts', import.meta.url).href, { namedExports: {
   navigate: (change: unknown) => { navigated.push(change) }, openArtifact: (id: string) => { navigated.push({ artifact: id }) },

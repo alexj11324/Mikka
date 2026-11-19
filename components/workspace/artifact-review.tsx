@@ -1,7 +1,7 @@
 'use client'
 
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { useRunArtifacts } from '@/hooks/use-thread-run-reads'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactCard, ArtifactChip } from '@/components/artifacts/artifact-card'

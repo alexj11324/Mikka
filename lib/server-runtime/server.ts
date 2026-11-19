@@ -1,5 +1,13 @@
-import { bindRequestCallback, requireRequestScope } from '../src/context'
-import { CookieJar } from '../src/cookies'
+/**
+ * The server's request and response types, bound to the request scope that
+ * carries the real Request, its cookies, its locale and its `after` queue.
+ *
+ * Application route handlers import this module instead of a framework package.
+ * `NextResponse`/`NextRequest` keep their names because every handler and test
+ * already uses them; they describe the shape, not the dependency.
+ */
+import { bindRequestCallback, requireRequestScope } from '../../apps/api/src/context'
+import { CookieJar } from '../../apps/api/src/cookies'
 
 type NextConfig = { basePath?: string }
 export class NextURL extends URL {

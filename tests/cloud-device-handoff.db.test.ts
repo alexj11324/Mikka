@@ -32,8 +32,8 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     for (const migration of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(migration, directory), 'utf8'))
-    const next = await import('next/server')
-    mock.module('next/server', { namedExports: { ...next, after() {} } })
+    const next = await import('@/lib/server-runtime/server')
+    mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after() {} } })
     const workflow = await import('workflow/api')
     let cloudWorkflows = 0
     mock.module('workflow/api', { namedExports: { ...workflow, start: async () => { cloudWorkflows++; return { runId: 'synthetic-workflow' } } } })

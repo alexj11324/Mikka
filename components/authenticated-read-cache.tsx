@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { SWRConfig, unstable_serialize, useSWRConfig, type Cache, type Key } from 'swr'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { useRouter } from '@/i18n/navigation'
 import { APP_BUILD } from '@/lib/app-build'
 import { selectedWebServer } from '@/lib/web-connection/selection'

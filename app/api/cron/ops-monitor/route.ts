@@ -6,7 +6,6 @@ import { collectOperationalSignals } from '@/lib/ops/monitor'
 import { collectProviderEgress } from '@/lib/ops/egress-fallback'
 import { isCloudEdition } from '@/lib/edition'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
 const headers = { 'cache-control': 'no-store' }
 async function handleGET(request: Request) {

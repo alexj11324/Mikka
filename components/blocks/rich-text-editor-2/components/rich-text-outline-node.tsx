@@ -14,7 +14,7 @@ import {
 } from "./rich-text-outline"
 import type { RichTextSlashItem } from "./rich-text-slash-menu"
 import { TableOfContents } from "@/components/icons"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 const LINK_INDENT = ["", "ps-4", "ps-8"] as const
 

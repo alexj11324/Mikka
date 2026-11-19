@@ -7,7 +7,6 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 
-export const dynamic = 'force-dynamic'
 
 const notFound = () => Response.json({ error: 'Not found' }, { status: 404, headers: { 'Cache-Control': 'private, no-store' } })
 

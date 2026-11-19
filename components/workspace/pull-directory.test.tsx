@@ -66,7 +66,7 @@ const githubPage: PullDirectoryPage = {
     },
   ],
 };
-mock.module("next-intl", {
+mock.module("@/lib/intl/i18n-client", {
   namedExports: {
     useTranslations: () => (key: string) => key,
     useFormatter: () => ({ dateTime: () => "Today" }),

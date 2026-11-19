@@ -16,7 +16,7 @@ stub('app/actions/projects.ts', {
   restoreProject: input => record('restore', input),
   deleteProject: input => record('delete', input),
 })
-mock.module('next-intl', { namedExports: { useTranslations: () => key => key } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => key => key } })
 stub('components/ui/dialog.tsx', {
   Dialog: ({ open, children }) => open ? children : null, DialogContent: ({ children }) => children,
   DialogHeader: element('header'), DialogFooter: element('footer'), DialogTitle: element('h2'), DialogDescription: element('p'),

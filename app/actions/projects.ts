@@ -1,5 +1,5 @@
 'use server'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { and, asc, desc, eq, getTableColumns, inArray, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'

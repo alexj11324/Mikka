@@ -1,5 +1,10 @@
-// This alias is confined to the independent server graph. Existing React
-// renderers keep the original package; only server cache needs an ALS owner.
+/**
+ * The server graph's React entry: the real package, except that `cache` is the
+ * request-scoped memo in `apps/api/src/context.ts`.
+ *
+ * This alias is confined to the independent server graph. Existing React
+ * renderers keep the original package; only the server cache needs an owner.
+ */
 import React from 'mikka-real-react'
 export default React
 // Re-export the real public implementation; only cache gets request semantics.
@@ -10,4 +15,4 @@ export const { Children, Fragment, Profiler, StrictMode, Suspense, Component, Pu
   useEffect, useId, useImperativeHandle, useInsertionEffect, useLayoutEffect, useMemo,
   useOptimistic, useReducer, useRef, useState, useSyncExternalStore, useTransition, version } = React
 export type { ReactNode, ReactElement, ComponentProps, ComponentType, RefObject, CSSProperties } from 'mikka-real-react'
-export { requestCache as cache } from '../src/context'
+export { requestCache as cache } from '../../apps/api/src/context'

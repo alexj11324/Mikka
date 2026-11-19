@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { actAs } from '@/lib/acting-user'
 import { SearchInputError } from '@/lib/issue-search'
@@ -6,7 +6,6 @@ import { parseInput, UnsupportedSourceError } from '@/lib/federated-search/input
 import { readSearchPage, SearchAccessError } from '@/lib/federated-search/store'
 import { unsupportedSources } from '@/lib/federated-search/types'
 
-export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store', Vary: 'Cookie, Authorization' }
 /** Site-only read adapter. Consumers fetch one independent page per source. */
 export async function GET(request: Request) {

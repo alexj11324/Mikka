@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { and,eq } from 'drizzle-orm'
 import { auth,apiWorkspaceAllowed } from '@/lib/api-auth'
@@ -8,7 +8,6 @@ import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
 import { updateOwnedBot } from '@/lib/bot-update'
 import { ActionFailureError } from '@/lib/action-error'
 
-export const dynamic='force-dynamic'
 const patch=z.object({name:z.string().optional(),color:z.string().optional(),shape:z.string().optional(),publicRole:z.string().max(2000).optional()}).strict()
 const response=(body:unknown,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'private, no-store'}})
 

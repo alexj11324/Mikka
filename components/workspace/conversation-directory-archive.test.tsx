@@ -14,7 +14,7 @@ let reads = 0
 let pendingRead: Promise<{ archiveIdleAfterDays: number }> | null = null
 const subscriptions = new Map<string, () => Promise<unknown>>()
 
-mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key, useFormatter: () => ({ dateTime: () => '' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key, useFormatter: () => ({ dateTime: () => '' }) } })
 const stub = (file: string, namedExports: Record<string, unknown>) => mock.module(new URL(file, import.meta.url).href, { namedExports })
 function readPreferences() { reads++; return pendingRead ?? { archiveIdleAfterDays: days } }
 stub('../../lib/settings-read.ts', { settingsRead: readPreferences })
@@ -37,7 +37,7 @@ stub('../../hooks/use-live-key.tsx', { useLiveKey(kind: string, id: string | nul
   }, [kind, id, scope, JSON.stringify(keys), mutate])
 } })
 const router = { refresh() {} }
-mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
 stub('../../i18n/navigation.ts', { useRouter: () => router })
 const { AuthenticatedReadCache } = await import('../authenticated-read-cache')
 const { ConversationDirectory } = await import('./conversation-directory')

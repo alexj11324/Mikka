@@ -8,7 +8,7 @@ import { Window } from 'happy-dom'
 // state's git mark and the count. Tapping (or hovering) lists each PR, and a
 // click on the badge never opens the thread behind it.
 const t = Object.assign((key: string, values?: Record<string, unknown>) => values && 'count' in values ? `${key}:${values.count}` : key, { rich: (key: string) => key, has: () => true })
-mock.module('next-intl', { namedExports: {
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en',
   useTranslations: () => t,
   useFormatter: () => ({ relativeTime: () => 'just now', dateTime: () => 'today' }),
   useNow: () => new Date('2026-11-01T12:00:00Z'),

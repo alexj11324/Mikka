@@ -15,7 +15,7 @@ const lookup = (key: string, args?: Record<string, string>) => {
   assert.equal(typeof value, 'string', `missing FactoryAcceptance.${key}`)
   return (value as string).replace(/\{(\w+)\}/g, (_, name) => args?.[name] ?? '')
 }
-mock.module('next-intl', { namedExports: { useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '10/28 14:20' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => lookup, useFormatter: () => ({ dateTime: () => '10/28 14:20' }) } })
 const Pass = ({ children, onKeyDown }: { children?: ReactNode; onKeyDown?: () => void }) => <div role="dialog" onKeyDown={onKeyDown}>{children}</div>
 mock.module(new URL('../components/ui/dialog.tsx', import.meta.url).href, { namedExports: { Dialog: ({ children }: { children?: ReactNode }) => <>{children}</>, DialogContent: Pass, DialogTitle: ({ children }: { children?: ReactNode }) => <h2>{children}</h2> } })
 mock.module(new URL('../components/workspace/short-sha.tsx', import.meta.url).href, { namedExports: { ShortSha: ({ sha }: { sha: string }) => <span>{sha.slice(0, 7)}</span> } })

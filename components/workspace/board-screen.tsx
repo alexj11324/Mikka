@@ -2,7 +2,7 @@
 
 import { taskWorkOwner } from '@/lib/issue-metadata'
 import type { ReactNode } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { BoardScreen } from '@ui-slot/board'
 import type { BoardScreenCard, BoardScreenColumn, BoardScreenProps } from '@/components/slots/board-contract'
 import { TaskContextMenu, type CardContext } from '@/components/blocks/kanban-board-1/components/kanban-board'

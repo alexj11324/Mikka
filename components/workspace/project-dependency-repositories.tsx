@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { listDependencyRepositories, replaceDependencyRepositories } from '@/app/actions/project-resources'
 import { useActionError } from '@/lib/use-action-error'
 import { settingsReadOptions } from '@/lib/settings-data'

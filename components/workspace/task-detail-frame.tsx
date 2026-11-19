@@ -4,7 +4,7 @@ import { githubPullRequestKey, taskWorkOwner } from '@/lib/issue-metadata'
 
 import { useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useMessages, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useMessages, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import type { IssueView } from '@/app/actions/issues'
 import { TaskAttachments } from './task-attachments'

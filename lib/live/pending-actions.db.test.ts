@@ -18,8 +18,8 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
 test('legacy pending producers invalidate only their committed owner-personal list', { skip: !url, timeout: 180_000 }, async t => {
   const queued: (() => Promise<void>)[] = []
-  const next = await import('next/server')
-  const scheduler = mock.module('next/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { queued.push(work) } } })
+  const next = await import('@/lib/server-runtime/server')
+  const scheduler = mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { queued.push(work) } } })
   const ownerWakes: string[] = []
   const wake = mock.module(new URL('../coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: async (userId: string) => { ownerWakes.push(userId) } } })
   const sent: { path: string; events: unknown }[] = []

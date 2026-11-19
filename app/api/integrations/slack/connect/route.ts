@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
 import { pool } from '@/lib/db'
@@ -7,7 +7,6 @@ import { withTaskWorkspace } from '@/lib/task-workspace'
 import { authorizeSlack, installPlatform, SLACK_CALLBACK_PATH, SLACK_INSTALL_RETURN_PATH, SLACK_STATE_COOKIE } from '@/lib/slack/install-provider'
 import { consumeInstall, startInstall } from '@/lib/slack/installation-store'
 
-export const runtime = 'nodejs'
 const path = '/api/integrations/slack/connect'
 async function handle(request: Request) {
   const url = new URL(request.url),

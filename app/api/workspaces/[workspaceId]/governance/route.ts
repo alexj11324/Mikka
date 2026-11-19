@@ -9,7 +9,6 @@ import { workspaceGovernanceSummary } from '@/lib/governance/entitlements'
 import { governanceJson, governanceResponse, governanceSession } from '@/lib/governance/http'
 import { applyApprovalTemplate, deleteApprovalTemplate, saveApprovalTemplate } from '@/lib/governance/templates'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ workspaceId: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import type { IconGlyph, IconProps } from '@/components/icons'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Check } from '@/components/icons'
 import { BadgeButton } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'

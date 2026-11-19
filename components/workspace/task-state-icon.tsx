@@ -5,7 +5,7 @@
 // TaskRunMark is its small mark (working, waiting for the person, error; EXECUTION_VISUALS), drawn on the conversation's own surfaces and
 // never beside a status icon. TaskStatusMark is a conversation card's one glyph: the mark while active, else the status.
 import { useCallback } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Circle, CircleCheck, CircleDashed, CirclePause, CircleSlash2, CircleX, Clock, Hand, OctagonAlert, TriangleAlert, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ISSUE_STATUSES } from '@/components/workspace/issue-properties'

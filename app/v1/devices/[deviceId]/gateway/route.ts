@@ -1,12 +1,11 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import type { DeviceGatewayTicket } from '@mikka/protocol/device'
 import { authenticateDevice, ownsDevice } from '@/lib/device-link'
 import { deviceGatewayTicket } from '@/lib/device-gateway-ticket'
 import { gatewayConfig, gatewayURL } from '@/lib/builtin-gateway/config'
 import { pool } from '@/lib/db'
 
-export const dynamic = 'force-dynamic'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 

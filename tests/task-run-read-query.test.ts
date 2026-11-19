@@ -53,7 +53,7 @@ let stateQueries: typeof import('../lib/task-state-query')
 let taskQueries: typeof import('../lib/task-block-runs')
 let schema: typeof import('../lib/db/schema')
 before(async () => {
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers() } })
   stub('../lib/auth.ts', { auth: { api: { getSession: async () => { order.push('auth'); return viewer ? { user: { id: viewer } } : null } } } })
   stub('../lib/workspace-access.ts', { loadWorkspaceContext: async (requested: string | undefined, user: { id: string }) => {
     assert.equal(requested, undefined); assert.equal(user.id, viewer)

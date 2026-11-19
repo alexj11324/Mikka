@@ -4,7 +4,7 @@ import { createContext, useContext, useMemo, useState, type ComponentProps, type
 import useSWR from 'swr'
 import { Globe } from '@/components/icons'
 import { GitHubIcon } from '@/components/icons/brand-icons'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { getLinkPreviews } from '@/app/actions/link-preview'
 import { LINK_PREVIEWS_PER_REQUEST } from '@/lib/link-preview-batch'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName, runTitle } from '@/lib/coordinator/citations'

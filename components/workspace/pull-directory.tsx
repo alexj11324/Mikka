@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite, { unstable_serialize } from "swr/infinite";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { Copy, Pin, X } from "lucide-react";
 import { listConversations } from "@/app/actions/task-runs";
 import { withBasePath } from "@/lib/base-path";

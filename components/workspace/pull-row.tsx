@@ -7,7 +7,7 @@
 // empty until the pointer is on the row or focus is inside it
 // (decision 2026-11-18-1400, R-92…R-94).
 import { ChevronDown, ChevronRight, ExternalLink, Pin } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { cn } from "cn";
 import { compactAge } from "@/components/nav/compact-age";
 import { Button } from "@/components/ui/button";

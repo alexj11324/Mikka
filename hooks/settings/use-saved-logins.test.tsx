@@ -15,7 +15,7 @@ function read<T>(value: T | Error): T {
 let list: { logins: SavedLogin[] } | { error: string } | Error
 let usage: { uses: SavedLoginUse[] } | { error: string } | Error
 const unused = async () => ({})
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => () => 'Read failed' } })
 mock.module('@/lib/settings-read', { namedExports: { settingsRead: async (name: string) => name === 'secrets' ? read(workspace) : read(list) } })
 mock.module('@/app/actions/user-secrets', { namedExports: { createMySecret: unused, deleteMySecret: unused, importMySecrets: unused, listMySecrets: async () => read(personal), replaceMySecret: unused } })

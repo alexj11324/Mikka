@@ -38,7 +38,7 @@ mock.module(new URL('../slots/new-task.tsx', import.meta.url).href, { namedExpor
     <Button aria-keyshortcuts="Control+Enter Meta+Enter" disabled={!props.canSubmit || props.sending} onClick={props.onSubmit}>Shell.newTaskDialog.create</Button>
   </>,
 } })
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 
 let data: AgentProfilesView | undefined, readError: Error | undefined
 const submitted: { text: string; context?: CoordinatorMessageContext }[] = []
