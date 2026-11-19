@@ -3232,7 +3232,8 @@
         "customTools": "Custom tools",
         "fallbacks": "Fallbacks",
         "thinking": "Thinking"
-      }
+      },
+      "baseUrl": "Base URL"
     },
     "modelOrder": {
       "fallbackNeedsKey": "Add an API key and connect a subscription to use this.",
@@ -4660,7 +4661,9 @@
     "loading": "Loading conversations…",
     "empty": "No matching conversations.",
     "untitled": "Untitled conversation",
-    "more": "Load more"
+    "more": "Load more",
+    "emptyTitle": "No threads yet.",
+    "clearFilters": "Clear filters"
   },
   "ThreadReferences": {
     "sourceUnavailable": "Source file and folder references are unavailable for this thread.",

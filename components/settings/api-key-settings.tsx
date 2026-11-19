@@ -191,7 +191,7 @@ function AddApiKeyDialog({ add, onClose }: { add: ReturnType<typeof useApiKeys>[
               <Input id="api-key-name" value={name} maxLength={60} autoComplete="off" onChange={event => setName(event.target.value)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="api-key-base-url">Base URL</FieldLabel>
+              <FieldLabel htmlFor="api-key-base-url">{t('baseUrl')}</FieldLabel>
               <Input id="api-key-base-url" value={baseUrl} maxLength={500} autoComplete="off" spellCheck={false} placeholder="https://api.example.com/v1" onChange={event => setBaseUrl(event.target.value)} />
             </Field>
             {/* Only a custom provider picks its protocol; each option names the Agent it runs on. */}
@@ -208,7 +208,7 @@ function AddApiKeyDialog({ add, onClose }: { add: ReturnType<typeof useApiKeys>[
             </Field>
           </>}
           <Field>
-            <FieldLabel htmlFor="api-key-value">API Key</FieldLabel>
+            <FieldLabel htmlFor="api-key-value">{t('apiKey')}</FieldLabel>
             <Input id="api-key-value" type="password" value={apiKey} autoComplete="new-password" spellCheck={false} onChange={event => setApiKey(event.target.value)} />
           </Field>
           {error && <FieldError>{error}</FieldError>}
