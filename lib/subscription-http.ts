@@ -10,8 +10,9 @@ import { expireSubscriptionAcquisitions } from './subscription-acquire-expiry'
 
 const id = z.uuid()
 const input = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('connect'), workspaceId: id, provider: z.enum(['codex', 'claude']) }).strict(),
-  z.object({ action: z.literal('reconnect'), connectionId: id, revision: z.number().int().positive() }).strict(),
+  // redirect 'code': Claude returns to Claude Code's code page (web, phones); without it, to localhost (the desktop app catches it).
+  z.object({ action: z.literal('connect'), workspaceId: id, provider: z.enum(['codex', 'claude']), redirect: z.literal('code').optional() }).strict(),
+  z.object({ action: z.literal('reconnect'), connectionId: id, revision: z.number().int().positive(), redirect: z.literal('code').optional() }).strict(),
   z.object({ action: z.literal('resume'), connectionId: id }).strict(),
   z.object({ action: z.literal('poll'), connectionId: id, state: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict(),
   z.object({ action: z.literal('callback'), connectionId: id, state: z.string().regex(/^[A-Za-z0-9_-]{43}$/), callbackUrl: z.string().min(1).max(8192) }).strict(),
@@ -88,7 +89,7 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         const row = await service.repository.connection(session.userId, connectionId)
         watched = { pool: service.repository.pool, repository: service.repository, userId: session.userId, id: row.id, seen: `${row.state}:${row.paused}` }
         const worker = service.worker(service.repository.scope(row))
-        const result = await worker.call<{ authorizationUrl: string; revision: number }>('oauthStart', { revision: Number(row.epoch), sessionId: session.sessionId }, acquisitionSignal())
+        const result = await worker.call<{ authorizationUrl: string; revision: number }>('oauthStart', { revision: Number(row.epoch), sessionId: session.sessionId, ...body.redirect ? { redirect: body.redirect } : {} }, acquisitionSignal())
           .catch(async (failure: unknown) => { if (created) await discardUnstarted(service, session.userId, connectionId, worker); throw failure })
         if (created || expired.expired) await ownerSettingsChanged(service.repository.pool, session.userId)
         return Response.json({ connectionId, ...result }, { headers })
@@ -117,7 +118,7 @@ export function subscriptionHTTP(deps: SubscriptionHTTPDependencies) {
         const revision = row.state === 'pending'
           ? (await worker.call<{ revision: number }>('disconnect', { revision: body.revision }, signal)).revision
           : body.revision
-        result = { connectionId: row.id, ...await worker.call<Record<string, unknown>>('oauthStart', { revision, sessionId: session.sessionId }, signal) }
+        result = { connectionId: row.id, ...await worker.call<Record<string, unknown>>('oauthStart', { revision, sessionId: session.sessionId, ...body.redirect ? { redirect: body.redirect } : {} }, signal) }
       }
       else if (body.action === 'pause') {
         await service.repository.setPaused(session.userId, row.id, body.paused)

@@ -1,7 +1,7 @@
-import { CircleDashed, Circle, CircleDot, CirclePause, CircleCheck, CircleX, Minus, SignalHigh, SignalMedium, SignalLow, AlertCircle } from 'lucide-react'
+import { CircleDashed, Circle, CircleDot, CirclePause, CircleCheck, CircleX, Minus, SignalHigh, SignalMedium, SignalLow, CircleAlert } from '@/components/icons'
 export const PROJECT_PRIORITIES = [
   { value: 'none', icon: Minus },
-  { value: 'urgent', icon: AlertCircle },
+  { value: 'urgent', icon: CircleAlert },
   { value: 'high', icon: SignalHigh },
   { value: 'normal', icon: SignalMedium },
   { value: 'low', icon: SignalLow },

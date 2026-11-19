@@ -28,8 +28,7 @@ test('dispatch failure, status and exactly-once re-dispatch on a real database',
   try {
     const dir = new URL('../../drizzle/', import.meta.url);
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'));
-    let clock = Date.now();
-    const recovery = createFactoryDispatchRecovery(pool, async () => false, () => clock);
+    const recovery = createFactoryDispatchRecovery(pool, async () => false);
     const [deviceId, agentId, issueId, eventId] = [randomUUID(), randomUUID(), randomUUID(), randomUUID()];
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now()),('other','X','x@example.invalid',true,now(),now())`);
     await pool.query(`INSERT INTO devices (id,"ownerId",name,harnesses,"lastSeenAt") VALUES ($1,'owner','Mac','[{"harness":"codex","installed":true}]',now()-interval '10 minutes')`, [deviceId]);
@@ -47,7 +46,7 @@ test('dispatch failure, status and exactly-once re-dispatch on a real database',
       return { taskId, runId };
     }
     const events = async (kind?: string) => (await pool.query(`SELECT 1 FROM coordinator_events${kind ? ' WHERE kind=$1' : ''}`, kind ? [kind] : [])).rowCount;
-    const record = async (runId: string) => { const c = await pool.connect(); try { return await recordFactoryDispatchFailure(c, 'owner', runId, null, clock); } finally { c.release(); } };
+    const record = async (runId: string) => { const c = await pool.connect(); try { return await recordFactoryDispatchFailure(c, 'owner', runId, null); } finally { c.release(); } };
     // Write path: a run queued on the offline device records one failure event, however often the queue path repeats.
     const a = await task();
     assert.equal(await record(a.runId), 'deviceOffline');
@@ -76,10 +75,9 @@ test('dispatch failure, status and exactly-once re-dispatch on a real database',
     assert.deepEqual(await snapshot(), before, 'GET wrote nothing');
 
     assert.deepEqual(await recovery.deviceOnline('owner', deviceId, true), [], 'still offline: nothing resumes');
-    await pool.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId]);
-    clock = Date.now();
+    await pool.query(`UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1`, [deviceId]);
     assert.deepEqual(await recovery.deviceOnline('owner', deviceId, false), [a.runId], 'already online before: only the run with a failure event');
-    // Concurrent heartbeats right after coming back: each pending run gets exactly one re-dispatch.
+    // Concurrent session reports right after coming back: each pending run gets exactly one re-dispatch.
     const results = await Promise.all(Array.from({ length: 6 }, () => recovery.deviceOnline('owner', deviceId, true)));
     assert.deepEqual(results.flat(), [b.runId]);
     assert.deepEqual(await recovery.deviceOnline('owner', deviceId, true), [], 'idempotent on repeat');

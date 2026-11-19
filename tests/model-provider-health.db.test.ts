@@ -92,7 +92,7 @@ test('provider health persists across dispatches without changing credential own
     }
     assert.ok(first.entries.some(entry => entry.source.kind === 'api_key' && entry.source.keyId === ready.id && first.states.get(entry.id)?.credential.usable))
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Fixture device','local',true,now(),$3)`,
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Fixture device','local',true,now(),$3,now())`,
       [deviceId, scope.ownerId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [scope.agentId, deviceId])
     const fallback = first.candidates.find(candidate => candidate.source.kind === 'api_key' && candidate.source.keyId === ready.id)!
@@ -130,8 +130,8 @@ test('provider health persists across dispatches without changing credential own
     const entries = (await order.readOrder(pool, scope)).entries
     await order.changeOrder(pool, scope, { kind: 'reorder', ids: wanted.map(item => entries.find(entry => entryKey(entry) === entryKey(item))!.id) })
     const deviceId = randomUUID(), alternateDeviceId = randomUUID()
-    for (const id of [deviceId, alternateDeviceId]) await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses)
-      VALUES ($1,$2,'Fixture device','local',true,now(),$3)`, [id, scope.ownerId,
+    for (const id of [deviceId, alternateDeviceId]) await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt")
+      VALUES ($1,$2,'Fixture device','local',true,now(),$3,now())`, [id, scope.ownerId,
       JSON.stringify([{ harness: 'codex', installed: true }, { harness: 'claude_code', installed: true }])])
     await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [scope.agentId, deviceId])
     for (const [id, harness] of [[deviceId, 'claude_code'], [alternateDeviceId, 'codex'], [alternateDeviceId, 'claude_code']]) {
@@ -208,7 +208,7 @@ test('provider health persists across dispatches without changing credential own
     // catalogue. Explicitly append the person's second preference.
     await order.changeOrder(pool, scope, { kind: 'add', entries: [ready] })
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'Fixture device','local',true,now(),$3)`,
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Fixture device','local',true,now(),$3,now())`,
       [deviceId, scope.ownerId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('UPDATE agents SET "deviceId"=$2 WHERE id=$1', [scope.agentId, deviceId])
     const dispatch = await resolveModelDispatch(pool, scope, undefined, 'local')

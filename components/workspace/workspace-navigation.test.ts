@@ -100,6 +100,18 @@ test('a thread sits beside its centre: a new centre closes it unless the move na
   assert.equal(readLocation(new URLSearchParams('thread=nope')).thread, null)
 })
 
+test('a Bot sidebar thread is the main conversation, with room for a child thread beside it', () => {
+  const main = `/mikka?bot=${BOT}&mainThread=${RUN}`
+  assert.equal(workspaceHref(at(`/mikka?bot=${BOT}&thread=${ISSUE}`), { mainThread: RUN }), main)
+  assert.equal(readLocation(at(main).searchParams).mainThread, RUN)
+  const withChild = workspaceHref(at(main), { thread: ISSUE })
+  assert.equal(withChild, `${main}&thread=${ISSUE}`)
+  assert.equal(readLocation(at(withChild).searchParams).thread, ISSUE)
+  assert.equal(workspaceHref(at(withChild), { thread: null }), main)
+  assert.equal(workspaceHref(at(withChild), { mainThread: null }), `/mikka?bot=${BOT}`)
+  assert.equal(workspaceHref(at(withChild), { section: 'all-issues' }), '/mikka?section=all-issues')
+})
+
 test('全部线程 stays open as the centre changes; a thread opened over it closes with a new centre', () => {
   const list = at(`/mikka?threads=all&thread=${RUN}`)
   assert.equal(workspaceHref(list, { section: 'all-issues' }), '/mikka?threads=all&section=all-issues')

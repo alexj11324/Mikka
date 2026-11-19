@@ -22,6 +22,7 @@ const lost = { id: '28700000-0000-4000-8000-000000000041', userId: 'synthetic-ow
 let inserted: Record<string, unknown> | undefined
 let transactions = 0
 let workspaceTransactions = 0, resourceLocked = false, resourceReads = 0
+let strandedReads = 0
 const dialect = new PgDialect()
 const normalize = (sql: string) => sql.replace(/\s+/g, ' ').trim()
 function queryOf(statement: SQL) {
@@ -50,16 +51,15 @@ const database = {
     const selection = {
       from(value: unknown) { table = value; return selection }, where(value: SQL) { condition = value; return selection }, innerJoin(value: unknown) { assert.equal(value, devices); return selection },
       limit: async () => {
-        const params = queryOf(condition).params
+        const { params, sql: text } = queryOf(condition)
         if (table === agentRuns) {
           assert.ok(params.includes(lost.userId))
           if (!fields) return scenario === 'retry' ? [lost] : []
-          assert.ok('run' in fields && 'lastSeenAt' in fields, 'only the stranded retry projection is expected')
-          if (scenario === 'queued') {
-            await Promise.resolve()
-            observedAt = now.getTime() + 20
-            return [{ run: { ...lost, status: 'queued', retryOf: 'previous-attempt' }, lastSeenAt: new Date(observedAt) }]
-          }
+          assert.deepEqual(Object.keys(fields), ['run'], 'only the stranded retry projection is expected')
+          // Stranded means the device has no open session (decision 2026-11-17-2215), decided in SQL.
+          assert.ok(text.includes('"sessionOpenedAt" IS NOT NULL'), 'stranded retries are read from the device session')
+          strandedReads++
+          // The queued retry's device holds its session, so the database returns nothing stranded.
           return []
         }
         assert.ok(resourceLocked)
@@ -72,10 +72,9 @@ const database = {
         assert.equal(table, devices)
         const params = queryOf(condition).params
         assert.ok(params.includes(lost.userId) && params.includes(true) && params.includes('local'))
-        assert.equal(scenario, 'retry', 'a device that heartbeats during the read must keep its queued run')
-        await Promise.resolve()
-        observedAt = now.getTime() + 20
-        return [{ deviceId: 'other-device', lastSeenAt: new Date(observedAt), harnesses: [{ harness: 'codex', installed: true }], deviceType: 'server', autoSchedule: null }]
+        assert.equal(scenario, 'retry', 'a queued retry whose device holds its session is never moved')
+        assert.ok(queryOf(condition).sql.includes('"sessionOpenedAt" IS NOT NULL'), 'only a device with an open session takes the run')
+        return [{ deviceId: 'other-device', harnesses: [{ harness: 'codex', installed: true }], deviceType: 'server', autoSchedule: null }]
       },
     }
     return selection
@@ -178,11 +177,9 @@ const recoveryHandoff = mock.fn(async (_pool: unknown, identity: unknown, prompt
 })
 mock.module(new URL('./factory/handoff.ts', import.meta.url).href, { namedExports: { factoryRecoveryHandoff: recoveryHandoff } })
 
-test('actual reclaim writer keeps the trusted private Bot when the target heartbeats after the lease snapshot', async t => {
+test('actual reclaim writer keeps the trusted private Bot when it moves the run to a device with an open session', async t => {
   t.mock.method(Date, 'now', () => observedAt)
   const { reclaimLostRuns } = await import('./run-leases')
-  // The async device query advances the observation clock after the immutable
-  // lease cutoff. The new heartbeat is current when read, not in the future.
   await reclaimLostRuns(lost.userId, now)
   assert.ok(inserted)
   assert.equal(recoveryHandoff.mock.callCount(), 1)
@@ -201,7 +198,7 @@ test('actual reclaim writer keeps the trusted private Bot when the target heartb
   assert.equal(workspaceTransactions, 0)
 })
 
-test('a heartbeat arriving during the queued-run query prevents migration or finalization', async t => {
+test('a queued retry whose device holds its session is neither moved nor finalized', async t => {
   scenario = 'queued'
   observedAt = now.getTime()
   transactions = 0
@@ -213,7 +210,7 @@ test('a heartbeat arriving during the queued-run query prevents migration or fin
   t.mock.method(Date, 'now', () => observedAt)
   const { reclaimLostRuns } = await import('./run-leases')
   await reclaimLostRuns(lost.userId, now)
-  assert.ok(observedAt > now.getTime(), 'the heartbeat arrived after the lease snapshot')
+  assert.ok(strandedReads > 0, 'the stranded read ran')
   assert.equal(transactions, 0)
   assert.equal(inserted, undefined)
   assert.deepEqual(events, [])

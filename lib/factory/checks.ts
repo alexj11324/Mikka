@@ -317,7 +317,7 @@ export async function configureFactoryCheck(
   const {
     rows: [row],
   } = await tx.query(
-    `SELECT c.*,EXISTS(SELECT 1 FROM project_decisions pd WHERE (pd."runId"=producer.id OR pd."factoryTaskId"=c."taskId") AND pd."recordStatus"='active' AND NOT EXISTS(SELECT 1 FROM project_decisions replacement WHERE replacement."supersedesId"=pd.id)) AS "hasProjectDecision",producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",${reportedCandidateShaSql()} AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d.harnesses,a.harness,
+    `SELECT c.*,EXISTS(SELECT 1 FROM project_decisions pd WHERE (pd."runId"=producer.id OR pd."factoryTaskId"=c."taskId") AND pd."recordStatus"='active' AND NOT EXISTS(SELECT 1 FROM project_decisions replacement WHERE replacement."supersedesId"=pd.id)) AS "hasProjectDecision",producer.report AS "producerReport",(SELECT json_build_object('status',p.status,'pullRequest',p."pullRequest",'branch',p.branch,'baseBranch',p."baseBranch") FROM run_publications p WHERE p."runId"=producer.id AND p."userId"=$4) AS "publicationReceipt",${reportedCandidateShaSql()} AS "executionSha",r."deviceId",r."deviceRepoId",COALESCE((SELECT settings."verifyCommand" FROM repository_settings settings WHERE settings."userId"=$4 AND settings."remoteKey"=repo."repoPath"),repo."verifyCommand") AS "verifyCommand",repo."remoteUrl",repo."repoPath",d.enabled,d.kind AS "deviceKind",d."lastSeenAt",d."sessionOpenedAt",d."sessionClosedAt",d.harnesses,a.harness,
        json_build_object('runId',producer.id,'sessionId',producer."sessionId",'status',producer.status,
          'model',producer."agentDefinition"->>'model','harness',producer."agentDefinition"->>'harness',
          'observedModel',producer.report->'runtime'->>'observedModel',
@@ -363,7 +363,7 @@ export async function configureFactoryCheck(
       : null)
   if (
     !row.enabled ||
-    (row.deviceKind === 'cloud' ? cloudTarget?.deviceId !== row.deviceId || cloudTarget?.harness !== row.harness : !await deviceIsOnline({ id: row.deviceId, lastSeenAt: row.lastSeenAt })) ||
+    (row.deviceKind === 'cloud' ? cloudTarget?.deviceId !== row.deviceId || cloudTarget?.harness !== row.harness : !deviceIsOnline(row)) ||
     (!freshCloudTarget && !row.harnesses?.some(
       (h: { harness: string; installed: boolean }) =>
         h.harness === row.harness && h.installed,

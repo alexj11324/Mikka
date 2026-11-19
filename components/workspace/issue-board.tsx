@@ -26,7 +26,7 @@ function groupIssues(issues: Issue[], blocks: ReadonlyMap<string, TaskBlock>): C
   return Object.fromEntries(BOARD_COLUMNS.map(column => [column.value, issues.filter(issue => boardColumnOf(issue.status, blocks.has(issue.id)) === column.value)]))
 }
 
-/** The card fade's length, matching `duration-150` on the card. */
+/** The card fade's length, matching `duration-150` on the card (a vendored block, so it keeps the raw value). */
 const CARD_MOTION_MS = 150
 
 /**

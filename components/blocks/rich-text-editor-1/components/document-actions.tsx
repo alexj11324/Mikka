@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { DOCUMENT_META } from "./data"
 import { TOAST_ERROR_ICON, TOAST_SUCCESS_ICON } from "./icons"
-import { MoreHorizontalIcon, PencilIcon, EyeIcon, CheckIcon, CodeIcon, CopyIcon, Trash2Icon } from "lucide-react"
+import { MoreHorizontal, Pencil, Eye, Check, Code, Copy, Trash2 } from "@/components/icons"
 
 type Mode = "editing" | "viewing"
 
@@ -112,7 +112,7 @@ export function DocumentActions({
             />
           }
         >
-          <MoreHorizontalIcon aria-hidden="true" />
+          <MoreHorizontal aria-hidden="true" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuGroup>
@@ -124,11 +124,11 @@ export function DocumentActions({
               }}
             >
               <DropdownMenuRadioItem value="editing" closeOnClick>
-                <PencilIcon aria-hidden="true" />
+                <Pencil aria-hidden="true" />
                 Editing
               </DropdownMenuRadioItem>
               <DropdownMenuRadioItem value="viewing" closeOnClick>
-                <EyeIcon aria-hidden="true" />
+                <Eye aria-hidden="true" />
                 Viewing
               </DropdownMenuRadioItem>
             </DropdownMenuRadioGroup>
@@ -143,9 +143,9 @@ export function DocumentActions({
               onClick={() => copyAs("html")}
             >
               {copied === "html" ? (
-                <CheckIcon aria-hidden="true" />
+                <Check aria-hidden="true" />
               ) : (
-                <CodeIcon aria-hidden="true" />
+                <Code aria-hidden="true" />
               )}
               {copied === "html" ? "Copied" : "Copy HTML"}
             </DropdownMenuItem>
@@ -155,9 +155,9 @@ export function DocumentActions({
               onClick={() => copyAs("text")}
             >
               {copied === "text" ? (
-                <CheckIcon aria-hidden="true" />
+                <Check aria-hidden="true" />
               ) : (
-                <CopyIcon aria-hidden="true" />
+                <Copy aria-hidden="true" />
               )}
               {copied === "text" ? "Copied" : "Copy Text"}
             </DropdownMenuItem>
@@ -168,7 +168,7 @@ export function DocumentActions({
             disabled={!editor || !editable}
             onClick={() => setConfirmOpen(true)}
           >
-            <Trash2Icon aria-hidden="true" />
+            <Trash2 aria-hidden="true" />
             Clear Document
           </DropdownMenuItem>
         </DropdownMenuContent>

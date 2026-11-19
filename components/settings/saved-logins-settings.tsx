@@ -2,7 +2,7 @@
 
 import { useRef, useState, type FormEvent } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
-import { Ellipsis, EyeIcon, EyeOffIcon, LockIcon, Plus } from 'lucide-react'
+import { Ellipsis, Eye, EyeOff, Lock, Plus } from '@/components/icons'
 import type { SavedLogin } from '@/lib/settings/saved-logins'
 import { useSavedLoginEditor, useSavedLoginUsage, useSavedLogins, withoutScheme } from '@/hooks/settings/use-secrets'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
@@ -138,14 +138,14 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
             <InputGroup>
               <InputGroupInput ref={passwordField} id="saved-login-password" type={reveal ? 'text' : 'password'} autoComplete="new-password" spellCheck={false} aria-invalid={error ? true : undefined} value={password} onChange={event => { setPassword(event.target.value); setError(null) }} disabled={pending} />
               <InputGroupAddon align="inline-end">
-                <InputGroupButton size="icon-xs" aria-label={reveal ? card('hidePassword') : card('showPassword')} aria-pressed={reveal} onClick={() => setReveal(value => !value)}>{reveal ? <EyeOffIcon /> : <EyeIcon />}</InputGroupButton>
+                <InputGroupButton size="icon-xs" aria-label={reveal ? card('hidePassword') : card('showPassword')} aria-pressed={reveal} onClick={() => setReveal(value => !value)}>{reveal ? <EyeOff /> : <Eye />}</InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
             {error && <FieldError>{error}</FieldError>}
           </Field>
         </FieldGroup>
         <SheetFooter className="flex-row items-center">
-          <span className="mr-auto flex items-center gap-1 text-xs text-muted-foreground"><LockIcon className="size-3" />{card('securedBy')}<MikkaMarkSmall />Mikka</span>
+          <span className="mr-auto flex items-center gap-1 text-xs text-muted-foreground"><Lock className="size-3" />{card('securedBy')}<MikkaMarkSmall />Mikka</span>
           <Button type="button" variant="outline" disabled={pending} onClick={() => onClose(false)}>{t('cancel')}</Button>
           <Button type="submit" disabled={pending || !ready}>{pending ? <Spinner data-icon="inline-start" /> : null}{t('save')}</Button>
         </SheetFooter>

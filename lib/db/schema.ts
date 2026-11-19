@@ -298,7 +298,7 @@ export const linearSyncInbox = pgTable('linear_sync_inbox', {
 //
 // The daemon owns detection and execution; the server stores what it reports.
 // `devices.harnesses` is exactly the daemon's `HarnessInfo[]` from its latest
-// heartbeat, so the UI never guesses what a machine has installed.
+// report, so the UI never guesses what a machine has installed.
 
 /** Harnesses this app drives. Cursor and mock stay out until we support them. */
 export const SUPPORTED_HARNESSES = ['claude_code', 'codex', 'cursor'] as const
@@ -325,7 +325,16 @@ export const devices = pgTable('devices', {
   /** Removed from settings: a tombstone that keeps run history (lib/device-removal.ts). */
   removedAt: timestamp('removedAt', { withTimezone: true }),
   maxConcurrentRuns: integer('maxConcurrentRuns').notNull().default(3),
+  /** Last time the device was heard from, shown to people ("last seen"); not presence. */
   lastSeenAt: timestamp('lastSeenAt', { withTimezone: true }),
+  /**
+   * The device session (decision 2026-11-17-2215): the gateway socket that
+   * opened last, and when it closed. Online while opened and not closed since
+   * (`isDeviceOnline`, `deviceSessionOpenSql` in lib/device-presence.ts); written only by lib/device-session.ts.
+   */
+  sessionOpenedAt: timestamp('sessionOpenedAt', { withTimezone: true }),
+  sessionClosedAt: timestamp('sessionClosedAt', { withTimezone: true }),
+  sessionSocketId: text('sessionSocketId'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('devices_owner_idx').on(table.ownerId)])
@@ -1362,8 +1371,9 @@ export const accountDataExports = pgTable('account_data_exports', {
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
   downloadedAt: timestamp('downloadedAt', { withTimezone: true }),
 }, table => [uniqueIndex('account_data_exports_token_key').on(table.tokenHash), index('account_data_exports_user_created_idx').on(table.userId, table.createdAt)])
-export const WORKSPACE_BOT_MODELS = ['mikka', 'codex', 'claude'] as const
-export type WorkspaceBotModel = (typeof WORKSPACE_BOT_MODELS)[number]
+import { WORKSPACE_BOT_MODELS, type WorkspaceBotModel } from '../bot-models.ts'
+export { WORKSPACE_BOT_MODELS }
+export type { WorkspaceBotModel }
 
 /** Workspace-level defaults and usage limits (settings › Bots, Usage). Null means unset / unlimited. */
 export const workspaceSettings = pgTable('workspace_settings', {

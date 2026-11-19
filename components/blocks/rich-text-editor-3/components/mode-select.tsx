@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { PencilIcon, MessageSquareTextIcon, EyeIcon } from "lucide-react"
+import { Pencil, MessageSquareText, Eye } from "@/components/icons"
 
 export type EditorMode = "editing" | "suggesting" | "viewing"
 
@@ -25,7 +25,7 @@ const MODE_OPTIONS: ModeOption[] = [
     label: "Editing",
     description: "Edits apply directly",
     icon: (
-      <PencilIcon aria-hidden="true" />
+      <Pencil aria-hidden="true" />
     ),
   },
   {
@@ -33,7 +33,7 @@ const MODE_OPTIONS: ModeOption[] = [
     label: "Suggesting",
     description: "Text edits become suggestions",
     icon: (
-      <MessageSquareTextIcon aria-hidden="true" />
+      <MessageSquareText aria-hidden="true" />
     ),
   },
   {
@@ -41,7 +41,7 @@ const MODE_OPTIONS: ModeOption[] = [
     label: "Viewing",
     description: "Read only, no edits",
     icon: (
-      <EyeIcon aria-hidden="true" />
+      <Eye aria-hidden="true" />
     ),
   },
 ]

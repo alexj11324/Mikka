@@ -8,7 +8,7 @@ let requests: { path: string; body?: Record<string, unknown> }[] = []
 const source = { version: 1, task: { id: factoryId, issueId: issue }, events: [{ kind: 'evidence', sourceId: 'immutable-version' }] }
 class ApiError extends Error { constructor(readonly status: number, readonly code: string) { super(code) } }
 mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: {
-  ApiError, apiConnection: () => ({ context }), api: async (path: string, config: { body?: Record<string, unknown> }, connection: { context: string }) => {
+  ApiError, ApiTransportError: Error, apiConnection: () => ({ context }), api: async (path: string, config: { body?: Record<string, unknown> }, connection: { context: string }) => {
     assert.equal(connection.context, 'origin')
     requests.push({ path, body: config.body })
     if (path === '/task?work=1') return { ...(combined ? { work: {version: 1, linkedChats: [], pullRequests: []} } : {}), task: { id: issue }, live: { workspaceId: workspace, ...(capability ? { factoryActivityVersion: 1 } : {}) } }

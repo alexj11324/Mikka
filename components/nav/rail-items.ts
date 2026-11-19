@@ -1,6 +1,7 @@
 import type { ComponentType } from 'react'
 import type { ChatNavEntry, ChatTarget } from './bot-list'
-import { Columns3, GitPullRequest, House, Lightbulb } from 'lucide-react'
+import type { WorkspacePage } from '@/components/workspace/page-loaders'
+import { Columns3, GitPullRequest, House, Lightbulb } from '@/components/icons'
 import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { ArtifactFilled, Columns3Filled, HouseFilled, LightbulbFilled, PlugCircle, PlugCircleFilled } from '@/components/icons/rail-filled-icons'
 
@@ -22,13 +23,14 @@ export const RAIL_ITEMS: { id: RailDestination; icon: RailIcon; selectedIcon: Ra
 export type RailProps = {
   active: RailDestination | null
   onNavigate: (destination: RailDestination) => void
+  onPageIntent?: (page: WorkspacePage) => void
   user: { name: string; email: string; image?: string | null }
   onSettings: (href?: string) => void
   onSignOut: () => void
   signingOut: boolean
   onBeforeChange?: (action: () => Promise<void>) => void
   /** The bot list's rows as data, for a frame that lists them itself (the hosted App Shell); the open-source rail ignores it. */
-  chats?: { workspaceId: string | null; entries: ChatNavEntry[]; /** The person's archived bots (已归档): they open nothing; their menu restores or deletes them. */ archived?: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void; onNewConversation?: () => void }
+  chats?: { workspaceId: string | null; entries: ChatNavEntry[]; /** The person's archived bots (已归档): they open nothing; their menu restores or deletes them. */ archived?: ChatNavEntry[]; /** Chats the person hid (已隐藏): they open as usual; their menu shows them again. */ hidden?: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void; onNewConversation?: () => void }
   /** Opens the ⌘K search, for a frame with its own search field. */
   onSearch?: () => void
   /** How many items 收件箱 lists (hooks/use-inbox-count.ts), for a frame that shows the count on it. */

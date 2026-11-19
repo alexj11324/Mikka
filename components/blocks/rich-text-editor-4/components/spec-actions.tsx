@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { TOAST_ERROR_ICON } from "./icons"
-import { CheckIcon, MoreHorizontalIcon, LinkIcon, CodeIcon, RotateCcwIcon } from "lucide-react"
+import { Check, MoreHorizontal, Link, Code, RotateCcw } from "@/components/icons"
 
 type CopyTarget = "link" | "html"
 
@@ -34,7 +34,7 @@ async function writeClipboard(value: string) {
 }
 
 const COPIED_ICON = (
-  <CheckIcon aria-hidden="true" />
+  <Check aria-hidden="true" />
 )
 
 interface SpecActionsProps {
@@ -72,7 +72,7 @@ export function SpecActions({ editor, onReplay }: SpecActionsProps) {
           />
         }
       >
-        <MoreHorizontalIcon aria-hidden="true" />
+        <MoreHorizontal aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuGroup>
@@ -82,7 +82,7 @@ export function SpecActions({ editor, onReplay }: SpecActionsProps) {
             {copied === "link" ? (
               COPIED_ICON
             ) : (
-              <LinkIcon aria-hidden="true" />
+              <Link aria-hidden="true" />
             )}
             {copied === "link" ? "Copied" : "Copy Link"}
           </DropdownMenuItem>
@@ -94,7 +94,7 @@ export function SpecActions({ editor, onReplay }: SpecActionsProps) {
             {copied === "html" ? (
               COPIED_ICON
             ) : (
-              <CodeIcon aria-hidden="true" />
+              <Code aria-hidden="true" />
             )}
             {copied === "html" ? "Copied" : "Copy HTML"}
           </DropdownMenuItem>
@@ -103,7 +103,7 @@ export function SpecActions({ editor, onReplay }: SpecActionsProps) {
         <DropdownMenuGroup>
           <DropdownMenuLabel>Demo</DropdownMenuLabel>
           <DropdownMenuItem onClick={onReplay}>
-            <RotateCcwIcon aria-hidden="true" />
+            <RotateCcw aria-hidden="true" />
             Replay Session
           </DropdownMenuItem>
         </DropdownMenuGroup>

@@ -10,7 +10,7 @@ import { ReadResponseError } from '@/lib/swr/retry'
 import { settingsKeys } from '@/lib/swr/keys'
 import { withBasePath } from '@/lib/base-path'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
-import { InvalidAuthorization, parseSubscriptionStart, subscriptionListSchema, subscriptionSignInState, subscriptionUsageSchema, type SubscriptionUsageView } from '@/lib/subscription-ui'
+import { InvalidAuthorization, claudeShowsCode, parseSubscriptionStart, subscriptionListSchema, subscriptionSignInState, subscriptionUsageSchema, type SubscriptionUsageView } from '@/lib/subscription-ui'
 
 // The same key as model-order-settings' modelOrderKey, written here so this hook does not import a UI module.
 const modelOrderKey = settingsKeys.modelOrder
@@ -196,6 +196,20 @@ export function useSubscriptions(workspaceId: string) {
       setError({ provider: current.provider, message: t(connection.lastErrorCode === 'acquire_expired' ? 'expired' : 'authorizationEnded', { provider: t(current.provider) }), again: { connectionId: current.connectionId } })
     }
   }, [state, attempt, error, changeAttempt, t])
+  // Phones reload a tab left for Claude's page. The server still holds this session's attempt (the list
+  // resumes it), so its paste field comes back by itself; each attempt once, so 取消 or a failure stays put.
+  const adopted = useRef(new Set<string>())
+  useEffect(() => {
+    if (attempt || starting || pending || error || !state || bridgeFromWindow(window as MikkaWindow)?.app.claudeCallback) return
+    for (const connection of state.connections) {
+      const open = connection.state === 'pending' ? connection.activeAttempt : null
+      const key = open ? `${connection.id}:${open.revision}:${open.state}` : ''
+      if (!open || open.flow !== 'callback_handoff' || adopted.current.has(key) || Date.parse(open.expiresAt) <= Date.now()) continue
+      adopted.current.add(key)
+      try { changeAttempt({ ...parseSubscriptionStart(open, connection.provider), provider: connection.provider }) } catch { continue }
+      return
+    }
+  }, [state, attempt, starting, pending, error, changeAttempt])
   useEffect(() => {
     if (!attempt || attempt.flow !== 'device' || !attempt.interval) return
     let stopped = false
@@ -221,7 +235,8 @@ export function useSubscriptions(workspaceId: string) {
   useEffect(() => { submitLatest.current = submitCallback })
   useEffect(() => {
     const catcher = bridgeFromWindow(window as MikkaWindow)?.app.claudeCallback
-    if (attempt?.flow !== 'callback_handoff' || !catcher) return
+    // An attempt started on the web returns to Claude's code page: nothing comes back to localhost.
+    if (attempt?.flow !== 'callback_handoff' || !catcher || claudeShowsCode(attempt.authorizationUrl)) return
     let stopped = false
     setCatching(true)
     catcher(attempt.authorizationUrl).then(callbackUrl => {
@@ -239,14 +254,17 @@ export function useSubscriptions(workspaceId: string) {
     // A tab opened after the request would be blocked, so hold it now. The desktop app opens the system browser instead.
     const tab = bridgeFromWindow(window as MikkaWindow) ? null : window.open('', '_blank')
     try {
-      const result = await post(existing ? resume ? { action: 'resume', connectionId: existing.id } : { action: 'reconnect', connectionId: existing.id, revision: existing.revision } : { action: 'connect', workspaceId, provider }, abort.signal)
+      // Only the desktop app can catch Claude's return to localhost; the web and phones get Claude Code's code page.
+      const redirect = provider === 'claude' && !bridgeFromWindow(window as MikkaWindow)?.app.claudeCallback ? { redirect: 'code' as const } : {}
+      const result = await post(existing ? resume ? { action: 'resume', connectionId: existing.id } : { action: 'reconnect', connectionId: existing.id, revision: existing.revision, ...redirect } : { action: 'connect', workspaceId, provider, ...redirect }, abort.signal)
       if (abort.signal.aborted) { tab?.close(); return }
       const value = existing && result && typeof result === 'object' ? { ...result, connectionId: existing.id } : result
       const next = parseSubscriptionStart(value, provider)
       if (Date.parse(next.expiresAt) <= Date.now()) throw new RequestError('acquire_expired')
       if (tab) { tab.opener = null; tab.location.href = next.authorizationUrl }
       // Set together with the attempt, so the paste field never flashes while the desktop app catches the return.
-      if (next.flow === 'callback_handoff' && bridgeFromWindow(window as MikkaWindow)?.app.claudeCallback) setCatching(true)
+      if (next.flow === 'callback_handoff' && bridgeFromWindow(window as MikkaWindow)?.app.claudeCallback && !claudeShowsCode(next.authorizationUrl)) setCatching(true)
+      adopted.current.add(`${next.connectionId}:${next.revision}:${next.state}`)
       changeAttempt({ ...next, provider })
     } catch (failure) {
       tab?.close()
@@ -308,5 +326,5 @@ export function useSubscriptions(workspaceId: string) {
     void connect(failure.provider, existing, !!existing && (!failure.again?.connectionId || failure.again.resume === true) && subscriptionSignInState(existing, Date.now()) === 'resume')
   }
 
-  return { state, loadFailed, attempt, callback, setCallback, catching, pending, starting, error, notice, now, usage, usageLoading, reloadUsage, refreshingModels, refreshModels, connect, finishCallback, cancel, disconnect, setPaused, remove, startAgain }
+  return { state, loadFailed, reload: refresh, attempt, callback, setCallback, catching, pending, starting, error, notice, now, usage, usageLoading, reloadUsage, refreshingModels, refreshModels, connect, finishCallback, cancel, disconnect, setPaused, remove, startAgain }
 }

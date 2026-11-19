@@ -4,7 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useFormatter, useTranslations } from 'next-intl'
 import { EditorContent, useEditor, type JSONContent } from '@tiptap/react'
 import { Extension } from '@tiptap/core'
-import { ArrowDown, ArrowUp, Check, History } from 'lucide-react'
+import { ArrowDown, ArrowUp, Check, History } from '@/components/icons'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -76,6 +76,7 @@ export function IssueDescriptionHistory({ open, onOpenChange, identifier, title,
               <div className="mb-5 flex items-center gap-2 text-xs text-muted-foreground"><History className="size-3.5" /><time>{selected ? format.dateTime(new Date(selected.createdAt)) : t('currentDescription')}</time></div>
               <DescriptionPreview key={`${selected?.id ?? 'current'}-${highlight}`} content={highlight ? compared.content : selected?.content ?? currentContent} />
             </div>
+            {/* control-size-exempt: a floating history toolbar whose 24px step buttons sit beside a 28px switch deliberately. */}
             <div className="mx-auto mb-3 flex max-w-full shrink-0 flex-wrap items-center justify-center gap-1 rounded-2xl border bg-popover px-2 py-1 shadow-lg sm:rounded-full [&_button]:min-h-11 [&_button[aria-label]]:min-w-11">
               <FieldLabel className="flex min-h-11 cursor-pointer items-center gap-2 px-1"><Switch size="sm" checked={highlight} onCheckedChange={value => { setHighlight(value); setChangeIndex(1) }} />{t('highlight')}</FieldLabel>
               <span className="px-2 text-xs tabular-nums text-muted-foreground">{compared.changes ? t('changeCounter', { current: Math.min(changeIndex, compared.changes), total: compared.changes }) : t('noChanges')}</span>
@@ -91,6 +92,6 @@ export function IssueDescriptionHistory({ open, onOpenChange, identifier, title,
         </div>}
       </DialogContent>
     </Dialog>
-    <AlertDialog open={confirm} onOpenChange={setConfirm}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('confirmTitle')}</AlertDialogTitle><AlertDialogDescription>{t('confirmDescription')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{tCommon('cancel')}</AlertDialogCancel><AlertDialogAction onClick={() => { void restore() }}>{t('confirmAction')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+    <AlertDialog open={confirm} onOpenChange={setConfirm}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('confirmTitle')}</AlertDialogTitle><AlertDialogDescription>{t('confirmDescription')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>{tCommon('cancel')}</AlertDialogCancel><AlertDialogAction variant="default" onClick={() => { void restore() }}>{t('confirmAction')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
   </>
 }

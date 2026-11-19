@@ -5,7 +5,7 @@
 import { getSingularPatch } from "@pierre/diffs";
 import { FileDiff as PierreFileDiff } from "@pierre/diffs/react";
 import type { FileDiffMetadata, FileDiffOptions } from "@pierre/diffs/react";
-import { Check, Copy, LoaderCircle } from "lucide-react";
+import { Check, Copy, LoaderCircle } from "@/components/icons";
 import { useTheme } from "next-themes";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";

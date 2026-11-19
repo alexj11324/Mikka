@@ -1,6 +1,6 @@
 'use client'
 
-import { KeyRound } from 'lucide-react'
+import { KeyRound } from '@/components/icons'
 import { vendorOf } from '@/lib/model-catalog'
 import { modelDisplayName } from '@/lib/model-display-name'
 import { ClaudeMark, OpenAIMark } from './brand-marks'

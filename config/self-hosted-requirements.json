@@ -1,4 +1,11 @@
 {
+  "lib/subscription-ui.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Checks a subscription sign-in's provider page (Claude's localhost return for the desktop app, or Claude Code's code page for the web and phones) and reads the clipboard for 粘贴 in the person's own browser. No installation dependency.",
+    "test": "lib/subscription-ui.test.ts",
+    "suite": "test:byos"
+  },
   "app/actions/bots.ts": {
     "mode": "built-in",
     "environment": [],
@@ -26,6 +33,13 @@
     "behavior": "Authenticate the conversation owner to read, enqueue, cancel or version input through the installation PostgreSQL database. Also read the conversation continuation model menu only for its authorized owner.",
     "test": "tests/thread-continue.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "app/actions/artifacts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List artifacts for a task using the signed-in reader's existing workspace, task and artifact authorization in the installation PostgreSQL database.",
+    "test": "tests/task-workspace-governance.db.test.ts",
+    "suite": "test:visibility-db"
   },
   "app/actions/issues.ts": {
     "mode": "built-in",
@@ -66,7 +80,7 @@
     "mode": "built-in",
     "environment": [],
     "behavior": "A signed-in owner can page through visible active thread roots on their local device in the current workspace, using the installation PostgreSQL database.",
-    "test": "lib/device-heartbeat.db.test.ts",
+    "test": "lib/device-session.db.test.ts",
     "suite": "test:device-revocation-db"
   },
   "app/api/drive/scopes/route.ts": {
@@ -127,14 +141,18 @@
   },
   "app/api/drive/shares/[shareId]/route.ts": {
     "mode": "built-in",
-    "environment": ["BETTER_AUTH_SECRET"],
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
     "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
   },
   "lib/drive/share-view.ts": {
     "mode": "built-in",
-    "environment": ["BETTER_AUTH_SECRET"],
+    "environment": [
+      "BETTER_AUTH_SECRET"
+    ],
     "behavior": "Look up one signed-in file share by its ID, rechecking the original Drive authorization for its metadata and every expiring content request. Uses the existing installation authentication secret.",
     "test": "lib/drive/server.db.test.ts",
     "suite": "test:drive-db"
@@ -1001,7 +1019,7 @@
       "DATABASE_URL"
     ],
     "behavior": "Keep explicit Run cancellation intent in the installation database so a paired local device can distinguish it from a lost lease.",
-    "test": "lib/device-heartbeat.db.test.ts",
+    "test": "lib/device-session.db.test.ts",
     "suite": "test:device-revocation-db"
   },
   "drizzle/20261117051905_organization_join_domain_receipts.sql": {
@@ -1559,6 +1577,20 @@
     "test": "lib/thread-artifacts.test.ts",
     "suite": "test:lib-units"
   },
+  "lib/thread-history-read.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Page conversation chunks and message keys from the installation PostgreSQL database for the authorized run chain selected by the thread action.",
+    "test": "tests/thread-detail-bytes.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
+  "lib/thread-history.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate and type the history page cursor and bound each page without any external service.",
+    "test": "tests/thread-detail-bytes.db.test.ts",
+    "suite": "test:activity-actor-db"
+  },
   "lib/thread-title-schedule.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1907,6 +1939,13 @@
     "behavior": "The Cloudflare sandbox adapter requires an injected workspace binding and a scoped grant. Ordinary Compose installations do not supply the private binding.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
   },
+  "lib/eve/host-authorization.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Sign the internal Eve scope with the host key supplied by the caller and the existing clock-skew allowance.",
+    "test": "lib/eve/auth.test.ts",
+    "suite": "test:eve"
+  },
   "lib/eve/product-definitions.ts": {
     "mode": "built-in",
     "environment": [],
@@ -2234,6 +2273,13 @@
     "test": "components/workspace/issue-relations.test.tsx",
     "suite": "test:view-state"
   },
+  "lib/issue-run-conversation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Project recorded commands and exit status from existing thread chunks. The thread preserves the serialized result for other clients and applies credential masking to displayed command and output text.",
+    "test": "lib/issue-run-conversation.test.ts",
+    "suite": "test:issues"
+  },
   "lib/issue-threads.ts": {
     "mode": "built-in",
     "environment": [],
@@ -2300,6 +2346,13 @@
     "behavior": "Accept only a validated Task or immutable receipt and an opaque rendezvous on the configured HTTPS server.",
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
+  },
+  "lib/mobile-task-refresh.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Version the existing native task list and validate bounded failure metadata. The list works without an observability exporter.",
+    "test": "tests/mobile-tasks.db.test.ts",
+    "suite": "test:workspace-admin-db"
   },
   "lib/mobile-web-scope.ts": {
     "mode": "built-in",
@@ -3337,6 +3390,27 @@
     "test": "lib/onboarding.db.test.ts",
     "suite": "test:onboarding-db"
   },
+  "app/api/integrations/github/repositories/pulls/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads the signed-in owner’s pull requests from their authorized GitHub repositories through the existing GitHub App access policy. Missing GitHub configuration or denied repository access cannot return pull requests.",
+    "test": "app/api/integrations/github/repositories/pulls/route.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/github/pull-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads a bounded pull-request page only through the signed-in owner's existing GitHub repository authorization, validates repository identity and provider response, and never exposes the credential.",
+    "test": "lib/github/pull-directory.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/pull-directory.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates bounded pull-directory inputs and derives metadata-only filtering, grouping, saved-view and linked-thread projections without accessing another user's GitHub data.",
+    "test": "lib/pull-directory.test.ts",
+    "suite": "test:github-pulls"
+  },
   "app/api/integrations/github/repositories/branches/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -3407,11 +3481,146 @@
     "test": "lib/enterprise/governance.db.test.ts",
     "suite": "test:enterprise-db"
   },
+  "app/v1/devices/[deviceId]/report/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A paired daemon reports changed device state, command receipts and update failures once to the installation database; the report renews no lease and records no presence.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "app/v1/internal/device-sessions/[deviceId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The device gateway reports a device socket opening or closing, authenticated with the gateway push secret; the installation database records the session and extends or ends the device's run leases.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "drizzle/20261117221604_device_session.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Store each device's gateway session (opened, closed, socket) in the installation database, so presence and run leases follow the session instead of a heartbeat.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/builtin-gateway/session-reports.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The built-in gateway reports device sessions to the installation in process, after a 30 second close grace, in order and with retries.",
+    "test": "lib/builtin-gateway/session-reports.test.ts",
+    "suite": "test:device-gateway"
+  },
+  "lib/daemon-release.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Refuse every device request without the device session header with 426 and the daemon versions, so an old daemon updates before it can be used.",
+    "test": "lib/daemon-release.test.ts",
+    "suite": "test:platform"
+  },
+  "lib/device-link.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authenticate device credentials against the installation database; a removed device reaches only its report, and a commands read stops runs whose lease the server ended.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/device-presence.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read device presence from the recorded gateway session in the installation database, without a heartbeat window or a gateway round trip.",
+    "test": "lib/device-presence.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/device-report-body.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bound the device report request body before parsing.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/device-session.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Apply gateway session reports in order to the installation database, extend or end run leases, and close sessions the gateway no longer holds during run recovery.",
+    "test": "lib/device-session.db.test.ts",
+    "suite": "test:device-revocation-db"
+  },
+  "lib/secrets/egress-binding.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Check a task Secret capability against the live run, claim credential and device session in the installation database on every use.",
+    "test": "tests/task-secret-access.db.test.ts",
+    "suite": "test:secrets-db"
+  },
   "lib/agent-no-model.ts": {
     "mode": "built-in",
     "environment": [],
     "behavior": "A cloud dispatch that names an Agent with no usable model is refused with agentNoModel, its message and a link to 模型与订阅, instead of agentProfileUnavailable.",
     "test": "tests/cloud-runtime-auto.db.test.ts",
     "suite": "test:bot-threads-db"
+  },
+  "lib/run-authority-stop.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "When a change takes a run's authority away (Bot archived, task deleted, member gone, workspace or account deleted), stop the affected runs in the installation database and push the stop to their devices.",
+    "test": "lib/run-authority-stop.db.test.ts",
+    "suite": "test:bot-chats-db"
+  },
+  "drizzle/20261118120000_conversation_model_device.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds an optional model and device to a conversation: a thread may pin which model answers it and which machine runs it, while every existing row and every caller that sends neither keeps the lead Bot's own model and any eligible device.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "lib/bot-models.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Names the three models a Bot or a thread may pin, shared by the conversations CHECK constraint, the strict create schema and the create dialog's picker; no network, no credentials.",
+    "test": "lib/bot-models.test.ts",
+    "suite": "test:lib-units"
+  },
+  "app/api/devices/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lists the signed-in person's own live, dispatchable devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
+    "test": "lib/devices/dispatchable.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/devices/dispatchable.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Lists the signed-in person's own live, dispatchable local devices with presence so a new thread can name one; names and presence only, and the create path rechecks ownership before a thread stores a device.",
+    "test": "lib/devices/dispatchable.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/acting-user.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve the acting person for a server action or route from the installation's own session or an explicit actAs principal, including the token's workspace scope and the request-log attribution. No external service.",
+    "test": "lib/task-work-read.test.ts",
+    "suite": "test:factory-activity"
+  },
+  "lib/link-preview-batch.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Bounds how many links one batched preview request carries. A constant shared by the web and desktop clients; no installation dependency.",
+    "test": "components/workspace/group-chat-revalidation.test.tsx",
+    "suite": "test:groups"
+  },
+  "app/actions/link-preview.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fetch a public web page's Open Graph title, summary and image for a signed-in person's chat citation. Private and loopback addresses are refused, so the installation never becomes an open proxy.",
+    "test": "components/workspace/group-chat-revalidation.test.tsx",
+    "suite": "test:groups"
+  },
+  "lib/issue-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Resolve the signed-in or acting person and authorize a task read against the installation's own PostgreSQL records, including workspace membership, token scope and Enterprise principal.",
+    "test": "tests/task-presentation.db.test.ts",
+    "suite": "test:task-presentation-db"
   }
 }

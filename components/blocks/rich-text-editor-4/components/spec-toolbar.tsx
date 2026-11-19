@@ -13,7 +13,7 @@ import {
   RichTextToolbarGroup,
   RichTextToolbarSeparator,
 } from "./rich-text-toolbar"
-import { BoldIcon, ItalicIcon, UnderlineIcon, MessageSquareTextIcon } from "lucide-react"
+import { Bold, Italic, Underline, MessageSquareText } from "@/components/icons"
 
 interface SpecToolbarProps {
   editor: Editor | null
@@ -49,7 +49,7 @@ export function SpecToolbar({
           disabled={disabled}
           onToggle={() => editor?.chain().focus().toggleBold().run()}
         >
-          <BoldIcon aria-hidden="true" />
+          <Bold aria-hidden="true" />
         </RichTextToggle>
         <RichTextToggle
           label="Italic"
@@ -58,7 +58,7 @@ export function SpecToolbar({
           disabled={disabled}
           onToggle={() => editor?.chain().focus().toggleItalic().run()}
         >
-          <ItalicIcon aria-hidden="true" />
+          <Italic aria-hidden="true" />
         </RichTextToggle>
         <RichTextToggle
           label="Underline"
@@ -67,7 +67,7 @@ export function SpecToolbar({
           disabled={disabled}
           onToggle={() => editor?.chain().focus().toggleUnderline().run()}
         >
-          <UnderlineIcon aria-hidden="true" />
+          <Underline aria-hidden="true" />
         </RichTextToggle>
         <RichTextLinkPopover
           editor={editor}
@@ -86,7 +86,7 @@ export function SpecToolbar({
           disabled={!canComment}
           onClick={onComment}
         >
-          <MessageSquareTextIcon aria-hidden="true" />
+          <MessageSquareText aria-hidden="true" />
         </RichTextButton>
       </RichTextToolbarGroup>
     </RichTextToolbar>

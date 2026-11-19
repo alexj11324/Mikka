@@ -31,7 +31,7 @@ mock.module('sonner', { namedExports: { toast: {
 mock.module('@/hooks/use-live-key', { namedExports: { ...live, useLiveKey: nothing } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => translate } })
 mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => [] } })
-mock.module('@/app/actions/link-preview', { namedExports: { getLinkPreview: async () => null } })
+mock.module('@/app/actions/link-preview', { namedExports: { getLinkPreview: async () => null, getLinkPreviews: async () => ({}) } })
 mock.module('@/components/nav/conversation-pill', { namedExports: { ConversationPill: empty } })
 mock.module('@/components/nav/group-avatar', { namedExports: { GroupAvatar: empty, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: [] }) } })
 mock.module('@/components/nav/letter-avatar', { namedExports: { LetterAvatar: empty } })

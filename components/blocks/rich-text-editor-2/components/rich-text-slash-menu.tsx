@@ -12,7 +12,7 @@ import {
   type RichTextSuggestionGroup,
   type RichTextSuggestionHandle,
 } from "./rich-text-suggestion"
-import { TypeIcon, Heading1Icon, Heading2Icon, Heading3Icon, ListIcon, ListOrderedIcon, ListTodoIcon, TextQuoteIcon, SquareCodeIcon, MinusIcon } from "lucide-react"
+import { Type, Heading1, Heading2, Heading3, List, ListOrdered, ListTodo, TextQuote, SquareCode, Minus } from "@/components/icons"
 
 export interface RichTextSlashItem {
   id: string
@@ -40,7 +40,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     hint: "Plain paragraph",
     keywords: ["paragraph", "plain"],
     icon: (
-      <TypeIcon aria-hidden="true" />
+      <Type aria-hidden="true" />
     ),
     // Already a paragraph counts too, so the item never vanishes mid-query.
     can: (editor) =>
@@ -56,7 +56,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     keywords: ["h1", "title", "heading"],
     markdown: "#",
     icon: (
-      <Heading1Icon aria-hidden="true" />
+      <Heading1 aria-hidden="true" />
     ),
     can: (editor) => editor.can().setHeading({ level: 1 }),
     run: (editor, range) =>
@@ -70,7 +70,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     keywords: ["h2", "subtitle", "heading"],
     markdown: "##",
     icon: (
-      <Heading2Icon aria-hidden="true" />
+      <Heading2 aria-hidden="true" />
     ),
     can: (editor) => editor.can().setHeading({ level: 2 }),
     run: (editor, range) =>
@@ -84,7 +84,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     keywords: ["h3", "heading"],
     markdown: "###",
     icon: (
-      <Heading3Icon aria-hidden="true" />
+      <Heading3 aria-hidden="true" />
     ),
     can: (editor) => editor.can().setHeading({ level: 3 }),
     run: (editor, range) =>
@@ -98,7 +98,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     keywords: ["unordered", "list", "ul"],
     markdown: "-",
     icon: (
-      <ListIcon aria-hidden="true" />
+      <List aria-hidden="true" />
     ),
     can: (editor) => editor.can().toggleBulletList(),
     run: (editor, range) =>
@@ -112,7 +112,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     keywords: ["ordered", "list", "ol", "steps"],
     markdown: "1.",
     icon: (
-      <ListOrderedIcon aria-hidden="true" />
+      <ListOrdered aria-hidden="true" />
     ),
     can: (editor) => editor.can().toggleOrderedList(),
     run: (editor, range) =>
@@ -126,7 +126,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     keywords: ["todo", "task", "checkbox", "check"],
     markdown: "[ ]",
     icon: (
-      <ListTodoIcon aria-hidden="true" />
+      <ListTodo aria-hidden="true" />
     ),
     can: (editor) => editor.can().toggleTaskList(),
     run: (editor, range) =>
@@ -140,7 +140,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     keywords: ["blockquote", "citation"],
     markdown: ">",
     icon: (
-      <TextQuoteIcon aria-hidden="true" />
+      <TextQuote aria-hidden="true" />
     ),
     can: (editor) => editor.can().setBlockquote(),
     run: (editor, range) =>
@@ -154,7 +154,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     keywords: ["code", "snippet", "pre"],
     markdown: "```",
     icon: (
-      <SquareCodeIcon aria-hidden="true" />
+      <SquareCode aria-hidden="true" />
     ),
     can: (editor) => editor.can().setCodeBlock(),
     run: (editor, range) =>
@@ -168,7 +168,7 @@ export const RICH_TEXT_BASIC_SLASH_ITEMS: RichTextSlashItem[] = [
     keywords: ["separator", "rule", "hr", "line"],
     markdown: "---",
     icon: (
-      <MinusIcon aria-hidden="true" />
+      <Minus aria-hidden="true" />
     ),
     can: (editor) => editor.can().setHorizontalRule(),
     run: (editor, range) =>

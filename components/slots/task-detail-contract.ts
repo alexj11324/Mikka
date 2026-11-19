@@ -119,6 +119,7 @@ export type TaskDetailFrameProps = {
   taskId?: string
   /** The task-bound file dialog; the existing template supplies its toolbar trigger. */
   attachments?: (trigger: (label: string, open: () => void) => ReactNode) => ReactNode
+  artifacts?: ReactNode
   workspaceId?: string | null
   rootRef: RefObject<HTMLDivElement | null>
   onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void
@@ -153,6 +154,7 @@ export type TaskDetailFrameProps = {
   saveError: { text: string; retry: string; onRetry: () => void; busy: boolean } | null
   syncNotice: string | null
   /** Mikka's collaborative description editor; `afterDescription` goes under it (the layer's Copy link row, 验收, sub-tasks), `activity` draws 活动. */
+  descriptionEditable?: boolean
   description: (parts: { afterDescription: ReactNode; activity: (discussions: IssueDiscussions) => ReactNode }) => ReactNode
   /** 验收 (FactoryAcceptance), in the body under the description. */
   acceptance: ReactNode
@@ -194,3 +196,10 @@ export type TaskDetailFrameProps = {
  */
 export type TaskDetailPlacement = { onExpand: () => void; expandLabel: string }
 export const TaskDetailPlacementContext = createContext<TaskDetailPlacement | null>(null)
+
+/** The task description disclosure and explicit edit requests from its frame. */
+export const TaskDescriptionContext = createContext<{
+  open: boolean
+  onOpen: () => void
+  focusRequest: number
+} | null>(null)

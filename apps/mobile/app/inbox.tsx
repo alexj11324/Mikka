@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Inbox as InboxIcon } from 'lucide-react-native'
 import { GlassButton } from '@/components/GlassButton'
 import { NavBar, underBar } from '@/components/NavBar'
 import { ReadNotice } from '@/components/ReadNotice'
@@ -16,6 +17,7 @@ import { mobileMessages } from '@/lib/messages'
 import { colors, LIST_INSET } from '@/lib/theme'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { useTaskContinuation } from '../../../lib/hooks/use-task-continuation'
+import { EmptyState, ListLoading } from '@/shared/components/empty-state'
 import type { InboxEntry, InboxPage } from '../../../lib/inbox/contract'
 
 const labels = mobileMessages.HostedInbox
@@ -85,8 +87,9 @@ export default function Inbox() {
         {(['dismiss', 'reopen'] as const).filter(action => entry.actions.includes(action)).map(action =>
           <View key={action} style={styles.action}><GlassButton label={labels[action]} disabled={writing} onPress={() => void change(entry, action)} /></View>)}
       </View>}
-      ListEmptyComponent={!list.error ? <Text style={styles.action}>{!page ? mobileMessages.Common.loading
-        : tab === 'done' ? labels.emptyDone : tab === 'snoozed' ? labels.emptySnoozed : labels.emptyPending}</Text> : undefined}
+      ListEmptyComponent={!list.error ? (!page ? <ListLoading />
+        : <EmptyState icon={<InboxIcon size={20} color={colors.secondary} strokeWidth={1.8} />}
+          title={tab === 'done' ? labels.emptyDone : tab === 'snoozed' ? labels.emptySnoozed : labels.caughtUp} />) : undefined}
       ListFooterComponent={pages.hasMore ? <View style={styles.action}><GlassButton busy={pages.loading}
         label={pages.failed ? mobileMessages.Common.retry : labels.more} onPress={() => void pages.loadMore()} /></View> : undefined} />
   </View>

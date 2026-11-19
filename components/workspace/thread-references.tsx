@@ -8,13 +8,19 @@ import { withBasePath } from '@/lib/base-path'
 import { ConversationReferenceTitles } from './conversation-reference-titles'
 import { mentionAt, personReferenceParts, referenceMarker, referenceQueryReady, sourceMentionAt, type ThreadReference } from '@/lib/thread-references'
 import { openGroupConversation, openTask, openThread, workspaceSearch } from './workspace-navigation'
+import { IssueCitation, LinkCitation, RunCitation, useAgentCitations } from './agent-citations'
 
 export function PersonReferences({ text }: { text: string }) {
   const t = useTranslations('ThreadReferences')
   const titles = useContext(ConversationReferenceTitles)
+  const citations = useAgentCitations()
   return <>{personReferenceParts(text).map((part, index) => {
     if (part.kind === 'text') return part.text
+    if (part.kind === 'pr' && citations) return <LinkCitation key={index} url={part.id} label={null} preview={citations.previews[part.id]} />
     if (part.kind === 'pr') return <a key={index} href={part.id} target="_blank" rel="noreferrer" className="break-all underline">{part.id.replace('https://github.com/', '')}</a>
+    const source = citations?.sources[part.id]
+    if (part.kind === 'task' && source?.kind === 'issue') return <IssueCitation key={index} issue={source} onOpen={citations!.onOpenIssue} />
+    if (part.kind === 'thread' && source?.kind === 'run') return <RunCitation key={index} run={source} />
     const task = part.kind === 'task'
     const title = task ? undefined : titles.get((part.kind === 'chat' ? 'chat:' : 'run:') + part.id)
     const href = withBasePath('/' + workspaceSearch(task ? { task: part.id } : part.kind === 'chat' ? { section: 'group', group: part.id } : { thread: part.id }))

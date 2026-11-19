@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { Copy, Link2 } from 'lucide-react'
+import { Copy, Link2 } from '@/components/icons'
 import { toast } from 'sonner'
 import { getArtifact, shareArtifact, stopSharingArtifact } from '@/app/actions/artifacts'
 import { Button } from '@/components/ui/button'

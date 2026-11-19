@@ -37,7 +37,7 @@ export async function syncComputerReviews(pool: Pool, deviceId: string, userId: 
         WHERE local_computer_reviews."deviceId"=EXCLUDED."deviceId" AND local_computer_reviews."runId"=EXCLUDED."runId"
           AND local_computer_reviews."userId"=EXCLUDED."userId" AND local_computer_reviews.digest=EXCLUDED.digest
         RETURNING id,decision,"expiresAt">now() AND NOT EXISTS (
-          SELECT 1 FROM previous WHERE decision IS NULL AND "seenAt">now()-interval '10 seconds'
+          SELECT 1 FROM previous WHERE decision IS NULL
         ) AS appeared`,
       [row.id, deviceId, row.runId, userId, row.target, row.display ?? null, JSON.stringify(maskDeep(row.call, mask)), row.digest, new Date(row.expiresAt)])
       if (!inserted.rowCount) throw new Error('Review changed')
@@ -53,7 +53,7 @@ export async function syncComputerReviews(pool: Pool, deviceId: string, userId: 
     ) SELECT DISTINCT b."botId" FROM removed JOIN computer_run_bindings b ON b."runId"=removed."runId" AND b."ownerId"=$2`,
     [deviceId, userId, rows.map(row => row.id)])
     for (const row of removed.rows) await computerChanged(client, pool, row.botId)
-    const result = await client.query('SELECT id,digest,decision AS approve FROM local_computer_reviews WHERE "deviceId"=$1 AND "userId"=$2 AND id=ANY($3::uuid[]) AND decision IS NOT NULL AND "expiresAt">now() AND "seenAt">now()-interval \'10 seconds\'', [deviceId, userId, rows.map(row => row.id)])
+    const result = await client.query('SELECT id,digest,decision AS approve FROM local_computer_reviews WHERE "deviceId"=$1 AND "userId"=$2 AND id=ANY($3::uuid[]) AND decision IS NOT NULL AND "expiresAt">now()', [deviceId, userId, rows.map(row => row.id)])
     await client.query('COMMIT')
     return result.rows
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
@@ -76,7 +76,8 @@ export async function decideComputerReview(pool: Pool, actor: { userId: string; 
       JOIN devices dev ON dev.id=v."deviceId" AND dev."ownerId"=$3 AND dev.enabled=true
       WHERE v.id=$1 AND v.digest=$2 AND v."userId"=$3 AND v.decision IS NULL AND v."expiresAt">now()
         AND NOT EXISTS (SELECT 1 FROM workspace_computer_policies p WHERE p."workspaceId"=b."workspaceId" AND p.permission='deny')
-        AND v."seenAt">now()-interval '10 seconds' AND v.display=':' || (CASE WHEN t."runId" IS NULL THEN d.display ELSE 1 END)::text
+        AND dev."sessionOpenedAt" IS NOT NULL AND (dev."sessionClosedAt" IS NULL OR dev."sessionClosedAt" < dev."sessionOpenedAt")
+        AND v.display=':' || (CASE WHEN t."runId" IS NULL THEN d.display ELSE 1 END)::text
         AND (t."runId" IS NULL OR (t."deviceId"=v."deviceId" AND t.state IN ('starting','running')))
         AND r."userId"=$3 AND r."deviceId"=v."deviceId" AND r."stopRequestedAt" IS NULL
         AND r."leaseExpiresAt">now() AND r.status=ANY($5::text[]) FOR UPDATE OF r`,

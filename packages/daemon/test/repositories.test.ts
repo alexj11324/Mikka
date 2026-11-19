@@ -287,7 +287,7 @@ describe('daemon-owned clone cache', () => {
       const dataDir = tempDir()
       expect(await runCli(['daemon', 'login', '--dev', '--data-dir', dataDir, '--token', 'isolated-test-token'], { out: () => {}, err: () => {} })).toBe(0)
       const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link: server.link(),
-        harnesses: [{ harness: 'mock', installed: true, version: 'test' }], mockSpeed: Infinity, heartbeatMs: 25, quotaSource: null }).start()
+        harnesses: [{ harness: 'mock', installed: true, version: 'test' }], mockSpeed: Infinity, quotaSource: null }).start()
       daemons.push(daemon)
       await daemon.syncWithServer()
       const policy = defaultRunPolicy()
@@ -332,7 +332,7 @@ describe('daemon-owned clone cache', () => {
     })).toBe(0)
     expect(messages.join('\n')).not.toContain('isolated-test-token')
     const daemon = await new Daemon({ dataDir, flavor: 'dev', agentSandbox: null, link: server.link(),
-      harnesses: [{ harness: 'mock', installed: true, version: 'test' }], mockSpeed: Infinity, heartbeatMs: 25, quotaSource: null }).start()
+      harnesses: [{ harness: 'mock', installed: true, version: 'test' }], mockSpeed: Infinity, quotaSource: null }).start()
     daemons.push(daemon)
     await daemon.syncWithServer()
     const runId = server.queueRun('device-no-repos', { issueId: 'issue-url', repoId: 'record-only', remoteUrl: pathToFileURL(bare).href,

@@ -1,11 +1,14 @@
-import { Circle, CircleCheck, CircleDashed, CircleDot, CircleX, CircleSlash2, CircleAlert, Eye, SignalHigh, SignalMedium, SignalLow, type LucideIcon } from 'lucide-react'
+import { Circle, CircleCheck, CircleDashed, CircleDot, CircleSlash2, CircleX, Eye, type LucideIcon } from 'lucide-react'
+
+import { CircleAlert, SignalLow, SignalMedium, SignalHigh, type IconGlyph } from '@/components/icons'
 
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES, type IssuePriority, type IssueStatus } from '@/lib/issue-meta'
 import { statusTone } from '@/lib/status-appearance'
 
 type Option = { label: string; icon: LucideIcon }
 type StatusOption = Option & { indicatorClassName: string; surfaceClassName: string; borderClassName: string }
-type PriorityOption = Option & { iconProps: { strokeWidth: number; viewBox?: string } }
+/** A priority's mark is Mikka's own glyph set, from one bar (low) to three (high); a status keeps its own icon. */
+type PriorityOption = { label: string; icon: IconGlyph; iconProps: { strokeWidth: number } }
 
 // One lucide family for every status and run state (decision 2026-11-18-0300, after LobeHub's ExecutionStatus):
 // the run states are EXECUTION_VISUALS in task-state-icon.tsx.
@@ -21,9 +24,9 @@ const statusOptions = {
 
 const priorityOptions = {
   urgent: { label: 'Urgent', icon: CircleAlert, iconProps: { strokeWidth: 2.5 } },
-  high: { label: 'High', icon: SignalHigh, iconProps: { strokeWidth: 3, viewBox: '-0.5 4 20 20' } },
-  normal: { label: 'Normal', icon: SignalMedium, iconProps: { strokeWidth: 3, viewBox: '-3 6 20 20' } },
-  low: { label: 'Low', icon: SignalLow, iconProps: { strokeWidth: 3, viewBox: '-5.5 8 20 20' } },
+  high: { label: 'High', icon: SignalHigh, iconProps: { strokeWidth: 3 } },
+  normal: { label: 'Normal', icon: SignalMedium, iconProps: { strokeWidth: 3 } },
+  low: { label: 'Low', icon: SignalLow, iconProps: { strokeWidth: 3 } },
 } as const satisfies Record<IssuePriority, PriorityOption>
 
 export const ISSUE_STATUSES = ISSUE_STATUS_CODES.map(value => ({ value, ...statusOptions[value], tone: statusTone(value) }))

@@ -102,8 +102,7 @@ const gateway = 'wss://mikka-gateway.aspectlylabs.com'
 const protocol = 'mikka-ticket-' + Math.floor((now() + 299_000) / 1000) + '-' + 'a'.repeat(64)
 const channel = createHash('sha256').update(JSON.stringify([ownerId, workspaceId])).digest('hex')
 const liveTicket = () => ({ url: gateway + '/v1/live/' + channel + '/socket', protocol, expiresAt: now() + 299_000 })
-const deviceTicket = () => ({ url: gateway + '/v1/devices/' + deviceId + '/socket', protocol,
-  runControl: 'push', computerReviews: 'push', coordinatorResults: 'push' })
+const deviceTicket = () => ({ url: gateway + '/v1/devices/' + deviceId + '/socket', protocol })
 
 test('tickets cannot leave the existing gateway, swap scope or carry arbitrary URL/query credentials', () => {
   const options = { ownerId, workspaceId, now, socketFactory: () => assert.fail('Invalid ticket reached WebSocket') }
