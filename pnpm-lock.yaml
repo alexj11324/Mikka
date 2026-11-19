@@ -29,7 +29,7 @@ patchedDependencies:
     hash: 7c49ecd9c22f1a10a87314ce3d1ab332d9c099736c6b8bd5bb86d4d50238776b
     path: patches/ffmpeg-static@5.3.0.patch
   graphile-worker@0.16.6:
-    hash: 7fcd34e117441d09f9b44e5076590243984ca998fdda8df59b398928b03937d7
+    hash: 6b2f970fcd12f8f9329bbf1eb2b3d38abe51b946998cea3c585bef27699ed2ef
     path: patches/graphile-worker@0.16.6.patch
 
 importers:
@@ -18472,7 +18472,7 @@ snapshots:
       cbor-x: 1.6.9
       dotenv: 17.4.2
       drizzle-orm: 0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1)(sql.js@1.16.0)
-      graphile-worker: 0.16.6(patch_hash=2083f044d5fe42e1c316aeec4ec91d104b995e929dab61ae7eec0a19cfadab0e)(typescript@6.0.3)
+      graphile-worker: 0.16.6(patch_hash=6b2f970fcd12f8f9329bbf1eb2b3d38abe51b946998cea3c585bef27699ed2ef)(typescript@6.0.3)
       pg: 8.23.1
       ulid: 3.0.2
       zod: 4.6.7
@@ -21502,7 +21502,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  graphile-worker@0.16.6(patch_hash=2083f044d5fe42e1c316aeec4ec91d104b995e929dab61ae7eec0a19cfadab0e)(typescript@6.0.3):
+  graphile-worker@0.16.6(patch_hash=6b2f970fcd12f8f9329bbf1eb2b3d38abe51b946998cea3c585bef27699ed2ef)(typescript@6.0.3):
     dependencies:
       '@graphile/logger': 0.2.0
       '@types/debug': 4.1.13

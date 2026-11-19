@@ -207,11 +207,10 @@ index 84afc57..fb98a92 100644
                  workerDeferred.resolve();
                  release();
              }
-
 diff --git a/dist/config.js b/dist/config.js
 --- a/dist/config.js
 +++ b/dist/config.js
-@@ -15,7 +15,7 @@ const makeWorkerPresetWorkerOptions = () => ({
+@@ -15,8 +15,8 @@ const makeWorkerPresetWorkerOptions = () => ({
      connectionString: process.env.DATABASE_URL,
      schema: process.env.GRAPHILE_WORKER_SCHEMA ||
          enforceStringOrUndefined("schema", cosmiconfig?.schema) ||
