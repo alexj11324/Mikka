@@ -13,12 +13,15 @@ const store = read('lib/profile/store.ts')
 const prompt = read('lib/profile/prompt.ts')
 const action = read('app/actions/memory.ts')
 const memory = read('lib/profile/memory.ts')
-const steps = read('workflows/coordinator/steps.ts')
+// The Eve turn's prompt moved out of the Workflow step into the product
+// instructions module; the step now delegates to it. Assert against where the
+// prompt is actually composed.
+const steps = read('lib/coordinator/product-instructions.ts')
 
-const bodyOf = (source: string, name: string) => {
+const bodyOf = (source: string, name: string, length = 1_200) => {
   const start = source.indexOf(`export async function ${name}`)
   assert.ok(start >= 0, `${name} must exist`)
-  return source.slice(start, start + 1_200)
+  return source.slice(start, start + length)
 }
 
 test('记忆 and the agent prompt retain owned fact sources and the active-only model filter', () => {
@@ -27,6 +30,13 @@ test('记忆 and the agent prompt retain owned fact sources and the active-only 
     assert.match(body, /from\(userFacts\)/, `${name} reads user_facts`)
     assert.match(body, /eq\(userFacts\.state, 'active'\)/, `${name} reads only active facts, as 记忆 does`)
   }
+  // A fact arrives `pending` and 记忆's approve action is the only thing that makes
+  // it `approved`. The prompt must not state one the person has not agreed to: the
+  // review gate lives in the read, not only in the UI that lists it.
+  assert.match(bodyOf(store, 'profilePromptSection'), /eq\(userFacts\.reviewStatus, 'approved'\)/,
+    'the agent prompt states only facts the person approved')
+  assert.match(bodyOf(memory, 'memoryForBotPrompt', 2_500), /eq\(userFacts\.reviewStatus, 'approved'\)/,
+    'a bot prompt states only facts the person approved')
   // The settings page has no read of its own: it goes through the store.
   assert.match(action, /from '@\/lib\/profile\/store'/)
   assert.match(action, /readMemoryView\(user, context\.workspace\.id, context\.choices\)/)

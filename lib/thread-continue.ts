@@ -35,7 +35,8 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
   const chain = await readRunChain(pool, userId, parsed.data.runId)
   if (!chain) throw new ActionFailureError('runNotFound')
   if (splitChatFiles(parsed.data.text).files.length) {
-    const { validateChatFiles, ChatFileError } = await import('@/lib/chat-attachments/store')
+    const { validateChatFiles } = await import('@/lib/chat-attachments/store')
+    const { ChatFileError } = await import('@/lib/chat-attachments/extract')
     // Only a rejected attachment is the user's input problem. A connection or
     // query failure inside the same call is a server fault and must not reach
     // the user as "messageRequired".

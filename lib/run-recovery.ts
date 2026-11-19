@@ -1,3 +1,4 @@
+import { CodedError, logCodedError } from '@mikka/protocol/coded-error'
 import { sweepExpiredRunLeases } from '@/lib/run-leases'
 import { reconcileCloudMachines } from '@/lib/computer/reconcile'
 import { pool } from '@/lib/db'
@@ -19,10 +20,11 @@ import type { RunRecoverySweep } from '@/lib/run-recovery-due'
  * A sweep that throws must not stop the others, but it must not vanish either:
  * the cron response reports `null` for a skipped sweep, so without a log a
  * sweep that fails every pass is indistinguishable from one that found nothing.
+ * Log the code and cause names only, never the raw driver error.
  */
 function swept<T>(name: string, work: Promise<T>): Promise<T | null> {
   return work.catch(error => {
-    console.error(`Run recovery sweep failed: ${name}`, error)
+    logCodedError(new CodedError('run_recovery_sweep_failed', { cause: error }), { sweep: name })
     return null
   })
 }
@@ -32,7 +34,7 @@ export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => 
   // Backstop for a lost `disconnected` report, in the cron sweep only (no `only`):
   // its existing cadence, no poll of its own. Ended leases are reclaimed just below.
   const sessions = only ? null : await (await import('./device-session')).closeLostDeviceSessions().catch(error => {
-    console.error('Run recovery sweep failed: sessions', error)
+    logCodedError(new CodedError('run_recovery_sweep_failed', { cause: error }), { sweep: 'sessions' })
     return null
   })
   const leases = runs('leases') ? await sweepExpiredRunLeases() : null
