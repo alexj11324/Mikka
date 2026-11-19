@@ -250,3 +250,15 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   3. `@expo/ui/swift-ui` 的无障碍属性是 modifiers，不是 RN props。
   4. 新增 catalog key 前先 `grep` 一遍同类 namespace：`Coordinator.pendingActions.*` 已经覆盖了 pending action 卡片的全部字段，我在 `MobileCore` 里重造了 23 个。
   5. 新加的 policy 测试要接进 `package.json` 的 `test:ui-policy`，否则永远不会在 CI 里跑。
+
+## 2026-11-18 对比度不能手算，必须写成测试；`.pathname` 是本仓库的复发 bug
+
+- 纠正：`--tertiary` 第一版按「页面底」算到 4.85:1 就收工，深色实际 4.498:1（未取整比较会判失败），而真正承载它的 `bg-muted/80` chip 上只有 3.97:1。reviewer 自己算出来才发现。
+- 规则：
+  1. 颜色 token 的可读性写成 `scripts/contrast.test.mjs` 这种从 `globals.css` 解析、按 WCAG 公式计算的测试，并且要覆盖**实际承载它的表面**（页面、card、`bg-muted` 整体、`bg-muted/80` 合成色），不是只算页面底。
+  2. 新写的检查必须做一次变异验证（把旧值改回去，确认它会红），否则不知道它在测什么。
+  3. 报错里用三位小数：两位会把 4.498 显示成「4.50 needs 4.5」，看起来像测试自己坏了。
+- 纠正（复发 bug）：`lib/ui-overlay.test.mjs` 用 `new URL('..', import.meta.url).pathname` 当根目录，本 worktree 路径含空格，`readdirSync` 直接 `ENOENT` 到 `%20`。这已经是本会话第三次遇到（`mobile-i18n-baseline.mjs`、`message-gesture.test.mts`、现在这个）。
+- 规则：
+  1. 凡是把 URL 变成文件系统路径，一律 `fileURLToPath`；`pathname` 只用于 URL 语义。
+  2. 改完 policy 测试要跑**整条** `test:ui-policy` 命令串，而不是只跑自己新加的那几个文件——`ui-overlay.test.mjs` 就藏在这条命令串的末尾。
