@@ -38,9 +38,16 @@ class FrameworkAcceptance(unittest.IsolatedAsyncioTestCase):
             # hand the same fixture to a real sandbox for the same reason.
             for name in ('package.json', 'package-lock.json'):
                 shutil.copy(FIXTURE / name, root / name)
+            # `--ignore-scripts` matches the two sandbox acceptance scripts that
+            # install this same fixture: the lockfile pins third-party packages
+            # this repository does not review, and this step runs under sudo.
+            # Neither Next with `--webpack` nor Vite needs a dependency postinstall.
+            # `npm` comes from the runner's PATH, which the workflow sets from
+            # setup-node; anyone able to plant an earlier `npm` can already edit
+            # this file, which runs the repository's own code as root anyway.
             npm = shutil.which('npm')
             self.assertIsNotNone(npm, 'npm is required to install the fixed framework fixture')
-            installed = subprocess.run([npm, 'ci', '--no-audit', '--no-fund'], cwd=root,
+            installed = subprocess.run([npm, 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], cwd=root,
                 stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                 env={'PATH': os.environ['PATH'], 'HOME': temporary, 'NO_COLOR': '1'})
             self.assertEqual(installed.returncode, 0,
