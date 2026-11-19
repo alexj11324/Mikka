@@ -401,3 +401,12 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
      `flat(branch) | flat(main)` 与当前文件比对，必须 **missing 为空且 extra 为空**。
   2. 任何"整取一方"的冲突解决，都要再 diff 一次该文件的**另一侧独有内容**（`git diff <theirs> <branch> -- <file>`），而不是回忆自己改过什么。
   3. 大文件 JSON 插入键时，插在最后一个成员之前要给原最后一行补逗号；写完立刻 `json.loads` 校验再落盘。
+
+## 2026-11-19 iOS/Web UI 的 className 不能透传，颜色查找表要放在 `lib/`
+
+- 现象：写 `Mark({shape, tone, className})` 并把 `className` 透传给 `<svg>`，`node scripts/lint-ui.mjs` 报 `style/static-layout-only`（`className` 必须可静态检查）。同时 `className={cn(...)}` 里如果用的是**本文件内**的查找表 `MARK_TONE_CLASS[tone]` 也会报同一条。
+- 根因：`scripts/ui-policy.mjs` 的 `resolve()` 只认字面量、`cn()` 实参、三元表达式、`&&` 右侧，以及**从别的模块 import 进来的对象**的下标访问（`imports.has(...)`）。函数参数里的解构 `className` 不是 `ts.VariableDeclaration`，`binding()` 找不到 → `known: false`。
+- 规则：
+  1. 业务组件不要收 `className` 再往下传（本体 `git grep 'className={className}' components/workspace` 里没有先例，这是原因）。要换尺寸就开 `size` prop，用字面量三元；要换颜色就开语义枚举 prop。
+  2. 需要"名字 → token class"的查找表，放到 `lib/`（如 `lib/status-appearance.ts`）再 import，本文件里写表会被判不可静态检查。
+  3. 加新 UI 前先跑一遍 `node scripts/lint-ui.mjs`，比写完再回来拆便宜。

@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 import { apiProxyOptions, developmentPages } from './dev-http.mjs'
+import { installOverlay, prepareDevelopment, provisionDevelopmentAccount } from './dev-preflight.mjs'
 import { assertApiBuildConfiguration, nodeRuntimePackages } from '../build-contract.mjs'
 import { startEveService } from '../../../scripts/eve-service.mjs'
 
@@ -198,6 +199,13 @@ export async function startDevelopment({ args = [], root = repository, log = con
   process.env.WORKFLOW_LOCAL_BASE_URL ??= options.origin
   process.env.WORKFLOW_LOCAL_DATA_DIR ??= join(directory, 'workflow')
   process.env.BETTER_AUTH_URL ??= options.origin
+  // One command: the loopback database exists and is migrated, and the official
+  // UI overlay's own dependencies are installed, decided before anything listens.
+  // Both used to fail on the first request instead, as a missing relation or an
+  // opaque SERVER_DOCUMENT_CANNOT_LOAD_WORKSPACE inside a React boundary.
+  const prepared = await prepareDevelopment({ root, log: message => process.stderr.write(`${message}\n`) })
+  Object.assign(process.env, prepared.env)
+  if (prepared.overlay.missingDependencies) installOverlay(join(root, process.env.MIKKA_UI_OVERLAY_DIR))
   const [{ build, createDevServer, createNitro, prepare }, { compileTracing }, { frontendConfig }] = await Promise.all([
     import('nitro/builder'), import('./finalize-build.mjs'), import('../../frontend/vite.config.mjs'),
   ])
@@ -284,6 +292,9 @@ export async function startDevelopment({ args = [], root = repository, log = con
     await developmentResponse(workerReady, options.origin, AbortSignal.timeout(30_000))
     log(`[dev] Local: ${options.origin}/mikka`)
     log(`[dev] Ready in ${Math.ceil(performance.now() - started)}ms (Vite + Nitro)`)
+    if (process.env.MIKKA_LOCAL_TEST_ACCOUNTS === '1') {
+      await provisionDevelopmentAccount(root, `${options.origin}/mikka`, log).catch(() => {})
+    }
     return { ...options, nitro, vite, close }
   } catch (error) {
     await close()
