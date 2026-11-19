@@ -1903,6 +1903,19 @@
     "backToAccessible": "Back to an accessible workspace"
   },
   "Projects": {
+    "deviceCheckouts": {
+      "title": "My local folders",
+      "empty": "No folder selected.",
+      "desktopEmpty": "Select a folder in Mikka Desktop.",
+      "choose": "Choose a Git folder",
+      "link": "Connect this computer",
+      "linkFailed": "Could not connect this computer to the workspace.",
+      "notRepo": "Select a folder inside a Git repository.",
+      "readFailed": "Could not load your folders.",
+      "writeFailed": "Could not save the folder change. Try again.",
+      "device": "Device",
+      "clearFor": "Remove folder on {device}"
+    },
     "dependencies": {
       "title": "Dependency repositories",
       "empty": "No repositories to show.",

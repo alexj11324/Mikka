@@ -168,3 +168,5 @@ are not a separate product entity.
 Adding a component, retiring one, or moving one between the tables is a
 change to this file in the same PR. If you delete a "Do not use" component,
 remove its row.
+
+Project details uses its existing outline Button, Dialog, FieldError and device icons for **My local folders**. The signed-in member can select a Git directory through the Desktop picker and read or clear their own bookmarks from an active Project. The remote sandbox rule in R-62 still governs task execution.

@@ -3081,6 +3081,24 @@
       "sourceHash": "32ea9938be779a85f29825c066a50dd358d9dbf6b5b6dba4fca48f9f27b42521"
     },
     {
+      "path": "/mikka/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout",
+      "template": "/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout",
+      "source": "app/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "37480f704533c60e9981974693b069fb15f26636b77799c2ca40b57875ba8965"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/clear",
+      "template": "/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/clear",
+      "source": "app/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/clear/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "23b80adf72bd6a329b09ff525115b5f814c522e1bae2ff7ea49200bd0b395571"
+    },
+    {
       "path": "/mikka/api/workspaces/[workspaceId]/governance",
       "template": "/api/workspaces/[workspaceId]/governance",
       "source": "app/api/workspaces/[workspaceId]/governance/route.ts",
@@ -3128,6 +3146,15 @@
         "PUT"
       ],
       "sourceHash": "080e75b968dbc25bc9d07d4ca5237913edc711467b34defa9bcb3634e5f892e2"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/device-checkouts",
+      "template": "/api/workspaces/[workspaceId]/projects/[projectId]/device-checkouts",
+      "source": "app/api/workspaces/[workspaceId]/projects/[projectId]/device-checkouts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "f3ac97e3f34e0e3183ea29af39900d96a0752de181b40c08371818ee5987035e"
     },
     {
       "path": "/mikka/api/workspaces/[workspaceId]/projects/[projectId]/environment-variables/[name]/value",
