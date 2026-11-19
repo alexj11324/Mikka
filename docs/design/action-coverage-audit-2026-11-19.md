@@ -21,6 +21,19 @@
 
 **这不是「系统坏了」，是大量功能停在半接通状态。** 没有崩溃、没有报错、测试全绿，但用户走不到。
 
+### 验证状态
+
+`docs/review-checklist.md:48` 要求每条审计标明验证状态。本报告的标注规则：
+
+| 状态 | 本报告中的含义 |
+| --- | --- |
+| `source-only` | 全部 45 条确认项。均由上述 public / hosted 源码对双向追踪（能力 ↔ 入口）得出，经 refute + impact 双视角复核，**未**在真实运行的产品上复现。 |
+| `runtime-verified` | 本报告 0 条。基线 `3e4658127` 上没有做浏览器或真机验收。 |
+| `not-tested` | 运行态行为、权限拒绝路径、移动端布局均未验证；基于这些的判断不构成结论。 |
+| `intentionally-unavailable` | `## 有意为之（12 条，不修）` 一节。 |
+
+需要运行时证据的条目，按 [mikka-browser-qa](../../.claude/skills/mikka-browser-qa/SKILL.md) 补齐后再改标 `runtime-verified`。
+
 ### 四类断链模式
 
 1. **读有写无**：`getWorkspaceBotDefaults` 被读，`updateWorkspaceBotDefaults` 零调用者；`personalInstructions` 会被注入 prompt，但没有输入框。
@@ -37,39 +50,6 @@
 已在本次修复（见下）。
 
 ## 严重度 3
-
-### [3] 任务 — Task Agent delegate
-
-- **用户任务**：把任务交给（或改交给/取消交给）某个 Agent、Bot 或 Profile
-
-- **命令**：`updateIssueMetadata({delegate})`
-
-- **分类**：`missing-affordance` · **层**：`both`
---
-### [3] 文件、制品与评审 — 运行截图/录屏的公开分享链接 (run_capture_shares)
-
-- **用户任务**：查看并撤销一张已随 PR 公开的截图/录屏分享链接（PR 发布时服务端自动建链，用户无法拒绝也无法收回）
-
-- **命令**：`shareCapture / stopSharingCapture`
-
-- **分类**：`missing-affordance` · **层**：`both`
---
-### [3] 设置 › 偏好设置 — user_time_zones（时区 / 自动-手动）
-
-- **用户任务**：把每日简报和提醒的时区改成本地正确的时区（自动检测错了时手动指定）
-
-- **命令**：`setTimeZone`
-
-- **分类**：`missing-affordance` · **层**：`both`
---
-### [3] 设置 › 偏好设置 — user_preferences.personalInstructions（个人指令）
-
-- **用户任务**：给 Coordinator 和自己所有 Bot 写一段长期生效的个人指令
-
-- **命令**：`updatePreferences`
-
-- **分类**：`missing-affordance` · **层**：`both`
-
 
 ### [3] 设置 › 模型与订阅 — Agent 配置 › Skills（repository 来源）
 
