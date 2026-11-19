@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { maskFactoryNote } from "./note-mask";
+import type { Masker } from '@/lib/secrets/mask';
 
 test("note masker hides secret values in their encoded forms and token patterns", () => {
   const value = "e2b_synthetic_value_123";
@@ -42,4 +43,12 @@ test("control endpoint masks the human reason before the store sees it", async (
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
   assert.deepEqual(seen, [{ action: "retry", reason: "retry with GITHUB_TOKEN=[REDACTED]" }]);
+});
+
+test("a workspace masker masks a saved secret without an explicit list", () => {
+  // The workspace's saved secret has no recognisable prefix, so only the
+  // workspace masker can catch it — the built-in token patterns cannot.
+  const value = "sup3rs3cr3t-db-password";
+  const mask = ((text: string) => text.replaceAll(value, "[secret]")) as Masker;
+  assert.equal(maskFactoryNote(`deploy failed: ${value}`, mask), "deploy failed: [secret]");
 });

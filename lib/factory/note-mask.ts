@@ -4,6 +4,7 @@
 // factory token patterns (redactFactoryCheckText). Once #438 merges, pass its
 // workspaceSecretMasker through `extraSecrets`/replace this with lib/secrets/mask.
 import { redactFactoryCheckText } from "./checks";
+import type { Masker } from '@/lib/secrets/mask'
 
 export const NOTE_MASK_MIN_LENGTH = 8;
 /** Server secrets that #438's masker also always masks. */
@@ -38,7 +39,12 @@ export function serverNoteSecrets(env: NodeJS.ProcessEnv = process.env): NoteSec
 // escaping, base64 at an offset (value not at a 3-byte boundary) and base64 inside
 // base64, the {"GITHUB_TOKEN":"..."} JSON form, keys split across words, and
 // provider tokens such as AKIA…, JWTs and xoxb-.
-export function maskFactoryNote(text: string, secrets: readonly NoteSecret[] = serverNoteSecrets()): string {
+export function maskFactoryNote(text: string, extra?: Masker | readonly NoteSecret[]): string {
+  // A resolved workspace Masker wins: it is the same gate every other Factory-
+  // adjacent exit already uses (lib/secrets/runtime.ts secretMaskerFor), so a
+  // saved workspace secret is masked here too, not only the built-in patterns.
+  if (typeof extra === "function") return redactFactoryCheckText(extra(text));
+  const secrets = extra ?? serverNoteSecrets();
   const needles = new Map<string, string>();
   for (const { value } of secrets) {
     if ([...value].length < NOTE_MASK_MIN_LENGTH) continue;
