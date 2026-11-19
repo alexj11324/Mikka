@@ -3615,5 +3615,26 @@
     "behavior": "Resolve the signed-in or acting person and authorize a task read against the installation's own PostgreSQL records, including workspace membership, token scope and Enterprise principal.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261119165111_agent_runs_status_lease_idx.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Indexes agent_runs on (status, leaseExpiresAt) so the due-timer recovery sweep and the lease reclaim stop scanning the table once per pass and once per owner. Schema only; the installation database serves it.",
+    "test": "lib/run-recovery-due.db.test.ts",
+    "suite": "test:run-recovery-db"
+  },
+  "lib/account/billing-cleanup.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Cancels a deleted account’s Stripe subscription before its workspace row is removed, so the installation stops billing a person who no longer has an account. Needs no installation dependency when the workspace has no customer.",
+    "test": "lib/account/owner-cleanup.db.test.ts",
+    "suite": "test:account-db"
+  },
+  "lib/link-preview.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fetches a link preview from a public address only. Every connection resolves the host and refuses a private answer at dial time, so the installation never reaches an internal or metadata address on a person’s behalf.",
+    "test": "lib/link-preview.test.ts",
+    "suite": "test:coordinator-events"
   }
 }
