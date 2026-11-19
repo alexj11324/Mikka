@@ -237,7 +237,7 @@ export function StreamingResponse({
                     aria-hidden="true"
                     animate={{ rotate: currentSourcesOpen ? 180 : 0 }}
                     transition={reduce ? { duration: 0 } : SPRING_SWAP}
-                    className="text-muted-foreground/50 group-hover:text-muted-foreground"
+                    className="text-tertiary group-hover:text-muted-foreground"
                   >
                     <ChevronDown className="size-3" />
                   </motion.span>

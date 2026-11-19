@@ -229,7 +229,7 @@ function SecretSheet({ workspaceId, workspaceName, role, secret, onClose, open =
           <AlertDialogCancel>{commonT('cancel')}</AlertDialogCancel>
           {confirm === 'delete'
             ? <AlertDialogAction variant="destructive" onClick={() => void remove()}>{commonT('delete')}</AlertDialogAction>
-            : <AlertDialogAction onClick={() => void save()}>{commonT('save')}</AlertDialogAction>}
+            : <AlertDialogAction variant="default" onClick={() => void save()}>{commonT('save')}</AlertDialogAction>}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -316,7 +316,7 @@ function BulkSheet({ workspaceId, workspaceName, role, onClose, open = true, onO
         <AlertDialogHeader><AlertDialogTitle>{t('confirmWorkspaceMany', { workspace: workspaceName ?? t('workspaceGroup'), count })}</AlertDialogTitle></AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{commonT('cancel')}</AlertDialogCancel>
-          <AlertDialogAction onClick={() => void save()}>{t('addCount', { count })}</AlertDialogAction>
+          <AlertDialogAction variant="default" onClick={() => void save()}>{t('addCount', { count })}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

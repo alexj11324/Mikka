@@ -323,7 +323,7 @@ export function PullDirectory({
       }}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2 px-4 pt-4">
-        <h1 className="me-1 text-md font-semibold">{t("title")}</h1>
+        <h1 className="me-1 text-xl font-semibold">{t("title")}</h1>
         <Tabs
           value={filters.view}
           onValueChange={(value) => set({ view: value as PullFilters["view"], state: "" })}

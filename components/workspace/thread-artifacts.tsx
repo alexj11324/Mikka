@@ -12,6 +12,7 @@ import { ArtifactIcon } from '@/components/icons/artifact-icon'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { InlineLoadError } from '@/components/load-error'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { readAccessFailure } from '@/lib/swr/persistent-cache'
 import { RequestError } from '@/lib/factory/browser-request'
 import { PULL_REQUEST_COLORS, PULL_REQUEST_ICONS } from '@/lib/pull-request-appearance'
@@ -106,7 +107,12 @@ export function TaskArtifactsButton({ issueId, threads, work, failed }: { issueI
       {hasError && <InlineLoadError message={t('loadError')} retryLabel={t('retry')} onRetry={() => { failed?.(); void documents.mutate(); void evidence.mutate() }} />}
       {threadArtifactCount(groups) > 0 ? <ThreadArtifactsPane groups={groups} focusId={null} mediaTaskId={work?.factory?.task.id ?? issueId} onOpenDocument={() => setOpen(false)} />
         : !hasError && (loading ? <div role="status" aria-label={t('loading')}><Skeleton className="h-10 w-full" /></div>
-          : <p role="status" className="text-muted-foreground">{t('empty')}</p>)}
+          : <Empty className="border-0 py-8">
+            <EmptyHeader>
+              <EmptyMedia variant="icon"><ArtifactIcon aria-hidden="true" /></EmptyMedia>
+              <EmptyTitle>{t('empty')}</EmptyTitle>
+            </EmptyHeader>
+          </Empty>)}
     </DialogContent>
   </Dialog>
 }

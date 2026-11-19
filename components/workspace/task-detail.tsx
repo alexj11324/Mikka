@@ -121,7 +121,7 @@ function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () =>
     <p role="status" className="text-sm text-muted-foreground">{description}</p>
     {error && <FieldError>{error}</FieldError>}
     <div className="flex gap-2">
-      {canRestore && <Button disabled={pending} onClick={restore}>{t('restoreTask')}</Button>}
+      {canRestore && <Button size="sm" disabled={pending} onClick={restore}>{t('restoreTask')}</Button>}
       <Button size="sm" variant="outline" onClick={onRetry}>{t('reload')}</Button>
       <Button size="sm" variant="ghost" onClick={onClose}>{t('backToWorkspace')}</Button>
     </div>

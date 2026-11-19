@@ -114,6 +114,7 @@ export function PullFilterBar({
   if (filters.linked) chips.push({ key: "linked", label: t("linkedOnly"), clear: { linked: false } });
   return (
     <div className="flex flex-col gap-2 px-4 pb-2">
+      {/* control-size-exempt: the filter bar mixes a 28px search with 24px chips inside the filter popover; the chips are not toolbar peers. */}
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <FieldGroup className="min-w-44 max-w-96 flex-1">
           <Field className="gap-0">
@@ -123,7 +124,7 @@ export function PullFilterBar({
               maxLength={120}
               aria-label={t("search")}
               placeholder={t("search")}
-              className="h-7"
+              className="h-(--control-sm)"
               onChange={(event) => onChange({ search: event.target.value })}
             />
           </Field>

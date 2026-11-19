@@ -326,5 +326,5 @@ export function useSubscriptions(workspaceId: string) {
     void connect(failure.provider, existing, !!existing && (!failure.again?.connectionId || failure.again.resume === true) && subscriptionSignInState(existing, Date.now()) === 'resume')
   }
 
-  return { state, loadFailed, attempt, callback, setCallback, catching, pending, starting, error, notice, now, usage, usageLoading, reloadUsage, refreshingModels, refreshModels, connect, finishCallback, cancel, disconnect, setPaused, remove, startAgain }
+  return { state, loadFailed, reload: refresh, attempt, callback, setCallback, catching, pending, starting, error, notice, now, usage, usageLoading, reloadUsage, refreshingModels, refreshModels, connect, finishCallback, cancel, disconnect, setPaused, remove, startAgain }
 }

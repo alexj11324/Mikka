@@ -83,6 +83,7 @@ export function FactoryProfilesSettings({ workspaceId }: { workspaceId: string }
         {failure && <FieldError>{t(failure)}</FieldError>}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={!!pending}>{common('cancel')}</AlertDialogCancel>
+          {/* A DELETE with no archive list to restore from: destructive, not a benign write (R-102). */}
           <AlertDialogAction disabled={!!pending} onClick={event => { event.preventDefault(); if (archiving) void update(archiving, true) }}>{pending ? t('saving') : t('archive')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

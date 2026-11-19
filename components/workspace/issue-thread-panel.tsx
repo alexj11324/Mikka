@@ -101,7 +101,7 @@ function ThreadInstructions({ issueId, runId, mine }: { issueId: string | null; 
     <Button type="button" variant="link" size="xs" aria-expanded={open} className="h-auto px-0 text-muted-foreground" onClick={() => { void toggle() }}>{open ? t('hideInstructions') : t('fullInstructions')}</Button>
     {open && (failed ? <InlineLoadError message={t('loadFailed')} retryLabel={t('retry')} onRetry={() => { setOpen(false); void toggle() }} />
       : text === null ? <Skeleton className="h-12 w-64" />
-      : <div data-slot="thread-instructions" className="w-full rounded-xl border border-border px-3 py-2 text-xs/5 whitespace-pre-wrap break-words text-muted-foreground"><CollapsibleMessage>{text}</CollapsibleMessage></div>)}
+      : <div data-slot="thread-instructions" className="w-full min-w-0 rounded-xl border border-rule px-3 py-2 text-xs/5 whitespace-pre-wrap break-words text-muted-foreground"><CollapsibleMessage>{text}</CollapsibleMessage></div>)}
   </div>
 }
 

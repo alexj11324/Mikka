@@ -59,7 +59,7 @@ export function WebhookTrigger({ value, onChange, automation, onSaved, disabled 
       {url
         ? <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
-            <Input readOnly aria-label={t('url')} value={url} dir="ltr" className="min-w-0 flex-1 font-mono text-xs" onFocus={event => event.currentTarget.select()} />
+            <Input readOnly aria-label={t('url')} value={url} dir="ltr" className="h-(--control-sm) min-w-0 flex-1 font-mono text-xs" onFocus={event => event.currentTarget.select()} />
             <Button size="icon-sm" variant="ghost" aria-label={t('copy')} onClick={() => { void copy() }}><Copy /></Button>
           </div>
           <p className="text-sm text-muted-foreground">{t('once')}</p>

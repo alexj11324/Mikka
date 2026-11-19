@@ -63,7 +63,7 @@ export function UsagePageView({ month, months, onMonthChange, view, onViewChange
         <div className="flex flex-col gap-0.5 pl-1"><dd className="text-xl font-semibold">{duration(data.totals.seconds)}</dd><dt className="text-xs text-muted-foreground">{t('runTime')}</dt></div>
         {balance !== null && <div data-slot="balance" className="flex flex-col gap-0.5 pl-1"><dd className="text-xl font-semibold tabular-nums">{t('points', { points: number.format(balance) })}</dd><dt className="text-xs text-muted-foreground">{t('balance')}</dt></div>}
       </dl>
-      <div data-settings-card className="rounded-2xl border bg-card p-4">
+      <div data-settings-card className="rounded-xl border bg-card p-4">
         <ChartContainer config={chartConfig} className="aspect-auto h-44 w-full" aria-label={t('chartLabel')}>
           {/* Weekly ticks (days 1, 8, 15, 22, 29) so the axis is evenly spaced; a y axis with grid lines gives the bars a scale. */}
           <BarChart data={data.daily} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
@@ -75,7 +75,7 @@ export function UsagePageView({ month, months, onMonthChange, view, onViewChange
           </BarChart>
         </ChartContainer>
       </div>
-      <div data-settings-card className="overflow-hidden rounded-2xl border bg-card">
+      <div data-settings-card className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader><TableRow>
             <TableHead className="pl-5">{admin ? view === 'members' ? t('member') : t('bot') : t('yourBots')}</TableHead>
@@ -92,7 +92,7 @@ export function UsagePageView({ month, months, onMonthChange, view, onViewChange
           </TableBody>
         </Table>
       </div>
-      {Boolean(data.executionAccounts?.length) && <section data-settings-card className="overflow-hidden rounded-2xl border bg-card">
+      {Boolean(data.executionAccounts?.length) && <section data-settings-card className="overflow-hidden rounded-xl border bg-card">
         <h2 className="px-5 pt-4 text-sm font-medium">{t('executionAccounts')}</h2>
         <Table className="table-fixed"><TableHeader><TableRow><TableHead className="w-1/3 whitespace-normal pl-5">{t('accountKind')}</TableHead><TableHead className="w-1/4 whitespace-normal">{t('accountPayer')}</TableHead><TableHead className="pr-5">{t('accountBilling')}</TableHead></TableRow></TableHeader>
           <TableBody>{data.executionAccounts!.map(account => <TableRow key={account.id}>

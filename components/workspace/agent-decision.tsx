@@ -236,7 +236,7 @@ function ChoiceCard({ title, description, options, task }: { title: string; desc
           onClick={() => { if (option.action === 'allowAutoSchedule') void allowAutoSchedule(option.value, label); else { setPicked(option.value); void send(label) } }} />} />
       })}
     </div>
-    {(error || autoError) && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-150 motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error || autoError}</AlertDescription></Alert></div>}
+    {(error || autoError) && <div className="animate-in fade-in-0 slide-in-from-bottom-1 duration-(--motion-fast) motion-reduce:slide-in-from-bottom-0"><Alert variant="destructive"><AlertDescription>{error || autoError}</AlertDescription></Alert></div>}
     <ConnectDeviceDialog open={dialog === 'mac'} onOpenChange={open => setDialog(open ? 'mac' : null)} hideTrigger />
     {e2bDialog.value && <E2BKeyDialog open={e2bDialog.open} onOpenChangeComplete={e2bDialog.onOpenChangeComplete} configured={false} onClose={changed => {
       setDialog(null)

@@ -96,7 +96,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
       const uploaded = await uploadPickedFile(item, attachmentScope)
       if (currentScope.current === original) setFiles(list => list.map(file => file.key === item.key ? { ...item, uploaded, state: 'ready' } : file))
     } catch (error) {
-      const message = error instanceof Error && error.message === 'audioKeyRequired' ? '请先添加可用的 OpenAI API Key' : '上传失败'
+      const message = error instanceof Error && error.message === 'audioKeyRequired' ? mobileMessages.MobileCore.audioKeyRequired : mobileMessages.MobileCore.uploadFailed
       if (currentScope.current === original) setFiles(list => list.map(file => file.key === item.key ? { ...item, state: 'error', error: message } : file))
     }
   }
@@ -104,7 +104,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
     if (blocked) return
     setProblem(null)
     try {
-      if (attachmentScope && files.length >= CHAT_FILE_MAX_COUNT) { setProblem('最多添加 10 个文件'); return }
+      if (attachmentScope && files.length >= CHAT_FILE_MAX_COUNT) { setProblem(mobileMessages.MobileCore.addFileLimit.replace('{count}', String(CHAT_FILE_MAX_COUNT))); return }
       if (source === 'file') {
         if (attachmentScope) {
           const item = await pickChatFile()
@@ -113,8 +113,8 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
           return
         }
         const file = await pickText()
-        if (file === 'notText') setProblem('只能发文本文件')
-        else if (file === 'tooLong') setProblem('文件太长')
+        if (file === 'notText') setProblem(mobileMessages.MobileCore.textFilesOnly)
+        else if (file === 'tooLong') setProblem(mobileMessages.MobileCore.fileTooLong)
         else if (file) setFiles(list => [...list, file])
         return
       }
@@ -123,7 +123,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
         for (const photo of picked) if (photo.kind === 'image') void upload({ key: photo.key, kind: 'file', name: `photo-${photo.key}.jpg`, uri: photo.uri, mediaType: 'image/jpeg', size: Math.floor((photo.dataUrl.split(',')[1]?.length ?? 0) * 3 / 4), state: 'uploading' })
       } else if (picked) setFiles(list => [...list, ...picked])
     } catch {
-      setProblem('无法添加文件')
+      setProblem(mobileMessages.MobileCore.cannotAddFile)
     }
   }
   const card = useAttachmentCard()
@@ -136,7 +136,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
     if (!composer || !plus) return
     composer.measureInWindow((cx, cy, _cw, ch) => plus.measureInWindow((px, py, _pw, ph) => card.setAnchor(cardAnchor({ x: px, y: py, height: ph }, { x: cx, y: cy, height: ch }))))
   }
-  const pasteImage = attachmentScope ? async (image: ClipboardImage) => { if (!blocked && files.length < CHAT_FILE_MAX_COUNT) { try { void upload(await pastedChatImage(image)) } catch { setProblem('无法粘贴图片') } } } : undefined
+  const pasteImage = attachmentScope ? async (image: ClipboardImage) => { if (!blocked && files.length < CHAT_FILE_MAX_COUNT) { try { void upload(await pastedChatImage(image)) } catch { setProblem(mobileMessages.MobileCore.cannotPasteImage) } } } : undefined
   return (
     <KeyboardStickyView offset={{ opened: Math.max(insets.bottom, 12) - 8 }} style={overlay ? styles.overlay : undefined}>
       <View ref={wrap} collapsable={false} onLayout={event => onHeight?.(event.nativeEvent.layout.height)} style={[styles.composerWrap, overlay && fade(scheme), { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -145,9 +145,9 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
             {files.map(file => (
               <View key={file.key} style={file.kind === 'image' ? styles.thumb : styles.fileChip}>
                 {file.kind === 'image'
-                  ? <Image source={{ uri: file.uri }} style={styles.thumbImage} accessibilityLabel="照片" />
-                  : <><FileText size={16} color={colors.ink} strokeWidth={1.8} /><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>{file.kind === 'file' ? <Text numberOfLines={1} style={styles.problem}>{file.state === 'uploading' ? '上传中' : file.state === 'error' ? file.error : `${Math.ceil(file.size / 1024)} KB`}</Text> : null}</View>{file.kind === 'file' && file.state === 'error' ? <Pressable accessibilityRole="button" accessibilityLabel={`重试上传 ${file.name}`} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} style={styles.attachmentAction} disabled={blocked} onPress={() => void upload(file)}><RotateCw size={16} color={colors.secondary} /></Pressable> : null}</>}
-                <Pressable accessibilityRole="button" accessibilityLabel={file.kind === 'image' ? '移除照片' : `移除 ${file.name}`} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} disabled={blocked} onPress={() => { if (blocked) return; setFiles(list => list.filter(item => item.key !== file.key)); if (file.kind === 'file' && file.uploaded) void api(`/api/chat/attachments/${file.uploaded.id}`, { method: 'DELETE' }).catch(() => {}) }} style={styles.remove}>
+                  ? <Image source={{ uri: file.uri }} style={styles.thumbImage} accessibilityLabel={mobileMessages.MobileCore.photo} />
+                  : <><FileText size={16} color={colors.ink} strokeWidth={1.8} /><View style={{ flex: 1, minWidth: 0 }}><Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>{file.kind === 'file' ? <Text numberOfLines={1} style={styles.problem}>{file.state === 'uploading' ? mobileMessages.MobileCore.uploading : file.state === 'error' ? file.error : `${Math.ceil(file.size / 1024)} KB`}</Text> : null}</View>{file.kind === 'file' && file.state === 'error' ? <Pressable accessibilityRole="button" accessibilityLabel={mobileMessages.MobileCore.retryUpload.replace('{name}', file.name)} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} style={styles.attachmentAction} disabled={blocked} onPress={() => void upload(file)}><RotateCw size={16} color={colors.secondary} /></Pressable> : null}</>}
+                <Pressable accessibilityRole="button" accessibilityLabel={file.kind === 'image' ? mobileMessages.MobileCore.removePhoto : mobileMessages.MobileCore.removeFile.replace('{name}', file.name)} accessibilityState={{ disabled: blocked }} aria-disabled={Platform.OS === 'web' ? blocked : undefined} disabled={blocked} onPress={() => { if (blocked) return; setFiles(list => list.filter(item => item.key !== file.key)); if (file.kind === 'file' && file.uploaded) void api(`/api/chat/attachments/${file.uploaded.id}`, { method: 'DELETE' }).catch(() => {}) }} style={styles.remove}>
                   <View style={styles.removeMark}><X size={12} color={colors.onInk} strokeWidth={3} /></View>
                 </Pressable>
               </View>
@@ -161,7 +161,7 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
           {quote ? (
             <View style={styles.quote}>
               <Text style={styles.quoteText} numberOfLines={1}>{quote.replace(/\s+/g, ' ')}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="取消引用" style={styles.attachmentAction} onPress={onClearQuote}>
+              <Pressable accessibilityRole="button" accessibilityLabel={mobileMessages.MobileCore.clearQuote} style={styles.attachmentAction} onPress={onClearQuote}>
                 <X size={16} color={colors.secondary} strokeWidth={2.2} />
               </Pressable>
             </View>
@@ -173,11 +173,11 @@ export function Composer({ placeholder, onSend, initial = '', disabled = false, 
             {accessory}
             <View style={{ flex: 1 }} />
             {onStop && empty && !sending ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="停止" hitSlop={4} onPress={() => { tap(); onStop() }} style={styles.send}>
+              <Pressable accessibilityRole="button" accessibilityLabel={mobileMessages.MobileCore.stop} hitSlop={4} onPress={() => { tap(); onStop() }} style={styles.send}>
                 <Square size={12} color={colors.onAccent} fill={colors.onAccent} strokeWidth={2.4} />
               </Pressable>
             ) : (
-              <Pressable accessibilityRole="button" accessibilityLabel="发送" hitSlop={4} accessibilityState={{ disabled: sendBlocked, busy: sending }} aria-disabled={Platform.OS === 'web' ? sendBlocked : undefined} aria-busy={Platform.OS === 'web' ? sending : undefined} onPress={() => void send()} disabled={sendBlocked}
+              <Pressable accessibilityRole="button" accessibilityLabel={mobileMessages.Coordinator.send} hitSlop={4} accessibilityState={{ disabled: sendBlocked, busy: sending }} aria-disabled={Platform.OS === 'web' ? sendBlocked : undefined} aria-busy={Platform.OS === 'web' ? sending : undefined} onPress={() => void send()} disabled={sendBlocked}
                 style={[styles.send, sendBlocked && { backgroundColor: colors.tertiary }]}>
                 <ArrowUp size={17} color={colors.onAccent} strokeWidth={2.4} />
               </Pressable>

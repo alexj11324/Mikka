@@ -149,7 +149,7 @@ export function AnimatedBadge({
       style={style}
       className={cn(
         "relative inline-flex shrink-0 items-center overflow-hidden whitespace-nowrap rounded-full border font-medium tabular-nums",
-        "transition-colors duration-300",
+        "transition-colors duration-(--motion-slow)",
         STATUS_CLASS[status],
         SIZE_CLASS[size],
         className,

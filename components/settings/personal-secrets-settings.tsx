@@ -160,7 +160,7 @@ function MySecretSheet({ workspaceId, workspaceName, secret, onClose, open = tru
           <AlertDialogCancel>{commonT('cancel')}</AlertDialogCancel>
           {confirm === 'delete'
             ? <AlertDialogAction variant="destructive" onClick={() => void remove()}>{commonT('delete')}</AlertDialogAction>
-            : <AlertDialogAction onClick={() => void save(true)}>{t('useMine')}</AlertDialogAction>}
+            : <AlertDialogAction variant="default" onClick={() => void save(true)}>{t('useMine')}</AlertDialogAction>}
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -239,7 +239,7 @@ function MyBulkSheet({ workspaceId, workspaceName, onClose, open = true, onOpenC
         <AlertDialogHeader><AlertDialogTitle>{t('shadowConfirmMany', { workspace: workspaceName ?? t('workspaceGroup'), names: (shadowed ?? []).join('、') })}</AlertDialogTitle></AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{commonT('cancel')}</AlertDialogCancel>
-          <AlertDialogAction onClick={() => void save(true)}>{t('useMine')}</AlertDialogAction>
+          <AlertDialogAction variant="default" onClick={() => void save(true)}>{t('useMine')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

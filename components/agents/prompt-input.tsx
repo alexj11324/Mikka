@@ -212,7 +212,7 @@ export function PromptInput({
         {...textareaProps}
         onChange={(event) => setValue(event.target.value)}
         onKeyDown={handleKeyDown}
-        className="block w-full resize-none overflow-hidden bg-transparent py-1.5 pl-2 pr-4 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground/55"
+        className="block w-full resize-none overflow-hidden bg-transparent py-1.5 pl-2 pr-4 text-sm leading-6 text-foreground outline-none placeholder:text-tertiary"
       />
       </ScrollArea>
 

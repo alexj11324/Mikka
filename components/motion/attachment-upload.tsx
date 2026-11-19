@@ -987,7 +987,7 @@ export function AttachmentUpload({
         }}
         className={cn(
           "group relative isolate flex min-h-52 w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] bg-muted/65 p-2 text-center outline-none",
-          "transition-colors duration-200 hover:bg-muted/85",
+          "transition-colors duration-(--motion-base) hover:bg-muted/85",
           "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "data-[dragging=true]:bg-muted",
           "disabled:pointer-events-none disabled:opacity-55",
@@ -996,7 +996,7 @@ export function AttachmentUpload({
       >
         <span
           aria-hidden="true"
-          className="absolute inset-2 -z-10 rounded-[1.5rem] border border-dashed border-muted-foreground/25 bg-background transition-[border-color,background-color] duration-200 group-hover:border-muted-foreground/45 group-data-[dragging=true]:border-foreground/65 group-data-[dragging=true]:bg-muted/20"
+          className="absolute inset-2 -z-10 rounded-[1.5rem] border border-dashed border-muted-foreground/25 bg-background transition-[border-color,background-color] duration-(--motion-base) group-hover:border-muted-foreground/45 group-data-[dragging=true]:border-foreground/65 group-data-[dragging=true]:bg-muted/20"
         />
         <motion.span
           aria-hidden="true"
@@ -1009,7 +1009,7 @@ export function AttachmentUpload({
                 }
           }
           transition={ITEM_TRANSITION}
-          className="mb-3 grid size-11 place-items-center rounded-2xl bg-muted text-foreground transition-colors duration-200 group-hover:bg-muted/80 group-data-[dragging=true]:bg-foreground group-data-[dragging=true]:text-background"
+          className="mb-3 grid size-11 place-items-center rounded-2xl bg-muted text-foreground transition-colors duration-(--motion-base) group-hover:bg-muted/80 group-data-[dragging=true]:bg-foreground group-data-[dragging=true]:text-background"
         >
           <Upload className="size-[18px]" />
         </motion.span>

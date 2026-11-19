@@ -162,7 +162,7 @@ function bubbleContentClass(
     variant === "ghost" && "w-full max-w-none rounded-none px-0 py-0",
     variant === "danger" && "text-destructive-foreground",
     interactive &&
-      "cursor-pointer text-left outline-none transition-[background-color,color,transform] duration-150 hover:brightness-[0.98] focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99]",
+      "cursor-pointer text-left outline-none transition-[background-color,color,transform] duration-(--motion-fast) hover:brightness-[0.98] focus-visible:ring-2 focus-visible:ring-ring active:scale-[0.99]",
   );
 }
 
@@ -338,7 +338,7 @@ export function MessageBubbleCollapsible({
       <div
         id={contentId}
         className={cn(
-          "transition-[mask-image] duration-200",
+          "transition-[mask-image] duration-(--motion-base)",
           !currentOpen && LINE_CLAMP_CLASS[collapsedLines],
           !currentOpen &&
             "[mask-image:linear-gradient(to_bottom,#000_68%,transparent_100%)]",

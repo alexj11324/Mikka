@@ -145,7 +145,7 @@ export function Alert({
                 layout={!reduce}
                 transition={{ opacity: { duration: 0.18, ease: EASE_OUT }, transform: { duration: 0.2, ease: EASE_OUT }, layout: SPRING_LAYOUT }}
                 style={{ ...style, ...gate.style, originY: 0, transitionTimingFunction: EASE_OUT_CSS }}
-                className={cn("relative w-full rounded-xl p-4 text-sm transition-colors duration-200", VARIANT_CLASS[variant], className)}
+                className={cn("relative w-full rounded-xl p-4 text-sm transition-colors duration-(--motion-base)", VARIANT_CLASS[variant], className)}
               >
                 <motion.div
                   layout={reduce ? false : "position"}

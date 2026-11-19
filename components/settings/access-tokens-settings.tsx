@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { SettingRow, SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import type { PersonalAccessTokenView } from '@/lib/tokens/store'
 import { relativeTime } from '@/lib/relative-time'
 import { useActionError } from '@/lib/use-action-error'
@@ -26,6 +26,7 @@ type Expiry = keyof typeof EXPIRY_DAYS
 /** N3 个人访问令牌: the person's tokens in this workspace; the plaintext is shown once, right after 新建. */
 export function AccessTokensSettings({ workspaceId }: { workspaceId?: string }) {
   const t = useTranslations('Settings.tokens')
+  const commonT = useTranslations('Common')
   const locale = useLocale()
   const actionError = useActionError()
   const tokens = useSWR(settingsKeys.tokens(workspaceId), () => listAccessTokens(workspaceId))
@@ -61,7 +62,7 @@ export function AccessTokensSettings({ workspaceId }: { workspaceId?: string }) 
   return <>
     <SettingsSection id="tokens-heading" action={<Button {...settingsSectionAction} onClick={() => setCreating(true)}>{t('create')}</Button>}>
       {!tokens.data && !tokens.error && <SettingsLoading label={t('loading')} rows={2} bare />}
-      {(tokens.error || tokens.data?.error) && <FieldError className="px-5 py-4">{actionError(tokens.data?.error)}</FieldError>}
+      {(tokens.error || tokens.data?.error) && <SettingsSaveError message={actionError(tokens.data?.error)} retryLabel={commonT('retry')} onRetry={() => { void tokens.mutate() }} />}
       {rows?.length === 0 && <p className="px-5 py-4 text-sm text-muted-foreground">{t('empty')}</p>}
       {rows?.map(token => <SettingRow key={token.id} title={token.name} description={describe(token)}>
         <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={() => setRevoking(token)}>{t('revoke')}</Button>

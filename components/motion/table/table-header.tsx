@@ -260,7 +260,7 @@ export function TableHeader<T>({
                     onPointerMove={onReorderMove}
                     onPointerUp={onReorderEnd}
                     className={cn(
-                      "flex h-full w-6 cursor-grab touch-none items-center justify-center text-muted-foreground/60 transition-colors hover:text-foreground active:cursor-grabbing",
+                      "flex h-full w-6 cursor-grab touch-none items-center justify-center text-tertiary transition-colors hover:text-foreground active:cursor-grabbing",
                       // The grip owns the whole press, so iOS must not open its
                       // callout out of the same one and cancel the drag.
                       TOUCH_GESTURE_CLASS,

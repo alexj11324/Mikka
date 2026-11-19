@@ -272,7 +272,7 @@ export function AppTools({ app, onLoadTools }: { app: BotPermissionApp; onLoadTo
       {tools === 'loading' && <p className="pt-1">{t('toolsLoading')}</p>}
       {failed && <p className="pt-1">{t('toolsFailed')}</p>}
       {loaded && <ul className="flex flex-col gap-0.5 pt-1">
-        {loaded.tools.slice(0, 100).map(tool => <li key={tool.name}><span>{tool.displayName}</span> <span className="text-muted-foreground/70">{tool.readOnly ? t('readOnly') : t('write')}</span></li>)}
+        {loaded.tools.slice(0, 100).map(tool => <li key={tool.name}><span>{tool.displayName}</span> <span className="text-tertiary">{tool.readOnly ? t('readOnly') : t('write')}</span></li>)}
       </ul>}
     </CollapsibleContent>
   </Collapsible>

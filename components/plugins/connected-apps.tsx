@@ -21,6 +21,7 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
+import { WhyDisabled } from '@/components/ui/why-disabled'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
 import { appState, needsReconnect } from '@/lib/composio-account-state'
 import { composioConnectRedirect, type ConnectedAccountView as AccountView } from '@/lib/composio-accounts'
@@ -294,12 +295,6 @@ export function useConnectedApps(enabled = true) {
 }
 
 export type ConnectedApps = ReturnType<typeof useConnectedApps>
-
-/** A disabled button takes no pointer events, so its reason sits on a wrapper. */
-function WhyDisabled({ reason, fill = false, children }: { reason?: string; fill?: boolean; children: ReactNode }) {
-  if (!reason) return children
-  return <span title={reason} className={cn('inline-flex', fill && 'w-full')}>{children}</span>
-}
 
 /**
  * Setup and result lines above the list or the detail page. Loading is read out only:
