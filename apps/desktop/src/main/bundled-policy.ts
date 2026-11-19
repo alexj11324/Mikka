@@ -120,7 +120,7 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (ORGANIZATION_DRIVE_VERSIONS.test(path) || ORGANIZATION_VERSION_FILE.test(path) || ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
   if (ORGANIZATION_FILE_SHARE.test(path)) return method === 'PATCH' || method === 'DELETE'
   if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
-  if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
+  if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments' || path === '/api/settings/thread-titles') return method === 'GET'
   // This human approval/read surface has exactly its declared methods. Do not
   // inherit the wider CRUD family or the generic asset HEAD allowance.
   if (FACTORY_FLOW.test(path)) return method === 'GET' || method === 'POST'
