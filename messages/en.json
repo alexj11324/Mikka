@@ -2276,7 +2276,11 @@
         "tool": "Tools",
         "person": "People",
         "preference": "Preferences"
-      }
+      },
+      "pendingTitle": "Waiting for you",
+      "pendingHint": "What Mikka just learned. It is used for answers and reminders only after you confirm it.",
+      "approve": "Keep",
+      "reject": "Discard"
     },
     "workspaceForm": {
       "name": "Name",
@@ -3232,7 +3236,8 @@
         "customTools": "Custom tools",
         "fallbacks": "Fallbacks",
         "thinking": "Thinking"
-      }
+      },
+      "baseUrl": "Base URL"
     },
     "modelOrder": {
       "fallbackNeedsKey": "Add an API key and connect a subscription to use this.",

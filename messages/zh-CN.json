@@ -2276,7 +2276,11 @@
         "tool": "工具",
         "person": "常联系的人",
         "preference": "偏好"
-      }
+      },
+      "pendingTitle": "待确认",
+      "pendingHint": "Mikka 刚学到的内容，确认后才会用于回答和提醒",
+      "approve": "确认",
+      "reject": "不保留"
     },
     "workspaceForm": {
       "name": "名称",
@@ -3232,7 +3236,8 @@
         "customTools": "自定义工具",
         "fallbacks": "备用路由",
         "thinking": "思考"
-      }
+      },
+      "baseUrl": "Base URL"
     },
     "modelOrder": {
       "fallbackNeedsKey": "需先添加 API 密钥并连接订阅。",
