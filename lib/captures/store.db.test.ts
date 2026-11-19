@@ -78,7 +78,10 @@ dbTest('artifact evidence follows each real submission version, not the artifact
     type CommittedVersion = { artifactId: string; version: number; sha256: string }
     const notifications: Promise<CommittedVersion[]>[] = []
     const scope = createRequestScope(new Request('http://127.0.0.1/mikka/api/captures'))
-    scope.after.add(() => {
+    // Count the product's own after() calls, as the retired framework fixture did.
+    // Enqueueing a watcher here instead would make every submit look like it
+    // scheduled work, refusal included.
+    scope.after.add = () => {
       scheduled++
       // Live run/chat/artifact/project-map notifications depend on gateway
       // configuration. Check the committed data they announce, not their count.
@@ -88,11 +91,8 @@ dbTest('artifact evidence follows each real submission version, not the artifact
         JOIN artifact_versions v ON v."artifactId"=a.id AND v.version::text=e.payload->>'version'
         WHERE e."userId"=$1 AND e."runId"=$2 AND e."issueId"=$3 AND e.kind='artifact_submitted'
           AND e."dedupeKey"='artifact_submitted:'||a.id::text||':'||v.version::text`, [userId, runId, issue]).then(result => result.rows))
-    })
-    const result = await runRequestScope(scope, async () => {
-      try { return await submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input) }
-      finally { await scope.after.finish() }
-    })
+    }
+    const result = await runRequestScope(scope, () => submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input))
     const observed = await Promise.all(notifications)
     if ('error' in result) assert.deepEqual(observed, [], 'a refused submission schedules no background work')
     else {
