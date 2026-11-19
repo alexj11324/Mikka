@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useViewScroll } from '@/lib/hooks/view-state'
-import dynamic from 'next/dynamic'
+import dynamic from '@/lib/client-runtime/dynamic'
 import useSWR, { useSWRConfig } from 'swr'
 import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { Lightbulb, RotateCw } from 'lucide-react'

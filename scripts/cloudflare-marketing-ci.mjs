@@ -39,7 +39,7 @@ export function buildEnvironment(env) {
   const names = ['PATH', 'HOME', 'USER', 'TMPDIR', 'XDG_RUNTIME_DIR', 'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
     'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy', 'NODE_EXTRA_CA_CERTS', 'SSL_CERT_FILE']
   return { ...Object.fromEntries(names.filter(name => env[name] !== undefined).map(name => [name, env[name]])),
-    CI: 'true', NEXT_TELEMETRY_DISABLED: '1', WRANGLER_SEND_METRICS: 'false' }
+    CI: 'true', WRANGLER_SEND_METRICS: 'false' }
 }
 
 export async function runMarketingCi({ env = process.env, verify = false, publicRoot = root } = {}) {

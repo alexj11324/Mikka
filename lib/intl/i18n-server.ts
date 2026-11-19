@@ -37,3 +37,7 @@ export async function getTranslations<N extends Namespace = never>(input?: N | {
 export function getRequestConfig<T>(configuration: (params: { requestLocale: Promise<string | undefined> }) => T): typeof configuration {
   return configuration
 }
+
+/** Build a translator outside a request, for a message rendered into a stored
+ * payload (a Slack notice, a run summary). */
+export { createTranslator }

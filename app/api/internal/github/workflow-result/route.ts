@@ -3,7 +3,6 @@ import { readGitHubAppConfig } from '@/lib/github/app-config'
 import { readGitHubWebhookBody } from '@/lib/github/webhook-dispatch'
 import { workflowResult, verifyWorkflowResult } from '@/lib/github/workflow-result'
 
-export const runtime = 'nodejs'
 
 /** Only the official edge consumer signs this bounded, domain-separated projection. */
 export async function POST(request: Request): Promise<Response> {

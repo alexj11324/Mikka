@@ -52,7 +52,7 @@ class FrameworkAcceptance(unittest.IsolatedAsyncioTestCase):
                 command = [node, str(binaries[0]), '--host', '127.0.0.1', '--port', str(port), '--strictPort']
             process = await asyncio.create_subprocess_exec(*command, cwd=root, stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, start_new_session=True,
-                env={'PATH': os.environ['PATH'], 'HOME': temporary, 'NEXT_TELEMETRY_DISABLED': '1', 'NO_COLOR': '1'})
+                env={'PATH': os.environ['PATH'], 'HOME': temporary, 'NO_COLOR': '1'})
             gateway = module.Gateway(root / 'authority', user_id=os.getuid(), protect=lambda _port: None)
             await gateway.start()
             drain = None

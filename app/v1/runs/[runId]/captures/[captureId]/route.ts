@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { INLINE_UPLOAD_MAX_BYTES, receiveUpload, resumeUpload } from '@/lib/captures/store'
 import { captureFailure, captureJson, deviceRun } from '@/lib/captures/device'
 
-export const dynamic = 'force-dynamic'
 
 /** Reissue a target for an existing unexpired reservation, including after run completion. */
 async function handlePOST(request: Request, { params }: { params: Promise<{ runId: string; captureId: string }> }) {

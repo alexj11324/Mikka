@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { useLiveScope } from '@/hooks/use-live-key'
 import { ArrowRight, RefreshCw, Unplug } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'

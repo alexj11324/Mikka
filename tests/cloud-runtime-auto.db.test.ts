@@ -15,7 +15,7 @@ import { isolateCoordinatorWakes } from './support/coordinator-wake'
 import { addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 
 mock.module('@/lib/intl/i18n-server',{namedExports:{getLocale:async()=> 'en',getTranslations:async()=> (key:string)=> key}})
-mock.module('next/headers',{namedExports:{cookies:async()=>({get:()=>undefined}),headers:async()=>new Headers()}})
+mock.module('@/lib/server-runtime/headers',{namedExports:{cookies:async()=>({get:()=>undefined}),headers:async()=>new Headers()}})
 let httpOwner: string | null = null
 mock.module(new URL('../lib/api-auth.ts',import.meta.url).href,{namedExports:{auth:{api:{getSession:async()=>httpOwner?{user:{id:httpOwner,email:`${httpOwner}@example.test`,name:"Fixture owner"}}:null}}}})
 

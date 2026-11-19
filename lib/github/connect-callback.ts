@@ -1,5 +1,5 @@
 import 'server-only'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/auth'
 import { resolveAppOrigin } from '@/lib/auth-config'
 import { withBasePath } from '@/lib/base-path'

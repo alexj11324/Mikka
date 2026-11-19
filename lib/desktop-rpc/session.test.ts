@@ -17,7 +17,11 @@ test('bearer session reads strip cookies and always revalidate, leaving web cach
   assert.equal(headers.get('cookie'), 'other-account=private')
   const web = { headers: new Headers({ cookie: 'web=1' }) }
   await api.getSession(web)
-  assert.equal(seen[1], web)
+  // The wrapper only adds the freshness flag; the result shape and the
+  // request stay exactly as the caller wrote them.
+  assert.equal(seen[1].headers, web.headers)
+  assert.equal(seen[1].returnHeaders, undefined)
+  assert.equal(seen[1].query?.disableCookieCache, undefined)
 })
 
 test('validated RPC identity is reused within one request, including fresh actions, with no global leakage', async () => {

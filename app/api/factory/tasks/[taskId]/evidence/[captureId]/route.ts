@@ -5,8 +5,6 @@ import { factoryApprovals } from "@/lib/factory/server";
 import { factoryBrowserSession } from "@/lib/factory/browser-human";
 import { factoryEvidenceMedia } from "@/lib/factory/evidence-media";
 
-export const dynamic = "force-dynamic";
-
 /** `GET /api/factory/tasks/:taskId/evidence/:captureId`: a screenshot or recording the task's evidence names. */
 export async function GET(
   request: Request,

@@ -68,7 +68,7 @@ for (const method of ['log', 'warn', 'error'] as const) {
 mock.module(new URL('../../../../../lib/device-route.ts', import.meta.url).href, {
   namedExports: { withDeviceRoute: (handler: unknown) => handler },
 })
-mock.module('next/server', { namedExports: { NextResponse: Response } })
+mock.module('@/lib/server-runtime/server', { namedExports: { NextResponse: Response } })
 
 let GET: typeof import('./route')['GET']
 before(async () => {

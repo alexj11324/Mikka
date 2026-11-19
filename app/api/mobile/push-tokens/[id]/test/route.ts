@@ -11,7 +11,6 @@ import { personLocale } from '@/lib/suggestions/action-title-server'
 import english from '@/messages/en.json'
 import chinese from '@/messages/zh-CN.json'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 90
 
 /** Some HTTP adapters supply an empty stream for POST even when no bytes were sent. */

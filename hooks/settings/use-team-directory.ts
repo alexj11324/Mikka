@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from '@/lib/client-runtime/navigation'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import posthog from 'posthog-js'

@@ -1,5 +1,5 @@
 import { getTranslations } from '@/lib/intl/i18n-server'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
 import { resolveSlugRedirect } from '@/lib/workspace-admin/general'

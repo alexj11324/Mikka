@@ -217,7 +217,7 @@ async function setup() {
     await recordAuthenticationSecrets([decodeURIComponent(new URL(process.env.E2E_DATABASE_URL).password)], { environment })
   }
   await new TestAccountPool(pool, environment).prepare({ pairs: 4 })
-  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1', MIKKA_DEV_SKIP_MODEL_SETUP: needsModels ? '0' : '1',
+  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, MIKKA_DEV_SKIP_ENV_FILES: '1', MIKKA_DEV_SKIP_MODEL_SETUP: needsModels ? '0' : '1',
     ...(selectedItems.some(item => ['9', '10'].includes(item)) ? { MIKKA_DEV_ACCEPTANCE_HANDOFF: '1' } : {}),
     ...(selectedItems.includes('10') ? { MIKKA_DEV_ACCEPTANCE_ONLINE_WATCHDOG: '1' } : {}), ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
   await step('server-ready', 180_000, signal => until(signal, async () => {

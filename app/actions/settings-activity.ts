@@ -1,6 +1,6 @@
 'use server'
 
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'

@@ -3,7 +3,7 @@
 import { browserProfileUpdated } from '@/lib/browser-rpc/session'
 import { withFreshSession } from '@/lib/fresh-session'
 import { recordDesktopTokenRotation } from '@/lib/desktop-rpc/session'
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { getTranslations } from '@/lib/intl/i18n-server'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'

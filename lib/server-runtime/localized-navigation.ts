@@ -1,3 +1,7 @@
+/**
+ * Locale-aware links and redirects for server code: `getPathname` prefixes the
+ * path for a non-default locale, matching the client's `localeHref`.
+ */
 import { redirect as navigate, permanentRedirect as permanent } from './navigation'
 
 type Href = string | { pathname: string; query?: Record<string, string | number | boolean | null | undefined | Array<string | number | boolean>>; hash?: string }

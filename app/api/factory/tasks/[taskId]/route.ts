@@ -1,6 +1,6 @@
 import { factoryWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { actAs } from "@/lib/acting-user";
-import { NextResponse } from "next/server";
+import { NextResponse } from "@/lib/server-runtime/server";
 import { auth } from "@/lib/api-auth";
 import { handleFactory } from "@/lib/factory/http";
 import { factoryHumanStore } from "@/lib/factory/server";
@@ -8,8 +8,6 @@ import { pool } from '@/lib/db';
 import { workspacePool } from '@/lib/workspace-db';
 import { factoryLiveScopes } from '@/lib/live/factory';
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
 // A retained-delivery retry has a bounded provider inspection and pause step,
 // followed by the locked receipt transaction and durable review handoff.
 export const maxDuration = 120;

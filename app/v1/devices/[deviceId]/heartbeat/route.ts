@@ -1,6 +1,6 @@
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { sql } from 'drizzle-orm'
 import { deviceHeartbeatSchema, isDeviceOnline } from '@mikka/protocol/device'
@@ -22,7 +22,6 @@ import { withBasePath } from '@/lib/base-path'
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 import { withDeviceHeartbeatBody } from '@/lib/device-heartbeat-body'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `POST /v1/devices/:deviceId/heartbeat`: online state and the harnesses the

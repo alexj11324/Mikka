@@ -13,7 +13,7 @@ let finish: (value: object) => void = () => {}
 const result = (id: string, canDelete: boolean) => ({ teamId: id, tasks: canDelete ? 0 : 1, canDelete })
 mock.module('posthog-js', { defaultExport: { capture() {} } })
 mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => (id: string) => id } })
-mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(), useRouter: () => ({ push() {} }) } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => new URLSearchParams(), useRouter: () => ({ push() {} }) } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => (message: string) => message } })
 mock.module('@/lib/settings-navigation', { namedExports: { pushSettingsHistory: () => true } })
 mock.module('@/components/workspace/workspace-navigation', { namedExports: { workspaceLink: () => '/' } })

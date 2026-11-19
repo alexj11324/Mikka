@@ -6,7 +6,7 @@ import { serverRunFailure } from '@/lib/run-failure-details'
 import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { withDeviceRoute } from '@/lib/device-route'
 import { runListChanged } from '@/lib/live/lists'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { and, eq, isNull } from 'drizzle-orm'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
@@ -67,7 +67,6 @@ import { ActionFailureError } from '@/lib/action-error'
 
 import { daemonTooOld, daemonVersions } from '@/lib/daemon-release'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `POST /v1/devices/:deviceId/runs/:runId/claim`: hands the daemon everything

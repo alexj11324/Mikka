@@ -60,8 +60,8 @@ mock.module(new URL('../app/actions/artifacts.ts', import.meta.url).href, { name
 mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { listBots: async () => [] } })
 mock.module(new URL('../components/artifacts/artifact-share.tsx', import.meta.url).href, { namedExports: { ArtifactShare: () => null } })
 mock.module(new URL('../components/coordinator/coordinator-chat.tsx', import.meta.url).href, { namedExports: { CoordinatorChat: () => null } })
-mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
-mock.module('next/dynamic', { defaultExport: () => (props: Parameters<typeof ArtifactViewer>[0]) => <ArtifactViewer {...props} /> })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => (props: Parameters<typeof ArtifactViewer>[0]) => <ArtifactViewer {...props} /> })
 
 const browser = new Window({ url: 'https://mikka.example/en' })
 let container: HTMLDivElement

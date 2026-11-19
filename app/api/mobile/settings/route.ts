@@ -16,7 +16,6 @@ import { mobileMembersPage } from '@/lib/mobile-web-target'
 import { mobilePluginConnections } from '@/lib/mobile-plugin-connections'
 import { json, mobileUser, unauthorized } from '@/lib/mobile-api'
 
-export const dynamic = 'force-dynamic'
 
 /** Which apps the person connected: every Composio toolkit with an active account (Composio's live list), and Linear. Connecting happens on the web. */
 async function connectedApps(userId: string): Promise<{ app: string; connected: boolean; account: string | null }[]> {

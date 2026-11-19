@@ -59,7 +59,7 @@ mock.module('swr', {
     : { data: [], mutate: () => {} },
   namedExports: { useSWRConfig: () => liveRead ? actualSWR.useSWRConfig() : ({ mutate: () => {}, cache: new Map() }), unstable_serialize: actualSWR.unstable_serialize },
 })
-mock.module('next/dynamic', { defaultExport: () => () => null })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => () => null })
 mock.module(at('lib/hooks/view-state.tsx'), { namedExports: {
   ...actualViewState,
   useViewState: <T,>(key: string, initial: T) => actualViewState.useViewState(key, key.endsWith(':draft') ? draftText as T : key.endsWith(':quote') && draftQuote ? draftQuote as T : initial),

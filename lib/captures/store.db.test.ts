@@ -1,6 +1,5 @@
 import { Pool } from 'pg'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
@@ -63,9 +62,9 @@ dbTest('capture metadata reads do not transfer the inline file', async t => {
 })
 
 dbTest('artifact evidence follows each real submission version, not the artifact creator or mutable latest version', async t => {
-  const [{ createRequestDatabaseScope, pool }, { submitArtifact, readArtifactContent }, { runEvidence }, { artifactStorage }, { workAsyncStorage }, { workUnitAsyncStorage }] = await Promise.all([
+  const [{ createRequestDatabaseScope, pool }, { submitArtifact, readArtifactContent }, { runEvidence }, { artifactStorage }, { createRequestScope, runRequestScope }] = await Promise.all([
     import('../db'), import('../artifacts/store'), import('./store'), import('../artifacts/storage'),
-    import('next/dist/server/app-render/work-async-storage.external'), import('next/dist/server/app-render/work-unit-async-storage.external'),
+    import('../../apps/api/src/context'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const observer = new Pool({ connectionString: databaseUrl!, max: 1 })
@@ -75,11 +74,11 @@ dbTest('artifact evidence follows each real submission version, not the artifact
   // Only the post-response scheduler is a fixture. Submit, receipt, version,
   // evidence and file reads use their real code and the isolated database.
   let scheduled = 0
-  const request = { type: 'request', phase: 'action' } as NonNullable<ReturnType<typeof workUnitAsyncStorage.getStore>>
   const submit = async (runId: string, input: Parameters<typeof submitArtifact>[1], userId = alice, issue: string = issueId) => {
     type CommittedVersion = { artifactId: string; version: number; sha256: string }
     const notifications: Promise<CommittedVersion[]>[] = []
-    const afterContext = { after: () => {
+    const scope = createRequestScope(new Request('http://127.0.0.1/mikka/api/captures'))
+    scope.after.add(() => {
       scheduled++
       // Live run/chat/artifact/project-map notifications depend on gateway
       // configuration. Check the committed data they announce, not their count.
@@ -89,11 +88,11 @@ dbTest('artifact evidence follows each real submission version, not the artifact
         JOIN artifact_versions v ON v."artifactId"=a.id AND v.version::text=e.payload->>'version'
         WHERE e."userId"=$1 AND e."runId"=$2 AND e."issueId"=$3 AND e.kind='artifact_submitted'
           AND e."dedupeKey"='artifact_submitted:'||a.id::text||':'||v.version::text`, [userId, runId, issue]).then(result => result.rows))
-    } }
-    const result = await workAsyncStorage.run(
-      { afterContext } as unknown as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,
-      () => workUnitAsyncStorage.run(request, () => submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input)),
-    )
+    })
+    const result = await runRequestScope(scope, async () => {
+      try { return await submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input) }
+      finally { await scope.after.finish() }
+    })
     const observed = await Promise.all(notifications)
     if ('error' in result) assert.deepEqual(observed, [], 'a refused submission schedules no background work')
     else {

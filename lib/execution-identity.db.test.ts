@@ -31,7 +31,7 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
     const directory = new URL('../drizzle/', import.meta.url)
     for (const migration of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(migration, directory), 'utf8'))
     await pool.query(await readFile(new URL('20261103220200_execution_identity_provenance.sql', directory), 'utf8'))
-    mock.module('next/server', { namedExports: { after() {} } })
+    mock.module('@/lib/server-runtime/server', { namedExports: { after() {} } })
     const { issueRunToken, verifyRunToken } = await import('./mcp/worker')
     const { apiKeyForRun } = await import('./model-api-keys')
     const { authorizeRunApp } = await import('./run-app-mcp')

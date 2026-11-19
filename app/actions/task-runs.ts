@@ -9,7 +9,7 @@ import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '
 
 import { createHash } from 'node:crypto'
 import { DEVICE_ONLINE_WINDOW_MS, isDeviceOnline } from '@mikka/protocol/device'
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { deviceOnlineStates } from '@/lib/device-presence'
 import { gatewayConfig } from '@/lib/builtin-gateway/config'

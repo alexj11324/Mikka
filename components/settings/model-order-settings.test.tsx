@@ -29,7 +29,7 @@ mock.module('swr', { defaultExport: () => ({ data, mutate: async (value?: OrderV
 } }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 const liveKeys: unknown[] = []
 mock.module(new URL('../../hooks/use-live-key.tsx', import.meta.url).href, { namedExports: { useLiveKey: (...args: unknown[]) => { liveKeys.push(args) } } })
-mock.module('next/link', { defaultExport: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> })
+mock.module('@/lib/client-runtime/link', { defaultExport: ({ children, href }: { children: ReactNode; href: string }) => <a href={href}>{children}</a> })
 mock.module(new URL('../../app/actions/model-order.ts', import.meta.url).href, { namedExports: {
   changeModelOrder: async (change: typeof changes[number], workspace: string) => {
     assert.equal(workspace, workspaceId)

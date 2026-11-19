@@ -1,6 +1,6 @@
 import { daemonRequestTooOld, daemonUpgradeResponse } from '@/lib/daemon-release'
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { eq, sql } from 'drizzle-orm'
 import { deviceRegistration } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
@@ -10,7 +10,6 @@ import { authenticateDevice, linkDeviceToken, WORKSPACE_ID } from '@/lib/device-
 import { daemonTraceSettings } from '@/lib/tracing/config'
 import { ownerListChanged } from '@/lib/live/lists'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `POST /v1/devices/register`: the daemon's first call, and its re-register

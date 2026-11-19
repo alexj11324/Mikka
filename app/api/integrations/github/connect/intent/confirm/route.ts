@@ -5,7 +5,6 @@ import { confirmLoopbackIntent } from '@/lib/github/connect-intent'
 import { saveSealedGitHubConnection } from '@/lib/github/connection'
 import { withRequestLog } from '@/lib/request-log'
 
-export const runtime = 'nodejs'
 const headers = { 'Cache-Control': 'private, no-store' }
 
 /**

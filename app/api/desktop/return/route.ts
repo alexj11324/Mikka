@@ -1,5 +1,5 @@
-import { headers } from 'next/headers'
-import { NextResponse } from 'next/server'
+import { headers } from '@/lib/server-runtime/headers'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { and, eq, gt, isNull } from 'drizzle-orm'
 
 import { auth } from '@/lib/auth'
@@ -10,7 +10,6 @@ import { withBasePath } from '@/lib/base-path'
 import { DESKTOP_AUTH_EXCHANGE_TTL_MS, desktopAuthState, desktopLoopbackCallback } from '@/lib/desktop-auth'
 import { newExchangeCode, sha256Hex } from '@/lib/desktop-auth-server'
 
-export const dynamic = 'force-dynamic'
 
 const safeHeaders = {
   'Cache-Control': 'private, no-store',

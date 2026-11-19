@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from '@/lib/server-runtime/server'
 import { PluginError } from '../../../../lib/plugins/contracts'
 
 // The generic connect flow: any store toolkit with Composio-managed auth can
@@ -8,7 +8,7 @@ import { PluginError } from '../../../../lib/plugins/contracts'
 const authorized: { user: string; toolkit: string }[] = []
 const store = new Set(['gmail', 'hubspot', 'googlesheets'])
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
-mock.module('next/server', { namedExports: { NextRequest, NextResponse, after: () => {} } })
+mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest, NextResponse, after: () => {} } })
 stub('../../../../lib/request-log.ts', { noteLogRpcAction: () => {}, noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
 stub('../../../../lib/api-auth.ts', { auth: { api: { getSession: async () => ({ user: { id: 'synthetic-user' } }) } } })
 stub('../../../../lib/auth.ts', { authBaseURL: 'https://example.test' })

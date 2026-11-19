@@ -61,13 +61,13 @@ test('Enterprise execution authority keeps verified device/workflow/cron provena
     await control.query(await readFile(new URL(name, directory), 'utf8'))
 
   const context = await import('../../apps/api/src/context')
-  const framework = await import('next/headers')
-  mock.module('next/headers', { namedExports: { ...framework,
+  const framework = await import('@/lib/server-runtime/headers')
+  mock.module('@/lib/server-runtime/headers', { namedExports: { ...framework,
     headers: async () => context.requireRequestScope().headers,
     cookies: async () => context.requireRequestScope().cookies,
   } })
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next,
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next,
     after: (work: () => unknown) => context.requireRequestScope().after.add(work),
   } })
   const requestScope = async <T,>(request: Request, work: (request: Request) => Promise<T>): Promise<T> => {

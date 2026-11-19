@@ -5,7 +5,6 @@ import { pool } from '@/lib/db'
 import { syncComputerReviews } from '@/lib/computer/reviews'
 import { syncLocalComputerReviews } from '@/lib/computer/local-reviews'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
-export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 async function handlePOST(request: Request, { params }: { params: Promise<{ deviceId: string }> }) {
   const caller = await authenticateDevice(request)

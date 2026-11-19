@@ -1,4 +1,3 @@
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHmac, randomBytes, randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
@@ -55,9 +54,9 @@ test('mobile task endpoints with real task ACL, current workspace membership and
   const context = await import('../apps/api/src/context')
   // The ordinary API framework adapters supply request-local headers, cookies,
   // translations and after-work. Authentication and authorization stay real.
-  mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') })
-  mock.module('@/lib/intl/i18n-server', { namedExports: await import('../apps/api/compat/intl') })
-  mock.module('next/server', { namedExports: await import('../apps/api/compat/server') })
+  mock.module('@/lib/server-runtime/headers', { namedExports: await import('../lib/server-runtime/headers') })
+  mock.module('@/lib/intl/i18n-server', { namedExports: await import('../lib/intl/i18n-server') })
+  mock.module('@/lib/server-runtime/server', { namedExports: await import('../lib/server-runtime/server') })
   const { auth } = await import('../lib/auth')
   const { GET } = await import('../app/api/mobile/tasks/[id]/route')
   const { GET: list } = await import('../app/api/mobile/tasks/route')

@@ -4,7 +4,6 @@ import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { organizationSession } from '@/lib/enterprise/http'
 import { WORKSPACE_ICON_MAX_BYTES } from '@/lib/workspace-admin/icon'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

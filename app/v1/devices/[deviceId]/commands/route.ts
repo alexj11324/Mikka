@@ -1,6 +1,6 @@
 import { CLIENT_VERSION_HEADER } from '@mikka/protocol/version'
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { COMMANDS_DAEMON_LATEST_PARAM, COMMANDS_MAX_SKIP, COMMANDS_MAX_SKIP_DEVICE_COMMANDS, COMMANDS_MAX_WAIT_SECONDS, COMMANDS_SKIP_DEVICE_COMMANDS_PARAM, COMMANDS_SKIP_PARAM, ACTIVE_TURN_STEER_HEADER, MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
 import { cachedDaemonVersions, daemonVersions, newerDaemonRelease, daemonRequestTooOld } from '@/lib/daemon-release'
 import { authenticateDevice, deviceMayHaveWork, deviceUpdateNotice, deviceWork, deviceWorkSubscription, longPollIdleCheck, ownsDevice, sleep, waitSeconds } from '@/lib/device-link'
@@ -13,7 +13,6 @@ import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { z } from 'zod'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * A daemon on the push socket does not call this route while it is idle; this

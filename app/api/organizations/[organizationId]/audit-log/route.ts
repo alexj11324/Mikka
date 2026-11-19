@@ -4,7 +4,6 @@ import { createOrganizationAuditExport, listOrganizationAuditEvents, readOrganiz
 import { AuditExportError } from '@/lib/audit/export'
 import { organizationSession } from '@/lib/enterprise/http'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
 async function exported(work: () => Promise<unknown>) {
   try { return await work() }

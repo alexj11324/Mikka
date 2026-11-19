@@ -4,7 +4,6 @@ import { readCapture } from '@/lib/captures/store'
 import { captureFileResponse } from '@/lib/captures/serve'
 import { captureOutsideToken } from '@/lib/tokens/scope'
 
-export const dynamic = 'force-dynamic'
 
 /** `GET /api/captures/:captureId`: one of the person's screenshots or recordings. */
 export async function GET(request: Request, { params }: { params: Promise<{ captureId: string }> }) {

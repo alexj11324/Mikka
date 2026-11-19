@@ -10,7 +10,7 @@ test('one person saves an environment, selects it for a Project and queues a Run
   const previousByos = process.env.MIKKA_BYOS_ENABLED
   process.env.MIKKA_BYOS_ENABLED = '1'
   t.after(() => { if (previousByos === undefined) delete process.env.MIKKA_BYOS_ENABLED; else process.env.MIKKA_BYOS_ENABLED = previousByos })
-  const headers = mock.module('next/headers', { namedExports: { cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() } })
+  const headers = mock.module('@/lib/server-runtime/headers', { namedExports: { cookies: async () => ({ get: () => undefined }), headers: async () => new Headers() } })
   const locale = mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
   t.after(() => { headers.restore(); locale.restore() })
   const fixture = new Pool({ connectionString: dbUrl })

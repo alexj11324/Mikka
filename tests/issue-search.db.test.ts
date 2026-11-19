@@ -1,4 +1,3 @@
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'

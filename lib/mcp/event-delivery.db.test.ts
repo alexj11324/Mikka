@@ -16,8 +16,8 @@ test('each MCP event write wakes once, after its durable row is visible', { skip
   const direct: string[] = []
   const committed: { userId: string; rows: number }[] = []
   let wakeObserved: (() => void) | undefined
-  const next = await import('next/server')
-  t.mock.module('next/server', { namedExports: { ...next, after: (callback: () => Promise<void>) => { scheduled.push(callback()) } } })
+  const next = await import('@/lib/server-runtime/server')
+  t.mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (callback: () => Promise<void>) => { scheduled.push(callback()) } } })
   const { pool, createRequestDatabaseScope } = await import('../db')
   const { workspacePool } = await import('../workspace-db')
   const scope = createRequestDatabaseScope(target!)

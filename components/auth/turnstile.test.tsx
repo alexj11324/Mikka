@@ -3,7 +3,7 @@ import { before, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'zh-CN' } })
-mock.module('next/script', { defaultExport: ({ src }: { src: string }) => <script data-src={src} /> })
+mock.module('@/lib/client-runtime/script', { defaultExport: ({ src }: { src: string }) => <script data-src={src} /> })
 
 let Turnstile: typeof import('./turnstile')['Turnstile']
 before(async () => { ({ Turnstile } = await import('./turnstile')) })

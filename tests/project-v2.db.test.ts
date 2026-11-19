@@ -51,8 +51,8 @@ test('Project v2: split database migration, canonical relationships and live ten
   globals.mikkaPool = application; globals.workspacePool = workspace
   let workspaceModule: Pool | undefined
   let selectedWorkspace: string | undefined
-  const framework = await import('next/headers')
-  const headersMock = mock.module('next/headers', { namedExports: { ...framework,
+  const framework = await import('@/lib/server-runtime/headers')
+  const headersMock = mock.module('@/lib/server-runtime/headers', { namedExports: { ...framework,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }),
     headers: async () => new Headers(),
   } })

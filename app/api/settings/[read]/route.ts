@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { withRequestLog } from '@/lib/request-log'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
 import { singleFlight } from '@/lib/single-flight'

@@ -1,5 +1,5 @@
 import { freshSessionRoute } from '@/lib/fresh-session'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/api-auth'
 import { auth as browserAuth } from '@/lib/auth'
 import { mintDeviceEnrollment } from '@/lib/device-enrollment'

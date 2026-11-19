@@ -18,8 +18,6 @@ import { artifactSubmittedEvent } from '../../lib/coordinator-events.ts'
 import { startMvpServices } from './services.mjs'
 import { traceGitHubEnvironment } from './trace-codex.mjs'
 import { hasBoundMvpTransport, installMvpTransport, MVP_DECISION_KEY, verifyMvpTransport } from './transport.mjs'
-import { createDedupeFetch } from 'next/dist/server/lib/dedupe-fetch.js'
-import { createPatchedFetcher } from 'next/dist/server/lib/patch-fetch.js'
 
 const database = 'postgresql://ci:fixture@127.0.0.1:5432/mikka_e2e'
 const isolated = { CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1', E2E_DATABASE_URL: database, MIKKA_DATABASE_URL: database, DATABASE_URL: database }
@@ -262,8 +260,6 @@ test('local test mode replaces only the GitHub Actions requirement (the rule: sc
 test('synthetic MVP transport binds the active fetch path, preserves requests and refuses other external services', async () => {
   const env = { ...isolated, AI_GATEWAY_API_KEY: MVP_DECISION_KEY }
   const requests = []
-  const nextPatch = Symbol.for('next-patch')
-  const previousNextPatch = Object.getOwnPropertyDescriptor(globalThis, nextPatch)
   const restore = installMvpTransport(env, async (request, options) => {
     requests.push({ url: request.url, method: request.method, authorization: request.headers.get('authorization'), body: await request.text(), redirect: options?.redirect })
     return new Response('{}', { headers: { 'content-type': 'application/json' } })
@@ -274,10 +270,10 @@ test('synthetic MVP transport binds the active fetch path, preserves requests an
     assert.equal(hasBoundMvpTransport(env), true)
     assert.equal(requests.length, 0, 'the transport challenge does not contact a server')
     const transport = globalThis.fetch
-    // Exercise the installed Next wrapper and its opaque dedupe closure.
-    // The proof must work through its real delegation, without property names.
-    const noRequestStore = { getStore: () => undefined }
-    globalThis.fetch = createPatchedFetcher(createDedupeFetch(transport), { workAsyncStorage: noRequestStore, workUnitAsyncStorage: noRequestStore })
+    // Exercise the installed transport behind an opaque wrapper, the way a host
+    // runtime may wrap fetch. The proof must work through delegation alone,
+    // without reading property names off the wrapper.
+    globalThis.fetch = (...args) => transport(...args)
     assert.equal(hasBoundMvpTransport(env), false)
     assert.equal(await verifyMvpTransport(env), true)
     assert.equal(hasBoundMvpTransport(env), true)
@@ -302,8 +298,6 @@ test('synthetic MVP transport binds the active fetch path, preserves requests an
     assert.equal(hasBoundMvpTransport(env), false)
   } finally {
     restore()
-    if (previousNextPatch) Object.defineProperty(globalThis, nextPatch, previousNextPatch)
-    else delete globalThis[nextPatch]
   }
 })
 

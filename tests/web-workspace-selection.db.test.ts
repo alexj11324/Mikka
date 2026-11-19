@@ -41,8 +41,8 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
   process.env.BETTER_AUTH_URL = origin
   // These are the same aliases as the API build, not session/permission mocks.
   const framework = [
-    mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') }),
-    mock.module('@/lib/intl/i18n-server', { namedExports: await import('../apps/api/compat/intl') }),
+    mock.module('@/lib/server-runtime/headers', { namedExports: await import('../lib/server-runtime/headers') }),
+    mock.module('@/lib/intl/i18n-server', { namedExports: await import('../lib/intl/i18n-server') }),
   ]
   // Keep authentication, Workspace/Bot resolution and message persistence
   // real; capture only the external Coordinator dispatch after its commit.

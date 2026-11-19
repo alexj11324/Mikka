@@ -1,10 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/auth'
 import { withRequestLog } from '@/lib/request-log'
 import { officialWebOriginAllowed } from '@/lib/web-connection/policy'
 import { webAuthHeaders, webBearer } from '@/lib/web-connection/auth-server'
 
-export const dynamic = 'force-dynamic'
 async function handlePOST(request: Request) {
   if (!officialWebOriginAllowed(request.headers.get('origin'))) return NextResponse.json({ error: 'web_auth_forbidden' }, { status: 403, headers: webAuthHeaders })
   const token = webBearer(request)

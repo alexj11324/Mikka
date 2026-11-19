@@ -17,8 +17,8 @@ if (!databaseUrl && process.env.REQUIRE_DB === '1') throw new Error('REQUIRE_DB=
 const dbTest = databaseUrl ? test : test.skip
 
 dbTest('a heartbeat re-checks execution identities only when the harnesses change or the device comes back, and renews the leases of the runs it reports', async t => {
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
   const [{ createRequestDatabaseScope, db, pool }, { POST }] = await Promise.all([import('./db'), import('../app/v1/devices/[deviceId]/heartbeat/route')])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const owner = `test-heartbeat-${randomUUID()}`

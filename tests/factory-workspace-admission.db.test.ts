@@ -59,13 +59,13 @@ test('human Factory admission holds Workspace before APP and reuses Profile memb
     await controls.query(await readFile(new URL(name, directory), 'utf8'))
   }
   const context = await import('../apps/api/src/context')
-  const framework = await import('next/headers')
-  mock.module('next/headers', { namedExports: { ...framework,
+  const framework = await import('@/lib/server-runtime/headers')
+  mock.module('@/lib/server-runtime/headers', { namedExports: { ...framework,
     headers: async () => context.requireRequestScope().headers,
     cookies: async () => context.requireRequestScope().cookies,
   } })
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next, after: (work: () => unknown) => context.requireRequestScope().after.add(work) } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => unknown) => context.requireRequestScope().after.add(work) } })
   const locale = await import('@/lib/intl/i18n-server')
   mock.module('@/lib/intl/i18n-server', { namedExports: { ...locale, getLocale: async () => 'en',
     getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })

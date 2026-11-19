@@ -1,6 +1,6 @@
 import { withRequestLog } from '@/lib/request-log'
 import { getTranslations } from '@/lib/intl/i18n-server'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { actAs } from '@/lib/acting-user'
 import { getApiSession, apiWorkspaceAllowed } from '@/lib/api-auth'

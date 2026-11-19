@@ -28,7 +28,7 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
   }
   let currentHeaders = new Headers()
   let cookieReads = 0
-  mock.module('next/headers', { namedExports: {
+  mock.module('@/lib/server-runtime/headers', { namedExports: {
     headers: async () => currentHeaders,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' ? { value: other.id } : undefined }),
   } })
@@ -37,8 +37,8 @@ test('PAT bearer authenticates existing GET/POST routes with owner/workspace che
     cookieReads++
     return currentHeaders.has('cookie') ? { user: { id: owner }, session: { id: 'browser-session' } } : null
   } } } } })
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next, after: () => {} } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: () => {} } })
   mock.module('@/app/actions/coordinator', { namedExports: Object.fromEntries(['getCoordinatorChat', 'pollCoordinatorChat', 'coordinatorHistory', 'sendCoordinatorMessage'].map(name => [name, async () => { throw new Error('PAT must not use cookie action') }])) })
   const store = await import('../lib/tokens/store')
   const { getApiSession } = await import('../lib/api-auth')

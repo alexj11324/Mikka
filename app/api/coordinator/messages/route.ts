@@ -1,6 +1,6 @@
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { auth } from '@/lib/api-auth'
 import { db } from '@/lib/db'
@@ -12,7 +12,6 @@ import { createHash } from 'node:crypto'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 
-export const dynamic = 'force-dynamic'
 
 /** `GET /api/coordinator/messages`: the person's conversation with their Coordinator, oldest first. */
 async function handleGET(request: Request) {

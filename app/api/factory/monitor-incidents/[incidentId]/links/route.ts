@@ -1,12 +1,11 @@
 import { factoryHumanWorkspaceResponse } from '@/lib/factory/workspace-http'
 import { factoryBrowserSession } from '@/lib/factory/browser-human'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/api-auth'
 import { FactoryError } from '@/lib/factory/contract'
 import { factoryMonitorIssueLinks } from '@/lib/factory/server'
 import { GitHubAccessError } from '@/lib/github/user-access'
 
-export const dynamic='force-dynamic'
 const headers={'Cache-Control':'private, no-store'}
 async function respond(request:Request,{params}:{params:Promise<{incidentId:string}>}){
   const session=await factoryBrowserSession(request, nativeHeaders => auth.api.getSession({headers:nativeHeaders,query:{disableCookieCache:true}}))

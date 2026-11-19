@@ -5,13 +5,8 @@
     "types": ["node"],
     "paths": {
       "@/*": ["../../*"],
-      "@/i18n/navigation": ["./compat/localized-navigation.ts"],
-      "next/server": ["./compat/server.ts"],
-      "next/headers": ["./compat/headers.ts"],
-      "next/headers.js": ["./compat/headers.ts"],
-      "next/navigation": ["./compat/navigation.ts"],
-      "server-only": ["./compat/server-only.ts"],
-      "react": ["./compat/react.ts"],
+      "server-only": ["../../lib/server-only.ts"],
+      "react": ["../../lib/server-runtime/react.ts"],
       "mikka-real-react": ["../../node_modules/@types/react/index.d.ts"]
     }
   },

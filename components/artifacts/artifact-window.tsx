@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import type { ReviewChangeTarget } from '@/lib/factory/review-change'
-import dynamic from 'next/dynamic'
-import { useSearchParams } from 'next/navigation'
+import dynamic from '@/lib/client-runtime/dynamic'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import useSWR from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { getIssueThread } from '@/app/actions/agents'

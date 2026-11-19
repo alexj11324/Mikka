@@ -17,7 +17,7 @@ let allowed = true, failEffect = false
 const sync = mock.fn(async () => { if (failEffect) throw new Error('temporary followup failure') })
 const access = mock.fn(async () => { if (!allowed) throw new Error('issueNotFound') })
 let effectsOutsideTransaction = 0
-mock.module('next/server', { namedExports: { after: () => { effectsOutsideTransaction++ } } })
+mock.module('@/lib/server-runtime/server', { namedExports: { after: () => { effectsOutsideTransaction++ } } })
 mock.module('@/lib/linear-sync/worker', { namedExports: { processLinearIssueOutbox: sync } })
 mock.module('@/lib/issue-access', { namedExports: { requireIssueAccess: access } })
 const queryExecutor = {

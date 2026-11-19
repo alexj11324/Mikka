@@ -28,8 +28,8 @@ test(`daemon ${MIN_DAEMON_VERSION} as released works against today's device rout
   const savedSecret = process.env.BETTER_AUTH_SECRET
   process.env.BETTER_AUTH_SECRET ??= randomBytes(32).toString('hex')
   t.after(() => { if (savedSecret === undefined) delete process.env.BETTER_AUTH_SECRET; else process.env.BETTER_AUTH_SECRET = savedSecret })
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { pool: appPool } = await import('../lib/db')

@@ -1,6 +1,6 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
-import { NextRequest, NextResponse } from 'next/server'
-import { getPathname } from '@/i18n/navigation'
+import { NextRequest, NextResponse } from '@/lib/server-runtime/server'
+import { getPathname } from '@/lib/server-runtime/localized-navigation'
 import { routing } from '@/i18n/routing'
 import { auth } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'

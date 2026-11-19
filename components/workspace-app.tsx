@@ -2,7 +2,7 @@
 import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { usePathname } from '@/i18n/navigation'
 import { SWRConfig, unstable_serialize } from 'swr'
 import type { listIssues } from '@/app/actions/issues'

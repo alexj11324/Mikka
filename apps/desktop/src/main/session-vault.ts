@@ -32,7 +32,7 @@ export function responseSessionCache(headers: Headers): string | undefined {
   if (!cookies) return undefined
   if (cookies.length > 64 * 1024) return ''
 
-  // Some existing REST handlers renew the SDK cache through nextCookies only.
+  // Some existing REST handlers renew the SDK cache through the cookie plugin only.
   // Extract exactly that opaque proof; never retain a cookie jar, session_token
   // or OAuth cookie. Commas in Expires/quoted unrelated values are not borders.
   const parts: string[] = []

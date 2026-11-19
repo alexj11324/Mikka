@@ -38,7 +38,7 @@ let swrDefaults: typeof import('../../components/swr-defaults')['swrDefaults']
 let requestedWorkspace: string | null = null
 let refreshes = 0
 const router = { refresh: () => { refreshes++ } }
-mock.module('next/navigation', { namedExports: { useSearchParams: () => ({ get: () => requestedWorkspace }) } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => ({ get: () => requestedWorkspace }) } })
 mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { useRouter: () => router } })
 mock.module(new URL('../app-build.ts', import.meta.url).href, { namedExports: { APP_BUILD: 'build-one', pageNeedsRefresh: () => false } })
 

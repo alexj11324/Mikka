@@ -35,7 +35,7 @@ const calls = {
 }
 
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
-mock.module('next/headers', { namedExports: { headers: async () => new Headers({ cookie: 'session=x' }) } })
+mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers({ cookie: 'session=x' }) } })
 mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => (key: string, values?: Record<string, unknown>) => `${key}:${JSON.stringify(values ?? {})}` } })
 stub('../lib/auth.ts', { auth: { $context: Promise.resolve({ sessionConfig: { freshAge: 24 * 60 * 60 } }), api: {
   getSession: async () => current,

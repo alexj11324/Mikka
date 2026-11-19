@@ -1,6 +1,6 @@
 'use server'
 
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import type { ActionResult } from '@/lib/action-result'
 import { auditRequestContext } from '@/lib/audit/events'
 import { getMemberSubscriptionPolicy, setMemberSubscriptionPolicy, type MemberSubscriptionPolicy } from '@/lib/personal-policy-server'

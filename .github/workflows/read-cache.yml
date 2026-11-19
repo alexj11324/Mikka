@@ -68,7 +68,6 @@ jobs:
       E2E_BASE_URL: http://localhost:3137
       MIKKA_TEST_DEPLOYMENT_SHA: ${{ github.sha }}
       MIKKA_TEST_ENVIRONMENT_FILE: .cache/e2e/environment.json
-      NEXT_TELEMETRY_DISABLED: '1'
       NODE_OPTIONS: --max-old-space-size=6144
       SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
       MIKKA_SIGNUP_IP_HOURLY: '1000'

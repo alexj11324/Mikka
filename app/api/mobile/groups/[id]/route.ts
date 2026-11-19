@@ -4,7 +4,6 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { setGroupPreference } from '@/lib/chat-preferences'
 import { groupOutsideToken } from '@/lib/tokens/scope'
 
-export const dynamic = 'force-dynamic'
 
 const change = z.object({ pinned: z.boolean().optional(), hidden: z.boolean().optional(), markedUnread: z.boolean().optional() })
   .strict().refine(value => Object.values(value).some(field => field !== undefined))

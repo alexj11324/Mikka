@@ -16,9 +16,12 @@ const builtins = new Set(builtinModules.flatMap(name => [name, `node:${name}`]))
 const officialSlot = '\0mikka:official-slot:'
 const officialContract = 'mikka:official-slot-contract'
 const virtualAction = '\0mikka:action:'
+// The application's own client router. These used to be framework specifiers
+// resolved to the renderer's shims; application code now names the modules
+// directly, and this map only keeps the localized navigation entry in one place.
+const clientRuntime = resolve(repository, 'lib/client-runtime')
 const commonAliases = new Map([
-  ['next/navigation', 'next-navigation.ts'], ['next/link', 'next-link.tsx'], ['next/dynamic', 'dynamic.tsx'],
-  ['@/i18n/navigation', 'i18n-navigation.tsx'],
+  ['@/i18n/navigation', 'localized-navigation.tsx'],
 ])
 const desktopAliases = new Map([
   ['@/lib/auth-client', 'auth-client.ts'], ['@/components/auth-form', 'auth-form.tsx'],
@@ -28,14 +31,22 @@ const desktopAliases = new Map([
 ])
 
 export function serverSpecifier(source) {
+  // The framework specifiers are gone from the source, but a browser bundle
+  // that reaches for one must fail loudly rather than pull in a real package.
   return source === 'server-only' || source.startsWith('@/lib/intl/i18n-server') || source.startsWith('node:') || builtins.has(source)
-    || /^next\/(?:headers|server|font)(?:\/|$)/.test(source)
+    || /^next(?:\/|$)/.test(source) || source.startsWith('next-intl')
     || source === 'better-auth' || source === 'pg' || source === 'postgres'
 }
 
 function serverFile(filename) {
   const path = slash(relative(repository, filename.split('?')[0]))
-  return path.startsWith('app/api/') || /^lib\/(?:auth|db|session)\.ts$/.test(path) || path.startsWith('lib/db/')
+  // Match the resolved path as well as the specifier: a relative or absolute
+  // import of a server module must fail even when the module's own imports
+  // happen to stay browser-safe.
+  return path.startsWith('app/api/') || path.startsWith('lib/server-runtime/')
+    || /^lib\/intl\/i18n-server(?:\.ts|$)/.test(path)
+    || path === 'lib/server-only.ts'
+    || /^lib\/(?:auth|db|session)\.ts$/.test(path) || path.startsWith('lib/db/')
     || /^lib\/desktop-rpc\/(?:registry|schemas|handler|bootstrap|authentication|session(?:-cache(?:-context)?)?)\.ts$/.test(path)
     || /\/next\/dist\/(?:server|compiled\/webpack)/.test(slash(filename))
 }
@@ -96,11 +107,13 @@ export async function applicationPlugin(target, { deploymentId = '', serverPages
       if (serverSpecifier(source)) throw new Error(`FRONTEND_SERVER_IMPORT: ${source}`)
       const action = /^@\/app\/actions\/([\w-]+)$/.exec(source)
       if (action) return `${virtualAction}${action[1]}`
-      const alias = commonAliases.get(source) ?? (target === 'desktop' ? desktopAliases.get(source) : undefined)
-      if (alias && importer?.split('?')[0] !== resolve(renderer, alias)) return resolve(renderer, alias)
-      if (source === 'next/script') {
+      const alias = commonAliases.get(source)
+      if (alias && importer?.split('?')[0] !== resolve(clientRuntime, alias)) return resolve(clientRuntime, alias)
+      const desktopAlias = target === 'desktop' ? desktopAliases.get(source) : undefined
+      if (desktopAlias && importer?.split('?')[0] !== resolve(renderer, desktopAlias)) return resolve(renderer, desktopAlias)
+      if (source === '@/lib/client-runtime/script') {
         if (target === 'desktop') throw new Error('FRONTEND_DESKTOP_REMOTE_SCRIPT_FORBIDDEN')
-        return resolve(frontend, 'src/web/next-script.tsx')
+        return resolve(clientRuntime, 'script.tsx')
       }
       if (uiSlots.dir && source.startsWith(SLOT_PREFIX)) {
         const name = source.slice(SLOT_PREFIX.length)

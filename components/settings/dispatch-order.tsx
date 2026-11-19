@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment } from 'react'
-import Link from 'next/link'
+import Link from '@/lib/client-runtime/link'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'

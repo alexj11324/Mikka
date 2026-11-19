@@ -1,7 +1,7 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname, useSearchParams } from '@/lib/client-runtime/navigation'
 import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { APP_BUILD, desktopBelowMinimum, isStaleBuild, readAppVersion, markPageNeedsRefresh, subscribePageRefresh } from '@/lib/app-build'

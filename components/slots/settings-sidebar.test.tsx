@@ -14,7 +14,7 @@ const translate = Object.assign((path: string) => {
   return value as string
 }, { has: (path: string) => typeof lookup(path) === 'string' })
 mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate } })
-mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
 mock.module(new URL('../settings/settings-link.tsx', import.meta.url).href, { namedExports: {
   SettingsLink: (props: ComponentProps<'a'>) => <a {...props} href={props.href} />,
 } })

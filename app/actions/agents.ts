@@ -8,7 +8,7 @@ import { deploymentSwitch } from '@/lib/deployment-switches'
 
 import { createHash } from 'node:crypto'
 import { gunzipSync } from 'node:zlib'
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { threadModelChoice, type ThreadModelChoice } from '@/lib/thread-model-choice'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
 import type { SelectResult } from 'drizzle-orm/query-builders/select.types'

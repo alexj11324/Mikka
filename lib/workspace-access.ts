@@ -1,7 +1,7 @@
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { getLocale } from '@/lib/intl/i18n-server'
 import 'server-only'
-import { cookies } from 'next/headers'
+import { cookies } from '@/lib/server-runtime/headers'
 import { and, asc, eq, inArray, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'

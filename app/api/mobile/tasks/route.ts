@@ -13,7 +13,6 @@ import { newestTaskRuns, taskScheduleLabels } from '@/lib/task-block-runs'
 import { taskStateOf } from '@/lib/task-state'
 import { taskReviewSummaries } from '@/lib/coding-workspace/task-review/summaries'
 
-export const dynamic = 'force-dynamic'
 
 /** `GET /api/mobile/tasks`: the 任务 list: the person's tasks in this workspace, newest change first, each with its 受阻 (lib/task-blocked.ts). No board on mobile. */
 async function handleGET(request: Request) {

@@ -1,10 +1,9 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { authenticateDevice, ownsDevice } from '@/lib/device-link'
 import { deviceGatewayTicket } from '@/lib/device-gateway-ticket'
 import { gatewayConfig, gatewayURL } from '@/lib/builtin-gateway/config'
 
-export const dynamic = 'force-dynamic'
 
 /** The waits this server pushes for (packages/protocol deviceGatewaySchema). */
 const PUSHED = { runControl: 'push', computerReviews: 'push', coordinatorResults: 'push' } as const

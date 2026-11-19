@@ -1,5 +1,5 @@
-import { cookies } from 'next/headers'
-import { NextResponse } from 'next/server'
+import { cookies } from '@/lib/server-runtime/headers'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/auth'
 import { pool } from '@/lib/db'
 import { withRequestLog } from '@/lib/request-log'
@@ -7,7 +7,6 @@ import { withTaskWorkspace } from '@/lib/task-workspace'
 import { installPlatform, redeemSlackCode, SLACK_CALLBACK_PATH, SLACK_INSTALL_RETURN_PATH, SLACK_STATE_COOKIE } from '@/lib/slack/install-provider'
 import { acceptInstall, consumeInstall } from '@/lib/slack/installation-store'
 
-export const runtime = 'nodejs'
 async function handle(request: Request) {
   const url = new URL(request.url),
     platform = installPlatform()

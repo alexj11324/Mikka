@@ -37,7 +37,7 @@ stub('../../hooks/use-live-key.tsx', { useLiveKey(kind: string, id: string | nul
   }, [kind, id, scope, JSON.stringify(keys), mutate])
 } })
 const router = { refresh() {} }
-mock.module('next/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => new URLSearchParams() } })
 stub('../../i18n/navigation.ts', { useRouter: () => router })
 const { AuthenticatedReadCache } = await import('../authenticated-read-cache')
 const { ConversationDirectory } = await import('./conversation-directory')

@@ -1,5 +1,5 @@
 import 'server-only'
-import { cookies } from 'next/headers'
+import { cookies } from '@/lib/server-runtime/headers'
 import { and, asc, eq, or } from 'drizzle-orm'
 import { workspaceDb } from '@/lib/workspace-db'
 import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'

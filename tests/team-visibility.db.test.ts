@@ -15,7 +15,7 @@ if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Visibility d
 test('real API/core visibility: immutable tenant, optional Team, provider scope and suspension', { skip: !authorized }, async t => {
   // Server actions need a Next request boundary even when actAs pins a valid workspace.
   // Supply only the browser transport; authentication and ACL still use the real fixture DB.
-  const request = mock.module('next/headers', { namedExports: {
+  const request = mock.module('@/lib/server-runtime/headers', { namedExports: {
     headers: async () => new Headers(),
     cookies: async () => ({ get: () => undefined }),
   } })

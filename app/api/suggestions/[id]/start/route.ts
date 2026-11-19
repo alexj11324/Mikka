@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
@@ -7,7 +7,6 @@ import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { startSuggestion } from '@/lib/cloud-computer/suggestions'
 import { ComputerError } from '@/lib/computer/store'
 import { wakeCoordinator } from '@/lib/coordinator/wake'
-export const runtime = 'nodejs'
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const respond = (value: unknown, status: number) => NextResponse.json(value, { status, headers: { 'Cache-Control': 'private, no-store' } })
   try {

@@ -1,5 +1,5 @@
 import { factoryHumanWorkspaceResponse } from '@/lib/factory/workspace-http';
-import { NextResponse } from "next/server";
+import { NextResponse } from "@/lib/server-runtime/server";
 import { auth } from "@/lib/api-auth";
 import { factoryApprovals, factoryMerges } from "@/lib/factory/server";
 import { GitHubAccessError, githubUserToken } from "@/lib/github/user-access";
@@ -7,7 +7,6 @@ import { handleFactoryApproval } from "@/lib/factory/approval-http";
 import { FactoryMergeRefused } from "@/lib/factory/merge";
 import { factoryBrowserSession } from "@/lib/factory/browser-human";
 
-export const dynamic = "force-dynamic";
 async function respond(
   request: Request,
   context: { params: Promise<{ taskId: string }> },

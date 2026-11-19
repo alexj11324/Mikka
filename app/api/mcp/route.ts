@@ -23,7 +23,6 @@ import { ARTIFACT_TITLE_MAX } from '@/lib/artifacts/limits'
 import { ProjectMapError } from '@/lib/project-map/contracts'
 import { RECORD_DECISION_TOOL } from '@/lib/project-map/mcp-tool'
 
-export const dynamic = 'force-dynamic'
 // Leaves room for read_coordinator_messages to wait for a reply.
 export const maxDuration = 120
 

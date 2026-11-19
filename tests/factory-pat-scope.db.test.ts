@@ -18,7 +18,7 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
   let currentHeaders = new Headers()
   let browser = false
   let browserWorkspaceId = workspace.id
-  mock.module('next/headers', { namedExports: {
+  mock.module('@/lib/server-runtime/headers', { namedExports: {
     headers: async () => currentHeaders,
     cookies: async () => ({ get: (name: string) => name === 'mikka-workspace' ? { value: browserWorkspaceId } : undefined }),
   } })
@@ -33,8 +33,8 @@ test('Factory HTTP adapters preserve a personal access token workspace', { skip:
       session: { id: 'fixture-browser-session' },
     } : null } },
   } })
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next, after: () => {} } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: () => {} } })
   t.after(async () => {
     mock.restoreAll()
     const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../lib/db'), import('../lib/workspace-db')])

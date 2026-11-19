@@ -41,7 +41,7 @@ import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { useViewState } from '@/lib/hooks/view-state'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 import { TaskDetailFrame } from '@ui-slot/task-detail'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { presentedFactoryEvents, readTaskEvidenceTarget, taskEvidenceThread } from '@/lib/task-factory-events'
 
 type Issue = IssueView

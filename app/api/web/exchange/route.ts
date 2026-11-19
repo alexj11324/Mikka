@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { and, eq, gt, isNotNull, isNull } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -12,7 +12,6 @@ import { webAuthHeaders, webAuthStateHash } from '@/lib/web-connection/auth-serv
 
 import { inheritEnterpriseSession } from '@/lib/enterprise/session-handoff'
 
-export const dynamic = 'force-dynamic'
 async function handlePOST(request: Request) {
   const reject = () => NextResponse.json({ error: 'web_auth_exchange_rejected' }, { status: 400, headers: webAuthHeaders })
   if (!officialWebOriginAllowed(request.headers.get('origin'))) return NextResponse.json({ error: 'web_auth_forbidden' }, { status: 403, headers: webAuthHeaders })

@@ -4,7 +4,6 @@ import { tokenWorkspace } from '../lib/tokens/principal'
 import { SCOPE_DATABASES } from '../scripts/scope-acceptance-policy.mjs'
 import { scopeSubtest, scopeResumeBootstrap } from './support/scope-acceptance.mjs'
 import './fixtures/scope-request-runtime.mjs'
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -79,25 +78,16 @@ test('provider policy preserves task tenancy and independent membership gates on
     linearRequestTimeout.ms = 2_000
     try { await callback() } finally { linearRequestTimeout.ms = 12_000 }
   }
-  const { AfterContext } = await import('next/dist/server/after/after-context')
-  const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
-  const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
-  const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
-  const { NextRequest } = await import('next/server')
-  // Native HTTP has no Next request context. Run the same after callbacks that
-  // Next runs when a request closes, and fail if an asynchronous effect fails.
+  const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
+  const { NextRequest } = await import('../lib/server-runtime/server')
+  // Run the request scope and its after queue the way the API dispatcher does,
+  // so a deferred effect that fails fails this test too.
   async function withRequestContext<T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) {
-    const waits: Promise<unknown>[] = [], errors: unknown[] = []
-    const closes: Array<() => void> = []
-    const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: callback => { closes.push(callback) }, onTaskError: error => { errors.push(error) } })
-    const request = new NextRequest('http://127.0.0.1/mikka')
-    // Next 16.4 adds an optional HMR hash to the API request-store factory;
-    // supplying it also works with the local 16.1 acceptance dependencies.
-    const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
-    return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
+    const scope = createRequestScope(new NextRequest('http://127.0.0.1/mikka'))
+    return runRequestScope(scope, async () => {
       try { const result = await fn(); await beforeClose?.(); return result }
-      finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
-    }))
+      finally { await scope.after.finish() }
+    })
   }
   const inWorkspace = <T>(userId: string, fn: () => Promise<T>, workspaceId: string = workspace) => actAs({ id: userId, [tokenWorkspace]: workspaceId }, fn)
   const action = <T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) => withRequestContext(() => inWorkspace(owner, fn), beforeClose)

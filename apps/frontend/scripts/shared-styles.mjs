@@ -5,9 +5,11 @@ import { sharedCssTargets } from './css-targets.mjs'
 /** Use the same Tailwind and build-only Lightning CSS pass the application
  * shipped with. Vite must not perform a second, different color conversion.
  *
- * Lightning CSS 1.33.0 is pinned deliberately: 1.30 and 1.32 parse a nested
- * `@apply` differently and drop the surrounding selector, which changes
- * meaning rather than only formatting. See css-targets.mjs for the targets. */
+ * The version is pinned so the emitted bytes stay put across installs. Tailwind
+ * expands `@apply` before this pass, so the pinned version only sees plain CSS;
+ * a Lightning CSS pass that ran first would parse a nested `@apply` differently
+ * in 1.30 and 1.32 and drop the surrounding selector. See css-targets.mjs for
+ * the targets. */
 export function sharedStylePlugins(repository, { development = false } = {}) {
   return [tailwind({ base: repository, optimize: true }), {
     postcssPlugin: 'mikka-shared-lightning-css',

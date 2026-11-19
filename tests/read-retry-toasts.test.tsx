@@ -63,7 +63,7 @@ stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
 stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
 stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
-mock.module('next/dynamic', { defaultExport: () => Empty })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => Empty })
 
 const issue = { id: 'issue', userId: 'owner', title: 'Retained task', content: { type: 'doc', content: [] }, status: 'review', priority: 'normal', revision: 1, identifier: 'FIX-1', metadata: {}, createdAt: new Date(0), updatedAt: new Date(0) }
 stub('app/actions/issues.ts', { pollIssue: () => read('task', { viewerId: 'owner', version: '1', issue }), pollIssueVersionSummaries: async () => ({ viewerId: 'owner', snapshot: { version: '1', items: [] } }), listIssueVersions: async () => [], saveIssue: async () => { throw new Error('This read test must not save') } })

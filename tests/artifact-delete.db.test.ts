@@ -11,7 +11,7 @@ import { enterprisePrincipal } from '../lib/enterprise/principal'
 type Caller = { id: string; [key: symbol]: string }
 let caller: Caller | null = null
 let selectedWorkspace: string | undefined
-mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }) } })
+mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }) } })
 const removed: string[] = []
 let failRemoval = false
 mock.module(new URL('../lib/mobile-api.ts', import.meta.url).href, { namedExports: {

@@ -8,7 +8,7 @@ const callbacks: (() => Promise<void>)[] = []
 const revokeReviews = mock.fn(async (_database: unknown, _scope: unknown, _reason: string) => ({ closed: 0, pending: 0 }))
 mock.module(new URL('./coding-workspace/review-sessions.ts', import.meta.url).href, { namedExports: { revokeReviewSessions: revokeReviews } })
 let outsideNext = false
-mock.module('next/server', { namedExports: { after: (callback: () => Promise<void>) => {
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (callback: () => Promise<void>) => {
   if (outsideNext) throw new Error('No request scope')
   callbacks.push(callback)
 } } })

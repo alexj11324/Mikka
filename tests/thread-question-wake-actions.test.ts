@@ -39,7 +39,7 @@ function selection(rows: unknown[]) {
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 let actions: typeof import('../app/actions/agents')
 before(async () => {
-  mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => requestHeaders } })
   stub('../lib/auth.ts', { auth: { api: { getSession: async () => ({ user: { id: viewer }, session: { id: 'fixture-human-session' } }) } } })
   stub('../lib/db/index.ts', { pool, db: { select: (fields: Record<string, unknown>) => {
     if ('prompt' in fields) return selection([fixtureRun()])

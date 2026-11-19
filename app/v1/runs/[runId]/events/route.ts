@@ -1,5 +1,5 @@
 import { withDeviceRoute } from '@/lib/device-route'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { and, eq, sql } from 'drizzle-orm'
 import { runEventBatchSchema } from '@mikka/protocol/device'
 import { db, pool } from '@/lib/db'
@@ -9,7 +9,6 @@ import { computerEventsMatch } from '@/lib/computer/events'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { persistRunEventBatch } from '@/lib/secrets/run-events'
 
-export const dynamic = 'force-dynamic'
 
 /** A run the caller's token may report on: it belongs to one of their devices. */
 async function ownedRun(runId: string, userId: string): Promise<boolean> {

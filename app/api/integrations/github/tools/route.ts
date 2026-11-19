@@ -2,7 +2,6 @@ import { auth } from '@/lib/api-auth'
 import { withRequestLog } from '@/lib/request-log'
 import { readAppToolCatalogue } from '@/lib/app-tool-catalogue'
 
-export const dynamic = 'force-dynamic'
 
 const headers = { 'Cache-Control': 'private, no-store' }
 

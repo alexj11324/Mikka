@@ -29,9 +29,9 @@ test('provider failure continues the same task through its own Agent\'s authoriz
   process.env.MIKKA_BYOS_ENABLED = '1'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
-  const next = await import('next/server')
+  const next = await import('@/lib/server-runtime/server')
   let captureAfter: (() => Promise<void>)[] | undefined
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse,
+  mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse,
     after: (work: () => Promise<void>) => { captureAfter?.push(work) },
   } })
   const coordinator = await isolateCoordinatorWakes(t)

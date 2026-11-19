@@ -34,16 +34,16 @@ test('native step imports compile workspace protocol and keep API adapters and p
     await mkdir(join(buildDir, 'workflow'), { recursive: true })
     const filename = join(buildDir, 'workflow/steps.mjs')
     const source = version => `
-      import { NextResponse } from 'next/server';
-      import { headers } from 'next/headers.js';
+      import { NextResponse } from '@/lib/server-runtime/server';
+      import { headers } from '@/lib/server-runtime/headers';
       import { cache, createElement } from 'react';
       import { createRequestScope, runRequestScope } from '@/apps/api/src/context';
       import { trace } from '@opentelemetry/api';
-      import { nextCookies } from 'better-auth/next-js';
+      import { after } from '@/lib/server-runtime/server';
       import { ACCOUNT_ROUTES, connectedAccount } from '@mikka/protocol';
       import { telemetryId } from '@mikka/protocol/trace-context';
       import pg from 'pg';
-      export { trace, pg, createElement, nextCookies, ACCOUNT_ROUTES, connectedAccount, telemetryId };
+      export { trace, pg, createElement, after, ACCOUNT_ROUTES, connectedAccount, telemetryId };
       export async function check() {
         let calls = 0; const memo = cache(() => ++calls);
         return runRequestScope(createRequestScope(new Request('http://localhost/fixture', { headers: { 'x-fixture': 'adapter' } })), async () => {
@@ -61,9 +61,9 @@ test('native step imports compile workspace protocol and keep API adapters and p
       assert.deepEqual(await readFile(filename), completed, 'initial dev reload must not recompile an already completed artifact')
       const probe = join(temporary, `probe-${version}.mjs`)
       await writeFile(probe, `
-        import assert from 'node:assert/strict'; import {trace} from '@opentelemetry/api'; import pg from 'pg'; import {createElement} from 'react'; import {nextCookies} from 'better-auth/next-js'; import {z} from 'zod';
+        import assert from 'node:assert/strict'; import {trace} from '@opentelemetry/api'; import pg from 'pg'; import {createElement} from 'react'; import {z} from 'zod';
         const step = await import(${JSON.stringify(pathToFileURL(filename).href)});
-        assert.equal(step.trace, trace); assert.equal(step.pg, pg); assert.equal(step.createElement, createElement); assert.equal(step.nextCookies, nextCookies);
+        assert.equal(step.trace, trace); assert.equal(step.pg, pg); assert.equal(step.createElement, createElement); assert.equal(typeof step.after, 'function');
         assert.equal(step.ACCOUNT_ROUTES.list, '/v1/me/accounts'); assert.equal(step.telemetryId('run_1512'), true); assert.ok(step.connectedAccount instanceof z.ZodObject);
         assert.deepEqual(await step.check(), {version:${version}, value:'adapter', memo:[1,1], basePath:'/mikka'});
         console.log('native-aliases-ok');
@@ -79,7 +79,7 @@ test('the actual Workflow LocalBuilder output loads natively and answers GET/HEA
   try {
     await writeFile(join(temporary, 'package.json'), JSON.stringify({ name: 'mikka-workflow-dev-alias-fixture', type: 'module' }))
     await writeFile(join(temporary, 'fixture.ts'), `
-      import { NextResponse } from 'next/server';
+      import { NextResponse } from '@/lib/server-runtime/server';
       import { ACCOUNT_ROUTES } from '@mikka/protocol';
       export async function aliasStep() {
         'use step';
@@ -95,13 +95,25 @@ test('the actual Workflow LocalBuilder output loads natively and answers GET/HEA
     const builder = new LocalBuilder({ options: { rootDir: temporary, workspaceDir: temporary, buildDir, dev: true,
       workflow: { dirs: ['.'], sourcemap: false }, externals: { external: nodeRuntimePackages } } })
     await builder.build()
-    assert.match(await readFile(join(buildDir, 'workflow/steps.mjs'), 'utf8'), /from ["']next\/server["']/, 'the real builder must include the fixture step with its unresolved framework import')
+    // The upstream builder follows the application's `@/` prefix into the real
+    // module, so the step carries the server runtime's own imports. The
+    // development pass below then has a graph Node can load as-is.
+    const built = await readFile(join(buildDir, 'workflow/steps.mjs'), 'utf8')
+    assert.ok(built.includes('aliasStep'), 'the fixture step reached the bundle')
+    assert.ok(!built.includes('@/lib/server-runtime/'), 'the alias is no longer left for Node to resolve')
+    assert.match(built, /NextResponse/, 'the step keeps the server response type it imports')
     const compile = developmentWorkflowAliases({ buildDir })
     await compile()
     const probe = join(temporary, 'health.mjs')
     await writeFile(probe, `
       import assert from 'node:assert/strict';
-      await import(${JSON.stringify(pathToFileURL(join(buildDir, 'workflow/steps.mjs')).href)});
+      const steps = await import(${JSON.stringify(pathToFileURL(join(buildDir, 'workflow/steps.mjs')).href)});
+      // The SDK registers steps in a global map instead of exporting them. Call
+      // the step itself: only that proves the aliased server runtime — and the
+      // NextResponse it builds — is loadable inside the Workflow world.
+      const registered = globalThis[Symbol.for('@workflow/core//registeredSteps')];
+      const aliasStep = registered.get('step//./fixture//aliasStep');
+      assert.equal(await aliasStep(), 200, 'the aliased NextResponse answers the step');
       const {POST} = await import(${JSON.stringify(pathToFileURL(join(buildDir, 'workflow/workflows.mjs')).href)});
       for (const method of ['GET','HEAD']) {
         const response = await POST(new Request('http://localhost/.well-known/workflow/v1/flow?__health', {method}));
