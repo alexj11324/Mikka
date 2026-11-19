@@ -53,8 +53,11 @@ export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners:
     .orderBy(agentRuns.userId).limit(100)
   let failed = 0
   for (const owner of owners) {
+    // A reclaim that fails for this owner leaves that owner's lost runs
+    // unrecovered until the next sweep, so name the owner: the count alone
+    // cannot tell a transient failure from one that repeats every pass.
     try { await reclaimLostRuns(owner.userId, now) }
-    catch { failed++ }
+    catch (error) { failed++; console.error(`Run lease reclaim failed for ${owner.userId}`, error) }
   }
   return { owners: owners.length, failed }
 }

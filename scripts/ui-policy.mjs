@@ -104,10 +104,7 @@ export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx
 // Files another open change owns; each fixes its own lines and then drops its entry here.
 // plugins-skills-view: the Plugins/Skills session moves its skill search to SearchInput.
 // secrets-settings: PR #557 rewrites the E2B section, whose loading rows need `bare`.
-export const UI_SWEEP_PENDING = new Map([
-  ['components/plugins/plugins-skills-view.tsx', 'style/search-input'],
-  ['components/settings/secrets-settings.tsx', 'style/nested-frame'],
-])
+export const UI_SWEEP_PENDING = new Map()
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx', 'components/slots/thread-header.tsx']
 // 2026-11-18-1900: Mikka's own UI draws affectUI's Hugeicons family through `policy.glyphLibrary`. A task's status icon
 // keeps lucide (2026-11-13-1405), in these three files only, so the status glyph is never drawn by another family.

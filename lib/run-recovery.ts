@@ -15,24 +15,39 @@ import type { RunRecoverySweep } from '@/lib/run-recovery-due'
  * to the sweeps whose work is due (lib/run-recovery-due.ts, #1371); a skipped
  * sweep reports null.
  */
+/**
+ * A sweep that throws must not stop the others, but it must not vanish either:
+ * the cron response reports `null` for a skipped sweep, so without a log a
+ * sweep that fails every pass is indistinguishable from one that found nothing.
+ */
+function swept<T>(name: string, work: Promise<T>): Promise<T | null> {
+  return work.catch(error => {
+    console.error(`Run recovery sweep failed: ${name}`, error)
+    return null
+  })
+}
+
 export async function recoverRuns(groupTurns: (work: () => Promise<unknown>) => unknown, only?: ReadonlySet<RunRecoverySweep>) {
   const runs = (sweep: RunRecoverySweep) => !only || only.has(sweep)
   // Backstop for a lost `disconnected` report, in the cron sweep only (no `only`):
   // its existing cadence, no poll of its own. Ended leases are reclaimed just below.
-  const sessions = only ? null : await (await import('./device-session')).closeLostDeviceSessions().catch(() => null)
+  const sessions = only ? null : await (await import('./device-session')).closeLostDeviceSessions().catch(error => {
+    console.error('Run recovery sweep failed: sessions', error)
+    return null
+  })
   const leases = runs('leases') ? await sweepExpiredRunLeases() : null
   // Bot computers whose sandbox E2B no longer has stop claiming to run.
-  const machines = runs('machines') ? await reconcileCloudMachines(pool).catch(() => null) : null
+  const machines = runs('machines') ? await swept('machines', reconcileCloudMachines(pool)) : null
   // Ended runs never judged (any end path, and the last week before outcomes existed) get their outcome (R-52).
-  const reviewSessions = runs('reviewSessions') ? await (await import('./coding-workspace/review-sessions')).expireReviewSessions(pool).catch(() => null) : null
-  const outcomes = runs('outcomes') ? await judgePendingOutcomes().catch(() => null) : null
+  const reviewSessions = runs('reviewSessions') ? await swept('reviewSessions', (await import('./coding-workspace/review-sessions')).expireReviewSessions(pool)) : null
+  const outcomes = runs('outcomes') ? await swept('outcomes', judgePendingOutcomes()) : null
   // The same durable owner follows create/resume, pause retries and retention,
   // including running machines whose individual Workflow ended or disappeared.
-  const taskMachines = runs('taskMachines') ? await reconcileDueThreadMachines(pool).catch(() => null) : null
+  const taskMachines = runs('taskMachines') ? await swept('taskMachines', reconcileDueThreadMachines(pool)) : null
   // Sandboxes of deleted workspaces whose kill did not go through are killed again.
-  const sandboxKills = runs('sandboxKills') ? await retrySandboxKills(pool).catch(() => null) : null
+  const sandboxKills = runs('sandboxKills') ? await swept('sandboxKills', retrySandboxKills(pool)) : null
   // Durable task progress, independent of a device session or an open client.
-  const tasks = runs('tasks') ? await (await import('@/lib/factory/watchdog')).sweepFactoryWatchdog(pool).catch(() => null) : null
+  const tasks = runs('tasks') ? await swept('tasks', (await import('@/lib/factory/watchdog')).sweepFactoryWatchdog(pool)) : null
   // Group turns left queued when their request ended: they no longer wait for someone to read the group.
   const started = Date.now()
   if (runs('groupTurns')) await groupTurns(() => resumePendingGroupTurns(started + 220000).catch(() => console.error('Group turn sweep failed')))

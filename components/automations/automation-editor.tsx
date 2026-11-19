@@ -88,7 +88,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
 
   const { data: bots = [] } = useSWR(workspaceId ? ['bots', 'workspace', workspaceId] as const : null,
     ([, , shown]) => listBotsForWorkspace(shown), { revalidateOnFocus: false })
-  const { data: devices = [] } = useSWR('devices', listDevices, { revalidateOnFocus: false })
+  const { data: devices = [], error: devicesError } = useSWR('devices', listDevices, { revalidateOnFocus: false })
   const workspaceBots = useWorkspaceBotNames(workspaceId)
   // The workspace's installed repositories, the ones a GitHub trigger may name (any member may read them).
   const { data: repositories = [] } = useSWR(workspaceId ? ['automation-repositories', workspaceId] as const : null, async ([, shown]) => {
@@ -251,6 +251,10 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
         <NativeSelectOption value="cloud">{t('machineCloud')}</NativeSelectOption>
         {draft.machine === 'cloudflare' && <NativeSelectOption value="cloudflare">{t('machineCloud')}</NativeSelectOption>}
         {localDevices.map(device => <NativeSelectOption key={device.id} value={device.id}>{device.name}</NativeSelectOption>)}
+        {/* A failed read leaves the list empty; without this the only machine
+            choices are the two defaults, with nothing saying why the person's
+            own devices are missing. */}
+        {devicesError && <NativeSelectOption value="" disabled>{t('devicesError')}</NativeSelectOption>}
       </NativeSelect>)}
       {field(t('agent'), <NativeSelect aria-label={t('agent')} value={draft.agent ?? ''} onChange={event => set({ agent: event.target.value === 'claude_code' || event.target.value === 'codex' ? event.target.value : null })}>
         <NativeSelectOption value="" disabled>{t('agentNone')}</NativeSelectOption>

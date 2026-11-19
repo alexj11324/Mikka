@@ -21,6 +21,12 @@ import { apiKeysKey, readApiKeys, useApiKeyLabels, useApiKeys, type ApiKey as Ke
 
 export { apiKeysKey, readApiKeys }
 const providers = [...API_KEY_PRESETS, 'custom'] as const
+/**
+ * 「自定义服务商」 first. It is the only choice that reveals the Base URL field, and a
+ * person who brings their own endpoint should not have to scan a list of presets to
+ * discover that Mikka accepts one. The presets keep their documented order after it.
+ */
+const orderedProviders = ['custom', ...API_KEY_PRESETS] as const
 
 /** 「Anthropic、OpenAI 协议 · 可用 Claude Code、Codex」: what a key speaks and which Agents can run it (Harness draft, Alex 2026-11-02). */
 
@@ -171,12 +177,14 @@ function AddApiKeyDialog({ add, onClose }: { add: ReturnType<typeof useApiKeys>[
       <DialogHeader><DialogTitle>{t('add')}</DialogTitle></DialogHeader>
       <form onSubmit={event => { event.preventDefault(); if (ready && !pending) void save() }}>
         <FieldGroup>
-          {/* A preset only takes its key: it speaks its own protocols, so each row says which Agents it runs on. */}
+          {/* A preset only takes its key: it speaks its own protocols, so each row says which Agents it runs on.
+              「自定义服务商」 leads the list and states what it is for, so a person adding their own endpoint
+              finds the Base URL field without first hunting for a radio at the end. */}
           <Field>
             <FieldLabel id="api-key-provider-label">{t('providerLabel')}</FieldLabel>
             <RadioGroup aria-labelledby="api-key-provider-label" value={provider} onValueChange={next => { if (providers.includes(next as never)) setProvider(next as ApiKeyProvider) }}
               className="w-full min-w-0 gap-0 overflow-hidden rounded-xl border">
-              {providers.map(value => <Label key={value} className="flex w-full min-w-0 items-center gap-3 px-3 py-2 font-normal hover:bg-muted has-data-checked:bg-muted">
+              {orderedProviders.map(value => <Label key={value} className="flex w-full min-w-0 items-center gap-3 px-3 py-2 font-normal hover:bg-muted has-data-checked:bg-muted">
                 <RadioGroupItem value={value} />
                 <span className="shrink-0">{t(`provider.${value}`)}</span>
                 <span className="min-w-0 flex-1 truncate text-right text-xs text-muted-foreground">
@@ -191,7 +199,7 @@ function AddApiKeyDialog({ add, onClose }: { add: ReturnType<typeof useApiKeys>[
               <Input id="api-key-name" value={name} maxLength={60} autoComplete="off" onChange={event => setName(event.target.value)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="api-key-base-url">Base URL</FieldLabel>
+              <FieldLabel htmlFor="api-key-base-url">{t('baseUrl')}</FieldLabel>
               <Input id="api-key-base-url" value={baseUrl} maxLength={500} autoComplete="off" spellCheck={false} placeholder="https://api.example.com/v1" onChange={event => setBaseUrl(event.target.value)} />
             </Field>
             {/* Only a custom provider picks its protocol; each option names the Agent it runs on. */}
