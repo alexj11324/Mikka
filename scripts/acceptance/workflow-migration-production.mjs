@@ -173,17 +173,17 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
   wait = sleep, readerFactory = managedReader, attestation } = {}) {
   const guard = productionGuard(env, event), deployed = guard.targetMode === 'deployed-target'
   const report = { version: 1, purpose: 'workflow-migration-production', issue: 1415,
-    applicationSha: guard.applicationSha, driverRevision: guard.driverRevision, webDeployRunId: guard.webDeployRunId,
+    applicationSha: guard.applicationSha, driverRevision: guard.driverRevision,
     status: 'running', normalSessionObserved: false, teamAdminMembershipVerified: false, sessionClosed: false, submissionCount: 0, cleanupSubmissionCount: 0,
     sdkMutations: 0, cronRequests: 0, databaseWritesByDriver: 0, providerLoginTested: false,
     startedAt: new Date(now()).toISOString(), futureScheduleConfirmedAbsent: false }
   if (deployed) Object.assign(report, { targetMode: guard.targetMode, driverRunId: guard.driverRunId,
-    driverRunAttempt: guard.driverRunAttempt, deploymentId: guard.deploymentId })
+    driverRunAttempt: guard.driverRunAttempt })
   let proof
   try { proof = deployed ? await assertDeployedTarget({ env, event, attestation, fetchImpl, now })
     : await attestProductionReadCache({ env, event, fetchImpl, now, issueNumber: 1415 }) }
   catch (error) { return { ...report, ...(deployed ? publicTargetFailure(error) : { status: 'blocked', code: 'attestation_failed' }) } }
-  if (deployed) Object.assign(report, { targetBefore: proof, webAttempt: proof.webAttempt, webDeployJobId: proof.webDeployJobId })
+  if (deployed) Object.assign(report, { targetBefore: proof })
   if (!proof.readable) return { ...report, status: 'skipped', code: 'issue_closed' }
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD, token = env.VERCEL_TEAM_TOKEN
   check(isSmokeAccountEmail(email) && typeof password === 'string' && password.length > 0, 'account_required')
@@ -270,15 +270,13 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
   try {
     const read = path => vercelRead(path, { token, fetchImpl })
     const alias = activeAlias(await read('/v4/aliases/' + PRODUCTION_ALIAS))
-    if (deployed && alias.deploymentId !== guard.deploymentId) throw new DeployedTargetError('target_changed', { detail: 'alias' })
     const deployment = await read('/v13/deployments/' + encodeURIComponent(alias.deploymentId))
     if (deployed) {
       const project = deployment.projectId ?? deployment.project?.id
       const source = deployment.gitSource?.sha ?? deployment.meta?.githubCommitSha
-      if (project !== PROJECT || (deployment.projectId && deployment.project?.id && deployment.projectId !== deployment.project.id)
-        || source !== guard.applicationSha || (deployment.meta?.githubCommitSha && deployment.meta.githubCommitSha !== source)
-        || deployment.readyState !== 'READY' || deployment.target !== 'production')
-        throw new DeployedTargetError('target_changed', { detail: 'deployment' })
+      check(project === PROJECT && (!deployment.projectId || !deployment.project?.id || deployment.projectId === deployment.project.id)
+        && source === guard.applicationSha && (!deployment.meta?.githubCommitSha || deployment.meta.githubCommitSha === source)
+        && deployment.readyState === 'READY' && deployment.target === 'production', 'deployment_mismatch')
     } else {
     check(deployment.projectId === PROJECT && (deployment.gitSource?.sha ?? deployment.meta?.githubCommitSha) === guard.applicationSha
       && deployment.readyState === 'READY' && deployment.target === 'production', 'deployment_mismatch')
@@ -335,7 +333,6 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
             report.operationHash = hash(occurrence.operationId)
             await session(); await pin()
             const current = activeAlias(await read('/v4/aliases/' + PRODUCTION_ALIAS))
-            if (deployed && current.deploymentId !== guard.deploymentId) throw new DeployedTargetError('target_changed', { detail: 'alias' })
             check(current.deploymentId === deploymentId, 'deployment_mismatch')
             report.status = 'pass'
             break

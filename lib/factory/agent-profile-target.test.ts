@@ -110,7 +110,8 @@ const result = async (fn: () => Promise<void>) => {
 }
 const reset = () => { memberships.length = 0; inactive.clear(); providerCalls = 0 }
 
-for (const shared of [false, true]) test(`fixed ${shared ? 'shared' : 'own'} dispatch avoids unrelated sources while retaining fresh credential refusal`, async () => {
+// A subscription serves its owner only (decision 2026-11-17): no shared subscription variant.
+for (const shared of [false]) test(`fixed ${shared ? 'shared' : 'own'} dispatch avoids unrelated sources while retaining fresh credential refusal`, async () => {
   reset()
   const f = fixture(), entry = f.source('subscription', shared)
   assert.ok(entry.source.kind === 'subscription')
@@ -135,11 +136,11 @@ test('a harness-only dispatch keeps its preference model even with a conflicting
     { exactEntry: entry, bindSubscription: false, skipCatalogueRefresh: true, probeQuota: false })
   assert.equal(resolved.kind, 'none')
   if (resolved.kind === 'none') assert.equal(resolved.reason, 'notOffered')
-  assert.ok(f.calls.some(call => call.kind === 'pooled_owners'))
+  assert.ok(f.calls.some(call => call.kind === 'catalogue'), 'a harness-only request reads the full own catalogue')
   assert.equal(providerCalls, 0)
 })
 
-for (const shared of [false, true]) for (const kind of ['subscription', 'api_key'] as const) test(`fixed ${shared ? 'shared' : 'own'} ${kind} reads only its selected source, with the original final fences`, async t => {
+for (const [shared, kind] of [[false, 'subscription'], [false, 'api_key'], [true, 'api_key']] as const) test(`fixed ${shared ? 'shared' : 'own'} ${kind} reads only its selected source, with the original final fences`, async t => {
   reset()
   const f = fixture(), entry = f.source(kind, shared), selected = f.selection(entry)
   const baseline = await result(() => assertFrozenModelTarget(f.query, scope, entry))
@@ -198,11 +199,11 @@ for (const scenario of ['unshared', 'team_denied', 'models_error', 'model_gone',
   assert.equal(providerCalls, 0)
 })
 
-for (const change of ['pause', 'share', 'key_share'] as const) test(`the original post-lock fresh read still sees ${change}`, async () => {
+for (const change of ['pause', 'key_share'] as const) test(`the original post-lock fresh read still sees ${change}`, async () => {
   reset()
   const run = async (full: boolean) => {
     const f = fixture(), entry = f.source(change === 'key_share' ? 'api_key' : 'subscription', change !== 'pause'), selected = f.selection(entry)
-    f.afterLock(() => { if (change === 'pause') f.connections[0].paused = true; else if (change === 'share') f.shares.delete('payor'); else f.keyShares.clear() })
+    f.afterLock(() => { if (change === 'pause') f.connections[0].paused = true; else f.keyShares.clear() })
     return result(() => full ? assertFrozenModelTarget(f.query, scope, entry) : assertProfileTarget(f.query, scope, selected))
   }
   const baseline = await run(true)

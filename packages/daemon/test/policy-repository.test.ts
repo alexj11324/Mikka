@@ -18,7 +18,7 @@ import { RunJournal } from '../src/runs/journal'
 import { RunSupervisor, type SupervisorDeps } from '../src/runs/supervisor'
 import { HttpServerLink } from '../src/server-link-http'
 import { WorktreeManager } from '../src/worktrees'
-import { cleanupTempDirs, makeRepo, tempDir, waitFor } from './helpers'
+import { cleanupTempDirs, loseDeviceSession, makeRepo, tempDir, waitFor } from './helpers'
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -155,7 +155,7 @@ it(`reaps the real Git child when ${end} wins during the speculative clone (reta
     await waitFor(() => f.supervisor.get(f.assignment.runId).state === 'preparing')
   }
   const ending = end === 'stop' || end === 'approved-stop' ? f.supervisor.cancel(f.assignment.runId)
-    : end === 'lease' ? (f.supervisor.revokeLeases([f.assignment.runId]), Promise.resolve())
+    : end === 'lease' ? (loseDeviceSession(f.supervisor), Promise.resolve())
     : (f.policyReady.reject(new Error('policySnapshotSignatureInvalid')), Promise.resolve())
   await ending
   await f.supervisor.idle()

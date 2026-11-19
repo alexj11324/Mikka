@@ -16,7 +16,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 1280, height: 900
     const title = `菜单碰撞 ${randomUUID().slice(0, 8)}`
     await seedTask(page, title)
     await page.reload()
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
     await openIssueFromSearch(page, title)
     await expect(page.getByLabel('任务标题', { exact: true })).toHaveValue(title)
     await page.setViewportSize(viewport)

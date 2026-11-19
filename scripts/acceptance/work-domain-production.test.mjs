@@ -100,8 +100,8 @@ function fixture({ badProject = false, badEnvironment = false, unsafeProfile = f
     executionIdentity: { version: 1, requester: ownerId, executionPrincipal: ownerId, outputOwner: ownerId,
       botId, botOwner: ownerId, workspaceId, personalResourcePolicy: 'requester_only',
       resourceBindings: [{ kind: 'device', id: id(900), ownerId, access: 'owner' },
-        { kind: 'subscription', id: id(901), ownerId: adminId, access: 'workspace_share', revision: '1' }],
-      billingAccount: { model: { kind: 'subscription', resourceId: id(901), ownerId: adminId },
+        { kind: 'subscription', id: id(901), ownerId, access: 'owner', revision: '1' }],
+      billingAccount: { model: { kind: 'subscription', resourceId: id(901), ownerId },
         runtime: { kind: 'e2b', resourceId: ownerId, ownerId } } } },
     private: 'PRIVATE_EVIDENCE_EXTRA', artifacts: [{ content: 'PRIVATE_ARTIFACT' }] })
   const rpc = value => Response.json({ version: 1, ok: true, result: value })
@@ -232,7 +232,7 @@ function fixture({ badProject = false, badEnvironment = false, unsafeProfile = f
       }
       if (action === 'bots.listBots') return rpc([{ id: botId, name: 'PRIVATE_BOT_NAME' }])
       if (action === 'model-order.getModelOrder') return rpc({ candidates: CASES.filter(item => item.id !== missingSource).map(item => ({ harness: item.harness, model: item.model,
-        source: fixed(item).source, credentialOwnerId: adminId })), entries: [] })
+        source: fixed(item).source, credentialOwnerId: ownerId })), entries: [] })
       if (action === 'execution-settings.getBotModelMenu') return rpc({ current: { kind: 'subscription', chosen: true,
         provider: chatModel, modelId: CASES.find(item => item.id === chatModel).model, available: true } })
       if (action === 'coordinator.pollCoordinatorChat') return rpc({ botId, enabled: true, working: false })

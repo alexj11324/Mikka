@@ -78,7 +78,7 @@ test('the real editor schema is the one wired into the editor, the detail page a
   assert.match(detail, /useSWR\(syncKey,/)
   assert.match(detail, /useLiveKey\('issue_document', sync \|\| reader \? saved\.id : null,/)
   assert.match(detail, /sharedDoc=\{sync\?\.doc\}/)
-  assert.match(detail, /readOnly && <Alert><AlertDescription>\{t\('invalidContentReadOnly'\)\}/)
+  assert.match(detail, /readOnly && <Alert\b[^>]*><AlertDescription>\{t\('invalidContentReadOnly'\)\}/)
   for (const file of ['../app/actions/collaboration.ts', './issue-create.ts'])
     assert.match(readFileSync(new URL(file, import.meta.url), 'utf8'), /readableIssueContent/)
 })

@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { useTranslations } from 'next-intl'
-import { Cloud, Copy, KeyRound, Laptop, Plug, Server, ShieldCheck } from 'lucide-react'
+import { Cloud, Copy, KeyRound, Laptop, Plug, Server, ShieldCheck } from '@/components/icons'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'

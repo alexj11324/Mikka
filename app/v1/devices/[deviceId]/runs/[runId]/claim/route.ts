@@ -15,7 +15,7 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { MIN_DAEMON_VERSION, RUN_LEASE_MS, REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
+import { MIN_DAEMON_VERSION, SESSION_LEASE_MS, isDeviceOnline, REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeLease } from '@mikka/protocol/subscription'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
@@ -52,7 +52,6 @@ import { blockQuestionRetry } from '@/lib/factory/questions/retry'
 import { afterRunEnded } from '@/lib/run-completion-effects'
 import { subscriptionRuntime } from '@/lib/subscription-runtime'
 import { leaseDevice } from '@/lib/subscription-native-device'
-import { sharedNativeBinding } from '@/lib/personal-policy'
 import { PublicationError } from '@/lib/run-publication-result'
 import { githubMachineConfigured, githubMachineCredential } from '@/lib/github/machine-credential'
 import { authorizedClaimResponse } from '@/lib/run-claim-response'
@@ -65,6 +64,7 @@ import { cloudStartupPhases, cloudStartupRunAttributes, cloudStartupSpan } from 
 import { cloudStartupDiagnosticEnv } from '@/lib/computer/startup-diagnostics'
 import { withRunProjectExecution } from '@/lib/project-resources/run-lease'
 import { ActionFailureError } from '@/lib/action-error'
+import { deviceSessionHeld } from '@/lib/device-session'
 
 import { daemonTooOld, daemonVersions } from '@/lib/daemon-release'
 
@@ -98,6 +98,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, minVersion: MIN_DAEMON_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
   }
   if (!device.enabled) return NextResponse.json({ error: 'Scheduling is off for this device.' }, { status: 409 })
+  // A run is leased for as long as the session that claims it (decision
+  // 2026-11-17-2215); without an open session there is nothing to lease it to.
+  // The claim transaction checks again under the device row lock (beforeClaim).
+  if (!isDeviceOnline(device)) return NextResponse.json({ error: 'Open the device session before claiming.', code: 'deviceSessionRequired' }, { status: 409 })
   timings.next('identity')
   const [run] = await db
     .select()
@@ -195,7 +199,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   try { subscription = deploymentSwitch('byos')
     ? run.agentDefinition && !pinned ? null : device.kind === 'cloud'
       ? await nativeRunBinding(pool, caller.userId, agent.id, harness, caller.scopeWorkspaceId, pinned?.bindingId)
-      : pinned ? await nativeRunBinding(pool, caller.userId, agent.id, harness, undefined, pinned.bindingId) : await localRunBinding(caller.userId, agent.id, harness, run.botId ?? null) : null
+      : pinned ? await nativeRunBinding(pool, caller.userId, agent.id, harness, undefined, pinned.bindingId) : await localRunBinding(caller.userId, agent.id, harness) : null
   } catch { return NextResponse.json({ error:'Subscription unavailable.' },{ status:409 }) }
   if (pinned && (!subscription || subscription.id !== pinned.bindingId || subscription.modelId !== pinned.modelId || subscription.route !== pinned.route || subscription.consumerId !== agent.id)) return NextResponse.json({ error:'Pinned subscription unavailable.' },{ status:409 })
   if (subscription && !device.harnesses.some(info => info.harness === harness && info.installed && info.toolApproval && info.subscriptionBroker && !info.subscriptionPreflight)) {
@@ -234,10 +238,14 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
     catch { return NextResponse.json({error:'Policy signing unavailable.'},{status:503}) }
   }
   timings.next('acquire_lease')
-  const leaseExpiresAt = new Date(Date.now() + RUN_LEASE_MS).toISOString()
+  // Upper bound only: `disconnected` ends the lease (lib/device-session.ts).
+  const leaseExpiresAt = new Date(Date.now() + SESSION_LEASE_MS).toISOString()
   let factoryClaim: Record<string, unknown> = {}
   let factoryToken: Awaited<ReturnType<typeof issueRunToken>> | undefined
   const beforeClaim = async (tx: import('pg').PoolClient) => {
+    // Same lock order as a `disconnected` report (device, then run): either it
+    // waits for this claim and ends its lease, or this claim sees the session closed.
+    if (!await deviceSessionHeld(tx, deviceId)) return false
     // Scope may change while publication/policy preparation awaits. Recheck the same frozen
     // binding, including both members and the share, before taking the lease.
     if (subscription && !await nativeRunBinding(tx, caller.userId, agent.id, harness, subscription.workspaceId, subscription.id)) return false
@@ -423,7 +431,7 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
         const runtime = subscriptionRuntime(true, false, { exportAccessLease: true })
         return await runtime.nativeLease(await runtime.nativeRun(caller.userId, deviceId, runId), request.signal,
           request.headers.get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER) === '1')
-      } catch (error) { throw new CodedError('run_credentials_unavailable', { detail: 'native_credentials', cause: error }) }
+      } catch (error) { throw new CodedError('run_credentials_unavailable', { detail: nativeCredentialDetail(error), cause: error }) }
     }),
     cloudStartupSpan('cloud.worker.claim.github_credentials', startupAttributes, async () => {
       if (!githubRepository || !await githubMachineConfigured(caller.userId)) return undefined
@@ -646,19 +654,16 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
 
 export const POST = withDeviceRoute(handlePOST)
 
-/**
- * The run owner's own subscription, else one another member shares in the
- * run's workspace with 分享给团队成员 (orchestration.md §2). The device then
- * takes that run's access lease; the share is checked again on every lease.
- */
-async function localRunBinding(userId: string, agentId: string, harness: string, botId: string | null) {
-  const repository = subscriptionRuntime().repository
-  const own = await repository.nativeBinding(userId, agentId, harness)
-  if (own || !botId) return own
-  const { rows: [bot] } = await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2 AND "archivedAt" IS NULL', [botId, userId])
-  if (!bot) return null
-  const id = await sharedNativeBinding(pool, userId, agentId, harness, bot.workspaceId)
-  if (!id) return null
-  const { rows: [row] } = await pool.query<{ ownerId: string }>('SELECT "ownerId" FROM byos_bindings WHERE id=$1', [id])
-  return row ? repository.binding(row.ownerId, id) : null
+/** The run owner's own subscription only (decision 2026-11-17: a subscription serves its owner only). */
+async function localRunBinding(userId: string, agentId: string, harness: string) {
+  return subscriptionRuntime().repository.nativeBinding(userId, agentId, harness)
+}
+
+/** Why the owner's own subscription gave no credential, as one closed detail. */
+function nativeCredentialDetail(error: unknown): 'credential_missing' | 'credential_expired' | 'quota_exhausted' | 'native_credentials' {
+  const code = error instanceof CodedError ? error.code : undefined
+  if (code === 'binding_required' || code === 'account_unavailable' || code === 'disconnected' || code === 'binding_mismatch' || code === 'stale_binding') return 'credential_missing'
+  if (code === 'reconnect_required' || code === 'pending_auth') return 'credential_expired'
+  if (code === 'quota_exhausted') return 'quota_exhausted'
+  return 'native_credentials'
 }

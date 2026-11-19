@@ -86,14 +86,7 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
   const { usableApiKeys } = await import('./model-api-keys')
   const settings = new ExecutionSettings(query as Pool)
   const rows = await settings.modelCandidates(scope, query)
-  const { pooledOwners } = await import('./personal-policy')
-  const { authorizeSubscriptionWorkspace } = await import('./subscription-runtime')
-  // Sharing grants use in this workspace, never ownership of the account. Both parties must still
-  // be active members; the owner is derived from server records, never an EntrySource supplied by a client.
-  for (const ownerId of await pooledOwners(query, scope.ownerId, scope.workspaceId)) {
-    try { await authorizeSubscriptionWorkspace(ownerId, scope.workspaceId) } catch { continue }
-    rows.push(...await settings.modelCandidates({ ...scope, ownerId }, query))
-  }
+  // A subscription serves its owner only (decision 2026-11-17): no teammate's account is a candidate.
   // Each account's models in the order the account listed them (its catalogue): the default takes the first Codex model.
   const connectionIds = [...new Set(rows.map(row => String(row.connectionId)))]
   const listed = new Map((connectionIds.length ? (await query.query<{ id: string; models: unknown }>(
@@ -185,11 +178,11 @@ export { dispatchOrder } from './model-order-plan'
 
 export type RefreshOrderQuota = (scope: OrderScope, connectionId: string, signal: AbortSignal, credentialOwnerId?: string) => Promise<void>
 const quotaRefreshes = new WeakMap<Query, Map<string, Promise<void>>>()
-const refreshOrderQuota = (query: Query): RefreshOrderQuota => async (scope, connectionId, signal, credentialOwnerId = scope.ownerId) => {
+const refreshOrderQuota = (_query: Query): RefreshOrderQuota => async (scope, connectionId, signal, credentialOwnerId = scope.ownerId) => {
   const service = (await import('./subscription-runtime')).subscriptionRuntime()
   await service.member(scope.ownerId, scope.workspaceId)
   await service.workspace(credentialOwnerId, scope.workspaceId)
-  if (credentialOwnerId !== scope.ownerId && !(await (await import('./personal-policy')).othersMayUse(query, credentialOwnerId, scope.workspaceId))) throw new ActionFailureError('executionAccountUnavailable')
+  if (credentialOwnerId !== scope.ownerId) throw new ActionFailureError('executionAccountUnavailable')
   await service.allowance(credentialOwnerId, connectionId, signal)
 }
 
@@ -215,7 +208,7 @@ export async function credentialStates(query: Query, scope: OrderScope, entries:
     ? [[candidate.source.keyId, candidate.credentialOwnerId ?? scope.ownerId] as const] : []))
   const readConnections = async () => {
     const authorized = [] as [string, string][]
-    for (const [id, owner] of owners) if (owner === scope.ownerId || await (await import('./personal-policy')).othersMayUse(query, owner, scope.workspaceId)) authorized.push([id, owner])
+    for (const [id, owner] of owners) if (owner === scope.ownerId) authorized.push([id, owner])
     return new Map((authorized.length ? (await query.query<{ id: string; ownerId: string; state: string; paused: boolean; quota: unknown; provider: 'claude' | 'codex'; epoch: string; removed: boolean }>(
       'SELECT c.id::text AS id,c."ownerId",c.state,c.paused,c.quota,c.provider,c.epoch::text AS epoch,c."removedAt" IS NOT NULL AS removed FROM byos_connections c JOIN unnest($1::text[],$2::text[]) AS authorized(id,owner) ON c.id::text=authorized.id AND c."ownerId"=authorized.owner', [authorized.map(([id]) => id), authorized.map(([, owner]) => owner)])).rows : []).map(row => [row.id, row]))
   }
@@ -304,11 +297,11 @@ export async function checkOrderQuota(query: Query, scope: OrderScope, connectio
  * A run not yet ended counts toward its device's load (pickDevice).
  */
 export async function poolDevices(query: Query, ownerId: string): Promise<(PoolDevice & { lastSeenAt: number | null })[]> {
-  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
-    `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d.harnesses,d."deviceType",d."createdAt",
+  const { rows } = await query.query<{ id: string; name: string; enabled: boolean; lastSeenAt: Date | null; sessionOpenedAt: Date | null; sessionClosedAt: Date | null; harnesses: HarnessInfo[] | null; deviceType: string | null; createdAt: Date; activeRuns: number }>(
+    `SELECT d.id,d.name,d.enabled,d."lastSeenAt",d."sessionOpenedAt",d."sessionClosedAt",d.harnesses,d."deviceType",d."createdAt",
       (SELECT count(*)::int FROM agent_runs r WHERE r."deviceId"=d.id AND r.status IN ('queued','preparing','running','paused','waiting_input','finishing')) AS "activeRuns"
     FROM devices d WHERE d."ownerId"=$1 AND d.kind='local' AND d."removedAt" IS NULL ORDER BY d."lastSeenAt" DESC NULLS LAST,d.id`, [ownerId])
-  const presence = await deviceOnlineStates(rows)
+  const presence = deviceOnlineStates(rows)
   return rows.map(row => ({
     id: row.id, name: row.name, enabled: row.enabled, online: presence.get(row.id) ?? false, harnesses: row.harnesses ?? [],
     server: row.deviceType === 'server', activeRuns: row.activeRuns, joinedAt: row.createdAt.getTime(), lastSeenAt: row.lastSeenAt?.getTime() ?? null,

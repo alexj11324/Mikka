@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslations } from 'next-intl'
-import { ChevronRight, Info } from 'lucide-react'
+import { ChevronRight, Info } from '@/components/icons'
 import { resumeQuotaPausedRunOnApiKey, retryQuotaPausedRun } from '@/app/actions/agents'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'

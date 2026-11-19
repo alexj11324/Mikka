@@ -1,13 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, Loader2, X } from 'lucide-react'
+import { Check, X } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import { LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from '@/components/ui/item'
 import { CodeBlock, CodeBlockCopyButton, CodeBlockHeader } from '@/components/reui/code-block/code-block'
+import { Spinner } from '@/components/ui/spinner'
 import { STEPS, stepStates } from '@/lib/device-ssh-view'
 import { firstRealError } from '@/lib/local-setup-failure'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
@@ -48,10 +49,12 @@ export function LocalSetupStatus({ onOnline }: { onOnline: () => void }) {
   const steps = stepStates(state)
   const current = STEPS.find(step => steps[step] === 'running' || steps[step] === 'failed')
   return <Item variant="outline" role="status" aria-live="polite" className="rounded-xl bg-card px-3.5 py-3">
-    <ItemMedia>
+    {/* variant="icon" is what normalises an unclassed glyph to the spinner's size;
+        a size-* class here would be overridden by the icon policy instead. */}
+    <ItemMedia variant="icon">
       {state.status === 'online' ? <Check aria-hidden="true" className="text-success-foreground" />
         : state.status === 'failed' ? <X aria-hidden="true" className="text-destructive-foreground" />
-          : <Loader2 aria-hidden="true" className="animate-spin text-muted-foreground motion-reduce:animate-none" />}
+          : <Spinner aria-hidden="true" className="text-muted-foreground" />}
     </ItemMedia>
     <ItemContent className="min-w-0">
       <ItemTitle>{state.status === 'online' ? t('local.online') : state.status === 'failed' ? t('local.failed') : t('local.adding')}</ItemTitle>

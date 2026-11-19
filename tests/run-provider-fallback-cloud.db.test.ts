@@ -11,7 +11,7 @@ import type { OrderEntry } from '../lib/model-order-plan'
 import { dbUrl, seedBot, seedIssue, seedProjectTasks, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 
-test('cloud provider recovery preserves scope and uses fresh task machines without waking its parent', { skip: !dbUrl }, async t => {
+test('cloud provider recovery keeps the thread\'s Agent, preserves scope and uses fresh task machines without waking its parent', { skip: !dbUrl }, async t => {
   const names = ['WORKSPACE_SECRETS_KEY', 'MIKKA_BYOS_ENABLED', 'MIKKA_CLOUD_COMPUTER_TASKS', 'MIKKA_FACTORY_ROUTING_ENABLED', 'MIKKA_FACTORY_LIFECYCLE_ENABLED', 'NEXT_PUBLIC_POSTHOG_KEY'] as const
   const saved = new Map(names.map(name => [name, process.env[name]]))
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
@@ -115,7 +115,9 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     [actor.userId, actor.workspaceId])).rows[0]
   const row = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
   const children = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [runId])).rows
-  const fixture = async (label: string, withEnvironment = false) => {
+  // B is on the same Agent as A by default: a thread keeps one Agent for life
+  // (decision 2026-11-17-1800). `otherAgent` puts B on Codex to prove it is never taken.
+  const fixture = async (label: string, withEnvironment = false, otherAgent = false) => {
     const userId = await seedUser(pool, label)
     users.push(userId)
     const workspace = await seedWorkspace(pool, userId, [{ userId, role: 'admin' }])
@@ -124,11 +126,12 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     const botId = await seedBot(pool, workspace.id, userId), issueId = await seedIssue(pool, userId, workspace.id)
     const scope = { ownerId: userId, workspaceId: workspace.id, botId }
     await setE2BKey(userId, workspace.id, { apiKey: `e2b-fixture-${randomUUID()}` }, { verify: async () => ({ ok: true }) })
-    const addKey = (provider: 'anthropic' | 'openai', model: string) => keys.addApiKey(pool, userId,
+    const addKey = (provider: 'anthropic' | 'openai' | 'deepseek', model: string) => keys.addApiKey(pool, userId,
       { provider, apiKey: `sk-fixture-${randomUUID()}` }, { fetch: (async () => Response.json({ data: [{ id: model }] })) as typeof fetch })
-    const first = await addKey('anthropic', 'fixture-claude-a'), second = await addKey('openai', 'fixture-codex-b')
+    const secondHarness = otherAgent ? 'codex' as const : 'claude_code' as const, secondModel = otherAgent ? 'fixture-codex-b' : 'fixture-claude-b'
+    const first = await addKey('anthropic', 'fixture-claude-a'), second = await addKey(otherAgent ? 'openai' : 'deepseek', secondModel)
     const entries = [{ harness: 'claude_code', model: 'fixture-claude-a', source: { kind: 'api_key', keyId: first.id } },
-      { harness: 'codex', model: 'fixture-codex-b', source: { kind: 'api_key', keyId: second.id } }] satisfies Omit<OrderEntry, 'id'>[]
+      { harness: secondHarness, model: secondModel, source: { kind: 'api_key', keyId: second.id } }] satisfies Omit<OrderEntry, 'id'>[]
     await order.changeOrder(pool, scope, { kind: 'location', location: 'cloud' })
     await order.changeOrder(pool, scope, { kind: 'add', entries })
     const stored = (await order.readOrder(pool, scope)).entries
@@ -166,16 +169,16 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     assert.equal(admitted.agentDefinition.allowLocalRecovery, undefined)
     // A usable local alternative makes staying in cloud a meaningful fence.
     const localDeviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt")
-      VALUES ($1,$2,'Available local fixture','local',true,$3,now())`, [localDeviceId, userId, JSON.stringify([workers[1]])])
-    await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Local fixture')`, [randomUUID(), userId, localDeviceId])
-    const local = await resolveModelDispatch(pool, scope, undefined, 'local')
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,harnesses,"lastSeenAt","sessionOpenedAt")
+      VALUES ($1,$2,'Available local fixture','local',true,$3,now(),now())`, [localDeviceId, userId, JSON.stringify([workers[otherAgent ? 1 : 0]])])
+    await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,'Local fixture')`, [randomUUID(), userId, localDeviceId, secondHarness])
+    const local = await resolveModelDispatch(pool, scope, { harness: secondHarness, model: secondModel }, 'local')
     assert.ok(local.kind === 'device' && local.deviceId === localDeviceId && local.model === entries[1].model)
-    const priorTarget = await runtime(botId, 'codex')
+    const priorTarget = await runtime(botId, secondHarness)
     await pool.query(`UPDATE cloud_machines SET state='sleeping' WHERE "ownerId"=$1 AND "workspaceId"=$2`, [userId, workspace.id])
     // Changing the default for new tasks cannot move this frozen cloud task.
     await order.changeOrder(pool, scope, { kind: 'location', location: 'local' })
-    return { actor, scope, botId, issueId, runId, admitted, priorTarget, remote: repository.remoteUrl, first, second, localDeviceId, environment, environmentConfiguration }
+    return { actor, scope, botId, issueId, runId, admitted, priorTarget, remote: repository.remoteUrl, first, second, secondHarness, secondModel, localDeviceId, environment, environmentConfiguration }
   }
   const complete = (actor: { userId: string }, runId: string) => persistRunCompletion(actor.userId, runId, {
     stopReason: 'provider_failure', report: { ...emptyRunReport('Synthetic terminal provider payment failure.'),
@@ -365,9 +368,25 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     }
   })
 
-  await t.test('402 crosses harnesses using a fresh task container while its sleeping parent stays unchanged', async () => {
+  await t.test('402 with only the other Agent\'s model left stops with a coded reason: no Codex container, parent unchanged', async () => {
+    const f = await fixture('provider-cloud-other-agent', false, true)
+    const beforeParent = await parentSnapshot(f.actor)
+    await complete(f.actor, f.runId)
+    const original = await row(f.runId)
+    assert.deepEqual(await children(f.runId), [], 'a Claude Code thread is never continued on Codex')
+    assert.equal(original.report.modelFallback.state, 'blocked')
+    assert.deepEqual(original.report.modelFallback.reasons.map((entry: { choice: { harness: string; model: string }; reason: string }) => [entry.choice.harness, entry.choice.model, entry.reason]),
+      [['claude_code', 'fixture-claude-a', 'balance']])
+    assert.equal(lifecycleStarts.filter(item => item.previousRunId === f.runId).length, 0, 'no handoff is started')
+    assert.deepEqual(await runtime(f.botId, 'codex'), f.priorTarget, 'the Codex runtime is untouched')
+    assert.deepEqual(await parentSnapshot(f.actor), beforeParent)
+    assert.equal(networkAttempts, 0)
+  })
+
+  await t.test('402 moves to the same Agent\'s next model on the task\'s retained machine while its sleeping parent stays unchanged', async () => {
     const f = await fixture('provider-cloud-sleeping')
     const beforeParent = await parentSnapshot(f.actor)
+    const originalMachine = (await pool.query('SELECT "sandboxId","deviceId" FROM thread_machines WHERE "runId"=$1', [f.runId])).rows[0]
     await complete(f.actor, f.runId)
     const original = await row(f.runId), [queuedChild, ...extra] = await children(f.runId)
     let child = queuedChild
@@ -376,8 +395,8 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     assert.equal(original.report.modelFallback.state, 'switched')
     assert.equal(original.report.modelFallback.retryRunId, child.id)
     assert.deepEqual(original.agentDefinition, f.admitted.agentDefinition, 'the failed run retains its frozen snapshot')
-    assert.equal(child.agentDefinition.harness, 'codex')
-    assert.deepEqual(child.agentDefinition.apiKey, { keyId: f.second.id, model: 'fixture-codex-b' })
+    assert.equal(child.agentDefinition.harness, 'claude_code', 'the thread keeps its Agent')
+    assert.deepEqual(child.agentDefinition.apiKey, { keyId: f.second.id, model: 'fixture-claude-b' })
     assert.equal(child.agentDefinition.readOnly, true)
     assert.equal(child.agentDefinition.modelDispatch.mode, 'preference')
     assert.equal(child.agentDefinition.modelDispatch.location, 'cloud')
@@ -394,22 +413,19 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     assert.equal(await handoffFactoryCloudStage(pool, f.actor, f.runId, child.id, true), true)
     child = await row(child.id)
 
-    const moved = await runtime(f.botId, 'codex')
+    const moved = await runtime(f.botId, 'claude_code')
     assert.deepEqual(moved, f.priorTarget, 'sleeping parent execution identities stay unchanged')
     assert.deepEqual(await parentSnapshot(f.actor), beforeParent, 'no parent VM state, lease, heartbeat or capabilities change')
-    const queued = launchPlacements.get(child.id)
-    assert.ok(queued, 'the durable host step must launch the actual task machine')
-    assert.deepEqual([queued.userId, queued.botId, queued.issueId, queued.agentId, queued.deviceId], [f.actor.userId, f.botId, f.issueId, moved.agentId, moved.deviceId])
-    const queuedRepo = (await pool.query('SELECT "deviceId","userId","remoteUrl" FROM device_repos WHERE id=$1', [queued.deviceRepoId])).rows[0]
-    assert.deepEqual(queuedRepo, { deviceId: moved.deviceId, userId: f.actor.userId, remoteUrl: f.remote })
-    const machine = (await pool.query(`SELECT m."ownerId",m."workspaceId",m."botId",m."issueId",m."deviceId",m."repoId",m.state,m."snapshotId",d.kind
+    assert.equal(launchPlacements.has(child.id), false, 'the same Agent keeps the task\'s machine: no new one is created')
+    const machine = (await pool.query(`SELECT m."ownerId",m."workspaceId",m."botId",m."issueId",m."deviceId",m."repoId",m.state,m."sandboxId",d.kind
       FROM thread_machines m JOIN devices d ON d.id=m."deviceId" WHERE m."runId"=$1`, [child.id])).rows[0]
-    assert.deepEqual([machine.ownerId, machine.workspaceId, machine.botId, machine.issueId, machine.state, machine.snapshotId, machine.kind],
-      [f.actor.userId, f.actor.workspaceId, f.botId, f.issueId, 'running', 'codex', 'cloud'])
+    assert.deepEqual([machine.ownerId, machine.workspaceId, machine.botId, machine.issueId, machine.state, machine.kind],
+      [f.actor.userId, f.actor.workspaceId, f.botId, f.issueId, 'running', 'cloud'])
+    assert.equal(machine.sandboxId, originalMachine.sandboxId, 'the retained VM carries the next model')
+    assert.equal(machine.deviceId, originalMachine.deviceId)
     assert.equal(child.deviceId, machine.deviceId)
     assert.equal(child.deviceRepoId, machine.repoId)
-    assert.notEqual(child.deviceId, moved.deviceId, 'a task uses its own machine after admission')
-    assert.notEqual(child.deviceId, f.admitted.deviceId, 'the new harness receives a fresh task machine')
+    assert.notEqual(child.deviceId, moved.deviceId, 'a task uses its own machine, not its parent\'s')
     assert.notEqual(child.deviceId, f.localDeviceId)
     assert.equal(provisions.get(f.botId), 1, 'the parent is not reprovisioned for provider recovery')
     assert.equal(lifecycleStarts.filter(item => item.runId === child.id).length, 1, 'handoff does not start a second lifecycle')
@@ -417,7 +433,8 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
   })
 
   await t.test('device-fenced completion hands the retained VM to a host after its old token is revoked', async () => {
-    const f = await fixture('provider-cloud-device-fence')
+    // B is Codex here, so the only same-Agent continuation is the healthy key added below.
+    const f = await fixture('provider-cloud-device-fence', false, true)
     // Preset providers have one key per owner. Use a distinct provider so this
     // cannot refresh/replace the failed source or erase its health evidence.
     const healthy = await keys.addApiKey(pool, f.actor.userId, { provider: 'deepseek', apiKey: `fixture-${randomUUID()}` },
@@ -480,6 +497,9 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     const f = await fixture('provider-cloud-concurrent-launch')
     await complete(f.actor, f.runId)
     const [child] = await children(f.runId)
+    // The same Agent normally keeps the task's VM. Here it is already gone, so
+    // the continuation needs a new one and two handoffs race to provision it.
+    await pool.query(`UPDATE thread_machines SET state='ended',"sandboxId"=NULL WHERE "runId"=$1`, [f.runId])
     let entered!: () => void, release!: () => void
     const creating = new Promise<void>(resolve => { entered = resolve })
     const held = new Promise<void>(resolve => { release = resolve })
@@ -548,7 +568,7 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
     const original = await row(f.runId)
     assert.equal(original.report.modelFallback.state, 'blocked')
     assert.equal(original.agentDefinition.modelDispatch.location, 'cloud')
-    assert.equal(original.report.modelFallback.reasons.find((entry: { choice: { model: string } }) => entry.choice.model === 'fixture-codex-b')?.reason, 'noDevice')
+    assert.equal(original.report.modelFallback.reasons.find((entry: { choice: { model: string } }) => entry.choice.model === 'fixture-claude-b')?.reason, 'noDevice')
     assert.deepEqual(await children(f.runId), [])
     assert.equal((await pool.query('SELECT count(*)::int AS count FROM agent_runs WHERE "userId"=$1 AND "deviceId"=$2', [f.actor.userId, f.localDeviceId])).rows[0].count, 0)
     assert.equal(provisions.get(f.botId), 2, 'the real registration rejects the disabled identity')
@@ -557,9 +577,9 @@ test('cloud provider recovery preserves scope and uses fresh task machines witho
   })
 
   await t.test('a later cloud task skips the remembered 402 within its selected Agent and freezes the healthy source', async () => {
-    const f = await fixture('provider-cloud-next-task')
+    const f = await fixture('provider-cloud-next-task', false, true)
     await complete(f.actor, f.runId)
-    assert.equal((await row(f.runId)).report.modelFallback.state, 'switched')
+    assert.equal((await row(f.runId)).report.modelFallback.state, 'blocked', 'only Codex is left, so the Claude Code thread stops')
     const next = await keys.addApiKey(pool, f.actor.userId, { provider: 'deepseek', apiKey: `fixture-${randomUUID()}` },
       { fetch: (async () => Response.json({ data: [{ id: 'fixture-claude-next' }] })) as typeof fetch })
     assert.notEqual(next.id, f.first.id, 'the healthy source cannot refresh the remembered failed key')

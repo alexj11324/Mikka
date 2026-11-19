@@ -450,7 +450,7 @@ Only authenticated `getBotModelMenu` requests the optional upgrade of an
 otherwise current catalogue for priority metadata. Default `ensureCatalogues`,
 `getModelOrder`, and dispatch do not request that upgrade. Missing catalogues
 and epoch mismatches retain the existing refresh; manual refresh also collects
-capability within the same owner and shared-subscription boundaries.
+capability within the same owner boundary (subscriptions are owner-only).
 
 Unknown or unsupported capability omits priority on the original request
 without retry. Fast can increase subscription allowance or credit use; consult

@@ -83,12 +83,16 @@ jobs:
           JS
 
   ui-policy-full:
-    name: Core unit checks
+    name: Core unit checks${{ matrix.node == '22' && ' (Node 22)' || '' }}
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.core == 'true'
     # Fixed standard Linux image; host namespace/security policy stays unchanged.
     runs-on: ubuntu-22.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
     env:
       BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
       BETTER_AUTH_URL: http://localhost:3000
@@ -98,6 +102,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
         with:
+          node-version: ${{ matrix.node }}
           ffmpeg-github-token: ${{ github.token }}
       - name: Ensure FFmpeg for Factory evidence acceptance regressions
         timeout-minutes: 5
@@ -117,12 +122,16 @@ jobs:
         run: pnpm test:governance
 
   ui-policy-integrations:
-    name: Integration unit checks
+    name: Integration unit checks${{ matrix.node == '22' && ' (Node 22)' || '' }}
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.integration == 'true'
     # Fixed standard Linux image; host namespace/security policy stays unchanged.
     runs-on: ubuntu-22.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24']
     env:
       BETTER_AUTH_SECRET: ci-build-secret-0123456789abcdef0123456789abcdef
       BETTER_AUTH_URL: http://localhost:3000
@@ -132,6 +141,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
         with:
+          node-version: ${{ matrix.node }}
           ffmpeg-github-token: ${{ github.token }}
       - name: Ensure FFmpeg for real recording regressions
         run: |
@@ -359,14 +369,16 @@ jobs:
   browser-tests-full:
     # CI runs no browser tests (decision 2026-11-01-1520); this job keeps the
     # database suites that the required check names cover.
-    name: Database checks (${{ matrix.shard }})
+    name: Database checks (${{ matrix.shard }})${{ matrix.node == '22' && ' (Node 22)' || '' }}
     needs: changes
     if: needs.changes.result == 'success' && needs.changes.outputs.db == 'true'
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(needs.changes.outputs.db_matrix) }}
+      matrix:
+        shard: ${{ fromJSON(needs.changes.outputs.db_matrix).shard }}
+        node: ['22', '24']
     services:
       postgres:
         image: postgres:17
@@ -401,6 +413,7 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
         with:
+          node-version: ${{ matrix.node }}
           ffmpeg-github-token: ${{ github.token }}
       # The .deb files apt downloads for the packages below, keyed on the package
       # list and the runner image (a new image can carry newer dependencies).

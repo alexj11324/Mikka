@@ -3,6 +3,7 @@
 - Date: 2026-11-05
 - Source: Alex, testing 设置 › 模型与订阅 in production, relayed by the coordinator session: the 优先使用的 Agent toggle does not filter the list (「选了 Claude Code，只显示 Claude Code 能跑的模型；选了 Codex，只显示 Codex 能跑的模型。每个 Agent 有自己的优先顺序」); the page does not refresh after a subscription connects; 「待检查」 does not change after 检查额度; there is no way to refresh a subscription's models. The coordinator filled in what Alex did not say (marked "coordinator").
 - Rule: R-05 (link); R-40 (a settings row may say what it does)
+- Superseded in part by: [2026-11-17-1800](2026-11-17-1800-one-agent-per-thread.md) (no cross-Agent fallback: "Nothing for this Agent, models for the other", "Dispatch follows the same split" and the 自动 Profile's "then the other's" no longer apply; a thread keeps one Agent and every dispatch names it)
 - Replaces: in [2026-11-02-1700](2026-11-02-1700-preferred-agent.md), "in a stored list, the rows of such models that were on the old preferred Agent move with it"; the single mixed list of [2026-11-02-1830](2026-11-02-1830-preferred-models-and-agent.md).
 
 **One list per Agent.** 优先使用的模型 shows only the rows of the
@@ -17,25 +18,30 @@ An untouched list gets a default for each Agent (decision 1400's rule, per
 Agent). A model both Agents run stays on the 优先使用的 Agent, as before.
 
 
-**Nothing for this Agent, models for the other** (coordinator): the empty list
+**Nothing for this Agent, models for the other** (coordinator; superseded by
+[2026-11-17-1800](2026-11-17-1800-one-agent-per-thread.md): the line, the button
+and the folded fallback list are gone): ~~the empty list
 reads 「<Agent> 没有能用的模型，任务会交给 <other>」 with one button,
 「改用 <other>」. Under a list with rows, the other Agent's list is one folded
 line, 「<other> 列表作为后备 · N 个模型」; it opens read-only, an API key marked
-按服务商计费. A row says 「两种 Agent 都能跑」 only for a model both run.
+按服务商计费.~~ A row says 「两种 Agent 都能跑」 only for a model both run.
 
 **Existing lists** (coordinator): a one-off migration
 (`20261105041500_preferred_agent_from_first_row.sql`) sets each saved list's
 优先使用的 Agent to its first row's Agent, so everyone keeps their current
 first choice. Untouched lists keep theirs.
 
-**Dispatch follows the same split** (coordinator). With no Agent named, a
+**Dispatch follows the same split** (coordinator; superseded by
+[2026-11-17-1800](2026-11-17-1800-one-agent-per-thread.md): every dispatch names
+its Agent and a thread, its retries and provider fallback use only that Agent's
+list). ~~With no Agent named, a
 thread tries the 优先使用的 Agent's list in order, then the other Agent's list
 in order. The second list is a fallback, not a mix: a computer that only has
 Codex, or a 优先使用的 Agent with an empty list, still gets a run. A thread or
 computer that names an Agent uses only that Agent's list, as before. Provider
 fallback after a failed run (`run-provider-fallback.ts`) and the Coordinator's
 model list in its prompt follow the same order, so what counts as already
-tried is what came first.
+tried is what came first.~~
 
 **Precedence** (Alex, via the coordinator: Agent and model for a dispatch are
 already set by Agent Profiles and the Decision API, #1284 / #1297). In order:

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
-import { registerHooks } from 'node:module'
+import { createRequire, registerHooks } from 'node:module'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -57,8 +57,26 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
     }
     const {serve} = await import('srvx/node')
     let application
-    runtime = serve({manual:true,silent:true,gracefulShutdown:false,fetch:request=>application.fetch(request)})
+    // The production node-server build mounts the built-in gateway on these
+    // paths (apps/api/builtin-services-module.mjs); the API handler alone has none.
+    let gateway
+    const gatewayPath = /^\/mikka\/v1\/(?:live\/|devices\/[^/]+\/(?:socket|push|status)$)/
+    const route = request => gatewayPath.test(new URL(request.url).pathname) ? gateway.fetch(request) : application.fetch(request)
+    runtime = serve({manual:true,silent:true,gracefulShutdown:false,fetch:route})
     server = createServer(runtime.node.handler)
+    // The daemon works only while it holds its device session socket
+    // (decision 2026-11-17-2215), so upgrades reach the built-in gateway
+    // through the same Nitro WebSocket adapter production uses.
+    const nitroRequire = createRequire(createRequire(import.meta.url).resolve('nitro/package.json'))
+    const {default: websocketAdapter} = await import(pathToFileURL(nitroRequire.resolve('crossws/adapters/node')).href)
+    const {NodeRequest} = await import(pathToFileURL(nitroRequire.resolve('srvx/node')).href)
+    const websocket = websocketAdapter({resolve: async request => {
+      const response = await route(request)
+      return response.crossws ?? request[Symbol.for('crossws.hooks')] ?? {}
+    }})
+    server.on('upgrade', (request, socket, head) => {
+      websocket.handleUpgrade(request, socket, head, new NodeRequest({req: request, upgrade: {socket, head}}))
+    })
     await new Promise((done,fail)=>{server.once('error',fail);server.listen(0,'127.0.0.1',done)})
     const origin = 'http://127.0.0.1:'+server.address().port
     process.env.BETTER_AUTH_URL = origin
@@ -66,6 +84,9 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
     const revision = execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim()
     process.env.MIKKA_TEST_DEPLOYMENT_SHA = revision
     application = (await import('../apps/api/src/index.ts')).default
+    const {H3} = await import('h3')
+    const {createGatewayHandler} = await import('../apps/api/routes/builtin-gateway.ts')
+    gateway = new H3().all('/**', createGatewayHandler())
     applicationPool = (await import('../lib/db/index.ts')).pool
     workspacePool = (await import('../lib/workspace-db.ts')).workspacePool
     const environment = await bootstrapEnvironment({connectionString:url.href,origin,deploymentSha:revision,
@@ -120,10 +141,21 @@ test('a paired daemon runs the owner’s retried Task and its active directory f
     daemon = await startDaemon({dataDir,flavor:'dev',link:new HttpServerLink(origin+'/mikka'),credential,
       harnesses:[{harness:'codex',installed:true,toolApproval:true,version:'fixture'}],
       harnessBinaries:{codex:resolve('packages/daemon/test/fakes/fake-codex.mjs')}, agentSandbox:new NoSandbox(),
-      modelProbe:false, quotaSource:null, retainResources:true, heartbeatMs:500, commandsWaitSeconds:1})
+      modelProbe:false, quotaSource:null, retainResources:true})
     await daemon.syncWithServer()
     const {deviceId,server:state} = daemon.status()
     assert.equal(state,'online')
+    // Work reaches the daemon only over its open gateway session, which the
+    // gateway reports to the application (decision 2026-11-17-2215).
+    const sessionDeadline = Date.now()+20_000
+    let session
+    while (Date.now()<sessionDeadline) {
+      session = (await pool.query('select "sessionOpenedAt" is not null and ("sessionClosedAt" is null or "sessionClosedAt"<"sessionOpenedAt") as open from devices where id=$1',[deviceId])).rows[0]
+      if (daemon.status().session==='open' && session?.open) break
+      await delay(100)
+    }
+    assert.equal(daemon.status().session,'open','the daemon holds its gateway session')
+    assert.equal(session?.open,true,'the gateway reported the session to the application')
     const deviceDirectory = 'devices/'+deviceId+'/active-threads'
     async function directory() {
       const response = await owner.request(deviceDirectory)

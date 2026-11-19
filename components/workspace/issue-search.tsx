@@ -1,6 +1,6 @@
 'use client'
 
-import { Plus } from 'lucide-react'
+import { Plus } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import type { listIssues } from '@/app/actions/issues'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command'

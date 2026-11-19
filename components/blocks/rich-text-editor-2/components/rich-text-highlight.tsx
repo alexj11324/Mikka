@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/tooltip"
 import type { RichTextSnapshot } from "./rich-text-state"
 import { keepEditorFocus, ShortcutKeys } from "./rich-text-toolbar"
-import { HighlighterIcon, CheckIcon, BanIcon } from "lucide-react"
+import { Highlighter, Check, Ban } from "@/components/icons"
 
 interface HighlightColor {
   id: string
@@ -116,7 +116,7 @@ export function RichTextHighlightPopover({
               />
             }
           >
-            <HighlighterIcon aria-hidden="true" />
+            <Highlighter aria-hidden="true" />
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent>
@@ -151,7 +151,7 @@ export function RichTextHighlightPopover({
                   )}
                 >
                   {selected ? (
-                    <CheckIcon aria-hidden="true" />
+                    <Check aria-hidden="true" />
                   ) : null}
                 </span>
               </Button>
@@ -168,7 +168,7 @@ export function RichTextHighlightPopover({
             disabled={state.highlight === null}
             onClick={() => apply(null)}
           >
-            <BanIcon aria-hidden="true" />
+            <Ban aria-hidden="true" />
           </Button>
         </div>
       </PopoverContent>

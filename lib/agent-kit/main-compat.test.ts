@@ -44,12 +44,10 @@ function identityFixtureQuery(raw: string, args: unknown[]) {
  if(sql==='SELECT "ownerId",kind,enabled FROM devices WHERE id=$1') {
   assert.deepEqual(args, [deviceId]); return fixtureRows([{ ownerId: owner, kind: 'cloud', enabled: true }])
  }
- if(sql===compactSql(`SELECT b."ownerId",b."workspaceId",b."connectionRevision"::text AS revision,b."modelId",b.route,
-      EXISTS (SELECT 1 FROM workspace_subscription_shares s WHERE s."ownerId"=b."ownerId" AND s."workspaceId"=$2 AND s."allowOthers"
-      AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"=$2 AND NOT p.subscriptions)) AS shared
+ if(sql===compactSql(`SELECT b."ownerId",b."workspaceId",b."connectionRevision"::text AS revision,b."modelId",b.route
       FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
       AND c.state='connected' AND NOT c.paused AND c.epoch=b."connectionRevision" WHERE b.id=$1`)) {
-  assert.deepEqual(args, [binding.id, workspace]); return fixtureRows([{ ownerId: owner, workspaceId: workspace, revision: String(binding.connectionRevision), modelId: binding.modelId, route: binding.route, shared: false }])
+  assert.deepEqual(args, [binding.id]); return fixtureRows([{ ownerId: owner, workspaceId: workspace, revision: String(binding.connectionRevision), modelId: binding.modelId, route: binding.route }])
  }
  if(sql==='SELECT 1 FROM user_e2b_keys WHERE "userId"=$1 UNION ALL SELECT 1 FROM workspace_e2b_keys WHERE "createdBy"=$1 LIMIT 1') {
   assert.deepEqual(args, [owner]); return fixtureRows([{}])
@@ -60,6 +58,8 @@ function identityFixtureQuery(raw: string, args: unknown[]) {
 // This suite substitutes device authentication and DB IO to test only claim
 // snapshot composition. Real credential admission is covered by revocation DB tests.
 stub('../device-route.ts',{withDeviceRoute:<T>(handler:T)=>handler})
+// The claiming device holds its gateway session (decision 2026-11-17-2215).
+stub('../device-session.ts',{deviceSessionHeld:async()=>true})
 let selectIndex=0
 let mismatch: string|undefined
 let currentRun: {id:string;userId:string;workspaceId:string|null;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;baseBranch:null;kind:string;prompt:string;agentDefinition:ReturnType<typeof frozen>|null;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}
@@ -190,7 +190,7 @@ stub('../db/index.ts',{
 afterEach(()=>{assert.equal(applicationLease,false,'claim always releases its APP client');assert.equal(memberLease,false,'the outer Workspace lease always closes')})
 const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,network:'deny',install_dependency:'deny',git_push:'deny'},networkAllow:['cli-policy.invalid']}
 let cliReadOnly=false
-stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
+stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,sessionOpenedAt:new Date(),sessionClosedAt:null,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
 const modelAdmissionCheck=mock.fn(async(_scope:{workspaceId:string;ownerId:string},_model:string,_signal?:AbortSignal)=>undefined)
 stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck})
 stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64),workspaceIds:[workspace]})})

@@ -122,9 +122,11 @@ Aspectly Labs 同时提供商业许可，联系邮箱为 [legal@aspectlylabs.com
 
 Mikka 的开发得到了 [Codex for Open Source](https://openai.com/form/codex-for-oss/) 计划的支持。
 
-衷心感谢 OpenAI 和 Codex 团队为 Mikka 的维护者提供六个月的 ChatGPT Pro 使用资格。这份支持让我们有更多空间探索有挑战性的想法、改进工程质量和用户体验，并回馈开源社区。
+<a href="https://neon.com">
+  <img src="docs/assets/neon-logo.svg" alt="Neon" width="160">
+</a>
 
-Mikka 是独立开源项目，与 OpenAI 不存在隶属关系，也未获得 OpenAI 官方背书。OpenAI 名称及标志均为 OpenAI 的商标。
+感谢 [Neon](https://neon.com) 通过 Neon Open Source Program 为 Mikka 提供支持。
 
 ## 许可证
 

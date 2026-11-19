@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { Monitor, Moon, Sun } from 'lucide-react'
+import { Monitor, Moon, Sun } from '@/components/icons'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { LocaleSetting } from '@/components/settings/locale-setting'

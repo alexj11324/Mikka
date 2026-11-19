@@ -35,7 +35,6 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
     const { issueRunToken, verifyRunToken } = await import('./mcp/worker')
     const { apiKeyForRun } = await import('./model-api-keys')
     const { authorizeRunApp } = await import('./run-app-mcp')
-    const { renewRunLeases } = await import('./run-leases')
     const { submitArtifact, readArtifact } = await import('./artifacts/store')
     appPool = (await import('./db')).pool; workspacePool = (await import('./workspace-db')).workspacePool
     const requester = 'requester', other = 'other', resourceOwner = 'resource-owner'
@@ -103,15 +102,6 @@ test('real claim, MCP tools, key disclosure and artifacts enforce the frozen exe
       assert.ok(await readArtifact(requester, result.artifactId))
       assert.equal(await readArtifact(other, result.artifactId), null)
       await assert.rejects(() => submitArtifact({ userId: other, runId, issueId: issue, authorName: 'Codex' }, { title: 'Wrong owner', kind: 'markdown', content: 'Synthetic' }), ExecutionIdentityError)
-    })
-    await t.test('revoking an in-flight resource cuts the lease and tells the daemon to remove credentials', async () => {
-      assert.ok((await renewRunLeases(device, [runId])).leases[runId])
-      await pool.query('DELETE FROM model_api_key_shares WHERE "keyId"=$1', [sharedKey])
-      const renewed = await renewRunLeases(device, [runId])
-      assert.deepEqual(renewed.revoked, [runId]); assert.deepEqual(renewed.leases, {})
-      assert.ok((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0].stopRequestedAt)
-      await pool.query('INSERT INTO model_api_key_shares("keyId","workspaceId") VALUES($1,$2)', [sharedKey, workspace])
-      await reset(); await claim(requester, device, runId, lease())
     })
     await t.test('cloud quota continuation freezes parent placement, then rebinds to a new child with the same principal', async t => {
       const { queueCloudRun } = await import('./computer/queue-run')

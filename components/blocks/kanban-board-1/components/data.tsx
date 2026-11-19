@@ -3,7 +3,7 @@ import type { TaskRun } from '@/app/actions/task-runs'
 import type { TaskState } from '@/hooks/use-bot-tasks'
 import { runIndicatorOf, type RunIndicator } from '@/lib/task-state'
 import { threadGroup, type GroupIssue } from '@/lib/thread-groups'
-import { CircleStop } from 'lucide-react'
+import { CircleStop } from '@/components/icons'
 import { ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
 import { taskBlock, type BlockRun, type TaskBlock } from '@/lib/task-blocked'
 

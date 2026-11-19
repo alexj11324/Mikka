@@ -10,7 +10,9 @@ test('rewritten native submissions preserve real srvx request headers/body witho
   incoming.method='POST';incoming.url='/eve/v1/session/wrun_fixture?botId=fixture';incoming.headers={host:'app.test','content-type':'application/json','x-mikka-submission-id':'fixture','cookie':'fixture=cookie'}
   incoming.rawHeaders=Object.entries(incoming.headers).flatMap(([name,value])=>[name,String(value)])
   const original=new NodeRequest({req:incoming,res:new ServerResponse(incoming),trustProxy:false})
-  assert.throws(()=>new Request(original,{method:'POST',body:'{}'}),/private member/)
+  // Undici's private-state error text differs between Node 22 and 24.
+  // The rejected srvx Request and the successful public-field copy are the contract.
+  assert.throws(()=>new Request(original,{method:'POST',body:'{}'}),TypeError)
   const payload=JSON.stringify({message:'Hello',idempotencyKey:'fixture'})
   const forwarded=forwardEveRequest(original,original.url,payload)
   assert.equal(forwarded.method,'POST')

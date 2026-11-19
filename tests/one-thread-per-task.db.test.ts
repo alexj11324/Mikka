@@ -84,8 +84,8 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const deviceId = randomUUID()
     const agent = state.agent ?? 'codex'
     const harnesses = state.old ? [{ harness: agent, installed: true }] : state.reports || agent !== 'codex' ? [{ harness: agent, installed: true, subscriptionBroker: true, modelSlots: [{ slot: state.reports ?? 'gpt-5', model: state.reports ?? 'gpt-5', name: state.reports ?? 'gpt-5' }] }] : mac
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"removedAt") VALUES ($1,$2,$3,'local','laptop',$4,$5,$6,$7)`,
-      [deviceId, userId, name, state.takesPart ?? true, state.online === false ? new Date(Date.now() - 3_600_000) : new Date(), JSON.stringify(harnesses), state.removed ? new Date() : null])
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"removedAt","sessionOpenedAt") VALUES ($1,$2,$3,'local','laptop',$4,$5,$6,$7,CASE WHEN $8::boolean THEN $5::timestamptz END)`,
+      [deviceId, userId, name, state.takesPart ?? true, state.online === false ? new Date(Date.now() - 3_600_000) : new Date(), JSON.stringify(harnesses), state.removed ? new Date() : null, state.online !== false])
     await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)`, [randomUUID(), userId, deviceId, agent, `${agent}-${deviceId.slice(0, 8)}`])
     return deviceId
   }
@@ -96,7 +96,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     // the same case; the real admission still rejects a stale provider read.
     await pool.query(`UPDATE byos_connections SET quota=jsonb_set(quota,'{observedAt}',to_jsonb(clock_timestamp()::text))
       WHERE "ownerId"=$1`, [who.id])
-    return await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, ...extra }, undefined, who.botId) as unknown as Dispatched
+    return await steps.dispatchRun(who.id, { model: { harness: 'codex' as const }, issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}`, ...extra }, undefined, who.botId) as unknown as Dispatched
   }
   const runs = async (userId: string) => (await pool.query('SELECT id,status,"continuesRunId","threadReplacedBy" FROM agent_runs WHERE "userId"=$1 ORDER BY "createdAt"', [userId])).rows
   const said = async (who: { id: string; botId: string }, text: string) => {
@@ -323,9 +323,9 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     assert.equal(first.thread, 'new')
     judged = 0.05
     // The model passes another repository the person never named: the thread keeps its own.
-    const kept = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', note: 'Look again.', readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Look again please') }, undefined, a.botId) as unknown as Dispatched
+    const kept = await steps.dispatchRun(a.id, { model: { harness: 'codex' as const }, issueId: a.issueId, repo: 'octo/web', note: 'Look again.', readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Look again please') }, undefined, a.botId) as unknown as Dispatched
     assert.deepEqual([kept.thread, kept.runId], ['message', first.runId], JSON.stringify(kept))
-    const moved = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, "It's in the octo/web repo") }, undefined, a.botId) as unknown as Dispatched
+    const moved = await steps.dispatchRun(a.id, { model: { harness: 'codex' as const }, issueId: a.issueId, repo: 'octo/web', readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, "It's in the octo/web repo") }, undefined, a.botId) as unknown as Dispatched
     assert.equal(moved.thread, 'new', JSON.stringify(moved))
     assert.equal(moved.replacedThreadId, first.runId)
     const rows = (await pool.query('SELECT r.id,r."stopRequestedAt",r."threadReplacedBy",d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
@@ -343,7 +343,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const first = await dispatch(a)
     await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
     judged = null
-    const moved = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', newThread: true, readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Start a new thread in octo/web: fix the layout and open a PR.') }, undefined, a.botId) as unknown as Dispatched
+    const moved = await steps.dispatchRun(a.id, { model: { harness: 'codex' as const }, issueId: a.issueId, repo: 'octo/web', newThread: true, readOnly: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Start a new thread in octo/web: fix the layout and open a PR.') }, undefined, a.botId) as unknown as Dispatched
     assert.equal(moved.thread, 'new', JSON.stringify(moved))
     assert.equal(moved.replacedThreadId, first.runId)
     const rows = (await pool.query('SELECT r.id,r."continuesRunId",r."threadReplacedBy",d."remoteUrl" FROM agent_runs r JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
@@ -361,7 +361,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     await pool.query('UPDATE devices SET enabled=false WHERE id=$1', [a.deviceId])
     const studio = await computer(a.id, 'Mac Studio')
     judged = 0.05
-    const next = await steps.dispatchRun(a.id, { issueId: a.issueId, repo: 'octo/web', readOnly: true, note: 'Look again.', requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Look again please') }, undefined, a.botId) as unknown as Dispatched
+    const next = await steps.dispatchRun(a.id, { model: { harness: 'codex' as const }, issueId: a.issueId, repo: 'octo/web', readOnly: true, note: 'Look again.', requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, 'Look again please') }, undefined, a.botId) as unknown as Dispatched
     judged = null
     const rows = (await pool.query('SELECT r.id,r."continuesRunId",d."remoteUrl" FROM agent_runs r LEFT JOIN device_repos d ON d.id=r."deviceRepoId" WHERE r."userId"=$1 ORDER BY r."createdAt"', [a.id])).rows
     assert.equal(next.thread, 'continued', JSON.stringify(next))
@@ -374,7 +374,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
     const first = await dispatch(a)
     await pool.query(`UPDATE agent_runs SET status='failed',"finishedAt"=now() WHERE id=$1`, [first.runId])
     judged = 0.95
-    const fresh = await steps.dispatchRun(a.id, { issueId: a.issueId, newThread: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, '另开一个线程，从头重新做') }, undefined, a.botId) as unknown as Dispatched
+    const fresh = await steps.dispatchRun(a.id, { model: { harness: 'codex' as const }, issueId: a.issueId, newThread: true, requestKey: `dispatch:${randomUUID()}`, sourceEventId: await said(a, '另开一个线程，从头重新做') }, undefined, a.botId) as unknown as Dispatched
     judged = null
     assert.equal(fresh.thread, 'new', JSON.stringify(fresh))
     assert.equal(fresh.replacedThreadId, first.runId)
@@ -401,7 +401,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
   })
   await t.test('no authorized list, no dispatch: not connected, authorization expired, GitHub down (after one retry)', async () => {
     type Refused = { error?: string; runId?: string; repository?: string }
-    const attempt = async (who: { id: string; issueId: string; botId: string }) => await steps.dispatchRun(who.id, { issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, who.botId) as unknown as Refused
+    const attempt = async (who: { id: string; issueId: string; botId: string }) => await steps.dispatchRun(who.id, { model: { harness: 'codex' as const }, issueId: who.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, who.botId) as unknown as Refused
     const token = (userId: string) => `synthetic-user-token-${userId}`
     const runCount = async (userId: string) => (await runs(userId)).length
 
@@ -430,7 +430,7 @@ test('one task, one thread: dispatch continues the task\'s thread unless the per
 
     // An authorized list without the repository: refused, nothing queued.
     const elsewhere = await person()
-    const notListed = await steps.dispatchRun(elsewhere.id, { issueId: elsewhere.issueId, repo: 'someone/private-app', requestKey: `dispatch:${randomUUID()}` }, undefined, elsewhere.botId) as unknown as Refused
+    const notListed = await steps.dispatchRun(elsewhere.id, { model: { harness: 'codex' as const }, issueId: elsewhere.issueId, repo: 'someone/private-app', requestKey: `dispatch:${randomUUID()}` }, undefined, elsewhere.botId) as unknown as Refused
     assert.deepEqual([notListed.error, await runCount(elsewhere.id)], ['repositoryNotFound', 0])
   })
 

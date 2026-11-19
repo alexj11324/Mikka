@@ -8,7 +8,7 @@ import { lstat, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace,
-  chooseSharedChatModel, subscriptionProof, cleanupCase } from './cloud-startup.mjs'
+  chooseOwnChatModel, subscriptionProof, cleanupCase } from './cloud-startup.mjs'
 import { CASES, openLive, assertAttemptBudget } from './run-observability.mjs'
 import { verifyExistingTaskTerminal, verifyTerminalRefusal } from './task-review-terminal.mjs'
 import { verifyExistingTaskPreview, verifyPreviewRefusal } from './task-review-preview.mjs'
@@ -301,7 +301,7 @@ async function executeCase(client, record, scope, profile, options, { checkpoint
 export async function runCodingWorkspace(options, { env = process.env, fetchImpl = fetch, now = Date.now, signal,
   attest = attestCodingWorkspace, clientFactory = createSessionClient, execute = executeCase,
   cleanup = cleanupWorkspaceCase, writeCheckpoint = writeWorkspaceCheckpoint, selectTeam = selectAcceptanceTeam,
-  quiet = quietAccount, chooseModel = chooseSharedChatModel } = {}) {
+  quiet = quietAccount, chooseModel = chooseOwnChatModel } = {}) {
   const report = { version: 1, kind: 'coding-workspace-product-acceptance', issues: [1723, 1724], fixtureId: randomUUID(),
     driver: options.driver, sourceCommit: options.sourceCommit, origin: ORIGIN, repository: REPOSITORY,
     startedAt: new Date(now()).toISOString(), status: 'running', cases: [], cleanup: { errors: [] },
@@ -337,7 +337,7 @@ export async function runCodingWorkspace(options, { env = process.env, fetchImpl
     const candidates = new Map()
     for (const item of CASES) {
       const matches = preflight.order.candidates?.filter(candidate => candidate.harness === item.harness && candidate.model === item.model
-        && candidate.source?.kind === 'subscription' && UUID.test(candidate.source.connectionId ?? '') && candidate.credentialOwnerId === scope.adminId) ?? []
+        && candidate.source?.kind === 'subscription' && UUID.test(candidate.source.connectionId ?? '') && candidate.credentialOwnerId === scope.ownerId) ?? []
       if (matches.length === 1) candidates.set(item.harness, matches[0])
     }
     const visible = await client.rpc('issues.listWorkspaceIssues', [scope.workspaceId])

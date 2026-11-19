@@ -67,7 +67,6 @@ export const settingsKeys = {
   apiKeys: (id: string) => ['settings:api-keys', id] as const,
   subscriptions: (id: string) => ['settings:subscriptions', id] as const,
   subscriptionUsage: (id: string) => ['settings:subscription-usage', id] as const,
-  subscriptionShare: (id: string) => ['settings:subscription-share', id] as const,
   paymentDesignation: (id: string) => ['settings:payment-designation', id] as const,
   creditShare: (id: string) => ['settings:credit-share', id] as const,
   tokens: (id?: string) => ['settings:tokens', id ?? ''] as const,

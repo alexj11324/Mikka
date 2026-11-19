@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Cloud, Monitor, ShieldCheck } from 'lucide-react'
+import { Cloud, Monitor, ShieldCheck } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'

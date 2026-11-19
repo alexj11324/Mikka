@@ -49,7 +49,7 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: Ke
   environments: id => [[settingsKeys.environments(id), () => settingsRead<Result<typeof listEnvironments>>('environments', { workspace: id })]],
   usage: id => { const month = currentMonth(); return [[settingsKeys.usage(id, month), () => settingsRead<Result<typeof getUsage>>('usage', { month, workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)]] },
   billing: id => [[settingsKeys.billing(id), () => settingsRead<Result<typeof getBilling>>('billing', { workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)], [cardVerificationKey(id), () => readCardVerification(id)]],
-  // 模型与订阅: its GET reads. 共享订阅 is still a server action, read when the section opens.
+  // 模型与订阅: its GET reads.
   models: id => [[subscriptionsKey(id), () => readSubscriptions(id)], [subscriptionUsageKey(id), () => readSubscriptionUsage(id)], [apiKeysKey(id), () => readApiKeys(id)], [modelOrderKey(id), () => readModelOrder(id)], [settingsKeys.e2bKey(id), () => settingsRead<Result<typeof getE2BKeyCapability>>('e2b-key', { workspace: id })]],
   // useSWRInfinite takes a preloaded page by the page's own key: page one of 全部.
   audit: id => [[settingsKeys.audit(id, 'all', null), () => settingsRead<Result<typeof listAuditLog>>('audit', { workspace: id, filter: 'all' })]],

@@ -338,7 +338,7 @@ test('real CI CLI binds artifact bytes then refuses changed source/attempt/publi
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   mkdirSync(root); mkdirSync(temp)
   for (const file of ['scripts/acceptance/task-secrets-ci.mjs', 'scripts/acceptance/thread-lifecycle-ci.mjs',
-    'scripts/release/web-deploy.mjs', 'scripts/vercel-ignore-build.mjs', 'scripts/ci-docs-only.mjs',
+    'scripts/release/web-deploy.mjs', 'scripts/ci-docs-only.mjs',
     'scripts/e2b/runtime-report.mjs', 'scripts/e2b/build-template.py']) {
     const target = join(root, file); mkdirSync(dirname(target), { recursive: true }); copyFileSync(new URL('../../' + file, import.meta.url), target)
   }

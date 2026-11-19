@@ -102,17 +102,13 @@ test('hosted settings expose the actual default target when cloud supersedes a c
   }
 })
 
-for (const source of ['selected', 'shared', 'default', 'pooled'] as const) test(`a valid ${source} subscription does not query unrelated hosted policy`, async () => {
+for (const source of ['selected', 'default'] as const) test(`a valid ${source} subscription does not query unrelated hosted policy`, async () => {
   const f = fixture('alice', [new Error('the unrelated hosted read must not run')])
-  const selected = source === 'shared' ? { ...binding, ownerId: 'bob' } : binding
-  if (source === 'selected') f.state.selected = selected
-  else if (source === 'shared') f.state.shared = selected
-  else if (source === 'default') f.state.own = [selected]
-  else f.state.pooled = [selected]
-  const explicit = source === 'selected' || source === 'shared'
+  if (source === 'selected') f.state.selected = binding
+  else f.state.own = [binding]
+  const explicit = source === 'selected'
   const result = await choose(f, explicit ? { selected: binding.bindingId } : {})
-  assert.deepEqual(result, { kind: 'subscription', binding: selected, chosen: explicit,
-    ...(source === 'shared' || source === 'pooled' ? { sharedOwnerId: selected.ownerId } : {}) })
+  assert.deepEqual(result, { kind: 'subscription', binding, chosen: explicit })
   assert.equal(f.calls.filter(call => call === 'hosted').length, 0)
 })
 

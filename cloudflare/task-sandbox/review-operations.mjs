@@ -19,7 +19,7 @@ export async function routeReviewBrowser(request, env) {
 }
 export async function reviewBrowser(machine, alias, request) {
   const {storage, container} = machine.ctx, run = await storage.get('run'), now = Date.now()
-  if (run?.state !== 'running' || !run.reviewBoot || !container?.running || now >= Math.min(run.expiresAt,run.hardDeadline)) return notFound()
+  if (run?.state !== 'running' || !run.reviewBoot || !container?.running || now >= run.expiresAt) return notFound()
   const id = await storage.get(aliasKey(alias)), lease = id && await storage.get(leaseKey(id))
   if (!lease || lease.closed || lease.boot !== run.reviewBoot.bootId || lease.scope.expiresAt <= now || lease.preview?.alias !== alias)
     return notFound()
@@ -40,7 +40,7 @@ export async function review(machine, identity, operation, openScoped) {
     const run = await storage.get('run'), now = Date.now()
     if (run?.state !== 'running' || !run.reviewBoot || !machine.ctx.container?.running || run.grant.runId !== grant.runId ||
         (run.review?.sourceOperationId ?? run.grant.operationId) !== scope.sourceOperationId ||
-        (run.review && run.grant.operationId !== grant.operationId) || now >= Math.min(run.expiresAt, run.hardDeadline, scope.expiresAt))
+        (run.review && run.grant.operationId !== grant.operationId) || now >= Math.min(run.expiresAt, scope.expiresAt))
       throw Error('Task machine run mismatch')
     const key = leaseKey(scope.leaseId), stored = await storage.get(key)
     if (stored && (stored.closed || stored.boot !== run.reviewBoot.bootId || stored.operationId !== grant.operationId ||
@@ -71,7 +71,7 @@ async function previewControl(machine, run, grant, key, stored, operation) {
   if (!suffix) throw Error('Private task preview domain unavailable')
   const binding = {taskId:grant.taskId,runId:grant.runId,ownerId:grant.ownerId,workspaceId:grant.workspaceId,
     deviceId:scope.deviceId,repoId:scope.repoId,sandboxId:machine.ctx.id.toString(),epoch:scope.epoch,
-    worktreePath:scope.worktreePath,expiresAt:Math.min(scope.expiresAt,run.expiresAt,run.hardDeadline)/1000}
+    worktreePath:scope.worktreePath,expiresAt:Math.min(scope.expiresAt,run.expiresAt)/1000}
   if (operation.action === 'preview-prepare') {
     if (operation.port !== undefined && !safePort(operation.port)) throw Error('Invalid task review scope')
     const reply = await guestControl(machine.ctx.container,'preview',{operation:'prepare',binding,

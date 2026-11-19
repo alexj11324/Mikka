@@ -6,6 +6,11 @@ import { and, asc, eq, inArray, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { z } from 'zod'
+// From lib/issue-access, not lib/acting-user directly: that module's
+// `requireUser` resolves the session lazily, so importing this file does not
+// statically pull lib/session.ts (and `next/headers`) into every reader.
+// issue-access reaches this module only through `await import()`, so the two
+// files are not a static cycle.
 import { requireUser } from '@/lib/issue-access'
 import * as workspaceDatabase from '@/lib/workspace-db'
 import { actingContext } from '@/lib/activity-actor'
@@ -14,7 +19,7 @@ import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { workspaces, workspaceMembers, workspaceInvitations } from '@/lib/db/workspace-schema'
 import { organizationWorkspaces } from '@/lib/db/governance-schema'
 import { renameGeneratedWorkspace, type WorkspaceLocale } from '@/lib/workspace-name'
-import { ensurePersonalShare, ensurePersonalWorkspace } from '@/lib/personal-workspace'
+import { ensurePersonalWorkspace } from '@/lib/personal-workspace'
 import type { ListLiveRead } from '@/lib/live/list-read'
 import { ownerLiveScope } from '@/lib/live/owner-scope'
 import { filterEnterpriseWorkspaceLinks, requireEnterpriseWorkspace } from '@/lib/enterprise/access'
@@ -90,7 +95,6 @@ async function readWorkspaceContext(userId: string, email: string, name: string,
     choices = await readChoices()
   }
   const personal = choices.find(choice => choice.kind === 'personal')
-  if (personal) await ensurePersonalShare(user.id, personal.id)
 
   const savedId = cookieStore.get('mikka-workspace')?.value
   // A cookie-less client starts in its own workspace, even if it joined a team first.

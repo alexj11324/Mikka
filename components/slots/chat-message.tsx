@@ -13,7 +13,7 @@ export const CHAT_SURFACE = ''
 export function ChatMessage({ from, compact = false, lead, body, extras, actions, after }: ChatMessageProps) {
   return <Message align={from === 'person' ? 'end' : 'start'} tabIndex={-1} className="outline-none"><MessageContent>
     {lead}
-    {from === 'bot' ? body : body && <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap">{body}</BubbleContent></Bubble>}
+    {from === 'bot' ? body : body && <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent size="roomy" className="flex flex-col gap-1.5 whitespace-pre-wrap">{body}</BubbleContent></Bubble>}
     {extras}
     {actions}
     {after}

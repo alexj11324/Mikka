@@ -87,7 +87,7 @@ export function CloudSettings({ personal = false, userKey, workspaceId }: { pers
         </NativeSelect></SettingRow>
         <SettingRow title={t('serverKey')}>
           <div className="flex w-full items-center gap-2">
-            <Input type="password" autoComplete="off" aria-label={t('serverKey')} value={serverKey} onChange={event => setServerKey(event.target.value)} disabled={pending} />
+            <Input className="h-(--control-sm)" type="password" autoComplete="off" aria-label={t('serverKey')} value={serverKey} onChange={event => setServerKey(event.target.value)} disabled={pending} />
             <Button variant="secondary" size="sm" disabled={pending || !serverKey.trim()} onClick={() => void write('connect', { action: 'key', key: serverKey.trim() })}>{t('save')}</Button>
           </div>
         </SettingRow>

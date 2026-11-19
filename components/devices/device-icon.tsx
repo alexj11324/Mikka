@@ -1,4 +1,4 @@
-import { Cloud, Laptop, Terminal } from 'lucide-react'
+import { Cloud, Laptop, Terminal } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
 export type DeviceState = 'online' | 'offline' | 'error'

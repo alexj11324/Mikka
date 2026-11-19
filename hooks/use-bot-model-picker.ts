@@ -72,7 +72,7 @@ export function modelSourceLabel(t: ModelPickerT, group: Pick<BotModelMenuGroup,
       if (current?.availability === 'exhausted' && current.quota) return current.quota.resetsAt
         ? t('source.usedUntil', { service, time: new Date(current.quota.resetsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) })
         : t('source.usedUp', { service })
-      return group.owner ? t('source.sharedSubscription', { name: group.owner, service }) : t('source.subscription', { service })
+      return t('source.subscription', { service })
     }
     case 'apiKey': {
       const last4 = /····(\S+)$/.exec(group.credentialLabel ?? '')?.[1]

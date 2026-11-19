@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { FlatList, Linking, RefreshControl, StyleSheet, View } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
+import { GitPullRequest, MessageSquare } from 'lucide-react-native'
 import { GlassButton } from '@/components/GlassButton'
 import { NavBar, underBar } from '@/components/NavBar'
 import { ReadNotice } from '@/components/ReadNotice'
@@ -16,6 +17,7 @@ import { mobileLocale, mobileMessages } from '@/lib/messages'
 import { colors, LIST_INSET } from '@/lib/theme'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { useTaskContinuation } from '../../../lib/hooks/use-task-continuation'
+import { EmptyState, ListLoading } from '@/shared/components/empty-state'
 import { directoryPullRequests, directoryPullStates, pullRequestsState } from '../../../lib/directory-pulls'
 import { directoryConversationKey, directoryTaskNumbers, type ConversationDirectoryPage, type DirectoryInput } from '../../../lib/conversation-directory-input'
 
@@ -109,7 +111,9 @@ export default function Conversations() {
           {!item.unread && <View style={styles.action}><GlassButton label={labels.markUnread} disabled={writing} onPress={() => void mark(item.kind === 'chat' ? { action: 'unread', chatId: item.id } : { action: 'unread', runId: item.id })} /></View>}
         </View>
       }}
-      ListEmptyComponent={!list.error ? <Text style={styles.action}>{list.loading || !workspaceId ? labels.loading : labels.empty}</Text> : undefined}
+      ListEmptyComponent={!list.error ? (list.loading || !workspaceId ? <ListLoading />
+        : <EmptyState icon={pullsOnly ? <GitPullRequest size={20} color={colors.secondary} strokeWidth={1.8} /> : <MessageSquare size={20} color={colors.secondary} strokeWidth={1.8} />}
+          title={pullsOnly ? (pullState === 'all' ? mobileMessages.PullDirectory.empty : mobileMessages.PullDirectory.noMatches) : labels.empty} />) : undefined}
       ListFooterComponent={pages.hasMore ? <View style={styles.action}><GlassButton label={pages.failed ? labels.retry : labels.more}
         busy={pages.loading} onPress={() => void pages.loadMore()} /></View> : undefined} />
   </View>

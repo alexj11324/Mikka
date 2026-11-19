@@ -63,6 +63,13 @@ test('path policy rejects traversal, encoded delimiters, absolute targets and un
   assert.equal(allowedApiPath('/api/settings/issue-prefix/extra', 'GET'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'GET'), true)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token', 'POST'), false)
+  // 收件箱 reads its authorized page and writes its lifecycle commands; nothing
+  // else about it is reachable, and the count query rides the same GET.
+  assert.equal(allowedApiPath('/api/inbox', 'GET'), true)
+  assert.equal(allowedApiPath('/api/inbox', 'POST'), true)
+  assert.equal(allowedApiPath('/api/inbox', 'HEAD'), true, 'HEAD reads as GET')
+  for (const method of ['PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath('/api/inbox', method), false, method)
+  assert.equal(allowedApiPath('/api/inbox/extra', 'GET'), false)
   assert.equal(allowedApiPath('/api/artifacts/shared/public-share-token/metadata', 'GET'), false)
   assert.equal(allowedApiPath(`/api/bots/${identity.user.id}/computer/viewer`, 'POST'), false)
   assert.equal(allowedApiPath(`/api/bots/${identity.user.id}/computer/takeover`, 'POST'), false)
@@ -126,6 +133,17 @@ test('Factory flow accepts only a strict UUID and its two declared methods', () 
     for (const method of ['GET', 'POST']) assert.equal(allowedApiPath(`/api/factory/tasks/${id}/flow`, method), false)
   }
   assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
+})
+
+test('Factory activity and its media are read-only under a strict task UUID', () => {
+  const task = identity.user.id
+  for (const path of [`/api/factory/tasks/${task}/activity`, `/api/factory/tasks/${task}/media/${task}`]) {
+    assert.equal(allowedApiPath(path, 'GET'), true, path)
+    for (const method of ['HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']) assert.equal(allowedApiPath(path, method), false, `${method} ${path}`)
+    assert.equal(allowedApiPath(`${path}/extra`, 'GET'), false)
+  }
+  assert.equal(allowedApiPath('/api/factory/tasks/task_1/activity', 'GET'), false)
+  assert.equal(allowedApiPath(`/api/factory/tasks/${task}/media/`, 'GET'), false)
 })
 
 test('service identity management forwards only its declared human-session methods and UUID paths', () => {

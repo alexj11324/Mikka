@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Users } from 'lucide-react'
+import { Users } from '@/components/icons'
 import { useTranslations } from 'next-intl'
 import { acceptWorkspaceInvitation } from '@/app/actions/workspace'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Link } from '@/i18n/navigation'
 import { endSession } from '@/lib/auth-client'
 import { useActionError } from '@/lib/use-action-error'
@@ -56,7 +57,7 @@ export function InvitationCard({ token, email }: { token: string; email: string 
     </CardContent>
     <CardFooter className="flex flex-col gap-3">
       {!joined && token && (email ? <>
-        <Button className="w-full" disabled={pending} onClick={() => void accept()}>{pending && <Loader2 className="animate-spin" data-icon="inline-start" />}{t('accept')}</Button>
+        <Button className="w-full" disabled={pending} onClick={() => void accept()}>{pending && <Spinner data-icon="inline-start" aria-hidden="true" />}{t('accept')}</Button>
         <Button variant="ghost" disabled={pending} onClick={() => void switchAccount()}>{t('switchAccount')}</Button>
       </> : <>
         <Link href={`/sign-in?next=${encodeURIComponent(next)}`} className={buttonVariants({ className: 'w-full' })}>{t('signInToAccept')}</Link>
@@ -102,7 +103,7 @@ export function OrganizationInvitationCard({ token, email }: { token: string; em
       {joined && !serverOnly ? <Link href="/settings?section=organization" className={buttonVariants({ className: 'w-full' })}>{t('openOrganization')}</Link>
         : !joined && token && (email ? <>
           <Button className="w-full" disabled={pending} onClick={() => void accept()}>
-            {pending && <Loader2 className="animate-spin" data-icon="inline-start" />}{t('accept')}
+            {pending && <Spinner data-icon="inline-start" aria-hidden="true" />}{t('accept')}
           </Button>
           <Button variant="ghost" disabled={pending} onClick={() => void switchAccount()}>{invite('switchAccount')}</Button>
         </> : <>

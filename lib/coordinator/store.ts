@@ -13,7 +13,7 @@ import { COORDINATOR_WELCOME_MARK } from '@/lib/agent-welcome'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, ne, or, sql } from 'drizzle-orm'
 import type { ModelMessage } from 'ai'
 import { db, pool } from '@/lib/db'
-import { botUnreadCounts } from '@/lib/conversation-reads-store'
+import { botReadState } from '@/lib/conversation-reads-store'
 import { agentRuns, bots, coordinatorEvents, coordinatorMessages, coordinatorSessions, issueMembers, issues, runChunks, type CoordinatorEventTier } from '@/lib/db/schema'
 import { chatItems, eventPrompt, type ChatItem, type StoredMessage } from '@/lib/coordinator/context'
 import { citedIds, namedCitations, type CitationName, type CitationSource } from '@/lib/coordinator/citations'
@@ -530,6 +530,13 @@ export interface BotChatSummary {
   /** The latest reply or message, with cited threads and tasks written as their names; null before the first. */
   line: string | null
   at: string | null
+  /** The latest message's id: what 标为已读 acknowledges (POST /api/conversations/bot:<id>/read); absent before the first. */
+  messageId?: string
+  /** The person's own 置顶 / 通知 / 隐藏 for this chat (lib/chat-preferences.ts), when they changed one. */
+  pinned?: boolean
+  muted?: boolean
+  hidden?: boolean
+  pinOrder?: number | null
   /** A turn is active, or pending input is new or holds its first live delivery lease. */
   working: boolean
 }
@@ -577,17 +584,20 @@ export async function botChatSnapshot(reader: IssueReader) {
     // A failed welcome is no message from the Bot: no preview line and no time to count as unread.
     if (item?.welcome) return []
     // An event's stored text is the model's (English, ids): the preview leaves it out (C1).
-    return [{ botId: row.botId, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
+    return [{ botId: row.botId, messageId: row.id, text: item?.from === 'event' ? null : item?.text || null, from: item?.from, at: row.createdAt.toISOString() }]
   })
   // A reply cites threads and tasks by id; the preview names them as the chat's chips do (R-15).
   const sources = await citationNames(reader, lines.flatMap(line => line.from === 'coordinator' && line.text ? [line.text] : []))
   for (const line of lines) {
     const text = line.text && line.from === 'coordinator' ? namedCitations(line.text, sources) : line.text
-    result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at }
+    result[line.botId] = { ...(result[line.botId] ?? { working: false }), line: text || null, at: line.at, messageId: line.messageId }
   }
-  for (const [botId, count] of await botUnreadCounts(pool, userId, botIds)) {
+  // The unread counts and, in the same read, the person's own 置顶 / 通知 / 隐藏 (lib/chat-preferences.ts writes them and pushes this list).
+  const { counts, preferences } = await botReadState(pool, userId, botIds)
+  for (const [botId, count] of counts) {
     if (count) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), unreadCount: count }
   }
+  for (const [botId, preference] of preferences) result[botId] = { ...(result[botId] ?? { line: null, at: null, working: false }), ...preference }
   return { items: result, expiries, observedAt: now.getTime() }
 }
 

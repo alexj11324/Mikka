@@ -217,7 +217,57 @@
     "archivedConversation": "历史：{title}",
     "suggestions": "建议",
     "artifacts": "Artifact",
-    "cardPreview": "[卡片]"
+    "cardPreview": "[卡片]",
+    "botMenu": {
+      "archive": "归档",
+      "unarchive": "取消归档",
+      "delete": "删除",
+      "archived": "已归档",
+      "archivedToast": "已归档「{name}」",
+      "unarchivedToast": "已取消归档「{name}」",
+      "deletedToast": "已删除「{name}」",
+      "deleteTitle": "删除「{name}」？",
+      "deletePermanent": "它的聊天记录会被永久删除。",
+      "deleteKeeps": "它派出的任务和线程会保留。",
+      "archiveInstead": "改为归档",
+      "failed": "没有完成，请重试。",
+      "copyLink": "复制链接",
+      "linkCopied": "已复制链接",
+      "profile": "Bot 资料",
+      "pin": "置顶",
+      "unpin": "取消置顶",
+      "mute": "静音",
+      "unmute": "取消静音",
+      "hide": "隐藏",
+      "unhide": "取消隐藏",
+      "hidden": "已隐藏",
+      "pinLimit": "置顶已满，先取消一个置顶。",
+      "rename": "重命名",
+      "renameTitle": "重命名线程",
+      "threadArchived": "已归档「{name}」",
+      "noMessages": "还没有消息",
+      "waitingOnYou": "{count} 个线程在等你",
+      "density": "显示密度",
+      "compact": "紧凑",
+      "detailed": "详细",
+      "botOptions": "Bot 选项",
+      "threadActions": "线程操作",
+      "showThreads": "显示线程",
+      "hideThreads": "隐藏线程",
+      "archiveThread": "归档线程",
+      "unreadSuffix": "{name}，未读",
+      "collapseSection": "收起{name}",
+      "expandSection": "展开{name}"
+    },
+    "age": {
+      "now": "刚刚",
+      "s": "{n}秒",
+      "m": "{n}分",
+      "h": "{n}小时",
+      "d": "{n}天",
+      "w": "{n}周",
+      "y": "{n}年"
+    }
   },
   "Plugins": {
     "ownDescription": {
@@ -238,6 +288,8 @@
     "loadFailed": "暂时无法加载 skills.sh 技能目录。",
     "retry": "重试",
     "browseSkills": "打开 skills.sh",
+    "identityUnavailable": "当前部署没有搜索 skills.sh 所需的身份凭证；你仍可直接打开 skills.sh 浏览。",
+    "identityRejected": "skills.sh 拒绝了部署身份；请检查 Vercel OIDC 配置，或直接打开 skills.sh 浏览。",
     "noResults": "没有找到匹配的技能。",
     "clearSearch": "清除搜索",
     "installCount": "{count} 次安装",
@@ -249,7 +301,11 @@
     "state": {
       "connected": "已连接",
       "notConnected": "未连接",
-      "paused": "已暂停"
+      "paused": "已暂停",
+      "needsReconnect": "需要重新连接",
+      "unknown": "已关联，状态未知",
+      "syncPaused": "同步已暂停",
+      "statusUnknown": "连接状态未知"
     },
     "popular": "热门",
     "latest": "新品推荐",
@@ -264,7 +320,11 @@
     "connectKind": {
       "managed": "一键授权",
       "credentials": "需要 API Key",
-      "none": "无需连接"
+      "none": "无需连接",
+      "oauthSetupRequired": "该服务需要 Composio 提供托管 OAuth 应用，目前尚未向 Mikka 开放",
+      "oauthSetupRequiredWithAlternative": "Composio 暂未向 Mikka 提供该服务的托管 OAuth · API Key 版本：{name}",
+      "alternativeLink": "改用 API Key 版本：{name}",
+      "unsupported": "Mikka 暂不支持该服务的认证方式。"
     },
     "key": {
       "title": "连接 {name}",
@@ -284,7 +344,14 @@
       "replaced": "已更换 {name} 的 Key",
       "securedBy": "安全保护"
     },
-    "connectionStatusFailed": "无法读取 {names} 的连接状态"
+    "connectionStatusFailed": "无法读取 {names} 的连接状态",
+    "storeDirectory": "应用目录",
+    "storeNotConfigured": "应用商店未配置",
+    "noAppsYet": "还没有应用",
+    "noSkillsYet": "还没有技能",
+    "noAppsForQuery": "没有找到「{query}」",
+    "noSkillsForQuery": "没有找到「{query}」",
+    "typeMore": "再多输入一个字"
   },
   "Auth": {
     "sso": {
@@ -1311,6 +1378,8 @@
     "deviceNameTooLong": "设备名称过长。",
     "deviceNotFound": "设备不存在。",
     "agentHarnessMissing": "这台电脑尚未安装所选 Agent。",
+    "agentRequired": "请指定由哪个 Agent 运行这个任务：Claude Code 或 Codex。",
+    "agentNoModel": "{agent} 没有可用的模型。请在 设置 › 模型与订阅 里为它连接订阅或 API Key。",
     "agentDuplicateName": "名称重复，请换一个名称。",
     "botDuplicateName": "已有同名 Bot，请换一个名字。",
     "botNameTooLong": "Bot 名字最多 60 个字。",
@@ -1418,7 +1487,7 @@
     "runNotActive": "此运行已结束，且没有可回答的问题。",
     "threadReplaced": "这个任务已经换到新的线程，请在那里发送。",
     "threadCannotContinue": "这个线程没有关联任务，无法再次运行。",
-    "threadRecoveryUnavailable": "暂时无法恢复原会话。",
+    "threadRecoveryUnavailable": "暂时无法恢复原线程。",
     "factoryQuestionNeedsAnswerTool": "请使用 Factory 问题回答工具提供可验证的答复。",
     "savedLoginNotFound": "此登录信息不存在或已删除。",
     "savedLoginSiteInvalid": "网站地址无效，只支持 https。",
@@ -1541,6 +1610,8 @@
       "filterComments": "评论",
       "filterAgents": "Agent 和 Bot",
       "showEarlier": "显示更早的 {count} 条",
+      "noActivity": "还没有活动",
+      "noMatchingActivity": "没有符合筛选条件的活动",
       "copy": "复制",
       "copied": "已复制",
       "copyFailed": "复制失败",
@@ -2207,7 +2278,11 @@
         "tool": "工具",
         "person": "常联系的人",
         "preference": "偏好"
-      }
+      },
+      "pendingTitle": "待确认",
+      "pendingHint": "Mikka 刚学到的内容，确认后才会用于回答和提醒",
+      "approve": "确认",
+      "reject": "不保留"
     },
     "workspaceForm": {
       "name": "名称",
@@ -2308,6 +2383,10 @@
       "callbackStepOpen": "打开 Claude，登录并允许授权。",
       "callbackStepCopy": "跳转到 localhost:54545 后，即使页面显示无法访问，也从浏览器地址栏复制完整地址。",
       "callbackStepPaste": "把完整地址粘贴到下方，点击「完成连接」。",
+      "codeStep": "在 Claude 页面点允许后，复制页面上显示的授权码，回到这里粘贴。",
+      "codeLabel": "授权码",
+      "codePlaceholder": "粘贴授权码",
+      "paste": "粘贴",
       "finish": "完成连接",
       "expired": "{provider} 授权已过期",
       "loadFailed": "无法加载订阅设置。",
@@ -2473,7 +2552,10 @@
       "githubAppOwner": "归属",
       "githubAppPersonal": "个人账号",
       "githubAppOrganization": "组织",
-      "githubAppOrganizationName": "组织名"
+      "githubAppOrganizationName": "组织名",
+      "githubNoMatch": "没有匹配的仓库",
+      "githubClearSearch": "清除搜索",
+      "githubNoRepository": "还没有仓库。授权 GitHub App 后会显示在这里"
     },
     "slackInstallation": {
       "title": "Slack 机器人",
@@ -2689,7 +2771,8 @@
       "neverUsed": "从未使用",
       "expires": "{date} 过期",
       "noExpiry": "永不过期",
-      "expired": "已过期"
+      "expired": "已过期",
+      "copyFailed": "复制失败。请手动选中并复制"
     },
     "secrets": {
       "heading": "密钥",
@@ -2956,29 +3039,12 @@
       }
     },
     "subscriptionShare": {
-      "heading": "团队共享",
-      "blocked": "管理员不允许分享订阅",
-      "others": "分享我的订阅给团队成员",
+      "others": "分享给团队成员",
       "othersTitle": "分享 {name} 给团队成员？",
-      "othersUsage": "团队成员可以用它跑自己的 Bot，用量算在你的订阅额度上。",
       "othersRuntime": "任务运行时，凭据会临时放到跑任务的那台电脑上，可能是成员自己的电脑；任务结束后删除。",
       "othersTrust": "只分享给你信任的人。部分服务商的条款不允许共享账号，请自行确认。",
       "othersConfirm": "分享",
-      "othersOn": "已分享 {names} 订阅 · 成员跑任务时凭据会临时放到他们的电脑上",
-      "subscriptionName": "{provider} 订阅",
-      "ownFallback": "我的订阅",
-      "listSeparator": "、",
-      "cancel": "取消",
-      "available": "{name} 分享的 {provider} 订阅",
-      "availableState": "你的任务也能用",
-      "provider": {
-        "claude": "Claude",
-        "codex": "ChatGPT"
-      },
-      "othersHint": "{workspace}的成员也能用你的 {names} 订阅跑任务，用量算在你的额度上",
-      "othersHintAny": "{workspace}的成员也能用你的订阅跑任务，用量算在你的额度上",
-      "othersOnAny": "已分享你的订阅 · 成员跑任务时凭据会临时放到他们的电脑上",
-      "thisWorkspace": "这个工作区"
+      "cancel": "取消"
     },
     "archivedBots": {
       "heading": "已暂停的 Bot",
@@ -2998,7 +3064,7 @@
     "sharePolicy": {
       "loading": "正在加载分享设置",
       "heading": "订阅与 API Key",
-      "label": "成员把自己的订阅和 API Key 分享给队友",
+      "label": "成员把自己的 API Key 分享给队友",
       "detail": "禁止后只停用分享给别人的部分，每个人自己照常能用"
     },
     "appPolicy": {
@@ -3176,7 +3242,8 @@
         "customTools": "自定义工具",
         "fallbacks": "备用路由",
         "thinking": "思考"
-      }
+      },
+      "baseUrl": "Base URL"
     },
     "modelOrder": {
       "fallbackNeedsKey": "需先添加 API 密钥并连接订阅。",
@@ -3264,9 +3331,8 @@
       "e2bKeyFill": "填入",
       "e2bKeyReplace": "更换",
       "agentSection": "Agent",
-      "preferredAgent": "优先使用的 Agent",
-      "preferredAgentHint": "任务先交给它，按它的模型顺序选；它跑不了就换另一个",
-      "preferredMark": "优先",
+      "preferredAgent": "Agent",
+      "preferredAgentHint": "每个 Agent 有自己的模型顺序。任务只用派发时选定的 Agent，不会换成另一个",
       "bothAgents": "两种 Agent 都能跑",
       "agentMenu": "{model} 的 Agent：{agent}",
       "emptyNoCredential": "还没有订阅或 API Key",
@@ -3282,12 +3348,7 @@
       "openApiKey": "查看 API Key",
       "openSubscription": "查看订阅",
       "description": "派发给 Agent 的任务从这里选模型",
-      "e2bKeyHint": "云端跑任务用",
-      "emptyUseOther": "{agent} 没有能用的模型，任务会交给 {other}",
-      "switchAgent": "改用 {agent}",
-      "backup": "{agent} 列表作为后备 · {count, plural, other {# 个模型}}",
-      "backupList": "{agent} 后备列表",
-      "billedByProvider": "按服务商计费"
+      "e2bKeyHint": "云端跑任务用"
     },
     "loadingPage": "正在加载设置",
     "modelScope": {
@@ -3971,7 +4032,7 @@
       "arguments": "内容",
       "approveRun": "执行"
     },
-    "loadError": "线程加载失败，正在重试。",
+    "loadError": "线程加载失败。",
     "failedTitle": "回复失败",
     "replyToolUnavailable": "回复未完成，请重试",
     "apiBalance": "API 余额不足",
@@ -4079,7 +4140,6 @@
       "noMatch": "没有匹配的模型",
       "source": {
         "subscription": "用你的 {service} 订阅",
-        "sharedSubscription": "用 {name} 共享的 {service} 订阅",
         "apiKey": "用 {vendor} API Key（尾号 {last4}），不扣 Mikka 额度",
         "apiKeyPlain": "用 {vendor} API Key，不扣 Mikka 额度",
         "sharedKey": "用 {name} 共享的 {vendor} API Key，不扣 Mikka 额度",
@@ -4090,12 +4150,6 @@
       }
     },
     "empty": "告诉 {name} 你要做什么",
-    "starters": {
-      "fixBug": "修复我仓库里的一个 bug",
-      "reviewPullRequests": "审阅我未合并的 PR",
-      "summarizeToday": "总结今天需要我处理的事",
-      "dailyBriefing": "设置每日简报"
-    },
     "events": {
       "aThread": "一个线程",
       "aTask": "一个任务",
@@ -4264,6 +4318,8 @@
         "finished": "{tool}完成",
         "failed": "失败",
         "args": "参数",
+        "command": "命令",
+        "exitCode": "退出码 {code}",
         "result": "结果",
         "waiting": "等待结果…",
         "empty": "没有参数或结果",
@@ -4290,13 +4346,10 @@
   },
   "AgentCopy": {
     "pleaseSignInFirst": "请先登录。",
-    "invalidConversationID": "会话标识无效。",
     "unableToLoadChatHistoryPleaseTry": "无法读取聊天历史，请稍后重试。",
     "activeAgentsNoParameters": "此接口不接受任何参数。",
     "conversationNotFound": "找不到此会话。",
-    "aResponseIsStillGeneratingPleaseTry": "此会话仍有回复正在生成，请稍后重试。",
     "thisMessageWasAlreadySubmittedPleaseAsk": "此轮消息不能重复提交，请新建一轮提问。",
-    "onlyTheLastResponseCanBeRetried": "只能重试会话中的最后一轮回复。",
     "invalidMessageIDPleaseAskANew": "消息标识无效，请新建一轮提问。",
     "theResponseEndedEarlySavedContentIs": "回复连接提前结束，已有内容已保存，请重试。",
     "theConnectionWasInterruptedRefreshToSee": "回复或保存连接中断，请刷新后查看已保存内容。",
@@ -4330,19 +4383,11 @@
     "formContent": "表单内容：",
     "theQuestionIsEmptyOrTooLong": "提问内容为空或过长，请在原组件中调整后重试。",
     "theQuestionDidNotFinishRetryIn": "本次提问未完成，请在原组件中重试。",
-    "unableToRefreshConversationsPleaseReloadThe": "暂时无法刷新会话列表，请刷新页面重试。",
     "newConversation": "新线程",
     "today": "今天",
     "last7Days": "最近 7 天",
     "earlier": "更早",
     "toggleSidebar": "展开或收起侧边栏",
-    "switchConversation": "切换会话：",
-    "searchConversations": "搜索历史会话",
-    "switchConversation2": "切换历史会话",
-    "conversationHistory": "历史会话",
-    "searchConversations2": "搜索历史会话…",
-    "noMatchingConversations": "未找到相关会话",
-    "noConversationsYet": "暂无历史会话",
     "responding": "正在回复",
     "componentDemo": "组件演示",
     "newTask": "新任务",
@@ -4569,7 +4614,8 @@
     "needsModelCloudModelsUnknown": "云端模板的模型尚未验证",
     "needsModelCloudModelNotReported": "云端模板没有上报这个模型",
     "needsModelCloudUnavailable": "云端暂时无法启动",
-    "needsModelChecking": "订阅额度暂未确认，请重试"
+    "needsModelChecking": "订阅额度暂未确认，请重试",
+    "invalidConversationID": "线程标识无效。"
   },
   "ThreadRunPlace": {
     "cloudName": "云电脑 {id}",
@@ -4625,7 +4671,9 @@
     "loading": "正在加载线程…",
     "empty": "没有匹配的线程。",
     "untitled": "未命名线程",
-    "more": "加载更多"
+    "more": "加载更多",
+    "emptyTitle": "还没有线程。",
+    "clearFilters": "清除筛选"
   },
   "ThreadReferences": {
     "sourceUnavailable": "此线程暂时无法引用源码文件或目录。",
@@ -4692,6 +4740,7 @@
     "stepsCommands": "已运行 {count} 条命令",
     "stepsTools": "调用了 {count} 个工具",
     "composer": "告诉 {agent} 下一步做什么…",
+    "replyUnavailable": "此线程暂时无法回复。",
     "checkEnded": "独立检查已结束，请在验收中处理结果。",
     "sendFailed": "发送结果未确认，草稿已保留",
     "stop": "停止",
@@ -5029,8 +5078,15 @@
       "noBots": "暂无可用 Bot",
       "newBot": "新建 Bot",
       "create": "开始线程",
+      "nameRequired": "请先填写线程名称",
+      "botsRequired": "请至少选择一个 Bot",
+      "lead": "负责回复",
       "failed": "创建线程失败",
       "unconfirmed": "尚未确认是否已创建",
+      "model": "模型",
+      "modelAuto": "跟随 Bot",
+      "device": "设备",
+      "deviceAuto": "自动选择",
       "reviewGroups": "查看线程"
     },
     "newGroup": {
@@ -5040,8 +5096,15 @@
       "noBots": "没有可选的 Bot",
       "newBot": "新建 Bot",
       "create": "创建",
+      "nameRequired": "请先填写群名",
+      "botsRequired": "请至少选择一个 Bot",
+      "lead": "负责回复",
       "failed": "群聊创建失败",
       "unconfirmed": "群聊创建状态未确认",
+      "model": "模型",
+      "modelAuto": "跟随 Bot",
+      "device": "设备",
+      "deviceAuto": "自动选择",
       "reviewGroups": "查看群聊"
     },
     "searchPlaceholder": "搜索 Bot、线程、群聊、任务和项目",
@@ -5273,6 +5336,9 @@
       "titlePlaceholder": "标题（可选，不填由 Bot 起）",
       "placeholder": "要它做什么？",
       "promptWithContext": "帮我新建一个任务（{context}）：{text}",
+      "contextAgent": "交给 {agent}",
+      "agent": "Agent",
+      "agentNone": "选择 Agent",
       "contextDevice": "在 {device} 上做",
       "device": "运行的机器",
       "bot": "交给哪个 Bot",
@@ -5531,7 +5597,7 @@
   "LegacyChat": {
     "title": "历史线程",
     "readOnly": "此线程仅供查看。请在 Bot 线程中继续工作。",
-    "empty": "暂无已保存的消息。",
+    "empty": "这条线程没有消息记录。",
     "loadError": "无法加载已保存的历史线程。",
     "retry": "重试",
     "incomplete": "此历史回复未完成。"
@@ -5791,8 +5857,7 @@
     },
     "steps": "操作 {count}",
     "questionCommandSource": "来自提问前的执行",
-    "sourceExecution": "查看执行",
-    "mergeConfirm": "合并"
+    "sourceExecution": "查看执行"
   },
   "ArtifactReview": {
     "checksRatio": "{passed}/{total} 项通过",
@@ -5842,7 +5907,9 @@
     "mergeFailed": "合并失败：{reason}",
     "letAgentFix": "让 Agent 解决",
     "checksFailed": "检查未通过：{names}",
-    "rerunChecks": "重跑检查"
+    "rerunChecks": "重跑检查",
+    "cancel": "取消",
+    "mergeConfirm": "合并"
   },
   "AccountEmail": {
     "exportSubject": "你的 Mikka 数据导出",
@@ -6223,6 +6290,7 @@
     "repositoryRemedy": "请在工作区设置中选择你已授权的仓库后重试。",
     "runtimeRemedy": "请连接你的本地 Agent 并保持在线，或在运行设置中配置你有权使用的云端电脑。",
     "toolRemedy": "请由 Bot 所有者在现有 Agent 设置中启用任务委派能力。",
+    "agentRemedy": "请在消息里写明由哪个 Agent 运行这个任务（Claude Code 或 Codex）后重试。",
     "authorizationRemedy": "请检查你自己的模型、订阅或 API Key 授权与运行位置设置后重试；其他成员的个人凭据不会被代用。",
     "chooseBot": "请指定本群中具备 Factory 任务能力的 Bot 来执行；此成员只提供回答。",
     "notStarted": "尚未开始执行。{remedy}",
@@ -6234,25 +6302,77 @@
     "chatUnavailable": "这个 Bot 的聊天模型使用其所有者的个人配置，当前消息无法代用该授权。请使用你自己的 Bot，或请其所有者发起这次聊天；任务委派会另行检查你自己的执行资源。"
   },
   "RunErrors": {
-    "cloud_machine_unfunded": {"default":"额度不足，无法继续使用云端机器"},
-    "review_auth_required": {"default":"请登录后审阅任务。"},
-    "review_not_found": {"default":"任务审阅不可用。"},
-    "not_owner_terminal": {"default":"只有任务负责人可以使用终端。"},
-    "review_machine_gone": {"default":"任务环境已不可用。"},
-    "review_binding_changed": {"default":"任务环境已变化，请重新打开审阅。"},
-    "review_checkout_unavailable": {"default":"任务暂无可用的工作目录。"},
-    "review_preview_unavailable": {"default":"预览不可用","configuration":"当前环境不支持安全预览","runtime":"预览服务暂时不可用","protocol":"预览响应无效","scope_changed":"任务环境或授权已变化","limit":"预览已达到使用上限"},
-    "terminal_unsupported": {"default":"当前环境尚未接入任务终端。","local_device":"此本地设备暂不支持远程终端。","runtime_version":"请更新任务运行环境后使用终端。"},
-    "terminal_already_controlled": {"default":"Agent 仍在使用任务环境，请结束其工作后打开终端。"},
-    "terminal_binding_changed": {"default":"终端环境或授权已变化。"},
-    "terminal_ended": {"default":"终端会话已结束。"},
-    "terminal_input_too_large": {"default":"终端输入超过 16 KiB。"},
-    "terminal_invalid_request": {"default":"终端请求无效。"},
-    "terminal_request_conflict": {"default":"此输入请求 ID 已用于其他内容。"},
-    "terminal_input_uncertain": {"default":"输入是否送达尚不确定，请查看终端后再决定是否重发。"},
-    "terminal_limit": {"default":"终端已达到使用上限。"},
-    "terminal_unavailable": {"default":"终端暂时不可用。","configuration":"安全终端尚未配置。","runtime":"终端运行环境暂时不可用。","protocol":"终端响应无效。","installation":"终端运行环境准备失败。","lease":"终端授权已过期或变化。"},
-    "terminal_control_unavailable": {"default":"暂时无法独占任务环境。","fence_unavailable":"任务环境控制锁不可用。","fence_lost":"任务环境控制锁已丢失。"},
+    "cloud_machine_unfunded": {
+      "default": "额度不足，无法继续使用云端机器"
+    },
+    "review_auth_required": {
+      "default": "请登录后审阅任务。"
+    },
+    "review_not_found": {
+      "default": "任务审阅不可用。"
+    },
+    "not_owner_terminal": {
+      "default": "只有任务负责人可以使用终端。"
+    },
+    "review_machine_gone": {
+      "default": "任务环境已不可用。"
+    },
+    "review_binding_changed": {
+      "default": "任务环境已变化，请重新打开审阅。"
+    },
+    "review_checkout_unavailable": {
+      "default": "任务暂无可用的工作目录。"
+    },
+    "review_preview_unavailable": {
+      "default": "预览不可用",
+      "configuration": "当前环境不支持安全预览",
+      "runtime": "预览服务暂时不可用",
+      "protocol": "预览响应无效",
+      "scope_changed": "任务环境或授权已变化",
+      "limit": "预览已达到使用上限"
+    },
+    "terminal_unsupported": {
+      "default": "当前环境尚未接入任务终端。",
+      "local_device": "此本地设备暂不支持远程终端。",
+      "runtime_version": "请更新任务运行环境后使用终端。"
+    },
+    "terminal_already_controlled": {
+      "default": "Agent 仍在使用任务环境，请结束其工作后打开终端。"
+    },
+    "terminal_binding_changed": {
+      "default": "终端环境或授权已变化。"
+    },
+    "terminal_ended": {
+      "default": "终端会话已结束。"
+    },
+    "terminal_input_too_large": {
+      "default": "终端输入超过 16 KiB。"
+    },
+    "terminal_invalid_request": {
+      "default": "终端请求无效。"
+    },
+    "terminal_request_conflict": {
+      "default": "此输入请求 ID 已用于其他内容。"
+    },
+    "terminal_input_uncertain": {
+      "default": "输入是否送达尚不确定，请查看终端后再决定是否重发。"
+    },
+    "terminal_limit": {
+      "default": "终端已达到使用上限。"
+    },
+    "terminal_unavailable": {
+      "default": "终端暂时不可用。",
+      "configuration": "安全终端尚未配置。",
+      "runtime": "终端运行环境暂时不可用。",
+      "protocol": "终端响应无效。",
+      "installation": "终端运行环境准备失败。",
+      "lease": "终端授权已过期或变化。"
+    },
+    "terminal_control_unavailable": {
+      "default": "暂时无法独占任务环境。",
+      "fence_unavailable": "任务环境控制锁不可用。",
+      "fence_lost": "任务环境控制锁已丢失。"
+    },
     "review_scope_denied": {
       "default": "你没有权限查看此任务。",
       "sponsored_placement": "此任务的托管工作区已无法用于查看任务。"
@@ -6353,7 +6473,15 @@
     "run_provider_error": {
       "default": "模型服务商未能完成这次请求，请重试。"
     },
-    "run_credentials_unavailable": {"default":"任务凭据暂不可用。","device_unavailable":"这台电脑暂时不能领取该任务的凭据。","native_credentials":"订阅凭据暂不可用。","github_credentials":"GitHub 凭据暂不可用。"},
+    "run_credentials_unavailable": {
+      "default": "任务凭据暂不可用。",
+      "device_unavailable": "这台电脑暂时不能领取该任务的凭据。",
+      "credential_missing": "任务所有者没有连接这项订阅。请在模型与订阅里连接后重试。",
+      "credential_expired": "任务所有者的订阅登录已过期。请重新登录后重试。",
+      "quota_exhausted": "任务所有者的订阅额度已用完。",
+      "native_credentials": "订阅凭据暂不可用。",
+      "github_credentials": "GitHub 凭据暂不可用。"
+    },
     "run_failed": {
       "default": "任务未能完成，请查看错误详情或重试。"
     },
@@ -6529,15 +6657,15 @@
       "host_unsupported": "云电脑环境不支持此运行",
       "cli_missing": "云电脑上没有所需的 Agent",
       "assignment_invalid": "线程的模型或订阅设置已失效，请重新选择模型",
-      "resume_mismatch": "原会话无法继续",
+      "resume_mismatch": "原线程无法继续",
       "run_closed": "线程已停止，运行未启动",
       "context_changed": "订阅在启动期间已变化，运行已停止",
       "workspace_invalid": "云电脑上的工作区无效",
-      "ledger_mismatch": "原会话记录与线程不匹配",
+      "ledger_mismatch": "原线程记录与当前线程不匹配",
       "computer_unavailable": "此运行无法操作电脑",
       "env_not_clean": "云电脑运行环境含有不允许的变量",
       "credential_mismatch": "模型凭据与运行不匹配",
-      "session_mismatch": "Agent 没有回到原会话",
+      "session_mismatch": "Agent 没有回到原线程",
       "adapter_start_failed": "Agent 无法在云电脑上启动",
       "cleanup_failed": "Agent 未启动，清理也未完成"
     },
@@ -7017,11 +7145,11 @@
     },
     "policy": {
       "title": "资源共享策略",
-      "description": "决定成员能否把自己的模型凭证、订阅和 MCP 共享到组织工作区。共享仍需要资源原有的授权；策略只能进一步收紧。",
+      "description": "决定成员能否把自己的 API Key 和 MCP 共享到组织工作区（订阅只给主人自己用，不能共享）。共享仍需要资源原有的授权；策略只能进一步收紧。",
       "needsEnterprise": "资源策略需要 Enterprise。",
       "modelCredentialSharing": {
-        "label": "模型凭证与订阅",
-        "note": "成员共享 API 密钥或模型订阅。"
+        "label": "模型凭证",
+        "note": "成员共享 API Key。订阅只给主人自己用。"
       },
       "mcpSharing": {
         "label": "MCP 服务",
@@ -7063,7 +7191,7 @@
         "title": "共享审批",
         "description": "「需审批」时，成员共享资源会在这里等待审批。拒绝会撤回该资源在工作区中的共享；批准不会绕过资源原有的授权。",
         "empty": "没有共享审批请求",
-        "emptyNote": "成员在组织工作区共享模型凭证、订阅或 MCP 时会出现在这里。",
+        "emptyNote": "成员在组织工作区共享 API Key 或 MCP 时会出现在这里。",
         "approvedDone": "已批准。",
         "deniedDone": "已拒绝，共享已撤回。",
         "kinds": {
@@ -7574,7 +7702,7 @@
     "personLabel": "你的名字",
     "finish": "完成",
     "enter": "开始使用",
-    "doneText": "交给 Mikka 第一件事吧。",
+    "doneText": "把第一件事交给 Mikka。",
     "model": {
       "title": "模型",
       "heading": "选择模型",
@@ -7658,6 +7786,17 @@
     "runsCount": "{count, plural, other {{formatted} 次}}"
   },
   "HostedShell": {
+    "workspacePicker": "在工作区打开",
+    "relatedThreads": "相关线程",
+    "expandWorkArea": "展开工作区",
+    "sidebarNavigation": "侧栏导航",
+    "openTabs": "已打开的标签页",
+    "tabActions": "标签页操作",
+    "closeTab": "关闭此标签页",
+    "closeNamedTab": "关闭 {name}",
+    "closeOtherTabs": "关闭其他标签页",
+    "closeFollowingTabs": "关闭后面的标签页",
+    "collapseWorkArea": "收起工作区",
     "newTab": "新标签页",
     "searchOrUrl": "搜索或输入网址",
     "tools": "工具",
@@ -7757,6 +7896,7 @@
       "readOnly": "暂时不能逐个停用模型",
       "providerOn": "{on}/{total} 个已启用",
       "firstModel": "任务先用",
+      "noFirstModel": "还没有可用的模型",
       "keyProvider": "服务商"
     }
   },
@@ -7800,7 +7940,9 @@
     "working": "正在工作",
     "groupChats": "群聊",
     "groupGlyph": "群",
-    "hiddenChats": "隐藏的聊天",
+    "hiddenChats": "隐藏的线程",
+    "noHiddenChats": "没有隐藏的线程",
+    "showAllItems": "显示全部 {count} 个",
     "restartToUpdate": "重启以更新",
     "chatList": "线程列表",
     "document": "文档",
@@ -7896,7 +8038,89 @@
       "minutes": "{count} 分钟前",
       "hours": "{count} 小时前",
       "days": "{count} 天前"
-    }
+    },
+    "approved": "已批准",
+    "rejected": "已拒绝",
+    "sendFailedRetry": "发送失败，请重试。",
+    "uploadFailed": "上传失败",
+    "uploading": "上传中",
+    "addFileLimit": "最多添加 {count} 个文件",
+    "textFilesOnly": "只能发文本文件",
+    "fileTooLong": "文件太长",
+    "cannotAddFile": "无法添加文件",
+    "removePhoto": "移除照片",
+    "removeFile": "移除 {name}",
+    "retryUpload": "重试上传 {name}",
+    "clearQuote": "取消引用",
+    "stop": "停止",
+    "stopUnconfirmed": "停止未确认",
+    "loading": "正在加载",
+    "selectText": "选择文本",
+    "unread": "未读",
+    "waitingReply": "等你回复",
+    "audioKeyRequired": "请先添加可用的 [OI] API Key",
+    "customAnswer": "补充其他回答…",
+    "cannotPasteImage": "无法粘贴图片",
+    "photo": "照片",
+    "event": {
+      "runSucceeded": "已完成",
+      "runFailed": "失败了",
+      "runStopped": "已停止",
+      "runCancelled": "已取消",
+      "scheduleRan": "已执行",
+      "scheduleFailed": "执行失败",
+      "scheduleSkipped": "已跳过",
+      "actionDone": "操作已完成",
+      "actionFailed": "操作失败",
+      "actionDeclined": "操作已拒绝",
+      "runRetried": "换了一台机器继续",
+      "runSwitched": "订阅额度用完，改用 API Key 继续",
+      "runPaused": "订阅额度用完，已暂停",
+      "runWaitingDevice": "等设备上线后开始",
+      "runDeviceBack": "设备已上线，即将开始",
+      "runReport": "汇报了进展",
+      "runQuestion": "在等你回答",
+      "runBlocked": "受阻",
+      "newEvent": "有一条新动态",
+      "someThread": "一个线程",
+      "someTask": "一个任务",
+      "quotedTitle": "「{title}」",
+      "scheduledTitle": "定时任务「{title}」",
+      "someSchedule": "一个定时任务",
+      "runEnded": "已结束",
+      "taskNowStatus": "{task} 改为{status}",
+      "taskStatusChanged": "{task} 状态有变化",
+      "taskIsStatus": "{task} 状态为{status}",
+      "scheduleResult": "有了执行结果",
+      "scheduleDue": "{schedule} 到时间了",
+      "artifactDelivered": "交来了「{title}」",
+      "someArtifact": "交来了一份 Artifact",
+      "actionNewState": "操作有新状态"
+    },
+    "failure": {
+      "subUnavailable": "所选订阅不可用",
+      "subReconnect": "订阅需要重新连接",
+      "subQuotaUsed": "订阅额度已用完",
+      "subRetry": "订阅暂时不可用",
+      "subSelectionChanged": "订阅选择已失效",
+      "subRateLimited": "订阅请求受限",
+      "subAccessDenied": "服务商拒绝订阅访问",
+      "modelRejected": "模型请求被拒绝",
+      "quotaChecking": "订阅额度待确认",
+      "runtimeUnavailable": "当前环境不支持此订阅",
+      "modelNotReported": "云电脑没报告能跑这个模型",
+      "hostedQuotaUsed": "Mikka 额度已用完",
+      "hostedPaused": "Mikka 额度暂时不可用",
+      "temporarilyUnavailable": "暂时不可用",
+      "wakeWaiting": "回复等待重试",
+      "wakeUnconfirmed": "回复启动未确认",
+      "wakeExhausted": "回复重试已停止",
+      "apiBalance": "API 余额不足",
+      "replyIncomplete": "回复未完成，请重试",
+      "replyFailed": "回复失败"
+    },
+    "item": "{count} 条",
+    "items": "{count} 条"
   },
   "PersonalFiles": {
     "archiveFolderTitle": "归档“{name}”？",
@@ -8105,12 +8329,15 @@
       "machine": "机器",
       "machineDefault": "按工作区设置",
       "machineCloud": "云端",
+      "agent": "Agent",
+      "agentNone": "选择 Agent",
       "profile": "Agent 配置",
       "timezone": "时区",
       "triggers": "满足任一条件就运行",
       "schedule": "定时",
       "manual": "手动运行",
       "runNow": "立即运行",
+      "runUnconfirmed": "尚未收到运行确认。可以再次点击“立即运行”重试。",
       "scheduleKind": {
         "once": "一次",
         "interval": "每隔",
@@ -8179,6 +8406,7 @@
         "repository": "每个 GitHub 事件都要选仓库",
         "title": "写上名称才能保存",
         "prompt": "写上要它做什么才能保存",
+        "agent": "选一个 Agent 才能保存",
         "time": "这个时间不存在或格式不对",
         "fold": "选较早或较晚后才能保存",
         "interval": "间隔要在 1 分钟到 1 年之间",
@@ -8236,7 +8464,9 @@
         "notInstalled": "先在设置里把 Slack 连到这个工作区",
         "noChannels": "Mikka 的 Slack 应用还看不到频道，先把它加进频道",
         "channelsError": "Slack 频道没加载出来"
-      }
+      },
+      "viewOnly": "只有创建者能修改。需要的话接手它。",
+      "devicesError": "设备加载失败"
     },
     "run": {
       "from": "由「{event}」触发 · {what}",
@@ -8290,5 +8520,127 @@
       "app": "去连接",
       "invite": "去邀请"
     }
+  },
+  "PullDirectory": {
+    "overview": "概览",
+    "changes": "改动",
+    "none": "无",
+    "notReported": "未报告",
+    "tasks": "任务",
+    "diffSize": "改动量",
+    "openReview": "打开审阅",
+    "noLinkedTask": "没有关联的任务。",
+    "moreActions": "更多",
+    "readingViews": "视图",
+    "countAll": "共 {count} 个",
+    "countShown": "{shown} / {count}",
+    "filter": "筛选",
+    "filters": "筛选，已启用 {count} 项",
+    "done": "完成",
+    "anyState": "全部状态",
+    "anyAuthor": "全部作者",
+    "anyLabel": "全部标签",
+    "stateValue": "状态 {value}",
+    "authorValue": "@{value}",
+    "labelValue": "标签 {value}",
+    "linkedOnly": "只看关联",
+    "removeFilter": "移除筛选 {name}",
+    "openTask": "打开任务",
+    "openTaskNamed": "打开任务 {name}",
+    "branch": "分支",
+    "description": "描述",
+    "showMore": "展开",
+    "showLess": "收起",
+    "viewsMenu": "视图，已保存 {count} 个",
+    "savedViews": "已保存的视图",
+    "noSavedViews": "还没有保存的视图",
+    "viewDefaultName": "{view}视图",
+    "title": "PR",
+    "source": "仓库",
+    "linkedPulls": "关联的 PR",
+    "refresh": "刷新",
+    "newPull": "在 GitHub 新建 PR",
+    "viewLabel": "PR 视图",
+    "views": {
+      "open": "打开",
+      "ready": "可合并",
+      "merged": "已合并",
+      "all": "全部"
+    },
+    "search": "搜索 PR",
+    "state": "状态",
+    "author": "作者",
+    "label": "标签",
+    "grouping": "分组",
+    "groups": {
+      "state": "按状态",
+      "repo": "按仓库",
+      "author": "按作者",
+      "none": "不分组"
+    },
+    "states": {
+      "ready": "可合并",
+      "pending": "检查中",
+      "failed": "检查失败",
+      "draft": "草稿",
+      "open": "打开",
+      "merged": "已合并",
+      "closed": "已关闭"
+    },
+    "clearFilters": "清除筛选",
+    "saveView": "保存视图",
+    "viewName": "视图名称",
+    "deleteView": "删除视图 {name}",
+    "save": "保存",
+    "cancel": "取消",
+    "repositoryError": "无法读取 GitHub 仓库。",
+    "connectGitHub": "连接 GitHub 后可浏览仓库的 PR。",
+    "connections": "连接",
+    "retry": "重试",
+    "loadError": "PR 加载失败。",
+    "list": "PR 列表",
+    "loading": "正在加载 PR",
+    "noLoadedMatches": "已加载的 PR 中没有匹配项，加载更多后继续查找。",
+    "noMatches": "没有符合筛选条件的 PR。",
+    "empty": "还没有 PR。",
+    "selectPull": "选择 PR #{number}",
+    "pin": "固定",
+    "unpin": "取消固定",
+    "more": "加载更多 PR",
+    "loadedPartial": "已加载 {count} 个 PR · 还有更多",
+    "loaded": "已加载 {count} 个 PR",
+    "preview": "PR 预览",
+    "copyLink": "复制链接",
+    "openGitHub": "在 GitHub 打开",
+    "closePreview": "关闭预览",
+    "selection": "已选 PR",
+    "selected": "已选 {count} 项",
+    "copyLinks": "复制链接",
+    "deselect": "取消选择",
+    "copied": "已复制",
+    "copyError": "复制失败，请重试。",
+    "pinned": "已固定",
+    "results": "PR",
+    "unknownAuthor": "未知作者",
+    "checks": "检查",
+    "review": "审阅",
+    "updated": "更新于",
+    "threads": "线程",
+    "checksState": {
+      "SUCCESS": "通过",
+      "PENDING": "检查中",
+      "FAILURE": "失败",
+      "ERROR": "出错",
+      "EXPECTED": "等待检查",
+      "unknown": "未报告"
+    },
+    "reviewState": {
+      "APPROVED": "已通过",
+      "CHANGES_REQUESTED": "要求修改",
+      "REVIEW_REQUIRED": "等待审阅",
+      "unknown": "未报告"
+    },
+    "linkedSnapshot": "上次交付时的状态。当前检查与审阅请在 GitHub 查看。",
+    "resizePreview": "调整拉取请求预览宽度"
   }
 }

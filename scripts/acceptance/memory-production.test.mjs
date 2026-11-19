@@ -57,8 +57,8 @@ function fixture(options = {}) {
   const choice = (bot, override = {}) => ({ id: id(bot.harness === 'codex' ? 21 : 20), provider: bot.harness === 'codex' ? 'codex' : 'claude',
     modelId: bot.harness === 'codex' ? 'gpt-6-luna' : 'claude-haiku-5-5', kind: 'subscription', chosen: true, available: true, ...override })
   const menu = bot => ({ groups: [
-    { kind: 'subscription', provider: 'claude', owner: 'shared owner private canary', options: [{ id: id(20), provider: 'claude', modelId: 'claude-haiku-5-5' }] },
-    { kind: 'subscription', provider: 'codex', owner: 'shared owner private canary', options: [{ id: id(21), provider: 'codex', modelId: 'gpt-6-luna' }] },
+    { kind: 'subscription', provider: 'claude', options: [{ id: id(20), provider: 'claude', modelId: 'claude-haiku-5-5' }] },
+    { kind: 'subscription', provider: 'codex', options: [{ id: id(21), provider: 'codex', modelId: 'gpt-6-luna' }] },
   ], current: bot.harness ? choice(bot, options.fallbackHarness === bot.harness ? { fallback: 'quota', kind: 'apiKey' } : {}) : { kind: 'hosted' } })
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input), path = url.pathname.replace(/^\/mikka/, ''), method = init.method ?? 'GET'
@@ -434,34 +434,28 @@ test('stream success requires a committed exact reply; a tool, provider error or
   assert.deepEqual(value, { committedReply: true, workflowFingerprint: createHash('sha256').update('wrun_Fixture123').digest('hex') })
 })
 
-test('the normal main/Web guard includes the memory issue without a dispatch or credential bypass', async () => {
+test('the main-dispatch live-build guard includes the memory issue without a relabelled event or credential bypass', async () => {
   assert.ok(CORE_ISSUES.includes(1821))
   const repository = { full_name: 'alexj11324/Mikka', owner: { login: 'alexj11324' } }, api = 'https://api.github.com/repos/alexj11324/Mikka'
   const env = { MIKKA_ACCEPTANCE_TARGET_MODE: CORE_MODE, GITHUB_REPOSITORY: repository.full_name, GITHUB_REPOSITORY_OWNER: 'alexj11324',
-    GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_run', GITHUB_SHA: SHA, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: SHA, GITHUB_RUN_ID: '17', GITHUB_RUN_ATTEMPT: '1',
     GITHUB_WORKFLOW_REF: repository.full_name + '/' + CORE_WORKFLOW + '@refs/heads/main', GH_TOKEN: 'synthetic-token' }
-  const release = { id: 51, run_attempt: 1, repository, head_repository: repository, event: 'push', head_branch: 'main', head_sha: SHA,
-    name: 'Web deploy', path: '.github/workflows/web-deploy.yml', status: 'completed', conclusion: 'success', url: api + '/actions/runs/51' }
-  const event = { action: 'completed', repository, workflow_run: release }
+  const event = { repository }
   const fetchImpl = async input => {
     const url = new URL(input), path = url.href.slice(api.length)
     if (url.origin === 'https://app.aspectlylabs.com') return response({ build: SHA })
     if (path.startsWith('/issues/')) { const number = Number(path.slice(8)); return response({ number, url: url.href, repository_url: api, state: number === 1821 ? 'open' : 'closed' }) }
     if (path === '/actions/runs/17') return response({ id: 17, run_attempt: 1, repository, head_repository: repository,
-      url: url.href, path: CORE_WORKFLOW, event: 'workflow_run', head_branch: 'main', head_sha: SHA, status: 'in_progress', conclusion: null })
+      url: url.href, path: CORE_WORKFLOW, event: 'workflow_dispatch', head_branch: 'main', head_sha: SHA, status: 'in_progress', conclusion: null })
     if (path === '/git/ref/heads/main') return response({ ref: 'refs/heads/main', object: { type: 'commit', sha: SHA } })
-    if (path === '/actions/runs/51') return response(release)
-    if (path.endsWith('/attempts/1/jobs?per_page=100')) return response({ total_count: 1, jobs: [{ id: 61, name: 'deploy', run_id: 51, head_sha: SHA,
-      status: 'completed', conclusion: 'success', steps: ['Verify the official runtime stays on the cloud edition',
-        'Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
-        'Verify the public production version before releasing the deployment queue'].map(name => ({ name, status: 'completed', conclusion: 'success' })) }] })
     assert.fail('unexpected target metadata request')
   }
   const proof = await attestCoreProduction({ env, event, fetchImpl, now: () => NOW })
   assert.equal(proof.status, 'ready'); assert.deepEqual(proof.openIssues, [1821])
-  await assert.rejects(attestCoreProduction({ env: { ...env, GITHUB_EVENT_NAME: 'workflow_dispatch' }, event, fetchImpl, now: () => NOW }))
+  await assert.rejects(attestCoreProduction({ env: { ...env, GITHUB_EVENT_NAME: 'push' }, event, fetchImpl, now: () => NOW }))
   const workflow = yaml.load(await readFile(new URL('../../.github/workflows/self-hosted-production.yml', import.meta.url), 'utf8'))
-  assert.equal(workflow.on.workflow_dispatch, undefined)
+  assert.equal(workflow.on.workflow_run, undefined, 'per-service releases publish no Web deploy run to follow')
+  assert.ok('workflow_dispatch' in workflow.on)
   assert.ok(workflow.concurrency.group.includes('production-smoke-owner-acceptance'))
   assert.equal(workflow.concurrency.queue, 'max'); assert.equal(workflow.concurrency['cancel-in-progress'], false)
   assert.ok(workflow.jobs.guards.steps.some(step => step.run?.includes('memory-production.test.mjs')))

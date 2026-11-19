@@ -135,7 +135,7 @@ async function inventory(client, shared) {
   chatFallback(keys)
   check(management.profiles.length < 101, 'profile_inventory_truncated')
   const sources = order.candidates.filter(row => row.source?.kind === 'subscription' && uuid(row.source.connectionId)
-    && row.credentialOwnerId === shared.adminId && CASES.some(item => row.harness === item.harness && row.model === item.model))
+    && row.credentialOwnerId === shared.ownerId && CASES.some(item => row.harness === item.harness && row.model === item.model))
   return { projects, bots, resources, github, management, sources, keys }
 }
 const sameSource = (row, item, connectionId) => row?.harness === item.harness && row?.model === item.model
@@ -438,8 +438,8 @@ export function runReceipt(evidence, shared, scope, issueId) {
     && identity.executionPrincipal === shared.ownerId && identity.outputOwner === shared.ownerId
     && identity.botOwner === shared.ownerId && identity.botId === shared.botId
     && identity.personalResourcePolicy === 'requester_only' && uuid(device?.id) && device.ownerId === shared.ownerId && device.access === 'owner'
-    && subscriptions.length === 1 && subscriptions[0].ownerId === shared.adminId && subscriptions[0].access === 'workspace_share'
-    && identity.billingAccount?.model?.kind === 'subscription' && identity.billingAccount.model.ownerId === shared.adminId
+    && subscriptions.length === 1 && subscriptions[0].ownerId === shared.ownerId && subscriptions[0].access === 'owner'
+    && identity.billingAccount?.model?.kind === 'subscription' && identity.billingAccount.model.ownerId === shared.ownerId
     && identity.billingAccount.model.resourceId === subscriptions[0].id && identity.billingAccount?.runtime?.kind === 'e2b'
     && identity.billingAccount.runtime.ownerId === shared.ownerId, 'run_scope_mismatch')
   return { runId: run.id, harness: run.harness, model: run.model, credentialType: run.credentialType,

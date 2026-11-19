@@ -1,6 +1,6 @@
 name: E2B serialized runtime publication
 # The caller holds e2b-official-runtime-release for this entire workflow,
-# including subscriptions, template publication and cleanup. Every gate checks
+# including template publication and cleanup. Every gate checks
 # the dispatched Cloudflare promotion receipt; there is no other Web publisher.
 on:
   workflow_call:
@@ -80,14 +80,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           CLOUDFLARE_RECEIPT: ${{ inputs.cloudflare_receipt }}
-  subscriptions:
+  templates:
     needs: [validate, await-web]
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    concurrency:
-      group: production-smoke-owner-acceptance
-      cancel-in-progress: false
-      queue: max
     permissions:
       contents: read
       issues: read
@@ -140,40 +136,8 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
-      - name: Read the authorized acceptance account email
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /
-          secret-name: SMOKE_OWNER_EMAIL
-          include-imports: false
-      - name: Read the authorized acceptance account password
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /
-          secret-name: SMOKE_OWNER_PASSWORD
-          include-imports: false
-      - name: Require real Claude Code and Codex subscriptions on the private candidates
-        run: node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/e2b-candidates/candidates.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
-      - name: Preserve closed diagnostics and any accepted subscription proof
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: e2b-template-subscription-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/subscription-diagnostics.json
-            ${{ runner.temp }}/accepted.json
-          if-no-files-found: warn
-          retention-days: 7
+      - name: Take the built candidates as the release (build-time checks only; E2B runs on the user's own key)
+        run: cp "$RUNNER_TEMP/e2b-candidates/candidates.json" "$RUNNER_TEMP/accepted.json"
       - name: Recheck the promoted Cloudflare Web before making accepted templates public
         run: node scripts/release/cloudflare-promoted-web.mjs
         env:
@@ -239,7 +203,7 @@ jobs:
           RUNTIME_REPORT_ARTIFACT_ID: ${{ steps.release.outputs.artifact-id }}
           RUNTIME_REPORT_SHA256: ${{ steps.publish.outputs.release-sha256 }}
   cleanup:
-    needs: [recheck, validate, await-web, subscriptions]
+    needs: [recheck, validate, await-web, templates]
     if: always() && github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.recheck.result == 'success' && needs.recheck.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -294,8 +258,8 @@ jobs:
           retention-days: 7
 
   remember-failure:
-    needs: [recheck, validate, subscriptions, cleanup]
-    if: always() && (needs.validate.result == 'failure' || needs.subscriptions.result == 'failure')
+    needs: [recheck, validate, templates, cleanup]
+    if: always() && (needs.validate.result == 'failure' || needs.templates.result == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

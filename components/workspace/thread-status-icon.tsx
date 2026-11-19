@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { threadGroup, type ThreadGroup, type ThreadOutcome } from '@/lib/thread-groups'

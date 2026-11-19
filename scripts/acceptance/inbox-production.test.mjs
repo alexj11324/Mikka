@@ -380,5 +380,5 @@ test('workflow keeps the existing current-main queue and two narrow Infisical se
   assert.match(workflow, /pull-requests: read/)
   assert.ok(workflow.indexOf('inbox-production.mjs --select') < workflow.indexOf('uses: Infisical/secrets-action'))
   assert.match(workflow, /if: steps\.inbox_selection\.outputs\.selected == 'true'/)
-  assert.doesNotMatch(workflow, /workflow_dispatch:|contents: write|actions: write|continue-on-error: true[\s\S]{0,180}inbox-production\.mjs/)
+  assert.doesNotMatch(workflow, /workflow_run:|contents: write|actions: write|continue-on-error: true[\s\S]{0,180}inbox-production\.mjs/)
 })

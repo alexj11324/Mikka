@@ -143,19 +143,24 @@ export async function listFacts(userId: string): Promise<ShownFact[]> {
  * The section of the Coordinator's system prompt that states what Mikka knows
  * about the person (lib/profile/prompt.ts), or '' when there is nothing to say.
  *
- * It reads the same rows 记忆 shows, through the same active-state filter, so
- * the two can never disagree about what Mikka believes; what differs is only
- * the reach of each surface: 记忆 shows every repository's facts, and a chat is
- * told the person-level ones plus those of the repositories its workspace
- * actually works in. `used` is those repositories (lib/coordinator/github-context.ts
- * usedRepositoriesForBot). An unreadable profile leaves the section out, never
- * fails the turn.
+ * It reads the same rows 记忆 shows, through the same active-and-approved
+ * filter, so the two can never disagree about what Mikka believes; what differs
+ * is only the reach of each surface: 记忆 shows every repository's facts, and a
+ * chat is told the person-level ones plus those of the repositories its
+ * workspace actually works in. `used` is those repositories
+ * (lib/coordinator/github-context.ts usedRepositoriesForBot). An unreadable
+ * profile leaves the section out, never fails the turn.
+ *
+ * `reviewStatus` is part of that filter. A fact Mikka extracts arrives `pending`
+ * (lib/profile/store.ts recordFacts) and only 记忆's approve action makes it
+ * `approved` (lib/profile/memory.ts reviewMemoryFact); stating a pending one
+ * here would act on what the person has not seen or agreed to.
  */
 export async function profilePromptSection(userId: string, used: readonly string[]): Promise<string> {
   const rows = await db.select({
     kind: userFacts.kind, subject: userFacts.subject, repository: userFacts.repository, confidence: userFacts.confidence,
     lastSeenAt: userFacts.lastSeenAt, userEdited: userFacts.userEdited,
-  }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'))).limit(500)
+  }).from(userFacts).where(and(eq(userFacts.userId, userId), eq(userFacts.state, 'active'), eq(userFacts.reviewStatus, 'approved'))).limit(500)
   return profileSection(promptFacts(rows as PromptFact[], used))
 }
 

@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type RefObject,
@@ -42,7 +43,7 @@ import {
   type BlockMenuState,
 } from "./rich-text-block-menu"
 import { keepEditorFocus, ShortcutKeys } from "./rich-text-toolbar"
-import { PlusIcon, GripVerticalIcon } from "lucide-react"
+import { Plus, GripVertical } from "@/components/icons"
 
 // Room between the gutter and the text, and how far below the last row a
 // pointer still counts as on it (the widest gap between blocks is 40px).
@@ -273,6 +274,7 @@ export function RichTextBlockGutter({
     const wide = window.matchMedia(SM_QUERY)
     let lastX = -1
     let lastY = -1
+    let leaveTimer: number | undefined
 
     function show(next: boolean) {
       if (shownRef.current === next) return
@@ -312,6 +314,8 @@ export function RichTextBlockGutter({
 
     function handlePointerMove(event: PointerEvent) {
       if (event.pointerType === "touch") return
+      window.clearTimeout(leaveTimer)
+      if (event.target instanceof Node && gutter?.contains(event.target)) return
       if (event.clientX === lastX && event.clientY === lastY) return
       lastX = event.clientX
       lastY = event.clientY
@@ -320,8 +324,13 @@ export function RichTextBlockGutter({
     }
 
     function handlePointerLeave() {
-      pointerRef.current = null
-      follow()
+      window.clearTimeout(leaveTimer)
+      // Give a diagonal movement from the text into the floating controls a moment to arrive.
+      leaveTimer = window.setTimeout(() => {
+        lastX = lastY = -1
+        pointerRef.current = null
+        follow()
+      }, 150)
     }
 
     // Typing hides the gutter until the pointer moves again.
@@ -401,6 +410,7 @@ export function RichTextBlockGutter({
     const unregister = registerBlockMenuOpener(editor, openFromShortcut)
 
     return () => {
+      window.clearTimeout(leaveTimer)
       followRef.current = null
       unregister()
       observer.disconnect()
@@ -460,7 +470,8 @@ export function RichTextBlockGutter({
       data-visible={visible ? "" : undefined}
       data-present={visible || dragging ? "" : undefined}
       inert={!visible && !dragging}
-      className="pointer-events-none absolute top-0 left-0 z-10 hidden -translate-x-full -translate-y-1/2 items-center gap-0.5 opacity-0 transition-[opacity,display] transition-discrete duration-150 ease-out data-visible:pointer-events-auto data-visible:opacity-100 motion-reduce:transition-none data-present:sm:flex data-visible:starting:opacity-0"
+      style={{ "--block-gutter-bridge": `${gap + 2}px` } as CSSProperties}
+      className="pointer-events-none absolute top-0 left-0 z-10 hidden after:absolute after:inset-y-0 after:left-full after:w-[var(--block-gutter-bridge)] after:content-[''] -translate-x-full -translate-y-1/2 items-center gap-0.5 opacity-0 transition-[opacity,display] transition-discrete duration-150 ease-out data-visible:pointer-events-auto data-visible:opacity-100 motion-reduce:transition-none data-present:sm:flex data-visible:starting:opacity-0"
     >
       <Tooltip>
         <TooltipTrigger
@@ -476,7 +487,7 @@ export function RichTextBlockGutter({
             />
           }
         >
-          <PlusIcon aria-hidden="true" />
+          <Plus aria-hidden="true" />
         </TooltipTrigger>
         <TooltipContent>
           <span className="flex flex-col items-start gap-0.5">
@@ -521,7 +532,7 @@ export function RichTextBlockGutter({
                 />
               }
             >
-              <GripVerticalIcon aria-hidden="true" />
+              <GripVertical aria-hidden="true" />
             </DropdownMenuTrigger>
           </TooltipTrigger>
           <TooltipContent>

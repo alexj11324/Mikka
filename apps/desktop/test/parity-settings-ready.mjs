@@ -128,7 +128,6 @@ export async function settingsReady(page, id, fixture, messages) {
         has: page.getByRole('heading', { level: 2, name: t('Settings.agentProfiles.title'), exact: true }),
       })
       await enabled(role('button', 'Settings.agentProfiles.add', profileHeader))
-      await either(role('switch', 'Settings.subscriptionShare.others'), text('Settings.subscriptionShare.blocked'))
       break
     }
     case 'logins':

@@ -20,7 +20,7 @@ function check(value, code) { if (!value) throw new Refusal(code) }
 export function target(env) {
   const build = env.ATTACHMENT_EXPECTED_SHA
   check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === 'alexj11324/Mikka'
-    && env.GITHUB_REF === 'refs/heads/main' && env.GITHUB_EVENT_NAME === 'workflow_run'
+    && env.GITHUB_REF === 'refs/heads/main' && env.GITHUB_EVENT_NAME === 'workflow_dispatch'
     && /^[0-9a-f]{40}$/.test(build ?? '') && build === env.GITHUB_SHA
     && /^[1-9]\d{0,19}$/.test(env.GITHUB_RUN_ID ?? '') && /^[1-9]\d{0,4}$/.test(env.GITHUB_RUN_ATTEMPT ?? ''), 'target_refused')
   return { build, fixture: historical.primary, run: env.GITHUB_RUN_ID }

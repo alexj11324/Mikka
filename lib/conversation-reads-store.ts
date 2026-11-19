@@ -157,11 +157,24 @@ export async function handleRead(q: Queryable, request: ReadRequest): Promise<Re
  * in unreadCount, consecutive assistant rows count as one reply. A legacy
  * Coordinator cursor belongs only to the bot that actually owns its message. */
 export async function botUnreadCounts(q: Queryable, userId: string, botIds: string[]) {
-  if (!botIds.length) return new Map<string, number>()
-  const { rows: [row] } = await q.query<{ counts: (number | null)[] }>(`
+  return (await botReadState(q, userId, botIds)).counts
+}
+
+/** A bot's own 置顶 / 通知 / 隐藏 (lib/chat-preferences.ts), for the bot list. */
+export type BotChatPreference = { pinned: boolean; muted: boolean; hidden: boolean; pinOrder: number | null }
+
+/**
+ * Each bot's unread count and, in the same read, the person's own preferences for the bots that have any
+ * (the bot list's one poll, tests/request-query-count.db.test.ts and tests/bot-summary-bytes.db.test.ts).
+ */
+export async function botReadState(q: Queryable, userId: string, botIds: string[]) {
+  const preferences = new Map<string, BotChatPreference>()
+  if (!botIds.length) return { counts: new Map<string, number>(), preferences }
+  const { rows: [row] } = await q.query<{ counts: (number | null)[]; prefs: Record<string, string> | null }>(`
     with visible as (
       select b.id, requested.ordinality, greatest(coalesce(r."lastReadPosition",0), coalesce(old_message.position,0)) as cursor,
-        coalesce(p."markedUnread",false) as marked
+        coalesce(p."markedUnread",false) as marked,
+        case when p."chatKey" is null then null else concat(p.pinned::int, p.muted::int, p.hidden::int, p."pinOrder") end as pref
       from unnest($2::uuid[]) with ordinality requested(id,ordinality)
       left join bots b on b.id=requested.id and b."ownerId"=$1
       left join conversation_reads r on r."userId"=$1 and r."conversationId"='bot:' || b.id::text
@@ -176,8 +189,13 @@ export async function botUnreadCounts(q: Queryable, userId: string, botIds: stri
         select position, message->>'role' as role, lag(message->>'role') over (order by position) as prev
         from coordinator_messages where "userId"=$1 and "botId"=v.id and message->>'role' in ('user','assistant')
       ) m on true group by v.ordinality,v.id,v.marked
-    ) select array_agg(count order by ordinality) as counts from totals`, [userId, botIds])
+    ) select array_agg(count order by ordinality) as counts,
+      (select jsonb_object_agg(id, pref) from visible where pref is not null) as prefs from totals`, [userId, botIds])
   // The caller already has the ordered IDs. Return one count per requested
   // slot from PostgreSQL, without transferring every UUID a second time.
-  return new Map(row.counts.flatMap((count, index) => count === null ? [] : [[botIds[index], count] as const]))
+  const counts = new Map(row.counts.flatMap((count, index) => count === null ? [] : [[botIds[index], count] as const]))
+  // A preference is pinned, muted and hidden as 0 or 1, then the pin order: only bots the person changed are sent.
+  for (const [id, pref] of Object.entries(row.prefs ?? {}))
+    preferences.set(id, { pinned: pref[0] === '1', muted: pref[1] === '1', hidden: pref[2] === '1', pinOrder: pref.length > 3 ? Number(pref.slice(3)) : null })
+  return { counts, preferences }
 }

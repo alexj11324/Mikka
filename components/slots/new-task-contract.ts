@@ -21,6 +21,9 @@ export type NewTaskBot = { id: string | null; name: string; avatar: ReactNode }
 /** An Agent 配置 choice; `icon` is its ProfileMark as Mikka draws it, absent for 自动. */
 export type NewTaskProfile = { value: string; label: string; detail?: string; disabled?: boolean; icon?: ReactNode }
 
+/** An Agent the task can run on (Claude Code or Codex). */
+export type NewTaskAgent = { value: 'claude_code' | 'codex'; label: string }
+
 export type NewTaskProps = {
   intent?: 'create_only' | 'create_and_dispatch'
   /** 创建方式, when the person may switch between 只创建 and 创建并派发 (a page that can open the created task). */
@@ -51,6 +54,13 @@ export type NewTaskProps = {
   bots: NewTaskBot[]
   bot: string | null
   onBot: (id: string | null) => void
+  /** 交给哪个 Agent: required to create and dispatch; `value` is null until the person picks one (nothing is preselected). */
+  agent: {
+    choices: NewTaskAgent[]
+    value: NewTaskAgent['value'] | null
+    onChange: (value: NewTaskAgent['value']) => void
+    disabled: boolean
+  }
   profile: {
     choices: NewTaskProfile[]
     value: string
@@ -68,7 +78,7 @@ export type NewTaskProps = {
   /** 继续新建 (Capy's Create more): on, a created task clears the window and leaves it open for the next one. */
   more: { checked: boolean; onChange: (checked: boolean) => void }
   sending: boolean
-  /** Whether 创建任务 can send now (a title or text, a usable profile, files done, creation available). */
+  /** Whether 创建任务 can send now (a title or text, an Agent, a usable profile, files done, creation available). */
   canSubmit: boolean
   onSubmit: () => void
 }

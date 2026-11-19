@@ -1,9 +1,9 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import type { LucideIcon, LucideProps } from 'lucide-react'
+import type { IconGlyph, IconProps } from '@/components/icons'
 import { useTranslations } from 'next-intl'
-import { Check } from 'lucide-react'
+import { Check } from '@/components/icons'
 import { BadgeButton } from '@/components/reui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -14,8 +14,8 @@ import { statusDots, statusIconTints, statusTones, type StatusTone } from '@/lib
 export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, disabled, iconOnly = false, variant = 'badge', displayValue, renderIcon, valueIcon, onChange }: {
   label: string
   value: string
-  options: readonly { value: string; label: string; icon?: LucideIcon; iconProps?: Pick<LucideProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string; tone?: StatusTone }[]
-  icon: LucideIcon
+  options: readonly { value: string; label: string; icon?: IconGlyph; iconProps?: Pick<IconProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string; tone?: StatusTone }[]
+  icon: IconGlyph
   disabled?: boolean
   pill?: boolean
   compact?: boolean
@@ -65,7 +65,7 @@ export function IssuePropertyMenu({ label, value, options, icon: FallbackIcon, d
   </DropdownMenu>
 }
 
-type MenuOption = { value: string; icon?: LucideIcon; iconProps?: Pick<LucideProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string; tone?: StatusTone }
+type MenuOption = { value: string; icon?: IconGlyph; iconProps?: Pick<IconProps, 'viewBox' | 'strokeWidth'>; indicatorClassName?: string; tone?: StatusTone }
 
 /** Statuses carry their color; priorities stay grey, as their bars already say how urgent (R-34). */
 function optionTint(option: MenuOption | undefined): StatusTone {

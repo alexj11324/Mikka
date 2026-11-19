@@ -36,7 +36,8 @@ export type ModelDispatch =
  * is refused before anything is queued. Null when it is listed, or when nothing was named (the list's first runnable entry).
  */
 export async function modelNotAllowed(pool: Pool, scope: OrderScope, asked?: { harness: OrderEntry['harness']; model?: string } | null): Promise<{ error: 'modelNotAllowed'; asked: { harness: OrderEntry['harness']; model?: string }; allowed: { harness: OrderEntry['harness']; model: string }[] } | null> {
-  if (!asked) return null
+  // The Agent alone is not a model: with nothing on its list, dispatch's own card says what to add.
+  if (!asked?.model) return null
   // Any catalogue model may run on Mikka 额度 (decision 2026-11-15-2000).
   if (asked.model && (await import('./model-catalog')).isCatalogId(asked.model)) return null
   await new (await import('./execution-settings')).ExecutionSettings(pool).ensureCatalogues(scope)

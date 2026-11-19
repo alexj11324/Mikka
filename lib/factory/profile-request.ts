@@ -4,13 +4,14 @@ import { AgentProfileError } from './agent-profile-definition'
 import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from './agent-profile-reference'
 import { readProfileRow } from './agent-profile-store'
 import { taskDestinationSchema, type TaskDestination } from '../task-destination'
+import { taskAgentSchema, type TaskAgent } from '../task-create-command'
 
 /** A selection from the owner's task form is authoritative. Otherwise the
  * Coordinator may choose one of the owner's Agent 配置 itself (decision
  * 2026-11-15-1630): a Profile is content only and grants no permission. */
 export async function requestedTaskSelection(pool: Pick<Pool, 'query'>, scope: { ownerId: string; workspaceId: string; botId: string },
-  eventId: string | undefined, offered: string | undefined): Promise<{ profileId?: string; taskDestination?: TaskDestination; commandIssueId?: string }> {
-  const chosen = async (selection: { taskDestination?: TaskDestination; commandIssueId?: string }) => {
+  eventId: string | undefined, offered: string | undefined): Promise<{ profileId?: string; taskDestination?: TaskDestination; commandIssueId?: string; agent?: TaskAgent }> {
+  const chosen = async (selection: { taskDestination?: TaskDestination; commandIssueId?: string; agent?: TaskAgent }) => {
     if (!offered) return selection
     // The retired built-in route is never chosen by a model.
     if (offered === BUILTIN_AGENT_PROFILE_ID) throw new AgentProfileError('agentProfilePinConflict')
@@ -26,7 +27,10 @@ export async function requestedTaskSelection(pool: Pick<Pool, 'query'>, scope: {
   const destination = taskDestinationSchema.safeParse(event?.payload?.taskDestination)
   const explicit = event?.payload?.taskCommand?.intent === 'create_and_dispatch'
   if (explicit && !event.commandIssueId) throw new AgentProfileError('factorySourceMismatch')
-  const selection = { ...(destination.success ? { taskDestination: destination.data } : {}), ...(explicit ? { commandIssueId: String(event.commandIssueId) } : {}) }
+  // The command's Agent (task form or schedule) is the task's; a command without one is refused by dispatch.
+  const agent = explicit ? taskAgentSchema.safeParse(event.payload.taskCommand.agent) : undefined
+  const selection = { ...(destination.success ? { taskDestination: destination.data } : {}), ...(explicit ? { commandIssueId: String(event.commandIssueId) } : {}),
+    ...(agent?.success ? { agent: agent.data } : {}) }
   const selected = agentProfileReferenceSchema.safeParse(event?.payload?.profileId)
   if (selected.success) return { ...selection, profileId: selected.data }
   return chosen(selection)
