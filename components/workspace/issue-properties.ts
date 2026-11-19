@@ -1,9 +1,8 @@
-import { Circle, CircleDashed, CircleX, CircleSlash2, type LucideIcon } from 'lucide-react'
+import { Circle, CircleCheck, CircleDashed, CircleDot, CircleSlash2, CircleX, Eye, type LucideIcon } from 'lucide-react'
 
 import { CircleAlert, SignalLow, SignalMedium, SignalHigh, type IconGlyph } from '@/components/icons'
 
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES, type IssuePriority, type IssueStatus } from '@/lib/issue-meta'
-import { StatusDoneIcon, StatusProgressIcon, StatusReviewIcon } from './status-icons'
 import { statusTone } from '@/lib/status-appearance'
 
 type Option = { label: string; icon: LucideIcon }
@@ -11,12 +10,14 @@ type StatusOption = Option & { indicatorClassName: string; surfaceClassName: str
 /** A priority's mark is Mikka's own glyph set, from one bar (low) to three (high); a status keeps its own icon. */
 type PriorityOption = { label: string; icon: IconGlyph; iconProps: { strokeWidth: number } }
 
+// One lucide family for every status and run state (decision 2026-11-18-0300, after LobeHub's ExecutionStatus):
+// the run states are EXECUTION_VISUALS in task-state-icon.tsx.
 const statusOptions = {
   backlog: { label: 'Backlog', icon: CircleDashed, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
   todo: { label: 'Todo', icon: Circle, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
-  doing: { label: 'In Progress', icon: StatusProgressIcon, indicatorClassName: 'text-warning-foreground', surfaceClassName: 'bg-warning/5', borderClassName: 'border-warning/20' },
-  review: { label: 'In Review', icon: StatusReviewIcon, indicatorClassName: 'text-info-foreground', surfaceClassName: 'bg-info/5', borderClassName: 'border-info/20' },
-  done: { label: 'Done', icon: StatusDoneIcon, indicatorClassName: 'text-success-foreground', surfaceClassName: 'bg-success/5', borderClassName: 'border-success/20' },
+  doing: { label: 'In Progress', icon: CircleDot, indicatorClassName: 'text-warning-foreground', surfaceClassName: 'bg-warning/5', borderClassName: 'border-warning/20' },
+  review: { label: 'In Review', icon: Eye, indicatorClassName: 'text-info-foreground', surfaceClassName: 'bg-info/5', borderClassName: 'border-info/20' },
+  done: { label: 'Done', icon: CircleCheck, indicatorClassName: 'text-success-foreground', surfaceClassName: 'bg-success/5', borderClassName: 'border-success/20' },
   canceled: { label: 'Canceled', icon: CircleX, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
   duplicate: { label: 'Duplicate', icon: CircleSlash2, indicatorClassName: 'text-muted-foreground', surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
 } as const satisfies Record<IssueStatus, StatusOption>
