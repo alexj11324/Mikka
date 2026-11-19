@@ -5320,7 +5320,8 @@
       "noneToday": "No new suggestions today."
     },
     "newTaskDialog": {
-      "defaultProject": "My default project",
+      "project": "Project",
+      "status": "Status",
       "projectPreferenceUnavailable": "Could not load or save your project.",
       "intent": "Action",
       "backlogTitlePlaceholder": "Title (optional, defaults to the first line)",

@@ -16,6 +16,8 @@ import type { TaskAgent } from '@/lib/task-create-command'
 import { harnessName } from '@/components/labels/entity-labels'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { AccessChangeDialog } from '@/components/workspace/issue-metadata-controls'
+import { ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
+import { TaskStatusIcon, useTaskStatusLabel } from '@/components/workspace/task-state-icon'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { DeviceIcon } from '@/components/devices/device-icon'
 import { useComputer } from '@/hooks/use-computer'
@@ -33,9 +35,9 @@ import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
 import { taskProfileSelectable, useAgentProfiles } from '@/components/settings/factory-profiles-data'
 import { TaskProfileNotice, useTaskProfileChoices } from './task-profile-picker'
 import { SetupChecklist } from './setup-checklist'
-import { PersonalProjectPicker, usePersonalProjectPicker } from './personal-project-picker'
+import { usePersonalProjectPicker } from './personal-project-picker'
 import { NewTask } from '@ui-slot/new-task'
-import type { NewTaskMachine } from '@/components/slots/new-task-contract'
+import type { NewTaskMachine, NewTaskProps } from '@/components/slots/new-task-contract'
 import { DEFAULT_MACHINE_SIZE, machineHourlyUsd } from '@/lib/cloud-computer/machine-pricing'
 import { usePaywall } from '@/components/billing/paywall'
 
@@ -89,6 +91,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   const projectId = pageProjectId ?? projectPicker.project?.id
   const project = pageProjectId ? pageProject : projectPicker.project?.name
   const tShell = useTranslations('Shell')
+  const tBoard = useTranslations('Shell.board')
   const tDevices = useTranslations('Devices')
   const locationT = useTranslations('Settings.modelOrder')
   const { submit: submitMessage, failureMessage } = useCoordinatorSubmit()
@@ -105,6 +108,10 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   const [sending, setSending] = useState(false)
   // 继续新建: after a create the window stays, cleared, with the same machine, Bot and profile, for the next task.
   const [more, setMore] = useState(false)
+  // 状态: the state the task is created in, a chip beside the other details and Todo by default, as the board's backlog
+  // entry has it. Only a create that carries the status field draws it (a dispatched task's command has none).
+  const [status, setStatus] = useState<IssueStatus>('todo')
+  const statusLabel = useTaskStatusLabel()
   const [picked, setPicked] = useState<string | null>(null)
   // 交给哪个 Agent: the person picks one; nothing is preselected and the task keeps it for life (decision 2026-11-17-1800).
   const [agent, setAgent] = useState<TaskAgent | null>(null)
@@ -168,7 +175,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   async function submit(confirmedFingerprint?: string) {
     const name = title.trim()
     const text = draft.trim() || name
-    const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, picked, botPick, profileId, agent])
+    const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, status, picked, botPick, profileId, agent])
     const confirmAccess = confirmedFingerprint === fingerprint
     if (!text || pending.current || projectPicker.pending || attachments.locked || (only && !workspaceId) || (!only && (!available || !profileAllowed || !agent || botPick && !handler))) return
     // A task on Mikka 额度 (its chat's model, or a Cloudflare machine) with nothing to pay opens 选择套餐 instead (decision 2026-11-15-1900).
@@ -183,7 +190,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
         createRequests.current.set(fingerprint, requestId)
         const { createTaskOnly } = await import('@/app/actions/issues')
         const result = await createTaskOnly({ version: 1, intent: 'create_only', workspaceId, requestId, ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}), ...(confirmAccess ? { confirmAccess: true } : {}),
-          ...backlogTaskDraft(name, text) })
+          ...backlogTaskDraft(name, text, status) })
         if (result.error && 'confirmable' in result && result.confirmable) { setAccessChange({ fingerprint, tasks: Number(result.params?.tasks ?? 1) }); return }
         if (result.error || !('taskId' in result)) { toast.error(actionError(result.error)); return }
         createRequests.current.delete(fingerprint)
@@ -236,8 +243,15 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   if (open && !TaskWindow) throw new Error('Required product UI export missing: new-task.NewTask')
   const machineNote = (machine: Machine) => machine.cloud && !machine.usable ? t('addE2BKey') : !machine.cloud && !machine.usable ? machine.status : undefined
   const slotMachine = (machine: Machine, group: NewTaskMachine['group']): NewTaskMachine => ({ value: machine.value, label: machine.label, icon: <MachineIcon machine={machine} cloudBotId={cloudBotId} />, usable: machine.usable, note: machineNote(machine), group })
+  // The window's context line: the Project the task goes to, and — when the page does not fix one — the Projects the
+  // person may switch to. A workspace with nothing to choose shows no picker at all, and none of it gates submission.
+  const projects = !pageProjectId && !projectPicker.error && projectPicker.data?.organizationId && projectPicker.data.projects.length
+    ? { choices: projectPicker.data.projects.map(item => ({ value: item.id, label: item.name })), value: projectPicker.project?.id ?? '',
+      onChange: (value: string) => { void projectPicker.choose(value || null) }, disabled: sending || projectPicker.pending, noneLabel: tBoard('noProject') }
+    : undefined
+  const statuses: NewTaskProps['status'] = { choices: ISSUE_STATUSES.map(item => ({ value: item.value, label: statusLabel(item.value), mark: <TaskStatusIcon status={item.value} /> })),
+    value: status, onChange: value => setStatus(ISSUE_STATUSES.find(item => item.value === value)?.value ?? 'todo'), disabled: sending }
   const notices = <>
-    {!pageProjectId && <PersonalProjectPicker picker={projectPicker} disabled={sending} />}
     {!only && <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />}
     {!only && !available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
     {!only && coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
@@ -245,7 +259,8 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   </>
   return <>
     {paywall.dialog}
-    {TaskWindow && <TaskWindow onClose={() => onOpenChange(false)} project={project} title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
+    {TaskWindow && <TaskWindow onClose={() => onOpenChange(false)} project={project} projects={projects} status={only ? statuses : undefined}
+      title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
       files={attachments.files.length || attachments.pending.length ? <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} /> : null}
       onAttach={files => { void attach(files) }} accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT}
       machines={only ? [] : [slotMachine(defaults, 'default'), slotMachine(cloud, 'cloud'), ...sponsored.map(item => slotMachine(item, 'cloud')), ...own.map(item => slotMachine(item, 'own'))]} machine={picked ?? 'auto'} onMachine={pick}

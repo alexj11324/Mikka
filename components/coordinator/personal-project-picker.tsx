@@ -1,12 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
 import type { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
 import { personalProjectSelection } from '@/lib/project-input'
-import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 
 type Selection = z.infer<typeof personalProjectSelection>
 type Read = { scope: string; data?: Selection; error?: boolean }
@@ -64,19 +61,4 @@ export function usePersonalProjectPicker(readerId?: string, workspaceId?: string
     }
   }
   return { data, project, pending, error: current?.error === true, choose, reload: () => setVersion(value => value + 1) }
-}
-
-export function PersonalProjectPicker({ picker, disabled }: { picker: ReturnType<typeof usePersonalProjectPicker>; disabled: boolean }) {
-  const t = useTranslations('Shell.newTaskDialog'), board = useTranslations('Shell.board')
-  // Nothing to choose here and nothing to fix: the dialog already creates the
-  // task without a project. A control that cannot change the outcome is noise.
-  if (picker.error) return null
-  if (!picker.data?.organizationId || !picker.data.projects.length) return null
-  return <Label className="flex items-center gap-2 text-sm">{t('defaultProject')}
-    <NativeSelect size="sm" disabled={disabled || picker.pending} value={picker.project?.id ?? ''}
-      onChange={event => { void picker.choose(event.currentTarget.value || null) }}>
-      <NativeSelectOption value="">{board('noProject')}</NativeSelectOption>
-      {picker.data.projects.map(item => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}
-    </NativeSelect>
-  </Label>
 }

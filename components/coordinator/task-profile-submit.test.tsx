@@ -26,6 +26,14 @@ mock.module(new URL('../ui/select.tsx', import.meta.url).href, { namedExports: {
 mock.module(new URL('../slots/new-task.tsx', import.meta.url).href, { namedExports: {
   NewTask: (props: import('../slots/new-task-contract').NewTaskProps) => <>
     <Input id="new-task-name" value={props.title} maxLength={props.titleMax} onChange={event => props.onTitle(event.target.value)} />
+    {props.project && <span data-crumb>{props.project}</span>}
+    {props.projects && <>
+      {props.projects.choices.map(choice => <Button key={choice.value} data-project={choice.value} disabled={props.projects!.disabled}
+        onClick={() => props.projects!.onChange(choice.value)}>{choice.label}</Button>)}
+      <Button data-project="" disabled={props.projects.disabled} onClick={() => props.projects!.onChange('')}>{props.projects.noneLabel}</Button>
+    </>}
+    {props.status && props.status.choices.map(choice => <Button key={choice.value} data-status={choice.value} data-status-picked={choice.value === props.status!.value}
+      disabled={props.status!.disabled} onClick={() => props.status!.onChange(choice.value)}>{choice.label}</Button>)}
     {props.notices}
     {props.chooseIntent && (['create_only', 'create_and_dispatch'] as const).map(value => <Button key={value} data-option={value}
       disabled={props.chooseIntent!.disabled} onClick={() => props.chooseIntent!.onChange(value)}>{value}</Button>)}
@@ -38,7 +46,7 @@ mock.module(new URL('../slots/new-task.tsx', import.meta.url).href, { namedExpor
     <Button aria-keyshortcuts="Control+Enter Meta+Enter" disabled={!props.canSubmit || props.sending} onClick={props.onSubmit}>Shell.newTaskDialog.create</Button>
   </>,
 } })
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => Object.assign((key: string) => `${namespace}.${key}`, { has: (key: string) => Boolean(key) }) } })
 
 let data: AgentProfilesView | undefined, readError: Error | undefined
 const submitted: { text: string; context?: CoordinatorMessageContext }[] = []
@@ -311,19 +319,46 @@ test('new task uses the visible personal Project, accepts No project and preserv
     projectId={explicit} project={explicit ? 'Second' : undefined} initialText="Prepare release."
     initialIntent="create_only" onCreated={() => {}} onOpenChange={() => {}} />
   await render(form())
-  const select = container.querySelector<HTMLSelectElement>('select')!
-  assert.equal(select.value, saved)
+  assert.equal(container.querySelector('[data-crumb]')?.textContent, 'First', 'the context line names the saved default Project')
   await act(async () => create().click())
   assert.equal(manualCommands[0].projectId, saved)
-  await act(async () => {
-    select.value = ''
-    select.dispatchEvent(new browser.Event('change', { bubbles: true }) as unknown as Event)
-  })
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-project=""]')!.click())
   assert.equal(stored, null)
+  assert.equal(container.querySelector('[data-crumb]'), null, 'no Project, no context line')
   await render(form(other))
+  assert.equal(container.querySelector('[data-crumb]')?.textContent, 'Second', 'a project page keeps its own Project')
   await act(async () => create().click())
   assert.equal(manualCommands.at(-1)?.projectId, other)
   assert.deepEqual(requests, ['GET', 'PUT'])
+})
+
+test('a workspace with no Project draws no context line and still creates the task', async () => {
+  let opened = ''
+  await render(<NewTaskDialog open workspaceId={workspaceId} initialText="No Project here." initialIntent="create_only"
+    onCreated={id => { opened = id }} onOpenChange={() => {}} />)
+  assert.equal(container.querySelector('[data-crumb]'), null)
+  assert.equal(container.querySelector('[data-project]'), null, 'nothing to choose, so no picker')
+  assert.equal(create().disabled, false, 'a missing Project is never a precondition')
+  await act(async () => create().click())
+  assert.equal(manualCommands.length, 1)
+  assert.equal(manualCommands[0].projectId, undefined)
+  assert.equal(opened, 'one-task')
+})
+
+test('the status chip starts on Todo and the picked status is the one the task is created in', async () => {
+  await render(<NewTaskDialog open workspaceId={workspaceId} initialText="Keep in backlog." initialIntent="create_only"
+    onCreated={() => {}} onOpenChange={() => {}} />)
+  assert.equal(container.querySelector('[data-status-picked="true"]')?.getAttribute('data-status'), 'todo')
+  await act(async () => container.querySelector<HTMLButtonElement>('[data-status="doing"]')!.click())
+  assert.equal(container.querySelector('[data-status-picked="true"]')?.getAttribute('data-status'), 'doing')
+  await act(async () => create().click())
+  assert.equal(manualCommands[0].status, 'doing', 'the chip reaches the create command')
+})
+
+test('a dispatched task has no status chip: its command carries no status field', async () => {
+  await render(dialog())
+  assert.equal(container.querySelector('[data-status]'), null)
+  assert.equal(submitted.length, 0)
 })
 
 test('Project creation binds the UUID and retries only after a real access refusal is confirmed', async () => {
