@@ -18,6 +18,7 @@ let container: HTMLDivElement, root: Root
 let createRoot: typeof import('react-dom/client')['createRoot']
 let McpConnections: typeof import('./mcp-connections')['McpConnections']
 let readMcpConnections: typeof import('./mcp-connections')['readMcpConnections']
+let useMcpConnections: typeof import('./mcp-connections')['useMcpConnections']
 let page: McpWorkspacePage | undefined, error: Error | undefined
 let requests: { url: string; method: string; body?: unknown }[]
 let respond: (method: string, body?: unknown) => Promise<Response>
@@ -27,13 +28,19 @@ const fixture = (): McpWorkspacePage => ({ workspaceId, workspaceKind: 'team', c
   transport: 'http', enabled: true, revision: 1, authKind: 'header', createdAt: '2026-11-04T00:00:00.000Z',
   ownerId: 'owner', ownerName: 'Connection owner', mine: true, shared: false,
 }] })
-const mutate = mock.fn(async (next: McpWorkspacePage) => { page = next; error = undefined; render(); return next })
+const mutate = mock.fn(async (next: McpWorkspacePage) => { page = next; error = undefined; return next })
 
-function render() {
-  const read = { data: page, error, mutate, isLoading: !page && !error, isValidating: false } as unknown as SWRResponse<McpWorkspacePage>
-  root.render(<McpConnections workspaceId={workspaceId} workspaceName="Research workspace" read={read} />)
+mock.module('swr', { defaultExport: () => ({ data: page, error, mutate, isLoading: !page && !error, isValidating: false }) as unknown as SWRResponse<McpWorkspacePage> })
+
+function Panel({ query, visible }: { query?: string; visible: boolean }) {
+  const read = useMcpConnections(workspaceId)
+  return visible ? <McpConnections workspaceId={workspaceId} workspaceName="Research workspace" read={read} query={query} /> : null
 }
-const shareSwitch = () => container.querySelector<HTMLElement>('[role="switch"]')
+function render(query?: string, visible = true) {
+  root.render(<Panel query={query} visible={visible} />)
+}
+const shareSwitch = () => container.querySelector<HTMLElement>('[role="switch"][aria-label^="shareLabel"]')
+const enabledSwitch = () => container.querySelector<HTMLElement>('[role="switch"][aria-label^="enabledLabel"]')
 const button = (text: string) => [...document.querySelectorAll('button')].find(value => value.textContent === text) as HTMLButtonElement | undefined
 
 before(async () => {
@@ -46,7 +53,7 @@ before(async () => {
   }
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   ;({ createRoot } = await import('react-dom/client'))
-  ;({ McpConnections, readMcpConnections } = await import('./mcp-connections'))
+  ;({ McpConnections, readMcpConnections, useMcpConnections } = await import('./mcp-connections'))
 })
 beforeEach(() => {
   page = fixture(); error = undefined; requests = []
@@ -72,11 +79,13 @@ test('only connection owners in a shareable workspace have a sharing control; pe
   page!.servers[0] = { ...page!.servers[0], mine: false, shared: true, url: null }
   await act(async () => render())
   assert.equal(shareSwitch(), null)
+  assert.equal(enabledSwitch(), null)
   assert.ok(container.textContent?.includes('sharedBy Connection owner'))
   assert.ok(!container.innerHTML.includes('private.example.com'))
   page = { ...fixture(), workspaceKind: 'personal', canShare: false }
   await act(async () => render())
   assert.equal(shareSwitch(), null)
+  assert.equal(enabledSwitch()?.getAttribute('aria-checked'), 'true')
   assert.ok(container.textContent?.includes('onlyYou'))
   assert.equal(requests.length, 0)
 })
@@ -114,6 +123,63 @@ test('unconfirmed revoke disables writes and checks persisted state without repe
   assert.equal(shareSwitch()!.getAttribute('aria-checked'), 'false')
   assert.notEqual(shareSwitch()!.getAttribute('aria-disabled'), 'true')
   assert.ok(!container.textContent?.includes('shareUnconfirmed'))
+})
+
+test('an owner can disable and re-enable their connection through the existing endpoint', async () => {
+  const server = fixture().servers[0]
+  const saved = fixture()
+  saved.servers[0].shared = true
+  respond = async (method, body) => {
+    if (method !== 'PATCH') return Response.json(saved)
+    saved.servers[0].enabled = (body as { enabled: boolean }).enabled
+    saved.servers[0].revision++
+    return Response.json({ server: saved.servers[0] })
+  }
+  await act(async () => render())
+  assert.equal(enabledSwitch()?.getAttribute('aria-checked'), 'true')
+  await act(async () => enabledSwitch()!.click())
+  assert.deepEqual(requests, [
+    { url: withBasePath('/api/integrations/mcp'), method: 'PATCH', body: { id: server.id, enabled: false } },
+    { url: withBasePath(`/api/integrations/mcp?workspaceId=${workspaceId}`), method: 'GET', body: undefined },
+  ])
+  assert.equal(enabledSwitch()?.getAttribute('aria-checked'), 'false')
+  assert.equal(shareSwitch()?.getAttribute('aria-checked'), 'true')
+  assert.equal(button('viewTools'), undefined)
+  await act(async () => enabledSwitch()!.click())
+  assert.deepEqual(requests[2].body, { id: server.id, enabled: true })
+  assert.equal(requests[3].method, 'GET')
+  assert.equal(enabledSwitch()?.getAttribute('aria-checked'), 'true')
+  assert.ok(button('viewTools'))
+})
+
+test('an uncertain enabled change remains blocked after switching tabs and can be checked without another write', async () => {
+  const saved = fixture()
+  saved.servers[0].enabled = false
+  respond = async method => {
+    if (method === 'PATCH') throw new TypeError('Response lost after the server disabled the connection')
+    return Response.json(saved)
+  }
+  await act(async () => render())
+  await act(async () => enabledSwitch()!.click())
+  assert.ok(container.textContent?.includes('enabledUnconfirmed'))
+  await act(async () => render('', false))
+  await act(async () => render())
+  assert.equal(enabledSwitch()?.getAttribute('aria-disabled'), 'true')
+  await act(async () => button('checkAgain')!.click())
+  assert.deepEqual(requests.map(value => value.method), ['PATCH', 'GET'])
+  assert.equal(enabledSwitch()?.getAttribute('aria-checked'), 'false')
+  assert.notEqual(enabledSwitch()?.getAttribute('aria-disabled'), 'true')
+})
+
+test('the MCP tab search trims and filters names without matching private endpoints', async () => {
+  await act(async () => render('  RESEArch  '))
+  assert.ok(container.textContent?.includes('Research tools'))
+  assert.equal(requests.length, 0)
+  await act(async () => render('private.example.com'))
+  assert.ok(container.textContent?.includes('noMatches'))
+  assert.ok(!container.textContent?.includes('Research tools'))
+  assert.ok(button('add'))
+  assert.equal(requests.length, 0)
 })
 
 test('read failure remains visible and an unexpected workspace response is rejected', async () => {

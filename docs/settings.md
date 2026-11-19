@@ -29,11 +29,10 @@ supplies content.
 
 ## Layout
 
-Settings render inside the app window (`SettingsFrame` in
-`components/settings/settings-shell.tsx`): the window bar and icon rail stay,
-the section list is the card's first column, and the section scrolls beside it.
-There is no 「返回应用」; the rail leaves Settings. On phones the section list is
-the sheet behind the header's sidebar button, with the rail items at its foot.
+The official app shows Settings in its own frame. Use the sidebar to search
+sections and teams, or use Back to return to the previous page. Settings
+keeps the selected workspace when moving between sections. On narrow screens,
+open the sidebar from the page header.
 
 ## Sections
 
@@ -46,6 +45,11 @@ sidebar, URL parsing and page body all read it.
 Account and Security hold how the person signs in, including linking Google
 to the Mikka account. Connections holds connected apps (Gmail, Calendar,
 Notion, Slack, Linear, Telegram), even when the app is a Google one.
+
+Open the **Custom MCP** tab in Connections to find or add a server. The owner
+can enable or disable a server and manage its workspace share. Recipients of
+a shared connection can see its status. If a change's result is unconfirmed,
+**Check again** reads the saved state.
 
 ## Threads
 
