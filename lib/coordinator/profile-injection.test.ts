@@ -13,7 +13,10 @@ const store = read('lib/profile/store.ts')
 const prompt = read('lib/profile/prompt.ts')
 const action = read('app/actions/memory.ts')
 const memory = read('lib/profile/memory.ts')
-const steps = read('workflows/coordinator/steps.ts')
+// The Eve turn's prompt moved out of the Workflow step into the product
+// instructions module; the step now delegates to it. Assert against where the
+// prompt is actually composed.
+const steps = read('lib/coordinator/product-instructions.ts')
 
 const bodyOf = (source: string, name: string, length = 1_200) => {
   const start = source.indexOf(`export async function ${name}`)
