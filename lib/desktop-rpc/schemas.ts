@@ -282,6 +282,7 @@ export const desktopActionSchemas = {
   'linear-sync.retryLinearDelivery': oneId,
   'linear-sync.disconnectLinearAccount': none,
   'link-preview.getLinkPreview': tuple(z.url({ protocol: /^https?$/ }).max(2048)),
+  'link-preview.getLinkPreviews': tuple(z.array(z.url({ protocol: /^https?$/ }).max(2048)).max(200)),
   'memory.getMemory': none,
   'memory.setMemory': tuple(bool),
   'memory.clearMemory': none,

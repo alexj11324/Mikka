@@ -1,11 +1,12 @@
 'use client'
 
-import { createContext, useContext, useState, type ComponentProps, type ReactNode } from 'react'
+import { createContext, useContext, useMemo, useState, type ComponentProps, type ReactNode } from 'react'
 import useSWR from 'swr'
 import { Globe } from '@/components/icons'
 import { GitHubIcon } from '@/components/icons/brand-icons'
 import { useFormatter, useTranslations } from 'next-intl'
-import { getLinkPreview } from '@/app/actions/link-preview'
+import { getLinkPreviews } from '@/app/actions/link-preview'
+import { LINK_PREVIEWS_PER_REQUEST } from '@/lib/link-preview-batch'
 import { CITATION_HREF, splitCitations, type CitationKind, type CitationSource, type IssueSource, type RunSource, runThreadName, runTitle } from '@/lib/coordinator/citations'
 import type { LinkPreview } from '@/lib/link-preview-parse'
 import { InlineCitation, InlineCitationBody, InlineCitationContent, InlineCitationDescription, InlineCitationFavicon, InlineCitationFooter, InlineCitationImage, InlineCitationLabel, InlineCitationMeta, InlineCitationSource, InlineCitationTitle, InlineCitationTrigger } from '@/components/ui/inline-citation'
@@ -82,9 +83,18 @@ const NO_PREVIEWS: LinkPreviews = {}
 /** Link previews for every web page cited in `texts`, fetched once. */
 export function useLinkPreviews(texts: readonly string[]): LinkPreviews {
   const urls = [...new Set(texts.flatMap(text => splitCitations(text).flatMap(part => part.type === 'link' ? [part.url] : [])))].sort()
-  const { data = NO_PREVIEWS } = useSWR<LinkPreviews>(urls.length ? ['link-previews', ...urls] : null, async () => {
-    const results = await Promise.all(urls.map(url => getLinkPreview(url).catch(() => null)))
-    return Object.fromEntries(urls.map((url, index) => [url, results[index]]))
+  // One request per chunk, not one per URL: a reply that adds a link refetches
+  // its own chunk rather than every earlier URL. `urls.join` is the stable
+  // identity, since `urls` is a fresh array each render.
+  const key = urls.join('\u0000')
+  const chunks = useMemo(() => {
+    const out: string[][] = []
+    for (let start = 0; start < urls.length; start += LINK_PREVIEWS_PER_REQUEST) out.push(urls.slice(start, start + LINK_PREVIEWS_PER_REQUEST))
+    return out
+  }, [key])
+  const { data = NO_PREVIEWS } = useSWR<LinkPreviews>(chunks.length ? ['link-previews', ...chunks.map(chunk => chunk.join('\u0000'))] : null, async () => {
+    const results = await Promise.all(chunks.map(chunk => getLinkPreviews(chunk).catch(() => ({} as Record<string, LinkPreview | null>))))
+    return Object.assign({}, ...results) as LinkPreviews
   }, { revalidateOnFocus: false, revalidateIfStale: false, shouldRetryOnError: false })
   return data
 }

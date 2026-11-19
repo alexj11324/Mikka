@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
 import { formatCount } from '@/lib/unread'
 import { EASE_OUT } from '@/lib/ease'
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 
 /** MIK-8 「↑/↓ N 条新消息 ×」 pill: default small Buttons; the body jumps, × only dismisses. */
 export function UnreadPill({ direction, count, onJump, onDismiss }: { direction: 'up' | 'down'; count: number; onJump: () => void; onDismiss: () => void }) {

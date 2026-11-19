@@ -7,7 +7,7 @@
 import { useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { Hand, LoaderCircle, TriangleAlert, type LucideIcon } from 'lucide-react'
-import { cn } from 'cn'
+import { cn } from '@/lib/utils'
 import { ISSUE_STATUSES } from '@/components/workspace/issue-properties'
 import { runIndicatorOf, type RunIndicator, type TaskState } from '@/lib/task-state'
 import { statusIconTints, type StatusTone } from '@/lib/status-appearance'
