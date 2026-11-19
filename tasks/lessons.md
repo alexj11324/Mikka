@@ -271,3 +271,21 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 把「测试改成读 catalog」时，要按 `grep -rn "<中文原文>"` 全仓库扫一遍断言，不能只改报错的那一个目录；根 `lib/` 下也有直接测移动端实现的测试。
   2. 本机 locale 会让这类测试假绿。判断标准是「断言里有没有字面量文案」，不是「本机跑没跑绿」。
   3. 修完再推一次，等 CI 全绿再 merge；不要因为「本机绿」就认为改动无关。
+
+## 2026-11-19 跨层追踪：组件名 grep 会漏掉同文件导出的 hook
+
+- 现象：审计 public 层时判定 `LinearSettings` / `TelegramSettings` 是「孤儿组件」（全仓库无 import）。实际 hosted 层 `.hosted-ui/components/mikka/app-page.tsx:16,20` 用的是同文件导出的 `useLinearPlugin` / `useTelegramPlugin`，功能完全正常。
+- 根因：`grep -rn "LinearSettings"` 只搜组件名，且我习惯性排除了源文件自身（`grep -v "linear-settings.tsx"`），于是 hook 导出和同文件引用全被滤掉。
+- 规则：
+  1. 判定「组件是否被挂载」必须同时搜**组件名和同文件的 hook 导出**，且**不要排除源文件自身**——源文件里的 `export function useX` 是跨层契约的一部分。
+  2. slot 架构下，「public 层是 stub」不等于缺陷。`components/slots/settings-connections.tsx` 抛 `UI_SLOT_REQUIRES_OFFICIAL_CLIENT` 是设计，不是缺失；判缺陷前先确认 hosted 层是否实现了它。
+  3. 每个 `missing-affordance` 结论至少用两条独立检索路径验证（按名字、按导入、按调用点），单次 grep 的空结果不足以定性。
+
+## 2026-11-19 后端返回了字段 ≠ UI 使用了字段
+
+- 现象：记忆页「待确认」功能完全不可用。后端 `lib/profile/store.ts:94` 每条新事实都写 `reviewStatus: 'pending'`，`lib/profile/memory.ts:155` 也把它放在 `pending` 数组返回，但 `hooks/settings/use-memory-settings.ts` 只解构 `facts`，`pending` 从未进入渲染，`reviewFact` 零调用者。结果：用户永远看不到 Mikka 记住了什么，记忆永不生效，且无任何报错。
+- 根因：审查时看到「后端返回了 pending」就以为功能存在。实际上消费端漏了一个字段，而周围代码（`undoable` 已被 hosted 使用）看起来都很完整，掩盖了这个缺口。
+- 规则：
+  1. 判定「功能是否可用」必须走完 `后端返回 → hook 解构 → 组件渲染 → 用户可操作` 四步，任何一步断开都是缺陷。
+  2. 看到 `data.xxx` 被返回时，`grep` 一次 `xxx` 在 hook 和组件里的出现位置；只出现在服务端和类型定义里，就是死字段。
+  3. 静默失效最危险：没有报错、没有空状态提示、测试全绿。给这类修复补的测试必须做**变异验证**（删掉实现看测试是否变红），否则不知道测试在测什么。

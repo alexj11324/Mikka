@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
-import { getMemory, removeFact, setMemory, updateFact } from '@/app/actions/memory'
+import { getMemory, removeFact, reviewFact, setMemory, updateFact } from '@/app/actions/memory'
 
 export type MemoryData = Awaited<ReturnType<typeof getMemory>>
 export type MemoryFact = MemoryData['facts'][number]
@@ -60,6 +60,22 @@ export function useMemorySettings() {
     remove: (id: string) => run({
       save: () => removeFact(id),
       apply: current => ({ ...current, facts: current.facts.filter(item => item.id !== id) }),
+    }),
+    /**
+     * 待确认 facts: every fact Mikka learns arrives as `pending` and is invisible to the
+     * person until it is approved (lib/profile/store.ts writes `reviewStatus: 'pending'`;
+     * lib/profile/memory.ts returns them in their own `pending` list). Approving moves one
+     * into `facts`; rejecting removes it, as reviewMemoryFact does.
+     */
+    review: (id: string, decision: 'approve' | 'reject') => run({
+      save: () => reviewFact(id, decision),
+      apply: current => {
+        const fact = current.pending.find(item => item.id === id)
+        if (!fact) return current
+        return decision === 'approve'
+          ? { ...current, pending: current.pending.filter(item => item.id !== id), facts: [fact, ...current.facts] }
+          : { ...current, pending: current.pending.filter(item => item.id !== id) }
+      },
     }),
   }
 }
