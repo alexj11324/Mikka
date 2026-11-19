@@ -2276,7 +2276,11 @@
         "tool": "Tools",
         "person": "People",
         "preference": "Preferences"
-      }
+      },
+      "pendingTitle": "Waiting for you",
+      "pendingHint": "What Mikka just learned. It is used for answers and reminders only after you confirm it.",
+      "approve": "Keep",
+      "reject": "Discard"
     },
     "workspaceForm": {
       "name": "Name",
@@ -2546,7 +2550,9 @@
       "githubAppOwner": "Owner",
       "githubAppPersonal": "Personal account",
       "githubAppOrganization": "Organization",
-      "githubAppOrganizationName": "Organization name"
+      "githubAppOrganizationName": "Organization name",
+      "githubNoMatch": "No repository matches this search",
+      "githubNoRepository": "No repositories yet. Authorize the GitHub App to see them here"
     },
     "slackInstallation": {
       "title": "Slack bot",

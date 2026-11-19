@@ -12,6 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Empty, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InlineLoadError } from '@/components/load-error'
@@ -365,7 +366,11 @@ export function RepositoriesDialog({ open, onOpenChange, repositories, userId }:
       <DialogHeader><DialogTitle className="pr-6 break-words">{editing?.fullName ?? t('githubRepositoriesDialog')}</DialogTitle></DialogHeader>
       {editing ? <RepositoryVerificationForm key={editing.fullName} repository={editing.fullName} userId={userId} onBack={() => setEditing(null)} /> : <>
       <SearchInput aria-label={t('githubRepositorySearch')} placeholder={t('githubRepositorySearch')} value={query} onChange={event => setQuery(event.target.value)} />
-      <ul aria-label={t('githubRepositoryList')} className="-mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto">
+      {/* An empty list and a search with no hits are different states; without
+          this the dialog shows only a search box and blank space. */}
+      {shown.length === 0
+        ? <Empty><EmptyHeader><EmptyTitle>{repositories.length ? t('githubNoMatch') : t('githubNoRepository')}</EmptyTitle></EmptyHeader></Empty>
+        : <ul aria-label={t('githubRepositoryList')} className="-mx-2 flex min-h-0 flex-1 flex-col overflow-y-auto">
         {shown.map(repository => <li key={repository.id} className="flex items-center gap-2">
           <a href={repository.htmlUrl} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-2 text-sm transition-colors hover:bg-muted/50">
             <span className="min-w-0 truncate">{repository.fullName}</span>
@@ -373,7 +378,7 @@ export function RepositoriesDialog({ open, onOpenChange, repositories, userId }:
           </a>
           <Button type="button" variant="ghost" size="sm" aria-label={t('githubVerificationFor', { repository: repository.fullName })} onClick={() => setEditing(repository)}>{t('githubVerification')}</Button>
         </li>)}
-      </ul>
+      </ul>}
       </>}
     </DialogContent>
   </Dialog>
