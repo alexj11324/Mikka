@@ -1,7 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
-import { useMemo, useRef } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { useLiveBotChatList, useLiveGroupList } from '@/hooks/use-live-lists'
 import type { BotView } from '@/app/actions/bots'
@@ -19,6 +19,7 @@ import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
 import { toast } from 'sonner'
 import { navigate } from '@/components/workspace/workspace-navigation'
 import { ChatRowActionError, chatPlace, copyPlaceLink, openPlaceInNewTab, setChatPreference, setChatUnread, setThreadUnread, threadPlace, type ChatNavAction } from './chat-row-actions'
+import { setThreadRead } from '@/lib/thread-read-client'
 import { setConversationOrganization } from '@/app/actions/task-runs'
 
 /**
@@ -56,7 +57,8 @@ function useChatRows({ bots, workspaceId, userId }: { bots: BotView[]; workspace
     const latestMessage = (id: string) => chats[id]?.messageId
     const summary = (id: string) => chats[id]
     const muted = (id: string) => Boolean(chats[id]?.muted)
-    return { reloadGroups, rows, hiddenRows, unreadCount, latestMessage, summary, muted, referenceGroups: groupsError ? [] : groups }
+    const groupMessageId = (id: string) => groups.find(group => group.id === id)?.lastMessage?.id
+    return { reloadGroups, rows, hiddenRows, unreadCount, latestMessage, groupMessageId, summary, muted, referenceGroups: groupsError ? [] : groups }
   }, [bots, chats, groups, groupsError, reloadGroups])
 }
 
@@ -74,10 +76,10 @@ export type BotLifecycle = { archive: (bot: BotView, archived: boolean) => void;
 /** What a row's menu asks the page for: a Bot's profile (its chat's 概览), and a thread's new title. */
 export type ChatNavPage = { openProfile: (target: ChatTarget) => void; renameThread: (thread: { target: { kind: 'run' | 'chat'; id: string }; title: string }) => void }
 
-export function useChatNav({ bots, archivedBots = [], workspaceId, active, userId, presentations, onLeaveGroup, lifecycle, page }: { bots: BotView[]; archivedBots?: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[]; presentations: Readonly<Record<string, TaskPresentation>>; onLeaveGroup?: (group: GroupSummary) => void; lifecycle?: BotLifecycle; page?: ChatNavPage }): { entries: ChatNavEntry[]; archived: ChatNavEntry[]; hidden: ChatNavEntry[]; reloadGroups: () => Promise<unknown>; referenceGroups: GroupSummary[] } {
+export function useChatNav({ bots, archivedBots = [], workspaceId, active, userId, presentations, onLeaveGroup, lifecycle, page }: { bots: BotView[]; archivedBots?: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[]; presentations: Readonly<Record<string, TaskPresentation>>; onLeaveGroup?: (group: GroupSummary) => void; lifecycle?: BotLifecycle; page?: ChatNavPage }): { entries: ChatNavEntry[]; archived: ChatNavEntry[]; hidden: ChatNavEntry[]; reloadGroups: () => Promise<unknown>; referenceGroups: GroupSummary[]; /** 全部标为已读: every thread and chat this list shows (Capy's menu item). */ markAllRead: () => Promise<void> } {
   const i18nText = useTranslations()
   const chatRows = useChatRows({ bots, workspaceId, active, userId })
-  const { rows, hiddenRows, unreadCount, latestMessage, summary, muted, reloadGroups, referenceGroups } = chatRows
+  const { rows, hiddenRows, unreadCount, latestMessage, groupMessageId, summary, muted, reloadGroups, referenceGroups } = chatRows
   const coordinatorId = bots.find(bot => bot.coordinator)?.id
   const sidebarKey = workspaceId ? ['conversation-sidebar',userId,workspaceId] : null
   const {data: sidebar} = useSWR(sidebarKey, () => listConversationSidebar(), {revalidateOnFocus:false})
@@ -203,5 +205,21 @@ export function useChatNav({ bots, archivedBots = [], workspaceId, active, userI
   // Every value the rows read. The menu callbacks are read through `menu`, so their identity (always new)
   // never rebuilds a row — only whether the page offers them at all, which is what the three flags carry.
   }, [bots, archivedBots, workspaceId, userId, presentations, i18nText, sidebar, chatRows, activeKind, activeId, Boolean(onLeaveGroup), Boolean(lifecycle), Boolean(page)]) // eslint-disable-line react-hooks/exhaustive-deps -- `menu` holds the callbacks themselves
-  return { ...model, reloadGroups, referenceGroups }
+  // 全部标为已读 (Capy's Threads section): the threads and the person's own group chats go in one bulk write
+  // (lib/thread-reads.ts `readAll`); a chat keeps its own read position (conversation_reads 'bot:<id>' and the
+  // group's receipts), which that write leaves alone, so each unread chat is read through the same writer its
+  // row's 标为已读 uses. The Coordinator's row is keyed 'coordinator': its chat is the Coordinator Bot's.
+  const markAllRead = useCallback(async () => {
+    const chatOf = (entry: ChatNavEntry): Parameters<typeof setChatUnread>[0] | null => {
+      if (entry.target.kind === 'group') return { kind: 'group', id: entry.target.id, latestMessageId: groupMessageId(entry.target.id) }
+      const botId = entry.target.kind === 'bot' ? entry.target.botId : coordinatorId
+      return botId ? { kind: 'bot', botId, latestMessageId: latestMessage(botId) } : null
+    }
+    const chats = [...model.entries, ...model.hidden].filter(entry => entry.unread).flatMap(entry => chatOf(entry) ?? [])
+    const results = await Promise.allSettled([setThreadRead({ action: 'readAll' }), ...chats.map(chat => setChatUnread(chat, false))])
+    // The lists re-read themselves from the writers' own live pushes; a failure is reported, not swallowed.
+    if (results.some(result => result.status === 'rejected')) toast.error(i18nText('Nav.botMenu.failed'))
+    else toast.success(i18nText('Nav.botMenu.allRead'))
+  }, [model, coordinatorId, latestMessage, groupMessageId, i18nText])
+  return { ...model, reloadGroups, referenceGroups, markAllRead }
 }
