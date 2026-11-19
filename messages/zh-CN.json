@@ -2550,7 +2550,9 @@
       "githubAppOwner": "归属",
       "githubAppPersonal": "个人账号",
       "githubAppOrganization": "组织",
-      "githubAppOrganizationName": "组织名"
+      "githubAppOrganizationName": "组织名",
+      "githubNoMatch": "没有匹配的仓库",
+      "githubNoRepository": "还没有仓库。授权 GitHub App 后会显示在这里"
     },
     "slackInstallation": {
       "title": "Slack 机器人",
