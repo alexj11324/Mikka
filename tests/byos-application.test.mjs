@@ -373,7 +373,7 @@ test('new OAuth consent, owner-bound streaming/tool use and native launches reus
       name: 'stub-model-order-server-action',
       setup(build) {
         build.onResolve({ filter: /^@\/app\/actions\/model-order$/ }, () => ({ path: 'model-order-action', namespace: 'fixture' }))
-        build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export async function refreshSubscriptionModels() { return { error: \"fixture-only\" } }', loader: 'js' }))
+        build.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: 'export async function refreshSubscriptionModels() { return { error: "fixture-only" } }', loader: 'js' }))
       }
     }], logLevel: 'silent' })
     browserServer = createServer(async (incoming, outgoing) => {
