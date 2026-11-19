@@ -353,3 +353,22 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   2. 断言的顺序按规则的读法排：先"存在时能用"，再"删除请求关闭"，再"行没了关闭"。不要为了复用一个 token 而反复插入/删除。
   3. 本机复现 CI 的 DB 测试：需要名为 `mikka_e2e` 的库（测试硬编码这个名字），`MIGRATE=1` 先跑 `scripts/migrate.mjs`，然后 `REQUIRE_DB=1` + 四个 URL 环境变量都指向它。
   4. `run_captures` 有 CHECK `run_captures_ready_file`：`status='ready'` 时 `storageKey`、`size`、`sha256` 都必须非空，直接 INSERT 时要一起给。
+
+## 2026-11-19 收紧读口的过滤条件，必须同步改 fixture 的造数路径
+
+- 现象：给 `lib/profile/store.ts` 的 `profilePromptSection` 加了 `reviewStatus = 'approved'`（修复真实的安全缺口：设置页承诺"确认后才用于回答"，而 prompt 一直在读 pending 事实）。CI 红了 `test:user-facts-db` 里唯一一条仓库作用域用例 —— 它的 fixture 用 `recordFacts` 造数据，而 `recordFacts` 按设计写 `pending`，于是整个 prompt 段读成空串，`assert.match` 报 `actual: ''`。
+- 根因：过滤条件是**读口**改的，测试的**写口**（`recordFacts` → `pending`）没变。测试的名字讲的是"仓库作用域"，容易被误判成"这条断言过期了、改断言就行"，实际上应该补全 fixture 的**前置状态**。
+- 规则：
+  1. 给读函数加状态过滤后，第一件事是 `grep -rn "<读函数名>" --include='*.test.*'`，逐个看每个测试的造数走的是哪条写路径、写到什么状态。
+  2. 补前置状态用该状态的生产入口（这里是"审批"）；测试层拿不到业务入口时，在 fixture 里直接 `UPDATE` 该列，并在注释里写明这是 fixture 前置状态而非被测行为。
+  3. 顺手把新加的过滤条件本身变成断言（"还没审批时读出来必须是空"），否则这次修复没有任何回归保护。
+  4. 一个 DB suite 红会连带把 `Database checks (4/4)` 两个矩阵变体和聚合门 `Production build and browser interactions` 一起拖红。判断"到底红了几件事"，看日志里的 `test:<name> lifecycle] exit code=1` 有几条，不要按 job 数。
+
+## 2026-11-19 在 JSDoc 和它描述的函数之间插入新符号，等于把文档送给了新符号
+
+- 现象：修 `lib/run-recovery.ts` 的静默失败时，我把新的 `swept` 辅助函数直接插在 `recoverRuns` 的 JSDoc 结束处和 `recoverRuns` 之间。结果那段"Everything run recovery does …"的文档挂到了 `swept` 上，`recoverRuns` 变成无文档；`tsc`、lint、CI 全绿，只有 review 能看出来。
+- 根因：JSDoc 的归属由**相邻性**决定，不是由内容决定。插入点选在 `*/` 之后、函数之前，就破坏了归属。
+- 规则：
+  1. 在任何 `/** … */` 和它下面的 `export function` 之间不要插入任何东西 —— 包括注释块、常量、辅助函数。新辅助函数放到该 `*/` 之前（如果它服务于同一个导出）或放到该函数之后。
+  2. 改完用 `sed -n '<起点>,<终点>p' <file>` 肉眼看一遍：每个 `/**` 的正下方应该紧跟它描述的那个声明。
+  3. 这类问题 CI 抓不到，只有代码审查或人眼能抓 —— 属于"必须 review"的那一类，别指望门禁兜底。
