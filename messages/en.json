@@ -2769,8 +2769,7 @@
       "neverUsed": "Never used",
       "expires": "Expires {date}",
       "noExpiry": "Never expires",
-      "expired": "Expired",
-      "copyFailed": "Could not copy. Select the key and copy it by hand"
+      "expired": "Expired"
     },
     "secrets": {
       "heading": "Secrets",
@@ -8462,8 +8461,7 @@
         "noChannels": "Mikka's Slack app cannot see any channels yet. Add it to a channel first",
         "channelsError": "Could not load Slack channels"
       },
-      "viewOnly": "Only its creator can change it. Take it over to edit.",
-      "devicesError": "Devices could not load"
+      "viewOnly": "Only its creator can change it. Take it over to edit."
     },
     "run": {
       "from": "Started by {event} · {what}",

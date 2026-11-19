@@ -155,15 +155,14 @@ dbTest('facts are scoped to a repository, so one project\'s habits stay out of a
     // All three are the person's own profile: 记忆 shows every one of them.
     assert.equal((await store.listFacts(owner)).length, 3)
 
-    // A recorded fact arrives `pending`, and the settings copy promises a fact is
-    // used for answers only after the person confirms it (lib/profile/memory.ts's
-    // review action is what approves one). The prompt states none of them yet.
+    // recordFacts writes every extracted fact as `pending` (lib/profile/store.ts), and
+    // only 记忆's approve action makes one `approved` (lib/profile/memory.ts
+    // reviewMemoryFact). The prompt must therefore state none of them yet: a fact the
+    // person has not agreed to is not something Mikka may act on.
     assert.equal(await store.profilePromptSection(owner, ['acme/widget']), '',
-      'a pending fact never reaches the prompt')
-    // Approve them the way 记忆's review action would, so the rest of this test
-    // exercises the read path a confirmed profile actually travels.
-    await db.update(schema.userFacts).set({ reviewStatus: 'approved' })
-      .where(and(eq(schema.userFacts.userId, owner), eq(schema.userFacts.state, 'active')))
+      'an unapproved fact never reaches the agent prompt')
+    // Approve all three, which is what the person does in 记忆.
+    await db.update(schema.userFacts).set({ reviewStatus: 'approved' }).where(eq(schema.userFacts.userId, owner))
 
     // A chat working in one repository is told that repository's facts and the person's, never the other's.
     const inWidget = await store.profilePromptSection(owner, ['acme/widget'])

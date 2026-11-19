@@ -299,6 +299,7 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 判定「功能是否可用」必须走完 `后端返回 → hook 解构 → 组件渲染 → 用户可操作` 四步，任何一步断开都是缺陷。
   2. 看到 `data.xxx` 被返回时，`grep` 一次 `xxx` 在 hook 和组件里的出现位置；只出现在服务端和类型定义里，就是死字段。
   3. 静默失效最危险：没有报错、没有空状态提示、测试全绿。给这类修复补的测试必须做**变异验证**（删掉实现看测试是否变红），否则不知道测试在测什么。
+
 ## 2026-11-19 "grep 不到 importer" 不能用来删依赖
 
 - 现象：审计把 `unstorage` 判成死依赖删掉（源码里 grep `unstorage` 零命中），CI 上 Nitro 构建全线失败：`unstorage is not installed. It is required for KV storage (nitro/kv)`。`lib/agent-images-server.ts:3` 用的是虚拟模块 `nitro/kv`，真正的包由 Nitro 在构建期注入。
