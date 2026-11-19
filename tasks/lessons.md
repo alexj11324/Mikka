@@ -391,3 +391,13 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 把测试接进 CI 时，除了确认"文件在任务列表里"，还要确认**它在 CI 里真的被执行过**：翻一次该 job 的日志，grep 测试文件名，出现 0 次就是还没验证。
   2. 新接的 suite 要照抄同目录其它 suite 的 `--import` 前缀，不要只写 `node --import tsx --test`。
   3. 带 skip 守卫的集成测试，本地绿灯不构成证据 —— 只能靠 CI 或手动打开守卫跑。
+
+## 2026-11-19 解决冲突时整取一方，会静默吃掉另一方的同文件新增
+
+- 现象：`messages/en.json` / `zh-CN.json` 在合 main 时冲突，我用 `git checkout --theirs` 整取 main 版，然后只补回了自己记得的 `githubClearSearch`。结果本分支加的 `Automations.editor.devicesError` 和 `Settings.tokens.copyFailed` 被静默删掉，CI 的 `pnpm typecheck` 报两条 `TS2345`（消息键不在类型里）。`Source checks` 和 `site-search` 两个 job 报的是同一个错。
+- 根因：冲突解决只按"我记住的那几个键"做人工并集，没有把两侧的键集**算出来**比对。`check-i18n.mjs` 抓不到：它校验 en/zh 之间是否成对、占位符是否一致，不校验"代码里引用的键是否存在"——那是 typecheck 的职责。
+- 规则：
+  1. `messages/*.json` 冲突不要 `checkout --theirs` 了事。解决后用脚本算并集：
+     `flat(branch) | flat(main)` 与当前文件比对，必须 **missing 为空且 extra 为空**。
+  2. 任何"整取一方"的冲突解决，都要再 diff 一次该文件的**另一侧独有内容**（`git diff <theirs> <branch> -- <file>`），而不是回忆自己改过什么。
+  3. 大文件 JSON 插入键时，插在最后一个成员之前要给原最后一行补逗号；写完立刻 `json.loads` 校验再落盘。
