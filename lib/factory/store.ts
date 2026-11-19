@@ -476,8 +476,11 @@ export function createFactoryStore(
       // masker reads through the global pool, and a second checkout while this
       // transaction waits would starve a small pool. Both the v2 summary and
       // the legacy `reason` use it, so neither path leaks a saved secret.
-      const mask = publicFlow && authorized.length
-        ? await withDatabaseClient(tx, () => secretMaskerFor({ workspaceId: authorized[0]!.workspaceId, ownerId: userId }))
+      // The issue's own tenant, not the first task's: the list is scoped to it
+      // by `inScope` below, and reading it from the row we already locked needs
+      // no assumption about which task happens to be first.
+      const mask = publicFlow
+        ? await withDatabaseClient(tx, () => secretMaskerFor({ workspaceId: issue.workspaceId, ownerId: userId }))
         : undefined;
       const tasks: (FactoryTaskSummary | FactoryPublicTaskSummary)[] = [];
       for (const row of authorized) {
