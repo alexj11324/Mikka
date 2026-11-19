@@ -1,6 +1,7 @@
 # App permissions belong to the workspace, not to each Bot
 
 - Date: 2026-11-10
+- App-action controls superseded by [authorized MCP connections](2026-11-19-native-mcp-authorization.md).
 - Source: Alex: authorizing each Bot separately is the wrong shape; an app is
   connected once and every Bot in the workspace should inherit that choice.
 - Rule: 设置 › 应用与运行权限 authorizes the current workspace. It shows one

@@ -13,8 +13,8 @@ import { catalogueToolDisplayName } from '@/lib/coordinator/tool-metadata'
 /**
  * Every toolset the server offers: `/x/all` is GitHub's documented path for
  * "All available toolsets" (github-mcp-server docs/remote-server.md). The
- * catalogue is paged (PAGE_BYTES) and every call still passes the workspace's
- * GitHub policy (lib/operations/github-call-policy.ts).
+ * catalogue is paged (PAGE_BYTES); GitHub authorizes calls with the caller's
+ * token.
  */
 export const GITHUB_MCP_URL = 'https://api.githubcopilot.com/mcp/x/all'
 export const GITHUB_MCP_MIN_VALIDITY_MS = 5 * 60_000

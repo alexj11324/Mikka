@@ -15,7 +15,7 @@ const url=process.env.E2E_DATABASE_URL
 if(url)assert.ok(isE2eTarget(url),E2E_DB_RULE)
 else if(process.env.REQUIRE_DB==='1')throw new Error('Native approval tests require E2E_DATABASE_URL')
 
-test('native Ask uses one durable product receipt and existing personal operation ledger',{skip:!url,timeout:30000},async t=>{
+test('native writes use one durable product receipt and existing personal operation ledger',{skip:!url,timeout:30000},async t=>{
   const schema=`eve_approval_${randomUUID().replaceAll('-','')}`,owner='fixture-owner',bot=randomUUID(),workspace=randomUUID()
   const admin=new Pool({connectionString:url}),pool=new Pool({connectionString:url,options:`-c search_path=${schema},pg_catalog`})
   await admin.query(`CREATE SCHEMA ${schema}`)
@@ -44,14 +44,13 @@ test('native Ask uses one durable product receipt and existing personal operatio
     })
     const store=eveApprovalStore(pool,owner,bot)
     const call:ApprovalCall={ownerId:owner,botId:bot,workspaceId:workspace,surface:'web',sessionId:'fixture-session',turnId:'fixture-turn',callId:'legacy-call',name:'call_app_tool',input:{toolkit:'slack',tool:'SLACK_SEND_MESSAGE',arguments:{text:'Final text'}},sourceEventId:randomUUID()}
-    const responder={authenticator:'mikka',principalType:'user',principalId:owner,attributes:{botId:bot,workspaceId:workspace,surface:'web'}}
     let sends=0,cards=0
-    const deps:AppToolDeps={appAllowed:async()=>true,resolveAccount:async()=>({accountId:'account',accounts:[]}),listTools:async()=>[],getTool:async()=>({slug:'SLACK_SEND_MESSAGE',name:'Send',toolkit:{slug:'slack'},version:'v1'}),setting:async()=>'ask',judge:async()=>{throw new Error('explicit Ask must not judge')},execute:async()=>{sends++;return {successful:true,data:{id:'message'}}},recordStart:async()=>'product-receipt',recordEnd:async()=>{},propose:async()=>{cards++;return {status:'awaiting_approval'}}}
+    const deps:AppToolDeps={appAllowed:async()=>true,resolveAccount:async()=>({accountId:'account',accounts:[]}),listTools:async()=>[],getTool:async()=>({slug:'SLACK_SEND_MESSAGE',name:'Send',toolkit:{slug:'slack'},version:'v1'}),execute:async()=>{sends++;return {successful:true,data:{id:'message'}}},recordStart:async()=>'product-receipt',recordEnd:async()=>{},propose:async()=>{cards++;return {status:'awaiting_approval'}}}
     const bridge=createEveApprovalBridge({store,run:(c,review)=>callAppTool(deps,c.input,{ownerId:owner,botId:bot,review})})
-    assert.equal((await bridge.review(call))?.status,'user-approval');assert.equal(sends,0);assert.equal(cards,0)
-    await Promise.all([bridge.execute(call,responder),bridge.execute(call,responder)])
+    assert.equal((await bridge.review(call))?.status,'not-applicable');assert.equal(sends,0);assert.equal(cards,0)
+    await Promise.all([bridge.execute(call),bridge.execute(call)])
     assert.equal(sends,1);assert.equal(cards,0)
-    assert.equal((await bridge.execute(call,responder) as {status:string}).status,'done');assert.equal(sends,1)
+    assert.equal((await bridge.execute(call) as {status:string}).status,'done');assert.equal(sends,1)
     assert.equal((await eveApprovalStore(pool,'other',bot).read('unknown')),null)
     deps.resolveAccount=async()=>({accountId:null,accounts:[{id:'account-a',alias:'Work'},{id:'account-b',alias:'Personal'}]})
     const selection={...call,callId:'selection-call'}
@@ -74,24 +73,24 @@ test('native Ask uses one durable product receipt and existing personal operatio
       if(!intents.has(c.callId))intents.set(c.callId,randomUUID())
       try{return await service.proposeFromRun(c.input,intents.get(c.callId)!)}catch(error){if(error instanceof Error&&error.message==='writeDenied')return {error:'writeDenied'};throw error}
     }})
-    assert.equal((await native.review(personal))?.status,'user-approval')
+    assert.equal((await native.review(personal))?.status,'not-applicable')
     assert.equal(personalSends,0)
     assert.equal(Number((await pool.query('SELECT count(*) FROM pending_actions')).rows[0].count),0,'review creates no parallel generic approval')
-    assert.equal((await native.execute(personal,responder) as {status:string}).status,'done')
+    assert.equal((await native.execute(personal) as {status:string}).status,'done')
     assert.equal(personalSends,1)
-    assert.equal((await native.execute(personal,responder) as {status:string}).status,'done')
+    assert.equal((await native.execute(personal) as {status:string}).status,'done')
     assert.equal(personalSends,1)
     assert.equal((await pool.query('SELECT status FROM operation_ledger')).rows[0].status,'succeeded')
     assert.equal(Number((await pool.query("SELECT count(*) FROM pending_actions WHERE status='pending'")).rows[0].count),0)
     const revoked={...personal,callId:'revoked-call'}
-    assert.equal((await native.review(revoked))?.status,'user-approval')
-    await pool.query('UPDATE workspace_computer_policies SET external_write_permissions=$2,external_write_policy_version=external_write_policy_version+1 WHERE "workspaceId"=$1',[workspace,{[action]:'deny'}])
-    assert.deepEqual(await native.execute(revoked,responder),{error:'writeDenied'})
-    assert.equal(personalSends,1,'revocation before the native response never sends')
+    assert.equal((await native.review(revoked))?.status,'not-applicable')
+    await pool.query('UPDATE agent_kit_executions SET status=$2 WHERE id=$1',[runId,'failed'])
+    await assert.rejects(native.execute(revoked),/writeRunUnavailable/)
+    assert.equal(personalSends,1,'a stopped execution never sends')
     const expired={...call,callId:'expired-call'}
     await bridge.review(expired)
     await pool.query("UPDATE eve_tool_approvals SET created_at=clock_timestamp()-interval '8 days' WHERE status='prepared'")
-    await assert.rejects(bridge.execute(expired,responder),/pendingActionUnavailable/)
+    await assert.rejects(bridge.execute(expired),/pendingActionUnavailable/)
     assert.equal(sends,1)
   } finally {await pool.end();await admin.query(`DROP SCHEMA ${schema} CASCADE`);await admin.end()}
 })

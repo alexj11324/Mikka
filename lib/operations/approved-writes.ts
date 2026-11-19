@@ -9,6 +9,7 @@ import { requireOperationSession, withOperationSession } from './session-authori
 import type { WriteProvider } from './write-contract'
 import { writeBindingSchema as bindingSchema, prepareWriteBinding } from './write-binding'
 import { lockWritePolicy } from './write-policy-store'
+import { DIRECT_APP_WRITE_VERSION } from './write-policy'
 import { withWritePolicy } from './policy-authorization'
 import { snapshotDigest as digest } from './write-target'
 import { approvedWriteChanged } from '../live/approved-writes'
@@ -197,22 +198,15 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
       }
       let proposal = await locked(prior)
       if (!proposal) {
-        // Check authorization before provider metadata and recheck under the insert lock.
-        // Explicit settings win first. Only when none names the action does the
-        // Decisions API judge whether this exact call is destructive (R-77).
-        const first = await transaction(tx => lockWritePolicy(tx, { ...run, action }))
-        if (first.decision === 'deny') throw new OperationError('writeDenied')
+        // Recheck the current tool and run under the insert lock after the provider read.
+        await transaction(tx => lockWritePolicy(tx, { ...run, action }, { direct: true }))
         const selected = await bounded(() => provider.prepare(run.ownerId, input), context.signal)
-        // A provider without a tool slug is judged under the action name; only a caller with no judge at all (no Decisions route) asks.
-        const approvalDefault = first.defaulted && context.judgeWrite ? await context.judgeWrite({ action, tool: selected.tool || action, annotations: selected.annotations, input }) : 'ask'
         proposal = await locked(async tx => {
           const existing = await prior(tx)
           if (existing) return existing
-          const policy = await lockWritePolicy(tx, { ...run, action }, { fallback: approvalDefault })
-          if (policy.version !== first.version) throw new OperationError('writePolicyChanged')
-          if (policy.decision === 'deny') throw new OperationError('writeDenied')
-          const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId:run.runId, botId:run.botId, workspaceId:run.workspaceId, policyVersion:policy.version, decision:policy.decision, approvalDefault } })
-          const nativeDecision = context.nativeWriteReview ? await context.nativeWriteReview(policy.decision, nativeBinding(run.ownerId, action, input, binding, selected.context ?? null)) : policy.decision
+          const policy = await lockWritePolicy(tx, { ...run, action }, { direct: true })
+          const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId: run.runId, botId: run.botId, workspaceId: run.workspaceId, policyVersion: policy.version, decision: policy.decision } })
+          const nativeDecision = context.nativeWriteReview ? await context.nativeWriteReview('allow', nativeBinding(run.ownerId, action, input, binding, selected.context ?? null)) : 'allow'
           if (nativeDecision === 'deny') throw new OperationError('writeDenied')
           if (nativeDecision === 'ask') {
             await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['approved-write-pending-owner', run.ownerId])])
@@ -254,7 +248,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
         const readbackOnly = Boolean(execution.rows[0]?.invokedAt)
         if (row.operationBinding.run) {
           const r = row.operationBinding.run
-          const policy = await lockWritePolicy(tx, { ownerId:actor.userId, botId:r.botId, workspaceId:r.workspaceId, runId:r.runId, action }, { allowCompleted:true, readbackOnly, fallback:r.approvalDefault ?? 'ask' })
+          const policy = await lockWritePolicy(tx, { ownerId:actor.userId, botId:r.botId, workspaceId:r.workspaceId, runId:r.runId, action }, { allowCompleted:true, readbackOnly, direct:r.policyVersion === DIRECT_APP_WRITE_VERSION, fallback:r.approvalDefault ?? 'ask' })
           if (policy.decision === 'deny') throw new OperationError('writeDenied')
           if (policy.version !== r.policyVersion || policy.decision !== r.decision) throw new OperationError('writePolicyChanged')
         }

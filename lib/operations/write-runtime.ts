@@ -21,7 +21,6 @@ import { nativeMailboxFence, type PersonalNativeScope } from '@/lib/personal-mai
 import { WORKSPACE_ID } from '@/lib/device-link'
 import type { MailboxTransactionGuard } from '@/lib/mailbox-transaction-guard'
 import { approvedWriteDecisionEvent } from './write-notice'
-import { serverWriteJudge } from './write-judgment'
 
 function guardForRun(run: { ownerId:string; workspaceId:string | null }) {
   return run.workspaceId ? (_tx: unknown, signal: AbortSignal) => acquireWorkspaceMembership(workspacePool, { workspaceId:run.workspaceId!, userId:run.ownerId }, signal) : undefined
@@ -43,7 +42,7 @@ export async function personalWriteFromRun(ownerId:string, botId:string | null, 
     const member = await memberGuard?.(tx,signal)
     return { signal:member?.signal ?? signal, async check() { await fence(tx); await member?.check() }, async close() { await member?.close() } }
   } : memberGuard
-  const service = personalWriteRuntime().operations(call.action as WriteActionName,{ modelRun:run, guard, guardForRun, judgeWrite:serverWriteJudge(ownerId,botId), nativeWriteReview, signal })
+  const service = personalWriteRuntime().operations(call.action as WriteActionName,{ modelRun:run, guard, guardForRun, nativeWriteReview, signal })
   return service.proposeFromRun(call.input,callIntent(runId,call.toolCallId))
 }
 

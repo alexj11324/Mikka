@@ -14,7 +14,7 @@ async function run(call:ApprovalCall,review:NativeWriteReview,signal?:AbortSigna
     const action=call.name as 'send_email'|'create_calendar_event'|'update_calendar_event'
     if(!await botMayUseApp(call.botId,COMPOSIO_ACTIONS[action].toolkit))return {error:'integrationBlockedByWorkspace'}
     const {account_id,...input}=call.input as Record<string,unknown>
-    return (await import('../pending-action-store')).writeAccountAction(call.ownerId,action,input,typeof account_id==='string'?account_id:undefined,call.botId,undefined,review,signal)
+    return (await import('../pending-action-store')).writeAccountAction(call.ownerId,action,input,typeof account_id==='string'?account_id:undefined,call.botId,review,signal)
   }
   if(!call.executionId)throw new Error('agentExecutionClosed')
   const {WRITE_TOOL_APPS}=await import('../app-policy/apps')

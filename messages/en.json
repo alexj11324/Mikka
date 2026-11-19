@@ -2195,7 +2195,7 @@
         "title": "Connections"
       },
       "bot-permissions": {
-        "title": "App & run permissions"
+        "title": "Run permissions"
       },
       "models": {
         "title": "Models and subscriptions",
@@ -2759,7 +2759,8 @@
         "writePolicyChanged": "The settings just changed; read again",
         "agentPolicyUnavailable": "This setting can't be saved right now",
         "workspaceAccessDenied": "Only admins can change workspace settings",
-        "noBotInWorkspace": "This workspace has no Bot yet. Create one to read and save its app permissions."
+        "noBotInWorkspace": "This workspace has no Bot yet. Create one to manage run permissions.",
+        "noAgent": "Connect an Agent to manage run permissions."
       }
     },
     "workspaceLoading": "Loading the workspace…",

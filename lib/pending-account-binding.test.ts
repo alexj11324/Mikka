@@ -6,7 +6,7 @@ import { observeCommitEffects } from './db/commit-effects'
 let row: Record<string, unknown> = {}
 let selected = 'account-a'
 let actionError: string | null = null
-// The tool tags the provider reports for the action; they go to the destructive judgment.
+// Provider annotations do not add a separate action approval gate.
 let toolTags: string[] | undefined = ['important', 'openWorldHint']
 const calls: unknown[][] = []
 const reviews: unknown[][] = []
@@ -29,6 +29,7 @@ const db = {
 }
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 stub('./db/index.ts', { db, pool: {} })
+stub('./coordinator/decide.ts', { decide: async () => { throw Error('Account writes do not use Decision') } })
 stub('./live/scope.ts', { liveGatewayConfig: () => ({ url: 'https://live.example.invalid', secret: 'test-only-live-transport' }) })
 stub('./live/notify.ts', { scheduleLive: (work: () => Promise<unknown>) => { liveEffects.push(work) }, sendLiveInvalidations: async () => {} })
 stub('./composio.ts', {
@@ -47,27 +48,26 @@ stub('./cloud-computer/action-reviews.ts', { executeApprovedBrowserAction: async
 const appCalls: unknown[][] = []
 stub('./app-tools-server.ts', { executeAppToolCall: async (_client: unknown, userId: string, call: { toolkit: string }, accountId: string | null) => { appCalls.push([userId, call.toolkit, accountId]); return { successful: true, data: {} } } })
 stub('./plugins/catalog.ts', { composioToolkitLister: () => async () => ({ items: [] }), isNoAuthToolkit: async (_list: unknown, id: string) => id === 'hackernews' })
+let appAllowed = true
+stub('./app-policy/store.ts', { botMayUseApp: async () => appAllowed })
 let store: typeof import('./pending-action-store'), actions: typeof import('./pending-actions')
 before(async () => { store = await import('./pending-action-store'); actions = await import('./pending-actions') })
 
-test('native mail review stops before storing a card; exact native Ask satisfaction retains a done receipt', async () => {
-  workspacePolicy = { gmail: 'ask' }; row = {}; selected = 'account-native'
+test('native mail review retains the exact prepared call and can withhold dispatch', async () => {
+  workspacePolicy = { gmail: 'deny' }; row = {}; selected = 'account-native'
   const input = { to: ['recipient@example.invalid'], subject: 'Final subject', body: 'Final text' }
   try {
     let binding: unknown
-    const stopped = await store.writeAccountAction('u', 'send_email', input, undefined, BOT, async () => { throw Error('explicit Ask never judges') }, async (decision, prepared) => {
-      assert.equal(decision, 'ask'); binding = prepared; return 'deny'
+    const stopped = await store.writeAccountAction('u', 'send_email', input, undefined, BOT, async (decision, prepared) => {
+      assert.equal(decision, 'allow'); binding = prepared; return 'deny'
     })
     assert.deepEqual(stopped, { error: 'integrationActionDenied' })
     assert.deepEqual(row, {}, 'native request creates no parallel pending-action UI')
-    assert.deepEqual(binding, { ownerId: 'u', botId: BOT, action: 'send_email', input, accountId: 'account-native', version: 'pinned-v1', policy: 'ask' })
-    const done = await store.writeAccountAction('u', 'send_email', input, undefined, BOT, async () => 'ask', async (decision, prepared) => {
-      assert.equal(decision, 'ask'); assert.deepEqual(prepared, binding); return 'allow'
+    assert.deepEqual(binding, { ownerId: 'u', botId: BOT, action: 'send_email', input, accountId: 'account-native', version: 'pinned-v1', policy: null })
+    const done = await store.writeAccountAction('u', 'send_email', input, undefined, BOT, async (decision, prepared) => {
+      assert.equal(decision, 'allow'); assert.deepEqual(prepared, binding); return 'allow'
     })
     assert.equal('status' in done && done.status, 'done'); assert.equal(row.status, 'done')
-    workspacePolicy = { gmail: 'deny' }; row = {}
-    const denied = await store.writeAccountAction('u', 'send_email', input, undefined, BOT, async () => 'allow', async () => 'allow')
-    assert.deepEqual(denied, { error: 'integrationActionDenied' }); assert.deepEqual(row, {})
   } finally { workspacePolicy = null }
 })
 
@@ -123,9 +123,7 @@ test('computer and credential reviews retain their own approval authority withou
 
 test('a mail send or calendar write runs at once in the connected account and stays as a record, not a card', async () => {
   selected = 'account-a'; calls.length = 0; row = {}
-  const judged: unknown[] = []
-  const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, undefined, null, async call => { judged.push(call); return 'allow' })
-  assert.deepEqual(judged, [{ action: 'send_email', tool: 'GMAIL_SEND_EMAIL', annotations: ['important', 'openWorldHint'], input: { to: ['recipient@example.invalid'], subject: 's', body: 'b' } }])
+  const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' })
   assert.equal(calls.length, 1)
   assert.equal(calls[0][1], 'send_email')
   assert.equal('status' in result && result.status, 'done')
@@ -137,21 +135,21 @@ test('a mail send or calendar write runs at once in the connected account and st
 test('a direct write with an unknown outcome stays running and is reported uncertain', async () => {
   calls.length = 0; row = {}; actionError = 'operationUncertain'
   try {
-    const result = await store.writeAccountAction('u', 'create_calendar_event', { summary: 'Review', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' }, undefined, null, async () => 'allow')
+    const result = await store.writeAccountAction('u', 'create_calendar_event', { summary: 'Review', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' })
     assert.deepEqual(result, { error: 'operationUncertain' })
     assert.equal(row.status, 'running')
     assert.equal(row.error, 'operationUncertain')
   } finally { actionError = null }
 })
 
-test('a call judged destructive, or not judged at all, becomes an approval card instead of running', async () => {
+test('destructive annotations do not interrupt an authorized account write', async () => {
   calls.length = 0; row = {}; toolTags = ['destructiveHint', 'openWorldHint']
   try {
-    const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, 'selected-account', null, async call => call.annotations?.includes('destructiveHint') ? 'ask' : 'allow')
-    assert.equal('status' in result && result.status, 'awaiting_approval')
-    assert.equal(row.status, 'pending')
+    const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, 'selected-account')
+    assert.equal('status' in result && result.status, 'done')
+    assert.equal(row.status, 'done')
     assert.equal(row.connectedAccountId, 'selected-account')
-    assert.equal(calls.length, 1, 'stopped at the gate: no dispatch')
+    assert.equal(calls.length, 1)
   } finally { toolTags = ['important', 'openWorldHint'] }
 })
 
@@ -171,91 +169,46 @@ test('an approved store-app call without an account runs only for an app that ne
   assert.deepEqual(appCalls.at(-1), ['u', 'hubspot', 'ca_frozen'])
 })
 
-// ALE-8: the workspace's app policy governs the Coordinator's first-class writes, and it is the one surface that
-// does. `send_email`, `create_calendar_event` and `update_calendar_event` were missing from the key map, so a Gmail
-// 不允许 blocked call_app_tool(GMAIL_*) while writeAccountAction still sent.
 const FIRST_CLASS_WRITES = [
   ['send_email', 'gmail', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }],
   ['create_calendar_event', 'googlecalendar', { summary: 'Review', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' }],
   ['update_calendar_event', 'googlecalendar', { event_id: 'e', summary: 'Review' }],
 ] as const
 
-// The workspace layer is read through a Bot the person owns (lib/operations/write-setting-layers.ts), which is how
-// the Coordinator's own path reaches it: accountWrite passes its botId through to writeAccountAction.
 const BOT = 'bot-in-workspace'
 
-test('workspace deny withholds each first-class write before dispatch, and never asks the judge', async () => {
-  for (const [action, app, input] of FIRST_CLASS_WRITES) {
-    calls.length = 0; row = {}; workspacePolicy = { [app]: 'deny' }
-    let judged = 0
-    const result = await store.writeAccountAction('u', action, input, undefined, BOT, async () => { judged++; return 'allow' })
-    assert.deepEqual(result, { error: 'integrationActionDenied' }, action)
-    assert.equal(calls.length, 1, `${action}: resolveAccount ran, nothing was sent`)
-    assert.equal(judged, 0, `${action}: a workspace deny is absolute`)
-    assert.equal(row.status, undefined, `${action}: no record, because nothing ran`)
+test('authorized first-class writes run directly regardless of historical action settings', async () => {
+  for (const choice of [null, 'allow', 'ask', 'deny']) {
+    for (const [action, app, input] of FIRST_CLASS_WRITES) {
+      calls.length = 0; row = {}; workspacePolicy = choice ? { [app]: choice } : null
+      const result = await store.writeAccountAction('u', action, input, undefined, BOT)
+      assert.equal('status' in result && result.status, 'done', `${action}: ${choice}`)
+      assert.equal(row.status, 'done')
+      assert.equal(calls.length, 1)
+    }
   }
   workspacePolicy = null
 })
 
-test('workspace ask makes the card for each first-class write, and never asks the judge', async () => {
-  for (const [action, app, input] of FIRST_CLASS_WRITES) {
-    calls.length = 0; row = {}; workspacePolicy = { [app]: 'ask' }
-    let judged = 0
-    const result = await store.writeAccountAction('u', action, input, undefined, BOT, async () => { judged++; return 'allow' })
-    assert.equal('status' in result && result.status, 'awaiting_approval', action)
-    assert.equal(row.status, 'pending', action)
-    assert.equal(judged, 0, `${action}: the card comes from the workspace setting`)
-  }
-  workspacePolicy = null
-})
-
-test('workspace allow runs each first-class write without the judge', async () => {
-  for (const [action, app, input] of FIRST_CLASS_WRITES) {
-    calls.length = 0; row = {}; workspacePolicy = { [app]: 'allow' }
-    let judged = 0
-    const result = await store.writeAccountAction('u', action, input, undefined, BOT, async () => { judged++; return 'ask' })
-    assert.equal('status' in result && result.status, 'done', action)
-    assert.equal(calls.length, 1, action)
-    assert.equal(judged, 0, `${action}: the workspace's Allow is a real grant`)
-  }
-  workspacePolicy = null
-})
-
-test('a Gmail deny withholds send_email and leaves the calendar writes alone', async () => {
-  workspacePolicy = { gmail: 'deny' }
-  const denied = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, undefined, BOT, async () => 'allow')
-  assert.deepEqual(denied, { error: 'integrationActionDenied' })
-  // A different app: the judge decides, and here it allows.
-  const allowed = await store.writeAccountAction('u', 'create_calendar_event', { summary: 'Review', start: '2027-01-01T10:00:00Z', end: '2027-01-01T11:00:00Z' }, undefined, BOT, async () => 'allow')
-  assert.equal('status' in allowed && allowed.status, 'done')
-  workspacePolicy = null
-})
-
-test('an unset workspace choice still reaches the judge, which can card a first-class write', async () => {
-  row = {}; workspacePolicy = null
-  const result = await store.writeAccountAction('u', 'send_email', { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, undefined, BOT, async () => 'ask')
-  assert.equal('status' in result && result.status, 'awaiting_approval')
-})
-
-test('a card approved before the app turned deny does not run, and the row records why', async () => {
-  // A card is not a permanent grant: the workspace is read again at approval.
+test('an existing approved card ignores historical action settings', async () => {
   calls.length = 0
   row = { id: 'stale', action: 'send_email', input: { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, connectedAccountId: 'account-a', botId: BOT, createdAt: new Date() }
   workspacePolicy = { gmail: 'deny' }
   try {
     const result = await actions.decidePendingAction('u', 'stale', true)
-    assert.deepEqual(result, { status: 'failed', error: 'integrationActionDenied' })
-    assert.deepEqual(calls, [], 'nothing was sent')
+    assert.deepEqual(result, { status: 'done', error: null })
+    assert.equal(calls.length, 1)
+    assert.equal(calls[0][3], 'account-a')
   } finally { workspacePolicy = null }
 })
 
-test('a card approved while the app is still allowed runs once', async () => {
+test('an approved card still respects current workspace app admission', async () => {
   calls.length = 0
   row = { id: 'fresh', action: 'send_email', input: { to: ['recipient@example.invalid'], subject: 's', body: 'b' }, connectedAccountId: 'account-a', botId: BOT, createdAt: new Date() }
-  workspacePolicy = { gmail: 'allow' }
+  appAllowed = false
   try {
     const result = await actions.decidePendingAction('u', 'fresh', true)
-    assert.equal(result.status, 'done')
-    assert.equal(calls.length, 1)
-  } finally { workspacePolicy = null }
+    assert.deepEqual(result, { status: 'failed', error: 'integrationBlockedByWorkspace' })
+    assert.deepEqual(calls, [])
+  } finally { appAllowed = true }
 })

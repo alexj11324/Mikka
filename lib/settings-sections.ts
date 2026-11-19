@@ -41,8 +41,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   // Hidden until an API accepts the tokens (Alex); the UI and token store are built. Delete `unbuilt` to ship it.
   { id: 'developer', group: 'personal', title: 'Personal access tokens', unbuilt: true },
   { id: 'general', group: 'workspace', title: 'General' },
-  // The workspace's app access and run policy, inherited by every Bot (decisions 2026-10-31, 2026-11-10).
-  { id: 'bot-permissions', group: 'workspace', title: 'App & run permissions' },
+  // Workspace execution rules for Agent runs.
+  { id: 'bot-permissions', group: 'workspace', title: 'Run permissions' },
   { id: 'members', group: 'workspace', title: 'Members', routed: true },
   { id: 'teams', group: 'workspace', title: 'Teams', routed: true },
   { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },

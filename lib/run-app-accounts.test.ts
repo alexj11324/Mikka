@@ -10,10 +10,15 @@ const accounts = [
   { id: 'second', userId: 'owner', toolkit: { slug: 'hubspot' }, status: 'ACTIVE', isDisabled: false, createdAt: '2026-02-01' },
   { id: 'foreign', userId: 'other-owner', toolkit: { slug: 'hubspot' }, status: 'ACTIVE', isDisabled: false, createdAt: '2026-03-01' },
 ]
-let chosen: string | null, rows = structuredClone(accounts), definition = structuredClone(initialTool), allowed = true, live = true, disableDuringDecision = false
+let chosen: string | null, rows = structuredClone(accounts), definition = structuredClone(initialTool), allowed = true, live = true, disableAfterSelection = false
 const sent: { connectedAccountId?: string; arguments: Record<string, unknown> }[] = [], owners: string[] = [], authorityChecks: unknown[][] = []
 const client = {
-  connectedAccounts: { list: async (query: { userIds: string[] }) => { owners.push(query.userIds[0]); return { items: rows.filter(row => query.userIds.includes(row.userId)) } } },
+  connectedAccounts: { list: async (query: { userIds: string[] }) => {
+    owners.push(query.userIds[0])
+    const items = structuredClone(rows.filter(row => query.userIds.includes(row.userId)))
+    if (disableAfterSelection) rows.find(row => row.id === 'second')!.isDisabled = true
+    return { items }
+  } },
   tools: { getRawComposioTools: async () => [definition], getRawComposioToolBySlug: async () => definition,
     execute: async (_slug: string, call: typeof sent[number]) => { sent.push(call); return { successful: true, data: { id: 'contact' } } } },
 }
@@ -21,17 +26,13 @@ stub('./composio.ts', { getComposio: () => client })
 stub('./composio-account-store.ts', { chosenComposioDefault: async () => chosen })
 stub('./db/index.ts', { db: {}, pool: {} })
 stub('./execution-identity.ts', { activeExecutionIdentity: async (...args: unknown[]) => { authorityChecks.push(args); if (!live) throw Error('revoked'); return { workspaceId: 'owned-workspace' } } })
-stub('./operations/write-judgment.ts', { serverWriteJudge: () => async () => { throw Error('No model call in this fixture') } })
-stub('./operations/write-setting-layers.ts', { readWriteSettingLayers: async () => {
-  if (disableDuringDecision) rows.find(row => row.id === 'second')!.isDisabled = true
-  return { workspace: { hubspot: 'allow' } }
-} })
+stub('./coordinator/decide.ts', { decide: async () => { throw Error('Native app calls do not use Decision') } })
 stub('./pending-action-store.ts', { proposeAppToolCall: async () => { throw Error('No write in this fixture') } })
 stub('./app-policy/store.ts', { botMayUseApp: async () => allowed })
 stub('./plugins/catalog.ts', { composioToolkitLister: () => async () => ({ items: [] }), isNoAuthToolkit: async () => false })
 const { runAppEntry } = await import('./app-tools-server')
 const entry = () => runAppEntry(scope)!
-beforeEach(() => { chosen = 'first'; rows = structuredClone(accounts); definition = structuredClone(initialTool); allowed = live = true; disableDuringDecision = false; sent.length = owners.length = authorityChecks.length = 0 })
+beforeEach(() => { chosen = 'first'; rows = structuredClone(accounts); definition = structuredClone(initialTool); allowed = live = true; disableAfterSelection = false; sent.length = owners.length = authorityChecks.length = 0 })
 
 test('a native tool can explicitly use the second authorized account instead of its default', async () => {
   const current = entry(), listed = await current.list()
@@ -81,7 +82,7 @@ test('native selection preserves current workspace permission and run authority 
 })
 
 test('an account disabled after selection is revalidated at use without switching to the default', async () => {
-  disableDuringDecision = true
+  disableAfterSelection = true
   assert.deepEqual(await entry().call(definition.slug, { mikka_account_id: 'second' }), { error: 'integrationActionFailed' })
   assert.equal(sent.length, 0)
 })
