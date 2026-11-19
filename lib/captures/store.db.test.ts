@@ -484,6 +484,15 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(await store.sharedCapture(share!.token), null)
     assert.equal(await store.sharedCapture(`mks_${share!.token.slice(4)}`), null)
 
+    // A kept capture outlives its owner's row (run_captures.userId has no foreign
+    // key), so a link must stop working once the account is gone.
+    const orphaned = await store.createCaptureShare(alice, saved.id)
+    assert.ok(orphaned)
+    await pool.query('DELETE FROM "user" WHERE id=$1', [alice])
+    try { assert.equal(await store.sharedCapture(orphaned!.token), null, 'a deleted account leaves no open back door') }
+    finally { await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [alice, `${alice}@example.com`]) }
+    assert.ok(await store.sharedCapture(orphaned!.token), 'the link works again once the account exists again')
+
     // Cloud computer: the run's own desktop, through a fake E2B runtime.
     const calls: string[] = []
     let failStart = false, gone = false

@@ -23,9 +23,22 @@ async function handlePUT(request: Request, { params }: { params: Promise<{ runId
   if (!z.uuid().safeParse(captureId).success) return captureJson({ error: 'Unknown capture.' }, 404)
   const declared = Number(request.headers.get('content-length'))
   if (Number.isFinite(declared) && declared > INLINE_UPLOAD_MAX_BYTES) return captureJson({ error: 'Too large.' }, 413)
-  const bytes = new Uint8Array(await request.arrayBuffer())
-  if (bytes.length > INLINE_UPLOAD_MAX_BYTES) return captureJson({ error: 'Too large.' }, 413)
-  const result = await receiveUpload(found.owner, captureId, bytes)
+  // Read with a hard ceiling: a missing or wrong content-length must not let the
+  // body buffer past the inline limit (the shape lib/coding-workspace/http.ts uses).
+  const reader = request.body?.getReader()
+  if (!reader) return captureJson({ error: 'Unreadable body.' }, 400)
+  const parts: Uint8Array[] = []
+  let size = 0
+  try {
+    for (;;) {
+      const { value, done } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > INLINE_UPLOAD_MAX_BYTES) { await reader.cancel(); return captureJson({ error: 'Too large.' }, 413) }
+      parts.push(value)
+    }
+  } finally { reader.releaseLock() }
+  const result = await receiveUpload(found.owner, captureId, Buffer.concat(parts))
   return 'error' in result ? captureFailure(result) : new Response(null, { status: 204 })
 }
 

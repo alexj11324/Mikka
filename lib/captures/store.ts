@@ -13,7 +13,7 @@ import {
 } from '@mikka/protocol/capture'
 import { withAccountWrite } from '@/lib/account/write-guard'
 import { db, pool, withDatabaseClient, withDatabaseTransaction } from '@/lib/db'
-import { agentRuns, runCaptureShares, runCaptureSteps, runCaptures } from '@/lib/db/schema'
+import { agentRuns, runCaptureShares, runCaptureSteps, runCaptures, users } from '@/lib/db/schema'
 import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, ObjectStorageReadError, presignArtifactPut, putArtifactObject } from '@/lib/artifacts/storage'
 import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 import { executionIdentitySchema } from '@/lib/execution-identity'
@@ -509,9 +509,17 @@ export async function revokeCaptureShares(userId: string, captureId: string): Pr
 /** The capture a live share token opens. */
 export async function sharedCapture(token: string) {
   if (!token.startsWith(SHARE_PREFIX)) return null
+  // A deleted account cannot leave an anonymous back door: the same rule
+  // artifacts apply (lib/artifacts/store.ts). Captures are owned by the person,
+  // not by a workspace, and `run_captures.userId` has no foreign key, so a kept
+  // capture can outlive its owner's row. The check rides in this statement so
+  // share authority and ready media stay one read.
   const [row] = await db.select(getTableColumns(runCaptures)).from(runCaptureShares)
     .innerJoin(runCaptures, eq(runCaptures.id, runCaptureShares.captureId))
-    .where(and(eq(runCaptureShares.tokenHash, hashToken(token)), isNull(runCaptureShares.revokedAt), eq(runCaptures.status, 'ready'))).limit(1)
+    .where(and(
+      eq(runCaptureShares.tokenHash, hashToken(token)), isNull(runCaptureShares.revokedAt), eq(runCaptures.status, 'ready'),
+      sql`exists (select 1 from ${users} where ${users.id} = ${runCaptures.userId})`,
+    )).limit(1)
   if (!row) return null
   const bytes = await fileOf(row)
   return bytes ? { ...captureView(row), bytes } : null
