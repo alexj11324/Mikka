@@ -3,6 +3,7 @@ import { registerHooks } from 'node:module'
 const sources = new Map([
   ['server-only', 'export {}'],
   ['next/headers', 'export async function headers(){return new Headers()} export async function cookies(){return {get(){return undefined},set(){}}}'],
+  ['@/lib/server-runtime/headers', 'export async function headers(){return new Headers()} export async function cookies(){return {get(){return undefined},set(){}}}'],
   ['next/server', 'export function after(){throw new Error("unexpected background dispatch")}'],
   ['@/lib/intl/i18n-server', 'export async function getLocale(){return "en"} export async function getTranslations(){return (key)=>key}'],
 ])

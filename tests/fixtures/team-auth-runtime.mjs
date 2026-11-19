@@ -4,7 +4,7 @@ import { registerHooks } from 'node:module'
 registerHooks({
   resolve(specifier,context,next) {
     if(specifier==='@/lib/intl/i18n-server') return {url:'team-auth-fixture:intl',shortCircuit:true}
-    if(specifier==='next/headers') return {url:'team-auth-fixture:headers',shortCircuit:true}
+    if(specifier==='next/headers'||specifier==='@/lib/server-runtime/headers') return {url:'team-auth-fixture:headers',shortCircuit:true}
     return next(specifier,context)
   },
   load(url,context,next) {
