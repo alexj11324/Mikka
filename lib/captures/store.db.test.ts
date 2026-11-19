@@ -484,6 +484,32 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     assert.equal(await store.sharedCapture(share!.token), null)
     assert.equal(await store.sharedCapture(`mks_${share!.token.slice(4)}`), null)
 
+    // A kept capture outlives its owner's row (run_captures.userId has no foreign
+    // key), so a link must stop working once the account is gone or its deletion
+    // is requested. This uses its own account: deleting alice would cascade
+    // cloud_machines and bot_desktops and break the cloud-computer section below.
+    const ghost = `test-captures-ghost-${randomUUID()}`
+    const ghostRun = randomUUID()
+    const ghostId = randomUUID()
+    await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,false,now(),now())`, [ghost, `${ghost}@example.com`])
+    await pool.query(`INSERT INTO agent_runs (id,"userId","agentId","deviceId",status) VALUES ($1,$2,$3,$4,'succeeded')`, [ghostRun, ghost, agentId, cloudDevice])
+    // `run_captures_ready_file` requires storageKey/size/sha256 for a ready row;
+    // the bytes stay inline, which is how the test database stores files.
+    await pool.query(`INSERT INTO run_captures (id,"userId","runId",kind,"contentType",source,status,title,"storageKey","inlineContent",size,sha256) VALUES ($1,$2,$3,'image','image/png','local','ready','Ghost','fixture',$4,$5,$6)`,
+      [ghostId, ghost, ghostRun, PNG, PNG.length, sha(PNG)])
+    const orphaned = await store.createCaptureShare(ghost, ghostId)
+    assert.ok(orphaned)
+    assert.deepEqual((await store.sharedCapture(orphaned!.token))?.bytes, PNG, 'the link works while the account exists')
+    // A requested deletion blocks the link before the row goes.
+    await pool.query(`INSERT INTO account_deletion_guards ("subjectId","jobId") VALUES ($1,$2)`, [ghost, randomUUID()])
+    try { assert.equal(await store.sharedCapture(orphaned!.token), null, 'a pending deletion closes the link') }
+    finally { await pool.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1', [ghost]) }
+    assert.ok(await store.sharedCapture(orphaned!.token), 'cancelling the deletion reopens it')
+    // The row going is the other half of the same rule.
+    await pool.query('DELETE FROM "user" WHERE id=$1', [ghost])
+    assert.equal(await store.sharedCapture(orphaned!.token), null, 'a deleted account leaves no open back door')
+    await pool.query('DELETE FROM agent_runs WHERE id=$1', [ghostRun])
+
     // Cloud computer: the run's own desktop, through a fake E2B runtime.
     const calls: string[] = []
     let failStart = false, gone = false

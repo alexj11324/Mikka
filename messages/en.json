@@ -4668,7 +4668,9 @@
     "loading": "Loading conversations…",
     "empty": "No matching conversations.",
     "untitled": "Untitled conversation",
-    "more": "Load more"
+    "more": "Load more",
+    "emptyTitle": "No threads yet.",
+    "clearFilters": "Clear filters"
   },
   "ThreadReferences": {
     "sourceUnavailable": "Source file and folder references are unavailable for this thread.",

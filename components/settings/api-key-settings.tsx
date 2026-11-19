@@ -216,7 +216,7 @@ function AddApiKeyDialog({ add, onClose }: { add: ReturnType<typeof useApiKeys>[
             </Field>
           </>}
           <Field>
-            <FieldLabel htmlFor="api-key-value">API Key</FieldLabel>
+            <FieldLabel htmlFor="api-key-value">{t('apiKey')}</FieldLabel>
             <Input id="api-key-value" type="password" value={apiKey} autoComplete="new-password" spellCheck={false} onChange={event => setApiKey(event.target.value)} />
           </Field>
           {error && <FieldError>{error}</FieldError>}
