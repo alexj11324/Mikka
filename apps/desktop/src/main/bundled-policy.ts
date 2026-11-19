@@ -73,7 +73,9 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/(workspace|workspace\/switcher|search|issues\/search|skills|skills\/search|teams\/directory)$/, ['GET']],
   [/^\/api\/settings\/(?:password|sessions|preferences|saved-logins|workspace-general|transfer-targets|deletion-impact|app-policy|share-policy|secrets|e2b-key|usage|billing|credit-billing|card-verification|audit|model-order|bots|workspace-bots|api-keys|environments)$/, ['GET']],
   [/^\/api\/agent-cli-policy$/, ['GET', 'POST']],
-  [/^\/api\/(bots|conversations|subscriptions|subscriptions\/usage|pending-actions|approved-writes|suggestions|computer\/events|agent\/sessions\/active)$/, ['GET', 'POST']],
+  // 收件箱 (Inbox) reads its page and writes its lifecycle commands here; both
+  // are authorized per reader and workspace inside the handler.
+  [/^\/api\/(bots|conversations|subscriptions|subscriptions\/usage|pending-actions|approved-writes|inbox|suggestions|computer\/events|agent\/sessions\/active)$/, ['GET', 'POST']],
   [/^\/api\/(coordinator\/(?:runtime|messages|attention))$/, ['GET', 'POST', 'DELETE']],
   [/^\/api\/(chat\/attachments|integrations\/mcp|integrations\/mcp\/shares|credentials|device-tokens)$/, ['GET', 'POST', 'PATCH', 'DELETE']],
   [/^\/api\/(agent\/images|agent\/sessions|devices\/hosts)$/, ['GET']],
