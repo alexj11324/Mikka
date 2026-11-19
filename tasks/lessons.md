@@ -308,3 +308,12 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
 
 - 现象：`scripts/ci/self-hosted-requirements.mjs` 要求每个**改动的**后端文件在 `config/self-hosted-requirements.json` 里声明 `mode` / `environment` / `behavior` / `test`（测试文件必须存在且在某个 suite 里）。漏了 4 个文件，`image` job 直接红。
 - 规则：改 `lib/**`、`app/{api,v1,actions}/**`、`apps/{api,eve}/**`、`workflows/**` 下任何文件后，本地先跑 `node scripts/ci/self-hosted-requirements.mjs`（这个不需要 build，可以本机跑）。
+
+## 2026-11-19 给模块加导出，要连 fixtures/ 和 scripts/ 一起查
+
+- 现象：把 `requireUser` 挪进 `lib/acting-user.ts` 后，`tests/fixtures/legacy-scope-runtime.mjs` 用 `registerHooks` 整体替换该模块，只导出了 `currentUser`/`actAs`。`lib/workspace-access.ts` 的新 import 链接失败，两个 `test:scope-policy` 用例报 `does not provide an export named 'requireUser'`。
+- 根因：第一次只 grep 了 `*.test.ts*` 里的 `mock.module`，漏了 `tests/fixtures/*.mjs` 的 `registerHooks` 文件级替换（这是本仓库第二种 mock 机制）。
+- 规则：
+  1. 给任何被 mock 的模块加导出后，搜索范围必须包含：`*.test.ts`、`*.test.tsx`、`*.test.mjs`、`tests/fixtures/*.mjs`、`scripts/**/*.mjs`。
+  2. 本仓库有两套 mock 机制：`mock.module()`（node:test）和 `registerHooks` + `resolve/load`（fixture 预加载）。后者用 `--import ./tests/fixtures/xxx.mjs` 挂上，grep 关键字是 `resolve(`/`load(` 里的文件路径。
+  3. fixture 里替换成"抛错"的模块（如 scope-store 的 acting-user）是有意的语义，补导出时要保持同样的抛错行为，不要图省事写成成功返回。
