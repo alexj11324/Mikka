@@ -104,10 +104,7 @@ export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx
 // Files another open change owns; each fixes its own lines and then drops its entry here.
 // plugins-skills-view: the Plugins/Skills session moves its skill search to SearchInput.
 // secrets-settings: PR #557 rewrites the E2B section, whose loading rows need `bare`.
-export const UI_SWEEP_PENDING = new Map([
-  ['components/plugins/plugins-skills-view.tsx', 'style/search-input'],
-  ['components/settings/secrets-settings.tsx', 'style/nested-frame'],
-])
+export const UI_SWEEP_PENDING = new Map()
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx', 'components/slots/thread-header.tsx']
 // 2026-11-18-1900: Mikka's own UI draws affectUI's Hugeicons family through `policy.glyphLibrary`. A task's status icon
 // keeps lucide (2026-11-13-1405), in these three files only, so the status glyph is never drawn by another family.
@@ -150,6 +147,8 @@ export function auditSource(file, text, policy) {
       // R-52 (Alex 2026-11-04): a circle is a task, a bubble is a thread; the thread's icon never borrows a circle.
       if (from === policy.iconLibrary && file === 'components/workspace/thread-status-icon.tsx') for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Circle|LoaderCircle|Hand)/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/thread-not-circle', '线程用对话气泡加状态色点，不用圆圈图标；圆圈只表示任务（R-52）。')
       if (isIconSource(from, policy)) for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Sparkles?|WandSparkles)(?:Icon)?$/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/no-sparkle', 'AI 不用闪光图标（R-71）：思考用 Brain，Bot 用 Bot。')
+      // 优先级是低中高一道上楼梯的柱子，由 Mikka 自己画；等高 tally 条在 2026-11-18 被 Alex 否掉（R-71a）。
+      if (file === 'components/icons/index.tsx') for (const spec of clause?.namedBindings?.elements ?? []) if (/^Tally\d/.test(spec.name.text)) add(spec, 'icons/priority-bars', '优先级用自绘的上楼梯柱子（SignalLow/SignalMedium/SignalHigh），不用等高的 tally 条。')
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const entries = variables.get(node.name.text) ?? []

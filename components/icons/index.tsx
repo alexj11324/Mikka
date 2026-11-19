@@ -198,9 +198,6 @@ import {
   TableIcon,
   TableOfContentsIcon,
   TagIcon,
-  Tally1Icon,
-  Tally2Icon,
-  Tally3Icon,
   TerminalIcon,
   TextAlignCenterIcon,
   TextAlignJustifyIcon,
@@ -242,6 +239,12 @@ export type IconGlyph = ComponentType<IconProps>
 const glyph = (icon: IconSvgElement) => forwardRef<SVGSVGElement, IconProps>(function Glyph(props, ref): ReactElement {
   const { size = 24, strokeWidth = 2, ...rest } = props
   return <HugeiconsIcon ref={ref} icon={icon} size={size} strokeWidth={strokeWidth} color="currentColor" {...rest} />
+})
+
+/** A mark Mikka draws itself: the same 24 box, stroke weight and `currentColor` as the imported set,
+ * so it sits beside those glyphs at any size a call site passes. */
+const own = (paths: string[]) => forwardRef<SVGSVGElement, IconProps>(function Glyph({ size = 24, strokeWidth = 2, ...rest }, ref): ReactElement {
+  return <svg ref={ref} width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" {...rest}>{paths.map(d => <path key={d} d={d} />)}</svg>
 })
 
 export const AlignCenter = glyph(TextAlignCenterIcon)
@@ -428,9 +431,12 @@ export const Settings2 = glyph(Settings02Icon)
 export const Share2 = glyph(Share02Icon)
 export const Shield = glyph(ShieldIcon)
 export const ShieldCheck = glyph(SecurityCheckIcon)
-export const SignalHigh = glyph(Tally3Icon)
-export const SignalLow = glyph(Tally1Icon)
-export const SignalMedium = glyph(Tally2Icon)
+// A priority is a staircase: one bar, two, three, on one baseline. No free set draws it (the tally
+// bars it offered are equal height and Alex rejected them on 2026-11-18), so Mikka draws its own low,
+// normal and high marks here, in the set's box and stroke (R-71a).
+export const SignalHigh = own(['M7 19V13', 'M12 19V8', 'M17 19V3'])
+export const SignalLow = own(['M7 19V13'])
+export const SignalMedium = own(['M7 19V13', 'M12 19V8'])
 export const SlidersHorizontal = glyph(SlidersHorizontalIcon)
 export const Square = glyph(SquareIcon)
 export const SquareCode = glyph(CodeSquareIcon)

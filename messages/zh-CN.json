@@ -1610,6 +1610,8 @@
       "filterComments": "评论",
       "filterAgents": "Agent 和 Bot",
       "showEarlier": "显示更早的 {count} 条",
+      "noActivity": "还没有活动",
+      "noMatchingActivity": "没有符合筛选条件的活动",
       "copy": "复制",
       "copied": "已复制",
       "copyFailed": "复制失败",
@@ -2276,7 +2278,11 @@
         "tool": "工具",
         "person": "常联系的人",
         "preference": "偏好"
-      }
+      },
+      "pendingTitle": "待确认",
+      "pendingHint": "Mikka 刚学到的内容，确认后才会用于回答和提醒",
+      "approve": "确认",
+      "reject": "不保留"
     },
     "workspaceForm": {
       "name": "名称",
@@ -2546,7 +2552,10 @@
       "githubAppOwner": "归属",
       "githubAppPersonal": "个人账号",
       "githubAppOrganization": "组织",
-      "githubAppOrganizationName": "组织名"
+      "githubAppOrganizationName": "组织名",
+      "githubNoMatch": "没有匹配的仓库",
+      "githubClearSearch": "清除搜索",
+      "githubNoRepository": "还没有仓库。授权 GitHub App 后会显示在这里"
     },
     "slackInstallation": {
       "title": "Slack 机器人",
@@ -2762,7 +2771,8 @@
       "neverUsed": "从未使用",
       "expires": "{date} 过期",
       "noExpiry": "永不过期",
-      "expired": "已过期"
+      "expired": "已过期",
+      "copyFailed": "复制失败。请手动选中并复制"
     },
     "secrets": {
       "heading": "密钥",
@@ -8454,7 +8464,8 @@
         "noChannels": "Mikka 的 Slack 应用还看不到频道，先把它加进频道",
         "channelsError": "Slack 频道没加载出来"
       },
-      "viewOnly": "只有创建者能修改。需要的话接手它。"
+      "viewOnly": "只有创建者能修改。需要的话接手它。",
+      "devicesError": "设备加载失败"
     },
     "run": {
       "from": "由「{event}」触发 · {what}",

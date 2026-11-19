@@ -774,7 +774,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
               <Message align="end"><MessageContent>
                 <span className="flex w-full min-w-0 items-center justify-end gap-2">
                   {row.phase === 'failed' && <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-destructive-foreground" />}
-                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent className="flex flex-col gap-1.5 rounded-2xl px-4 py-3 whitespace-pre-wrap"><PersonWords text={row.text} />{row.context.quote && <span>{row.context.quote.label ?? row.context.quote.text}</span>}</BubbleContent></Bubble>
+                  <Bubble variant="secondary" align="end" className={cn(PERSON_BUBBLE, compact ? 'max-w-[90%]' : 'max-w-[min(26rem,80%)]')}><BubbleContent size="roomy" className="flex flex-col gap-1.5 whitespace-pre-wrap"><PersonWords text={row.text} />{row.context.quote && <span>{row.context.quote.label ?? row.context.quote.text}</span>}</BubbleContent></Bubble>
                 </span>
                 <span role={row.phase === 'failed' ? 'alert' : 'status'} className="flex items-center justify-end gap-1 self-end text-xs text-muted-foreground">
                   {row.phase === 'sending' ? tNavAll('HostedThread.sending') : row.error}

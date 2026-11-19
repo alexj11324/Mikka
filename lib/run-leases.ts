@@ -53,8 +53,12 @@ export async function sweepExpiredRunLeases(now = new Date()): Promise<{ owners:
     .orderBy(agentRuns.userId).limit(100)
   let failed = 0
   for (const owner of owners) {
+    // A reclaim that fails for this owner leaves that owner's lost runs
+    // unrecovered until the next sweep, so record which owner failed. The
+    // error goes in as a cause, logged by name and code only: never the raw
+    // driver error and never the owner id in the message.
     try { await reclaimLostRuns(owner.userId, now) }
-    catch { failed++ }
+    catch (error) { failed++; logCodedError(new CodedError('run_lease_reclaim_failed', { cause: error }), { owner: owner.userId }) }
   }
   return { owners: owners.length, failed }
 }

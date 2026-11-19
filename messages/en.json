@@ -1610,6 +1610,8 @@
       "filterComments": "Comments",
       "filterAgents": "Agents & bots",
       "showEarlier": "Show {count} earlier",
+      "noActivity": "No activity yet",
+      "noMatchingActivity": "No activity matches these filters",
       "copy": "Copy",
       "copied": "Copied",
       "copyFailed": "Could not copy",
@@ -2276,7 +2278,11 @@
         "tool": "Tools",
         "person": "People",
         "preference": "Preferences"
-      }
+      },
+      "pendingTitle": "Waiting for you",
+      "pendingHint": "What Mikka just learned. It is used for answers and reminders only after you confirm it.",
+      "approve": "Keep",
+      "reject": "Discard"
     },
     "workspaceForm": {
       "name": "Name",
@@ -2546,7 +2552,10 @@
       "githubAppOwner": "Owner",
       "githubAppPersonal": "Personal account",
       "githubAppOrganization": "Organization",
-      "githubAppOrganizationName": "Organization name"
+      "githubAppOrganizationName": "Organization name",
+      "githubNoMatch": "No repository matches this search",
+      "githubClearSearch": "Clear search",
+      "githubNoRepository": "No repositories yet. Authorize the GitHub App to see them here"
     },
     "slackInstallation": {
       "title": "Slack bot",
@@ -2762,7 +2771,8 @@
       "neverUsed": "Never used",
       "expires": "Expires {date}",
       "noExpiry": "Never expires",
-      "expired": "Expired"
+      "expired": "Expired",
+      "copyFailed": "Could not copy. Select the key and copy it by hand"
     },
     "secrets": {
       "heading": "Secrets",
@@ -8454,7 +8464,8 @@
         "noChannels": "Mikka's Slack app cannot see any channels yet. Add it to a channel first",
         "channelsError": "Could not load Slack channels"
       },
-      "viewOnly": "Only its creator can change it. Take it over to edit."
+      "viewOnly": "Only its creator can change it. Take it over to edit.",
+      "devicesError": "Devices could not load"
     },
     "run": {
       "from": "Started by {event} · {what}",

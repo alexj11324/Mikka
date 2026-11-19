@@ -144,7 +144,7 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
           </Empty>
             : <div className="flex flex-col gap-4">{groups.map(group => <section key={group.key} aria-label={group.label ?? undefined} className="flex flex-col gap-2">
               {group.label && <h2 className="flex items-center gap-1.5 px-1 text-sm font-medium text-muted-foreground">{group.key === 'pinned' && <Pin className="size-3.5" />}{group.label}</h2>}
-              <ItemGroup role="list" className="gap-0! overflow-hidden rounded-2xl border bg-card">
+              <ItemGroup role="list" className="gap-0! overflow-hidden rounded-xl border bg-card">
               {group.rows.map((row, index) => <Fragment key={row.id}>{index > 0 && <ItemSeparator className="my-0" />}<Item role="listitem" className="rounded-none hover:bg-accent/50" render={row.deleted ? undefined : <a href={href(row.id)} />} onClick={row.deleted ? undefined : (event: MouseEvent) => follow(event, row.id)}>
                 <ItemContent className="min-w-0">
                   <ItemTitle className="w-full truncate">{row.definition.title}</ItemTitle>

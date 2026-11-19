@@ -36,7 +36,12 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
   if (!chain) throw new ActionFailureError('runNotFound')
   if (splitChatFiles(parsed.data.text).files.length) {
     const { validateChatFiles } = await import('@/lib/chat-attachments/store')
-    try { await validateChatFiles(userId, { kind: 'thread', id: parsed.data.runId }, parsed.data.text) } catch { throw new ActionFailureError('messageRequired') }
+    const { ChatFileError } = await import('@/lib/chat-attachments/extract')
+    // Only a rejected attachment is the user's input problem. A connection or
+    // query failure inside the same call is a server fault and must not reach
+    // the user as "messageRequired".
+    try { await validateChatFiles(userId, { kind: 'thread', id: parsed.data.runId }, parsed.data.text) }
+    catch (error) { if (error instanceof ChatFileError) throw new ActionFailureError('messageRequired'); throw error }
   }
   const active = UNFINISHED_RUN_STATUSES.some(status => status === chain.attempts.at(-1)?.status)
   if (delivery === 'queue' && requestId && !parsed.data.modelChoice) {

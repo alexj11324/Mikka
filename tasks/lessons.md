@@ -282,6 +282,24 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   3. 新写的回归测试要做变异验证：把旧代码放回去确认变红，否则不知道它在测什么。
   4. 跨组件共享的 context 要从**叶子模块**导出，不要从已经 import 了消费方的模块里导出（会形成 cycle）——`conversation-panels-context.ts` 就是这么拆出来的。
 
+## 2026-11-19 跨层追踪：组件名 grep 会漏掉同文件导出的 hook
+
+- 现象：审计 public 层时判定 `LinearSettings` / `TelegramSettings` 是「孤儿组件」（全仓库无 import）。实际 hosted 层 `.hosted-ui/components/mikka/app-page.tsx:16,20` 用的是同文件导出的 `useLinearPlugin` / `useTelegramPlugin`，功能完全正常。
+- 根因：`grep -rn "LinearSettings"` 只搜组件名，且我习惯性排除了源文件自身（`grep -v "linear-settings.tsx"`），于是 hook 导出和同文件引用全被滤掉。
+- 规则：
+  1. 判定「组件是否被挂载」必须同时搜**组件名和同文件的 hook 导出**，且**不要排除源文件自身**——源文件里的 `export function useX` 是跨层契约的一部分。
+  2. slot 架构下，「public 层是 stub」不等于缺陷。`components/slots/settings-connections.tsx` 抛 `UI_SLOT_REQUIRES_OFFICIAL_CLIENT` 是设计，不是缺失；判缺陷前先确认 hosted 层是否实现了它。
+  3. 每个 `missing-affordance` 结论至少用两条独立检索路径验证（按名字、按导入、按调用点），单次 grep 的空结果不足以定性。
+
+## 2026-11-19 后端返回了字段 ≠ UI 使用了字段
+
+- 现象：记忆页「待确认」功能完全不可用。后端 `lib/profile/store.ts:94` 每条新事实都写 `reviewStatus: 'pending'`，`lib/profile/memory.ts:155` 也把它放在 `pending` 数组返回，但 `hooks/settings/use-memory-settings.ts` 只解构 `facts`，`pending` 从未进入渲染，`reviewFact` 零调用者。结果：用户永远看不到 Mikka 记住了什么，记忆永不生效，且无任何报错。
+- 根因：审查时看到「后端返回了 pending」就以为功能存在。实际上消费端漏了一个字段，而周围代码（`undoable` 已被 hosted 使用）看起来都很完整，掩盖了这个缺口。
+- 规则：
+  1. 判定「功能是否可用」必须走完 `后端返回 → hook 解构 → 组件渲染 → 用户可操作` 四步，任何一步断开都是缺陷。
+  2. 看到 `data.xxx` 被返回时，`grep` 一次 `xxx` 在 hook 和组件里的出现位置；只出现在服务端和类型定义里，就是死字段。
+  3. 静默失效最危险：没有报错、没有空状态提示、测试全绿。给这类修复补的测试必须做**变异验证**（删掉实现看测试是否变红），否则不知道测试在测什么。
+
 ## 2026-11-19 "grep 不到 importer" 不能用来删依赖
 
 - 现象：审计把 `unstorage` 判成死依赖删掉（源码里 grep `unstorage` 零命中），CI 上 Nitro 构建全线失败：`unstorage is not installed. It is required for KV storage (nitro/kv)`。`lib/agent-images-server.ts:3` 用的是虚拟模块 `nitro/kv`，真正的包由 Nitro 在构建期注入。
@@ -336,3 +354,50 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   2. 断言的顺序按规则的读法排：先"存在时能用"，再"删除请求关闭"，再"行没了关闭"。不要为了复用一个 token 而反复插入/删除。
   3. 本机复现 CI 的 DB 测试：需要名为 `mikka_e2e` 的库（测试硬编码这个名字），`MIGRATE=1` 先跑 `scripts/migrate.mjs`，然后 `REQUIRE_DB=1` + 四个 URL 环境变量都指向它。
   4. `run_captures` 有 CHECK `run_captures_ready_file`：`status='ready'` 时 `storageKey`、`size`、`sha256` 都必须非空，直接 INSERT 时要一起给。
+
+## 2026-11-19 收紧读口的过滤条件，必须同步改 fixture 的造数路径
+
+- 现象：给 `lib/profile/store.ts` 的 `profilePromptSection` 加了 `reviewStatus = 'approved'`（修复真实的安全缺口：设置页承诺"确认后才用于回答"，而 prompt 一直在读 pending 事实）。CI 红了 `test:user-facts-db` 里唯一一条仓库作用域用例 —— 它的 fixture 用 `recordFacts` 造数据，而 `recordFacts` 按设计写 `pending`，于是整个 prompt 段读成空串，`assert.match` 报 `actual: ''`。
+- 根因：过滤条件是**读口**改的，测试的**写口**（`recordFacts` → `pending`）没变。测试的名字讲的是"仓库作用域"，容易被误判成"这条断言过期了、改断言就行"，实际上应该补全 fixture 的**前置状态**。
+- 规则：
+  1. 给读函数加状态过滤后，第一件事是 `grep -rn "<读函数名>" --include='*.test.*'`，逐个看每个测试的造数走的是哪条写路径、写到什么状态。
+  2. 补前置状态用该状态的生产入口（这里是"审批"）；测试层拿不到业务入口时，在 fixture 里直接 `UPDATE` 该列，并在注释里写明这是 fixture 前置状态而非被测行为。
+  3. 顺手把新加的过滤条件本身变成断言（"还没审批时读出来必须是空"），否则这次修复没有任何回归保护。
+  4. 一个 DB suite 红会连带把 `Database checks (4/4)` 两个矩阵变体和聚合门 `Production build and browser interactions` 一起拖红。判断"到底红了几件事"，看日志里的 `test:<name> lifecycle] exit code=1` 有几条，不要按 job 数。
+
+## 2026-11-19 在 JSDoc 和它描述的函数之间插入新符号，等于把文档送给了新符号
+
+- 现象：修 `lib/run-recovery.ts` 的静默失败时，我把新的 `swept` 辅助函数直接插在 `recoverRuns` 的 JSDoc 结束处和 `recoverRuns` 之间。结果那段"Everything run recovery does …"的文档挂到了 `swept` 上，`recoverRuns` 变成无文档；`tsc`、lint、CI 全绿，只有 review 能看出来。
+- 根因：JSDoc 的归属由**相邻性**决定，不是由内容决定。插入点选在 `*/` 之后、函数之前，就破坏了归属。
+- 规则：
+  1. 在任何 `/** … */` 和它下面的 `export function` 之间不要插入任何东西 —— 包括注释块、常量、辅助函数。新辅助函数放到该 `*/` 之前（如果它服务于同一个导出）或放到该函数之后。
+  2. 改完用 `sed -n '<起点>,<终点>p' <file>` 肉眼看一遍：每个 `/**` 的正下方应该紧跟它描述的那个声明。
+  3. 这类问题 CI 抓不到，只有代码审查或人眼能抓 —— 属于"必须 review"的那一类，别指望门禁兜底。
+
+## 2026-11-19 `test:web-auth-db` 是 flake，不要当回归查
+
+- 现象：`tests/web-auth-handoff.db.test.ts` 的 `remote Web Workspace selection survives bearer-only HTTP and never broadens a tenant or PAT`（单条约 7 秒的重 HTTP+PG 用例）会间歇失败。本会话里出现三次：CI 报 `fetch failed` + 120s 超时；本地同样环境跑出 20/21；紧接着同参数重跑 29/29 全过。
+- 判断依据：**同输入重跑即绿** + 失败信息是网络层（`fetch failed`）而非断言不一致。本机复跑要带 `BETTER_AUTH_URL`，否则 `context.baseURL` 为空，`new URL('')` 会让 4 条用例报 `TypeError: Invalid URL` —— 那是环境缺失，不是代码问题。
+- 规则：
+  1. 看到这个 suite 红，先原地重跑一次再决定是否调查；不要顺着 workspace/PAT 的代码路径去改。
+  2. 本机跑 DB suite 必须按脚本原样调用（`bash -c "$(node -e "console.log(require('./package.json').scripts['<name>'])" )"`），漏掉 `--experimental-test-module-mocks` 或 `--import ./scripts/server-test.mjs` 会自己造出假失败。
+  3. 本地补齐的环境变量：`E2E_DATABASE_URL` / `MIKKA_DATABASE_URL` / `DATABASE_URL` / `WORKSPACE_DATABASE_URL` / `ORVILO_DATABASE_URL` 指向 `mikka_e2e`，外加 `BETTER_AUTH_URL` 和 `REQUIRE_DB=1`。
+
+## 2026-11-19 新接进 CI 的测试，"接上"不等于"跑过"
+
+- 现象：计划 006 把六个没被任何 CI 任务执行的 suite 接进了 `scripts/ci/tasks.json`。其中 `test:factory-query-http` 和 `test:factory-monitor-http` 少了全仓库其它 factory suite 都带的 `--import ./tests/support/server-only.mjs`，CI 一真正选中就报 `ERR_MODULE_NOT_FOUND: Cannot find package 'server-only' imported from lib/task-status-run-start.ts`。在 main 上它一直是绿的，因为 main 的 `Core unit checks` 日志里**这两个测试一次都没出现过** —— 任务按改动文件被选中，很久没匹配到相关改动。
+- 根因：这两个探测用例用 `FACTORY_QUERY_LOCAL_HTTP=1` 做 skip 守卫，本地默认跳过，跳过发生在运行测试体之前，所以本地永远走不到那条动态 import 链；`server-only` 本地甚至没装（Next 自己解析）。
+- 规则：
+  1. 把测试接进 CI 时，除了确认"文件在任务列表里"，还要确认**它在 CI 里真的被执行过**：翻一次该 job 的日志，grep 测试文件名，出现 0 次就是还没验证。
+  2. 新接的 suite 要照抄同目录其它 suite 的 `--import` 前缀，不要只写 `node --import tsx --test`。
+  3. 带 skip 守卫的集成测试，本地绿灯不构成证据 —— 只能靠 CI 或手动打开守卫跑。
+
+## 2026-11-19 解决冲突时整取一方，会静默吃掉另一方的同文件新增
+
+- 现象：`messages/en.json` / `zh-CN.json` 在合 main 时冲突，我用 `git checkout --theirs` 整取 main 版，然后只补回了自己记得的 `githubClearSearch`。结果本分支加的 `Automations.editor.devicesError` 和 `Settings.tokens.copyFailed` 被静默删掉，CI 的 `pnpm typecheck` 报两条 `TS2345`（消息键不在类型里）。`Source checks` 和 `site-search` 两个 job 报的是同一个错。
+- 根因：冲突解决只按"我记住的那几个键"做人工并集，没有把两侧的键集**算出来**比对。`check-i18n.mjs` 抓不到：它校验 en/zh 之间是否成对、占位符是否一致，不校验"代码里引用的键是否存在"——那是 typecheck 的职责。
+- 规则：
+  1. `messages/*.json` 冲突不要 `checkout --theirs` 了事。解决后用脚本算并集：
+     `flat(branch) | flat(main)` 与当前文件比对，必须 **missing 为空且 extra 为空**。
+  2. 任何"整取一方"的冲突解决，都要再 diff 一次该文件的**另一侧独有内容**（`git diff <theirs> <branch> -- <file>`），而不是回忆自己改过什么。
+  3. 大文件 JSON 插入键时，插在最后一个成员之前要给原最后一行补逗号；写完立刻 `json.loads` 校验再落盘。
