@@ -372,3 +372,21 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 在任何 `/** … */` 和它下面的 `export function` 之间不要插入任何东西 —— 包括注释块、常量、辅助函数。新辅助函数放到该 `*/` 之前（如果它服务于同一个导出）或放到该函数之后。
   2. 改完用 `sed -n '<起点>,<终点>p' <file>` 肉眼看一遍：每个 `/**` 的正下方应该紧跟它描述的那个声明。
   3. 这类问题 CI 抓不到，只有代码审查或人眼能抓 —— 属于"必须 review"的那一类，别指望门禁兜底。
+
+## 2026-11-19 `test:web-auth-db` 是 flake，不要当回归查
+
+- 现象：`tests/web-auth-handoff.db.test.ts` 的 `remote Web Workspace selection survives bearer-only HTTP and never broadens a tenant or PAT`（单条约 7 秒的重 HTTP+PG 用例）会间歇失败。本会话里出现三次：CI 报 `fetch failed` + 120s 超时；本地同样环境跑出 20/21；紧接着同参数重跑 29/29 全过。
+- 判断依据：**同输入重跑即绿** + 失败信息是网络层（`fetch failed`）而非断言不一致。本机复跑要带 `BETTER_AUTH_URL`，否则 `context.baseURL` 为空，`new URL('')` 会让 4 条用例报 `TypeError: Invalid URL` —— 那是环境缺失，不是代码问题。
+- 规则：
+  1. 看到这个 suite 红，先原地重跑一次再决定是否调查；不要顺着 workspace/PAT 的代码路径去改。
+  2. 本机跑 DB suite 必须按脚本原样调用（`bash -c "$(node -e "console.log(require('./package.json').scripts['<name>'])" )"`），漏掉 `--experimental-test-module-mocks` 或 `--import ./scripts/server-test.mjs` 会自己造出假失败。
+  3. 本地补齐的环境变量：`E2E_DATABASE_URL` / `MIKKA_DATABASE_URL` / `DATABASE_URL` / `WORKSPACE_DATABASE_URL` / `ORVILO_DATABASE_URL` 指向 `mikka_e2e`，外加 `BETTER_AUTH_URL` 和 `REQUIRE_DB=1`。
+
+## 2026-11-19 新接进 CI 的测试，"接上"不等于"跑过"
+
+- 现象：计划 006 把六个没被任何 CI 任务执行的 suite 接进了 `scripts/ci/tasks.json`。其中 `test:factory-query-http` 和 `test:factory-monitor-http` 少了全仓库其它 factory suite 都带的 `--import ./tests/support/server-only.mjs`，CI 一真正选中就报 `ERR_MODULE_NOT_FOUND: Cannot find package 'server-only' imported from lib/task-status-run-start.ts`。在 main 上它一直是绿的，因为 main 的 `Core unit checks` 日志里**这两个测试一次都没出现过** —— 任务按改动文件被选中，很久没匹配到相关改动。
+- 根因：这两个探测用例用 `FACTORY_QUERY_LOCAL_HTTP=1` 做 skip 守卫，本地默认跳过，跳过发生在运行测试体之前，所以本地永远走不到那条动态 import 链；`server-only` 本地甚至没装（Next 自己解析）。
+- 规则：
+  1. 把测试接进 CI 时，除了确认"文件在任务列表里"，还要确认**它在 CI 里真的被执行过**：翻一次该 job 的日志，grep 测试文件名，出现 0 次就是还没验证。
+  2. 新接的 suite 要照抄同目录其它 suite 的 `--import` 前缀，不要只写 `node --import tsx --test`。
+  3. 带 skip 守卫的集成测试，本地绿灯不构成证据 —— 只能靠 CI 或手动打开守卫跑。
