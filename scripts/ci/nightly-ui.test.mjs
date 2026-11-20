@@ -12,14 +12,14 @@ const identity = { id: 1427517699, full_name: 'alexj11324/Mikka', private: false
 const run = { id: 101, run_attempt: 1, head_sha: source, head_branch: 'main', event: 'push', status: 'completed', conclusion: 'success',
   path: '.github/workflows/cloudflare-api-image.yml', actor: { id: 183887963 }, triggering_actor: { id: 183887963 }, repository: identity, head_repository: identity }
 
-function archive(extra = [], proofOverrides = {}) {
+function archive(extra = [], proofOverrides = {}, actionsOverride) {
   const proof = { version: 1, target: 'web', rendererBuild: 'd'.repeat(64), usedActions: ['tasks.read'], modules: { tasks: ['read'] },
     inputs: ['.hosted-ui/slots/synthetic-fixture.tsx'], serverModules: [], ...proofOverrides }
   const release = 'bbbbbbb-101-1'
   const files = [
     { name: 'site/index.html', content: `<html><script src="/mikka/assets/main.js?dpl=${release}"></script></html>` },
     { name: 'site/assets/main.js', content: 'export const syntheticFixture = true;' },
-    { name: 'site/renderer-actions.json', content: JSON.stringify(rendererActionContract({ ...proof, target: 'web' })) },
+    { name: 'site/renderer-actions.json', content: JSON.stringify(actionsOverride ?? rendererActionContract({ ...proof, target: 'web' })) },
     { name: 'proof/renderer-manifest.json', content: JSON.stringify(proof) }, ...extra,
   ]
   const result = JSON.parse(execFileSync('python3', ['-c', String.raw`
@@ -81,6 +81,7 @@ test('nonofficial renderers, source files, mismatched member digests and changed
     archive([], { inputs: ['components/slots/synthetic.tsx'] }),
     archive([], { target: 'desktop' }),
     archive([{ name: 'site/component.tsx', content: 'synthetic raw source' }]),
+    archive([], {}, { version: 1, target: 'web', rendererBuild: 'f'.repeat(64), usedActions: ['tasks.read'], modules: { tasks: ['read'] } }),
   ]) await assert.rejects(restoreNightlyUi(packet, directory))
   const mismatch = archive()
   mismatch.web.artifacts.assets.digest = 'sha256:' + '0'.repeat(64)

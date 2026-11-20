@@ -57,6 +57,7 @@ def unpack(archive, destination, expected):
             seen.add(name)
             require(member.isdir() or member.isfile())
             require(name in ('site', 'proof') or name.startswith('site/') or name == 'proof/renderer-manifest.json')
+            require(name != 'site/renderer-manifest.json')
             if member.isfile():
                 require(member.size <= 64 * 1024 * 1024)
                 files[name] = tar.extractfile(member).read()

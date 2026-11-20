@@ -38,6 +38,8 @@ export async function selectNightlyUi({ source, api = github }) {
   const manifests = jobs.filter(job => job.name === 'release-manifest')
   assert.equal(manifests.length, 1, 'nightly_ui_manifest_job_required')
   const [manifestJob] = manifests
+  assert.equal(String(manifestJob.run_id), String(run.id))
+  assert.equal(String(manifestJob.run_attempt), String(run.run_attempt))
   assert.equal(manifestJob.head_sha, source)
   assert.equal(manifestJob.status, 'completed')
   assert.equal(manifestJob.conclusion, 'success')
