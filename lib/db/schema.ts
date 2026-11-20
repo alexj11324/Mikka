@@ -162,6 +162,8 @@ export const botModelChoices = pgTable('bot_model_choices', {
   botKey:text('botKey').notNull(),bindingId:uuid('bindingId'),
   /** Or a model an API key / custom provider serves (C22); exactly one of the two. */
   apiKeyId:uuid('apiKeyId'),apiKeyModel:text('apiKeyModel'),
+  /** Optional credits-model selection stored by the current product API. */
+  creditsModel:text('creditsModel'),
 }, table=>[primaryKey({columns:[table.ownerId,table.workspaceId,table.botKey]})])
 
 export const agentSessions = pgTable('agent_sessions', {
