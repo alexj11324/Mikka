@@ -4,6 +4,8 @@
 // conditions that are on as chips you can remove where you read them, the
 // group-by control, and a quiet ⋯ for refresh, the reading views and the saved
 // views (decision 2026-11-18-1400; Alex, 2026-11-18 「你应该跟他修成一样的才对吧」).
+// The reading view is a condition too, so it shows as the leading chip instead
+// of hiding in the tab alone.
 // The row stays one family, as the board's toolbar and 自动化's are: the search
 // and the group-by control take a `--control` fill with no stroke, the group-by
 // selection is the row's one filled segment (R-31), and every action beside them
@@ -18,12 +20,14 @@ import { withBasePath } from "@/lib/base-path";
 import {
   pullGroups,
   pullStates,
+  pullViewStates,
   type PullFilters,
   type PullGroup,
   type PullState,
   type SavedPullView,
 } from "@/lib/pull-directory";
 import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,8 +54,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const stateKeys: Record<PullState, `states.${PullState}`> = {
   ready: "states.ready",
+  attention: "states.attention",
   pending: "states.pending",
-  failed: "states.failed",
   draft: "states.draft",
   open: "states.open",
   merged: "states.merged",
@@ -66,6 +70,17 @@ const groupKeys: Record<PullGroup, `groups.${PullGroup}`> = {
 /** The grouping a segmented control reports back, read against the list it was built from. */
 const groupingValue = (value: string | undefined) =>
   pullGroups.find((group) => group === value);
+
+/** One condition, read the way Capy reads it: the property, the operator, the
+ *  value, and a × that drops just this one. A condition with nothing to compare
+ *  — "Linked only" — is one phrase rather than an empty value. */
+type Chip = {
+  key: string;
+  property: string;
+  value?: string;
+  title?: string;
+  clear: Partial<PullFilters>;
+};
 
 export function activeFilterCount(filters: PullFilters, repo: string) {
   return [
@@ -114,14 +129,48 @@ export function PullFilterBar({
   const t = useTranslations("PullDirectory");
   const [conditionsOpen, setConditionsOpen] = useState(false);
   const active = activeFilterCount(filters, repo);
-  const chips: { key: string; label: string; clear: Partial<PullFilters> }[] = [];
+  const admitted = pullViewStates(filters.view);
+  const chips: Chip[] = [];
+  // The reading view is itself a state condition, so it leads the row; an
+  // explicit state filter replaces it rather than stacking a second one.
+  if (admitted.length && !filters.state)
+    chips.push({
+      key: "view",
+      property: t("state"),
+      value:
+        admitted.length === 1
+          ? t(stateKeys[admitted[0]])
+          : t("eitherOfStates", { count: admitted.length }),
+      title: admitted.map((state) => t(stateKeys[state])).join(" · "),
+      clear: { view: "all", state: "" },
+    });
   if (filters.state)
-    chips.push({ key: "state", label: t("stateValue", { value: t(stateKeys[filters.state]) }), clear: { state: "" } });
+    chips.push({
+      key: "state",
+      property: t("state"),
+      value: t(stateKeys[filters.state]),
+      clear: { state: "" },
+    });
   if (repo && filters.author)
-    chips.push({ key: "author", label: t("authorValue", { value: filters.author }), clear: { author: "" } });
+    chips.push({
+      key: "author",
+      property: t("author"),
+      value: filters.author,
+      clear: { author: "" },
+    });
   if (repo && filters.label)
-    chips.push({ key: "label", label: t("labelValue", { value: filters.label }), clear: { label: "" } });
-  if (filters.linked) chips.push({ key: "linked", label: t("linkedOnly"), clear: { linked: false } });
+    chips.push({
+      key: "label",
+      property: t("label"),
+      value: filters.label,
+      clear: { label: "" },
+    });
+  if (filters.linked)
+    chips.push({
+      key: "linked",
+      property: t("linkedOnly"),
+      clear: { linked: false },
+    });
   return (
     <div className="flex flex-col gap-2 px-4 pb-2">
       {/* control-size-exempt: the row's 24px control is the remove-view icon inside a saved-view menu row, not a peer of the 28px toolbar controls beside it. */}
@@ -165,7 +214,13 @@ export function PullFilterBar({
                   size="sm"
                   aria-label={t("state")}
                   value={filters.state}
-                  onChange={(event) => onChange({ state: event.target.value as PullFilters["state"] })}
+                  // A chosen state replaces the reading view's own condition, so
+                  // the view steps back to 全部 instead of claiming a filter the
+                  // list no longer applies.
+                  onChange={(event) => {
+                    const state = event.target.value as PullFilters["state"];
+                    onChange(state ? { state, view: "all" } : { state: "" });
+                  }}
                   className="w-full"
                 >
                   <NativeSelectOption value="">{t("anyState")}</NativeSelectOption>
@@ -310,23 +365,19 @@ export function PullFilterBar({
         </DropdownMenu>
       </div>
       {chips.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1">
+        <div data-pull-conditions className="flex flex-wrap items-center gap-1">
           {chips.map((chip) => (
-            <span
+            <FilterChip
               key={chip.key}
-              className="inline-flex h-6 items-center gap-0.5 rounded-md bg-control ps-2 pe-0.5 text-xs text-foreground"
-            >
-              {chip.label}
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label={t("removeFilter", { name: chip.label })}
-                onClick={() => onChange(chip.clear)}
-                className="text-muted-foreground"
-              >
-                <X data-icon />
-              </Button>
-            </span>
+              field={chip.property}
+              value={chip.value}
+              is={t('is')}
+              title={chip.title}
+              removeLabel={t('removeFilter', {
+                name: chip.value === undefined ? chip.property : `${chip.property} ${chip.value}`,
+              })}
+              onRemove={() => onChange(chip.clear)}
+            />
           ))}
         </div>
       )}
