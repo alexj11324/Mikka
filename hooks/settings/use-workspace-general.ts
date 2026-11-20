@@ -17,7 +17,7 @@ import { useActionError } from '@/lib/use-action-error'
 export const WORKSPACE_ICON_MAX_BYTES = 200 * 1024
 export const WORKSPACE_ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 
-type Field = 'name' | 'slug' | 'icon' | 'taskPrefix'
+type Field = 'name' | 'slug' | 'icon' | 'taskPrefix' | 'share'
 export interface WorkspaceFailedSave { field: Field; value: string | null; message: string }
 
 function readDataUrl(file: File) {
@@ -77,6 +77,24 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
     }
   }
 
+  async function patch(input: Parameters<typeof updateWorkspace>[0]) {
+    const current = data
+    if (!current || inFlight.current) return
+    inFlight.current = true
+    setSaving('share')
+    setFailed(null)
+    try {
+      const result = await updateWorkspace(input, current.id)
+      if (result.error) { setFailed({ field: 'share', value: null, message: actionError(result.error) }); return }
+      await general.mutate({ ...current, ...result }, { revalidate: false })
+    } catch {
+      setFailed({ field: 'share', value: null, message: actionError() })
+    } finally {
+      setSaving(null)
+      inFlight.current = false
+    }
+  }
+
   function commit(field: 'name' | 'slug' | 'taskPrefix') {
     if (!data) return
     const draft = field === 'name' ? name : field === 'slug' ? slug : prefix
@@ -99,7 +117,7 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
     data,
     loadError: data ? null : actionError(readError),
     reload: () => { void general.mutate() },
-    host, name, setName, slug, setSlug, prefix, setPrefix, saving, failed, save, commit, pickIcon,
+    host, name, setName, slug, setSlug, prefix, setPrefix, saving, failed, save, patch, commit, pickIcon,
     removeIcon: () => { void save('icon', null) },
     /** True when the failure was a picked icon, which 重试 picks again */
     failedPick: failed?.field === 'icon' && failed.value === null,

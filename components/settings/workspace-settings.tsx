@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingSelect, SettingSwitch, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { useReplayOnboarding } from '@/hooks/settings/use-preferences-page'
 import { usePresence, type PresenceProps } from '@/lib/use-presence'
@@ -93,9 +93,15 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => { if (general.failedPick) { fileRef.current?.click(); return } general.retry() }} />}
     <SettingsSection id="workspace-share" title={t('share')}>
-      <SettingRow title={t('newWorkVisibility')} description={t('newWorkHint')}><span className="text-sm text-muted-foreground">{t('unavailable')}</span></SettingRow>
-      <SettingRow title={t('workspaceWorkVisibility')} description={t('workspaceWorkHint')}><span className="text-sm text-muted-foreground">{t('unavailable')}</span></SettingRow>
-      <SettingRow title={t('allowPrivate')} description={t('allowPrivateHint')}><span className="text-sm text-muted-foreground">{t('unavailable')}</span></SettingRow>
+      <SettingRow title={t('newWorkVisibility')} description={t('newWorkHint')}>
+        <SettingSelect label={t('newWorkVisibility')} value={current.newWorkVisibility} disabled={saving !== null} options={[{ value: 'inherit', label: t('visibilityInherit') }, { value: 'members', label: t('visibilityMembers') }, { value: 'private', label: t('visibilityPrivate') }]} onValueChange={value => { if (value === 'inherit' || value === 'members' || value === 'private') void general.patch({ newWorkVisibility: value }) }} />
+      </SettingRow>
+      <SettingRow title={t('workspaceWorkVisibility')} description={t('workspaceWorkHint')}>
+        <SettingSelect label={t('workspaceWorkVisibility')} value={current.workspaceWorkVisibility} disabled={saving !== null} options={[{ value: 'members', label: t('visibilityMembers') }, { value: 'private', label: t('visibilityPrivate') }]} onValueChange={value => { if (value === 'members' || value === 'private') void general.patch({ workspaceWorkVisibility: value }) }} />
+      </SettingRow>
+      <SettingRow title={t('allowPrivate')} description={t('allowPrivateHint')}>
+        <SettingSwitch label={t('allowPrivate')} checked={current.allowPrivate} disabled={saving !== null} onCheckedChange={checked => { void general.patch({ allowPrivate: checked }) }} />
+      </SettingRow>
     </SettingsSection>
 
     <SettingsSection id="workspace-danger" title={t('danger')}>

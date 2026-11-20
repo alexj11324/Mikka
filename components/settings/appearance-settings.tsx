@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { Plus } from '@/components/icons'
+import { Image, Pencil, Plus } from '@/components/icons'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -57,10 +58,7 @@ export function AppearanceSettings() {
           const selected = ui.themeId === theme.id
           return <Button key={theme.id} type="button" aria-pressed={selected} variant={selected ? 'secondary' : 'outline'} onClick={() => paint({ themeId: theme.id, accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}
             className="h-auto flex-col items-start gap-2 p-2 text-xs">
-            <span className="flex h-14 w-full overflow-hidden" style={{ background: theme.fill }}>
-              <span className="w-3" style={{ background: theme.accent }} />
-              <span className="m-1.5 h-2 flex-1" style={{ background: theme.foreground, opacity: 0.75 }} />
-            </span>
+            <ThemeThumb fill={theme.fill} accent={theme.accent} foreground={theme.foreground} />
             {t(`theme_${theme.id}` as 'theme_mikka')}
           </Button>
         })}
@@ -92,30 +90,38 @@ export function AppearanceSettings() {
       </SettingRow>)}
     </SettingsSection>
     <SettingsSection title={t('background')}>
-      <SettingRow title={t('dashboardBackground')}>
-        <SettingSelect label={t('dashboardBackground')} value={ui.background} options={[{ value: 'none', label: t('backgroundNone') }, { value: 'color', label: t('backgroundColor') }]} onValueChange={value => { if (value === 'none' || value === 'color') paint({ background: value }) }} />
+      <SettingRow title={t('dashboardBackground')} description={t('dashboardHint')}>
+        <div className="flex items-center gap-2">
+          <span className="flex size-8 items-center justify-center overflow-hidden rounded-md border" style={{ background: ui.background === 'color' ? ui.accent : ui.fill }} aria-hidden>
+            <Image data-icon className="text-foreground" />
+          </span>
+          <Button type="button" variant="ghost" size="icon" aria-label={t('editBackground')} onClick={() => paint({ background: ui.background === 'color' ? 'none' : 'color' })}>
+            <Pencil data-icon />
+          </Button>
+        </div>
       </SettingRow>
-      <SettingRow title={t('backgroundEffect')}>
-        <SettingSelect label={t('backgroundEffect')} value={ui.backgroundEffect} options={[{ value: 'none', label: t('backgroundNone') }, { value: 'gradient', label: t('effectGradient') }, { value: 'grid', label: t('effectGrid') }]} onValueChange={value => { if (value === 'none' || value === 'gradient' || value === 'grid') paint({ backgroundEffect: value }) }} />
+      <SettingRow title={t('backgroundEffect')} description={t('effectHint')}>
+        <SettingSelect label={t('backgroundEffect')} value={ui.backgroundEffect} options={[{ value: 'colorful', label: t('effectColorful') }, { value: 'none', label: t('backgroundNone') }]} onValueChange={value => { if (value === 'none' || value === 'colorful') paint({ backgroundEffect: value }) }} />
       </SettingRow>
-      <SettingRow title={t('wallpaper')}>
-        <SettingSelect label={t('wallpaper')} value={ui.wallpaper} options={[{ value: 'none', label: t('backgroundNone') }, { value: 'color', label: t('backgroundColor') }]} onValueChange={value => { if (value === 'none' || value === 'color') paint({ wallpaper: value }) }} />
+      <SettingRow title={t('wallpaper')} description={ui.wallpaper === 'none' ? t('wallpaperEmpty') : t('wallpaperSaved')}>
+        <Button type="button" size="sm" variant="outline" onClick={() => paint({ wallpaper: 'color' })}>{t('saveCurrent')}</Button>
       </SettingRow>
     </SettingsSection>
     <SettingsSection title={t('code')}>
-      <SettingRow title={t('codeSize')}>
+      <SettingRow title={t('codeSize')} description={t('codeSizeHint')}>
         <SettingSelect label={t('codeSize')} value={ui.codeSize} options={[{ value: 'default', label: t('codeDefault') }, { value: 'small', label: t('codeSmall') }, { value: 'large', label: t('codeLarge') }]} onValueChange={value => { if (value === 'default' || value === 'small' || value === 'large') paint({ codeSize: value }) }} />
       </SettingRow>
-      <SettingRow title={t('diffView')}>
+      <SettingRow title={t('diffView')} description={t('diffViewHint')}>
         <SettingSelect label={t('diffView')} value={ui.diffView} options={[{ value: 'unified', label: t('diffUnified') }, { value: 'split', label: t('diffSplit') }]} onValueChange={value => { if (value === 'unified' || value === 'split') paint({ diffView: value }) }} />
       </SettingRow>
-      <SettingRow title={t('diffColor')}>
+      <SettingRow title={t('diffColor')} description={t('diffColorHint')}>
         <SettingSelect label={t('diffColor')} value={ui.diffColor} options={[{ value: 'redGreen', label: t('diffRedGreen') }, { value: 'blue', label: t('diffBlue') }]} onValueChange={value => { if (value === 'redGreen' || value === 'blue') paint({ diffColor: value }) }} />
       </SettingRow>
+      <DiffPreview color={ui.diffColor} />
     </SettingsSection>
     <SettingsSection title={t('hidden')}>
-      <SettingRow title={t('hidden')}>
-        <SettingSelect label={t('hidden')} value={ui.hiddenFiles} options={[{ value: 'hide', label: t('hiddenHide') }, { value: 'dim', label: t('hiddenDim') }, { value: 'show', label: t('hiddenShow') }]} onValueChange={value => { if (value === 'hide' || value === 'dim' || value === 'show') paint({ hiddenFiles: value }) }} />
+      <SettingRow title={t('hiddenFold')} description={t('hiddenFoldHint')}>
+        <SettingSelect className="w-56" label={t('hiddenFold')} value={ui.hiddenFiles} options={[{ value: 'generated', label: t('hiddenGenerated') }, { value: 'none', label: t('hiddenNone') }, { value: 'all', label: t('hiddenAll') }]} onValueChange={value => { if (value === 'generated' || value === 'none' || value === 'all') paint({ hiddenFiles: value }) }} />
       </SettingRow>
     </SettingsSection>
   </>
@@ -130,11 +136,34 @@ function ModeThumb({ mode }: { mode: 'light' | 'dark' | 'system' }) {
   </span>
 }
 
+function ThemeThumb({ fill, accent, foreground }: { fill: string; accent: string; foreground: string }) {
+  return <span className="flex h-16 w-full overflow-hidden rounded-md border" style={{ background: fill }}>
+    <span className="w-5" style={{ background: accent }} />
+    <span className="flex flex-1 flex-col gap-1 p-1.5">
+      <span className="h-1.5 w-8 rounded-full" style={{ background: foreground }} />
+      <span className="h-1 w-full rounded-full opacity-30" style={{ background: foreground }} />
+      <span className="mt-auto h-4 w-full rounded-sm opacity-80" style={{ background: accent }} />
+    </span>
+  </span>
+}
+
 function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return <SettingRow title={label}>
-    <Label className="flex items-center gap-2 text-sm">
-      <Input aria-label={label} type="color" value={value} onChange={event => onChange(event.target.value)} className="size-8 p-1" />
+    <Label className="flex h-7 items-center gap-2 rounded-full border bg-background px-1.5 pr-2.5 text-sm">
+      <span className="size-4 rounded-sm border" style={{ background: value }} />
       <span className="font-mono text-xs">{value}</span>
+      <Input aria-label={label} type="color" value={value} onChange={event => onChange(event.target.value)} className="sr-only" />
     </Label>
   </SettingRow>
+}
+
+function DiffPreview({ color }: { color: 'redGreen' | 'blue' }) {
+  const removed = color === 'blue' ? 'bg-sidebar-primary/15' : 'bg-destructive/15'
+  const added = color === 'blue' ? 'bg-sidebar-primary/10' : 'bg-success/15'
+  return <pre className="mx-5 mb-4 overflow-hidden rounded-md border font-mono text-xs leading-6">
+    <div className="px-3">1 export function add(a: number, b: number) {'{'}</div>
+    <div className={cn('px-3', removed)}>- return a - b</div>
+    <div className={cn('px-3', added)}>+ return a + b</div>
+    <div className="px-3">{'}'}</div>
+  </pre>
 }

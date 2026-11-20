@@ -13,7 +13,7 @@ export const COLOR_SCHEMES = ['light', 'dark', 'system'] as const
 export const CODE_SIZES = ['default', 'small', 'large'] as const
 export const DIFF_VIEWS = ['unified', 'split'] as const
 export const DIFF_COLORS = ['redGreen', 'blue'] as const
-export const HIDDEN_FILES = ['hide', 'dim', 'show'] as const
+export const HIDDEN_FILES = ['generated', 'none', 'all'] as const
 export const BACKGROUNDS = ['none', 'color'] as const
 
 export const UI_THEMES = [
@@ -38,7 +38,7 @@ const THEME_IDS = UI_THEMES.map(theme => theme.id) as [UiThemeId, ...UiThemeId[]
 const RAIL_IDS = RAIL_PAGE_IDS
 const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/)
 
-export const BACKGROUND_EFFECTS = ['none', 'gradient', 'grid'] as const
+export const BACKGROUND_EFFECTS = ['none', 'colorful'] as const
 export const WALLPAPERS = ['none', 'color'] as const
 
 export interface CustomTheme { id: string; name: string; accent: string; fill: string; foreground: string }
@@ -95,13 +95,13 @@ export const DEFAULT_UI: UiPreferences = {
   foregroundDark: null,
   border: null,
   background: 'none',
-  backgroundEffect: 'none',
+  backgroundEffect: 'colorful',
   wallpaper: 'none',
   customThemes: [],
   codeSize: 'default',
   diffView: 'unified',
   diffColor: 'redGreen',
-  hiddenFiles: 'hide',
+  hiddenFiles: 'generated',
 }
 
 export const uiPreferencesSchema = z.object({
@@ -137,8 +137,17 @@ export const uiPreferencesSchema = z.object({
 export type UiPreferencesPatch = z.infer<typeof uiPreferencesSchema>
 
 /** Fills anything the stored object left out. An empty column is the defaults. */
+function migrateStored(stored: unknown) {
+  if (!stored || typeof stored !== 'object') return stored
+  const value = { ...(stored as Record<string, unknown>) }
+  if (value.hiddenFiles === 'hide' || value.hiddenFiles === 'dim') value.hiddenFiles = 'generated'
+  if (value.hiddenFiles === 'show') value.hiddenFiles = 'none'
+  if (value.backgroundEffect === 'gradient' || value.backgroundEffect === 'grid') value.backgroundEffect = 'colorful'
+  return value
+}
+
 export function normalizeUi(stored: unknown): UiPreferences {
-  const patch = uiPreferencesSchema.safeParse(stored ?? {})
+  const patch = uiPreferencesSchema.safeParse(migrateStored(stored) ?? {})
   const value = patch.success ? patch.data : {}
   return { ...DEFAULT_UI, ...value, sidebarPages: value.sidebarPages ?? DEFAULT_UI.sidebarPages }
 }
@@ -204,12 +213,9 @@ export function publishUiPreferences(ui: UiPreferences, root: HTMLElement | null
   paintToken(root, '--card', custom ? fill : null)
   paintToken(root, '--border', ui.border)
   const accentMix = `color-mix(in srgb, ${accent} 14%, ${fill})`
-  if (ui.backgroundEffect === 'gradient') {
+  if (ui.backgroundEffect === 'colorful') {
     root.style.backgroundImage = `linear-gradient(to bottom, ${fill}, ${accentMix})`
     root.style.backgroundSize = ''
-  } else if (ui.backgroundEffect === 'grid') {
-    root.style.backgroundImage = 'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)'
-    root.style.backgroundSize = '24px 24px'
   } else {
     root.style.backgroundImage = ''
     root.style.backgroundSize = ''

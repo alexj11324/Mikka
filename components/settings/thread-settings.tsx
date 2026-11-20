@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { SettingRow, SettingSelect, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { useWorkspaceGeneral } from '@/hooks/settings/use-workspace-general'
 import { updatePreferences } from '@/app/actions/preferences'
 import { useThreadTitleSettings } from '@/hooks/settings/use-thread-title-settings'
 import { settingsRead } from '@/lib/settings-read'
@@ -15,6 +16,8 @@ import type { ThreadTitleTriggers } from '@/lib/thread-title'
 
 const TRIGGERS = ['first_run_ended', 'pull_opened', 'either'] as const satisfies readonly ThreadTitleTriggers[]
 const ARCHIVE_DAYS = [3, 7, 14, 30, 90] as const
+const PARALLEL = [1, 2, 4, 8, 16] as const
+const DEPTH = [1, 2, 3, 4] as const
 
 /** 线程, frame 1508:73. Title instructions and archive save. Sub-agent limits have no API. */
 export function ThreadSettings({ workspaceId, personal }: { workspaceId?: string; personal: boolean }) {
@@ -29,15 +32,33 @@ export function ThreadSettings({ workspaceId, personal }: { workspaceId?: string
     </div> : null}
     <TitleScope key={shown} scope={shown} workspaceId={shown === 'workspace' ? workspaceId : null} />
     {shown === 'mine' ? <ArchiveSection /> : null}
-    <SettingsSection title={t('subagents')} description={t('subagentsHint')}>
-      <SettingRow title={t('parallel')} description={t('parallelHint')}>
-        <span className="text-sm text-muted-foreground">{t('unavailable')}</span>
-      </SettingRow>
-      <SettingRow title={t('depth')} description={t('depthHint')}>
-        <span className="text-sm text-muted-foreground">{t('unavailable')}</span>
-      </SettingRow>
-    </SettingsSection>
+    <SubagentLimits workspaceId={workspaceId} />
   </>
+}
+
+function SubagentLimits({ workspaceId }: { workspaceId?: string }) {
+  const t = useTranslations('Settings.threadTitles')
+  const general = useWorkspaceGeneral(workspaceId)
+  const current = general.data
+  if (general.loading) return <SettingsLoading label={t('subagents')} rows={2} />
+  if (!current) return null
+  const parallel = PARALLEL.map(count => ({ value: String(count), label: t('countWorkspace', { count }) }))
+  const depth = DEPTH.map(count => ({ value: String(count), label: t('countWorkspace', { count }) }))
+  const busy = general.saving !== null
+  return <SettingsSection title={t('subagents')} description={t('subagentsHint')}>
+    <SettingRow title={t('parallel')} description={t('parallelHint')}>
+      <SettingSelect label={t('parallel')} value={String(current.parallelSubagents)} disabled={!current.canEdit || busy} options={parallel} onValueChange={value => {
+        const next = Number(value)
+        if (PARALLEL.includes(next as typeof PARALLEL[number]) && next !== current.parallelSubagents) void general.patch({ parallelSubagents: next })
+      }} />
+    </SettingRow>
+    <SettingRow title={t('depth')} description={t('depthHint')}>
+      <SettingSelect label={t('depth')} value={String(current.nestDepth)} disabled={!current.canEdit || busy} options={depth} onValueChange={value => {
+        const next = Number(value)
+        if (DEPTH.includes(next as typeof DEPTH[number]) && next !== current.nestDepth) void general.patch({ nestDepth: next })
+      }} />
+    </SettingRow>
+  </SettingsSection>
 }
 
 function TitleScope({ scope, workspaceId }: { scope: 'mine' | 'workspace'; workspaceId?: string | null }) {
