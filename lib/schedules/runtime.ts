@@ -38,11 +38,12 @@ export const automationSeams:AutomationSeams={
     const {issueMutationsEnabled}=await import('@/lib/coordinator/issue-tools-enabled')
     if(!issueMutationsEnabled())throw new ScheduleError('issueToolsDisabled',503)
     const botId=await dispatchBot(ownerId,workspaceId,task)
-    const bot=(await tx.query<{repository:string|null}>('SELECT repository FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "archivedAt" IS NULL FOR SHARE',[botId,ownerId,workspaceId])).rows[0]
+    const bot=(await tx.query<{repository:string|null;environmentId:string|null}>('SELECT repository,"environmentId" FROM bots WHERE id=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "archivedAt" IS NULL FOR SHARE',[botId,ownerId,workspaceId])).rows[0]
     if(!bot)throw new ScheduleError('scheduleBotUnavailable',403)
-    if(bot.repository){
+    const repository=await (await import('@/lib/bot-environment')).botRepository({workspaceId,environmentId:bot.environmentId,repository:bot.repository})
+    if(repository){
       const {repositoryAvailable}=await import('@/lib/workspace-admin/bots')
-      if(!await repositoryAvailable(workspaceId,bot.repository))throw new ScheduleError('scheduleRepositoryUnavailable',403)
+      if(!await repositoryAvailable(workspaceId,repository))throw new ScheduleError('scheduleRepositoryUnavailable',403)
     }
     if(task.destination?.kind==='device'&&!(await tx.query('SELECT 1 FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind=\'local\' AND enabled=true',[task.destination.deviceId,ownerId])).rowCount)throw new ScheduleError('scheduleDeviceUnavailable',403)
     const {BUILTIN_AGENT_PROFILE_ID}=await import('@/lib/factory/agent-profile-reference')

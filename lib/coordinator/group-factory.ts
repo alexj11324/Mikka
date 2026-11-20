@@ -220,12 +220,12 @@ async function productionAdapters():Promise<GroupFactoryAdapters> {
   return {
     authorize:scope=>authorizeGroupFactoryActor(pool,scope),
     async executionBot(scope) {
-      const {rows:[bot]}=await pool.query(`SELECT id,"ownerId",repository FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "archivedAt" IS NULL`,[scope.reporter.id,scope.workspaceId])
+      const {rows:[bot]}=await pool.query(`SELECT id,"ownerId",repository,"environmentId" FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "archivedAt" IS NULL`,[scope.reporter.id,scope.workspaceId])
       if (!bot) throw Error('group_task_not_authorized')
       // A shared Bot is the reporter. Execution stays on the requester's own
       // Coordinator/resources, never impersonating the reporter's owner.
       const botId=bot.ownerId===scope.userId ? bot.id : await (await import('./coordinator-bot')).chatBotId(scope.userId,null,scope.workspaceId)
-      return {botId,reporterOwnerId:bot.ownerId,repository:bot.repository}
+      return {botId,reporterOwnerId:bot.ownerId,repository:await (await import('@/lib/bot-environment')).botRepository({workspaceId:scope.workspaceId,environmentId:bot.environmentId,repository:bot.repository})}
     },
     async create(userId,sourceEventId,title) { return (await (await import('./issue-create')).createIssueFromRequest(userId,{sourceEventId,title})).issueId },
     async dispatch(userId,input,botId) {

@@ -7,8 +7,9 @@ import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { workspaceAction } from '@/lib/workspace-admin/action'
-import { updateOwnedBot } from '@/lib/bot-update'
-import { createOwnedBot } from '@/lib/bot-create'
+import { updateOwnedBot, type UpdateBotInput } from '@/lib/bot-update'
+import { createOwnedBot, type CreateBotInput } from '@/lib/bot-create'
+import { pool } from '@/lib/db'
 import { deleteOwnedBot, ownArchivedBots, setOwnedBotArchived } from '@/lib/bot-lifecycle'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
@@ -54,7 +55,7 @@ export async function pollBots(workspaceId?: string) {
  * 新建 Bot: a name, a colour and a shape. Bots run on Mikka's own harness, so there is no machine to pick.
  * `model` and `repository` default to the workspace's 新 Bot 默认值 when omitted.
  */
-export async function createBot(input: { name: string; color: string; shape: string; model?: string | null; repository?: string | null }, workspaceId?: string): Promise<BotView> {
+export async function createBot(input: CreateBotInput, workspaceId?: string): Promise<BotView> {
   return createOwnedBot(await getOwner(workspaceId), input)
 }
 
@@ -62,8 +63,58 @@ export async function createBot(input: { name: string; color: string; shape: str
  * Rename a bot or change its shape and colour, from the right panel. Same rules
  * as createBot. The Coordinator keeps its name and look (the left column draws it).
  */
-export async function updateBot(input: { botId: string; name?: string; color?: string; shape?: string; publicRole?: string }, workspaceId?: string): Promise<ActionResult<BotView>> {
+export async function updateBot(input: UpdateBotInput, workspaceId?: string): Promise<ActionResult<BotView>> {
   return workspaceAction(async () => updateOwnedBot(await getOwner(workspaceId), input))
+}
+
+/** Bot Profile: Alias, Environment, Tasks run on, Default agent and profile, where the Bot runs, its effort. Its owner only. */
+export async function getBotSettings(botId: string, workspaceId?: string): Promise<ActionResult<import('@/lib/bot-settings-store').OwnedBotSettings>> {
+  return workspaceAction(async () => {
+    const settings = await (await import('@/lib/bot-settings-store')).readOwnedBotSettings(pool, await getOwner(workspaceId), botId)
+    if (!settings) throw new ActionFailureError('botNotFound')
+    return settings
+  })
+}
+
+/** The Environments a Bot can work in here, the workspace default first. */
+export async function listBotEnvironments(workspaceId?: string): Promise<ActionResult<{ environments: import('@/lib/bot-environment').BotEnvironmentOption[] }>> {
+  return workspaceAction(async () => ({ environments: await (await import('@/lib/bot-environment')).botEnvironmentOptions((await getOwner(workspaceId)).workspaceId) }))
+}
+
+/** The reasoning effort of the Bot's chat model; null is the model's default. */
+export async function setBotEffort(botId: string, effort: string | null, workspaceId?: string): Promise<ActionResult<{ id: string; effort: string | null }>> {
+  return workspaceAction(async () => {
+    await (await import('@/lib/bot-settings-store')).setBotModelEffort(pool, await getOwner(workspaceId), botId, effort)
+    return { id: botId, effort }
+  })
+}
+
+const actorOf = async (workspaceId?: string) => { const owner = await getOwner(workspaceId); return { userId: owner.ownerId, workspaceId: owner.workspaceId } }
+
+/** Who can find the Bot and who follows it. */
+export async function getBotAccess(botId: string, workspaceId?: string): Promise<ActionResult<import('@/lib/bot-access').BotAccessView>> {
+  return workspaceAction(async () => (await import('@/lib/bot-access')).botAccess(await actorOf(workspaceId), botId))
+}
+
+/** Share: the owner makes the Bot shared with the workspace or private, and sets its followers. */
+export async function setBotAccess(botId: string, input: { visibility?: 'shared' | 'private'; subscribers?: string[] }, workspaceId?: string): Promise<ActionResult<import('@/lib/bot-access').BotAccessView>> {
+  return workspaceAction(async () => {
+    const access = await import('@/lib/bot-access')
+    const actor = await actorOf(workspaceId)
+    let view = input.visibility ? await access.setBotVisibility(actor, botId, input.visibility) : await access.botAccess(actor, botId)
+    if (input.subscribers) view = await access.setBotSubscribers(actor, botId, input.subscribers)
+    return view
+  })
+}
+
+/** Follow or stop following a Bot one can find. */
+export async function followBot(botId: string, follow: boolean, workspaceId?: string): Promise<ActionResult<{ subscribed: boolean }>> {
+  return workspaceAction(async () => (await import('@/lib/bot-access')).followBot(await actorOf(workspaceId), botId, follow))
+}
+
+/** Transfer ownership to another active member; the Bot's unfinished runs stop. */
+export async function transferBot(botId: string, toUserId: string, workspaceId?: string): Promise<ActionResult<{ id: string; ownerId: string }>> {
+  return workspaceAction(async () => (await import('@/lib/bot-access')).transferBotOwnership(await actorOf(workspaceId), botId, toUserId))
 }
 
 /** 归档 / 取消归档 one of the person's own bots (not the Coordinator), from its sidebar row (lib/bot-lifecycle.ts). */

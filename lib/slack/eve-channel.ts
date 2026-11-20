@@ -13,13 +13,15 @@ import { nativeSlackToken, type SlackGrantScope } from './channel-grant'
 import type { SlackBinding } from './installation-store'
 import { validSlackSignature } from './webhook'
 import type { SlackScope } from './eve-ambient'
+import { slackBotAlias } from '../bot-settings'
 
 const GUIDANCE =
   'Reply only in this Slack thread. Do not use or disclose the private Mikka chat, personal memories or unrelated integration content. Use ordinary titles and ids; Slack does not render Mikka source chips. If this message is not intended for you or you cannot add useful help, call no_reply. A dispatched task completes separately; do not promise automatic Slack completion updates.'
 
 export interface SlackChannelDependencies {
   env?: () => Record<string, string | undefined>
-  resolveScope?: (ownerId: string, workspaceId: string | null) => Promise<SlackScope>
+  /** `alias` is a message's `bot=<alias>` (lib/bot-settings.ts slackBotAlias): one of the sender's own Bots answers instead of their Coordinator. */
+  resolveScope?: (ownerId: string, workspaceId: string | null, alias?: string | null) => Promise<SlackScope>
   shouldJoin?: (scope: SlackScope, text: string) => Promise<boolean>
   api?: SlackChannelConfig['api']
   binding?: (app: string, team: string, sender: string) => Promise<SlackBinding | null>
@@ -29,13 +31,24 @@ export interface SlackChannelDependencies {
   recordSource?: (scope: SlackScope, message: SlackMessage) => Promise<string>
 }
 
-async function defaultScope(ownerId: string, workspaceId: string | null): Promise<SlackScope> {
+async function defaultScope(ownerId: string, workspaceId: string | null, alias?: string | null): Promise<SlackScope> {
   const [{ coordinatorBot }, { requireTaskWorkspace }] = await Promise.all([
     import('../coordinator/coordinator-bot'),
     import('../task-workspace'),
   ])
   const bot = await coordinatorBot(ownerId, workspaceId)
   await requireTaskWorkspace(ownerId, bot.workspaceId)
+  if (alias) {
+    // Only the sender's own live Bot in this workspace: a Bot runs on its owner's resources.
+    const { pool } = await import('../db')
+    const {
+      rows: [named],
+    } = await pool.query<{ id: string }>(
+      'SELECT id FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 AND alias=$3 AND "archivedAt" IS NULL',
+      [bot.workspaceId, ownerId, alias],
+    )
+    if (named) return { ownerId, botId: named.id, workspaceId: bot.workspaceId, alias }
+  }
   return { ownerId, ...bot }
 }
 
@@ -120,7 +133,7 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
       latest.installationId !== grant.installationId
     )
       return null
-    const scope = await resolveScope(grant.ownerId, grant.workspaceId)
+    const scope = await resolveScope(grant.ownerId, grant.workspaceId, slackBotAlias(message.text))
     if (scope.botId !== grant.botId || scope.workspaceId !== grant.workspaceId) return null
     const admit = async (ambient = false) => ({
       auth: {
@@ -244,7 +257,7 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
                 return new Response(null, { status: 204 })
               let scope: SlackScope
               try {
-                scope = await resolveScope(installed.ownerId, installed.workspaceId)
+                scope = await resolveScope(installed.ownerId, installed.workspaceId, slackBotAlias(identity.text))
               } catch (error) {
                 if (error instanceof Error && ['workspaceAccessDenied', 'botNotFound'].includes(error.message))
                   return new Response(null, { status: 204 })
@@ -253,15 +266,22 @@ export function createMikkaSlackChannel(dependencies: SlackChannelDependencies =
               if (scope.workspaceId !== installed.workspaceId || scope.ownerId !== installed.ownerId)
                 return new Response(null, { status: 204 })
               const grant: SlackGrantScope = {
-                ...scope,
+                ownerId: scope.ownerId,
+                botId: scope.botId,
+                workspaceId: scope.workspaceId,
                 surface: 'slack',
                 installationId: installed.installationId,
                 linkId: installed.linkId,
                 teamId: installed.teamId,
                 slackUserId: installed.slackUserId,
               }
+              // A Bot named by alias keeps its own session; the Coordinator's address is unchanged.
               const addressFor = (address: string) =>
-                JSON.stringify([scope.ownerId, scope.workspaceId, grant.linkId, address])
+                JSON.stringify(
+                  scope.alias
+                    ? [scope.ownerId, scope.workspaceId, grant.linkId, address, scope.botId]
+                    : [scope.ownerId, scope.workspaceId, grant.linkId, address],
+                )
               const scoped: RouteHandlerArgs<SlackChannelState> = {
                 ...args,
                 from(address) {

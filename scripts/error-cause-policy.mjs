@@ -111,8 +111,6 @@ export const droppedCauseAllowlist = {
   'lib/agent-runs.ts': 2,
   'lib/audit/authentication.ts': 1,
   'lib/billing/points-purchase.ts': 1,
-  'lib/bot-create.ts': 2,
-  'lib/bot-update.ts': 1,
   'lib/chat-attachments/extract.ts': 2,
   'lib/chat-attachments/transcribe.ts': 1,
   'lib/cloud-computer/thread-machines.ts': 1,

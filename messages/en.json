@@ -1525,6 +1525,12 @@
     "teamNotFound": "This team does not exist.",
     "teamDeleteNameMismatch": "The name you entered does not match the team name.",
     "botDefaultRepositoryUnavailable": "This repository is not in any workspace member’s GitHub App installation.",
+    "botEnvironmentUnavailable": "This environment is unavailable. Choose another one.",
+    "botAliasInvalid": "An alias is 1–32 lowercase letters, digits, - or _.",
+    "botAliasTaken": "Another bot in this workspace uses this alias.",
+    "botTargetUnavailable": "This machine, Agent or profile is unavailable.",
+    "botShareUnavailable": "A personal workspace has no one to share with.",
+    "botSubscriberNoAccess": "This member cannot see this bot.",
     "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
     "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",
     "billingNotConfigured": "Billing is not set up.",
@@ -2981,7 +2987,8 @@
         },
         "bot": {
           "permissions_changed": "changed permissions for {target}",
-          "taken_over": "took over {target}"
+          "taken_over": "took over {target}",
+          "transferred": "handed {target} to another member"
         },
         "integration": {
           "permission_changed": "set {integration} to {to}"
@@ -5105,6 +5112,18 @@
       "model": "Model",
       "repository": "Repository",
       "noRepository": "No repository",
+      "environment": "Environment",
+      "machine": "Machine",
+      "machineCloud": "Mikka Cloud",
+      "machineCloudflare": "Cloudflare coding machine",
+      "otherDevices": "Other devices",
+      "effort": "Effort",
+      "effortDefault": "Default",
+      "access": "Access",
+      "accessPrivate": "Private",
+      "accessShared": "Workspace",
+      "subscribers": "Subscribers",
+      "noEnvironment": "No environment",
       "loading": "Loading…"
     },
     "createConversation": {
@@ -5195,6 +5214,16 @@
       "allThreadsWaiting": "All threads, {count} waiting on you",
       "tabs": "Right panel content",
       "details": "Details",
+      "profile": {
+        "label": "Profile",
+        "alias": "Alias",
+        "aliasHint": "Slack: @Mikka bot=<alias>",
+        "aliasPlaceholder": "release",
+        "tasksRunOn": "Tasks run on",
+        "defaultAgent": "Default agent",
+        "unset": "Your default",
+        "loadError": "Could not load the profile."
+      },
       "publicRole": {
         "label": "Public role",
         "hint": "Group chats use this role to choose the bot. Tools still require authorization.",
