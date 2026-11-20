@@ -269,14 +269,14 @@ test('Organization invitations grant only a verified Member without inheriting W
   })
 
   await t.test('elevated invitations require current org and workspace authority and grant only named teams', async t => {
-    const recipients = ['scoped-admin', 'org-admin', 'changed-issuer', 'removed-team', 'suspended-recipient'].map(name => ({
+    const recipients = ['scoped-admin', 'org-admin', 'changed-issuer', 'removed-team', 'suspended-recipient', 'revoked-scope'].map(name => ({
       id: randomUUID(), name, email: `${randomUUID()}@org.example.invalid`,
     }))
     people.push(...recipients)
     for (const user of recipients) await check.query(
       'insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values ($1,$2,$3,true,now(),now())',
       [user.id, user.name, user.email])
-    const [scopedAdmin, orgAdmin, changedIssuer, removedTeam, suspendedRecipient] = recipients
+    const [scopedAdmin, orgAdmin, changedIssuer, removedTeam, suspendedRecipient, revokedScope] = recipients
     const teamId = randomUUID(), siblingTeamId = randomUUID(), foreignTeamId = randomUUID()
     const teamIds = [teamId, siblingTeamId, foreignTeamId]
     t.after(async () => {
@@ -325,6 +325,17 @@ test('Organization invitations grant only a verified Member without inheriting W
     const unscoped = await issue(orgAdmin, 'admin', [])
     assert.equal((await invite.acceptOrganizationInvitation({ invitationId: unscoped.id }, orgAdmin)).role, 'admin')
     assert.equal((await check.query('select 1 from mikka_workspace_members where "userId"=$1', [orgAdmin.id])).rowCount, 0)
+    const revoked = await issue(revokedScope, 'admin', [teamId])
+    await invite.revokeOrganizationInvitation(organizationId, owner.id, { invitationId: revoked.id })
+    await assert.rejects(invite.acceptOrganizationInvitation({ invitationId: revoked.id }, revokedScope))
+    const reissued = await issue(revokedScope, 'member', [])
+    assert.equal(reissued.id, revoked.id)
+    const replacement = (await invite.listOrganizationInvitations(organizationId, owner.id)).invitations.find(row => row.id === reissued.id)
+    assert.equal(replacement?.role, 'member')
+    assert.deepEqual(replacement?.teamIds, [])
+    assert.equal((await invite.acceptOrganizationInvitation({ invitationId: reissued.id }, revokedScope)).role, 'member')
+    assert.equal((await check.query('select 1 from mikka_workspace_members where "userId"=$1', [revokedScope.id])).rowCount, 0,
+      'reissuing an unscoped invitation cannot retain the revoked team grant')
     const changed = await issue(changedIssuer, 'admin', [teamId])
     await check.query('update mikka_organization_members set role=$1 where "organizationId"=$2 and "userId"=$3',
       ['member', organizationId, owner.id])
@@ -333,6 +344,9 @@ test('Organization invitations grant only a verified Member without inheriting W
     await check.query('update mikka_workspace_members set role=$1 where "workspaceId"=$2 and "userId"=$3', ['member', workspaceId, owner.id])
     try { await assert.rejects(invite.acceptOrganizationInvitation({ invitationId: changed.id }, changedIssuer), denied) }
     finally { await check.query('update mikka_workspace_members set role=$1 where "workspaceId"=$2 and "userId"=$3', ['admin', workspaceId, owner.id]) }
+    await check.query('update mikka_teams set "archivedAt"=now() where id=$1', [siblingTeamId])
+    await assert.rejects(issue(removedTeam, 'member', [siblingTeamId]), denied)
+    await check.query('update mikka_teams set "archivedAt"=null where id=$1', [siblingTeamId])
     const removed = await issue(removedTeam, 'member', [siblingTeamId])
     await check.query('delete from mikka_teams where id=$1', [siblingTeamId])
     await assert.rejects(invite.acceptOrganizationInvitation({ invitationId: removed.id }, removedTeam), denied)

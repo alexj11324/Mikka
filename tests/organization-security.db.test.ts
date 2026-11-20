@@ -59,6 +59,7 @@ test('native second-factor verification enforces Organization security without d
   const { requireEnterpriseOrganization } = await import('../lib/enterprise/access')
   const policyRoute = await import('../app/api/organizations/[organizationId]/security/route')
   const personalRoute = await import('../app/api/me/security/route')
+  const domainRoute = await import('../app/api/organizations/[organizationId]/allowed-domains/[domainId]/verify/route')
   const invitation = await import('../lib/governance/organization-invitations')
   const { BASE_PATH } = await import('../lib/base-path')
   assert.ok(authBaseURL)
@@ -137,11 +138,13 @@ test('native second-factor verification enforces Organization security without d
   // Same account/client origin keeps the real endpoint limiter and its rejection observable.
   Object.defineProperty(secondBrowser, 'ip', { value: ownerBrowser.ip })
   await t.test('enrollment uses native encrypted TOTP and requires proof before policy enablement', async () => {
+    assert.equal((await authRequest('/two-factor/enable', new Browser(), {})).status, 401)
     const login = await authRequest('/sign-in/email', ownerBrowser, { email: owner.email, password })
     assert.equal(login.status, 200)
     ownerSessionId = (await session(ownerBrowser)).session.id
     assert.deepEqual(await factors.twoFactorSessionState(owner.id, ownerSessionId), { enabled: false, verified: false })
     assert.equal((await policy('PATCH', ownerBrowser, undefined, { requireTwoFactor: true, gracePeriodDays: 7 })).status, 403)
+    assert.equal((await authRequest('/two-factor/enable', ownerBrowser, {})).status, 400, 'credential accounts still need their password')
     const enroll = await authRequest('/two-factor/enable', ownerBrowser, { password })
     assert.equal(enroll.status, 200)
     const setup = await enroll.json() as { totpURI: string; backupCodes: string[] }
@@ -185,6 +188,19 @@ test('native second-factor verification enforces Organization security without d
     const memberView = await personal(memberBrowser, memberSession.token)
     assert.equal(memberView.status, 200)
     assert.equal((await memberView.json()).organizations[0].status, 'grace')
+    const domains = await import('../lib/governance/organization-join-domains')
+    const rule = await domains.addAllowedDomain(organizationId, owner, { domain: 'security.example.invalid' })
+    for (const [browser, token] of [[memberBrowser, memberSession.token], [outsiderBrowser, outsiderSession.token]] as const) {
+      const request = new Request(`${origin}/api/organizations/${organizationId}/allowed-domains/${rule.domain.id}/verify`,
+        { method: 'POST', headers: browser.headers(origin, token) })
+      const denied = await scoped(request, () => domainRoute.POST(request, { params: Promise.resolve({ organizationId, domainId: rule.domain.id }) }))
+      assert.equal(denied.status, 403)
+    }
+    const foreignRead = new Request(`${origin}/api/me/security?userId=${owner.id}`, { headers: outsiderBrowser.headers(origin, outsiderSession.token) })
+    const ownView = await scoped(foreignRead, () => personalRoute.GET(foreignRead))
+    assert.equal(ownView.status, 200)
+    assert.deepEqual((await ownView.json()).organizations.map((row: { organizationId: string }) => row.organizationId), [organizations[1]],
+      'personal security has no client-selectable subject')
     await workspaceDb.transaction(tx => requireWorkspace(tx, workspaces[0], member.id, false, { kind: 'session', sessionId: memberSession.id }))
   })
   await t.test('an enrolled account still requires second-factor proof for each new human session', async () => {
@@ -249,6 +265,28 @@ test('native second-factor verification enforces Organization security without d
     assert.equal((await authRequest('/two-factor/disable', ownerBrowser, { password })).status, 403,
       'organization policy prevents disabling 2FA even with a verified session')
     await requireEnterpriseOrganization(owner.id, organizationId, otherSessionId)
+  })
+  await t.test('a native second-factor sign-in with failed audit never publishes a session or cookie journal', async t => {
+    const browser = new Browser()
+    const pending = await authRequest('/sign-in/email', browser, { email: owner.email, password })
+    assert.equal(pending.status, 200)
+    assert.equal((await pending.json()).twoFactorRedirect, true)
+    const sessions = async () => (await database.query('select count(*)::int n from session where "userId"=$1', [owner.id])).rows[0].n
+    const before = await sessions()
+    const constraint = `two_factor_audit_${randomUUID().replaceAll('-', '')}`
+    await database.query(`alter table workspace_audit_outbox add constraint ${constraint} check ("workspaceId"<>'${workspaces[0]}'::uuid) not valid`)
+    const logs: unknown[] = []
+    t.mock.method(console, 'error', (...args: unknown[]) => { logs.push(args) })
+    try {
+      const denied = await authRequest('/two-factor/verify-backup-code', browser, { code: backupCodes[1] }, undefined, { 'x-mikka-client': 'desktop' })
+      assert.equal(denied.status, 503)
+      assert.equal((await denied.json()).code, 'AUTH_AUDIT_UNAVAILABLE')
+      assert.equal(denied.headers.getSetCookie().length, 0)
+      assert.equal(denied.headers.has('x-mikka-session-cache'), false)
+      assert.equal(denied.headers.has('set-auth-token'), false)
+      assert.equal(await sessions(), before)
+      for (const value of [password, secret, ...backupCodes]) assert.equal(JSON.stringify(logs).includes(value), false)
+    } finally { await database.query(`alter table workspace_audit_outbox drop constraint ${constraint}`) }
   })
   await t.test('passwordless accounts enroll with native verification; invitations respect the deadline', async () => {
     const created = (await invitation.issueOrganizationInvitations(organizationId, owner.id, { emails: [invitee.email] })).outcomes[0]

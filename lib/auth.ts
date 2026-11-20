@@ -46,7 +46,7 @@ export type DeviceSessionSummary = {
   user: { id: string; email: string }
 }
 
-/** Runs after native plugin hooks: an unfinished 2FA sign-in cannot publish a session/cache. */
+/** After native 2FA withholding, before bearer/header and cookie publication. */
 const authCompletion: BetterAuthPlugin = {
   id: 'mikka-auth-completion',
   hooks: {
@@ -167,6 +167,7 @@ export const auth = betterAuth({
     enterpriseIdentityModels,
     enterpriseSso(),
     twoFactor({ issuer: 'Mikka', allowPasswordless: true }),
+    authCompletion,
     bearer(),
     ...(proxyOptions ? [oAuthProxy(proxyOptions)] : []),
     // The iOS app signs in through the system browser and keeps its session cookie in the keychain.
@@ -188,7 +189,6 @@ export const auth = betterAuth({
       disableJwtPlugin: true,
       prefix: { opaqueAccessToken: 'mka_', refreshToken: 'mkr_' },
     }),
-    authCompletion,
     // Authentication may still revoke/replace cookies; publish the final journal last.
     mikkaCookies(),
   ],
