@@ -81,7 +81,7 @@ CONFIG
 pgbouncer -d "$dir/config"
 POOL
 
-"${compose[@]}" create app
+"${compose[@]}" create --build app litellm
 docker network connect --alias pooled --alias direct "$network" "$db_container"
 docker network connect --alias model "$network" "$model_container"
 if [[ "${PUBLISH_IMAGE:-false}" != true ]]; then
