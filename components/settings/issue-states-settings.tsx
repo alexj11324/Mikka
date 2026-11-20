@@ -64,7 +64,8 @@ export function IssueStatesSettings({ workspaceId }: { workspaceId: string }) {
     {rows.map((state, index) => <SettingRow key={state.id} icon={<Mark shape={state.icon} tone={state.color} size="md" />} title={label(state)}
       description={t('tasks', { count: state.taskCount })}>
       <div className="flex items-center gap-2">
-        {state.isDefault && <Badge variant="secondary">{t('default')}</Badge>}
+        {/* Every category has a default; the mark only says something where a category has more than one state. */}
+        {state.isDefault && (states ?? []).filter(other => other.category === state.category).length > 1 && <Badge variant="secondary">{t('default')}</Badge>}
         {canEdit && <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" disabled={pending} aria-label={t('actions', { name: label(state) })} />}><Ellipsis /></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
