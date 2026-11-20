@@ -50,16 +50,16 @@ export function AppearanceSettings() {
         <SettingSelect label={t('sync')} value={ui.appearanceSync ? 'synced' : 'local'} options={[{ value: 'synced', label: t('synced') }, { value: 'local', label: t('notSynced') }]} onValueChange={value => { if (value === 'synced' || value === 'local') paint({ appearanceSync: value === 'synced' }) }} />
       </SettingRow>
     </SettingsSection>
-    <SettingsSection title={t('themes')}>
+    <SettingsSection title={t('themes')} action={naming ? null : <Button type="button" variant="ghost" size="sm" onClick={() => setNaming(true)}><Plus data-icon />{t('createTheme')}</Button>}>
       <p className="px-5 pt-4 text-sm text-muted-foreground">{t('themeLead')}</p>
       <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
         {UI_THEMES.map(theme => {
           const selected = ui.themeId === theme.id
           return <Button key={theme.id} type="button" aria-pressed={selected} variant={selected ? 'secondary' : 'outline'} onClick={() => paint({ themeId: theme.id, accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}
             className="h-auto flex-col items-start gap-2 p-2 text-xs">
-            <span className="flex h-14 w-full overflow-hidden bg-muted">
-              <span className="w-3 bg-primary" />
-              <span className="m-1.5 h-2 flex-1 bg-foreground/70" />
+            <span className="flex h-14 w-full overflow-hidden" style={{ background: theme.fill }}>
+              <span className="w-3" style={{ background: theme.accent }} />
+              <span className="m-1.5 h-2 flex-1" style={{ background: theme.foreground, opacity: 0.75 }} />
             </span>
             {t(`theme_${theme.id}` as 'theme_mikka')}
           </Button>
@@ -73,14 +73,11 @@ export function AppearanceSettings() {
           setThemeName('')
           setNaming(false)
         }}>{common('save')}</Button>
-      </div> : <div className="px-5 pb-4">
-        <Button type="button" variant="outline" size="sm" onClick={() => setNaming(true)}><Plus data-icon />{t('createTheme')}</Button>
-      </div>}
+      </div> : null}
     </SettingsSection>
-    <SettingsSection title={t('colors')}>
-      <div className="flex gap-2 px-5 pt-4" role="radiogroup" aria-label={t('colors')}>
-        {(['light', 'dark'] as const).map(value => <Button key={value} type="button" role="radio" aria-checked={side === value} size="sm" variant={side === value ? 'secondary' : 'outline'} onClick={() => setSide(value)}>{t(value)}</Button>)}
-      </div>
+    <SettingsSection title={t('colors')} action={<div className="flex gap-2" role="radiogroup" aria-label={t('colors')}>
+      {(['light', 'dark'] as const).map(value => <Button key={value} type="button" role="radio" aria-checked={side === value} size="sm" variant={side === value ? 'secondary' : 'outline'} onClick={() => setSide(value)}>{t(value)}</Button>)}
+    </div>}>
       <ColorRow label={t('accent')} value={accent} onChange={next => paint(side === 'dark' ? { accentDark: next } : { themeId: 'mikka', accent: next })} />
       <ColorRow label={t('surface')} value={fill} onChange={next => paint(side === 'dark' ? { fillDark: next } : { themeId: 'mikka', fill: next })} />
       <ColorRow label={t('foreground')} value={foreground} onChange={next => paint(side === 'dark' ? { foregroundDark: next } : { themeId: 'mikka', foreground: next })} />

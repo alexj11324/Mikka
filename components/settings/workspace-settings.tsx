@@ -55,28 +55,33 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
     <SettingRow title={t('icon')} description={t('iconHint')}>{icon}</SettingRow>
     <SettingRow title={t('name')} description={t('nameHint')}><span>{current.name}</span></SettingRow>
     <WorkspaceId id={current.id} />
-    {current.slug && <SettingRow title={t('address')}><span className="break-all">{host}{current.slug}</span></SettingRow>}
     <SettingRow title={t('taskPrefix')} description={t('taskPrefixHint')}><span className="font-mono">{current.taskPrefix ?? ''}</span></SettingRow>
+    {current.slug && <SettingRow title={t('address')}><span className="break-all">{host}{current.slug}</span></SettingRow>}
   </SettingsSection></>
 
   return <>
     <SettingsSection id="workspace-general" title={t('profile')}>
       <SettingRow title={t('icon')} description={t('iconHint')}>
         <div className="flex items-center gap-2">
-          <Button type="button" variant="ghost" aria-label={t('changeIcon')} disabled={saving !== null} onClick={() => fileRef.current?.click()}>
-            {icon}
+          {icon}
+          <Button type="button" variant="ghost" size="icon" aria-label={t('changeIcon')} disabled={saving !== null} onClick={() => fileRef.current?.click()}>
             <Pencil data-icon />
           </Button>
           <Input ref={fileRef} type="file" accept={WORKSPACE_ICON_TYPES.join(',')} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={event => void pickIcon(event)} />
-          {current.icon ? <Button type="button" variant="ghost" disabled={saving !== null} onClick={() => void save('icon', null)}>{t('removeIcon')}</Button> : null}
+          {current.icon ? <Button type="button" variant="ghost" size="sm" disabled={saving !== null} onClick={() => void save('icon', null)}>{t('removeIcon')}</Button> : null}
         </div>
       </SettingRow>
       <SettingRow title={t('name')} description={t('nameHint')}>
-        <Input aria-label={t('name')} className="w-full sm:w-50" maxLength={120} value={name ?? current.name} disabled={saving === 'name'}
+        <Input aria-label={t('name')} className="w-full min-w-0" maxLength={120} value={name ?? current.name} disabled={saving === 'name'}
           onChange={event => setName(event.target.value)} onBlur={() => commit('name')}
           onKeyDown={event => { if (event.key === 'Enter') commit('name'); if (event.key === 'Escape') setName(null) }} />
       </SettingRow>
       <WorkspaceId id={current.id} />
+      <SettingRow title={t('taskPrefix')} description={t('taskPrefixHint')}>
+        <Input aria-label={t('taskPrefix')} className="w-24 font-mono uppercase" maxLength={4} value={prefix ?? current.taskPrefix ?? ''} disabled={saving === 'taskPrefix'}
+          onChange={event => setPrefix(event.target.value)} onBlur={() => commit('taskPrefix')}
+          onKeyDown={event => { if (event.key === 'Enter') commit('taskPrefix'); if (event.key === 'Escape') setPrefix(null) }} />
+      </SettingRow>
       <SettingRow title={t('address')}>
         <InputGroup className="w-full min-w-0">
           <InputGroupAddon><InputGroupText>{host}</InputGroupText></InputGroupAddon>
@@ -84,11 +89,6 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
             onChange={event => setSlug(event.target.value)} onBlur={() => commit('slug')}
             onKeyDown={event => { if (event.key === 'Enter') commit('slug'); if (event.key === 'Escape') setSlug(null) }} />
         </InputGroup>
-      </SettingRow>
-      <SettingRow title={t('taskPrefix')} description={t('taskPrefixHint')}>
-        <Input aria-label={t('taskPrefix')} className="w-24 font-mono uppercase" maxLength={4} value={prefix ?? current.taskPrefix ?? ''} disabled={saving === 'taskPrefix'}
-          onChange={event => setPrefix(event.target.value)} onBlur={() => commit('taskPrefix')}
-          onKeyDown={event => { if (event.key === 'Enter') commit('taskPrefix'); if (event.key === 'Escape') setPrefix(null) }} />
       </SettingRow>
     </SettingsSection>
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => { if (general.failedPick) { fileRef.current?.click(); return } general.retry() }} />}
