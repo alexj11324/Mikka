@@ -39,8 +39,9 @@ export type ThreadEntryPart =
   | { kind: 'task'; run: RunSource; onOpen: () => void }
   /** Artifacts it handed over: a chip opens the artifact. */
   | { kind: 'artifacts'; items: { id: string; name: string }[]; onOpen: (id: string) => void }
-  /** Something failed: the words, with what can be done about it (retry, change model, sign in again). */
-  | { kind: 'error'; text: string; actions?: ReactNode }
+  /** Something failed: the words, with what can be done about it (retry, change model, sign in again).
+   * Current failures keep their semantic marker on the existing error line; historical actions own their past marker. */
+  | { kind: 'error'; text: string; actions?: ReactNode; failure?: 'live' | 'welcome' }
 
 export type ThreadEntry =
   | {

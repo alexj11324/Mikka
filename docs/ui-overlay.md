@@ -180,3 +180,5 @@ the same rule as the web applies (merge the layer's export first).
 ### Shared chat screen (#2913)
 
 Every chat entrance calls `ThreadScreen`. The `host` identifies its containing surface without selecting a new style. The original official thread presentation remains in the official provider; group and Artifact transcript presentations share the public `ThreadTranscript` renderer through that same provider. This renderer contains only the existing public primitives. The readers still own history, delivery, unread state and callbacks; keyed rows, the scroll container and composer placement belong to the screen. Optional message nodes carry existing event/card contents, not another list.
+
+An error part's optional `failure` identifies the current `live` or `welcome` failure. Providers pass it to `data-message-failure` on their existing error line, without adding an element or changing its contents. Historical failures keep the `past` marker in the supplied recovery notice; the surrounding error line does not duplicate it.
