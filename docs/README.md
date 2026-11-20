@@ -50,7 +50,12 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 
 ## Verify and operate
 
-- [Acceptance](acceptance.md) defines required evidence, identities and cleanup.
+- [Acceptance process](../.agents/acceptance/PROCESS.md) defines runner/checker
+  reviews, required evidence, verdicts, reuse, and PR declarations.
+- [Acceptance project adapter](../.agents/acceptance/PROJECT.md) maps local
+  commands, scripted boundaries, accounts, and runtime proof.
+- [Runtime acceptance](acceptance.md) covers specific identities, OAuth,
+  deployed origins, and production exceptions.
 - [Isolated test accounts](test-accounts.md) describes the loopback account pool
   and its application, database and lease boundaries.
 - [UI review checklist](review-checklist.md) applies before presenting UI.
