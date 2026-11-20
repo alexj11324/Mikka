@@ -178,11 +178,9 @@ export function useChatNav({ bots, archivedBots = [], followedBots = [], shareab
           id: 'choice' as const, label: i18nText(visibility === 'shared' ? 'Shell.newBot.accessShared' : 'Shell.newBot.accessPrivate'), checked: (bot.visibility ?? 'private') === visibility,
           run: () => runChange(setBotAccess(bot.id, { visibility }, workspaceId ?? undefined).then(result => { if (result.error) throw new ChatRowActionError(400) })) })) },
       ] : []),
-      ...(bot && menu.current.lifecycle ? [
-        ...(environments?.length ? [{ id: 'moveTo' as const, label: i18nText('Nav.botMenu.moveTo'), run: () => {}, children: environments.map(environment => ({
+      ...(bot && menu.current.lifecycle && environments?.length ? [{ id: 'moveTo' as const, label: i18nText('Nav.botMenu.moveTo'), run: () => {}, children: environments.map(environment => ({
           id: 'choice' as const, label: environment.name, checked: bot.environmentId === environment.id,
           run: () => runChange(updateBot({ botId: bot.id, environmentId: environment.id }, workspaceId ?? undefined).then(result => { if (result.error) throw new ChatRowActionError(400) })) })) }] : []),
-      ] : []),
       ...(bot && menu.current.lifecycle ? [
         { id: 'archive' as const, label: i18nText('Nav.botMenu.archive'), run: () => menu.current.lifecycle?.archive(bot, true) },
         { id: 'delete' as const, label: i18nText('Nav.botMenu.delete'), danger: true, run: () => menu.current.lifecycle?.askDelete(bot) },
