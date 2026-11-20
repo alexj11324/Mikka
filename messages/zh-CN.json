@@ -148,6 +148,14 @@
       "working": "Agent 运行中",
       "waiting": "等你处理",
       "error": "Agent 出错"
+    },
+    "stateMenu": {
+      "search": "更改状态…",
+      "searchAria": "搜索{label}",
+      "open": "未关闭",
+      "closed": "已关闭",
+      "noMatch": "没有匹配的状态",
+      "readFailed": "状态读取失败"
     }
   },
   "Nav": {
@@ -2261,6 +2269,9 @@
       },
       "environments": {
         "title": "运行环境"
+      },
+      "issue-states": {
+        "title": "任务状态"
       }
     },
     "appearance": {
@@ -3682,6 +3693,40 @@
       "workspaceDefault": "工作区默认",
       "triggersError": "重新生成时机更新失败",
       "loadError": "线程标题设置读取失败"
+    },
+    "issueStates": {
+      "open": "未关闭",
+      "closed": "已关闭",
+      "new": "新建状态",
+      "newIn": "新建{type}状态",
+      "default": "默认",
+      "tasks": "{count} 个任务",
+      "rename": "重命名",
+      "look": "图标和颜色",
+      "makeDefault": "设为默认",
+      "delete": "删除",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "actions": "{name} 的操作",
+      "name": "名称",
+      "category": "类别",
+      "icon": "图标",
+      "color": "颜色",
+      "create": "创建",
+      "save": "保存",
+      "cancel": "取消",
+      "resetName": "恢复默认名称",
+      "deleteTitle": "删除{name}",
+      "moveTo": "任务移到",
+      "moveAndDelete": "移动并删除",
+      "colors": {
+        "gray": "灰色",
+        "yellow": "黄色",
+        "green": "绿色",
+        "blue": "蓝色",
+        "purple": "紫色",
+        "red": "红色"
+      }
     }
   },
   "TelegramBot": {

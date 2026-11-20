@@ -12,6 +12,7 @@ import { PanelRightClose, PanelRightOpen, RefreshCw } from '@/components/icons'
 import type { listIssues } from '@/app/actions/issues'
 import { listAgents } from '@/app/actions/agents'
 import { useLiveTaskRunList } from '@/hooks/use-live-lists'
+import { useIssueStates } from '@/hooks/use-issue-states'
 import type { TaskBlock } from '@/lib/task-blocked'
 import { TaskPresentationsContext } from '@/hooks/use-task-collection'
 import { useListExpiry } from '@/hooks/use-list-expiry'
@@ -156,6 +157,8 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   }, [sidebar, sheet, setSidebar])
   const [prefill, setPrefill] = useState<{ text: string; nonce: number }>()
   const [newTask, setNewTask] = useState(false)
+  // The board owns the states' live subscription; every card's picker reads the same entry (decision 2026-11-19-2115).
+  useIssueStates(workspaceId, { live: true })
   const { data: linear, mutate: refreshLinear } = useSWR(workspaceId ? ['linear-board-sync', userId, workspaceId] : null,
     ([, , workspace]) => getLinearBoardSync(workspace), { revalidateOnFocus: false })
   // Without a connected Linear team, the button only reloads the board.

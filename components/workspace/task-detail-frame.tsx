@@ -18,7 +18,11 @@ import type { IssueDetailNavigation } from './issue-detail-header'
 import { useIssueDetailMenu, type IssueActionRequest } from './issue-detail-actions'
 import { overdue } from './issue-detail-properties'
 import { AccessChangeDialog, IssueMetadataControls, useIssueMetadataSave, type MetadataRequest } from './issue-metadata-controls'
-import { ISSUE_PRIORITIES, ISSUE_STATUSES } from './issue-properties'
+import { ISSUE_PRIORITIES } from './issue-properties'
+import { issueStateMenuItems } from './issue-state-menu'
+import { Mark } from './state-mark'
+import { useIssueStates } from '@/hooks/use-issue-states'
+import { issueStateLabel, taskIssueState } from '@/lib/issue-states'
 import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useTaskOwnershipRows } from './issue-scope-control'
 import { AgentSphere } from './issue-assignee-menu'
@@ -92,6 +96,8 @@ export type FramedTaskProps = {
   task: Issue
   title: string
   status: string
+  /** The workspace state the task is in (lib/issue-states.ts); null before it is known. */
+  stateId?: string | null
   priority: string
   liveWorkspaceId: string | null
   saveLabel: string
@@ -117,7 +123,8 @@ export type FramedTaskProps = {
   getCurrent: () => Promise<Issue | null>
   adopt: (issue: Issue) => void
   onMetadataBusy: (busy: boolean) => void
-  onStatus: (value: string) => void
+  /** `stateId`: the workspace state picked; absent from a writer that only knows the category. */
+  onStatus: (value: string, stateId?: string | null) => void
   onPriority: (value: string) => void
   onHistory: () => void
   onMembers: () => void
@@ -155,7 +162,11 @@ export function FramedTask(props: FramedTaskProps) {
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
 
-  const menu = useIssueDetailMenu({ task, userId, disabled: locked, documentTools: props.documentTools, request: props.actionRequest, getCurrent, onSaved: adopt, onOpen, onDeleted: props.onDeleted, onHistory: props.onHistory, onMembers: props.onMembers, onDocumentTools: props.onDocumentTools, onProperty: props.requestProperty, onStatus: props.onStatus, onPriority: props.onPriority })
+  // The task page owns the states' live subscription; the menus below read the same entry (decision 2026-11-19-2115).
+  const issueStates = useIssueStates(task.workspaceId, { live: true }).states
+  const stateItems = issueStateMenuItems(issueStates, { status: props.status, stateId: props.stateId }, statusLabel, props.onStatus)
+  const currentState = issueStates ? taskIssueState(issueStates, { status: props.status, stateId: props.stateId }) : undefined
+  const menu = useIssueDetailMenu({ task, userId, disabled: locked, documentTools: props.documentTools, request: props.actionRequest, getCurrent, onSaved: adopt, onOpen, onDeleted: props.onDeleted, onHistory: props.onHistory, onMembers: props.onMembers, onDocumentTools: props.onDocumentTools, onProperty: props.requestProperty, onStatus: props.onStatus, onPriority: props.onPriority, statusItems: stateItems })
 
   // The property choices are read when a menu opens, as the community page reads them when its popover opens.
   const [wantOptions, setWantOptions] = useState(false)
@@ -244,14 +255,13 @@ export function FramedTask(props: FramedTaskProps) {
   const rows: TaskDetailRow[] = [
     {
       id: 'status', label: tIssue('statusLabel'), disabled: locked,
-      value: { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } },
+      value: currentState
+        ? { text: issueStateLabel(currentState, statusLabel), mark: { kind: 'node', node: <Mark shape={currentState.icon} tone={currentState.color} /> } }
+        : { text: statusLabel(props.status), mark: { kind: 'status', value: props.status } },
       state: presentation.data ?? undefined,
       menu: [
         ...presentation.error ? [{ id: 'reload', label: tAssignee('reload'), onSelect: presentation.retry }] : [],
-        ...ISSUE_STATUSES.map(item => ({
-          id: item.value, label: statusLabel(item.value), mark: { kind: 'status' as const, value: item.value },
-          checked: item.value === props.status, onSelect: () => props.onStatus(item.value),
-        })),
+        ...stateItems,
       ],
     },
     { id: 'priority', label: tIssue('priorityLabel'), disabled: locked, value: { text: priorityLabel(props.priority), mark: { kind: 'priority', value: props.priority } }, menu: ISSUE_PRIORITIES.map(item => ({ id: item.value, label: priorityLabel(item.value), mark: { kind: 'priority', value: item.value }, checked: item.value === props.priority, onSelect: () => props.onPriority(item.value) })) },
