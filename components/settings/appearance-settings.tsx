@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { ChevronRight, Image, Pencil, Plus } from '@/components/icons'
+import { ChevronRight, Cloud, Image, Pencil, Plus } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,6 +23,7 @@ export function AppearanceSettings() {
   const { setTheme } = useTheme()
   const [side, setSide] = useState<'light' | 'dark'>('light')
   const [advanced, setAdvanced] = useState(false)
+  const [themesOpen, setThemesOpen] = useState(false)
   const [naming, setNaming] = useState(false)
   const [themeName, setThemeName] = useState('')
   if (prefs.loading) return <SettingsLoading label={t('displayMode')} rows={3} />
@@ -54,7 +55,7 @@ export function AppearanceSettings() {
     </SettingsSection>
     <SettingsSection title={t('themes')} action={naming ? null : <Button type="button" variant="ghost" size="sm" onClick={() => setNaming(true)}><Plus data-icon />{t('createTheme')}</Button>}>
       <p className="px-5 pt-4 text-sm text-muted-foreground">{t('themeLead')}</p>
-      <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 p-4 min-[720px]:grid-cols-6">
         {UI_THEMES.map(theme => {
           const selected = ui.themeId === theme.id
           return <Button key={theme.id} type="button" aria-pressed={selected} variant="outline" onClick={() => paint({ themeId: theme.id, accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}
@@ -83,11 +84,13 @@ export function AppearanceSettings() {
     </SettingsSection>
     <Button type="button" variant="ghost" size="sm" className="self-start" aria-expanded={advanced} onClick={() => setAdvanced(open => !open)}>{t('advanced')}<ChevronRight data-icon /></Button>
     {advanced ? <SettingsSection><ColorRow label={t('border')} value={ui.border ?? '#e5e5e5'} onChange={border => paint({ border })} /></SettingsSection> : null}
-    <SettingsSection title={t('explore')}>
-      {ui.customThemes.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">{t('myThemesEmpty')}</p> : ui.customThemes.map(theme => <SettingRow key={theme.id} title={theme.name}>
-        <Button type="button" size="sm" variant="outline" onClick={() => paint({ themeId: 'mikka', accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}>{t('useTheme')}</Button>
-      </SettingRow>)}
-    </SettingsSection>
+    <Button type="button" variant="outline" className="h-auto w-full justify-between px-5 py-4" aria-expanded={themesOpen} onClick={() => setThemesOpen(open => !open)}>
+      {t('exploreEntry')}
+      <ChevronRight data-icon />
+    </Button>
+    {themesOpen && ui.customThemes.length > 0 ? <SettingsSection>{ui.customThemes.map(theme => <SettingRow key={theme.id} title={theme.name}>
+      <Button type="button" size="sm" variant="outline" onClick={() => paint({ themeId: 'mikka', accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}>{t('useTheme')}</Button>
+    </SettingRow>)}</SettingsSection> : null}
     <SettingsSection title={t('background')}>
       <SettingRow title={t('dashboardBackground')} description={t('dashboardHint')}>
         <div className="flex items-center gap-2">
@@ -102,10 +105,10 @@ export function AppearanceSettings() {
       <SettingRow title={t('backgroundEffect')}>
         <SettingSelect label={t('backgroundEffect')} value={ui.backgroundEffect} options={[{ value: 'colorful', label: t('effectColorful') }, { value: 'none', label: t('backgroundNone') }]} onValueChange={value => { if (value === 'none' || value === 'colorful') paint({ backgroundEffect: value }) }} />
       </SettingRow>
-      <SettingRow title={t('wallpaper')} description={ui.wallpaper === 'none' ? t('wallpaperEmpty') : t('wallpaperSaved')}>
-        <Button type="button" size="sm" variant="outline" onClick={() => paint({ wallpaper: 'color' })}>{t('saveCurrent')}</Button>
+      <SettingRow title={t('wallpaper')} description={t('effectHint')}>
+        <Button type="button" size="sm" variant="outline" onClick={() => paint({ wallpaper: 'color' })}><Cloud data-icon />{t('saveCurrent')}</Button>
       </SettingRow>
-      <p className="px-5 py-3 text-sm text-muted-foreground">{t('effectHint')}</p>
+      <p className="px-5 py-3 text-sm text-muted-foreground">{t('wallpaperEmpty')}</p>
     </SettingsSection>
     <SettingsSection title={t('code')}>
       <SettingRow title={t('codeSize')} description={t('codeSizeHint')}>
@@ -117,11 +120,11 @@ export function AppearanceSettings() {
       <SettingRow title={t('diffColor')} description={t('diffColorHint')}>
         <SettingSelect label={t('diffColor')} value={ui.diffColor} options={[{ value: 'redGreen', label: t('diffRedGreen') }, { value: 'blue', label: t('diffBlue') }]} onValueChange={value => { if (value === 'redGreen' || value === 'blue') paint({ diffColor: value }) }} />
       </SettingRow>
-      <DiffPreview color={ui.diffColor} />
     </SettingsSection>
+    <DiffPreview color={ui.diffColor} />
     <SettingsSection title={t('hidden')}>
       <SettingRow title={t('hiddenFold')} description={t('hiddenFoldHint')}>
-        <SettingSelect className="w-56" label={t('hiddenFold')} value={ui.hiddenFiles} options={[{ value: 'generated', label: t('hiddenGenerated') }, { value: 'none', label: t('hiddenNone') }, { value: 'all', label: t('hiddenAll') }]} onValueChange={value => { if (value === 'generated' || value === 'none' || value === 'all') paint({ hiddenFiles: value }) }} />
+        <SettingSelect className="w-auto max-w-full" label={t('hiddenFold')} value={ui.hiddenFiles} options={[{ value: 'generated', label: t('hiddenGenerated') }, { value: 'none', label: t('hiddenNone') }, { value: 'all', label: t('hiddenAll') }]} onValueChange={value => { if (value === 'generated' || value === 'none' || value === 'all') paint({ hiddenFiles: value }) }} />
       </SettingRow>
     </SettingsSection>
   </>
@@ -160,10 +163,14 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
 function DiffPreview({ color }: { color: 'redGreen' | 'blue' }) {
   const removed = color === 'blue' ? 'bg-sidebar-primary/20' : 'bg-destructive/15'
   const added = color === 'blue' ? 'bg-attention/25' : 'bg-success/15'
-  return <pre className="mx-5 mb-4 rounded-md border font-mono text-xs leading-6 break-all whitespace-pre-wrap">
-    <div className="px-3">1 export function add(a: number, b: number) {'{'}</div>
-    <div className={cn('px-3', removed)}>- return a - b</div>
-    <div className={cn('px-3', added)}>+ return a + b</div>
-    <div className="px-3">{'}'}</div>
+  const row = (mark: string, text: string, tone?: string) => <div className={cn('grid grid-cols-[1.25rem_minmax(0,1fr)] px-3', tone)}>
+    <span>{mark}</span>
+    <span className="min-w-0 break-all">{text}</span>
+  </div>
+  return <pre className="rounded-xl border bg-card font-mono text-xs leading-6 whitespace-pre-wrap">
+    {row('1', 'export function add(a: number, b: number) {')}
+    {row('-', 'return a - b;', removed)}
+    {row('+', 'return a + b;', added)}
+    {row('3', '}')}
   </pre>
 }
