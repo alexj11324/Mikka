@@ -1549,6 +1549,8 @@
     "botAliasTaken": "工作区里已有 Bot 使用这个别名。",
     "botTargetUnavailable": "这台机器、Agent 或配置不可用。",
     "botShareUnavailable": "个人工作区没有可以共享的成员。",
+    "privateWorkNotAllowed": "此工作区不允许创建私有线程或 Bot。",
+    "sharedWorkNotAllowed": "个人工作区的线程和 Bot 只能设为私有。",
     "botSubscriberNoAccess": "这位成员看不到这个 Bot。",
     "usageLimitReached": "已达到用量上限，新任务已暂停，运行中的任务会继续完成。",
     "usageCreditsExhausted": "点数已用完，新任务已暂停，运行中的任务会继续完成。",

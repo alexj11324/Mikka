@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { workVisibilitySchema } from './work-visibility'
 
 export const SCREEN_WIDTH = 1280
 export const SCREEN_HEIGHT = 800
@@ -22,7 +23,7 @@ export const computerStateSchema = z.object({
 export const viewerModeSchema = z.enum(['view', 'control'])
 export const viewerRequestSchema = z.object({ mode: viewerModeSchema }).strict()
 export const viewerGrantSchema = z.object({ url: z.url({ protocol: /^wss$/ }), expiresAt: z.iso.datetime() })
-export const createBotSchema = z.object({ name: z.string().trim().min(1).max(120) }).strict()
+export const createBotSchema = z.object({ name: z.string().trim().min(1).max(120), visibility: workVisibilitySchema.optional() }).strict()
 export const botViewSchema = z.object({ id: z.uuid(), name: z.string().min(1).max(120) })
 export const approvalDecisionSchema = z.object({ digest: z.string(), decision: z.enum(['approve', 'deny']), scope: z.enum(['once', 'run']) }).strict()
 export const computerTaskStateSchema = z.enum(['working', 'approval', 'done', 'failed'])

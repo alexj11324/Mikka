@@ -8,6 +8,7 @@ import { workspaceMembers } from '@/lib/db/workspace-schema'
 import { activeTaskWorkspaces, taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { workspaceDb } from '@/lib/workspace-db'
 import type { IssueReader } from '@/lib/issue-visibility'
+import { assertWorkVisibilityChange } from '@/lib/settings/work-creation'
 import { RESOURCE_ACTIONS, RESOURCE_KINDS, SHARING_GRANT_ACTIONS, deniedResourceCapabilities, resourceManagementMetadata,
   type ResourceAction, type ResourceCapabilities, type ResourceKind, type ResourcePolicy, type ResourceReference } from './contract'
 
@@ -143,6 +144,7 @@ export async function changeResourceAccess(reader: IssueReader, reference: Resou
     return db.transaction(tx => withDatabaseTransaction(tx, async () => {
       const current = await lockResourceAccess(tx, userId, reference, 'canManageAccess', true)
       if (current.revision !== value.expectedRevision) throw new ActionFailureError('issueOutdated')
+      await assertWorkVisibilityChange(tx, { userId, workspaceId: reference.workspaceId }, reference.kind, current.visibility, value.visibility)
       const { rows: previous } = await tx.execute<{ subjectId: string; capabilities: ResourceAction[]; expiresAt: Date | null }>(sql`select "subjectId",capabilities,"expiresAt" from resource_access_grants where "resourceKind"=${reference.kind} and "resourceId"=${reference.id}::uuid and "subjectKind"='account'`)
       const expansion = current.visibility !== 'shared' && value.visibility === 'shared'
         || value.grants.some(grant => {

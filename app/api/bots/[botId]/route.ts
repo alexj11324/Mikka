@@ -8,6 +8,7 @@ import { BOT_DEFAULT_AGENTS, botRunsOnSchema } from '@/lib/bot-settings'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { MODEL_ROUTING_EFFORTS } from '@/lib/model-routing'
 import { botBody, botRoute } from '@/lib/bot-route'
+import { withTaskWorkspace } from '@/lib/task-workspace'
 
 const patch = z.object({
   name: z.string().optional(), color: z.string().optional(), shape: z.string().optional(), publicRole: z.string().max(2000).optional(),
@@ -28,12 +29,12 @@ async function handle(request: Request, { params }: { params: Promise<{ botId: s
       const { effort, visibility, subscribers, ...fields } = await botBody(request, patch)
       if (!Object.keys(fields).length && effort === undefined && !visibility && !subscribers) throw new ActionFailureError('validationGeneric')
       // One change, one transaction: a refused part leaves the Bot as it was.
-      await db.transaction(tx => withDatabaseTransaction(tx, async () => {
+      await withTaskWorkspace(userId, workspaceId, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
         if (Object.keys(fields).length) await updateOwnedBot(owner, { botId, ...fields })
         if (effort !== undefined) await store.setBotModelEffort(owner, botId, effort)
-        if (visibility) await access.setBotVisibility(actor, botId, visibility)
+        if (visibility) await access.setBotVisibility(actor, botId, visibility, tx)
         if (subscribers) await access.setBotSubscribers(actor, botId, subscribers)
-      }))
+      })))
     }
     const [bot] = await db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, publicRole: bots.publicRole }).from(bots)
       .where(and(eq(bots.id, botId), eq(bots.ownerId, userId), eq(bots.workspaceId, workspaceId))).limit(1)

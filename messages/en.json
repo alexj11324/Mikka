@@ -1549,6 +1549,8 @@
     "botAliasTaken": "Another bot in this workspace uses this alias.",
     "botTargetUnavailable": "This machine, Agent or profile is unavailable.",
     "botShareUnavailable": "A personal workspace has no one to share with.",
+    "privateWorkNotAllowed": "This workspace does not allow new private threads or Bots.",
+    "sharedWorkNotAllowed": "Threads and Bots in a personal workspace stay private.",
     "botSubscriberNoAccess": "This member cannot see this bot.",
     "usageLimitReached": "The usage limit has been reached. New tasks are paused; running tasks will finish.",
     "usageCreditsExhausted": "Credits have run out. New tasks are paused; running tasks will finish.",

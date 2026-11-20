@@ -8,6 +8,8 @@ import { workspaceMembers, workspaces } from '@/lib/db/workspace-schema'
 import { requireWorkspace } from '@/lib/workspace-access'
 import { workspaceDb } from '@/lib/workspace-db'
 import { botListChanged } from '@/lib/live/lists'
+import { requireTaskWorkspaceLease, withTaskWorkspace } from '@/lib/task-workspace'
+import { assertWorkVisibilityChange } from '@/lib/settings/work-creation'
 
 /**
  * A Bot's access, members and owner (Capy Captain, decision 2026-11-19-2105).
@@ -23,6 +25,7 @@ export interface BotAccessView { visibility: BotVisibility; ownerId: string | nu
 const botId = z.uuid()
 const userIds = z.array(z.string().min(1).max(128)).max(200)
 type Executor = Pick<typeof db, 'execute'>
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
 async function ownedBot(executor: Executor, actor: BotActor, id: string, lock = false) {
   if (!botId.safeParse(id).success) throw new ActionFailureError('botNotFound')
@@ -82,20 +85,23 @@ export async function botAccess(actor: BotActor, id: string): Promise<BotAccessV
 }
 
 /** The owner shares the Bot with the workspace or makes it private again. A personal workspace has no one to share with. */
-export async function setBotVisibility(actor: BotActor, id: string, visibility: BotVisibility): Promise<BotAccessView> {
+export async function setBotVisibility(actor: BotActor, id: string, visibility: BotVisibility, transaction?: Transaction): Promise<BotAccessView> {
   z.enum(['shared', 'private']).parse(visibility)
-  return workspaceDb.transaction(async tx => {
-    const { workspace } = await requireWorkspace(tx, actor.workspaceId, actor.userId)
+  const write = async (main: Transaction) => {
+    const workspace = requireTaskWorkspaceLease(actor.userId, actor.workspaceId)
     if (visibility === 'shared' && workspace.kind === 'personal') throw new ActionFailureError('botShareUnavailable')
-    return db.transaction(async main => {
-      await ownedBot(main, actor, id, true)
-      await main.execute(sql`select set_config('mikka.acl_actor',${actor.userId},true),set_config('mikka.acl_source','owner_access_change',true)`)
-      await main.execute(sql`update resource_access_policies set visibility=${visibility} where kind='bot' and id=${id}::uuid and visibility<>${visibility} and visibility<>'quarantined'`)
-      await pruneSubscribers(main, actor.workspaceId, id)
-      await botListChanged(main, id)
-      return readAccess(main, actor.workspaceId, id)
-    })
-  })
+    await ownedBot(main, actor, id, true)
+    const { rows: [current] } = await main.execute<{ visibility: string }>(sql`SELECT visibility FROM resource_access_policies
+      WHERE kind='bot' AND id=${id}::uuid AND "workspaceId"=${actor.workspaceId}::uuid FOR UPDATE`)
+    if (!current) throw new ActionFailureError('botNotFound')
+    await assertWorkVisibilityChange(main, actor, 'bot', current.visibility, visibility)
+    await main.execute(sql`select set_config('mikka.acl_actor',${actor.userId},true),set_config('mikka.acl_source','owner_access_change',true)`)
+    await main.execute(sql`update resource_access_policies set visibility=${visibility} where kind='bot' and id=${id}::uuid and visibility<>${visibility} and visibility<>'quarantined'`)
+    await pruneSubscribers(main, actor.workspaceId, id)
+    await botListChanged(main, id)
+    return readAccess(main, actor.workspaceId, id)
+  }
+  return transaction ? write(transaction) : withTaskWorkspace(actor.userId, actor.workspaceId, () => db.transaction(write))
 }
 
 /**
