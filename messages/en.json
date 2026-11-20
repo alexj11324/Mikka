@@ -7597,6 +7597,20 @@
     "waitingOnYou": "Waiting on you",
     "inProgress": "Running"
   },
+  "HostedAutomations": {
+    "aroundNow": "Around now",
+    "now": "Now",
+    "runningNow": "Running now",
+    "next": "Next",
+    "nothingNext": "No runs in the next 8 hours",
+    "more": "Show all",
+    "less": "Show less",
+    "activity": "Runs",
+    "perTen": "runs / 10 min",
+    "perTenOne": "run / 10 min",
+    "nextRun": "next",
+    "lastRun": "last run"
+  },
   "HostedThread": {
     "placeholder": "What should it do?",
     "open": "Open",

@@ -116,7 +116,7 @@ function Chip({ label, remove, onRemove }: { label: string; remove: string; onRe
   return <Badge variant="secondary" className="gap-1">{label}<Button size="icon-xs" variant="ghost" aria-label={remove} onClick={onRemove}><X /></Button></Badge>
 }
 
-function AutomationRowItem({ row, onOpen, onPin, onOrganize, onRestore, onViewRuns, onTag, restoring }: { row: AutomationRow } & AutomationsPageProps) {
+function AutomationRowItem({ row, onOpen, onPin, onOrganize, onRestore, onPause, onViewRuns, onTag, restoring }: { row: AutomationRow } & AutomationsPageProps) {
   const t = useTranslations('Automations')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
@@ -142,6 +142,7 @@ function AutomationRowItem({ row, onOpen, onPin, onOrganize, onRestore, onViewRu
           <DropdownMenuGroup>
             <DropdownMenuItem onClick={() => onViewRuns(row)}>{t('viewRuns')}</DropdownMenuItem>
             <DropdownMenuItem onClick={() => onPin(row)}>{row.pinned ? t('unpin') : t('pin')}</DropdownMenuItem>
+            {row.canPause && <DropdownMenuItem onClick={() => onPause(row, row.status === 'active')}>{row.status === 'active' ? t('editor.pause') : t('editor.resume')}</DropdownMenuItem>}
             {row.canOrganize && <DropdownMenuItem onClick={() => onOrganize(row)}>{t('organize')}</DropdownMenuItem>}
           </DropdownMenuGroup>
         </DropdownMenuContent>

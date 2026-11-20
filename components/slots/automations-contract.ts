@@ -39,6 +39,8 @@ export type AutomationRow = {
   canRestore: boolean
   /** 文件夹和标签 is offered. */
   canOrganize: boolean
+  /** 暂停 / 恢复 is offered (a running or paused automation that is not deleted). */
+  canPause: boolean
 }
 
 export type AutomationGroup = {
@@ -84,6 +86,8 @@ export type AutomationsPageProps = {
   onPin: (row: AutomationRow) => void
   onOrganize: (row: AutomationRow) => void
   onRestore: (row: AutomationRow) => void
+  /** 暂停 (true) or 恢复 (false) a row whose `canPause` is set. */
+  onPause: (row: AutomationRow, paused: boolean) => void
   /** 查看运行: the thread directory filtered to this automation's runs. */
   onViewRuns: (row: AutomationRow) => void
   /** The row being restored; others wait. */

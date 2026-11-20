@@ -7597,6 +7597,20 @@
     "waitingOnYou": "等你处理",
     "inProgress": "进行中"
   },
+  "HostedAutomations": {
+    "aroundNow": "近几小时",
+    "now": "现在",
+    "runningNow": "正在运行",
+    "next": "下一次",
+    "nothingNext": "接下来 8 小时没有运行",
+    "more": "显示全部",
+    "less": "收起",
+    "activity": "运行",
+    "perTen": "次 / 10 分钟",
+    "perTenOne": "次 / 10 分钟",
+    "nextRun": "下次",
+    "lastRun": "上次运行"
+  },
   "HostedThread": {
     "placeholder": "想让它做什么？",
     "open": "打开",

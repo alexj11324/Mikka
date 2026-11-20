@@ -4,7 +4,7 @@ import { useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
-import { organizeAutomation, pinAutomation, restoreAutomation } from '@/app/actions/automations'
+import { organizeAutomation, pauseAutomation, pinAutomation, restoreAutomation, resumeAutomation } from '@/app/actions/automations'
 import { listWorkspaceBots } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -102,6 +102,7 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
     pinned: Boolean(row.pinned), tags: row.tags ?? [], deleted: Boolean(row.deleted),
     canRestore: Boolean(row.deleted) && (row.owner_id === userId || Boolean(row.can_take_over)),
     canOrganize: row.owner_id === userId || Boolean(row.can_take_over),
+    canPause: !row.deleted && (row.status === 'active' || row.status === 'paused'),
   })
   // The server's counts cover the whole filtered list; a search or tag narrows to the rows read, so it counts those.
   const narrowed = Boolean(query.trim() || tag)
@@ -133,6 +134,17 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
     } catch { toast.error(actionError('generic')) }
     finally { setRestoring(null) }
   }
+  async function setPaused(row: AutomationRow, paused: boolean) {
+    const automation = byId.get(row.id)
+    if (!automation || !workspaceId) return
+    try {
+      const input = { scheduleId: automation.id, version: automation.version }
+      const result = paused ? await pauseAutomation(input, workspaceId) : await resumeAutomation(input, workspaceId)
+      if ('error' in result && result.error) toast.error(actionError(result.error))
+    } catch { toast.error(actionError('generic')) }
+    // Read again either way: a refused change shows the row as it is.
+    await mutate()
+  }
   async function pin(row: AutomationRow) {
     const result = await pinAutomation({ scheduleId: row.id, pinned: !row.pinned }, workspaceId ?? undefined)
     if ('error' in result && result.error) { toast.error(actionError(result.error)); return }
@@ -163,6 +175,7 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
     onPin={row => { void pin(row) }}
     onOrganize={row => { const automation = byId.get(row.id); if (automation) setOrganizing(automation) }}
     onRestore={row => { void restore(row) }}
+    onPause={(row, paused) => { void setPaused(row, paused) }}
     onViewRuns={row => navigate({ section: 'conversations', directoryAutomation: row.id })}
     restoring={restoring}
     templates={templates}
