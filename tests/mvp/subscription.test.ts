@@ -63,6 +63,7 @@ test('trace Coordinator fixture chooses the source-bound Codex identity on the s
       { id: agentId, deviceId, harness: 'codex', deviceOnline: true }]),
   ], tools: [{ name: 'dispatch_run' }] }
   const answer = answerModel(request, { marker, deviceId, repo: REPOSITORY, harness: 'synthetic-codex' })
+  assert.ok(answer, 'The registered request must match the shared model script')
   assert.equal(answer.content[0].toolName, 'dispatch_run')
   assert.deepEqual(JSON.parse(answer.content[0].input), { issueId, agentId, repo: REPOSITORY })
 })
@@ -80,7 +81,9 @@ test('trace completion accepts publication not yet observed while the execute pu
     ] },
   ] }
   const scenario = { marker, deviceId, repo: REPOSITORY, harness: 'synthetic-codex' }
-  assert.match(answerModel(request, scenario, (value?: Record<string, unknown>) => { if (value) observed.push(value) }).content[0].text, /发布状态尚未确认/)
+  const answer = answerModel(request, scenario, (value?: Record<string, unknown>) => { if (value) observed.push(value) })
+  assert.ok(answer, 'The registered completion must match the shared model script')
+  assert.match(answer.content[0].text, /发布状态尚未确认/)
   assert.ok(!observed.some(value => value.pullRequest || value.kind === 'result'))
   assert.equal(tracePublicationReady(undefined), false)
   assert.equal(tracePublicationReady({ status: 'pending' }), false)
@@ -100,6 +103,7 @@ test('trace completion distinguishes a failed run detail from a refused get_run 
     { role: 'tool', content: [{ type: 'tool-result', toolName: 'get_run', output: { type: 'json', value } }] },
   ] })
   const answer = answerModel(returned({ id: runId, issueId, status: 'failed', error: 'private provider failure', summary: null }), scenario)
+  assert.ok(answer, 'The registered request must match the shared model script')
   assert.equal(answer.content[0].text, '线程已停止。')
   assert.ok(!JSON.stringify(answer).includes('private'))
   assert.throws(() => answerModel(returned({ error: 'runNotFound' }), scenario), { code: 'MODEL_RESULT_REFUSED', sourceCode: 'runNotFound' })
