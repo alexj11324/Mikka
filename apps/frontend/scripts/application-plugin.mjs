@@ -108,7 +108,8 @@ export async function applicationPlugin(target, { deploymentId = '', serverPages
       const action = /^@\/app\/actions\/([\w-]+)$/.exec(source)
       if (action) return `${virtualAction}${action[1]}`
       const alias = commonAliases.get(source)
-      if (alias && importer?.split('?')[0] !== resolve(clientRuntime, alias)) return resolve(clientRuntime, alias)
+      // Keep package metadata identical for redirected and canonical imports.
+      if (alias && importer?.split('?')[0] !== resolve(clientRuntime, alias)) return this.resolve(resolve(clientRuntime, alias), importer, { ...options, skipSelf: true })
       const desktopAlias = target === 'desktop' ? desktopAliases.get(source) : undefined
       if (desktopAlias && importer?.split('?')[0] !== resolve(renderer, desktopAlias)) return resolve(renderer, desktopAlias)
       if (source === '@/lib/client-runtime/script') {
