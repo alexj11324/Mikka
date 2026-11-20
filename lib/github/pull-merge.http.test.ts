@@ -13,6 +13,30 @@ const detail = (headSha: string): PullDetail => ({ url: `https://github.com/${re
   mergeable: 'MERGEABLE', checkRuns: [], moreChecks: false, reviews: [],
 })
 
+test('the GitHub directory/detail HTTP contracts expose the current Git head and review policy', async t => {
+  const fixture = await githubFixture()
+  t.after(() => fixture.close())
+  const request = async (operation: string, variables: object) => {
+    const response = await fixture.fetch('https://api.github.com/graphql', { method: 'POST', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ query: `query ${operation} { repository { nameWithOwner } }`, variables: { owner: 'mikka-e2e', name: 'core-loop', ...variables } }) })
+    assert.equal(response.status, 200)
+    return (await response.json()).data.repository
+  }
+  const list = (await request('PullDirectory', { states: ['OPEN'] })).pullRequests
+  assert.equal(list.totalCount, 1)
+  assert.equal(list.nodes[0].headRefOid, fixture.head)
+  assert.equal(list.nodes[0].title, 'HTTP fake acceptance')
+  assert.deepEqual(list.pageInfo, { hasNextPage: false, endCursor: null })
+  fixture.github.rules.set(number, { requiredReview: true })
+  const pending = (await request('PullDetail', { number })).pullRequest
+  assert.equal(pending.reviewDecision, 'REVIEW_REQUIRED')
+  assert.equal(pending.mergeStateStatus, 'BLOCKED')
+  fixture.github.rules.set(number, { requiredReview: true, approved: true })
+  const approved = (await request('PullDetail', { number })).pullRequest
+  assert.equal(approved.reviews.nodes[0].state, 'APPROVED')
+  assert.equal(approved.mergeStateStatus, 'CLEAN')
+})
+
 test('S3 merge reaches the real GitHub HTTP client and creates a two-parent Git commit', async t => {
   const fixture = await githubFixture()
   t.after(() => fixture.close())

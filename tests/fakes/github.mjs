@@ -74,6 +74,18 @@ export function createGitHubRoutes({ getScenario, getPullRequests, observe, git,
     observe({ kind: 'synthetic-ci-checked', commit, name: 'Local fixture diff (synthetic CI)' })
     return { state: 'SUCCESS', contexts: { totalCount: 1, nodes: [{ __typename: 'CheckRun', name: 'Local fixture diff (synthetic CI)', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: `${MVP_SERVICES}/observations` }] } }
   }
+  const graphPull = async pr => {
+    const oid = await currentCommit(pr.head.ref), state = await mergeState(pr), rule = rules.get(pr.number) ?? {}
+    const rollup = await checkCommit(oid)
+    return { number: pr.number, title: pr.title, bodyText: pr.body ?? '', state: pr.merged ? 'MERGED' : pr.state.toUpperCase(),
+      isDraft: pr.draft, createdAt: pr.created_at ?? '2026-11-20T12:00:00Z', updatedAt: pr.updated_at ?? '2026-11-20T12:00:00Z',
+      additions: 1, deletions: 0, changedFiles: 1, headRefName: pr.head.ref, baseRefName: pr.base.ref, headRefOid: oid,
+      mergeStateStatus: state.toUpperCase(), mergeable: state === 'dirty' ? 'CONFLICTING' : 'MERGEABLE',
+      reviewDecision: rule.requiredReview ? rule.approved ? 'APPROVED' : 'REVIEW_REQUIRED' : null,
+      author: null, labels: { nodes: [] }, commits: { nodes: [{ commit: { oid, statusCheckRollup: {
+        ...rollup, contexts: { ...rollup.contexts, pageInfo: { hasNextPage: false } },
+      } } }] }, reviews: { nodes: rule.approved ? [{ author: { login: 'fixture-reviewer' }, state: 'APPROVED', submittedAt: '2026-11-20T12:00:00Z' }] : [] } }
+  }
   if (path === '/graphql' && method === 'POST') {
     const input = await readBody(request)
     if (input.query === 'mutation($id: ID!) { convertPullRequestToDraft(input: {pullRequestId: $id}) { pullRequest { id isDraft } } }') {
@@ -87,7 +99,18 @@ export function createGitHubRoutes({ getScenario, getPullRequests, observe, git,
     readAccess()
     assert.ok(typeof input.query === 'string' && !/\bmutation\b/.test(input.query), 'Fixture GraphQL is read-only')
     const variables = input.variables ?? input
-    assert.equal(variables.owner, 'mikka-e2e'); assert.equal(variables.repository, 'core-loop')
+    assert.equal(variables.owner, 'mikka-e2e'); assert.equal(variables.repository ?? variables.name, 'core-loop')
+    if (/\bquery PullDirectory\b/.test(input.query)) {
+      assert.ok(variables.after === undefined || variables.after === null, 'Fixture directory has one page')
+      const nodes = await Promise.all(pullRequests.map(graphPull))
+      const selected = nodes.filter(pr => !variables.states || variables.states.includes(pr.state))
+      return reply({ data: { repository: { databaseId: REPOSITORY_ID, nameWithOwner: 'mikka-e2e/core-loop',
+        pullRequests: { totalCount: selected.length, nodes: selected, pageInfo: { hasNextPage: false, endCursor: null } } } } })
+    }
+    if (/\bquery PullDetail\b/.test(input.query)) {
+      const pr = pullRequests.find(pr => pr.number === variables.number)
+      return reply({ data: { repository: { databaseId: REPOSITORY_ID, nameWithOwner: 'mikka-e2e/core-loop', pullRequest: pr ? await graphPull(pr) : null } } })
+    }
     const commit = variables.commit
     return reply({ data: { repository: { object: { oid: commit, statusCheckRollup: await checkCommit(commit) } } } })
   }
