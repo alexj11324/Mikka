@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+// Retained for explicit manual verification; this is outside the automatic CI test glob.
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
