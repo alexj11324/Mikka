@@ -2,6 +2,7 @@
 
 import { effectiveRequestWorkspace } from '@/lib/request-workspace'
 import { nextTaskListCursor, taskListPageInput, TASK_LIST_PAGE_SIZE, type TaskListPageInput } from '@/lib/task-list-page'
+import { taskListFilterPredicate } from '@/lib/task-list-filters'
 import { dispatchedByBot } from '@/lib/task-dispatches'
 import { singleFlight } from '@/lib/single-flight'
 
@@ -168,7 +169,7 @@ export async function listWorkspaceTaskPage(input: TaskListPageInput) {
 const listStateId = sql<string | null>`case when exists (select 1 from workspace_issue_states s where s.id = ${issues.stateId} and s.is_default) then null else ${issues.stateId} end`
 
 async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[], after?: TaskListPageInput['after'], filters: Omit<TaskListPageInput, 'workspaceId' | 'after'> = {}) {
-  const { dispatchedBy, projectId, teamId, parentId } = filters
+  const { dispatchedBy, projectId, teamId, parentId, ...listFilters } = filters
   const userId = await getUserId()
   const context = await loadWorkspaceContext(workspaceId)
   // Before the list: the selected workspace's key and the home's key, both of which this list listens to.
@@ -222,18 +223,20 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
     sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'parentId' = ${parentId}`,
     sql`${issues.userId} = (${readParent})`,
   ) : undefined
+  // The list filters and views (Capy's task list) narrow before LIMIT, like the Team scope above.
+  const filtered = taskListFilterPredicate(listFilters, userId)
   let continuation
   if (after) {
     // JavaScript timestamps carry milliseconds; PostgreSQL orders the exact
     // microsecond and UUID. Re-read the visible anchor before continuing.
     const [anchor] = await db.select({ time: sql<string>`${issues.updatedAt}::text` }).from(issues)
       .leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId)))
-      .where(and(visibility.predicate, dispatched, inProject, inTeam, inParent, eq(issues.id, after.id), eq(issues.workspaceId, context.workspace.id),
+      .where(and(visibility.predicate, dispatched, inProject, inTeam, inParent, filtered, eq(issues.id, after.id), eq(issues.workspaceId, context.workspace.id),
         sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).limit(1)
     if (!anchor || new Date(anchor.time).getTime() !== Date.parse(after.updatedAt)) throw new ActionFailureError('issueStale')
     continuation = sql`(${issues.updatedAt}, ${issues.id}) < (${anchor.time}::timestamptz, ${after.id}::uuid)`
   }
-  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, stateId: listStateId.as('stateId'), priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, dispatched, inProject, inTeam, inParent, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
+  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, stateId: listStateId.as('stateId'), priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, dispatched, inProject, inTeam, inParent, filtered, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
   // Issued identifiers are part of the Task row and do not follow Team,
   // personal-prefix or provider renames. Current human profile changes still
   // invalidate responsibility without rewriting historical Task metadata.
@@ -241,7 +244,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
     (select jsonb_build_array(person.name,person.image) from "user" person where person.id = coalesce(task_list.content->'attrs'->'mikka',task_list.content->'attrs'->'orvilo')->'assignee'->>'id')
   )`.as('identifiers') }).from(candidates)
   const tasksVersion = await queryVersion(signature)
-  const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teamId ?? null, teams.map(team => team.id).sort(), tasksVersion, linksVersion, membersVersion, projectsVersion])).digest('hex').slice(0, 32)
+  const version = createHash('sha256').update(JSON.stringify([userId, context.workspace.id, teamId ?? null, listFilters, teams.map(team => team.id).sort(), tasksVersion, linksVersion, membersVersion, projectsVersion])).digest('hex').slice(0, 32)
   if (known === version) return { ...unchangedList(version), live }
   // Read the version first: a concurrent change is picked up on the next poll, never acknowledged unseen.
   const signed = signature.as('task_signatures')
