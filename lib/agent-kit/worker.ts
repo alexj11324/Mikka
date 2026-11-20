@@ -23,6 +23,8 @@ export interface WorkerModelDispatch {
   /** The model was not named: the task followed the dispatching chat's own
    * (decision 2026-11-15-1630). Still pinned like a pick, never swapped silently. */
   followed?: true
+  /** The reasoning effort the request asked for (an automation's), host-checked against the model. */
+  effort?: import('../model-routing').ModelRoutingEffort
 }
 
 export interface WorkerDefinitionSnapshot {

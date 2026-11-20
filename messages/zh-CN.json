@@ -1577,7 +1577,9 @@
     "apiKeyInvalid": "Key 无效或已被撤销。",
     "apiKeyUnverifiable": "暂时无法验证这个 Key，请稍后重试。",
     "apiKeyBaseUrlInvalid": "Base URL 需要是公网上的 https 地址。",
-    "apiKeyNotFound": "这个 API Key 已不存在。"
+    "apiKeyNotFound": "这个 API Key 已不存在。",
+    "scheduleEnvironmentUnavailable": "选择的环境已不可用。",
+    "scheduleThreadUnavailable": "它运行的线程已不可用。"
   },
   "Overview": {
     "sections": {
@@ -3659,7 +3661,10 @@
       },
       "restore": "恢复",
       "copyFiles": "复制到工作树的文件，每行一个",
-      "approveSetup": "新工作树启动时运行这些准备步骤"
+      "approveSetup": "新工作树启动时运行这些准备步骤",
+      "machineSize": "默认机器规格",
+      "machineSizeDefault": "Mikka 默认",
+      "machineSizeOption": "{vcpu} vCPU · {gib} GiB"
     },
     "threadTitles": {
       "title": "线程标题",

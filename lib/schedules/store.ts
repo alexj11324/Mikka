@@ -6,7 +6,7 @@ import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { issues } from '../db/schema'
 import { issueVisibilityPredicate } from '../issue-visibility-policy'
-import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Definition, type DispatchTask, type EventTrigger, type ScheduledRead } from './contract'
+import { commandSchema, definitionSchema, ScheduleError, SCHEDULE_PAGE_MAX, type Actor, type Command, type Definition, type DispatchTask, type EventTrigger, type ScheduledRead } from './contract'
 import { describeGitHubEvent, triggerMatches, type GitHubAutomationEvent } from './github-events'
 import { describeLinearEvent, linearTriggerMatches, type LinearAutomationEvent } from './linear-events'
 import { describeSlackEvent, slackTriggerMatches, type SlackAutomationEvent } from './slack-events'
@@ -25,7 +25,9 @@ export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => 
 export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => Promise<{ id: string; title: string; status: string } | null>
 /** What one dispatch_task run made: the task (as the chat's task line shows it) and the request event behind it. */
 export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId?: string; requestedBy?: string; runId?: string; continued?: true }
-export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'slack' | 'webhook'; single?: true }
+/** How each run is set up beyond the request: the Environment, model and effort, machine size and the thread's organize. */
+export type DispatchRun = Pick<Definition, 'environmentId' | 'model' | 'machineSize' | 'runs'>
+export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'slack' | 'webhook'; single?: true; thread?: string; run?: DispatchRun }
 /** What started a run: a GitHub event and the indexes of the triggers that took it, or the webhook requests it batched. */
 export type OccurrenceTrigger = { event: GitHubAutomationEvent | LinearAutomationEvent | SlackAutomationEvent; triggers: number[] } | { webhook: { requests: WebhookRequest[] } }
 /** One finished run to post: the automation, how it ended, and the task it made or added to. */
@@ -48,6 +50,10 @@ export type AutomationSeams = {
   slackChannels?: (ownerId: string, workspaceId: string) => Promise<Set<string> | null>
   /** Whether the workspace can still use a repository an event trigger names. */
   repository?: (workspaceId: string, repository: string) => Promise<boolean>
+  /** Whether the workspace still has this Environment, not archived. */
+  environment?: (workspaceId: string, environmentId: string) => Promise<boolean>
+  /** Whether the person may still send to this thread (its root run) in the workspace. */
+  thread?: (ownerId: string, workspaceId: string, threadId: string) => Promise<boolean>
   /** A trigger's one-sentence condition against the event: true, false, or null when no answer could be had. */
   runWhen?: (input: RunWhenInput) => Promise<boolean | null>
 }
@@ -93,7 +99,7 @@ const MAX_ATTEMPTS = 3
 // The frozen request key is internal; keep the existing tool-response fields.
 const SCHEDULE_COLUMNS = 'id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,status_before_delete IS NOT NULL AS deleted,version,next_at,disabled_reason,webhook_key_hash IS NOT NULL AS webhook_key_set,folder,tags,created_at,updated_at'
 /** A run that fails one of these lost its creator's authority: the automation is paused with the code as its reason. */
-const AUTHORITY_LOST = new Set(['scheduleStandingTaskUnavailable','scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleLinearUnavailable','scheduleSlackUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable'])
+const AUTHORITY_LOST = new Set(['scheduleStandingTaskUnavailable','scheduleWorkspaceAccessDenied','scheduleOwnerUnavailable','scheduleConversationUnavailable','scheduleBotUnavailable','scheduleRepositoryUnavailable','scheduleLinearUnavailable','scheduleSlackUnavailable','scheduleDeviceUnavailable','scheduleProfileUnavailable','scheduleEnvironmentUnavailable','scheduleThreadUnavailable'])
 /** Runs that count toward maxRunsPerDay: queued, running and finished, not skipped or cancelled. */
 const COUNTED = "status IN ('pending','running','succeeded','failed')"
 
@@ -143,6 +149,8 @@ export class ScheduleStore {
     if(def.task.kind==='dispatch_task'){
       if(!workspaceId||!this.automation.check)throw new ScheduleError('scheduleDispatchUnavailable',503)
       await this.automation.check(tx,owner,workspaceId,def.task)
+      if(def.environmentId&&(!this.automation.environment||!await this.automation.environment(workspaceId,def.environmentId)))throw new ScheduleError('scheduleEnvironmentUnavailable',403)
+      if(def.singleThreadId&&(!this.automation.thread||!await this.automation.thread(owner,workspaceId,def.singleThreadId)))throw new ScheduleError('scheduleThreadUnavailable',403)
       for(const repository of new Set((def.events??[]).flatMap(trigger=>trigger.source==='github'?trigger.repositories:[]))){
         if(!this.automation.repository||!await this.automation.repository(workspaceId,repository))throw new ScheduleError('scheduleRepositoryUnavailable',403)
       }
@@ -169,6 +177,7 @@ export class ScheduleStore {
     const parsed = commandSchema.safeParse(raw)
     if (!parsed.success) throw new ScheduleError('invalidScheduleCommand',400)
     const cmd = parsed.data
+    if (cmd.action === 'duplicate') return this.duplicate(actor, cmd)
     return this.workspace(actor.ownerId,actor.workspaceId,access=>this.transaction(async tx=>{
       await this.conversation(tx,actor)
       await this.safeMessage(tx,actor.ownerId,cmd)
@@ -401,6 +410,70 @@ export class ScheduleStore {
     return { ...publicBatch(record!), batchId, status, replayed } satisfies WebhookBatchClosure
   }
   /**
+   * Duplicate to: a copy of an automation the person can see, created as theirs in a workspace they are an active
+   * member of (this one or another). Everything it uses is checked again there; what the target cannot use is cleared
+   * (the Bot falls back to the Coordinator, triggers and channels are dropped) and named in `cleared`, and such a copy
+   * starts paused. The webhook key, pins and run history stay with the original. The request ID makes a retry return
+   * the first copy.
+   */
+  private async duplicate(actor: Actor, cmd: Extract<Command, { action: 'duplicate' }>) {
+    if (!actor.direct) throw new ScheduleError('scheduleUserSourceRequired',403)
+    const source = await this.workspace(actor.ownerId,actor.workspaceId,()=>this.transaction(async tx=>{
+      await this.conversation(tx,actor)
+      const row=(await tx.query<Schedule & { folder: string | null; tags: string[] }>('SELECT * FROM user_schedules WHERE id=$1 AND workspace_id IS NOT DISTINCT FROM $2::uuid AND status_before_delete IS NULL',[cmd.scheduleId,actor.workspaceId])).rows[0]
+      if(!row||(row.visibility==='owner'&&(row.owner_id!==actor.ownerId||row.bot_id!==actor.botId))||(row.visibility==='workspace'&&!actor.workspaceId))throw new ScheduleError('scheduleNotFound',404)
+      return row
+    }))
+    const target: Actor = { ownerId: actor.ownerId, workspaceId: cmd.targetWorkspaceId, botId: null, direct: true }
+    return this.workspace(target.ownerId,target.workspaceId,()=>this.transaction(async tx=>{
+      await this.conversation(tx,target)
+      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[JSON.stringify(['schedule',actor.ownerId,'duplicate',cmd.requestId])])
+      const old=(await tx.query<Schedule>(`SELECT ${SCHEDULE_COLUMNS} FROM user_schedules WHERE owner_id=$1 AND request_origin='duplicate' AND request_id=$2`,[actor.ownerId,cmd.requestId])).rows[0]
+      if(old){if(old.workspace_id!==target.workspaceId)throw new ScheduleError('scheduleRequestConflict');return {schedule:old,cleared:[] as string[],replayed:true}}
+      const {definition,cleared}=await this.fitDefinition(tx,target,source.definition)
+      const paused=cleared.length>0
+      const next=paused?null:nextTime(definition,this.clock(),true)
+      const {rows}=await tx.query<Schedule>(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,definition,request_definition,status,next_at,request_origin,folder,tags)
+        VALUES($1,$2,$3,NULL,'workspace',NULL,$4,$5,$5,$6,$7,'duplicate',$8,$9) RETURNING ${SCHEDULE_COLUMNS}`,
+        [randomUUID(),actor.ownerId,target.workspaceId,cmd.requestId,definition,paused||(!next&&runsOnSchedule(definition))?'paused':'active',next,source.folder,source.tags])
+      await this.listChanged(tx,target.workspaceId)
+      return {schedule:rows[0],cleared,replayed:false}
+    }))
+  }
+  /** The definition with what `actor` cannot use in its workspace cleared, and the names of the cleared fields. */
+  private async fitDefinition(tx: PoolClient, actor: Actor, original: Definition): Promise<{ definition: Definition; cleared: string[] }> {
+    let definition: Definition = structuredClone(original)
+    const cleared: string[] = []
+    const drop = (source: EventTrigger['source']) => {
+      const events = (definition.events ?? []).filter(trigger => trigger.source !== source)
+      const { events: _events, ...rest } = definition
+      definition = events.length ? { ...rest, events } : rest
+    }
+    for (let attempt = 0; attempt < 12; attempt++) {
+      try { await this.permission(tx,actor.ownerId,actor.botId,actor.workspaceId,definition); return { definition, cleared } }
+      catch (error) {
+        if (!(error instanceof ScheduleError) || definition.task.kind !== 'dispatch_task') throw error
+        const task: DispatchTask = definition.task
+        const field = ({
+          scheduleBotUnavailable: () => task.botId ? (definition = { ...definition, task: { ...task, botId: null } }, 'bot') : null,
+          scheduleDeviceUnavailable: () => task.destination ? (definition = { ...definition, task: { ...task, destination: undefined } }, 'machine') : null,
+          scheduleProfileUnavailable: () => task.profileId ? (definition = { ...definition, task: { ...task, profileId: undefined } }, 'profile') : null,
+          scheduleEnvironmentUnavailable: () => { const { environmentId: _id, ...rest } = definition; definition = rest; return 'environment' },
+          scheduleThreadUnavailable: () => { const { singleThreadId: _id, ...rest } = definition; definition = { ...rest, eachRun: 'new_task' }; return 'thread' },
+          scheduleLinearUnavailable: () => (drop('linear'), 'linear'),
+          scheduleSlackUnavailable: () => { drop('slack'); const { notify: _notify, ...rest } = definition; definition = rest; return 'slack' },
+          // A Bot's repository, or a repository a GitHub trigger names.
+          scheduleRepositoryUnavailable: () => definition.events?.some(trigger => trigger.source === 'github') ? (drop('github'), 'github') : task.botId ? (definition = { ...definition, task: { ...task, botId: null } }, 'bot') : null,
+        } as Record<string, () => string | null>)[error.code]?.()
+        if (!field) throw error
+        // Undefined keys are not part of a stored definition.
+        definition = definitionSchema.parse(JSON.parse(JSON.stringify(definition)))
+        if (!cleared.includes(field)) cleared.push(field)
+      }
+    }
+    throw new ScheduleError('scheduleDispatchUnavailable',503)
+  }
+  /**
    * 接手: the automation becomes the actor's. It runs as them from now on, reports to their chat, and its authority is
    * theirs, checked now. When something it uses is not theirs to use (another person's Bot, a repository outside the
    * workspace), it is taken over paused with that reason, so they can change it and turn it back on. Runs that had not
@@ -530,7 +603,10 @@ export class ScheduleStore {
     const source=!o.trigger?undefined:'event' in o.trigger?o.trigger.event.source:'webhook' as const
     const event=!o.trigger?undefined:'event' in o.trigger?(o.trigger.event.source==='linear'?describeLinearEvent(o.trigger.event):o.trigger.event.source==='slack'?describeSlackEvent(o.trigger.event):describeGitHubEvent(o.trigger.event)):describeWebhook(o.trigger.webhook.requests)
     if(o.trigger&&'event' in o.trigger&&event&&!await this.runWhenHolds(row,o,event))return this.skipQuietly(row,o,'runWhenNotMet')
-    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:o.definition.task,...(event&&source?{event,source}:{}),...(o.definition.eachRun==='same_task'?{single:true as const}:{})})
+    const d=o.definition
+    const run:DispatchRun={...(d.environmentId?{environmentId:d.environmentId}:{}),...(d.model?{model:d.model}:{}),...(d.machineSize?{machineSize:d.machineSize}:{}),...(d.runs?{runs:d.runs}:{})}
+    const result=await this.automation.dispatch({ownerId:row.owner_id,workspaceId:row.workspace_id,scheduleId:row.id,occurrenceId:o.id,task:d.task,...(event&&source?{event,source}:{}),
+      ...(d.eachRun==='same_task'?{single:true as const}:{}),...(d.eachRun==='existing_thread'&&d.singleThreadId?{thread:d.singleThreadId}:{}),...(Object.keys(run).length?{run}:{})})
     const recorded=await this.workspace(row.owner_id,row.workspace_id,()=>this.transaction(async tx=>{
       await tx.query('SELECT id FROM user_schedules WHERE id=$1 FOR UPDATE',[row.id])
       // A lost lease means another worker owns this occurrence; it repeats the same idempotent dispatch.

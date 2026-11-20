@@ -1577,7 +1577,9 @@
     "apiKeyInvalid": "The key is invalid or has been revoked.",
     "apiKeyUnverifiable": "Couldn't verify the key right now. Try again later.",
     "apiKeyBaseUrlInvalid": "The base URL must be a public https address.",
-    "apiKeyNotFound": "This API key no longer exists."
+    "apiKeyNotFound": "This API key no longer exists.",
+    "scheduleEnvironmentUnavailable": "The selected environment is no longer available.",
+    "scheduleThreadUnavailable": "The thread it runs in is no longer available."
   },
   "Overview": {
     "sections": {
@@ -3659,7 +3661,10 @@
       },
       "restore": "Restore",
       "copyFiles": "Files to copy into the worktree, one per line",
-      "approveSetup": "Run this setup when a new worktree starts"
+      "approveSetup": "Run this setup when a new worktree starts",
+      "machineSize": "Default machine size",
+      "machineSizeDefault": "Mikka default",
+      "machineSizeOption": "{vcpu} vCPU · {gib} GiB"
     },
     "threadTitles": {
       "title": "Thread titles",
