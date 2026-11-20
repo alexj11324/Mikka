@@ -94,7 +94,7 @@ export async function listBotEnvironments(workspaceId?: string): Promise<ActionR
 /** The reasoning effort of the Bot's chat model; null is the model's default. */
 export async function setBotEffort(botId: string, effort: string | null, workspaceId?: string): Promise<ActionResult<{ id: string; effort: string | null }>> {
   return workspaceAction(async () => {
-    await (await import('@/lib/bot-settings-store')).setBotModelEffort(pool, await getOwner(workspaceId), botId, effort)
+    await (await import('@/lib/bot-settings-store')).setBotModelEffort(await getOwner(workspaceId), botId, effort)
     return { id: botId, effort }
   })
 }
@@ -111,9 +111,13 @@ export async function setBotAccess(botId: string, input: { visibility?: 'shared'
   return workspaceAction(async () => {
     const access = await import('@/lib/bot-access')
     const actor = await actorOf(workspaceId)
-    let view = input.visibility ? await access.setBotVisibility(actor, botId, input.visibility) : await access.botAccess(actor, botId)
-    if (input.subscribers) view = await access.setBotSubscribers(actor, botId, input.subscribers)
-    return view
+    const { db, withDatabaseTransaction } = await import('@/lib/db')
+    // Access and followers change together or not at all.
+    return db.transaction(tx => withDatabaseTransaction(tx, async () => {
+      let view = input.visibility ? await access.setBotVisibility(actor, botId, input.visibility) : await access.botAccess(actor, botId)
+      if (input.subscribers) view = await access.setBotSubscribers(actor, botId, input.subscribers)
+      return view
+    }))
   })
 }
 

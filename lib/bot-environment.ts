@@ -34,12 +34,17 @@ export async function botEnvironmentOptions(workspaceId: string): Promise<BotEnv
 /**
  * The Environment a new Bot binds when the person picked none: the oldest one
  * listing `repository` (an older client's 仓库 choice or the workspace's 新 Bot
- * 默认值), else the workspace default. Null in a workspace with no Environment.
+ * 默认值), else the workspace default. A workspace with no Environment gets a
+ * Default one now, listing that repository, so a new Bot always has one
+ * (lib/project-resources/store.ts ensureBotEnvironment).
  */
-export async function defaultBotEnvironment(workspaceId: string, repository?: string | null): Promise<string | null> {
+export async function defaultBotEnvironment(ownerId: string, workspaceId: string, repository?: string | null): Promise<string> {
   const options = await botEnvironmentOptions(workspaceId)
   const key = legacyRepositoryKey(repository)
-  return (key ? options.find(option => option.repositoryKeys.includes(key)) : undefined)?.id ?? options[0]?.id ?? null
+  const chosen = (key ? options.find(option => option.repositoryKeys.includes(key)) : undefined)?.id ?? options[0]?.id
+  if (chosen) return chosen
+  const { ensureBotEnvironment } = await import('@/lib/project-resources/store')
+  return ensureBotEnvironment(ownerId, workspaceId, 'Default', key ? [key] : [])
 }
 
 /**
@@ -55,7 +60,16 @@ export async function botRepository(bot: BotEnvironmentRef): Promise<string | nu
   return bot.repository
 }
 
-/** A writer's check: the Environment must be a live one of this workspace. */
-export async function assertBotEnvironment(workspaceId: string, environmentId: string): Promise<void> {
-  if (await environmentRepositories(workspaceId, environmentId) === null) throw new ActionFailureError('botEnvironmentUnavailable')
+/**
+ * A writer's check: the Environment is a live one of this workspace and the
+ * person binding it may use it, through the same workspace access every
+ * Environment read takes (lib/project-resources/store.ts readableEnvironment).
+ */
+export async function assertBotEnvironment(actorId: string, workspaceId: string, environmentId: string): Promise<void> {
+  const { readableEnvironment } = await import('@/lib/project-resources/store')
+  const readable = await readableEnvironment(actorId, workspaceId, environmentId).catch((error: unknown) => {
+    if (error instanceof ActionFailureError && error.code === 'workspaceAccessDenied') return false
+    throw error
+  })
+  if (!readable) throw new ActionFailureError('botEnvironmentUnavailable')
 }

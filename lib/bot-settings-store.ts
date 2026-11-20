@@ -16,10 +16,22 @@ export function parseBotSettings(input: BotSettingsInput): BotSettings {
   throw new ActionFailureError(parsed.error.issues[0]?.path[0] === 'alias' ? 'botAliasInvalid' : 'validationGeneric')
 }
 
-async function ownDevice(query: Query, ownerId: string, deviceId: string, agentId?: string) {
-  const { rowCount } = await query.query(`SELECT 1 FROM devices d WHERE d.id=$1 AND d."ownerId"=$2 AND d.kind='local'
-    AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM agents a WHERE a.id=$3 AND a."userId"=$2 AND a."deviceId"=d.id))`, [deviceId, ownerId, agentId ?? null])
-  return Boolean(rowCount)
+/**
+ * A device the Bot may name: the owner's own local computer, enabled and not
+ * removed, with the named Agent on it, while the owner is an active member of
+ * this workspace. Devices belong to a person, not a workspace, so membership
+ * is what ties one to the workspace.
+ */
+async function ownDevice(query: Query, owner: BotOwnerScope, deviceId: string, agentId?: string) {
+  const { rowCount } = await query.query(`SELECT 1 FROM devices d WHERE d.id=$1 AND d."ownerId"=$2 AND d.kind='local' AND d.enabled AND d."removedAt" IS NULL
+    AND ($3::uuid IS NULL OR EXISTS (SELECT 1 FROM agents a WHERE a.id=$3 AND a."userId"=$2 AND a."deviceId"=d.id))`, [deviceId, owner.ownerId, agentId ?? null])
+  if (!rowCount) return false
+  const { workspaceDb } = await import('@/lib/workspace-db')
+  const { workspaceMembers } = await import('@/lib/db/workspace-schema')
+  const { and, eq } = await import('drizzle-orm')
+  const [member] = await workspaceDb.select({ id: workspaceMembers.userId }).from(workspaceMembers)
+    .where(and(eq(workspaceMembers.workspaceId, owner.workspaceId), eq(workspaceMembers.userId, owner.ownerId), eq(workspaceMembers.status, 'active'))).limit(1)
+  return Boolean(member)
 }
 
 /**
@@ -29,10 +41,10 @@ async function ownDevice(query: Query, ownerId: string, deviceId: string, agentI
  * is never trusted.
  */
 export async function assertBotSettings(query: Query, owner: BotOwnerScope, settings: BotSettings): Promise<void> {
-  if (settings.environmentId) await assertBotEnvironment(owner.workspaceId, settings.environmentId)
+  if (settings.environmentId) await assertBotEnvironment(owner.ownerId, owner.workspaceId, settings.environmentId)
   const target = settings.crewTarget
-  if (target?.kind === 'device' && !await ownDevice(query, owner.ownerId, target.deviceId, target.agentId)) throw new ActionFailureError('botTargetUnavailable')
-  if (settings.runsOn?.kind === 'device' && !await ownDevice(query, owner.ownerId, settings.runsOn.deviceId)) throw new ActionFailureError('botTargetUnavailable')
+  if (target?.kind === 'device' && !await ownDevice(query, owner, target.deviceId, target.agentId)) throw new ActionFailureError('botTargetUnavailable')
+  if (settings.runsOn?.kind === 'device' && !await ownDevice(query, owner, settings.runsOn.deviceId)) throw new ActionFailureError('botTargetUnavailable')
   if (settings.defaultProfileId) {
     const { readProfileRow } = await import('@/lib/factory/agent-profile-store')
     const profile = await readProfileRow(query, owner, settings.defaultProfileId).catch(() => null)
@@ -88,12 +100,14 @@ export async function readOwnedBotSettings(query: Query, owner: BotOwnerScope, b
  * The reasoning effort of the Bot's chat model (New Bot's Model + effort);
  * null is the model's default. Kept beside the model choice, which it leaves as it is.
  */
-export async function setBotModelEffort(query: Query, owner: BotOwnerScope, botId: string, effort: string | null): Promise<void> {
+export async function setBotModelEffort(owner: BotOwnerScope, botId: string, effort: string | null): Promise<void> {
   if (!z.uuid().safeParse(botId).success) throw new ActionFailureError('botNotFound')
   const parsed = botEffortSchema.nullable().safeParse(effort)
   if (!parsed.success) throw new ActionFailureError('validationGeneric')
-  const { rowCount } = await query.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey",effort)
-    SELECT "ownerId","workspaceId",id::text,$4 FROM bots WHERE id=$3 AND "ownerId"=$1 AND "workspaceId"=$2 AND "archivedAt" IS NULL
-    ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET effort=EXCLUDED.effort`, [owner.ownerId, owner.workspaceId, botId, parsed.data])
+  // Through `db`, so a caller's open transaction (a Bot create or PATCH) carries it.
+  const [{ db }, { sql }] = await Promise.all([import('@/lib/db'), import('drizzle-orm')])
+  const { rowCount } = await db.execute(sql`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey",effort)
+    SELECT "ownerId","workspaceId",id::text,${parsed.data} FROM bots WHERE id=${botId}::uuid AND "ownerId"=${owner.ownerId} AND "workspaceId"=${owner.workspaceId}::uuid AND "archivedAt" IS NULL
+    ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET effort=EXCLUDED.effort`)
   if (!rowCount) throw new ActionFailureError('botNotFound')
 }

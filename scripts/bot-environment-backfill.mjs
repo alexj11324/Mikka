@@ -15,32 +15,29 @@ export function legacyRepositoryKey(repository) {
   return key && KEY.test(key) && key.split('/').every(part => part !== '.' && part !== '..') ? key : null
 }
 
-const MAX_REPOSITORIES = 100
 const EMPTY_CONFIGURATION = { runtime: 'any', harness: 'any', variables: {}, secretIds: [] }
 /** Who the workspace's resource history names for a write no person made. */
 export const MIGRATION_ACTOR = 'mikka:bot-environment-backfill'
 
 /**
- * The Environment the repository goes into: one that already lists it, else
- * the workspace's default (its oldest live Environment) when it has room, else
- * a new "Default" Environment. Runs in a workspace transaction holding the
- * workspace's lock, so two Bots never create two defaults.
+ * The Environment a retired repository binds: one that already lists it, else a
+ * new Environment for this Bot listing only it. An existing Environment is
+ * never changed, since other work may be using it. The new one gets the same
+ * setup history and resource event saveEnvironment writes
+ * (lib/project-resources/store.ts), under the same workspace resource lock.
  */
-async function placeRepository(client, workspaceId, key, actor) {
+async function placeRepository(client, workspaceId, key, bot, actor) {
   const { rows: [listed] } = await client.query(`SELECT id FROM workspace_environments WHERE "workspaceId"=$1 AND "archivedAt" IS NULL
     AND configuration->'repositoryKeys' ? $2 ORDER BY "createdAt",id LIMIT 1`, [workspaceId, key])
-  if (listed) return { id: listed.id, created: false, appended: false }
-  const { rows: [fallback] } = await client.query(`SELECT id,jsonb_array_length(COALESCE(configuration->'repositoryKeys','[]'::jsonb)) AS size
-    FROM workspace_environments WHERE "workspaceId"=$1 AND "archivedAt" IS NULL ORDER BY "createdAt",id LIMIT 1 FOR UPDATE`, [workspaceId])
-  if (fallback && fallback.size < MAX_REPOSITORIES) {
-    await client.query(`UPDATE workspace_environments SET configuration=jsonb_set(configuration,'{repositoryKeys}',COALESCE(configuration->'repositoryKeys','[]'::jsonb)||to_jsonb($2::text)),
-      revision=revision+1,"updatedBy"=$3,"updatedAt"=now() WHERE id=$1`, [fallback.id, key, actor])
-    return { id: fallback.id, created: false, appended: true }
-  }
+  if (listed) return { id: listed.id, created: false }
   const id = crypto.randomUUID()
-  await client.query(`INSERT INTO workspace_environments(id,"workspaceId",name,configuration,"createdBy","updatedBy") VALUES($1,$2,'Default',$3::jsonb,$4,$4)`,
-    [id, workspaceId, JSON.stringify({ ...EMPTY_CONFIGURATION, repositoryKeys: [key] }), actor])
-  return { id, created: true, appended: false }
+  const name = (typeof bot.name === 'string' && bot.name.trim() ? bot.name.trim() : key.split('/').slice(-2).join('/')).slice(0, 120)
+  await client.query(`INSERT INTO workspace_environments(id,"workspaceId",name,configuration,revision,"createdBy","updatedBy") VALUES($1,$2,$3,$4::jsonb,1,$5,$5)`,
+    [id, workspaceId, name, JSON.stringify({ ...EMPTY_CONFIGURATION, repositoryKeys: [key] }), actor])
+  await client.query(`INSERT INTO workspace_environment_setup_versions ("workspaceId","environmentId",revision,recipe) VALUES($1,$2,1,NULL)`, [workspaceId, id])
+  await client.query(`INSERT INTO workspace_resource_events(id,"workspaceId","actorId",kind,"resourceId",detail) VALUES($1,$2,$3,'environment.saved',$4,$5::jsonb)`,
+    [crypto.randomUUID(), workspaceId, actor, id, JSON.stringify({ revision: 1, source: 'bot-environment-backfill', botId: bot.id })])
+  return { id, created: true }
 }
 
 export async function backfillBotEnvironments(application, workspace, { batch = 200 } = {}) {
@@ -48,7 +45,7 @@ export async function backfillBotEnvironments(application, workspace, { batch = 
   if (!ready.ready) return { bound: 0, created: 0, skipped: 0 }
   let after = '00000000-0000-0000-0000-000000000000', bound = 0, created = 0, skipped = 0
   for (;;) {
-    const { rows } = await application.query(`SELECT id,"workspaceId",repository FROM bots WHERE "environmentId" IS NULL AND repository IS NOT NULL AND id>$1 ORDER BY id LIMIT $2`, [after, batch])
+    const { rows } = await application.query(`SELECT id,"workspaceId",name,repository FROM bots WHERE "environmentId" IS NULL AND repository IS NOT NULL AND id>$1 ORDER BY id LIMIT $2`, [after, batch])
     if (!rows.length) break
     after = rows.at(-1).id
     for (const bot of rows) {
@@ -60,8 +57,10 @@ export async function backfillBotEnvironments(application, workspace, { batch = 
         await client.query('BEGIN')
         const { rows: [exists] } = await client.query('SELECT 1 FROM mikka_workspaces WHERE id=$1', [bot.workspaceId])
         if (!exists) { await client.query('ROLLBACK'); skipped++; continue }
-        await client.query(`SELECT pg_advisory_xact_lock(hashtext('bot-environment-backfill:'||$1))`, [bot.workspaceId])
-        placed = await placeRepository(client, bot.workspaceId, key, MIGRATION_ACTOR)
+        // saveEnvironment's lock order: team relations shared, then this workspace's resources.
+        await client.query(`SELECT pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations',0))`)
+        await client.query(`SELECT pg_advisory_xact_lock(hashtextextended('project-resources:'||$1,0))`, [bot.workspaceId])
+        placed = await placeRepository(client, bot.workspaceId, key, bot, MIGRATION_ACTOR)
         await client.query('COMMIT')
       } catch (error) {
         await client.query('ROLLBACK').catch(() => {})

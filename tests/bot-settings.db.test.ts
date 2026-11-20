@@ -51,6 +51,30 @@ test('bot settings', { skip: !dbUrl }, async t => {
     assert.equal((await pool.query('select count(*)::int as n from bots where name in ($1,$2) and "workspaceId"=$3', ['Archived', 'Foreign', ws.id])).rows[0].n, 0)
   })
 
+  await t.test('a workspace with no Environment gets a Default one, once, with its history', async () => {
+    const empty = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
+    const first = await createOwnedBot({ ownerId: member, workspaceId: empty.id }, { name: 'First', color: 'encre', shape: 'cercle' })
+    const made = (await row(first.id)).environmentId
+    assert.ok(made, 'any member\'s new Bot gets an Environment')
+    assert.deepEqual((await pool.query(`select name,"createdBy" from workspace_environments where id=$1`, [made])).rows[0], { name: 'Default', createdBy: member })
+    assert.equal((await pool.query(`select count(*)::int as n from workspace_resource_events where "resourceId"=$1 and kind='environment.saved'`, [made])).rows[0].n, 1)
+    const second = await createOwnedBot({ ownerId: owner, workspaceId: empty.id }, { name: 'Second', color: 'encre', shape: 'cercle' })
+    assert.equal((await row(second.id)).environmentId, made, 'the next Bot reuses it')
+    assert.equal((await pool.query(`select count(*)::int as n from workspace_environments where "workspaceId"=$1`, [empty.id])).rows[0].n, 1)
+  })
+
+  await t.test('binding an Environment needs the binder to reach it', async () => {
+    // The outsider owns a Bot in another workspace and is not a member of this one.
+    const theirs = await seedBot(pool, other.id, outsider, 'Outsider bot')
+    await rejects(updateOwnedBot({ ownerId: outsider, workspaceId: other.id }, { botId: theirs, environmentId: defaultEnv }), 'botEnvironmentUnavailable')
+    await pool.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [ws.id, member])
+    const memberBot = await seedBot(pool, ws.id, member, 'Suspended member bot')
+    await rejects(updateOwnedBot({ ownerId: member, workspaceId: ws.id }, { botId: memberBot, environmentId: apiEnv }), 'botEnvironmentUnavailable')
+    await pool.query(`update mikka_workspace_members set status='active' where "workspaceId"=$1 and "userId"=$2`, [ws.id, member])
+    await updateOwnedBot({ ownerId: member, workspaceId: ws.id }, { botId: memberBot, environmentId: apiEnv })
+    assert.equal((await row(memberBot)).environmentId, apiEnv)
+  })
+
   await t.test('alias: lowercase, unique in the workspace, cleared with null', async () => {
     const a = await createOwnedBot(me, { name: 'Alias A', color: 'encre', shape: 'cercle', alias: 'Release' })
     assert.equal((await row(a.id)).alias, 'release')
@@ -74,6 +98,15 @@ test('bot settings', { skip: !dbUrl }, async t => {
     assert.deepEqual(await store.botDispatchDefaults(pool, bot), { crewTarget: { kind: 'device', deviceId: device }, defaultAgent: 'codex', defaultProfileId: null, repository: 'v2/github.com/acme/web' })
     await rejects(updateOwnedBot(me, { botId: bot, crewTarget: { kind: 'device', deviceId: theirs } }), 'botTargetUnavailable')
     await rejects(updateOwnedBot(me, { botId: bot, runsOn: { kind: 'device', deviceId: theirs, checkout: 'linked' } }), 'botTargetUnavailable')
+    // A disabled or removed computer is not one a Bot can name, nor is one whose owner is no longer a member here.
+    const off = randomUUID(), gone = randomUUID()
+    await pool.query(`insert into devices (id,"ownerId",name,kind,enabled,"removedAt") values ($1,$3,'off','local',false,null),($2,$3,'gone','local',true,now())`, [off, gone, owner])
+    await rejects(updateOwnedBot(me, { botId: bot, crewTarget: { kind: 'device', deviceId: off } }), 'botTargetUnavailable')
+    await rejects(updateOwnedBot(me, { botId: bot, crewTarget: { kind: 'device', deviceId: gone } }), 'botTargetUnavailable')
+    const leftBot = await seedBot(pool, other.id, owner, 'Left workspace bot')
+    await pool.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [other.id, owner])
+    await rejects(updateOwnedBot({ ownerId: owner, workspaceId: other.id }, { botId: leftBot, crewTarget: { kind: 'device', deviceId: device } }), 'botTargetUnavailable')
+    await pool.query(`update mikka_workspace_members set status='active' where "workspaceId"=$1 and "userId"=$2`, [other.id, owner])
     await rejects(updateOwnedBot(me, { botId: bot, defaultProfileId: randomUUID() }), 'botTargetUnavailable')
     await rejects(updateOwnedBot(me, { botId: bot, defaultAgent: 'cursor' as 'codex' }), 'validationGeneric')
     await rejects(updateOwnedBot({ ownerId: member, workspaceId: ws.id }, { botId: bot, defaultAgent: 'claude_code' }), 'botNotFound')
@@ -86,14 +119,14 @@ test('bot settings', { skip: !dbUrl }, async t => {
   await t.test('effort sits beside the model choice and keeps it', async () => {
     const bot = await seedBot(pool, ws.id, owner, 'Effort')
     await pool.query(`insert into bot_model_choices("ownerId","workspaceId","botKey","creditsModel") values($1,$2,$3,'openai/gpt')`, [owner, ws.id, bot])
-    await store.setBotModelEffort(pool, me, bot, 'high')
+    await store.setBotModelEffort(me, bot, 'high')
     const [choice] = (await pool.query('select "creditsModel",effort from bot_model_choices where "botKey"=$1', [bot])).rows
     assert.deepEqual(choice, { creditsModel: 'openai/gpt', effort: 'high' })
     assert.equal((await store.readOwnedBotSettings(pool, me, bot))?.effort, 'high')
-    await store.setBotModelEffort(pool, me, bot, null)
+    await store.setBotModelEffort(me, bot, null)
     assert.equal((await store.readOwnedBotSettings(pool, me, bot))?.effort, null)
-    await rejects(store.setBotModelEffort(pool, me, bot, 'extreme'), 'validationGeneric')
-    await rejects(store.setBotModelEffort(pool, { ownerId: member, workspaceId: ws.id }, bot, 'low'), 'botNotFound')
+    await rejects(store.setBotModelEffort(me, bot, 'extreme'), 'validationGeneric')
+    await rejects(store.setBotModelEffort({ ownerId: member, workspaceId: ws.id }, bot, 'low'), 'botNotFound')
     assert.equal(await store.readOwnedBotSettings(pool, { ownerId: member, workspaceId: ws.id }, bot), null)
   })
 
@@ -158,27 +191,33 @@ test('bot settings', { skip: !dbUrl }, async t => {
     assert.equal(await threads.slackThreadBot(pool, thread, owner, ws.id), null, 'an archived Bot no longer answers')
   })
 
-  await t.test('the backfill moves each retired repository into an Environment, once', async () => {
+  await t.test('the backfill binds a listing Environment or makes the Bot its own, never changing a shared one', async () => {
     const fresh = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
     const listed = await seedBot(pool, ws.id, owner, 'Legacy listed')
-    const appended = await seedBot(pool, ws.id, owner, 'Legacy appended')
+    const unlisted = await seedBot(pool, ws.id, owner, 'Legacy unlisted')
     const invalid = await seedBot(pool, ws.id, owner, 'Legacy invalid')
     const lonely = await seedBot(pool, fresh.id, owner, 'Legacy lonely')
     const chosen = await seedBot(pool, ws.id, owner, 'Legacy chosen')
     await pool.query(`update bots set repository=$2,"environmentId"=null where id=$1`, [listed, 'Acme/API'])
-    await pool.query(`update bots set repository=$2,"environmentId"=null where id=$1`, [appended, 'acme/new-repo'])
+    await pool.query(`update bots set repository=$2,"environmentId"=null where id=$1`, [unlisted, 'acme/new-repo'])
     await pool.query(`update bots set repository=$2,"environmentId"=null where id=$1`, [invalid, 'not a repository'])
     await pool.query(`update bots set repository=$2,"environmentId"=null where id=$1`, [lonely, 'acme/solo'])
     await pool.query(`update bots set repository=$2,"environmentId"=$3 where id=$1`, [chosen, 'acme/other', apiEnv])
+    const sharedBefore = (await pool.query(`select configuration,revision,"updatedBy" from workspace_environments where id=$1`, [defaultEnv])).rows[0]
     const first = await backfillBotEnvironments(pool, pool, { batch: 2 })
-    assert.ok(first.bound >= 3 && first.created >= 1 && first.skipped >= 1, JSON.stringify(first))
+    assert.ok(first.bound >= 3 && first.created >= 2 && first.skipped >= 1, JSON.stringify(first))
     assert.equal((await row(listed)).environmentId, apiEnv, 'the Environment that already lists it')
-    assert.equal((await row(appended)).environmentId, defaultEnv, 'else the workspace default, which gains it')
-    const keys = (await pool.query(`select configuration->'repositoryKeys' as keys,"updatedBy" from workspace_environments where id=$1`, [defaultEnv])).rows[0]
-    assert.deepEqual(keys, { keys: ['v2/github.com/acme/web', 'v2/github.com/acme/new-repo'], updatedBy: MIGRATION_ACTOR })
+    const own = (await row(unlisted)).environmentId
+    assert.ok(own && own !== defaultEnv && own !== apiEnv, 'an unlisted repository gets an Environment of its own')
+    assert.deepEqual((await pool.query(`select name,configuration->'repositoryKeys' as keys,"createdBy" from workspace_environments where id=$1`, [own])).rows[0],
+      { name: 'Legacy unlisted', keys: ['v2/github.com/acme/new-repo'], createdBy: MIGRATION_ACTOR })
+    assert.deepEqual((await pool.query(`select "actorId",kind,detail->>'botId' as bot from workspace_resource_events where "resourceId"=$1`, [own])).rows,
+      [{ actorId: MIGRATION_ACTOR, kind: 'environment.saved', bot: unlisted }], 'it leaves the same resource event saveEnvironment does')
+    assert.equal((await pool.query(`select count(*)::int as n from workspace_environment_setup_versions where "environmentId"=$1`, [own])).rows[0].n, 1)
+    assert.deepEqual((await pool.query(`select configuration,revision,"updatedBy" from workspace_environments where id=$1`, [defaultEnv])).rows[0], sharedBefore, 'the shared default is untouched')
     assert.equal((await row(invalid)).environmentId, null, 'a value that is no repository stays for a person to fix')
     const made = (await row(lonely)).environmentId
-    assert.deepEqual((await pool.query(`select name,configuration->'repositoryKeys' as keys from workspace_environments where id=$1`, [made])).rows[0], { name: 'Default', keys: ['v2/github.com/acme/solo'] })
+    assert.deepEqual((await pool.query(`select name,configuration->'repositoryKeys' as keys from workspace_environments where id=$1`, [made])).rows[0], { name: 'Legacy lonely', keys: ['v2/github.com/acme/solo'] })
     assert.equal((await row(chosen)).environmentId, apiEnv, 'a Bot that already has an Environment keeps it')
     assert.equal((await row(listed)).repository, 'Acme/API', 'the retired column stays for rollback')
     const again = await backfillBotEnvironments(pool, pool)

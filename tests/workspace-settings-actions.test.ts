@@ -82,7 +82,10 @@ before(async () => {
     teamLifecycleImpact: () => assert.fail('unexpected lifecycle impact read'),
   } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name }, session: { id: 'workspace-fixture-session' } }) } } } })
-  mock.module('@/lib/db', { namedExports: { pool: { query: () => { throw Error('unexpected query') } }, db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }) } } })
+  // createBot writes the Bot, its access and followers in one transaction; this fixture's writes need no real one.
+  mock.module('@/lib/db', { namedExports: { pool: { query: () => { throw Error('unexpected query') } },
+    db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }), transaction: async (work: (tx: object) => Promise<unknown>) => work({}) },
+    withDatabaseTransaction: (_tx: object, work: () => unknown) => work() } })
   mock.module('@/lib/run-policy-stop', { namedExports: { stopRunsForPolicyChange: respond('stopRunsForPolicyChange', 0) } })
   mock.module('@/lib/workspace-admin/bots', { namedExports: {
     workspaceBotDefaults: async (workspaceId: string) => { calls.push(['workspaceBotDefaults', workspaceId]); return defaults },

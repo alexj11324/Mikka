@@ -240,6 +240,34 @@ export async function saveEnvironment(reader: Reader, raw: z.input<typeof saveEn
   })
 }
 
+/**
+ * The Environment a new Bot works in when the workspace has none (lib/bot-environment.ts):
+ * any active member may make it, through the same lock, setup history and audit
+ * as saveEnvironment. Under the write lock an Environment made meanwhile wins,
+ * so two Bots created at once never make two.
+ */
+export async function ensureBotEnvironment(reader: Reader, workspaceId: string, name: string, repositoryKeys: string[]): Promise<string> {
+  const configuration = environmentConfiguration.parse({ repositoryKeys: [...new Set(repositoryKeys)] })
+  return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
+    await resourceWriteLock(tx, workspaceId)
+    const { rows: [existing] } = await tx.execute<{ id: string }>(sql`select id from workspace_environments where "workspaceId"=${workspaceId} and "archivedAt" is null order by "createdAt",id limit 1`)
+    if (existing) return existing.id
+    const id = randomUUID()
+    await persistEnvironment(tx, reader, workspaceId, id, name, configuration, 1, null)
+    await audit(tx, reader, workspaceId, 'environment.saved', id, { revision: 1, source: 'bot' })
+    await workspaceListChanged(tx, workspaceId, ['workspace_settings'])
+    return id
+  })
+}
+
+/** Whether the reader may use this live Environment: the same workspace access every Environment read takes. */
+export async function readableEnvironment(reader: Reader, workspaceId: string, environmentId: string): Promise<boolean> {
+  return withTaskWorkspace(reader, workspaceId, async (_workspace, tx) => {
+    const { rowCount } = await tx.execute(sql`select 1 from workspace_environments where id=${environmentId} and "workspaceId"=${workspaceId} and "archivedAt" is null`)
+    return Boolean(rowCount)
+  })
+}
+
 const currentSetupScope = projectSetupScope.omit({ environmentId: true })
 
 type SelectedProjectRepository = Pick<ProjectRepositoryBinding, 'repositoryKey' | 'baseBranch' | 'environmentId'> & { selectedEnvironmentId: string | null }
