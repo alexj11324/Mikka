@@ -44,28 +44,3 @@ export async function seedMvpExecutionOrder(pool, ownerId, workspaceId, deviceId
     ON CONFLICT ("ownerId","workspaceId",harness,model,"sourceId") DO UPDATE SET position=0`, [randomUUID(), ownerId, workspaceId, MVP_SUBSCRIPTION_MODEL, connectionId])
 }
 
-/** Adapt the real OpenAI-compatible subscription request to the same scripted model. */
-export function subscriptionPrompt(payload) {
-  const names=new Map()
-  const prompt=payload.messages.map(message=>{
-    if(message.role==='tool') {
-      const toolName=names.get(message.tool_call_id)
-      assert.ok(toolName,'Tool result needs a preceding real tool call')
-      return {role:'tool',content:[{type:'tool-result',toolCallId:message.tool_call_id,toolName,output:{type:'json',value:JSON.parse(message.content)}}]}
-    }
-    const content=typeof message.content==='string'?[{type:'text',text:message.content}]:(message.content??[])
-    for(const call of message.tool_calls??[]) {
-      names.set(call.id,call.function.name)
-      content.push({type:'tool-call',toolCallId:call.id,toolName:call.function.name,input:JSON.parse(call.function.arguments)})
-    }
-    return {role:message.role==='developer'?'system':message.role,content}
-  })
-  return {prompt,tools:payload.tools?.map(tool=>({name:tool.function.name}))}
-}
-export function subscriptionChunks(answer, model) {
-  const calls=answer.content.filter(part=>part.type==='tool-call')
-  const text=answer.content.filter(part=>part.type==='text').map(part=>part.text).join('')
-  const base={id:'mvp-subscription',object:'chat.completion.chunk',created:1,model}
-  const delta={role:'assistant',...(text?{content:text}:{}),...(calls.length?{tool_calls:calls.map((call,index)=>({index,id:call.toolCallId,type:'function',function:{name:call.toolName,arguments:call.input}}))}:{})}
-  return [`data: ${JSON.stringify({...base,choices:[{index:0,delta,finish_reason:null}]})}\n\n`,`data: ${JSON.stringify({...base,choices:[{index:0,delta:{},finish_reason:calls.length?'tool_calls':'stop'}],usage:{prompt_tokens:1,completion_tokens:1,total_tokens:2}})}\n\n`,'data: [DONE]\n\n'].join('')
-}

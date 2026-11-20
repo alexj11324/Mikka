@@ -1,14 +1,15 @@
-import {evaluationForSession,evaluationNativeTools} from '../../../../lib/eve/evaluation-runtime'
 import { defineDynamic } from 'eve/tools'
 import { turnModel, turnPolicy, turnRequest } from '../../../../lib/eve/runtime'
 import { scopeFromAuth } from '../../../../lib/eve/scope'
-import { productCatalogue } from '../../../../lib/eve/product-definitions'
-import { createProductTool } from '../../../../lib/eve/product-tool'
 
 /** Product actions keep their existing ownership, billing and audit boundaries. */
 export default defineDynamic(async ctx => {
+  const {evaluationForSession,evaluationNativeTools}=await import('../../../../lib/eve/evaluation-runtime')
   const evaluation=await evaluationForSession(ctx)
   if(evaluation)return evaluationNativeTools(evaluation)
+  const [{ productCatalogue }, { createProductTool }] = await Promise.all([
+    import('../../../../lib/eve/product-definitions'), import('../../../../lib/eve/product-tool'),
+  ])
   const scope = scopeFromAuth(ctx.session.auth.current)
   const policy = turnPolicy.get()
   const runtime = turnModel.get()!

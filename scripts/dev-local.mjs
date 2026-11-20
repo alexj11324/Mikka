@@ -1,23 +1,19 @@
-// pnpm dev:local (docs/local-runtime.md): the whole loop on this machine with no
-// GitHub. Starts the local fake services (tests/mvp/services.mjs, with the
-// substitutes in scripts/dev-local/services.mjs), Vite + the API (hot reload) with a
-// preload that sends GitHub's API to the fake, and the daemon from source with
-// tsx. A workspace's own model key stays real; without a configured LiteLLM service
-// or RESEND_API_KEY, Mikka 默认, Decisions and mail use the local substitutes.
+// pnpm dev:local runs the product against loopback HTTP fakes by default.
+// A deliberate manual opt-in can configure a real LiteLLM; acceptance forbids it.
 import { spawn, execFileSync } from 'node:child_process'
 import { generateKeyPairSync, randomUUID } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import pg from 'pg'
-import { EnvHttpProxyAgent, fetch as proxyFetch } from 'undici'
+import { localModelEnvironment } from './dev-local/model-environment.mjs'
 import { assertDevLocal } from './dev-local/guard.mjs'
 import { startLocalCron } from './dev-local/cron.mjs'
 import { localSecretsKey } from './dev-local/secrets-key.mjs'
 import { refreshQueue } from './dev-local/refresh-queue.mjs'
 import { stopOwnedServices, waitForApiReady } from './dev-local/shutdown.mjs'
 import { prepareLocalHarnesses } from './dev-local/prepare-harnesses.mjs'
-import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_LITELLM_KEY, LOCAL_LITELLM_URL } from './dev-local/services.mjs'
+import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY } from './dev-local/services.mjs'
 import { startMvpServices } from '../tests/mvp/services.mjs'
 import { MVP_SERVICES, REPOSITORY } from '../tests/mvp/isolated-env.mjs'
 
@@ -38,7 +34,6 @@ const GITHUB_ACCOUNT_ID = '4242'
 const daemonUser = process.getuid?.() === 0 ? process.env.MIKKA_DEV_DAEMON_USER : undefined
 const children = []
 const closers = []
-// Child Node processes must use the managed HTTP proxy for real model calls.
 // Keep local API/fixture traffic on loopback, preserving inherited exclusions.
 const childEnv = { ...process.env, NODE_USE_ENV_PROXY: '1', NO_PROXY: [process.env.NO_PROXY, process.env.no_proxy, 'localhost', '127.0.0.1', '::1'].filter(Boolean).join(',') }
 const log = message => console.log(`dev:local ${message}`)
@@ -82,43 +77,24 @@ log(`fake GitHub on ${MVP_SERVICES}; repository ${REPOSITORY} → ${scenario.bar
 const cronSecret = process.env.CRON_SECRET || LOCAL_CRON_SECRET
 // One value for the API and the model key seeder: what one seals, the other opens.
 const secretsKey = process.env.WORKSPACE_SECRETS_KEY || localSecretsKey(join(root, '.cache/dev-local'))
-// The workspace model key (DeepSeek preset): from the environment, else by name from Infisical
-// (MIKKA_DEV_INFISICAL_PROJECT). Held in memory for the seeder only; never written or printed.
+// Preserve normal key validation/sealing/selection while the key is a public
+// placeholder. No secret-store lookup is needed for scripted development.
 const skipModelSetup = process.env.MIKKA_DEV_SKIP_MODEL_SETUP === '1'
-const deepseekKey = skipModelSetup ? undefined : process.env.DEEPSEEK_API_KEY || await infisicalSecret('DEEPSEEK_API_KEY')
-delete process.env.DEEPSEEK_API_KEY
-delete childEnv.DEEPSEEK_API_KEY
-log(skipModelSetup ? 'model setup: not required by selected acceptance items' : deepseekKey ? 'model key DEEPSEEK_API_KEY: found' : 'model key: 缺少 DEEPSEEK_API_KEY，跳过模型 key 注入')
-async function infisicalSecret(name) {
-  const project = process.env.MIKKA_DEV_INFISICAL_PROJECT || process.env.INFISICAL_PROJECT_ID
-  if (!project) return undefined
-  const api = (process.env.INFISICAL_API_URL || 'https://app.infisical.com').replace(/\/+$/, '')
-  const dispatcher = new EnvHttpProxyAgent()
-  let token = process.env.INFISICAL_TOKEN
-  if (!token && process.env.INFISICAL_CLIENT_ID && process.env.INFISICAL_CLIENT_SECRET) {
-    const auth = await proxyFetch(`${api}/api/v1/auth/universal-auth/login`, {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ clientId: process.env.INFISICAL_CLIENT_ID, clientSecret: process.env.INFISICAL_CLIENT_SECRET }), signal: AbortSignal.timeout(15_000), dispatcher,
-    }).catch(() => null)
-    if (!auth?.ok) { log(`Infisical authentication: ${auth ? `HTTP ${auth.status}` : 'unreachable'}`); return undefined }
-    token = (await auth.json()).accessToken
-  }
-  // Local acceptance always reads only the named development model credential.
-  const query = new URLSearchParams({ projectId: project, environment: 'dev', secretPath: '/vercel', viewSecretValue: 'true' })
-  const headers = token ? { authorization: `Bearer ${token}` } : {}
-  const response = await proxyFetch(`${api}/api/v4/secrets/${name}?${query}`, { headers, signal: AbortSignal.timeout(15_000), dispatcher }).catch(() => null)
-  if (!response?.ok) { log(`Infisical ${name}: ${response ? `HTTP ${response.status}` : 'unreachable'}`); return undefined }
-  return (await response.json()).secret?.secretValue || undefined
+const modelEnvironment = localModelEnvironment(process.env)
+const deepseekKey = skipModelSetup ? undefined : modelEnvironment.DEEPSEEK_API_KEY
+for (const key of ['DEEPSEEK_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'AI_GATEWAY_API_KEY']) {
+  delete process.env[key]
+  delete childEnv[key]
 }
+childEnv.MIKKA_LITELLM_URL = modelEnvironment.MIKKA_LITELLM_URL
+childEnv.MIKKA_LITELLM_MASTER_KEY = modelEnvironment.MIKKA_LITELLM_MASTER_KEY
+log(skipModelSetup ? 'model setup: not required by selected acceptance items' : process.env.MIKKA_LOCAL_LIVE_MODELS === '1' ? 'model setup: explicit manual LiteLLM configuration' : 'model setup: scripted LiteLLM with public placeholder key')
 const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })
 const preload = pathToFileURL(join(root, 'scripts/dev-local/preload.mjs')).href
 const apiProcess = watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '--port', String(port)], {
   cwd: root, stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
   env: { ...childEnv, NODE_ENV: 'development', NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import ${preload}`.trim(),
-    // A configured LiteLLM stays real; otherwise the guarded fixture handles model calls.
-    MIKKA_LITELLM_URL: process.env.MIKKA_LITELLM_URL || LOCAL_LITELLM_URL,
-    MIKKA_LITELLM_MASTER_KEY: process.env.MIKKA_LITELLM_URL ? process.env.MIKKA_LITELLM_MASTER_KEY : LOCAL_LITELLM_KEY,
-    RESEND_API_KEY: process.env.RESEND_API_KEY || LOCAL_RESEND_KEY,
+    RESEND_API_KEY: LOCAL_RESEND_KEY,
     CRON_SECRET: cronSecret,
     // Saving a workspace's own model key needs it (lib/secrets/crypto.ts).
     WORKSPACE_SECRETS_KEY: secretsKey,
