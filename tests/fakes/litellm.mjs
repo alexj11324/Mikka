@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 
 export const FAKE_LITELLM_KEY = 'mikka-local-litellm'
 export const FAKE_MODEL_KEY = 'mikka-local-model-placeholder'
-export const FAKE_MODELS = ['mikka-default', 'mikka-title', 'mikka-decision', 'mikka-planning', 'mikka-test', 'deepseek-flash', 'deepseek-v4.1-flash']
+export const FAKE_MODELS = ['mikka-default', 'mikka-title', 'mikka-decision', 'mikka-planning', 'mikka-test', 'mvp-subscription-model', 'deepseek-flash', 'deepseek-v4.1-flash']
 const MAX_BODY = 16 * 1024 * 1024
 const parts = text => String(text).match(/[\s\S]{1,24}/g) ?? []
 const unbox = value => { try { return JSON.parse(value) } catch { return value } }
@@ -77,16 +77,16 @@ function probeAnswer(request) {
   return { content: [{ type: 'text', text: 'Scripted model response across several stream chunks.' }], cost: 0.001234 }
 }
 
-function chat(answer, model, id, usage, stream) {
+function chat(answer, model, id, usage, stream, { start = true, end = true } = {}) {
   const content = answer.content.filter(part => part.type === 'text').map(part => part.text).join('')
   const calls = answer.content.filter(part => part.type === 'tool-call').map((part, index) => ({ index, id: part.toolCallId, type: 'function', function: { name: part.toolName, arguments: typeof part.input === 'string' ? part.input : JSON.stringify(part.input) } }))
   const finish_reason = calls.length ? 'tool_calls' : 'stop'
   const base = { id, object: stream ? 'chat.completion.chunk' : 'chat.completion', created: 1, model }
   if (!stream) return { ...base, choices: [{ index: 0, finish_reason, message: { role: 'assistant', content: content || null, ...(calls.length && { tool_calls: calls.map(({ index: _index, ...call }) => call) }) } }], usage }
   const chunk = (delta, finish = null, extra = {}) => ({ ...base, choices: [{ index: 0, delta, finish_reason: finish }], ...extra })
-  return [chunk({ role: 'assistant' }), ...parts(content).map(content => chunk({ content })),
+  return [...(start ? [chunk({ role: 'assistant' })] : []), ...parts(content).map(content => chunk({ content })),
     ...calls.flatMap(call => [chunk({ tool_calls: [{ ...call, function: { name: call.function.name, arguments: '' } }] }), ...parts(call.function.arguments).map(arguments_ => chunk({ tool_calls: [{ index: call.index, function: { arguments: arguments_ } }] }))]),
-    chunk({}, finish_reason, { usage })].map(value => `data: ${JSON.stringify(value)}\n\n`).join('') + 'data: [DONE]\n\n'
+    ...(end ? [chunk({}, finish_reason, { usage })] : [])].map(value => `data: ${JSON.stringify(value)}\n\n`).join('') + (end ? 'data: [DONE]\n\n' : '')
 }
 
 function messages(answer, model, id, usage, stream) {
@@ -134,7 +134,7 @@ export function createLiteLlmRoutes({ basePath = '/litellm', apiKey = FAKE_LITEL
   return async (request, response, url) => {
     if (!url.pathname.startsWith(`${basePath}/`)) return false
     const json = (value, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(value)); return true }
-    const error = (code, status) => json({ error: { type: 'fixture_error', code, message: code } }, status)
+    const error = (code, status) => { observe({ kind: 'litellm-refused', code }); return json({ error: { type: 'fixture_error', code, message: code } }, status) }
     const auth = request.headers.authorization ?? request.headers['x-litellm-api-key']
     if (auth !== `Bearer ${apiKey}`) return error('fixture_invalid_key', 401)
     if (url.search) return error('fixture_unmatched_query', 400)
@@ -165,15 +165,20 @@ export function createLiteLlmRoutes({ basePath = '/litellm', apiKey = FAKE_LITEL
       if (!Array.isArray(result.content) || !result.content.length) return error('fixture_empty_answer', 422)
       const usage = { prompt_tokens: result.usage?.inputTokens?.total ?? 11, completion_tokens: result.usage?.outputTokens?.total ?? 7, cost }
       usage.total_tokens = usage.prompt_tokens + usage.completion_tokens
-      const output = ({ chat, messages, responses })[protocol](result, body.model, id, usage, body.stream === true)
+      if (result.next && (protocol !== 'chat' || !body.stream)) return error('fixture_stream_gate_protocol', 422)
+      const output = ({ chat, messages, responses })[protocol](result, body.model, id, usage, body.stream === true, { end: !result.next })
       if (!body.stream) return json(output)
       response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
-      response.end(output)
+      if (result.next) {
+        response.write(output)
+        const next = await result.next
+        response.end(chat(next, body.model, id, usage, true, { start: false }))
+      } else response.end(output)
       return true
     } catch (cause) {
       // No request text, credentials or arbitrary thrown message enters evidence.
-      observe({ kind: 'litellm-refused', protocol, code: cause.status ? cause.message : 'fixture_script_failed' })
-      return error(cause.status ? cause.message : 'fixture_script_failed', cause.status ?? 422)
+      const code = ['fixture_body_too_large', 'fixture_invalid_json'].includes(cause.message) ? cause.message : 'fixture_script_failed'
+      return error(code, code === 'fixture_script_failed' ? 422 : cause.status)
     }
   }
 }

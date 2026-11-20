@@ -7,7 +7,8 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { createGateway, generateText, stepCountIs, tool } from 'ai'
+import { generateText, stepCountIs, tool } from 'ai'
+import { createOpenAICompatible } from '@ai-sdk/openai-compatible'
 import { z } from 'zod'
 import { assertMvpEnvironment, REPOSITORY } from './isolated-env.mjs'
 import { answerModel } from './model.mjs'
@@ -285,7 +286,7 @@ test('synthetic MVP transport binds the active fetch path, preserves requests an
     })
     await fetch('http://localhost:3100/mikka/api/test-environment')
     assert.deepEqual(requests, [
-      { url: 'http://127.0.0.1:3191/decisions', method: 'POST', authorization: `Bearer ${MVP_DECISION_KEY}`, body: '{"synthetic":true}', redirect: 'error' },
+      { url: 'http://127.0.0.1:3191/litellm/v1/decisions', method: 'POST', authorization: `Bearer ${MVP_DECISION_KEY}`, body: '{"synthetic":true}', redirect: 'error' },
       { url: 'http://127.0.0.1:3191/github/repos/mikka-e2e/core-loop/pulls?page=1', method: 'POST', authorization: 'Bearer overridden-fixture', body: '{"draft":true}', redirect: 'error' },
       { url: 'http://localhost:3100/mikka/api/test-environment', method: 'GET', authorization: null, body: '', redirect: 'error' },
     ])
@@ -322,9 +323,9 @@ test('scripted model uses only the real tool results for dispatch, including exa
     await request('/scenario', { marker, title: 'Fixture SDK boundary' })
     await request('/scenario/device', { deviceId })
     const calls = []
-    globalThis.AI_SDK_DEFAULT_PROVIDER = createGateway({ baseURL: `${services.origin}/v1`, apiKey: 'synthetic-fixture' })
+    globalThis.AI_SDK_DEFAULT_PROVIDER = createOpenAICompatible({ name: 'litellm', baseURL: `${services.origin}/litellm/v1`, apiKey: MVP_DECISION_KEY, includeUsage: true })
     const response = await generateText({
-      model: 'fixture-model',
+      model: 'mikka-default',
       prompt: `${marker}\nThe person selected device ${deviceId} in the task dialog. Use a local execution identity on exactly this device; do not substitute another device or Mikka Cloud.`,
       stopWhen: stepCountIs(5), maxRetries: 0,
       tools: {
@@ -363,18 +364,18 @@ test('scripted Decisions accepts only the runtime triage contract and identifies
       input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ hostObservation: JSON.stringify({ eventId, eventKind: 'run_finished', ownerId: randomUUID(), runId, observedRun: { id: runId, status: 'succeeded' } }) }) }] }],
       questions: [{ type: 'choice', name: 'tier', choices: ['attention', 'result', 'background'].map(value => ({ value })) }],
     }
-    const post = async (body, token = 'mvp-synthetic-decisions') => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) })
+    const post = async (body, token = 'mvp-synthetic-decisions') => fetch(`${services.origin}/litellm/v1/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: JSON.stringify(body) })
     const response = await post(request)
     assert.equal(response.status, 200)
     const result = await response.json()
     assert.equal(result.model, request.model)
-    assert.match(response.headers.get('x-litellm-call-id'), /^mvp-synthetic-/)
+    assert.match(response.headers.get('x-litellm-call-id'), /^fake-litellm-/)
     assert.equal(response.headers.get('x-litellm-response-cost'),'0.001','scripted hosted triage includes its billing receipt')
     assert.deepEqual(result.answers, [{ type: 'choice', name: 'tier', choice: 'result' }])
     for (const invalid of [{ ...request, model: 'unconfigured-model' }, { ...request, questions: [{ type: 'predicate', name: 'approved' }] }, { ...request, input: 'unexpected judgment request' }]) {
-      assert.equal((await post(invalid)).status, 500)
+      assert.equal((await post(invalid)).status, 422)
     }
-    assert.equal((await post(request, 'not-the-fixture-key')).status, 500)
+    assert.equal((await post(request, 'not-the-fixture-key')).status, 401)
     const evidence = await (await fetch(`${services.origin}/observations`)).json()
     assert.equal(evidence.observations.filter(item => item.kind === 'decision-request').length, 1)
     assert.equal(evidence.observations[0].eventId, eventId)
@@ -389,7 +390,7 @@ test('scripted Decisions accepts the real artifact notice contract without requi
     const submitter = { userId: randomUUID(), botId: randomUUID(), issueId: randomUUID(), runId: randomUUID(), authorName: 'Synthetic Agent' }
     const event = (source = submitter, value = artifact) => ({ ...artifactSubmittedEvent(source, value), id: randomUUID(), observedRun: null })
     const request = value => ({ model: 'mikka-decision', input: decisionRequestInput(triageInput(value)), questions: triageQuestions(value) })
-    const post = body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
+    const post = body => fetch(`${services.origin}/litellm/v1/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
     // Both a run artifact and a Factory/agent report without a run use this
     // producer. Neither receipt supplies the independent PR publication gate.
     for (const value of [event(), event({ ...submitter, runId: null }), event({ ...submitter, runId: null, issueId: null }, { ...artifact, kind: 'html' })]) {
@@ -399,7 +400,7 @@ test('scripted Decisions accepts the real artifact notice contract without requi
     }
     for (const invalid of [event(submitter, { ...artifact, version: 0 }), event(submitter, { ...artifact, kind: 'private-invalid-kind' }),
       event(submitter, { ...artifact, artifactId: 'invalid' }), { ...event(), kind: 'private-invalid-event' },
-      { ...event(), observedRun: { id: randomUUID(), status: 'running' } }]) assert.equal((await post(request(invalid))).status, 500)
+      { ...event(), observedRun: { id: randomUUID(), status: 'running' } }]) assert.equal((await post(request(invalid))).status, 422)
     const evidence = await (await fetch(`${services.origin}/observations`)).json()
     assert.deepEqual(evidence.observations.filter(item => item.kind === 'decision-request').map(item => item.eventKind), ['artifact_submitted', 'artifact_submitted', 'artifact_submitted'])
     assert.equal(evidence.errors.length, 5)
@@ -412,11 +413,11 @@ test('scripted Decisions answers an ended run\'s outcome only from the run outco
     const OUTCOME_QUESTIONS = [{ type: 'choice', name: 'outcome', choices: ['done', 'blocked', 'needs_input', 'failed', 'idle'].map(value => ({ value })) }]
     const facts = (status) => ['status: ' + status, 'stop reason: none', 'attempts on this task: 1', 'task: in_review — "Add README"', 'pull requests: open', 'summary (quoted): "Opened the PR"', 'last reply (quoted): "Done"'].join('\n')
     const request = (text, questions = OUTCOME_QUESTIONS) => ({ model: 'mikka-decision', input: decisionRequestInput(text), questions })
-    const post = async body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
+    const post = async body => fetch(`${services.origin}/litellm/v1/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
     assert.deepEqual((await (await post(request(facts('succeeded')))).json()).answers, [{ type: 'choice', name: 'outcome', choice: 'done' }])
     assert.deepEqual((await (await post(request(facts('cancelled')))).json()).answers, [{ type: 'choice', name: 'outcome', choice: 'idle' }])
     for (const invalid of [request('status: succeeded'), request(facts('running')), request(facts('succeeded'), [{ ...OUTCOME_QUESTIONS[0], choices: OUTCOME_QUESTIONS[0].choices.slice(1) }]), request({ text: facts('succeeded') })]) {
-      assert.equal((await post(invalid)).status, 500)
+      assert.equal((await post(invalid)).status, 422)
     }
     const evidence = await (await fetch(`${services.origin}/observations`)).json()
     assert.deepEqual(evidence.observations.filter(item => item.kind === 'outcome-request').map(item => item.status), ['succeeded', 'cancelled'])
@@ -430,10 +431,10 @@ test('scripted Decisions answers a Coordinator reply\'s phone push only from the
     const PUSH_QUESTIONS = [{ type: 'choice', name: 'push', choices: ['decide', 'review', 'finished', 'briefing', 'none'].map(value => ({ value })) }]
     const evidence = (answers) => `answeredEvents: user_message (attention)\nanswersAMessageFromThePerson: ${answers}\nreply: 已在你选择的电脑上启动线程。`
     const request = (input, questions = PUSH_QUESTIONS) => ({ model: 'mikka-decision', input, questions })
-    const post = async body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
+    const post = async body => fetch(`${services.origin}/litellm/v1/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
     assert.deepEqual((await (await post(request(evidence('yes')))).json()).answers, [{ type: 'choice', name: 'push', choice: 'none' }])
     for (const invalid of [request('reply: hi'), request([{ role: 'user', content: [{ type: 'input_text', text: evidence('yes') }] }]), request(evidence('yes'), [{ ...PUSH_QUESTIONS[0], choices: PUSH_QUESTIONS[0].choices.slice(1) }])]) {
-      assert.equal((await post(invalid)).status, 500)
+      assert.equal((await post(invalid)).status, 422)
     }
     const observed = await (await fetch(`${services.origin}/observations`)).json()
     assert.deepEqual(observed.observations.filter(item => item.kind === 'push-request').map(item => item.answersPerson), ['yes'])
