@@ -164,11 +164,16 @@ jobs:
           import assert from 'node:assert/strict'
           import {readFile,appendFile} from 'node:fs/promises'
           import {execFileSync} from 'node:child_process'
-          const operations = execFileSync('git',['-C','.operations-input','rev-parse','HEAD'],{encoding:'utf8'}).trim()
-          assert.match(operations,/^[a-f0-9]{40}$/)
-          const selected = JSON.parse(await readFile('.operations-input/docs/operations/releases/hosted-api-staging.json','utf8'))
-          assert.match(selected.overlaySource,/^[a-f0-9]{40}$/)
-          await appendFile(process.env.GITHUB_OUTPUT,'overlay='+selected.overlaySource+'\n')
+          try {
+            const operations = execFileSync('git',['-C','.operations-input','rev-parse','HEAD'],{encoding:'utf8'}).trim()
+            assert.match(operations,/^[a-f0-9]{40}$/)
+            const selected = JSON.parse(await readFile('.operations-input/docs/operations/releases/hosted-api-staging.json','utf8'))
+            assert.match(selected.overlaySource,/^[a-f0-9]{40}$/)
+            await appendFile(process.env.GITHUB_OUTPUT,'overlay='+selected.overlaySource+'\n')
+          } catch {
+            console.error('APPROVED_BUILD_SELECTION_UNAVAILABLE')
+            process.exitCode = 1
+          }
           JS
       - name: Read existing content tags with a short-lived pull credential
         id: registry-read

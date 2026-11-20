@@ -213,6 +213,10 @@ async function bundle(directory, configPath, filename, env) {
 async function build(service, planFile, directory) {
   const revision = await source(), context = await readJson(planFile), input = context.services[service]
   assert.ok(input && serviceNames.includes(service)); assert.equal(context.sourceCommit, revision)
+  const current = (await buildContexts({ overlayCommit: context.overlayCommit,
+    publicSettings: JSON.parse(process.env.API_PUBLIC_BUILD_SETTINGS || '{}') })).services[service]
+  assert.equal(current.contextDigest, input.contextDigest, 'Build inputs or public settings changed after planning')
+  assert.deepEqual(current.files, input.files)
   await install(service, context)
   await mkdir(directory, { recursive: true })
   const release = releaseId(revision, process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT)
@@ -395,13 +399,21 @@ async function qualifyCachedLiteLlm(planDirectory, pull) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [action, ...args] = process.argv.slice(2)
-  if (action === 'plan') await plan(...args)
-  else if (action === 'build') await build(...args)
-  else if (action === 'publish') await publish(...args)
-  else if (action === 'finish') await finish(...args)
-  else if (action === 'record-cache') await recordCache(...args)
-  else if (action === 'qualify-pull') await qualifyCachedLiteLlm(args[0], true)
-  else if (action === 'qualify') await qualifyCachedLiteLlm(args[0], false)
-  else throw new Error('Usage: service-build-ci.mjs plan | build | publish | finish | record-cache | qualify-pull | qualify')
+  try {
+    const [action, ...args] = process.argv.slice(2)
+    if (action === 'plan') await plan(...args)
+    else if (action === 'build') await build(...args)
+    else if (action === 'publish') await publish(...args)
+    else if (action === 'finish') await finish(...args)
+    else if (action === 'record-cache') await recordCache(...args)
+    else if (action === 'qualify-pull') await qualifyCachedLiteLlm(args[0], true)
+    else if (action === 'qualify') await qualifyCachedLiteLlm(args[0], false)
+    else assert.fail('Unknown service build action')
+  } catch (error) {
+    // Failed JSON parsing or a third-party exception can contain input bytes.
+    // Keep stage/location diagnostics; never echo settings or private source.
+    const location = /service-build-ci\.mjs:(\d+:\d+)/.exec(error.stack ?? '')?.[1]
+    console.error('SERVICE_BUILD_FAILED', { name: error.name, code: error.code, location })
+    process.exitCode = 1
+  }
 }
