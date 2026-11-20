@@ -8,5 +8,7 @@ Public product architecture, local development and self-hosting remain in the
 [documentation index](../README.md). The pages here retain public compatibility
 links where an internal operating runbook has moved.
 
-The [service manifest deployment contract](deploy-pipeline.md) describes public
-build provenance, service selection, verification evidence and recovery inputs.
+Public deployment verification contracts:
+
+- [Service manifest deployment contract](deploy-pipeline.md): public build provenance, service selection, verification evidence and recovery inputs.
+- [API route registration probe](route-probe.md)
