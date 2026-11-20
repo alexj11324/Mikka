@@ -13,7 +13,7 @@ export const CUSTOM_MCP_TOOLKIT = 'custom_mcp'
 type Query = Pick<Pool | PoolClient, 'query'>
 
 export async function runMcpAuthority(userId: string, runId: string, query: Query = pool, membership?: Query): Promise<McpAuthority | null> {
-  const { rows: [row] } = await query.query<{ customMcp: unknown }>(`SELECT "agentDefinition"->'customMcp' AS "customMcp"
+  const { rows: [row] } = await query.query<{ customMcp: unknown; environmentId: string | null }>(`SELECT "agentDefinition"->'customMcp' AS "customMcp","agentDefinition"#>>'{projectExecution,environment,id}' AS "environmentId"
     FROM agent_runs WHERE id=$1 AND "userId"=$2`, [runId, userId])
   // Historical tokens do not discover new workspace grants.
   if (!row?.customMcp) return null
@@ -21,7 +21,7 @@ export async function runMcpAuthority(userId: string, runId: string, query: Quer
   if (!parsed.success || parsed.data.requester !== userId) throw new PluginError('mcpUnavailable', 403)
   const identity = await activeExecutionIdentity(query, runId, userId, membership)
   if (!identity || identity.workspaceId !== parsed.data.workspaceId) throw new PluginError('mcpUnavailable', 403)
-  return parsed.data
+  return { ...parsed.data, ...(row.environmentId || parsed.data.environmentId ? { environmentId: row.environmentId } : {}) }
 }
 
 export async function runMcpAdvertised(userId: string, runId: string): Promise<boolean> {

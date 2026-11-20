@@ -9,7 +9,11 @@ let installedForRefresh: { id: string; enabled: boolean; transport: string }[] =
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 stub('../api-auth.ts', { auth: { api: { getSession: async () => owner ? { user: { id: owner } } : null } } })
 stub('../request-log.ts', { noteLogRpcAction: () => {}, noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
-stub('./runtime.ts', { runPersonalMcp: async (actor: string, authority: unknown, command: { serverId: string; cursor?: string }) => {
+stub('./runtime.ts', { mcpConnections: { check: async (actor: string, serverId: string) => {
+  assert.ok(sessionMustBeFresh())
+  calls.push(['checkMcp', actor, serverId])
+  return { status: 'connected', tools: [{ name: 'list_issues', enabled: true, available: true, description: 'server description' }] }
+} }, runPersonalMcp: async (actor: string, authority: unknown, command: { serverId: string; cursor?: string }) => {
   assert.ok(sessionMustBeFresh())
   calls.push(['refreshMcp', actor, authority, command])
   return { serverId: command.serverId, tools: [{ name: 'list_issues', description: 'server description', inputSchema: {} }], nextCursor: null }
@@ -213,5 +217,5 @@ test('owner Settings refresh uses the personal discovery grant, accepts only a l
   installedForRefresh = []
   assert.equal(result.status, 200)
   assert.deepEqual(await result.json(), { serverId, tools: [{ name: 'list_issues' }], nextCursor: null })
-  assert.deepEqual(calls, [['listMcp', 'owner'], ['refreshMcp', 'owner', undefined, { serverId, cursor: 'next' }]])
+  assert.deepEqual(calls, [['listMcp', 'owner'], ['checkMcp', 'owner', serverId]])
 })

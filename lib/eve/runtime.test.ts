@@ -57,7 +57,7 @@ mock.module(new URL('../agent-kit/service.ts', import.meta.url).href, { namedExp
 } })
 mock.module(new URL('../plugins/runtime.ts', import.meta.url).href, { namedExports: {
   personalPlugins: {
-    async snapshot() { pluginReads++; return plugins() },
+    async snapshotForBot() { pluginReads++; return plugins() },
     async mcpConnection() { return { transport: 'http', name: 'Fixture MCP', url: 'https://fixture.invalid/mcp', headers: {} } },
   },
 } })

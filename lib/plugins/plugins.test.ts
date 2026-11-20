@@ -126,7 +126,7 @@ for (const type of ['http', 'sse'] as const) test(`real MCP ${type} handshake, d
   const snapshot = { servers: [{ id: serverId, name: 'Fixture', revision }], skills: [] }
   const runtime = createPersonalMcpRuntime({ mcpConnection: async (userId, id, expected) => {
     if (userId !== 'owner' || id !== serverId || !enabled || expected !== undefined && expected !== revision) throw Error('denied')
-    return { id, name: 'Fixture', url: 'https://mcp.acme.dev/rpc', transport: type, enabled, revision, authKind: 'header', createdAt: '', headers: { authorization: `Bearer ${secret}` } }
+    return { id, name: 'Fixture', url: 'https://mcp.acme.dev/rpc', transport: type, enabled, revision, authKind: 'header', disabledTools: [], createdAt: '', headers: { authorization: `Bearer ${secret}` } }
   } }, { transport: (_origin, signal) => ({ fetch: (input, init) => fetch(address + new URL(String(input)).pathname, { ...init, signal }), close: async () => {} }) })
   try {
     const list = await runtime('owner', snapshot, { serverId })

@@ -31,7 +31,7 @@ export default defineHook({events:{
         agentKitEnabled() ? (async () => {
           const { personalPlugins } = await import('../../../../lib/plugins/runtime')
           const [current, plugins] = await Promise.all([
-            agentKitStore.active(scope, agentKitDefaults()), personalPlugins.snapshot(scope.ownerId, undefined, scope.workspaceId),
+            agentKitStore.active(scope, agentKitDefaults()), personalPlugins.snapshotForBot(scope.ownerId, scope.botId, scope.workspaceId),
           ])
           const effectiveTools = new Set<string>(current.effectiveTools)
           if (plugins.servers.length) { effectiveTools.add('list_personal_mcp_tools'); effectiveTools.add('call_personal_mcp_tool') }

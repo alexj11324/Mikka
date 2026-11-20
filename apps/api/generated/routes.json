@@ -1507,6 +1507,16 @@
       "sourceHash": "79cb7d4c89453d123f2ed724ca8e3d3688c03c5534d6545f6319bd230ab71537"
     },
     {
+      "path": "/mikka/api/integrations/mcp/catalog",
+      "template": "/api/integrations/mcp/catalog",
+      "source": "app/api/integrations/mcp/catalog/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "785120d20476d4975863f3fbfb180a9bcc300a5f758f18d0ce42502f0e42ebac"
+    },
+    {
       "path": "/mikka/api/integrations/mcp/refresh",
       "template": "/api/integrations/mcp/refresh",
       "source": "app/api/integrations/mcp/refresh/route.ts",
@@ -1516,6 +1526,15 @@
       "sourceHash": "011ca580d14d1729082cb397c44cc40d02e85816f3b1603d31bbf77b2ba7a433"
     },
     {
+      "path": "/mikka/api/integrations/mcp/search",
+      "template": "/api/integrations/mcp/search",
+      "source": "app/api/integrations/mcp/search/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "d098c66187962028ddfaec4c781572557a3e6d69df52d216c16d24ae80fd2e44"
+    },
+    {
       "path": "/mikka/api/integrations/mcp/shares",
       "template": "/api/integrations/mcp/shares",
       "source": "app/api/integrations/mcp/shares/route.ts",
@@ -1523,6 +1542,60 @@
         "PATCH"
       ],
       "sourceHash": "d450b093e5517282b41f6a49e6b712675ee8f33e8a0be7b4bafa04fa483ecf31"
+    },
+    {
+      "path": "/mikka/api/integrations/mcp/[id]",
+      "template": "/api/integrations/mcp/[id]",
+      "source": "app/api/integrations/mcp/[id]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "720dca1bfcc13d8b87c90e66ee283493834a29eaa294e1d0fd3eb324ab952977"
+    },
+    {
+      "path": "/mikka/api/integrations/mcp/[id]/check",
+      "template": "/api/integrations/mcp/[id]/check",
+      "source": "app/api/integrations/mcp/[id]/check/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "1562ce948e13430057449438585313066339397d983d0cdf4c08f2e23fc02fcf"
+    },
+    {
+      "path": "/mikka/api/integrations/mcp/[id]/environments",
+      "template": "/api/integrations/mcp/[id]/environments",
+      "source": "app/api/integrations/mcp/[id]/environments/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "sourceHash": "b6da012730f267dbd005fd7f9debb117d3e16a35a273c23e677d99da674aa6fe"
+    },
+    {
+      "path": "/mikka/api/integrations/mcp/[id]/oauth/callback",
+      "template": "/api/integrations/mcp/[id]/oauth/callback",
+      "source": "app/api/integrations/mcp/[id]/oauth/callback/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "75cad1132ea2b8d8fc596a72be511059879d9c33a89e05de3a607d34e593a7ea"
+    },
+    {
+      "path": "/mikka/api/integrations/mcp/[id]/oauth/start",
+      "template": "/api/integrations/mcp/[id]/oauth/start",
+      "source": "app/api/integrations/mcp/[id]/oauth/start/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "8872c4582127288a8a9abef53c7a7c811c5ced81fee4aa7dff1aafe7bded707f"
+    },
+    {
+      "path": "/mikka/api/integrations/mcp/[id]/tools/[name]",
+      "template": "/api/integrations/mcp/[id]/tools/[name]",
+      "source": "app/api/integrations/mcp/[id]/tools/[name]/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "sourceHash": "20a972c1bde8d31f7f53ce41b54532991013d1be56dc7e6b6ec7573d43dbe151"
     },
     {
       "path": "/mikka/api/integrations/slack",

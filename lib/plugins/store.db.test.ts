@@ -20,6 +20,7 @@ test('real Postgres: personal ownership, encrypted auth, revocation, installatio
     await pool.query(`CREATE TABLE "user"(id text PRIMARY KEY); INSERT INTO "user" VALUES('owner'),('peer'); CREATE TABLE workspace_app_policies(app text CHECK(app IN ('gmail','notion'))); CREATE TABLE composio_accounts("userId" text,toolkit text); CREATE TABLE bots(id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,UNIQUE(id,"workspaceId","ownerId")); CREATE TABLE agent_runs(id uuid PRIMARY KEY)`)
     const migration = await readFile(new URL('../../drizzle/20261031040000_personal_plugins.sql', import.meta.url), 'utf8')
     await pool.query(migration); await pool.query(migration)
+    await pool.query(await readFile(new URL('../../drizzle/20261120185217_mcp_connection_details.sql', import.meta.url), 'utf8'))
     const store = new PersonalPluginStore(pool, { WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') })
     const secret = randomBytes(24).toString('base64url')
     const server = await store.createMcp('owner', createMcpSchema.parse({ name: 'Personal', url: 'https://mcp.acme.dev/rpc', auth: { name: 'Authorization', value: `Bearer ${secret}` } }))

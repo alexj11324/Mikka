@@ -235,7 +235,7 @@ export class CursorAdapter implements AgentAdapter {
     // and `session/load` finds the session again on resume.
     // The path as given, not its real path: with `/private/tmp/...` Cursor
     // 2026.09 stopped using CURSOR_DATA_DIR and wrote to `/tmp/.cursor`.
-    const configDir = prepareCursorHome(join(paths.runDir, "cursor-home"))
+    const configDir = prepareCursorHome(join(paths.runDir, "cursor-home"), (options.apps?.servers ?? []).flatMap(server => (server.disabledTools ?? []).map(name => `Mcp(${server.name}:${name})`)))
     const ctx = new RunContext({
       github: options.github,
       githubEnvironment: options.githubEnvironment,

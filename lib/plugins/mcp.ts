@@ -117,6 +117,7 @@ export function mcpFailure(error: unknown, stage: McpStage, host?: string) {
 export function createPersonalMcpRuntime(store: Pick<PersonalPluginStore, 'mcpConnection'>, dependencies: McpDependencies = {}) {
   return async (userId: string, snapshot: PersonalPluginSnapshot | undefined, command: PersonalMcpCommand, guard?: () => Promise<unknown>) => {
     let revision: number | undefined
+    let disabledTools: string[] = []
     const result = await runMcpCommand(async () => {
       await guard?.()
       const entry = snapshot?.servers.find(server => server.id === command.serverId)
@@ -124,15 +125,17 @@ export function createPersonalMcpRuntime(store: Pick<PersonalPluginStore, 'mcpCo
       const connection = await store.mcpConnection(userId, command.serverId, entry?.revision, snapshot?.mcpAuthority)
       if (connection.transport === 'stdio') throw new PluginError('mcpUnavailable', 400)
       revision = connection.revision
+      disabledTools = connection.disabledTools ?? []
+      if ('name' in command && disabledTools.includes(command.name)) throw new PluginError('mcpToolDisabled', 403)
       // The connection may belong to a teammate. Mask its own secret values,
       // not only the requester's secret registry; the endpoint also stays private.
       return { url: connection.url, transport: connection.transport, headers: connection.headers, secrets: [...Object.values(connection.headers), connection.url] }
     }, command, dependencies, {
       // A setting changed while the server initialized: do not dispatch with an old credential.
-      ready: async () => { await guard?.(); await store.mcpConnection(userId, command.serverId, revision, snapshot?.mcpAuthority) },
+      ready: async () => { await guard?.(); const current = await store.mcpConnection(userId, command.serverId, revision, snapshot?.mcpAuthority); if ('name' in command && current.disabledTools?.includes(command.name)) throw new PluginError('mcpToolDisabled', 403) },
       code: error => error instanceof PluginError ? error.code : undefined,
     })
-    return 'name' in command || 'error' in result ? result : { serverId: command.serverId, ...result }
+    return 'name' in command || 'error' in result ? result : { serverId: command.serverId, ...result, tools: (result.tools as { name: string }[]).filter(tool => !disabledTools.includes(tool.name)) }
   }
 }
 

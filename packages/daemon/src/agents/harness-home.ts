@@ -100,7 +100,9 @@ export function carryHistory(from: string, to: string, entries: string[]) {
   }
 }
 
-export function prepareCursorHome(dir: string): string {
+export function prepareCursorHome(dir: string, deniedTools: readonly string[] = []): string {
   ownDir(dir)
+  // Cursor's documented native permission tokens; deny wins over allow.
+  writeOwnFile(join(dir, "cli-config.json"), JSON.stringify({ permissions: { deny: deniedTools } }))
   return dir
 }
