@@ -69,7 +69,7 @@ export function useWebhookBatches(workspaceId: string, scheduleId: string) {
 /** 用量 per day, read on open and again when the live channel says a schedule changed. */
 export function useAutomationUsage(workspaceId: string | null, id: string | null) {
   const key = workspaceId && id ? ['automation-usage', workspaceId, id] as const : null
-  const usage = useSWR<AutomationUsage>(key, () => automationUsage({ scheduleId: id! }, workspaceId!).then(unwrap<AutomationUsage>), { revalidateOnFocus: false, shouldRetryOnError: false })
+  const usage = useSWR<AutomationUsage>(key, () => automationUsage({ scheduleId: id!, days: 30 }, workspaceId!).then(unwrap<AutomationUsage>), { revalidateOnFocus: false, shouldRetryOnError: false })
   useLiveKey('schedule_list', workspaceId, key ? [serialize(key)] : [], workspaceId)
   return usage
 }

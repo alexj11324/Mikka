@@ -1,3 +1,4 @@
+import { taskRunSettingsSchema } from './task-run-settings-schema'
 import { z } from 'zod'
 import type { JSONContent } from '@tiptap/core'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from './issue-meta'
@@ -39,6 +40,8 @@ export const dispatchTaskIntent = z.strictObject({
   version: z.literal(1), intent: z.literal('create_and_dispatch'), teamId: z.uuid().optional(), projectId: z.uuid().optional(), description: z.string().trim().min(1).max(10_000),
   /** Required to dispatch: a command without it is refused with agentRequired. Optional here so stored commands still parse. */
   agent: taskAgentSchema.optional(),
+  /** How the new thread is set up (an automation's Environment, model and effort, machine size, pin). */
+  run: taskRunSettingsSchema.optional(),
 })
 export type DispatchTaskIntent = z.infer<typeof dispatchTaskIntent>
 

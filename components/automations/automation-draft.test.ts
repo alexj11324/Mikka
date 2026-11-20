@@ -146,3 +146,29 @@ test('Slack author choices round-trip as stable member IDs; an empty list keeps 
   assert.ok('definition' in empty)
   assert.deepEqual(empty.definition.events, [{ source: 'slack', event: 'message', channels: ['CTEAM'] }])
 })
+
+test('description, Environment, Runs in, model and effort, machine size and pin round-trip; defaults are left out', () => {
+  const plain = definitionFrom(filled(), now)
+  assert.ok('definition' in plain)
+  for (const key of ['description', 'environmentId', 'singleThreadId', 'model', 'machineSize', 'runs', 'eachRun']) assert.equal(key in plain.definition, false, key)
+  const draft = filled({ description: '  Keeps main green ', environmentId: '6b1f1a2e-0d7b-4c57-9b0e-0e6f1f0b9a11', model: 'gpt-6-luna', effort: 'high', machineSize: 'standard-4-16', pin: true })
+  const saved = definitionFrom(draft, now)
+  assert.ok('definition' in saved)
+  assert.equal(saved.definition.description, 'Keeps main green')
+  assert.deepEqual([saved.definition.environmentId, saved.definition.model, saved.definition.machineSize, saved.definition.runs],
+    ['6b1f1a2e-0d7b-4c57-9b0e-0e6f1f0b9a11', { id: 'gpt-6-luna', effort: 'high' }, 'standard-4-16', { pin: true }])
+  const back = draftFrom(saved.definition, now)
+  assert.deepEqual([back.description, back.environmentId, back.model, back.effort, back.machineSize, back.pin], ['Keeps main green', draft.environmentId, 'gpt-6-luna', 'high', 'standard-4-16', true])
+})
+
+test('Runs in an existing thread needs the thread; the thread is kept only for that choice', () => {
+  const thread = '0f8a4a62-8f3f-4c2f-a1f8-5d6b2a0c9e11'
+  assert.deepEqual(definitionFrom(filled({ eachRun: 'existing_thread' }), now), { missing: 'thread' })
+  const saved = definitionFrom(filled({ eachRun: 'existing_thread', singleThreadId: thread }), now)
+  assert.ok('definition' in saved)
+  assert.deepEqual([saved.definition.eachRun, saved.definition.singleThreadId], ['existing_thread', thread])
+  assert.deepEqual([draftFrom(saved.definition, now).eachRun, draftFrom(saved.definition, now).singleThreadId], ['existing_thread', thread])
+  const standing = definitionFrom(filled({ eachRun: 'same_task', singleThreadId: thread }), now)
+  assert.ok('definition' in standing)
+  assert.deepEqual([standing.definition.eachRun, 'singleThreadId' in standing.definition], ['same_task', false])
+})

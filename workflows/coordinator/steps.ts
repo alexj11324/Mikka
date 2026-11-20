@@ -351,6 +351,7 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
   let creation: { eventId: string; botId: string; workspaceId: string } | undefined
   // The task form's or schedule's Agent: undefined without one of those commands, null when it named none.
   let commanded: 'claude_code' | 'codex' | null | undefined
+  let commandedModel: string | undefined
   requestEventId ??= sourceEventId
   try {
     const workspaceId = await timedPhase('executionWorkspace', async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, botId))
@@ -361,7 +362,7 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
       request.requestKey = `task-command:${requestEventId}`
     }
     request.profileId = selection.profileId
-    if (selection.commandIssueId) commanded = selection.agent ?? null
+    if (selection.commandIssueId) { commanded = selection.agent ?? null; commandedModel = selection.model }
     if (selection.taskDestination?.kind === 'cloud') target = 'cloud'
     // The computer the person named, when the model left the place out, and
     // its Agent whatever the model passed. A different place stays refused.
@@ -374,6 +375,8 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
   // task's, whatever the model passed; a command that named none is refused.
   if (commanded === null) return { error: 'agentRequired' as const, issueId: request.issueId }
   if (commanded && request.model?.harness !== commanded) request.model = { harness: commanded }
+  // The command's own model (an automation's) wins over one the Bot named.
+  if (commanded && commandedModel) request.model = { harness: commanded, model: commandedModel }
   // The Agent or model the Bot named must be one of 优先使用的模型, the list its prompt shows; otherwise nothing is queued.
   if (request.model) {
     const { modelNotAllowed } = await import('@/lib/model-dispatch')

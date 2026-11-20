@@ -13,6 +13,8 @@ export type SponsoredTaskPlacement = Readonly<{
   botId: string
   repositoryKey: string
   requestEventId: string
+  /** The size the machine is billed at: the run's request, else its Environment's default; absent is Mikka's default. */
+  size?: import('./machine-pricing').MachineSize
 }>
 export type TaskMachineActor = { userId: string; workspaceId: string }
 type Query = Pick<PoolClient, 'query'>

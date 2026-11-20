@@ -263,3 +263,9 @@ export async function runAutomationNow(input: { scheduleId: string; version: num
   const parsed = versioned.extend({ requestId: z.uuid() }).safeParse(input)
   return parsed.success ? command({ action: 'run_now', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
+
+/** Duplicate to: a copy in this or another workspace of the person's, checked there; `cleared` names what it could not keep. */
+export async function duplicateAutomation(input: { scheduleId: string; targetWorkspaceId: string; requestId: string }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView; cleared: string[]; replayed: boolean }>> {
+  const parsed = z.object({ scheduleId: z.uuid(), targetWorkspaceId: z.uuid(), requestId: z.uuid() }).strict().safeParse(input)
+  return parsed.success ? command({ action: 'duplicate', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
+}
