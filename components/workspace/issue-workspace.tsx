@@ -687,7 +687,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     if (FRAME_OWNS_PANEL) setPanelReveal(value => ({ reveal: value.reveal + 1, revealId: 'overview' }))
     else setPanelSheet(true)
   }
-  const { entries: chatNav, archived: archivedNav, hidden: hiddenNav, followed: followedNav, reloadGroups, referenceGroups, markAllRead } = useChatNav({ bots, archivedBots, followedBots, workspaceId: listWorkspaceId, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items, onLeaveGroup: setLeavingGroup,
+  const { entries: chatNav, archived: archivedNav, hidden: hiddenNav, followed: followedNav, reloadGroups, referenceGroups, markAllRead } = useChatNav({ bots, archivedBots, followedBots, shareable: botList?.shareable === true, workspaceId: listWorkspaceId, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items, onLeaveGroup: setLeavingGroup,
     lifecycle: { archive: (bot, archived) => { void setBotArchived(bot, archived) }, askDelete: setDeletingBot }, page: { openProfile, renameThread: setRenamingThread } })
   const referenceTitles = useMemo(() => conversationReferenceTitles(user.id, listWorkspaceId, threadsError ? undefined : threadList, referenceGroups), [user.id, listWorkspaceId, threadList, threadsError, referenceGroups])
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }

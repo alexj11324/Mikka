@@ -159,6 +159,12 @@ export async function transferBotOwnership(actor: BotActor, id: string, toUserId
   return result
 }
 
+/** Whether Bots here can be shared: a team workspace, not a personal one. */
+export async function botsShareable(workspaceId: string): Promise<boolean> {
+  const [workspace] = await workspaceDb.select({ kind: workspaces.kind }).from(workspaces).where(eq(workspaces.id, workspaceId)).limit(1)
+  return workspace?.kind === 'team'
+}
+
 /** Bots the person follows here (their sidebar's 订阅的 Bot), newest first. */
 export async function followedBots(actor: BotActor) {
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, ownerId: bots.ownerId }).from(bots)

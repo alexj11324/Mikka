@@ -55,9 +55,10 @@ export async function listBotsForWorkspace(workspaceId: string): Promise<BotView
 /** The list cache is bound to this actual authorized Owner/workspace read. */
 export async function pollBots(workspaceId?: string) {
   const owner = await getOwner(workspaceId)
-  const { followedBots } = await import('@/lib/bot-access')
-  const [items, followed] = await Promise.all([listOwnerBots(owner.ownerId, owner.workspaceId), followedBots({ userId: owner.ownerId, workspaceId: owner.workspaceId })])
-  return { items, followed: followed as FollowedBotView[], live: owner }
+  const { followedBots, botsShareable } = await import('@/lib/bot-access')
+  const [items, followed, shareable] = await Promise.all([listOwnerBots(owner.ownerId, owner.workspaceId), followedBots({ userId: owner.ownerId, workspaceId: owner.workspaceId }), botsShareable(owner.workspaceId)])
+  // `shareable`: a team workspace, where a Bot's row menu offers Share (a personal one has no one to share with).
+  return { items, followed: followed as FollowedBotView[], shareable, live: owner }
 }
 
 /**
