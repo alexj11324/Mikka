@@ -433,7 +433,7 @@ test('provider failure continues the same task through its own Agent\'s authoriz
     assert.equal(assignment.requireWorktreeContinuation, true)
     assert.equal(assignment.resumeSessionId, `session-${runId}`, 'the same Agent resumes its own session')
     assert.equal(assignment.followUp, providerContinuationNote())
-    assert.ok(assignment.modelCredential, 'the continuation carries B\'s key')
+    assert.ok(assignment.modelCredential, 'the continuation carries a gateway token for B')
     assert.equal(assignment.subscriptionBinding, undefined)
   })
 
