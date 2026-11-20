@@ -11,7 +11,6 @@ import useSWR from "swr";
 import { toast } from "sonner";
 import { Copy, ExternalLink, GitMerge, X } from "lucide-react";
 import { withBasePath } from "@/lib/base-path";
-import { openPullReview } from "@/hooks/code-review/use-review-page";
 import { useTranslations } from "@/lib/intl/i18n-client";
 import { cn } from "cn";
 import { compactAge } from "@/components/nav/compact-age";
@@ -20,7 +19,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PULL_STATE_TONES } from "@/lib/pull-request-appearance";
 import {
   pullDirectoryState,
-  pullReviewRef,
   type PullDetail,
   type PullDirectoryRow,
   type PullMergeResult,
@@ -213,10 +211,14 @@ export function PullPreview({
               <span className="text-muted-foreground">@{row.author}</span>
             </>
           )}
-          <span aria-hidden="true" className="text-muted-foreground opacity-60">·</span>
-          <span className="text-muted-foreground tabular-nums">
-            {compactAge(row.updatedAt, Date.now(), (key, values) => age(key, values))}
-          </span>
+          {row.updatedAt && (
+            <>
+              <span aria-hidden="true" className="text-muted-foreground opacity-60">·</span>
+              <span className="text-muted-foreground tabular-nums">
+                {compactAge(row.updatedAt, Date.now(), (key, values) => age(key, values))}
+              </span>
+            </>
+          )}
         </p>
       </header>
       <Tabs value={view} onValueChange={(key) => setView(String(key))} className="min-h-0 flex-1 gap-0">
@@ -373,8 +375,9 @@ export function PullPreview({
             </Fact>
           </dl>
           <div className="flex flex-wrap items-center gap-2">
-            {pullReviewRef(row) && (
-              <Button size="sm" variant="secondary" onClick={() => openPullReview(pullReviewRef(row)!)}>
+            {/* The review page mounts for a task only (ReviewPageProps.taskId). */}
+            {tasks[0] && (
+              <Button size="sm" variant="secondary" onClick={() => openTask(tasks[0][0])}>
                 {t("openReview")}
               </Button>
             )}

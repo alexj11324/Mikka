@@ -123,7 +123,7 @@ export function pullAddressRow(
     number: pull.number,
     author: null,
     authorAvatar: null,
-    updatedAt: new Date(0).toISOString(),
+    updatedAt: "", // unknown until pulls/detail answers; the preview shows no age
     createdAt: null,
     body: null,
     head: null,
