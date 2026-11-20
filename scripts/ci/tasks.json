@@ -441,6 +441,11 @@
     "kind": "core",
     "env": {}
   },
+  "core-interop": {
+    "command": "pnpm test:interop",
+    "kind": "core",
+    "env": {}
+  },
   "core-github-pulls": {
     "command": "pnpm test:github-pulls",
     "kind": "core",

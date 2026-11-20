@@ -6963,6 +6963,37 @@
       "request": "GitHub App setup did not finish. Try again.",
       "response": "GitHub did not return complete App credentials. Start again.",
       "template": "This version cannot create a GitHub App yet. Update the server and try again."
+    },
+    "interop_not_found": {
+      "default": "Not found, or you do not have access."
+    },
+    "interop_invalid_request": {
+      "default": "The request is invalid."
+    },
+    "interop_scope_required": {
+      "default": "This token lacks the required scope."
+    },
+    "interop_send_unavailable": {
+      "default": "The message could not be delivered.",
+      "run_not_active": "The run is no longer active.",
+      "thread_replaced": "A newer thread replaced this one.",
+      "thread_cannot_continue": "This thread cannot continue.",
+      "delivery_unavailable": "This delivery mode is unavailable for the thread.",
+      "delivery_uncertain": "The earlier send with this key has no recorded outcome; it is not sent again.",
+      "bot_unavailable": "The Bot is unavailable.",
+      "continuation_requires_grant": "Continuing this ended thread needs its owner's explicit grant."
+    },
+    "interop_diff_unavailable": {
+      "default": "The diff is unavailable.",
+      "no_checkpoint": "The thread has no saved changes.",
+      "masked": "The diff contains a secret and is withheld."
+    },
+    "interop_drive_conflict": {
+      "default": "The Drive folder changed. Read it again and retry."
+    },
+    "interop_drive_unavailable": {
+      "default": "Drive is unavailable.",
+      "file_too_large": "The file is too large."
     }
   },
   "FactoryFlow": {

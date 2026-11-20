@@ -120,6 +120,7 @@ import type { JournalEntry, RunJournal } from "./journal"
 import type { ToolApprovalGate } from "../agents/tool-approval"
 import type { PreparedRunGitHub } from '../agents/local-github'
 import { assertMailboxRunAuthority, mailboxNoticeText, type RunMailbox } from '../run-mailbox'
+import type { RunDrive } from '../run-drive'
 import { daemonTracer, runIdHash, type DaemonStartupTiming, type SpanHandle } from '../tracing'
 import { runDiagnosticsEnabled, runRuntimeTimings, type RunRuntimeObservation, type RunRuntimeTiming } from '../run-runtime-timing'
 
@@ -145,6 +146,7 @@ export interface SupervisorDeps {
   /** The task VM prepares its actual API key and starts the official CLI directly. */
   startCredential?(assignment:RunAssignment,options:StartOptions):Promise<AgentSession>
   prepareRunMailbox?(assignment: RunAssignment, signal: AbortSignal, check: () => void): Promise<RunMailbox | undefined>
+  prepareRunDrive?(assignment: RunAssignment, signal: AbortSignal): Promise<RunDrive | undefined>
   /** Fresh policy validation before worktree/setup/agent effects, including resume. */
   verifyRunPolicy?(assignment: RunAssignment, signal: AbortSignal): Promise<unknown>
   prepareRunToolApproval?(assignment: RunAssignment, signal: AbortSignal, check: () => void, worktree?: string): Promise<ToolApprovalGate>
@@ -233,6 +235,8 @@ interface ActiveRun {
   /** The run's trace span; its outcome is the stop reason. */
   span?: SpanHandle
   mailbox?: RunMailbox
+  /** Shared Drive folders mirrored under ~/.mikka/drive. */
+  drive?: RunDrive
   mailboxPreparing?: Promise<RunMailbox | undefined>
   mailboxAbort?: AbortController
   mailboxClosing?: Promise<void>
@@ -390,6 +394,8 @@ export class RunSupervisor {
         const masker = this.maskers.get(runId)
         const checkpoint = taken?.checkpoint ? masker ? masker.checkpoint(taken.checkpoint) : taken.checkpoint : undefined
         if (checkpoint) await save(runId, checkpoint)
+        // Drive changes go up with each checkpoint; a refusal never fails the checkpoint.
+        if (checkpoint) await run.drive?.push()
         if (taken) { run.lastCheckpointTree = taken.tree; run.lastCheckpointHead = taken.head }
         run.checkpointDue = false
         run.lastCheckpointAt = now
@@ -414,6 +420,8 @@ export class RunSupervisor {
       const accepted = runCheckpointReceiptSchema.safeParse(await save(id, checkpoint))
       if (accepted.success && accepted.data.runId === id) receipt = accepted.data
     }, Date.now(), true)
+    // The final Drive changes, whatever the worktree's checkpoint did.
+    if (!this.stopping) await run.drive?.push()
     const checkpoint = ready && receipt
       ? { checkpoint: 'ready' as const, checkpointTakenAt: receipt.takenAt }
       : { checkpoint: 'unavailable' as const }
@@ -1803,7 +1811,13 @@ export class RunSupervisor {
     if (toolApproval) {
       try { checkMailbox() } catch (error) { toolApproval.revoke(); throw error }
     }
-    let prompt = [assignment.prompt, run.secretBridge?.instructions].filter(Boolean).join('\n\n')
+    // Shared Drive folders are on this machine before the agent starts.
+    if (!run.drive && this.deps.prepareRunDrive) {
+      run.drive = await this.deps.prepareRunDrive(assignment, run.abort.signal).catch(() => undefined)
+      await run.drive?.pull()
+    }
+    const driveBrief = run.drive?.folders.length ? `Shared Drive folders on this machine (synced at checkpoints and when you finish; a version conflict keeps your copy beside the newer one):\n${run.drive.folders.map(folder => `- ${folder.scope}: ${folder.path}${folder.write ? '' : ' (read-only)'}`).join('\n')}` : undefined
+    let prompt = [assignment.prompt, run.secretBridge?.instructions, driveBrief].filter(Boolean).join('\n\n')
     let followUp = assignment.followUp
     if (splitChatFiles(prompt).files.length || followUp && splitChatFiles(followUp).files.length) {
       if (!this.deps.downloadChatFile || !this.deps.adapterStateDir) throw Error('Run attachments unavailable')
