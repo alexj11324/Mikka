@@ -14,13 +14,20 @@ import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import { loadProductPromptContext } from '@/lib/coordinator/prompt-context'
 import { readWorkspaceInstructionsForBot } from '@/lib/coordinator/workspace-instructions'
+import { ActionFailureError } from '@/lib/action-error'
 
 /** Product context only: eve supplies history and owns pruning and compaction. */
 export async function composeEveInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot, nativeTurn?: { sessionId: string; turnId: string }, nativePolicy?: Pick<DefinitionSnapshot, 'definition' | 'effectiveTools' | 'personalPlugins'>) {
   snapshot = snapshot ? { ...snapshot, personalPlugins: snapshot.personalPlugins ? { ...snapshot.personalPlugins, skills: [] } : undefined } : undefined
   const policy = nativePolicy ?? snapshot
   const [conversation, workspaceInstructions] = await Promise.all([
-    loadProductPromptContext(userId, botId), readWorkspaceInstructionsForBot(userId, botId),
+    loadProductPromptContext(userId, botId), readWorkspaceInstructionsForBot(userId, botId).catch(error => {
+      // Existing pre-bot previews have platform/personal context only. An
+      // unowned or missing bot never reveals a workspace; a real bot's current
+      // membership/policy refusal must still fail the prompt.
+      if (error instanceof ActionFailureError && error.code === 'botNotFound') return ''
+      throw error
+    }),
   ])
   const { memory } = conversation
   const mailboxTools: readonly MailboxToolName[] = []

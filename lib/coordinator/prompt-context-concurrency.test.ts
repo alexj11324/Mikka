@@ -7,6 +7,7 @@ import { executionInstructions } from '../agent-kit/execution-instructions'
 import { withCoordinatorPresentation } from './native-prompt'
 import { cachedContextLines, instructionsWithPersonal, instructionsWithWorkspace, promptWithCachedContext, type StoredMessage } from './context'
 import { SCHEDULE_INSTRUCTIONS } from '../schedules/instructions'
+import { ActionFailureError } from '../action-error'
 
 const owner = 'synthetic-prompt-owner', bot = '10000000-0000-4000-8000-000000000001'
 const snapshot = makeSnapshot('10000000-0000-4000-8000-000000000002', 1, DEFAULT_AGENT_DEFINITION, 'Synthetic frozen host policy', { harness: 'ai_sdk', model: 'synthetic' })
@@ -157,4 +158,13 @@ test('workspace admission refusal fails prompt composition without partial conte
   workspaceDenied = new Error('Synthetic workspace access refusal')
   await assert.rejects(composeEveInstructions(owner, bot, snapshot), error => error === workspaceDenied)
   assert.equal(calls.length, 0)
+})
+
+test('legacy pre-bot previews retain personal context without any workspace instructions', async () => {
+  workspaceText = 'Workspace text that must not reach a pre-bot preview'
+  workspaceDenied = new ActionFailureError('botNotFound')
+  const preview = await composeEveInstructions(owner, bot, snapshot)
+  assert.match(preview, /Synthetic frozen host policy/)
+  assert.match(preview, /Synthetic personal instruction/)
+  assert.doesNotMatch(preview, /Workspace text that must not reach|<workspace_instructions>/)
 })
