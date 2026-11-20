@@ -34,7 +34,7 @@ export async function startExternalServices(options = {}) {
       json(response, { error: 'invalid_fake_provider_request' }, 400)
     }
   })
-  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+  await new Promise((resolve, reject) => { server.once('error', reject); server.listen(options.port ?? 0, '127.0.0.1', resolve) })
   const origin = `http://127.0.0.1:${server.address().port}`
   return { ...services, origin, fetch: externalServiceFetch(origin),
     e2bOptions: { apiKey: LOCAL_E2B_KEY, apiUrl: `${origin}/e2b/api`, sandboxUrl: `${origin}/e2b/envd`, httpVersion: /** @type {const} */ ('1.1'), retries: 0 },

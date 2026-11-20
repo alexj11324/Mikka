@@ -260,7 +260,7 @@
     "test:runtime-config": "node --import ./tests/support/server-only.mjs --import tsx --test lib/edition.test.ts scripts/release/verify-cloud-edition.test.ts lib/server-info.test.ts && node --test tests/self-hosted-decisions-http.test.mjs scripts/self-hosted-source.test.mjs scripts/build-installation.test.mjs",
     "test:service-config": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/default-model-config.test.ts lib/mail-delivery.test.ts lib/account/mail.test.ts lib/artifacts/storage.test.ts lib/credentials/local-kms.test.ts lib/coordinator/model-ready.test.ts lib/coordinator/wake-after-commit.test.ts app/api/skills/search/route.test.ts lib/posthog-server.test.ts lib/deployment-switches.test.ts",
     "lint:external-clients": "node scripts/external-client-mock-policy.mjs",
-    "test:http-fakes": "node --test tests/fakes/e2b.test.mjs scripts/external-client-mock-policy.test.mjs scripts/e2b/loopback-cloud-relay.test.mjs && node --import ./scripts/server-test.mjs --import tsx --test lib/github/pull-merge.http.test.ts"
+    "test:http-fakes": "node --test tests/fakes/e2b.test.mjs tests/fakes/e2b-process.test.mjs scripts/external-client-mock-policy.test.mjs scripts/e2b/loopback-cloud-relay.test.mjs && node --import ./scripts/server-test.mjs --import tsx --test lib/github/pull-merge.http.test.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.121",

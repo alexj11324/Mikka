@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import { mkdtemp, mkdir, writeFile, readFile, realpath, chown, rm, lstat, open } from 'node:fs/promises'
+import { mkdtemp, mkdir, writeFile, readFile, realpath, readlink, chown, rm, lstat, open } from 'node:fs/promises'
 import { constants } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 /** Optional execution backend for the HTTP fake. Each fake VM owns a real
  * Linux mount/PID namespace and files; no host home, credentials or environment
  * enter it. The ordinary SDK remains the only caller of this backend. */
-export async function createLocalE2BProcesses({ env = {}, mounts = [], prepare = async () => {} } = {}) {
+export async function createLocalE2BProcesses({ env = {}, mounts = [], networkAdministration = false, prepare = async () => {} } = {}) {
   assert.equal(process.platform, 'linux', 'LOCAL_E2B_PROCESS_REQUIRES_LINUX')
   const directory = await mkdtemp(join(tmpdir(), 'mikka-http-e2b-'))
   const userUid = process.getuid() === 0 ? 1000 : process.getuid(), userGid = process.getuid() === 0 ? 1000 : process.getgid()
@@ -29,10 +29,16 @@ export async function createLocalE2BProcesses({ env = {}, mounts = [], prepare =
     await writeFile(join(root, 'etc/hosts'), '127.0.0.1 localhost\n::1 localhost\n')
     await writeFile(join(root, 'etc/pam.d/runuser'), 'auth sufficient pam_permit.so\naccount sufficient pam_permit.so\nsession sufficient pam_permit.so\n')
     await prepare({ sandbox, root })
-    const args = ['--die-with-parent', '--new-session', '--unshare-pid', '--cap-add', 'CAP_SETUID', '--cap-add', 'CAP_SETGID', '--cap-add', 'CAP_CHOWN', '--bind', root, '/', '--proc', '/proc', '--dev', '/dev']
+    const capabilities = ['SETUID', 'SETGID', 'CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'KILL']
+    if (networkAdministration) {
+      assert.equal(process.getuid(), 0, 'LOCAL_E2B_ROOT_IDENTITY_UNAVAILABLE')
+      assert.notEqual(await readlink('/proc/self/ns/net'), await readlink('/proc/1/ns/net'), 'LOCAL_E2B_NETWORK_NAMESPACE_NOT_ISOLATED')
+      capabilities.push('NET_ADMIN')
+    }
+    const args = ['--die-with-parent', '--new-session', '--unshare-pid', ...capabilities.flatMap(name => ['--cap-add', `CAP_${name}`]), '--bind', root, '/', '--proc', '/proc', '--dev', '/dev']
     for (const path of ['/usr', '/bin', '/sbin', '/lib', '/lib64', '/etc/ssl/certs']) args.push('--ro-bind-try', path, path)
     args.push('--ro-bind', dirname(dirname(process.execPath)), dirname(dirname(process.execPath)), '--ro-bind', bridge, '/bridge.mjs')
-    for (const mount of mounts) {
+    for (const mount of typeof mounts === 'function' ? await mounts({ sandbox, root }) : mounts) {
       assert.ok(mount.source && mount.target.startsWith('/') && !['/', '/root', '/home', '/etc', '/run'].includes(mount.target), 'LOCAL_E2B_MOUNT_INVALID')
       args.push('--ro-bind', resolve(mount.source), mount.target)
     }
