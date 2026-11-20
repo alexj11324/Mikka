@@ -31,7 +31,7 @@ export async function githubFixture({ conflict = false, githubAccountId = 456 } 
     await git(source, ['add', '.']); await git(source, ['commit', '-m', 'base changes'])
     await git(source, ['push', bare, 'HEAD:refs/heads/trunk'])
   }
-  const pulls = [{ number: 41, node_id: 'MVP_PR_41', title: 'HTTP fixture', html_url: 'https://github.com/mikka-e2e/core-loop/pull/41',
+  const pulls = [{ number: 41, node_id: 'MVP_PR_41', title: 'HTTP fake acceptance', html_url: 'https://github.com/mikka-e2e/core-loop/pull/41',
     state: 'open', draft: false, merged: false, head: { ref: 'mikka/http-1', repo: { id: 789 } }, base: { ref: 'trunk', repo: { id: 789 } } }]
   const scenario = { barePath: bare, githubAccountId, harness: 'synthetic-codex' }, observations = []
   const github = createGitHubRoutes({ getScenario: () => scenario, getPullRequests: () => pulls, git, observe: item => observations.push(item), origin: 'http://127.0.0.1' })
