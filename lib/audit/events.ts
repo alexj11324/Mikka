@@ -125,7 +125,7 @@ export const AUDIT_METADATA = {
     expiresAt: z.string().datetime({ offset: true }).nullable(),
     // lib/tokens/format.ts TOKEN_SCOPES; inlined because this file is shared with UI code.
     scopes: z.array(z.enum(['tasks:read', 'tasks:write', 'runs:read', 'runs:write', 'threads:read', 'threads:write', 'artifacts:read',
-      'drive:read', 'drive:write', 'bots:read', 'bots:write', 'legacy:full'])).min(1).max(12),
+      'drive:read', 'drive:write', 'bots:read', 'bots:write', 'grants:read', 'grants:write', 'legacy:full'])).min(1).max(14),
   }).partial().strict(),
   'token.revoked': none,
   'token.rotated': none,

@@ -206,4 +206,56 @@ test('interop reads, sends and Drive follow the ACL of the caller\'s own Workspa
     await pool.query('UPDATE mikka_workspace_service_identities SET enabled=false WHERE id=$1', [serviceId])
     assert.equal((await read()).status, 401)
   })
+
+  await t.test('/api/v1/grants: only the owner creates; an admin lists and revokes; subjects stay in the tenant', async () => {
+    const { createPersonalAccessToken } = await import('../tokens/store')
+    const collection = await import('../../app/api/v1/grants/[kind]/[resourceId]/route')
+    const single = await import('../../app/api/v1/grants/[kind]/[resourceId]/[subjectKind]/[subjectId]/route')
+    const admin = await seedUser(pool, 'interop-admin')
+    users.push(admin)
+    await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'admin','active')`, [team.id, admin, `${admin}@example.invalid`])
+    const token = async (userId: string, workspaceId: string, scopes: string[]) => (await createPersonalAccessToken(userId, workspaceId, { name: 'grants', scopes })).token
+    const ownerToken = await token(owner, team.id, ['grants:read', 'grants:write'])
+    const teammateToken = await token(teammate, team.id, ['grants:read', 'grants:write'])
+    const adminToken = await token(admin, team.id, ['grants:read', 'grants:write'])
+    const readOnly = await token(owner, team.id, ['grants:read'])
+    const outsiderToken = await token(outsider, other.id, ['grants:read', 'grants:write'])
+    const params = { kind: 'thread', resourceId: thread }
+    const put = (bearer: string, body: unknown) => collection.PUT(new Request('http://localhost/mikka/api/v1/grants/thread/' + thread, {
+      method: 'PUT', headers: { authorization: `Bearer ${bearer}`, 'content-type': 'application/json' }, body: JSON.stringify(body) }), { params: Promise.resolve(params) })
+    const list = (bearer: string) => collection.GET(new Request('http://localhost/mikka/api/v1/grants/thread/' + thread, { headers: { authorization: `Bearer ${bearer}` } }), { params: Promise.resolve(params) })
+    const revoke = (bearer: string, subjectKind: string, subjectId: string) => single.DELETE(new Request('http://localhost/x', { method: 'DELETE', headers: { authorization: `Bearer ${bearer}` } }),
+      { params: Promise.resolve({ ...params, subjectKind, subjectId }) })
+    // The admin's own Bot: the admin holds no grant on the thread, so the Bot inherits nothing.
+    const newBot = await seedBot(pool, team.id, admin)
+    const asNewBot = await botPrincipal(admin, newBot)
+    const grant = { subjectKind: 'bot', subjectId: newBot, capabilities: ['canReadContent'] }
+    assert.deepEqual(await runInteropTool(asNewBot, 'read_thread_messages', { runId: thread }), notFound)
+
+    assert.equal((await put(readOnly, grant)).status, 403, 'grants:write is required')
+    assert.equal((await put(teammateToken, grant)).status, 404, 'a teammate cannot share the owner\'s thread')
+    assert.equal((await put(adminToken, grant)).status, 404, 'an admin cannot share content')
+    assert.equal((await put(outsiderToken, grant)).status, 404, 'another tenant cannot name this thread')
+    assert.equal((await put(ownerToken, { ...grant, subjectId: outsiderBot })).status, 400, 'a subject from another tenant is refused')
+    assert.equal((await put(ownerToken, { ...grant, capabilities: ['canManageAccess'] })).status, 400, 'only sharing capabilities')
+    const created = await put(ownerToken, grant)
+    assert.equal(created.status, 200)
+    assert.deepEqual(((await created.json()) as { grant: { capabilities: string[] } }).grant.capabilities, ['canReadContent'])
+    assert.equal((await runInteropTool(asNewBot, 'read_thread_messages', { runId: thread }) as { rootRunId: string }).rootRunId, thread)
+
+    assert.equal((await list(teammateToken)).status, 404)
+    const listed = await list(adminToken)
+    assert.equal(listed.status, 200)
+    const subjects = ((await listed.json()) as { grants: { subjectKind: string; subjectId: string }[] }).grants
+    assert.ok(subjects.some(row => row.subjectKind === 'bot' && row.subjectId === newBot))
+    assert.ok(subjects.every(row => row.subjectKind !== 'account'), 'account grants stay with the share UI')
+
+    assert.equal((await revoke(teammateToken, 'bot', newBot)).status, 404)
+    const revoked = await revoke(adminToken, 'bot', newBot)
+    assert.deepEqual([revoked.status, await revoked.json()], [200, { revoked: true }])
+    assert.deepEqual(await runInteropTool(asNewBot, 'read_thread_messages', { runId: thread }), notFound)
+    const { rows: [event] } = await pool.query(`SELECT "actorId",source,action FROM resource_access_events WHERE "resourceKind"='thread' AND "resourceId"=$1
+      AND detail->>'subjectId'=$2 ORDER BY "createdAt" DESC LIMIT 1`, [thread, newBot])
+    assert.deepEqual(event, { actorId: admin, source: 'agent_access_revoke', action: 'grant_delete' })
+  })
 })

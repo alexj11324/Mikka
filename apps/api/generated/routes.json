@@ -2960,6 +2960,25 @@
       "sourceHash": "0d66343f539c678416aaf0f5c4873f27b452df9cb2cdd6e367b17b01b7f6c51e"
     },
     {
+      "path": "/mikka/api/v1/grants/[kind]/[resourceId]",
+      "template": "/api/v1/grants/[kind]/[resourceId]",
+      "source": "app/api/v1/grants/[kind]/[resourceId]/route.ts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "sourceHash": "8cc357623ec6e344d4da53f06b5d20955a4ef3a51ef27a3fe0738652061694e0"
+    },
+    {
+      "path": "/mikka/api/v1/grants/[kind]/[resourceId]/[subjectKind]/[subjectId]",
+      "template": "/api/v1/grants/[kind]/[resourceId]/[subjectKind]/[subjectId]",
+      "source": "app/api/v1/grants/[kind]/[resourceId]/[subjectKind]/[subjectId]/route.ts",
+      "methods": [
+        "DELETE"
+      ],
+      "sourceHash": "b0aab2656927abc534322188002858ac196eb9082bec9a1a2148a52aa71a0cc7"
+    },
+    {
       "path": "/mikka/api/v1/threads",
       "template": "/api/v1/threads",
       "source": "app/api/v1/threads/route.ts",

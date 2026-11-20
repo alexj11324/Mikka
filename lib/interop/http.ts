@@ -50,6 +50,14 @@ export async function interopApi(request: Request, scope: ApiScope, work: (princ
   }
 }
 
+/** A handler only a person's PAT may call, as that person (never a service key). */
+export async function accountApi(request: Request, scope: ApiScope, work: (manager: { userId: string; workspaceId: string }) => Promise<unknown>, status = 200): Promise<Response> {
+  return interopApi(request, scope, async principal => {
+    if (principal.kind !== 'account') throw new InteropError('interop_scope_required')
+    return work({ userId: principal.userId, workspaceId: principal.workspaceId })
+  }, status)
+}
+
 /** A JSON body, bounded; anything else is `interop_invalid_request`. */
 export async function interopBody(request: Request): Promise<Record<string, unknown>> {
   const length = Number(request.headers.get('content-length') ?? '0')

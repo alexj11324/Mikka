@@ -91,14 +91,14 @@ ALTER TABLE drive_blobs DROP CONSTRAINT drive_blob_shared_owner,
 
 ALTER TABLE personal_access_tokens DROP CONSTRAINT personal_access_tokens_scopes_check,
   ADD CONSTRAINT personal_access_tokens_scopes_check CHECK (
-    cardinality(scopes) BETWEEN 1 AND 12
+    cardinality(scopes) BETWEEN 1 AND 14
     AND array_position(scopes, null) IS NULL
     AND scopes <@ ARRAY['tasks:read','tasks:write','runs:read','runs:write','threads:read','threads:write','artifacts:read',
-      'drive:read','drive:write','bots:read','bots:write','legacy:full']::text[]
+      'drive:read','drive:write','bots:read','bots:write','grants:read','grants:write','legacy:full']::text[]
     AND NOT (scopes @> ARRAY['legacy:full']::text[] AND cardinality(scopes) > 1)),
   -- A new token defaults to the full public set, as the settings page creates it.
   ALTER COLUMN scopes SET DEFAULT ARRAY['tasks:read','tasks:write','runs:read','runs:write','threads:read','threads:write',
-    'artifacts:read','drive:read','drive:write','bots:read','bots:write']::text[];
+    'artifacts:read','drive:read','drive:write','bots:read','bots:write','grants:read','grants:write']::text[];
 
 CREATE TABLE IF NOT EXISTS interop_thread_sends (
   "rootRunId" uuid NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,

@@ -59,7 +59,7 @@ test('agent Drive scopes name a uuid and their own storage namespace', () => {
 })
 
 test('interop PAT scopes are selectable and the read-only set holds no write scope', () => {
-  for (const scope of ['threads:read', 'threads:write', 'artifacts:read', 'drive:read', 'drive:write', 'bots:read', 'bots:write'])
+  for (const scope of ['threads:read', 'threads:write', 'artifacts:read', 'drive:read', 'drive:write', 'bots:read', 'bots:write', 'grants:read', 'grants:write'])
     assert.ok((API_SCOPES as readonly string[]).includes(scope), scope)
   assert.ok(READ_ONLY_API_SCOPES.every(scope => scope.endsWith(':read')))
 })

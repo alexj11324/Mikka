@@ -3980,5 +3980,26 @@
     "behavior": "A Bot's interop tool step: the Bot acts in its own Workspace with its owner's identity and its own grants.",
     "test": "lib/interop/interop.db.test.ts",
     "suite": "test:interop-db"
+  },
+  "app/api/v1/grants/[kind]/[resourceId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List (owner or Workspace admin) or create (owner only) Bot, run and service grants on one resource for a scoped PAT, in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/grants/[kind]/[resourceId]/[subjectKind]/[subjectId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Revoke one Bot, run or service grant (owner or Workspace admin) for a scoped PAT, in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/grants.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Owner-created, owner- or admin-revoked explicit grants to Bot, run and service subjects in the same Workspace, audited through the existing ACL events.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
   }
 }
