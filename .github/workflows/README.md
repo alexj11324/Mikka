@@ -98,6 +98,17 @@ for proof that a ready PR is safe to merge.
   workflow paths before predicting release work.
 - The run-dispatch and Controlled Skill improvement suites run in the CI
   database shards (`pnpm test:db`); they no longer have workflows of their own.
+- `mobile-update.yml` keeps its mobile type check on main pushes. Production
+  OTA waits for the private deployment policy's explicit owner window, merged
+  compatibility change and authenticated automatic staging receipts. It reads
+  that policy at a fixed private main commit through the existing read-only
+  source App, then calls the same read-only eligibility gate before reading
+  Expo/UI credentials and again before publication. The official overlay comes
+  from the verified staging manifest. A completed automatic Cloudflare
+  deployment supplies the next opportunity; no polling or new release identity
+  is introduced. A declined gate explicitly records that no OTA was published.
+  Main events do not cancel an active OTA; PR preview cancellation stays local
+  to its PR ref.
 - The `ui-policy.yml` concurrency key includes `github.run_id` only on `main`.
   This prevents GitHub from evicting an older *pending* main verification,
   in addition to not cancelling a running main job. Superseded PR checks may

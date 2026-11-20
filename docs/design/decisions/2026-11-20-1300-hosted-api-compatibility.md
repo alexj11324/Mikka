@@ -66,6 +66,13 @@ header，不转发来访者的 Cookie、Authorization 或版本声明；接入�
 接受旧五字段和新的完整字段对，未知字段、非法 SHA 和不完整代际仍拒绝。
 这使旧 Web → 新 API、新 Web → 旧 API 和 API 独立更新/回退都保留可读性。
 
+移动端主分支 OTA 也受同一私有部署策略控制。提交合并后仍执行类型检查，
+但不会直接读取生产 Expo 凭据。工作流固定私有 main 的一个提交，复用其
+只读 eligibility 入口核实 owner 窗口、已合并的兼容改造和真实预发回执；
+通过后只取该回执指定的 UI overlay，并在发布前再次核对授权。默认关闭
+或证据不完整时明确记录「未发布 OTA」，不把检查成功写成生产发布成功。
+自动预发结束事件触发下一次检查，新 main 提交不取消已经开始的 OTA。
+
 首个固定契约是 Node 调用方 → World Worker 的运行事件和读取 RPC。
 `packages/eve-cloudflare-world/test/node-world.test.mjs` 使用上一成功 serving
 源码 `64a3a8df554f7efdd00784a3790a544109ade658` 的真实客户端模块调用当前

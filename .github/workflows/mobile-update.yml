@@ -1,31 +1,51 @@
 name: Mobile OTA update
 
-# Publishes the iOS app's JavaScript as an EAS Update (decision
-# 2026-10-31-2010-ota-updates): main goes to the `production` channel that
-# TestFlight builds read; a pull request gets its own `pr-<n>` branch, which
-# can be opened in a preview build. Production reads the existing Expo token
-# from Infisical using the trusted main workload's OIDC identity. PR previews
-# retain their existing repository-secret delivery; forks cannot publish.
-# Production requires the official mobile UI checkout before publishing.
+# Production OTA shares the deployment pipeline's default-off owner window
+# and completed staging proof. A main push still checks the client, but cannot
+# publish ahead of staging. A completed automatic deployment supplies the next
+# release opportunity without polling. PR previews keep their own EAS branch.
 on:
   push:
     branches: [main]
     paths: ['apps/mobile/**', 'packages/protocol/**']
   pull_request:
     paths: ['apps/mobile/**', 'packages/protocol/**']
-  # A push to the private UI layer's mobile/ folder ships through this (docs/ui-overlay.md).
+  workflow_run:
+    workflows: [Cloudflare application deployment]
+    types: [completed]
+  # A private UI change also needs the corresponding reviewed staging receipt.
   workflow_dispatch:
+    inputs:
+      staging_run:
+        description: Completed automatic staging workflow run for this main source
+        type: string
+        required: false
+      staging_attempt:
+        description: Original staging run attempt
+        type: string
+        required: false
+        default: '1'
+      staging_artifact:
+        description: Original deploy-pipeline receipt artifact
+        type: string
+        required: false
 
 permissions:
   contents: read
 
 concurrency:
   group: mobile-update-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   update:
     name: EAS Update
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.event == 'workflow_run' &&
+       github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.repository.id == 1427517699 &&
+       github.event.workflow_run.head_repository.id == 1427517699 && !github.event.workflow_run.head_repository.fork)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -33,6 +53,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
         with:
           version: 10.34.3
@@ -44,9 +67,113 @@ jobs:
         run: node --test scripts/mobile-ota-credentials.test.mjs
       - run: pnpm install --frozen-lockfile --filter @mikka/mobile...
       - run: pnpm --filter @mikka/mobile typecheck
+      - name: Select the trusted main OTA candidate
+        id: candidate
+        if: >-
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run') &&
+          github.ref == 'refs/heads/main' && github.repository == 'alexj11324/Mikka' &&
+          github.repository_id == '1427517699' && github.repository_owner_id == '183887963' && github.actor_id == '183887963'
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import { appendFile } from 'node:fs/promises'
+          import { execFileSync } from 'node:child_process'
+          const source = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+          assert.match(source, /^[a-f0-9]{40}$/)
+          assert.equal(source, process.env.GITHUB_SHA)
+          await appendFile(process.env.GITHUB_OUTPUT, 'source=' + source + '\n')
+          JS
+      - name: Read the existing source App id
+        if: steps.candidate.outputs.source != ''
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /github
+          secret-name: GITHUB_APP_ID
+          recursive: false
+          include-imports: false
+      - name: Read the existing source App private key
+        if: steps.candidate.outputs.source != ''
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /github
+          secret-name: GITHUB_APP_PRIVATE_KEY
+          recursive: false
+          include-imports: false
+      - name: Read the reviewed operations policy and public evidence
+        if: steps.candidate.outputs.source != ''
+        id: source-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ env.GITHUB_APP_ID }}
+          private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
+          owner: alexj11324
+          repositories: |
+            Mikka
+            mikka-cloud
+          permission-contents: read
+          permission-actions: read
+          permission-issues: read
+      - name: Remove source App credentials
+        if: steps.candidate.outputs.source != ''
+        run: |
+          echo 'GITHUB_APP_ID=' >> "$GITHUB_ENV"
+          echo 'GITHUB_APP_PRIVATE_KEY=' >> "$GITHUB_ENV"
+      - name: Pin the reviewed private main source
+        if: steps.candidate.outputs.source != ''
+        id: operations
+        env:
+          GH_TOKEN: ${{ steps.source-token.outputs.token }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict'
+          import { appendFile } from 'node:fs/promises'
+          import { execFileSync } from 'node:child_process'
+          const source = execFileSync('gh', ['api', 'repos/alexj11324/mikka-cloud/git/ref/heads/main', '--jq', '.object.sha'],
+            { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+          assert.match(source, /^[a-f0-9]{40}$/)
+          await appendFile(process.env.GITHUB_OUTPUT, 'source=' + source + '\n')
+          JS
+      - name: Check out the fixed read-only production policy
+        if: steps.candidate.outputs.source != ''
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: alexj11324/mikka-cloud
+          ref: ${{ steps.operations.outputs.source }}
+          token: ${{ steps.source-token.outputs.token }}
+          path: .mikka-cloud
+          persist-credentials: false
+      - name: Check the shared owner window and actual staging receipts
+        if: steps.candidate.outputs.source != ''
+        id: eligibility
+        env:
+          GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_CF_OPERATIONS_SHA: ${{ steps.operations.outputs.source }}
+          MIKKA_PUBLIC_SOURCE_SHA: ${{ steps.candidate.outputs.source }}
+          MIKKA_PRODUCT_ROOT: ${{ github.workspace }}
+          MIKKA_STAGE_RUN_ID: ${{ inputs.staging_run }}
+          MIKKA_STAGE_RUN_ATTEMPT: ${{ inputs.staging_attempt }}
+          MIKKA_STAGE_ARTIFACT_ID: ${{ inputs.staging_artifact }}
+        run: node .mikka-cloud/operations/business-api/pipeline-policy.mjs mobile-eligibility
+      - name: Record when production OTA is not authorized
+        if: steps.candidate.outputs.source != '' && steps.eligibility.outputs.allowed != 'true'
+        env:
+          ELIGIBILITY_REASON: ${{ steps.eligibility.outputs.reason }}
+        run: |
+          printf 'Production OTA was not published: %s. Type checking completed; no production Expo credential was read.\n' "$ELIGIBILITY_REASON" >> "$GITHUB_STEP_SUMMARY"
       - name: Read the existing production Expo credential through OIDC
         if: >-
-          (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main' &&
+          steps.eligibility.outputs.allowed == 'true' &&
+          (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run') && github.ref == 'refs/heads/main' &&
           github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
           github.repository_owner_id == '183887963'
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -61,7 +188,7 @@ jobs:
           recursive: false
           include-imports: false
       - name: Read the private UI checkout credential through OIDC
-        if: env.EXPO_TOKEN != ''
+        if: steps.eligibility.outputs.allowed == 'true' && env.EXPO_TOKEN != ''
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
         with:
           method: oidc
@@ -73,26 +200,56 @@ jobs:
           secret-name: HOSTED_UI_READ_KEY
           recursive: false
           include-imports: false
+      - name: Require the authorized production credentials
+        if: steps.eligibility.outputs.allowed == 'true'
+        run: |
+          if [ -z "$EXPO_TOKEN" ] || [ -z "$HOSTED_UI_READ_KEY" ]; then
+            echo '::error::Authorized production OTA credentials were not delivered.'
+            exit 1
+          fi
       - name: Check out the private UI
-        if: env.EXPO_TOKEN != '' && env.HOSTED_UI_READ_KEY != ''
+        if: steps.eligibility.outputs.allowed == 'true' && env.EXPO_TOKEN != '' && env.HOSTED_UI_READ_KEY != ''
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: alexj11324/mikka-hosted-ui
-          ref: main
+          ref: ${{ steps.eligibility.outputs.overlay_sha }}
           ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui
           persist-credentials: false
       - name: Use the private UI's mobile layer
-        if: env.EXPO_TOKEN != ''
+        if: steps.eligibility.outputs.allowed == 'true' && env.EXPO_TOKEN != ''
+        env:
+          OVERLAY_SHA: ${{ steps.eligibility.outputs.overlay_sha }}
         run: |
           echo "HOSTED_UI_READ_KEY=" >> "$GITHUB_ENV"
+          test "$(git -C .hosted-ui rev-parse HEAD)" = "$OVERLAY_SHA"
           test -d .hosted-ui/mobile || { echo "::error::Official mobile UI checkout required."; exit 1; }
           echo "MIKKA_MOBILE_OVERLAY_DIR=.hosted-ui/mobile" >> "$GITHUB_ENV"
           echo "::notice::Bundling the private UI layer at $(git -C .hosted-ui rev-parse HEAD)."
+      - name: Recheck the owner window immediately before publication
+        if: steps.eligibility.outputs.allowed == 'true' && env.EXPO_TOKEN != ''
+        id: publication-eligibility
+        env:
+          GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_CF_OPERATIONS_SHA: ${{ steps.operations.outputs.source }}
+          MIKKA_PUBLIC_SOURCE_SHA: ${{ steps.candidate.outputs.source }}
+          MIKKA_PRODUCT_ROOT: ${{ github.workspace }}
+          MIKKA_STAGE_RUN_ID: ${{ inputs.staging_run }}
+          MIKKA_STAGE_RUN_ATTEMPT: ${{ inputs.staging_attempt }}
+          MIKKA_STAGE_ARTIFACT_ID: ${{ inputs.staging_artifact }}
+        run: node .mikka-cloud/operations/business-api/pipeline-policy.mjs mobile-eligibility
       - name: Publish to production
-        if: env.EXPO_TOKEN != '' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        if: >-
+          env.EXPO_TOKEN != '' && steps.publication-eligibility.outputs.allowed == 'true' &&
+          steps.publication-eligibility.outputs.overlay_sha == steps.eligibility.outputs.overlay_sha
         working-directory: apps/mobile
         run: npx -y eas-cli@27.2.0 update --channel production --platform ios --message "$(git log -1 --format=%s)" --non-interactive
+      - name: Record a closed window before publication
+        if: >-
+          steps.eligibility.outputs.allowed == 'true' &&
+          (steps.publication-eligibility.outputs.allowed != 'true' ||
+           steps.publication-eligibility.outputs.overlay_sha != steps.eligibility.outputs.overlay_sha)
+        run: echo 'Production OTA was not published because the final owner window or staged UI identity no longer matched.' >> "$GITHUB_STEP_SUMMARY"
       - name: Publish to pr-${{ github.event.number }}
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         working-directory: apps/mobile
