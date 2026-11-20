@@ -114,8 +114,14 @@ After the service upload succeeds, a small
 original artifact ID. Cache lookup verifies this archive's GitHub digest, the
 original service job and all its build/publication/upload steps. Another service
 may have failed in that older run; this does not discard a separately successful
-service build. The final candidate manifest's workflow must still succeed in
-full, including the latest LiteLLM qualification.
+service build. Cancelled or incomplete workflows cannot supply release artifacts.
+A full retry writes `service-build-plan-<runId>-<attempt>` and consumers use
+the actual planning job's artifact ID. A failed-job retry retains that earlier
+plan and successful services from their original attempts; the final collector
+verifies each original job and selects only its successful full artifact. Only the small discovery cache pointer may be replaced during
+that retry; the original service archives and final manifests remain immutable.
+The final candidate manifest's workflow must still succeed in full, including
+the latest LiteLLM qualification.
 
 Job `release-manifest` verifies these artifact digests and uploads
 `release-manifest-<runId>-<attempt>` with member `release-manifest.json` in its

@@ -159,6 +159,21 @@ test('API workflow keeps source qualification unprivileged and publication on th
   assert.ok(manifest.includes('name: Upload release manifest'))
   assert.ok(!manifest.includes('secrets.'))
   assert.ok(!manifest.includes('id-token: write'))
+  const planName = 'name: service-build-plan-${{ github.run_id }}-${{ github.run_attempt }}'
+  assert.ok(plan.includes(planName), 'a rerun publishes a distinct plan artifact')
+  assert.ok(plan.includes('plan-artifact: ${{ steps.plan-artifact.outputs.artifact-id }}'))
+  for (const section of [build, qualification, manifest]) {
+    assert.ok(section.includes('artifact-ids: ${{ needs.service-plan.outputs.plan-artifact }}'), 'a failed-job retry retains the actual original plan')
+    assert.ok(section.includes('merge-multiple: true'), 'artifact IDs download directly into the expected plan directory')
+    assert.ok(section.includes('github-token: ${{ github.token }}'))
+    assert.ok(section.includes('run-id: ${{ github.run_id }}'))
+  }
+  assert.ok(manifest.includes('pattern: service-{web,api,eve,task,world,litellm}-${{ github.run_id }}-*'))
+  assert.equal((workflow.match(/overwrite: true/g) ?? []).length, 1, 'only the disposable cache pointer may be overwritten')
+  const cacheUpload = build.slice(build.indexOf('      - name: Upload service cache receipt'))
+  assert.ok(cacheUpload.includes('overwrite: true'))
+  assert.ok(build.includes('name: service-${{ matrix.service }}-${{ github.run_id }}-${{ github.run_attempt }}'))
+  assert.ok(manifest.includes('name: release-manifest-${{ github.run_id }}-${{ github.run_attempt }}'))
 })
 
 test('the unified service producer retains the existing image qualification gates', async () => {

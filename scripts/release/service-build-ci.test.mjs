@@ -4,8 +4,8 @@ import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from '
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { checkedServiceCache, stageContext, trustedBuildSource } from './service-build-ci.mjs'
-import { registryImage, serviceDigest } from './service-builds.mjs'
+import { checkedServiceCache, selectServicePublications, stageContext, trustedBuildSource } from './service-build-ci.mjs'
+import { registryImage, serviceDigest, serviceNames } from './service-builds.mjs'
 
 const revision = 'a'.repeat(40), merge = 'b'.repeat(40)
 function event(kind) {
@@ -99,7 +99,7 @@ test('a successful service survives a sibling failure, but missing provenance or
   const run = { id: 101, run_attempt: 1, head_sha: revision, repository: repo, head_repository: repo,
     event: 'push', head_branch: 'main', path: '.github/workflows/cloudflare-api-image.yml',
     status: 'completed', conclusion: 'failure', actor: { id: 183887963 }, triggering_actor: { id: 183887963 } }
-  const job = { name: 'service-build (litellm)', run_id: 101, run_attempt: 1, status: 'completed', conclusion: 'success',
+  const job = { name: 'service-build (litellm)', run_id: 101, run_attempt: 1, head_sha: revision, status: 'completed', conclusion: 'success',
     steps: ['Build and verify service', 'Publish immutable service image', 'Upload service artifact', 'Upload service cache receipt']
       .map(name => ({ name, conclusion: 'success' })) }
   const artifact = { id: 201, name: 'service-litellm-101-1', expired: false, workflow_run: {
@@ -110,11 +110,57 @@ test('a successful service survives a sibling failure, but missing provenance or
     value => { value.job.steps[0].conclusion = 'skipped' },
     value => { value.job.steps.pop() },
     value => { value.run.head_repository.fork = true },
+    value => { value.run.conclusion = 'cancelled' },
+    value => { value.run.status = 'in_progress' },
     value => { value.run.triggering_actor.id = 7 },
     value => { value.artifact.expired = true },
     value => { value.artifact.workflow_run.head_sha = merge },
   ]) {
     const value = structuredClone({ receipt, run, job, artifact }); change(value)
     assert.throws(() => checkedServiceCache('litellm', value.receipt, value.run, [value.job], value.artifact))
+  }
+})
+
+
+test('a failed-job rerun assembles successful original attempts without relabeling or adopting a failed partial upload', () => {
+  const digest = 'sha256:' + 'c'.repeat(64)
+  const plan = { sourceCommit: revision, services: Object.fromEntries(serviceNames.map(name => [name, { contextDigest: digest }])) }
+  const cached = Object.fromEntries(serviceNames.filter(name => !['eve', 'litellm'].includes(name)).map(name => [name, { retained: true }]))
+  function publication(name, attempt, conclusion = 'success') {
+    const artifactId = 200 + attempt * 10 + (name === 'eve' ? 1 : 2)
+    const receipt = { service: name, kind: 'container', contextDigest: digest, sourceCommit: revision, overlayCommit: null,
+      release: revision.slice(0, 12) + '-101-' + attempt, reused: false,
+      build: { runId: '101', runAttempt: String(attempt), workflow: 'cloudflare-api-image.yml' },
+      image: 'registry.cloudflare.com/' + 'd'.repeat(32) + '/mikka-' + name + '@' + digest,
+      imageDigest: digest, localImageId: digest, artifacts: { worker: { path: 'workers/' + name + '.mjs', digest } } }
+    const job = { id: artifactId + 1000, name: 'service-build (' + name + ')', run_id: 101, run_attempt: attempt,
+      head_sha: revision, status: 'completed', conclusion,
+      steps: ['Build and verify service', 'Publish immutable service image', 'Upload service artifact', 'Upload service cache receipt']
+        .map(name => ({ name, conclusion: 'success' })) }
+    const artifact = { id: artifactId, name: 'service-' + name + '-101-' + attempt, expired: false,
+      workflow_run: { id: 101, head_sha: revision, head_branch: 'main', repository_id: 1427517699, head_repository_id: 1427517699 } }
+    return { receipt, job, artifact }
+  }
+  const packets = [publication('eve', 1, 'failure'), publication('litellm', 1), publication('eve', 2), publication('eve', 3, 'failure')]
+  const select = selected => selectServicePublications(plan, cached, selected.map(p => p.receipt), selected.map(p => p.artifact),
+    selected.map(p => p.job), { runId: '101', runAttempt: '3' })
+  const selected = Object.fromEntries(select(packets).map(item => [item.name, item]))
+  assert.equal(selected.litellm.receipt.build.runAttempt, '1')
+  assert.equal(selected.litellm.receipt.build.artifactId, '212')
+  assert.equal(selected.eve.receipt.build.runAttempt, '2')
+  assert.equal(selected.eve.receipt.build.artifactId, '221')
+  assert.equal(selected.eve.receipt.release, revision.slice(0, 12) + '-101-2')
+  assert.equal(selected.eve.artifactName, 'service-eve-101-2')
+  assert.throws(() => select(packets.filter(p => p.receipt.service !== 'litellm')), /No successful original service publication/)
+  for (const change of [
+    p => { p[1].job.steps[2].conclusion = 'skipped' },
+    p => { p[1].job.head_sha = merge },
+    p => { p[1].artifact.workflow_run.repository_id = 1 },
+    p => { p[1].artifact.expired = true },
+    p => { p[1].receipt.build.runId = '102' },
+    p => { p[1].receipt.build.runAttempt = '4' },
+  ]) {
+    const altered = structuredClone(packets); change(altered)
+    assert.throws(() => select(altered))
   }
 })
