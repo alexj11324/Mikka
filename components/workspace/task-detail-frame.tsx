@@ -2,7 +2,7 @@
 
 import { githubPullRequestKey, taskWorkOwner } from '@/lib/issue-metadata'
 
-import { useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useMessages, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
@@ -22,6 +22,7 @@ import { ISSUE_PRIORITIES } from './issue-properties'
 import { issueStateMenuItems } from './issue-state-menu'
 import { Mark } from './state-mark'
 import { useIssueStates } from '@/hooks/use-issue-states'
+import { useTaskUnread } from '@/hooks/use-task-unread'
 import { issueStateLabel, taskIssueState } from '@/lib/issue-states'
 import { useIssueConnections, type RelationKind } from './issue-relations'
 import { useTaskOwnershipRows } from './issue-scope-control'
@@ -164,6 +165,10 @@ export function FramedTask(props: FramedTaskProps) {
 
   // The task page owns the states' live subscription; the menus below read the same entry (decision 2026-11-19-2115).
   const issueStates = useIssueStates(task.workspaceId, { live: true }).states
+  // Opening a task the person marked unread marks it read again (Mark as unread, S1-C).
+  const taskUnread = useTaskUnread(task.workspaceId)
+  const markRead = taskUnread.unread.has(task.id) ? taskUnread.set : null
+  useEffect(() => { if (markRead) void markRead(task.id, false) }, [markRead, task.id])
   const stateItems = issueStateMenuItems(issueStates, { status: props.status, stateId: props.stateId }, statusLabel, props.onStatus)
   const currentState = issueStates ? taskIssueState(issueStates, { status: props.status, stateId: props.stateId }) : undefined
   const menu = useIssueDetailMenu({ task, userId, disabled: locked, documentTools: props.documentTools, request: props.actionRequest, getCurrent, onSaved: adopt, onOpen, onDeleted: props.onDeleted, onHistory: props.onHistory, onMembers: props.onMembers, onDocumentTools: props.onDocumentTools, onProperty: props.requestProperty, onStatus: props.onStatus, onPriority: props.onPriority, statusItems: stateItems })

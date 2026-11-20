@@ -5536,7 +5536,10 @@
           "flagged": "Flagged"
         },
         "markBlocked": "Mark as blocked",
-        "unblock": "Move out of Blocked"
+        "unblock": "Move out of Blocked",
+        "unread": "Unread",
+        "markUnread": "Mark as unread",
+        "markRead": "Mark as read"
       },
       "title": "Board",
       "synced": "Synced with Linear",
@@ -5545,7 +5548,29 @@
       "coordinatorPlaceholder": "Tell the Coordinator what to arrange…",
       "collapse": "Hide conversation",
       "expand": "Show conversation",
-      "unassigned": "Unassigned"
+      "unassigned": "Unassigned",
+      "views": {
+        "forYou": "For you",
+        "assigned": "Assigned to me",
+        "created": "Created by me",
+        "mentioned": "Mentioned",
+        "all": "All"
+      },
+      "grouping": "Grouping",
+      "groupBy": {
+        "status": "Status",
+        "priority": "Priority"
+      },
+      "direction": "Direction",
+      "directionValue": {
+        "desc": "Descending",
+        "asc": "Ascending"
+      },
+      "subtasks": "Sub-tasks",
+      "subtasksValue": {
+        "show": "Show",
+        "hide": "Hide"
+      }
     },
     "search": {
       "searching": "Searching…",

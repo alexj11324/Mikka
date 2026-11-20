@@ -44,6 +44,7 @@ import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
 import * as actions36 from '@/app/actions/thread-title-settings'
 import * as issueStateActions from '@/app/actions/issue-states'
+import * as taskListActions from '@/app/actions/task-list'
 import * as automations from '@/app/actions/automations'
 import * as listViews from '@/app/actions/list-views'
 
@@ -178,6 +179,9 @@ const functions = {
   'issue-prefix.getIssuePrefixState': actions13.getIssuePrefixState,
   'issue-prefix.saveIssuePrefix': actions13.saveIssuePrefix,
   'issue-states.getIssueStates': issueStateActions.getIssueStates,
+  'task-list.countTaskListViews': taskListActions.countTaskListViews,
+  'task-list.listUnreadTaskIds': taskListActions.listUnreadTaskIds,
+  'task-list.setTaskUnread': taskListActions.setTaskUnread,
   'issue-states.createWorkspaceIssueState': issueStateActions.createWorkspaceIssueState,
   'issue-states.updateWorkspaceIssueState': issueStateActions.updateWorkspaceIssueState,
   'issue-states.reorderWorkspaceIssueStates': issueStateActions.reorderWorkspaceIssueStates,

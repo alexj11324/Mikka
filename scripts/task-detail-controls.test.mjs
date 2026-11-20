@@ -38,6 +38,7 @@ stub('app/actions/team-relations.ts', {
   setIssueTeam: async input => { teamWrites.push(input); return response ?? { ok: true, data: input.teamId } },
 })
 stub('app/actions/teams.ts', { listTeams: async () => teams })
+stub('app/actions/task-list.ts', { listUnreadTaskIds: async () => [], setTaskUnread: async () => ({ unread: false }), countTaskListViews: async () => ({}) })
 stub('app/actions/task-domain.ts', { getTaskPresentations: () => { throw new Error('Unexpected Task presentation read in detail controls fixture') } })
 stub('app/actions/issues.ts', {
   setIssueScope: noop, promoteIssueToTeam: noop,

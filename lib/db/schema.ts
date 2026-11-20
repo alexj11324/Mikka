@@ -99,6 +99,14 @@ export const workspaceIssueStates = pgTable('workspace_issue_states', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('workspace_issue_states_position_idx').on(table.workspaceId, table.position)])
+/** Capy's "Mark as unread" (drizzle/20261120063603_task_reads.sql): a person's own unread flag on a task. */
+export const taskReads = pgTable('task_reads', {
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  issueId: uuid('issue_id').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspace_id').notNull(),
+  unread: boolean('unread').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.issueId] })])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
