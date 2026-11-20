@@ -123,7 +123,9 @@ export const AUDIT_METADATA = {
   'token.created': z.object({
     tokenName: label,
     expiresAt: z.string().datetime({ offset: true }).nullable(),
-    scopes: z.array(z.enum(['tasks:read', 'tasks:write', 'runs:read', 'runs:write', 'legacy:full'])).min(1).max(5),
+    // lib/tokens/format.ts TOKEN_SCOPES; inlined because this file is shared with UI code.
+    scopes: z.array(z.enum(['tasks:read', 'tasks:write', 'runs:read', 'runs:write', 'threads:read', 'threads:write', 'artifacts:read',
+      'drive:read', 'drive:write', 'bots:read', 'bots:write', 'legacy:full'])).min(1).max(12),
   }).partial().strict(),
   'token.revoked': none,
   'token.rotated': none,

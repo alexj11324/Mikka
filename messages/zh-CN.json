@@ -6794,6 +6794,36 @@
       "request": "GitHub App 创建未完成，请重试。",
       "response": "GitHub 未返回完整的 App 凭证，请重新创建。",
       "template": "此版本暂时无法创建 GitHub App，请更新服务器后重试。"
+    },
+    "interop_not_found": {
+      "default": "不存在，或无权访问。"
+    },
+    "interop_invalid_request": {
+      "default": "请求无效。"
+    },
+    "interop_scope_required": {
+      "default": "令牌缺少所需权限范围。"
+    },
+    "interop_send_unavailable": {
+      "default": "消息未能送达。",
+      "run_not_active": "运行已结束。",
+      "thread_replaced": "此线程已被新的线程取代。",
+      "thread_cannot_continue": "此线程无法继续。",
+      "delivery_unavailable": "此线程不支持这种送达方式。",
+      "delivery_uncertain": "此前用同一个 key 的发送没有记录结果，不会再次发送。",
+      "bot_unavailable": "Bot 不可用。"
+    },
+    "interop_diff_unavailable": {
+      "default": "无法读取改动。",
+      "no_checkpoint": "此线程没有保存的改动。",
+      "masked": "改动含有密钥，已隐藏。"
+    },
+    "interop_drive_conflict": {
+      "default": "Drive 文件夹已变化，请重新读取后再试。"
+    },
+    "interop_drive_unavailable": {
+      "default": "Drive 不可用。",
+      "file_too_large": "文件过大。"
     }
   },
   "FactoryFlow": {
