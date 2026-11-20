@@ -277,6 +277,31 @@ test('the public operator scopes source credentials, keeps provider delivery pri
   assert.doesNotMatch(workflow, /CLOUDFLARE_API_TOKEN|upload-artifact|continue-on-error|inputs\.(?:script|command|path|env)/)
 })
 
+test('marketing recovery admits only original receipt references and isolates the website read credential', async () => {
+  const base = {...operatorEnv(), MIKKA_OPERATION:'marketing-cloudflare-release',
+    MIKKA_OPERATION_ACTION:'rollback', MIKKA_OPERATION_RECEIPT:'123-1-' + 'b'.repeat(40) + '-' + 'c'.repeat(64),
+    MIKKA_OPERATIONS_CI_RUN_ID:'', MIKKA_OPERATIONS_CI_RUN_ATTEMPT:'', MIKKA_OPERATIONS_CI_ARTIFACT_ID:'',
+    MIKKA_MARKETING_GITHUB_OWNER:'aspectly-labs'}
+  for (const action of ['rollback', 'rollback-legacy', 'cleanup-legacy']) {
+    assert.equal(operationsInput({...base, MIKKA_OPERATION_ACTION:action}).action, action)
+  }
+  for (const patch of [{MIKKA_OPERATION_RECEIPT:''}, {MIKKA_OPERATION_RECEIPT:'../123'},
+    {MIKKA_OPERATION_ACTION:'release'}, {MIKKA_OPERATION_ACTION:'verify'},
+    {MIKKA_OPERATION_ACTION:'inspect-legacy'}, {MIKKA_MARKETING_GITHUB_OWNER:'foreign'},
+    {MIKKA_OPERATIONS_CI_RUN_ID:'../123'}]) {
+    let oidc = false
+    await assert.rejects(admitOperations({...base, ...patch}, async () => {oidc = true; throw Error('unexpected credential admission')}))
+    assert.equal(oidc, false)
+  }
+  const workflow = await readFile(new URL('../../.github/workflows/cloudflare-operations.yml', import.meta.url), 'utf8')
+  const website = workflow.indexOf('Mint the separate read-only website credential')
+  assert.ok(website > workflow.indexOf('Mint the scoped read-only operations credential')
+    && website < workflow.indexOf('Remove App signing credentials before loading private source'))
+  assert.match(workflow, /owner: \$\{\{ steps\.marketing-app\.outputs\.owner \}\}\n\s+repositories: mikka-web\n\s+permission-contents: read/)
+  assert.match(workflow, /MIKKA_MARKETING_READ_TOKEN: \$\{\{ steps\.marketing-token\.outputs\.token \}\}/)
+  assert.match(workflow, /MIKKA_OPERATION_RECEIPT: \$\{\{ inputs\.operation_receipt \}\}/)
+})
+
 
 test('the public source fence rejects unmerged or dirty operations before private installation', async t => {
   const directory = await realpath(await mkdtemp(join(tmpdir(), 'protected-operations-source-')))

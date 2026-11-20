@@ -9,13 +9,13 @@ on:
       operation:
         description: Existing Cloudflare operator capability
         type: choice
-        options: [operator-identity, capture-retention, eve-world-resources, github-webhook-prepare, cloudflare-billing-evidence, container-identity-metadata, private-source-download, vercel-project-billing, vercel-workflow-inventory]
+        options: [operator-identity, capture-retention, eve-world-resources, github-webhook-prepare, cloudflare-billing-evidence, container-identity-metadata, private-source-download, vercel-project-billing, vercel-workflow-inventory, marketing-cloudflare-release]
         default: operator-identity
         required: true
       action:
         description: Action validated by the selected private operator
         type: choice
-        options: [verify, inspect, enable, remove, authorize, prepare, read, deliver]
+        options: [verify, inspect, enable, remove, authorize, prepare, read, deliver, release, rollback, inspect-legacy, release-legacy, rollback-legacy, cleanup-legacy]
         default: verify
         required: true
       target:
@@ -43,19 +43,23 @@ on:
         description: Inspect the original 21-item legacy cohort
         type: boolean
         default: false
+      operation_receipt:
+        description: Original operation receipt or private-run ID for recovery
+        type: string
+        required: false
       qualification_run:
         description: Original public Cloud Services qualification run
         type: string
-        required: true
+        required: false
       qualification_attempt:
         description: Original public qualification attempt
         type: string
         default: '1'
-        required: true
+        required: false
       qualification_artifact:
         description: Original public qualification receipt artifact
         type: string
-        required: true
+        required: false
 permissions:
   contents: read
 jobs:
@@ -74,6 +78,7 @@ jobs:
       id-token: write
     env:
       MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
+      MIKKA_MARKETING_GITHUB_OWNER: ${{ vars.MIKKA_MARKETING_GITHUB_OWNER || vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
       MIKKA_CF_OPERATIONS_SHA: ${{ inputs.cloud_source_sha }}
       MIKKA_OPERATION: ${{ inputs.operation }}
       MIKKA_OPERATION_ACTION: ${{ inputs.action }}
@@ -83,6 +88,7 @@ jobs:
       MIKKA_BILLING_TO: ${{ inputs.billing_to }}
       MIKKA_OPERATOR_PRODUCT_SHA: ${{ inputs.product_source_sha || github.sha }}
       MIKKA_OBSERVE_ORIGINAL_EVE: ${{ inputs.observe_original_eve }}
+      MIKKA_OPERATION_RECEIPT: ${{ inputs.operation_receipt }}
       MIKKA_OPERATIONS_CI_RUN_ID: ${{ inputs.qualification_run }}
       MIKKA_OPERATIONS_CI_RUN_ATTEMPT: ${{ inputs.qualification_attempt }}
       MIKKA_OPERATIONS_CI_ARTIFACT_ID: ${{ inputs.qualification_artifact }}
@@ -150,6 +156,61 @@ jobs:
           permission-contents: read
           permission-actions: read
           permission-issues: read
+      - name: Select the isolated website source App
+        id: marketing-app
+        if: inputs.operation == 'marketing-cloudflare-release'
+        env:
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import {appendFileSync} from 'node:fs'
+          const owner = process.env.MIKKA_MARKETING_GITHUB_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
+          JS
+      - name: Read the website source App id
+        if: inputs.operation == 'marketing-cloudflare-release'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: ${{ steps.marketing-app.outputs.secret-path }}
+          secret-name: GITHUB_APP_ID
+          recursive: false
+          include-imports: false
+      - name: Read the website source App key
+        if: inputs.operation == 'marketing-cloudflare-release'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: ${{ steps.marketing-app.outputs.secret-path }}
+          secret-name: GITHUB_APP_PRIVATE_KEY
+          recursive: false
+          include-imports: false
+      - name: Verify the website source App identity
+        if: inputs.operation == 'marketing-cloudflare-release'
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.marketing-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("CI_SOURCE_APP_ID_MISMATCH")'
+      - name: Mint the separate read-only website credential
+        id: marketing-token
+        if: inputs.operation == 'marketing-cloudflare-release'
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ env.GITHUB_APP_ID }}
+          private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.marketing-app.outputs.owner }}
+          repositories: mikka-web
+          permission-contents: read
       - name: Remove App signing credentials before loading private source
         run: |
           echo 'GITHUB_APP_ID=' >> "$GITHUB_ENV"
@@ -195,4 +256,5 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
           MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
+          MIKKA_MARKETING_READ_TOKEN: ${{ steps.marketing-token.outputs.token }}
         run: node operations/public-operations.mjs

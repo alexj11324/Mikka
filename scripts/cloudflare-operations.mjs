@@ -24,11 +24,21 @@ export function operationsInput(env) {
     'private-source-download': ['deliver'],
     'vercel-project-billing': ['read'],
     'vercel-workflow-inventory': ['read'],
+    'marketing-cloudflare-release': ['verify', 'release', 'rollback', 'inspect-legacy', 'release-legacy', 'rollback-legacy', 'cleanup-legacy'],
   }
   check(Object.hasOwn(actions, operation) && actions[operation].includes(action), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   check(sha.test(env.MIKKA_CF_OPERATIONS_SHA ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+  const marketing = operation === 'marketing-cloudflare-release'
+  const recovery = marketing && ['rollback', 'rollback-legacy', 'cleanup-legacy'].includes(action)
   for (const key of ['MIKKA_OPERATIONS_CI_RUN_ID', 'MIKKA_OPERATIONS_CI_RUN_ATTEMPT', 'MIKKA_OPERATIONS_CI_ARTIFACT_ID']) {
-    check(id.test(env[key] ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    check(recovery && !env[key] || id.test(env[key] ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+  }
+  if (marketing) {
+    check(['alexj11324', 'aspectly-labs'].includes(env.MIKKA_MARKETING_GITHUB_OWNER || env.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324'), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    const receipt = env.MIKKA_OPERATION_RECEIPT
+    if (receipt) check(['release', 'rollback', 'rollback-legacy', 'cleanup-legacy'].includes(action)
+      && /^(?:private-[1-9][0-9]{0,15}|[1-9][0-9]{0,15}-[1-9][0-9]{0,15}-[a-f0-9]{40}-[a-f0-9]{64})$/.test(receipt), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    if (recovery) check(Boolean(receipt), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   }
   if (operation === 'private-source-download') check(id.test(env.MIKKA_SOURCE_COMMENT_ID ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   if (operation === 'vercel-project-billing') {
