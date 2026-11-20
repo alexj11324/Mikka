@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { assessAudit } from './audit-policy.mjs'
-import { admitOperations, operationsClaims, operationsInput, verifyOperationsCheckout, verifyOperationsProduct } from '../cloudflare-operations.mjs'
+import { admitOperations, operationsClaims, operationsInput, verifyOperationsCheckout, verifyOperationsProduct, operationsProductInput } from '../cloudflare-operations.mjs'
 import { checkWorkflowRuns, releaseIdentity, RELEASE_WORKFLOWS, waitForReleaseChecks } from './ci-gate.mjs'
 import { artifactInventory, pinRuntime, sealArtifact, stageDesktop, verifyArtifact } from './evidence.mjs'
 import { workspaceSbom } from './workspace-sbom.mjs'
@@ -300,6 +300,54 @@ test('marketing recovery admits only original receipt references and isolates th
   assert.match(workflow, /owner: \$\{\{ steps\.marketing-app\.outputs\.owner \}\}\n\s+repositories: mikka-web\n\s+permission-contents: read/)
   assert.match(workflow, /MIKKA_MARKETING_READ_TOKEN: \$\{\{ steps\.marketing-token\.outputs\.token \}\}/)
   assert.match(workflow, /MIKKA_OPERATION_RECEIPT: \$\{\{ inputs\.operation_receipt \}\}/)
+})
+
+test('runtime operations reject unrelated receipts or incomplete activation before OIDC', async () => {
+  const receipt = '123-1-' + 'b'.repeat(40) + '-' + 'c'.repeat(64)
+  const base = {...operatorEnv(), MIKKA_OPERATION:'runtime-native-alert', MIKKA_OPERATION_ACTION:'enable',
+    MIKKA_ALERT_SCOPE:'filesystem', MIKKA_ALERT_ENROLLMENT:receipt,
+    MIKKA_PROMOTION_POST:'123-' + 'd'.repeat(64), MIKKA_PREPARATION_RUN:'321-1', MIKKA_OBSERVATION_RUN:'456-1'}
+  assert.equal(operationsInput(base).action, 'enable')
+  for (const patch of [{MIKKA_ALERT_SCOPE:'all'}, {MIKKA_ALERT_ENROLLMENT:''},
+    {MIKKA_PROMOTION_POST:'https://example.invalid'}, {MIKKA_PREPARATION_RUN:'321'},
+    {MIKKA_OBSERVATION_RUN:'private-123'}, {MIKKA_OPERATION_ACTION:'prepare'},
+    {MIKKA_OPERATION_ACTION:'disable'}]) {
+    let oidc = false
+    await assert.rejects(admitOperations({...base, ...patch}, async () => {oidc = true; throw Error('unexpected admission')}))
+    assert.equal(oidc, false)
+  }
+  const observe = {...operatorEnv(), MIKKA_OPERATION:'observe-cloudflare-runtime', MIKKA_OPERATION_ACTION:'read',
+    MIKKA_OPERATOR_PRODUCT_SHA:sourceSha, MIKKA_PROMOTION_POST:base.MIKKA_PROMOTION_POST,
+    MIKKA_PREPARATION_RUN:'321-1', MIKKA_OBSERVATION_HISTORY:Array(8).fill(receipt).join(','),
+    MIKKA_PRESSURE_ENROLLMENT:'456-1'}
+  assert.equal(operationsInput(observe).action, 'read')
+  for (const history of ['../123', receipt, Array(9).fill(receipt).join(',')]) {
+    assert.throws(() => operationsInput({...observe, MIKKA_OBSERVATION_HISTORY:history}))
+  }
+  const workflow = await readFile(new URL('../../.github/workflows/cloudflare-operations.yml', import.meta.url), 'utf8')
+  const choices = /action:\n[\s\S]*?options: \[([^\]]+)\]/.exec(workflow)?.[1].split(',').map(value => value.trim())
+  for (const action of ['prepare', 'enable', 'disable']) assert.ok(choices?.includes(action), 'Native alert action is not dispatchable: ' + action)
+})
+
+test('model and daemon drivers come only from the reviewed fixed private request files', async t => {
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'operations-driver-')))
+  t.after(() => rm(directory, {recursive:true, force:true}))
+  const env = {...operatorEnv(), MIKKA_OPERATION:'product-task-canary', MIKKA_OPERATION_ACTION:'verify'}
+  await assert.rejects(operationsProductInput(env, {directory}))
+  await mkdir(join(directory, '.github/release-requests'), {recursive:true})
+  const canary = join(directory, '.github/release-requests/product-task-canary.json')
+  await writeFile(canary, JSON.stringify({version:2, public_sha:sourceSha}))
+  assert.deepEqual(await operationsProductInput(env, {directory}), {source:sourceSha, directory:'public-source', browser:true})
+  await writeFile(canary, JSON.stringify({version:2, public_sha:'main'}))
+  await assert.rejects(operationsProductInput(env, {directory}))
+  await rm(canary)
+  await writeFile(join(directory, 'unreviewed.json'), JSON.stringify({version:2, public_sha:sourceSha}))
+  await symlink(join(directory, 'unreviewed.json'), canary)
+  await assert.rejects(operationsProductInput(env, {directory}))
+  await mkdir(join(directory, 'docs/operations/releases'), {recursive:true})
+  await writeFile(join(directory, 'docs/operations/releases/daemon-qualification.json'), JSON.stringify({driver:sourceSha}))
+  assert.deepEqual(await operationsProductInput({...env, MIKKA_OPERATION:'production-daemon-qualification'}, {directory}),
+    {source:sourceSha, directory:'product', browser:false})
 })
 
 

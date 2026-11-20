@@ -9,13 +9,13 @@ on:
       operation:
         description: Existing Cloudflare operator capability
         type: choice
-        options: [operator-identity, capture-retention, eve-world-resources, github-webhook-prepare, cloudflare-billing-evidence, container-identity-metadata, private-source-download, vercel-project-billing, vercel-workflow-inventory, marketing-cloudflare-release]
+        options: [operator-identity, capture-retention, eve-world-resources, github-webhook-prepare, cloudflare-billing-evidence, container-identity-metadata, private-source-download, vercel-project-billing, vercel-workflow-inventory, marketing-cloudflare-release, observe-cloudflare-runtime, runtime-native-alert, product-task-canary, production-daemon-qualification]
         default: operator-identity
         required: true
       action:
         description: Action validated by the selected private operator
         type: choice
-        options: [verify, inspect, enable, remove, authorize, prepare, read, deliver, release, rollback, inspect-legacy, release-legacy, rollback-legacy, cleanup-legacy]
+        options: [verify, inspect, enable, disable, remove, authorize, prepare, read, deliver, release, rollback, inspect-legacy, release-legacy, rollback-legacy, cleanup-legacy, run]
         default: verify
         required: true
       target:
@@ -45,6 +45,35 @@ on:
         default: false
       operation_receipt:
         description: Original operation receipt or private-run ID for recovery
+        type: string
+        required: false
+      promotion_post:
+        description: Original protected promotion comment id-SHA256
+        type: string
+        required: false
+      preparation_run:
+        description: Original private API preparation run-attempt
+        type: string
+        required: false
+      observation_history:
+        description: Eight original observation references, comma-separated, or auto
+        type: string
+        required: false
+      pressure_enrollment:
+        description: Original pressure enrollment run-attempt or operation receipt
+        type: string
+        required: false
+      alert_scope:
+        description: Existing native notification group
+        type: choice
+        options: [filesystem, pressure]
+        default: filesystem
+      alert_enrollment:
+        description: Original alert enrollment run-attempt or operation receipt
+        type: string
+        required: false
+      observation_run:
+        description: Original successful observation run-attempt or operation receipt
         type: string
         required: false
       qualification_run:
@@ -89,6 +118,13 @@ jobs:
       MIKKA_OPERATOR_PRODUCT_SHA: ${{ inputs.product_source_sha || github.sha }}
       MIKKA_OBSERVE_ORIGINAL_EVE: ${{ inputs.observe_original_eve }}
       MIKKA_OPERATION_RECEIPT: ${{ inputs.operation_receipt }}
+      MIKKA_PROMOTION_POST: ${{ inputs.promotion_post }}
+      MIKKA_PREPARATION_RUN: ${{ inputs.preparation_run }}
+      MIKKA_OBSERVATION_HISTORY: ${{ inputs.observation_history }}
+      MIKKA_PRESSURE_ENROLLMENT: ${{ inputs.pressure_enrollment }}
+      MIKKA_ALERT_SCOPE: ${{ inputs.alert_scope }}
+      MIKKA_ALERT_ENROLLMENT: ${{ inputs.alert_enrollment }}
+      MIKKA_OBSERVATION_RUN: ${{ inputs.observation_run }}
       MIKKA_OPERATIONS_CI_RUN_ID: ${{ inputs.qualification_run }}
       MIKKA_OPERATIONS_CI_RUN_ATTEMPT: ${{ inputs.qualification_attempt }}
       MIKKA_OPERATIONS_CI_ARTIFACT_ID: ${{ inputs.qualification_artifact }}
@@ -228,16 +264,20 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
         run: node scripts/cloudflare-operations.mjs source
-      - name: Check out the immutable public inventory reader
-        if: inputs.operation == 'vercel-workflow-inventory'
+      - name: Select the fixed public operator driver
+        id: product-input
+        if: contains(fromJSON('["vercel-workflow-inventory","observe-cloudflare-runtime","product-task-canary","production-daemon-qualification"]'), inputs.operation)
+        run: node scripts/cloudflare-operations.mjs product-input
+      - name: Check out the immutable public operator driver
+        if: steps.product-input.outputs.source != ''
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           repository: ${{ github.repository }}
-          ref: ${{ inputs.product_source_sha || github.sha }}
-          path: .mikka-cloud/product
+          ref: ${{ steps.product-input.outputs.source }}
+          path: .mikka-cloud/${{ steps.product-input.outputs.directory }}
           persist-credentials: false
       - name: Verify the public reader before installing its SDK
-        if: inputs.operation == 'vercel-workflow-inventory'
+        if: steps.product-input.outputs.source != ''
         env:
           MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
         run: node scripts/cloudflare-operations.mjs product
@@ -247,14 +287,21 @@ jobs:
       - name: Install the locked operator dependencies
         working-directory: .mikka-cloud
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Install the locked legacy inventory SDK
-        if: inputs.operation == 'vercel-workflow-inventory'
-        working-directory: .mikka-cloud/product
+      - name: Install the locked public operator SDK
+        if: steps.product-input.outputs.source != ''
+        working-directory: .mikka-cloud/${{ steps.product-input.outputs.directory }}
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prepare the existing reviewed canary browser driver
+        if: inputs.operation == 'product-task-canary' && steps.product-input.outputs.browser == 'true'
+        working-directory: .mikka-cloud
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --prefix operations/task-review-browser
+          google-chrome --version
       - name: Execute the reviewed private operation
         working-directory: .mikka-cloud
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
           MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
           MIKKA_MARKETING_READ_TOKEN: ${{ steps.marketing-token.outputs.token }}
+          MIKKA_OPERATOR_PRODUCT_SHA: ${{ steps.product-input.outputs.source || inputs.product_source_sha || github.sha }}
         run: node operations/public-operations.mjs

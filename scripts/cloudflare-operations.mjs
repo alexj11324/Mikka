@@ -1,11 +1,14 @@
 import {execFileSync} from 'node:child_process'
-import {appendFile, lstat, realpath} from 'node:fs/promises'
+import {appendFile, lstat, readFile, realpath} from 'node:fs/promises'
 import {join, resolve} from 'node:path'
 import {pathToFileURL} from 'node:url'
 import {actionsMikkaRepository, hasGitHubOrigin, operationsRepositoryId, privateMikkaRepository} from './cloudflare-source.mjs'
 
 const sha = /^[a-f0-9]{40}$/
 const id = /^[1-9][0-9]{0,15}$/
+const attempt = /^[1-9][0-9]{0,15}-[1-9][0-9]{0,15}$/
+const receipt = /^[1-9][0-9]{0,15}-[1-9][0-9]{0,15}-[a-f0-9]{40}-[a-f0-9]{64}$/
+const post = /^[1-9][0-9]{0,15}-[a-f0-9]{64}$/
 const codes = new Set(['PUBLIC_OPERATIONS_INPUT_REQUIRED', 'PUBLIC_OPERATIONS_IDENTITY_REQUIRED',
   'PUBLIC_OPERATIONS_OIDC_REQUIRED', 'PUBLIC_OPERATIONS_OIDC_UNAVAILABLE', 'PUBLIC_OPERATIONS_SOURCE_REQUIRED'])
 const check = (condition, code) => {
@@ -25,6 +28,10 @@ export function operationsInput(env) {
     'vercel-project-billing': ['read'],
     'vercel-workflow-inventory': ['read'],
     'marketing-cloudflare-release': ['verify', 'release', 'rollback', 'inspect-legacy', 'release-legacy', 'rollback-legacy', 'cleanup-legacy'],
+    'observe-cloudflare-runtime': ['read'],
+    'runtime-native-alert': ['prepare', 'enable', 'disable'],
+    'product-task-canary': ['verify', 'run'],
+    'production-daemon-qualification': ['verify', 'run'],
   }
   check(Object.hasOwn(actions, operation) && actions[operation].includes(action), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   check(sha.test(env.MIKKA_CF_OPERATIONS_SHA ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
@@ -52,9 +59,51 @@ export function operationsInput(env) {
     check(sha.test(env.MIKKA_OPERATOR_PRODUCT_SHA ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
     check(['true', 'false'].includes(env.MIKKA_OBSERVE_ORIGINAL_EVE), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   }
+  const original = value => attempt.test(value ?? '') || receipt.test(value ?? '')
+  if (operation === 'observe-cloudflare-runtime') {
+    check(sha.test(env.MIKKA_OPERATOR_PRODUCT_SHA ?? '') && post.test(env.MIKKA_PROMOTION_POST ?? '')
+      && attempt.test(env.MIKKA_PREPARATION_RUN ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    const history = env.MIKKA_OBSERVATION_HISTORY || ''
+    check(!history || history === 'auto' || history.split(',').length === 8 && history.split(',').every(original), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    check(!env.MIKKA_PRESSURE_ENROLLMENT || original(env.MIKKA_PRESSURE_ENROLLMENT), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+  }
+  if (operation === 'runtime-native-alert') {
+    const scope = env.MIKKA_ALERT_SCOPE, enrollment = env.MIKKA_ALERT_ENROLLMENT || ''
+    check(['filesystem', 'pressure'].includes(scope), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    check(scope === 'filesystem' && action === 'prepare' ? !enrollment : original(enrollment), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    if (action === 'enable') check(post.test(env.MIKKA_PROMOTION_POST ?? '')
+      && attempt.test(env.MIKKA_PREPARATION_RUN ?? '') && original(env.MIKKA_OBSERVATION_RUN), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    else {
+      check(!env.MIKKA_PREPARATION_RUN && !env.MIKKA_OBSERVATION_RUN, 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+      check(scope === 'filesystem' ? !env.MIKKA_PROMOTION_POST
+        : action === 'prepare' && !env.MIKKA_PROMOTION_POST || post.test(env.MIKKA_PROMOTION_POST ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    }
+  }
   const target = env.WORLD_ENVIRONMENT || 'staging'
   check(['staging', 'production'].includes(target), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   return {operation, action, ...(operation === 'eve-world-resources' ? {target} : {})}
+}
+
+/** Select only the fixed reviewed request data; never a caller-supplied path or executable. */
+export async function operationsProductInput(env = process.env, {directory = resolve('.mikka-cloud')} = {}) {
+  operationsInput(env)
+  const operation = env.MIKKA_OPERATION
+  check(['vercel-workflow-inventory', 'observe-cloudflare-runtime', 'product-task-canary', 'production-daemon-qualification'].includes(operation),
+    'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+  let source = env.MIKKA_OPERATOR_PRODUCT_SHA, browser = false
+  if (['product-task-canary', 'production-daemon-qualification'].includes(operation)) {
+    const file = join(directory, operation === 'product-task-canary'
+      ? '.github/release-requests/product-task-canary.json' : 'docs/operations/releases/daemon-qualification.json')
+    check((await lstat(file)).isFile(), 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+    const request = JSON.parse(await readFile(file, 'utf8'))
+    source = operation === 'product-task-canary' ? request.public_sha : request.driver
+    if (operation === 'product-task-canary') {
+      check(Number.isSafeInteger(request.version) && request.version >= 1 && request.version <= 3, 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+      browser = request.version >= 2
+    }
+  }
+  check(sha.test(source ?? ''), 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+  return {source, directory:operation === 'product-task-canary' ? 'public-source' : 'product', browser}
 }
 
 export function operationsIdentity(env) {
@@ -141,18 +190,22 @@ export async function verifyOperationsCheckout(env = process.env, {directory = r
   return {status:'checked', operationsSource:identity.operationsSource}
 }
 
-/** Only the reviewed public inventory reader and its locked SDK run in this product checkout. */
-export async function verifyOperationsProduct(env = process.env, {directory = resolve('.mikka-cloud/product'), fetchImpl = fetch} = {}) {
+/** Only the selected reviewed public driver and its locked SDK run in this checkout. */
+export async function verifyOperationsProduct(env = process.env, {directory, fetchImpl = fetch} = {}) {
   operationsInput(env)
-  const identity = operationsIdentity(env), source = env.MIKKA_OPERATOR_PRODUCT_SHA
-  check(env.MIKKA_OPERATION === 'vercel-workflow-inventory' && sha.test(source ?? ''), 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+  const identity = operationsIdentity(env), selected = await operationsProductInput(env), source = selected.source
+  directory ??= resolve('.mikka-cloud', selected.directory)
   const git = args => execFileSync('git', ['-C', directory, ...args], {encoding:'utf8', stdio:['ignore', 'pipe', 'pipe'],
     env:{PATH:env.PATH ?? process.env.PATH, HOME:env.HOME ?? process.env.HOME}}).trim()
   check(await realpath(directory) === resolve(directory) && git(['rev-parse', '--show-toplevel']) === directory
     && git(['rev-parse', 'HEAD']) === source
     && hasGitHubOrigin(git(['remote', 'get-url', 'origin']), identity.repository)
     && git(['status', '--porcelain', '--untracked-files=no']) === '', 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
-  for (const entry of ['package.json', 'pnpm-lock.yaml', 'scripts/ops/vercel-workflow-inventory.mjs']) {
+  const entries = env.MIKKA_OPERATION === 'vercel-workflow-inventory' ? ['scripts/ops/vercel-workflow-inventory.mjs']
+    : env.MIKKA_OPERATION === 'observe-cloudflare-runtime' ? ['scripts/ops/cloudflare-container-logs.mjs', 'scripts/ops/cloudflare-capacity.mjs', 'scripts/ops/runtime-outcomes.mjs', 'scripts/ops/egress-monitor.mjs']
+      : env.MIKKA_OPERATION === 'product-task-canary' ? ['scripts/acceptance/cloud-startup.mjs', 'scripts/release/ci-gate.mjs']
+        : ['scripts/ops/production-mobile-daemon.mjs', 'scripts/acceptance/deployed-target.mjs']
+  for (const entry of ['package.json', 'pnpm-lock.yaml', ...entries]) {
     check((await lstat(join(directory, entry))).isFile(), 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
     git(['ls-files', '--error-unmatch', entry])
   }
@@ -176,6 +229,11 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
   try {
     if (process.argv.length === 3 && process.argv[2] === 'source') console.log(JSON.stringify(await verifyOperationsCheckout()))
     else if (process.argv.length === 3 && process.argv[2] === 'product') console.log(JSON.stringify(await verifyOperationsProduct()))
+    else if (process.argv.length === 3 && process.argv[2] === 'product-input') {
+      const selected = await operationsProductInput()
+      await appendFile(process.env.GITHUB_OUTPUT, `source=${selected.source}\ndirectory=${selected.directory}\nbrowser=${selected.browser}\n`)
+      console.log(JSON.stringify({status:'selected', productSource:selected.source}))
+    }
     else {
       check(process.argv.length === 2, 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
       const selected = await admitOperations()
@@ -183,7 +241,7 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
       console.log(JSON.stringify({status:'admitted', operation:selected.operation, action:selected.action, driverSource:selected.driverSource}))
     }
   } catch (error) {
-    console.error(JSON.stringify({status:'refused', code:codes.has(error.code) ? error.code : ['source', 'product'].includes(process.argv[2]) ? 'PUBLIC_OPERATIONS_SOURCE_REQUIRED' : 'PUBLIC_OPERATIONS_IDENTITY_REQUIRED'}))
+    console.error(JSON.stringify({status:'refused', code:codes.has(error.code) ? error.code : ['source', 'product', 'product-input'].includes(process.argv[2]) ? 'PUBLIC_OPERATIONS_SOURCE_REQUIRED' : 'PUBLIC_OPERATIONS_IDENTITY_REQUIRED'}))
     process.exitCode = 1
   }
 }
