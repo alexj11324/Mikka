@@ -7,7 +7,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { answerModel } from './model.mjs'
-import { subscriptionPrompt, subscriptionChunks, MVP_SUBSCRIPTION_MODEL } from './subscription.mjs'
+import { createLiteLlmRoutes } from '../fakes/litellm.mjs'
+import { answerDecision } from './decisions.mjs'
+import { MVP_DECISION_KEY } from './transport.mjs'
 import { MVP_SERVICES, REPOSITORY } from './isolated-env.mjs'
 import { finishMvpResources, indexMvpResource } from './retention.mjs'
 import { fixtureFailure } from './diagnostics.mjs'
@@ -46,6 +48,23 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
   let pullRequests = []
   const streams = new Map()
   const observe = item => observations.push({ at: new Date().toISOString(), ...item })
+  const modelRoutes = createLiteLlmRoutes({
+    apiKey: MVP_DECISION_KEY,
+    answer: prompt => {
+      const stream = [...streams.values()].find(value => prompt.prompt.some(message => message.role === 'user'
+        && (Array.isArray(message.content) ? message.content : [{ type: 'text', text: message.content }]).some(part => part.type === 'text' && part.text.includes(value.marker))))
+      if (stream) {
+        stream.started++
+        return { content: [{ type: 'text', text: stream.first }], next: stream.held.then(() => ({ content: [{ type: 'text', text: stream.last }] })) }
+      }
+      return answerModel(prompt, scenario, observe)
+    },
+    decision: input => answerDecision(input, observe),
+    observe: event => {
+      if (event.kind === 'litellm-refused') errors.push({ handler: 'litellm', code: event.code })
+      else observe(event)
+    },
+  })
   const server = createServer(async (request, response) => {
     const requestId = `mvp-${randomUUID()}`
     const url = new URL(request.url, 'http://127.0.0.1')
@@ -106,110 +125,7 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         scenario.deviceId = deviceId
         return reply({ configured: true })
       }
-      if (url.pathname === '/subscription/model' && request.method === 'POST') {
-        handler = 'subscription_model'
-        const payload=await readBody(request)
-        assert.equal(payload.model,MVP_SUBSCRIPTION_MODEL)
-        observe({kind:'subscription-model-request',requestId})
-        handler = 'subscription_prompt'
-        const prompt=subscriptionPrompt(payload)
-        const stream=[...streams.values()].find(value=>prompt.prompt.some(message=>message.role==='user' && message.content.some(part=>part.type==='text' && part.text.includes(value.marker))))
-        handler = 'subscription_answer'
-        const answer=stream ? null : answerModel(prompt,scenario,observe)
-        handler = 'subscription_chunks'
-        response.writeHead(200,{'content-type':'text/event-stream'})
-        if(stream) {
-          stream.started++
-          const first=subscriptionChunks({content:[{type:'text',text:stream.first}]},payload.model).split('\n\n')[0]
-          response.write(first+'\n\n')
-          await stream.held
-          return response.end(subscriptionChunks({content:[{type:'text',text:stream.last}]},payload.model))
-        }
-        return response.end(subscriptionChunks(answer,payload.model))
-      }
-      if (url.pathname === '/v1/language-model' && request.method === 'POST') {
-        handler = 'language_model'
-        observe({ kind: 'model-request', requestId })
-        return reply(answerModel(await readBody(request), scenario, observe))
-      }
-      if (url.pathname === '/decisions' && request.method === 'POST') {
-        handler = 'decisions'
-        response.setHeader('x-litellm-call-id', `mvp-synthetic-${randomUUID()}`)
-        response.setHeader('x-litellm-response-cost', '0.001')
-        // The real triage transport still validates a model response and issues
-        // its own execution receipt. This scripted response is only evidence of
-        // that integration contract, never live model judgment or authorization.
-        assert.equal(request.headers.authorization, 'Bearer mvp-synthetic-decisions')
-        const input = await readBody(request)
-        assert.equal(input.model, 'mikka-decision')
-        assert.equal(input.questions?.length, 1)
-        const question = input.questions[0]
-        assert.equal(question.type, 'choice')
-        if (question.name === 'push') {
-          handler = 'decisions_push'
-          // Whether a Coordinator reply also goes to the phone (lib/push-reasons.ts):
-          // the answered events and the reply, one per line, as plain text.
-          assert.deepEqual(question.choices?.map(choice => choice.value), ['decide', 'review', 'finished', 'briefing', 'none'])
-          assert.equal(typeof input.input, 'string')
-          const answersPerson = /^answeredEvents: .+\nanswersAMessageFromThePerson: (yes|no)\nreply: .+$/s.exec(input.input)?.[1]
-          assert.ok(answersPerson, 'Unexpected push evidence')
-          observe({ kind: 'push-request', requestId, answersPerson })
-          // The person is in the chat they just wrote in: no phone notification.
-          return reply({
-            model: input.model,
-            answers: [{ type: 'choice', name: 'push', choice: 'none' }],
-          })
-        }
-        if (question.name === 'outcome') {
-          handler = 'decisions_outcome'
-          // run-outcome-judge passes outcomeText directly. decisionRequestInput
-          // preserves plain strings; only DecisionContext callers use messages.
-          assert.deepEqual(question.choices?.map(choice => choice.value), ['done', 'blocked', 'needs_input', 'failed', 'idle'])
-          assert.equal(typeof input.input, 'string')
-          const facts = input.input
-          const status = /^status: (succeeded|stopped|failed|cancelled)\nstop reason: .+\nattempts on this task: [1-9][0-9]*\ntask: .+\npull requests: .+\nsummary \(quoted\): .+\nlast reply \(quoted\): .+$/.exec(facts)?.[1]
-          assert.ok(status, 'Unexpected run outcome evidence')
-          observe({ kind: 'outcome-request', requestId, status })
-          return reply({
-            model: input.model,
-            answers: [{ type: 'choice', name: 'outcome', choice: status === 'succeeded' ? 'done' : 'idle' }],
-          })
-        }
-        handler = 'decisions_tier'
-        assert.equal(question.name, 'tier')
-        assert.deepEqual(question.choices?.map(choice => choice.value), ['attention', 'result', 'background'])
-        assert.equal(input.input?.length, 1)
-        assert.equal(input.input[0].role, 'user')
-        assert.equal(input.input[0].content?.length, 1)
-        assert.equal(input.input[0].content[0].type, 'input_text')
-        const state = JSON.parse(input.input[0].content[0].text)
-        const host = JSON.parse(state.hostObservation)
-        assert.ok(['run_finished', 'action_decided', 'artifact_submitted'].includes(host.eventKind), 'Unexpected MVP runtime event')
-        assert.match(host.eventId, /^[a-f0-9-]{36}$/)
-        assert.equal(typeof host.ownerId, 'string')
-        if (host.eventKind === 'run_finished') {
-          assert.equal(host.observedRun?.id, host.runId)
-          assert.ok(['succeeded', 'failed', 'cancelled'].includes(host.observedRun?.status))
-        }
-        if (host.eventKind === 'artifact_submitted') {
-          // artifactSubmittedEvent is also emitted by Factory reports. This
-          // model tier classifies the notice; it cannot prove PR publication.
-          const artifact = JSON.parse(state.untrustedEventPayload)
-          assert.match(artifact.artifactId, /^[a-f0-9-]{36}$/)
-          assert.ok(Number.isSafeInteger(artifact.version) && artifact.version > 0)
-          assert.ok(['markdown', 'html'].includes(artifact.artifactKind))
-          assert.equal(typeof artifact.title, 'string')
-          assert.equal(typeof artifact.authorName, 'string')
-          if (host.runId !== null) assert.match(host.runId, /^[a-f0-9-]{36}$/)
-          if (host.issueId !== null) assert.match(host.issueId, /^[a-f0-9-]{36}$/)
-          if (host.observedRun !== null) assert.equal(host.observedRun.id, host.runId)
-        }
-        observe({ kind: 'decision-request', requestId, eventId: host.eventId, eventKind: host.eventKind })
-        return reply({
-          model: input.model,
-          answers: [{ type: 'choice', name: 'tier', choice: 'result' }],
-        })
-      }
+      if (await modelRoutes(request, response, url)) return
       if (!url.pathname.startsWith('/github/')) throw new Error('Unexpected fixture route')
       handler = 'github'
       assert.ok(scenario, 'GitHub called before the fixture scenario exists')
