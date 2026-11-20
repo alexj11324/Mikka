@@ -43,10 +43,16 @@ receive no Registry, Cloudflare or private UI credentials. The old
 manual publishers remain available for release-owner operations already in
 progress; they are not the automatic build path.
 
-The producer reads the already approved UI selection from a fixed read-only
-operations checkout. Only API and Web check out that exact UI commit and verify
-its membership in the UI repository's main history. Compilers receive a filtered
-environment without checkout, Registry or deployment credentials.
+The producer reads `docs/operations/releases/deploy-build-inputs.json` from a
+fixed read-only operations checkout. Its exact schema is `version: 1` and
+`overlaySource`, a lowercase 40-character commit SHA. The independent build input
+selects the reviewed UI for upcoming builds; serving release requests retain
+their original source pair and migration baseline. Missing or invalid build
+input stops the plan without falling back to a serving release request. Only
+API and Web check out that exact UI commit and verify its membership in the UI
+repository's main history. Every required official provider must be present.
+Compilers receive a filtered environment without checkout, Registry or
+deployment credentials.
 
 `config/service-build-inputs.json` records the six service input boundaries.
 `scripts/release/service-builds.mjs` hashes sorted file names, file bytes, file

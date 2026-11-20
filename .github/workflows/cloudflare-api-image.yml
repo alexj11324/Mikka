@@ -158,7 +158,7 @@ jobs:
           token: ${{ steps.source-token.outputs.token }}
           path: .operations-input
           persist-credentials: false
-      - name: Keep the approved overlay from the fixed operations checkout
+      - name: Read the independent approved build input from the fixed operations checkout
         id: selection
         run: |
           node --input-type=module <<'JS'
@@ -168,7 +168,10 @@ jobs:
           try {
             const operations = execFileSync('git',['-C','.operations-input','rev-parse','HEAD'],{encoding:'utf8'}).trim()
             assert.match(operations,/^[a-f0-9]{40}$/)
-            const selected = JSON.parse(await readFile('.operations-input/docs/operations/releases/hosted-api-staging.json','utf8'))
+            const selected = JSON.parse(await readFile('.operations-input/docs/operations/releases/deploy-build-inputs.json','utf8'))
+            assert.ok(selected && typeof selected === 'object' && !Array.isArray(selected))
+            assert.deepEqual(Object.keys(selected).sort(),['overlaySource','version'])
+            assert.equal(selected.version,1)
             assert.match(selected.overlaySource,/^[a-f0-9]{40}$/)
             await appendFile(process.env.GITHUB_OUTPUT,'overlay='+selected.overlaySource+'\n')
           } catch {
