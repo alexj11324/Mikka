@@ -51,10 +51,17 @@ export const POST = withRequestLog(
       return Response.json(result, { status, headers });
     } catch (error) {
       if (request.signal.aborted) throw error;
+      // A merge whose answer was lost is re-read in mergePullRequest and returned as merged; what
+      // reaches here did not merge this head. Logged by name and code only: provider messages can
+      // carry private data.
+      console.error("Pull request merge failed", {
+        name: error instanceof Error ? error.name : "UnknownError",
+        code: error instanceof GitHubAccessError ? error.code : null,
+      });
       const failure =
         error instanceof GitHubAccessError
           ? error
-          : new GitHubAccessError("githubUnavailable", 502);
+          : new GitHubAccessError("githubUnavailable", 502, { cause: error });
       return Response.json(
         { error: failure.code },
         { status: failure.status, headers },

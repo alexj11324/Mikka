@@ -82,10 +82,22 @@ export async function mergePullRequest(
         ? input.method
         : methods[0];
     if (!method) return { kind: "refused", code: "githubMergeBlocked" };
-    const merged = await deps.github.merge(token, repo, input.number, {
-      sha: input.expectedHeadSha,
-      method,
-    });
+    let merged: Awaited<ReturnType<GitHubMergePort["merge"]>>;
+    try {
+      merged = await deps.github.merge(token, repo, input.number, {
+        sha: input.expectedHeadSha,
+        method,
+      });
+    } catch (error) {
+      // The answer can be lost after GitHub merged (a timeout, a reset): read the PR once more
+      // before calling it a failure. Only this head merged counts as this merge.
+      const after = await deps.github
+        .pullRequest(token, repo, input.number)
+        .catch(() => null);
+      if (after?.merged && after.headSha.toLowerCase() === input.expectedHeadSha)
+        return { kind: "merged", mergeCommitSha: after.mergeCommitSha };
+      throw error;
+    }
     return merged.merged
       ? { kind: "merged", mergeCommitSha: merged.mergeCommitSha }
       : { kind: "refused", code: refusalFor(merged.status, pull.mergeableState) };

@@ -115,3 +115,26 @@ test("input names one PR of an admitted repository by number and full head SHA",
   ])
     await assert.rejects(mergePullRequest("owner", bad as typeof input, deps));
 });
+
+test("a merge whose answer is lost is read again: merged at this head is success, anything else stays an error", async () => {
+  let reads = 0;
+  const landed = harness({ github: {
+    merge: async () => { throw new Error("socket hang up"); },
+    pullRequest: async () => (++reads === 1
+      ? { state: "open", merged: false, headSha: sha, mergeableState: "clean", mergeCommitSha: null }
+      : { state: "closed", merged: true, headSha: sha, mergeableState: null, mergeCommitSha: "c".repeat(40) }),
+  } });
+  assert.deepEqual(await mergePullRequest("owner", input, landed.deps), { kind: "merged", mergeCommitSha: "c".repeat(40) });
+  assert.equal(reads, 2);
+  const lost = new Error("socket hang up");
+  const notMerged = harness({ github: { merge: async () => { throw lost; } } });
+  await assert.rejects(mergePullRequest("owner", input, notMerged.deps), (error) => error === lost);
+  let other = 0;
+  const elsewhere = harness({ github: {
+    merge: async () => { throw new Error("timeout"); },
+    pullRequest: async () => (++other === 1
+      ? { state: "open", merged: false, headSha: sha, mergeableState: "clean", mergeCommitSha: null }
+      : { state: "closed", merged: true, headSha: "e".repeat(40), mergeableState: null, mergeCommitSha: "f".repeat(40) }),
+  } });
+  await assert.rejects(mergePullRequest("owner", input, elsewhere.deps), { message: "timeout" }, "a different head merged is not this merge");
+});
