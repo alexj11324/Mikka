@@ -166,6 +166,7 @@ const functions = {
   'execution-settings.refreshBotModelMenuAction': actions10.refreshBotModelMenuAction,
   'execution-settings.chooseBotModel': actions10.chooseBotModel,
   'issue-metadata.getIssuePropertyOptions': actions11.getIssuePropertyOptions,
+  'issue-metadata.getNewTaskOptions': actions11.getNewTaskOptions,
   'issue-metadata.updateIssueMetadata': actions11.updateIssueMetadata,
   'issue-operations.listIssueConnections': actions12.listIssueConnections,
   'issue-operations.updateIssueRelation': actions12.updateIssueRelation,
