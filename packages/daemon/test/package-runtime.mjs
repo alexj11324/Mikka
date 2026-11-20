@@ -2,8 +2,9 @@
 // MemoryServer and the mock model are explicit substitutes; git operations,
 // clone/worktree creation, verification, commit and local-bare push are real.
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -25,8 +26,23 @@ git(personal, 'clone', '--bare', '--no-hardlinks', personal, bare)
 await writeFile(join(personal, 'README.md'), 'Uncommitted personal work must stay unchanged.\n')
 const before = git(personal, 'status', '--porcelain')
 const server = new MemoryServer('package-device')
+const link = server.link(), mcpReceipts = []
+const mcpScript = join(temporary, 'mcp-settings.mjs'), mcpCalls = join(temporary, 'mcp-calls')
+await copyFile(new URL('./fakes/mcp-settings.mjs', import.meta.url), mcpScript)
+const mcpCommand = { id: randomUUID(), expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  server: { name: 'packaged_fixture', transport: 'stdio', command: process.execPath, args: [mcpScript], cwd: temporary,
+    env: { SERVICE_TOKEN: 'synthetic-packaged-mcp-credential', MCP_TEST_RECORD: mcpCalls } } }
+const fetchCommands = link.fetchCommands.bind(link), reportCommands = link.report.bind(link)
+link.fetchCommands = async (id, wait, options) => {
+  options?.onMcpChecks?.([mcpCommand])
+  return fetchCommands(id, wait, options)
+}
+link.report = async (id, fields) => {
+  mcpReceipts.push(...(fields.mcpChecks ?? []))
+  return reportCommands(id, fields)
+}
 const daemon = new Daemon({
-  dataDir: join(temporary, 'data'), flavor: 'dev', link: server.link(),
+  dataDir: join(temporary, 'data'), flavor: 'dev', link,
   harnesses: [{ harness: 'mock', installed: true, version: 'package-test' }],
   mockSpeed: Infinity,
   quotaSource: null, agentSandbox: null,
@@ -41,6 +57,15 @@ const waitFor = async check => {
 try {
   await daemon.start()
   await daemon.syncWithServer()
+  // Exercise the shipped SDK through the installed daemon, without a loader
+  // or a source import. Discovery performs a real child-process handshake.
+  await waitFor(() => mcpReceipts.length === 1)
+  assert.deepEqual(mcpReceipts, [{ id: mcpCommand.id, status: 'connected', tools: [{ name: 'read_docs', description: 'Read [redacted]' }] }])
+  await daemon.syncWithServer()
+  assert.equal(mcpReceipts.length, 1)
+  assert.deepEqual((await readFile(mcpCalls, 'utf8')).trim().split('\n'), ['initialize', 'notifications/initialized', 'tools/list'])
+  assert.ok(!(await readFile(daemon.paths.device, 'utf8')).includes('synthetic-packaged-mcp-credential'))
+  console.log('PACKAGED_DAEMON_STDIO_MCP_CHECK_PASSED')
   const runId = server.queueRun('package-device', {
     issueId: 'package-issue', repoId: 'package-record-only', remoteUrl: pathToFileURL(bare).href,
     harness: 'mock', prompt: 'Add the mock usage note', fixture: 'success-edit',

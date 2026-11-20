@@ -63,7 +63,7 @@ stub('../bot-model-selection.ts', { freezeBotModel: async (scope: AgentScope) =>
 stub('../subscription-runtime.ts', { authorizeSubscriptionWorkspace: forbidden, subscriptionRuntime: forbidden })
 stub('../coordinator/instructions.ts', { COORDINATOR_INSTRUCTIONS: base })
 stub('../coordinator/native-prompt.ts', { personalCoordinatorInstructions: () => base })
-stub('../plugins/runtime.ts', { personalPlugins: { snapshot: async () => {
+stub('../plugins/runtime.ts', { personalPlugins: { snapshotForBot: async () => {
   pluginSnapshots++; return { servers: [], skills: [] }
 } } })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: forbidden })

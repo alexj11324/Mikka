@@ -118,7 +118,11 @@ index for inspection. The test daemon still performs its normal lifecycle
 cleanup inside the new dedicated fixture; previously retained resources are
 not part of that fixture.
 
-No global `tsx` or separate `@mikka/protocol` package is needed. A push to `main`
+No global `tsx` or separate `@mikka/protocol` package is needed. The MCP
+connection-check client and its JavaScript dependencies are also bundled;
+the build appends their complete upstream licenses to `THIRD_PARTY_NOTICES.md`.
+SDKs that need native binaries or runtime assets remain external dependencies.
+A push to `main`
 that changes the daemon, the protocol, shared config, the lockfile or the
 release scripts publishes through `.github/workflows/publish-daemon.yml` after
 daemon checks and the installed-package runtime test pass. The workflow uses npm
@@ -146,5 +150,7 @@ Node then runs the installed CLI and bundled mock daemon through a real
 clone/worktree/verification/commit/push against a disposable local bare origin.
 It verifies the pushed file and preserves the personal checkout. The test logs
 the tarball digest; its control plane and model are explicit in-memory fixtures.
+The installed daemon also starts a local STDIO MCP fixture, discovers its tools
+without invoking them, and returns a receipt with credential values redacted.
 This is not real Claude Code/Codex, native-helper, live GitHub App or production
 device-authorization acceptance.

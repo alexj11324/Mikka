@@ -44,7 +44,9 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
   assert.equal(DAEMON_VERSION, manifest.version)
   assert.equal(manifest.bin.mikka, './mikka.js')
   assert.ok(!manifest.dependencies['@mikka/protocol'])
+  assert.ok(!manifest.dependencies['@modelcontextprotocol/sdk'])
   assert.ok(!manifest.dependencies.tsx)
+  assert.match(await readFile(join(installed, 'THIRD_PARTY_NOTICES.md'), 'utf8'), /## @modelcontextprotocol\/sdk@/)
   assert.ok(Object.values(manifest.dependencies).every(version => !version.startsWith('workspace:')))
   for (const path of Object.values(manifest.exports)) assert.ok((await readFile(join(installed, path))).length > 0)
   // Bundled code finds its helper scripts beside itself; each one must ship.
@@ -94,6 +96,7 @@ test('registry-installed tarball runs its CLI and a real mock-daemon git task wi
     assert.equal(submitted.summary, 'Packaged MCP submission')
   }
   const output = execFileSync(process.execPath, [join(root, 'test/package-runtime.mjs'), installed, temporary], { cwd: installation, env: runtimeEnv, encoding: 'utf8', timeout: 45_000, killSignal: 'SIGKILL' })
+  assert.match(output, /PACKAGED_DAEMON_STDIO_MCP_CHECK_PASSED/)
   assert.match(output, /PACKAGED_MOCK_DAEMON_GIT_TASK_PASSED/)
   assert.ok(!output.includes(token))
   console.log(JSON.stringify({ package: manifest.name, version: manifest.version,
