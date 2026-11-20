@@ -344,3 +344,27 @@ test('server-owned billing adapter reuses the full route and settles in its own 
   assert.equal(reservations.length, 0)
   assert.equal(settlements.length, 0)
 })
+
+test('one hosted deadline covers cold readiness plus provider time while caller cancellation remains immediate', async t => {
+  const deadlines: Array<{ milliseconds: number; controller: AbortController }> = []
+  t.mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
+    const controller = new AbortController()
+    deadlines.push({ milliseconds, controller })
+    return controller.signal
+  })
+  const wrapped = await hostedModel('workspace', 'fixture-model')
+  for (const method of ['doGenerate', 'doStream'] as const) {
+    const caller = new AbortController()
+    const result = await wrapped[method]({ prompt: [], abortSignal: caller.signal })
+    assert.equal(deadlines.at(-1)?.milliseconds, 120_000)
+    const received = (modelOptions.at(-1) as { abortSignal: AbortSignal }).abortSignal
+    assert.equal(received.aborted, false)
+    const reason = new Error('Synthetic request stopped')
+    const stop = method === 'doGenerate' ? deadlines.at(-1)!.controller : caller
+    stop.abort(reason)
+    assert.equal(received.aborted, true)
+    assert.equal(received.reason, reason)
+    if (method === 'doStream') await (result as Awaited<ReturnType<typeof model.doStream>>).stream.cancel()
+  }
+  assert.deepEqual([generated, streamed, deadlines.length], [1, 1, 2], 'the larger budget does not retry or add a model request')
+})
