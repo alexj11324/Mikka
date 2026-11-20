@@ -173,6 +173,9 @@ export const commandSchema = z.discriminatedUnion('action', [
   // Duplicate to: a copy in this or another workspace the person can write to, checked again there. Fields the target
   // cannot use are cleared and reported; the copy starts paused when any were. The webhook key and pins are not copied.
   z.object({ action: z.literal('duplicate'), scheduleId: z.uuid(), targetWorkspaceId: z.uuid(), requestId: z.uuid() }).strict(),
+  // Runs as: who each dispatched run acts, is billed and posts as; null is the creator. A person can name only themselves
+  // (consent). The creator, an owner/admin or that person can return it to the creator.
+  z.object({ action: z.literal('run_as'), scheduleId: z.uuid(), version: z.number().int().positive(), userId: z.string().min(1).max(200).nullable() }).strict(),
   // 用量: runs and cost per day in the automation's time zone, newest first.
   z.object({ action: z.literal('usage'), scheduleId: z.uuid(), days: z.number().int().min(1).max(90).optional() }).strict(),
 ])

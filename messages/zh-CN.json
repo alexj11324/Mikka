@@ -1580,7 +1580,8 @@
     "apiKeyNotFound": "这个 API Key 已不存在。",
     "scheduleEnvironmentUnavailable": "选择的环境已不可用。",
     "scheduleThreadUnavailable": "它运行的线程已不可用。",
-    "scheduleRunAsUnavailable": "它运行时使用的成员已不在这个工作区。"
+    "scheduleRunAsUnavailable": "它运行时使用的成员已不在这个工作区。",
+    "scheduleRunAsConsentRequired": "只有运行身份本人或所有者、管理员可以这样做。"
   },
   "Overview": {
     "sections": {

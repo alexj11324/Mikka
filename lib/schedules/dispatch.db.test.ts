@@ -789,15 +789,33 @@ test('dispatch_task automations run as their creator through the existing create
     const foreign = await seedWorkspace(fixture, member, [{ userId: member, role: 'admin' }])
     await assert.rejects(duplicate(foreign.id), /scheduleWorkspaceAccessDenied/, 'only a workspace the person is an active member of')
   })
-  await t.test('Runs as: the creator or an admin names who each run acts and is billed as; a member who leaves stops it', async () => {
+  await t.test('Runs as is by consent: a person names only themselves; another person’s change or Slack identity needs them', async () => {
     const { schedule } = await create(definition(null))
-    const runAs = (userId: string | null, version: number, who = owner, bot = chat) =>
-      page<{ schedule: Schedule & { run_as_user_id: string | null } }>(who, bot, { action: 'run_as', scheduleId: schedule.id, version, userId })
-    const named = (await runAs(member, schedule.version)).schedule
-    assert.deepEqual([named.run_as_user_id, named.version], [member, schedule.version + 1])
+    const runAs = (userId: string | null, version: number, who = owner, bot = chat, id = schedule.id) =>
+      page<{ schedule: Schedule & { run_as_user_id: string | null; definition: Definition } }>(who, bot, { action: 'run_as', scheduleId: id, version, userId })
+    await assert.rejects(runAs(member, schedule.version), /scheduleRunAsConsentRequired/, 'an admin cannot name someone else')
+    const named = (await runAs(member, schedule.version, member, memberChat)).schedule
+    assert.deepEqual([named.run_as_user_id, named.version], [member, schedule.version + 1], 'a member volunteers themselves')
+
+    // The member's own automation, which the admin then runs as themselves.
     const own = (await page<{ schedule: Schedule }>(member, memberChat, { action: 'create', requestId: randomUUID(), definition: definition(null) })).schedule
-    await assert.rejects(page(member, memberChat, { action: 'run_as', scheduleId: own.id, version: own.version, userId: owner }), /scheduleAdminRequired/, 'a member names only themselves')
-    await assert.rejects(runAs(randomUUID(), named.version), /scheduleRunAsUnavailable/, 'only an active member of the workspace')
+    await assert.rejects(runAs(owner, own.version, member, memberChat, own.id), /scheduleRunAsConsentRequired/, 'the creator cannot name someone else either')
+    const adminRuns = (await runAs(owner, own.version, owner, chat, own.id)).schedule
+    await assert.rejects(page(member, memberChat, { action: 'run_now', scheduleId: own.id, version: adminRuns.version, requestId: randomUUID() }), /scheduleRunAsConsentRequired/,
+      'while it runs as someone else, the creator cannot start its runs')
+    const edited = (await page<{ schedule: Schedule & { run_as_user_id: string | null } }>(member, memberChat, { action: 'update', scheduleId: own.id, version: adminRuns.version,
+      definition: { ...definition(null), task: { kind: 'dispatch_task', botId: null, prompt: 'A different request', title: 'Fix main CI' } } })).schedule
+    assert.equal(edited.run_as_user_id, null, 'the creator’s change returns it to the creator')
+    await assert.rejects(page(owner, chat, { action: 'update', scheduleId: own.id, version: edited.version,
+      definition: { ...definition(null), notify: { slack: { channel: 'C123', locale: 'en', postAsRunner: true } } } }), /scheduleRunAsConsentRequired/,
+    'an admin cannot turn on posting as the creator')
+
+    // Posting as a person stays on only while it runs as the person who turned it on.
+    await fixture.query(`UPDATE user_schedules SET status='paused',next_at=NULL,run_as_user_id=$2,definition=jsonb_set(definition,'{notify}','{"slack":{"channel":"C123","locale":"en","postAsRunner":true}}') WHERE id=$1`, [own.id, owner])
+    const before = (await fixture.query<{ version: number }>('SELECT version FROM user_schedules WHERE id=$1', [own.id])).rows[0]!
+    const cleared = (await runAs(null, before.version, owner, chat, own.id)).schedule
+    assert.deepEqual([cleared.run_as_user_id, cleared.definition.notify?.slack?.postAsRunner], [null, undefined], 'back to the creator, who did not turn it on')
+
     const { occurrence: started } = await runNow(named)
     const swept = await tick()
     const run = await occurrence(started.id)

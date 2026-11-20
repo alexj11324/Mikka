@@ -1580,7 +1580,8 @@
     "apiKeyNotFound": "This API key no longer exists.",
     "scheduleEnvironmentUnavailable": "The selected environment is no longer available.",
     "scheduleThreadUnavailable": "The thread it runs in is no longer available.",
-    "scheduleRunAsUnavailable": "The person it runs as is no longer a member of this workspace."
+    "scheduleRunAsUnavailable": "The person it runs as is no longer a member of this workspace.",
+    "scheduleRunAsConsentRequired": "Only the person it runs as can do this, or an owner or admin."
   },
   "Overview": {
     "sections": {

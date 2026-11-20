@@ -126,13 +126,13 @@ export async function takeOverAutomation(input: { scheduleId: string; version: n
   return parsed.success ? command({ action: 'take_over', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
-/** Runs as: who each run acts, is billed and posts as; null is the creator. A member names only themselves. */
+/** Runs as: who each run acts, is billed and posts as; null is the creator. A person can name only themselves. */
 export async function setAutomationRunAs(input: { scheduleId: string; version: number; userId: string | null }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.extend({ userId: z.string().min(1).max(200).nullable() }).safeParse(input)
   return parsed.success ? command({ action: 'run_as', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
 }
 
-/** Runs as' choices: every active member for an owner or admin; a member sees only themselves. */
+/** Runs as' choices: the reader themselves, while an active member (a person can name only themselves). */
 export async function automationRunAsChoices(workspaceId?: string): Promise<ActionResult<{ members: { id: string; name: string }[] }>> {
   return runAction(async () => {
     if (actingContext.getStore()) throw new ActionFailureError('authRequired')
@@ -145,8 +145,7 @@ export async function automationRunAsChoices(workspaceId?: string): Promise<Acti
     const { workspacePool } = await import('@/lib/workspace-db')
     const { rows } = await workspacePool.query<{ id: string; name: string; role: string }>(`SELECT "userId" id,name,role FROM mikka_workspace_members
       WHERE "workspaceId"=$1 AND status='active' ORDER BY lower(name),"userId"`, [actor.workspaceId])
-    const admin = rows.some(row => row.id === actor.userId && row.role !== 'member')
-    return { members: rows.filter(row => admin || row.id === actor.userId).map(({ id, name }) => ({ id, name })) }
+    return { members: rows.filter(row => row.id === actor.userId).map(({ id, name }) => ({ id, name })) }
   })
 }
 

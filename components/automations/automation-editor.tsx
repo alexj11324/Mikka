@@ -333,7 +333,9 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       value => set({ notify: value ? { ...draft.notify, channel: value, locale: draft.notify?.locale ?? (locale === 'en' ? 'en' : 'zh-CN') } : null }), !slackChannels.data && !draft.notify)
       : { kind: 'button', label: t('notifyChoose'), onClick: () => setSlackWanted(true), disabled: busy !== null }] },
     ...(draft.notify ? [
+      // Only the person posts would appear as can turn this on; anyone may turn it off.
       { id: 'post-as-runner', label: t('postAsRunner'), controls: [{ kind: 'switch' as const, label: t('postAsRunner'), checked: draft.notify.postAsRunner === true,
+        disabled: draft.notify.postAsRunner !== true && Boolean(current) && (current!.run_as_user_id ?? current!.owner_id) !== userId,
         onChange: (on: boolean) => set({ notify: { ...draft.notify!, postAsRunner: on || undefined } }) }] },
       { id: 'quiet', label: t('quiet'), controls: [{ kind: 'switch' as const, label: t('quiet'), checked: draft.notify.quiet === true,
         onChange: (on: boolean) => set({ notify: { ...draft.notify!, quiet: on || undefined } }) }] },

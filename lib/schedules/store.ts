@@ -154,6 +154,19 @@ export class ScheduleStore {
     try { await access.requireActiveMember(runAs) } catch (error) { throw new ScheduleError('scheduleRunAsUnavailable', 403, { cause: error }) }
     return runAs
   }
+  /**
+   * While an automation runs as someone else, only that person or an owner/admin may start or resume its runs: what it
+   * spends and acts with is theirs.
+   */
+  private consented(actor: Actor, access: WorkspaceAccess, row: Pick<Schedule, 'run_as_user_id'>) {
+    if (row.run_as_user_id && row.run_as_user_id !== actor.ownerId && access.role === 'member') throw new ScheduleError('scheduleRunAsConsentRequired', 403)
+  }
+  /** Posting under a person's name and picture is turned on only by that person (the run-as person, else the creator). */
+  private postAsConsented(actor: Actor, before: Pick<Schedule, 'owner_id' | 'run_as_user_id' | 'definition'>, def: Definition, runner: string) {
+    if (!def.notify?.slack?.postAsRunner || actor.ownerId === runner) return
+    const kept = before.definition.notify?.slack?.postAsRunner === true && (before.run_as_user_id ?? before.owner_id) === runner
+    if (!kept) throw new ScheduleError('scheduleRunAsConsentRequired', 403)
+  }
   private async source(tx: PoolClient, actor: Actor, workspaceId: string | null) {
     // The 自动化 page's server action authenticated the person; a chat command names their message instead.
     if (actor.direct) return
@@ -344,6 +357,7 @@ export class ScheduleStore {
       if(row.version!==cmd.version) throw new ScheduleError('scheduleVersionConflict')
       if(cmd.action==='restore'){
         if(!row.status_before_delete) throw new ScheduleError('scheduleNotDeleted')
+        this.consented(actor,access,row)
         let status = row.status_before_delete
         let next: Date | null = null
         if(status==='active'){
@@ -362,8 +376,9 @@ export class ScheduleStore {
         return {schedule:updated.rows[0]}
       }
       if(row.status==='cancelled') throw new ScheduleError('scheduleCancelled')
+      if(cmd.action==='flush_batch') this.consented(actor,access,row)
       if(cmd.action==='flush_batch'||cmd.action==='cancel_batch') return this.closeWebhookBatch(tx, row, cmd.batchId, cmd.action, access)
-      if(cmd.action==='run_now') return this.runNow(tx,row,cmd.requestId,access)
+      if(cmd.action==='run_now'){this.consented(actor,access,row);return this.runNow(tx,row,cmd.requestId,access)}
       if(cmd.action==='run_as') return this.runAs(tx,actor,access,row,cmd.userId)
       if(cmd.action==='take_over') return this.takeOver(tx,actor,access,row)
       if(cmd.action==='webhook_key'){
@@ -376,11 +391,18 @@ export class ScheduleStore {
         await this.listChanged(tx,row.workspace_id)
         return {schedule:updated,key}
       }
-      let def=row.definition, status=row.status, next=row.next_at
-      if(cmd.action==='update'){def=cmd.definition;def.timezone=timezone(def.timezone);await this.permission(tx,await this.runner(access,row,def),row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
+      let def=row.definition, status=row.status, next=row.next_at, runAs=row.run_as_user_id??null
+      if(cmd.action==='update'){
+        def=cmd.definition;def.timezone=timezone(def.timezone)
+        // A change by anyone but the run-as person returns the automation to its creator: that person agreed to run
+        // what they saw, not what someone else writes after.
+        if(runAs&&runAs!==actor.ownerId)runAs=null
+        const runner=await this.runner(access,{...row,run_as_user_id:runAs},def)
+        this.postAsConsented(actor,row,def,runner)
+        await this.permission(tx,runner,row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock(),true);if(status==='completed')status='active'}
       else if(cmd.action==='pause'){status='paused';next=null}
       else if(cmd.action==='cancel'||cmd.action==='delete'){status='cancelled';next=null}
-      else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');await this.permission(tx,await this.runner(access,row,def),row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock());status=next||!runsOnSchedule(def)?'active':'completed'}
+      else {if(status!=='paused')throw new ScheduleError('scheduleNotPaused');this.consented(actor,access,row);await this.permission(tx,await this.runner(access,row,def),row.bot_id,row.workspace_id,def);next=nextTime(def,this.clock());status=next||!runsOnSchedule(def)?'active':'completed'}
       const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
       if (stale.rows.length) {
         await this.lockChat(tx,row)
@@ -389,7 +411,7 @@ export class ScheduleStore {
           await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
         }
       }
-      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5,status_before_delete=CASE WHEN $6 THEN status END,disabled_reason=CASE WHEN $3='paused' OR $6 THEN disabled_reason END WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock(),cmd.action==='delete'])).rows[0]
+      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5,status_before_delete=CASE WHEN $6 THEN status END,disabled_reason=CASE WHEN $3='paused' OR $6 THEN disabled_reason END,run_as_user_id=$7 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock(),cmd.action==='delete',runAs])).rows[0]
       await this.listChanged(tx,row.workspace_id)
       return {schedule:updated}
     }))
@@ -491,20 +513,25 @@ export class ScheduleStore {
     throw new ScheduleError('scheduleDispatchUnavailable',503)
   }
   /**
-   * Runs as: the creator or an owner/admin names who each run acts, is billed and posts as. A member may name only
-   * themselves; an owner/admin any active member. Only a dispatched task runs as someone; the authority is that
-   * person's, checked now and at every run. Runs that had not started are cancelled, as on any change.
+   * Runs as, by consent: a person can make an automation run as themselves, and only themselves; it then acts, is
+   * billed and posts as them. The creator, an owner/admin or that person can return it to the creator. Only a
+   * dispatched task runs as someone, with that person's authority, checked now and at every run. Posting under a
+   * person's name stays on only when the person it now runs as turned it on. Runs that had not started are cancelled.
    */
   private async runAs(tx:PoolClient,actor:Actor,access:WorkspaceAccess,row:Schedule,userId:string|null){
     if(row.visibility!=='workspace'||!row.workspace_id) throw new ScheduleError('scheduleNotFound',404)
-    if(row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
     const target=userId===row.owner_id?null:userId
-    if(target&&target!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+    if(target&&target!==actor.ownerId) throw new ScheduleError('scheduleRunAsConsentRequired',403)
+    if(!target&&row.owner_id!==actor.ownerId&&row.run_as_user_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
     if(target&&row.definition.task.kind!=='dispatch_task') throw new ScheduleError('invalidScheduleCommand',400)
     if((row.run_as_user_id??null)===target) return {schedule:(await tx.query<Schedule>(`SELECT ${SCHEDULE_COLUMNS} FROM user_schedules WHERE id=$1`,[row.id])).rows[0]}
+    // The person it now runs as did not turn on posting under their name unless they are the one changing it.
+    const slack=row.definition.notify?.slack
+    const def:Definition=slack?.postAsRunner&&actor.ownerId!==(target??row.owner_id)
+      ?{...row.definition,notify:{slack:(({postAsRunner:_off,...rest})=>rest)(slack)}}:row.definition
     const next={...row,run_as_user_id:target}
-    if(row.status==='active') await this.permission(tx,await this.runner(access,next,row.definition),row.bot_id,row.workspace_id,row.definition)
-    else if(target) await this.runner(access,next,row.definition)
+    if(row.status==='active') await this.permission(tx,await this.runner(access,next,def),row.bot_id,row.workspace_id,def)
+    else if(target) await this.runner(access,next,def)
     const stale=await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='cancelled',error='scheduleChanged',lease_token=NULL,lease_until=NULL,finished_at=$2 WHERE schedule_id=$1 AND status IN ('pending','running') RETURNING *`,[row.id,this.clock()])
     if (stale.rows.length) {
       await this.lockChat(tx,row)
@@ -513,7 +540,7 @@ export class ScheduleStore {
         await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
       }
     }
-    const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET run_as_user_id=$2,version=version+1,updated_at=$3 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,target,this.clock()])).rows[0]
+    const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET run_as_user_id=$2,definition=$4,version=version+1,updated_at=$3 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,target,this.clock(),def])).rows[0]
     await this.listChanged(tx,row.workspace_id)
     return {schedule:updated}
   }
