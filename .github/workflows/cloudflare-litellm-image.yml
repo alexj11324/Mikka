@@ -28,14 +28,13 @@ on:
       - 'lib/model-gateway/**'
       - 'tests/model-gateway-litellm.test.ts'
       - '.github/workflows/cloudflare-litellm-image.yml'
-  push:
-    branches: [main]
-    paths: *litellm_paths
 permissions:
   contents: read
 jobs:
   image:
-    if: github.event_name != 'workflow_dispatch'
+    # All PRs retain their existing credential-free qualification. The
+    # protected Registry producer is allowed to run only on real main pushes.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -46,6 +45,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts --prefix cloudflare/litellm
+      - run: node --test cloudflare/litellm/worker.test.mjs
       - name: Build the LiteLLM image and check its health and master-key guard offline
         run: |
           docker build --platform linux/amd64 -t mikka-litellm deploy/litellm

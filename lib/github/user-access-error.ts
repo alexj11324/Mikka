@@ -2,8 +2,8 @@
 export type GitHubAccessCode = 'authRequired' | 'githubNotConfigured' | 'githubNotConnected' | 'githubReconnectRequired' | 'githubRepositoryForbidden' | 'githubPullRequestInvalid' | 'githubIssueInvalid' | 'githubUnavailable'
 
 export class GitHubAccessError extends Error {
-  constructor(readonly code: GitHubAccessCode, readonly status: number) {
-    super(code)
+  constructor(readonly code: GitHubAccessCode, readonly status: number, options?: ErrorOptions) {
+    super(code, options)
     this.name = 'GitHubAccessError'
   }
 }

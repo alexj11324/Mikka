@@ -16,6 +16,9 @@ patchedDependencies:
   '@novnc/novnc@1.6.0':
     hash: 4c366142582a7e49bf37b4e30502f6cc47d708fe1d91b0627c029c3872963573
     path: patches/@novnc__novnc@1.6.0.patch
+  '@workflow/world-postgres@5.2.0':
+    hash: 49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6
+    path: patches/@workflow__world-postgres@5.2.0.patch
   eve@1.0.0-rc.9:
     hash: e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2
     path: patches/eve@1.0.0-rc.9.patch
@@ -540,7 +543,7 @@ importers:
     dependencies:
       '@workflow/world-postgres':
         specifier: 5.2.0
-        version: 5.2.0(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)
+        version: 5.2.0(patch_hash=49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)
       eve:
         specifier: 1.0.0-rc.9
         version: 1.0.0-rc.9(patch_hash=e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2)(c629b6f9c4762629636b6743fc5a3ca8)
@@ -18116,7 +18119,7 @@ snapshots:
     optionalDependencies:
       '@opentelemetry/api': 1.10.0
 
-  '@workflow/world-postgres@5.2.0(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)':
+  '@workflow/world-postgres@5.2.0(patch_hash=49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)':
     dependencies:
       '@vercel/queue': 0.10.0(@opentelemetry/api@1.10.0)
       '@workflow/errors': 5.1.1

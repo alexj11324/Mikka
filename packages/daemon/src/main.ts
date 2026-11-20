@@ -539,6 +539,7 @@ export class Daemon {
       startCredential: hosted?.start,
       prepareSubscription: hosted?.prepare,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
+      prepareRunDrive: this.options.link.prepareRunDrive?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       prepareRunGitHub: hosted ? undefined : (assignment, signal, onCredential) => prepareLocalGitHub(assignment, {
         stateDir: join(this.paths.adapterState, 'github'), link: this.options.link, signal, onCredential,

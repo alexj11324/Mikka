@@ -56,14 +56,15 @@ export function useApiKeys(workspaceId: string) {
       await keys.mutate(result, { revalidate: false })
     } catch { setFailed({ message: actionError(), retry: () => void setFeature(key, feature, on) }) } finally { setPending(false) }
   }
-  async function refetch(key: ApiKey) {
+  async function refetch(key: ApiKey): Promise<boolean> {
     setPending(true); setFailed(null)
     try {
       const result = await refetchApiKeyModels(key.id, workspaceId)
-      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void refetch(key) }); return }
+      if (result.error) { setFailed({ message: actionError(result.error), retry: () => void refetch(key) }); return false }
       await keys.mutate(result, { revalidate: false })
       void mutate(modelOrderKey(workspaceId))
-    } catch { setFailed({ message: actionError(), retry: () => void refetch(key) }) } finally { setPending(false) }
+      return true
+    } catch { setFailed({ message: actionError(), retry: () => void refetch(key) }); return false } finally { setPending(false) }
   }
   async function remove(key: ApiKey) {
     setPending(true); setFailed(null)

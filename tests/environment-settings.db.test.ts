@@ -4,6 +4,27 @@ import { test } from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedIssue, seedProject, seedProjectTasks, seedTeam, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
+test('an Environment keeps its default machine size; a run that names it gets it and keeps it as chosen', { skip: !dbUrl }, async t => {
+  const fixture = new Pool({ connectionString: dbUrl })
+  const store = await import('../lib/project-resources/store')
+  // The suite's last test closes the shared application pools.
+  t.after(() => fixture.end())
+  const owner = await seedUser(fixture, 'environment-size-owner')
+  const workspace = await seedWorkspace(fixture, owner, [{ userId: owner, role: 'admin' }])
+  const issueId = await seedIssue(fixture, owner, workspace.id)
+  const configuration = { setup: { copyFiles: [], command: 'echo size', approved: true } }
+  const size = async (id: string) => (await store.listProjectResources(owner, workspace.id)).environments.find(row => row.id === id)?.defaultMachineSize
+  const saved = await store.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Large', configuration, defaultMachineSize: 'standard-4-16' })
+  assert.equal(await size(saved.id), 'standard-4-16')
+  const renamed = await store.saveEnvironment(owner, { workspaceId: workspace.id, id: saved.id, revision: saved.revision, name: 'Large runs', configuration })
+  assert.equal(await size(saved.id), 'standard-4-16', 'a save without the size keeps it')
+  await assert.rejects(store.saveEnvironment(owner, { workspaceId: workspace.id, name: 'Bad', configuration, defaultMachineSize: 'huge' as never }))
+  const snapshot = await store.withProjectExecution({ userId: owner, workspaceId: workspace.id, issueId, repositoryKey: null, baseBranch: null, runtime: 'cloud', harness: 'codex', environmentId: saved.id }, async value => value)
+  assert.deepEqual([snapshot.environment?.id, snapshot.environment?.chosen, snapshot.environment?.defaultMachineSize], [saved.id, true, 'standard-4-16'])
+  await store.saveEnvironment(owner, { workspaceId: workspace.id, id: saved.id, revision: renamed.revision, name: 'Large runs', configuration, defaultMachineSize: null })
+  assert.equal(await size(saved.id), null, 'null goes back to Mikka’s default')
+})
+
 test('project default editor preserves repository overrides and canonical task selection', { skip: !dbUrl }, async t => {
   const fixture = new Pool({ connectionString: dbUrl })
   const { pool } = await import('../lib/db')

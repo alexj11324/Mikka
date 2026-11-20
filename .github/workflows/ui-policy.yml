@@ -28,7 +28,6 @@ concurrency:
 
 env:
   # Existing accounting/admission suites exercise the hosted deployment.
-  # The self-hosted image workflow separately runs the default community mode.
   MIKKA_EDITION: cloud
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
@@ -286,16 +285,6 @@ jobs:
 
   # PR specializations are reusable jobs so the stable gate can require their
   # actual conclusions. Main retains its existing independent release workflows.
-  image-checks:
-    needs: changes
-    if: github.event_name != 'push' && needs.changes.outputs.image == 'true'
-    uses: ./.github/workflows/self-hosted-image.yml
-    with:
-      selected: true
-    permissions:
-      contents: read
-      packages: write
-
   analytics-checks:
     needs: changes
     if: github.event_name != 'push' && needs.changes.outputs.analytics == 'true'
@@ -317,7 +306,7 @@ jobs:
     # The required check name. It reports success when only documentation
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
-    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, image-checks, analytics-checks, workspace-governance-checks]
+    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, analytics-checks, workspace-governance-checks]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -332,11 +321,9 @@ jobs:
           EXPECT_INTEGRATION: ${{ needs.changes.outputs.integration }}
           EXPECT_SOURCE: ${{ needs.changes.outputs.source }}
           EXPECT_DAEMON: ${{ needs.changes.outputs.daemon }}
-          EXPECT_IMAGE: ${{ github.event_name != 'push' && needs.changes.outputs.image == 'true' }}
           EXPECT_ANALYTICS: ${{ github.event_name != 'push' && needs.changes.outputs.analytics == 'true' }}
           EXPECT_GOVERNANCE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.changes.outputs.db == 'true' }}
           GOVERNANCE: ${{ needs.workspace-governance-checks.result }}
-          IMAGE: ${{ needs.image-checks.result }}
           ANALYTICS: ${{ needs.analytics-checks.result }}
           CORE: ${{ needs.ui-policy-full.result }}
           INTEGRATION: ${{ needs.ui-policy-integrations.result }}
@@ -344,7 +331,7 @@ jobs:
           DAEMON: ${{ needs.daemon-checks.result }}
         run: |
           test "$CHANGES_RESULT" = success
-          for name in CORE INTEGRATION SOURCE DAEMON IMAGE ANALYTICS GOVERNANCE; do
+          for name in CORE INTEGRATION SOURCE DAEMON ANALYTICS GOVERNANCE; do
             expected="EXPECT_$name"
             case "${!expected}" in
               true) test "${!name}" = success ;;
@@ -475,7 +462,7 @@ jobs:
           RUN_DISPATCH_DB_TESTS: '1'
           FACTORY_MONITOR_TEST_URL: postgresql://e2e:e2e-local-only@127.0.0.1:5432/mikka_e2e
           CREDENTIAL_TEST_RETAIN_RESOURCES: '1'
-          DB_TEST_EXPECTED: test:abuse-db,test:account-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:approved-writes-db,test:artifact-migration-db,test:audit-db,test:bot-chats-db,test:bot-threads-db,test:captures-db,test:chat-attachments-db,test:cloud-backend-db,test:cloud-services-db,test:coding-workspace-db,test:computer-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-issue-tools-db,test:coordinator-native,test:coordinator-task-binding-db,test:credentials-db,test:desktop-auth,test:device-enrollment-db,test:device-revocation-db,test:domain-lifecycle-db,test:drive-db,test:enterprise-db,test:eve-db,test:execution-settings-db,test:factory,test:factory-activity-db,test:factory-activity-http-db,test:factory-all-dispatch-db,test:factory-approval-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-monitor-db,test:factory-routing-db,test:github-connections-db,test:group-turns,test:groups,test:inbox-db,test:issue-search-db,test:live-db,test:local-repository-migration-db,test:migration-steps-db,test:model-admission-db,test:onboarding-db,test:organization-invitations-db,test:organization-join-domains-db,test:ops-db,test:pat-api-db,test:pat-db,test:personal-mailbox-default-off-db,test:plugins-db,test:preview-driver,test:project-decisions-db,test:project-resources-db,test:project-v2-db,test:relation-cycle,test:run-dispatch,test:run-publication-db,test:run-recovery-db,test:schedules-db,test:scope-detachment-db,test:secrets-db,test:self-improvement-db,test:self-improvement-unit,test:session-mailbox-db,test:settings-activity-db,test:settings-prefs-db,test:skill-semantic-db,test:slack-installation-db,test:suggestion-artifact-db,test:task-identity-db,test:task-presentation-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:web-auth-db,test:worker-authorization-db,test:workspace-admin-db,test:workspace-migration-db,test:workspace-permissions-migration-db
+          DB_TEST_EXPECTED: test:abuse-db,test:account-db,test:active-agents,test:activity-actor-db,test:agent-kit-db,test:agent-tool-approval-db,test:approved-writes-db,test:artifact-migration-db,test:audit-db,test:bot-chats-db,test:bot-threads-db,test:captures-db,test:chat-attachments-db,test:cloud-backend-db,test:cloud-services-db,test:coding-workspace-db,test:computer-db,test:conversation-reads,test:coordinator-issue-create-db,test:coordinator-issue-tools-db,test:coordinator-native,test:coordinator-task-binding-db,test:credentials-db,test:desktop-auth,test:device-enrollment-db,test:device-revocation-db,test:domain-lifecycle-db,test:drive-db,test:enterprise-db,test:eve-db,test:execution-settings-db,test:factory,test:factory-activity-db,test:factory-activity-http-db,test:factory-all-dispatch-db,test:factory-approval-db,test:factory-check-independence-db,test:factory-checks-db,test:factory-monitor-db,test:factory-routing-db,test:github-connections-db,test:group-turns,test:groups,test:inbox-db,test:interop-db,test:issue-search-db,test:live-db,test:local-repository-migration-db,test:migration-steps-db,test:model-admission-db,test:onboarding-db,test:organization-invitations-db,test:organization-join-domains-db,test:ops-db,test:pat-api-db,test:pat-db,test:personal-mailbox-default-off-db,test:plugins-db,test:preview-driver,test:project-decisions-db,test:project-resources-db,test:project-v2-db,test:relation-cycle,test:run-dispatch,test:run-publication-db,test:run-recovery-db,test:schedules-db,test:scope-detachment-db,test:secrets-db,test:self-improvement-db,test:self-improvement-unit,test:session-mailbox-db,test:settings-activity-db,test:settings-prefs-db,test:skill-semantic-db,test:slack-installation-db,test:suggestion-artifact-db,test:task-identity-db,test:task-presentation-db,test:test-accounts-db,test:user-facts-db,test:visibility-db,test:web-auth-db,test:worker-authorization-db,test:workspace-admin-db,test:workspace-migration-db,test:workspace-permissions-migration-db
       - name: Preserve synthetic CLI approval database evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

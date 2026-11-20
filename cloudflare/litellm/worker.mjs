@@ -21,6 +21,11 @@ export class LiteLlm extends Container {
       NEON_AI_GATEWAY_TOKEN: env.NEON_AI_GATEWAY_TOKEN ?? '',
     }
   }
+
+  startAndWaitForPorts(ports, cancellationOptions, startOptions) {
+    // LiteLLM can take longer than the SDK's 20-second port deadline on a cold instance.
+    return super.startAndWaitForPorts(ports, { portReadyTimeoutMS: 50_000, ...cancellationOptions }, startOptions)
+  }
 }
 
 export default class LiteLlmService extends WorkerEntrypoint {

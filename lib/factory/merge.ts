@@ -158,7 +158,7 @@ export function githubMergeApi(fetcher: typeof fetch = fetch, budget?: RequestBu
 }
 
 /** GitHub's refusal of PUT /merge, as a stable code. */
-function refusalFor(status: number, mergeableState: string | null): MergeRefusal {
+export function refusalFor(status: number, mergeableState: string | null): MergeRefusal {
   if (status === 401) return "githubMergeAuthorizationRequired";
   if (status === 403 || status === 404) return "githubMergeForbidden";
   if (status === 409) return "githubMergeHeadMoved";

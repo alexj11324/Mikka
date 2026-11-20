@@ -325,6 +325,51 @@ test('separately deployed Web and API keep truthful source pins and compatibilit
   assert.equal(calls, 5, 'no successful response can hide an API update or rollback')
 })
 
+test('independent Web and API releases expose their own sources and observe API updates and rollback', async () => {
+  const web = 'a'.repeat(40), webOverlay = 'b'.repeat(40), api = 'c'.repeat(40), apiOverlay = 'd'.repeat(40)
+  let value = { build: api, overlaySha: apiOverlay, minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null }
+  let calls = 0
+  const env = { RELEASE_SHA: web, OVERLAY_SHA: webOverlay,
+    API: { fetch: () => { calls++; return Response.json(value) } } }
+  const read = current => release.fetch(request('/mikka/api/version'), current)
+  const expected = current => ({ ...value, build: current.RELEASE_SHA, overlaySha: current.OVERLAY_SHA,
+    apiBuild: value.build, apiOverlaySha: value.overlaySha })
+  assert.deepEqual(await (await read(env)).json(), expected(env))
+  const nextWeb = { ...env, RELEASE_SHA: 'e'.repeat(40) }
+  assert.deepEqual(await (await read(nextWeb)).json(), expected(nextWeb), 'a Web-only update retains the real API identity')
+  // These updates retain the exact same warm binding and Web configuration.
+  value = { ...value, build: 'f'.repeat(40), overlaySha: '1'.repeat(40), minMobileBuild: 7 }
+  assert.deepEqual(await (await read(nextWeb)).json(), expected(nextWeb), 'an API-only update is observed without replacing Web')
+  value = { ...value, build: api, overlaySha: apiOverlay, minMobileBuild: 0 }
+  assert.deepEqual(await (await read(nextWeb)).json(), expected(nextWeb), 'rollback restores the actual API pins and metadata')
+  assert.equal(calls, 4, 'a successful read cannot hide an API update or rollback')
+})
+
+test('version validates all four source pins and retains the exact five-field API contract', async () => {
+  const source = 'a'.repeat(40), overlay = 'b'.repeat(40)
+  const value = { build: source, overlaySha: overlay, minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null }
+  const cases = [
+    { api: { ...value, build: 'invalid' }, web: { RELEASE_SHA: 'invalid' } },
+    { api: { ...value, build: 'invalid' } },
+    { api: { ...value, overlaySha: null } },
+    { web: { RELEASE_SHA: 'invalid' } },
+    { web: { OVERLAY_SHA: undefined } },
+    { api: { ...value, unrecognized: true } },
+    { api: { ...value, apiBuild: source, apiOverlaySha: overlay } },
+    { api: { ...value, minMobileBuild: -1 } },
+    { api: { ...value, mobileUpdateUrl: null } },
+    { api: { ...value, minDesktopVersion: 1 } },
+    { api: { build: source, overlaySha: overlay, minMobileBuild: 0, mobileUpdateUrl: '' } },
+  ]
+  for (const invalid of cases) {
+    const env = { RELEASE_SHA: source, OVERLAY_SHA: overlay, ...invalid.web,
+      API: { fetch: () => Response.json(invalid.api ?? value) } }
+    const response = await release.fetch(request('/mikka/api/version'), env)
+    assert.equal(response.status, 503)
+    assert.deepEqual(await response.json(), { error: 'deploymentVersionInvalid' })
+  }
+})
+
 test('version compatibility metadata must be a complete valid pair and cannot expose unrecognized fields', async () => {
   const value = { build: 'a'.repeat(40), overlaySha: 'b'.repeat(40), minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null }
   for (const patch of [{ apiVersion: 1 }, { minApiVersion: 0 }, { apiVersion: 1, minApiVersion: 2 },
@@ -390,7 +435,7 @@ test('rejected or stalled cold version reads free the upstream and an independen
   assert.equal((await get(env, { method: 'HEAD' })).status, 200)
 })
 
-test('separate version bindings do not share cached values and private requests keep caller scope', async () => {
+test('separate version bindings preserve their own metadata and private requests keep caller scope', async () => {
   const publicFields = { build: 'a'.repeat(40), overlaySha: 'b'.repeat(40), minMobileBuild: 0, minDesktopVersion: null }
   const scope = mobileUpdateUrl => ({
     RELEASE_SHA: publicFields.build, OVERLAY_SHA: publicFields.overlaySha,
