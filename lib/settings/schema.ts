@@ -24,3 +24,10 @@ export const workspaceSettingValues = pgTable('workspace_setting_values', {
   primaryKey({ columns: [table.workspaceId, table.key] }),
   check('workspace_setting_values_one_type', sql`num_nonnulls(${table.booleanValue}, ${table.integerValue}, ${table.textValue}, ${table.textArrayValue}) <= 1`),
 ])
+
+/** Null restores the action default; empty text explicitly disables it. */
+export const keyboardShortcuts = pgTable('keyboard_shortcuts', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  actionId: text('actionId').notNull(), binding: text('binding'),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.actionId] })])

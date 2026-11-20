@@ -1,4 +1,6 @@
 /** Shared settings contract. Clients never import the server registry or storage. */
+import type { KeyboardShortcutAction, KeyboardShortcutContext } from './keyboard-shortcuts'
+
 export type SettingSource = 'personal' | 'workspace' | 'default'
 export type SettingScope = 'personal' | 'workspace'
 export type SettingValue = string | number | boolean | string[]
@@ -20,6 +22,9 @@ export interface SettingSchemaEntry {
   personalOverride: boolean
   writeAccess: { personal?: 'owner'; workspace?: 'admin' }
   options?: SettingValue[]
+  /** Present for a configurable existing keyboard action. */
+  action?: KeyboardShortcutAction
+  context?: KeyboardShortcutContext
 }
 
 export interface SettingsView {
