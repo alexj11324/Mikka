@@ -85,3 +85,38 @@ test('failure exercise is an explicit manual staging input and never a productio
   assert.equal(workflow.jobs['pipeline-production'].env.MIKKA_STAGING_FAILURE_DRILL, undefined)
   assert.equal(workflow.jobs['deploy-application'].env.MIKKA_STAGING_FAILURE_DRILL, undefined)
 })
+
+test('read-only migration admission precedes candidate preparation and deployment credentials for both targets', () => {
+  const command = 'node operations/business-api/pipeline-preflight.mjs'
+  const expectedToken = '${{ steps.source-token.outputs.token }}'
+  for (const [name, applyName, uploadName] of [
+    ['pipeline', 'Deploy and verify staged service manifest', 'Upload pipeline receipts'],
+    ['pipeline-production', 'Promote and verify the staged service manifest', 'Upload production receipts'],
+  ]) {
+    const job = workflow.jobs[name]
+    const admissions = job.steps.filter(step => step.run === command)
+    assert.equal(admissions.length, 1, name + ' requires one independent admission step')
+    const admission = admissions[0]
+    const index = job.steps.indexOf(admission)
+    assert.equal(admission['working-directory'], 'operations')
+    assert.equal(admission.if, "steps.select.outputs.status == 'selected'")
+    assert.deepEqual(admission.env, { GH_TOKEN: expectedToken, MIKKA_PUBLIC_ACTIONS_TOKEN: expectedToken })
+    assert.equal(admission['continue-on-error'], undefined)
+    assert.equal(workflow.env?.CLOUDFLARE_API_TOKEN, undefined)
+    assert.equal(job.env?.CLOUDFLARE_API_TOKEN, undefined)
+    const tools = job.steps.findIndex(step => step.name === 'Install deployment tools without rebuilding the product')
+    assert.ok(tools >= 0 && tools < index, 'admission only needs installed private tools')
+    assert.doesNotMatch(JSON.stringify(job.steps.slice(0, index + 1)), /CLOUDFLARE_API_TOKEN/)
+    assert.equal(job.steps.slice(0, index).some(step => step.run && step['working-directory'] === 'operations/product'), false)
+    for (const stepName of ['Install pinned product client and verification dependencies', 'Prepare Ubuntu package mirrors',
+      'Install immutable image inspection tools', 'Read the existing Cloudflare deployment identity', applyName]) {
+      const later = job.steps.findIndex(step => step.name === stepName)
+      assert.ok(later > index, stepName + ' must wait for admission')
+      assert.equal(job.steps[later].if, "steps.select.outputs.status == 'selected'", 'the default success condition must stop later work')
+      assert.equal(job.steps[later]['continue-on-error'], undefined)
+    }
+    const upload = job.steps.find(step => step.name === uploadName)
+    assert.equal(upload.if, "always() && steps.select.outputs.status == 'selected'", 'a rejection must retain safe evidence')
+  }
+  assert.equal(workflow.jobs['deploy-application'].steps.some(step => step.run === command), false)
+})

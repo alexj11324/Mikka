@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
-import { validateReleaseManifest } from './service-builds.mjs'
+import { validateHistoricalReleaseManifest, validateReleaseManifest } from './service-builds.mjs'
 
 export const repository = 'alexj11324/Mikka'
 const producer = '.github/workflows/cloudflare-api-image.yml'
@@ -133,14 +133,33 @@ async function members(api, run, prefix) {
   return { artifact, files: readArtifactMembers(bytes, artifact) }
 }
 
-async function release(api, runId, runAttempt) {
+async function releasePacket(api, runId, runAttempt) {
   assert.match(String(runId ?? ''), number)
   const path = runAttempt ? `actions/runs/${runId}/attempts/${runAttempt}` : `actions/runs/${runId}`
   const run = checkedRun(await api(`${repository}/${path}`), producer, { event: 'push' })
+  assert.equal(String(run.id), String(runId), 'pipeline_release_run_mismatch')
+  if (runAttempt) assert.equal(String(run.run_attempt), String(runAttempt), 'pipeline_release_attempt_mismatch')
   const packet = await members(api, run, 'release-manifest')
-  const manifest = validateReleaseManifest(packet.files['release-manifest.json'])
+  assert.deepEqual(Object.keys(packet.files), ['release-manifest.json'], 'pipeline_release_member_required')
+  const manifest = packet.files['release-manifest.json']
+  assert.ok(manifest && typeof manifest === 'object' && !Array.isArray(manifest), 'pipeline_release_manifest_required')
   assert.equal(manifest.sourceCommit, run.head_sha)
-  return { run, manifest, origin: { runId: String(run.id), runAttempt: String(run.run_attempt), artifactId: String(packet.artifact.id) } }
+  return { run, manifest,
+    origin: { runId: String(run.id), runAttempt: String(run.run_attempt), artifactId: String(packet.artifact.id) } }
+}
+
+async function release(api, runId, runAttempt) {
+  const result = await releasePacket(api, runId, runAttempt)
+  validateReleaseManifest(result.manifest)
+  return result
+}
+
+// Only already-published state and rollback use the historical reader. Every
+// forward staging/production candidate goes through the strict v2 reader above.
+async function historicalRelease(api, runId, runAttempt) {
+  const result = await releasePacket(api, runId, runAttempt)
+  validateHistoricalReleaseManifest(result.manifest)
+  return result
 }
 
 export async function priorDeployment(api, currentRun, selectedRun, target = 'staging') {
@@ -178,6 +197,11 @@ export async function priorDeployment(api, currentRun, selectedRun, target = 'st
       // rejects an artifact name supplied by a different job in the same run.
       assert.ok(log.includes(`Artifact ${packet.artifact.name}.zip successfully finalized.`)
         && log.includes(`Artifact ID ${packet.artifact.id}`), 'pipeline_summary_upload_evidence_required')
+      // Only the separate preflight can prove rejection before any writer; its
+      // failed run has a skipped Deploy step and was handled above. Once this
+      // step ran, an admission label cannot hide a possibly partial deployment.
+      assert.equal(summary.admission, undefined, 'pipeline_previous_release_requires_recovery')
+      assert.notEqual(summary.failedStep, 'migration-identity', 'pipeline_previous_release_requires_recovery')
       return { run, summary, files: packet.files }
     }
   }
@@ -217,14 +241,14 @@ export async function selectPipeline({ env = process.env, api = github } = {}) {
     if (env.MIKKA_DEPLOYMENT_PHASE === 'pipeline-rollback') {
       assert.match(env.INPUT_PIPELINE_RUN ?? '', number)
       rollback = await priorDeployment(api, env.GITHUB_RUN_ID, env.INPUT_PIPELINE_RUN)
-      selected = await release(api, rollback.summary.origin.runId, rollback.summary.origin.runAttempt)
-      if (rollback.summary.previousOrigin) previous = await release(api, rollback.summary.previousOrigin.runId, rollback.summary.previousOrigin.runAttempt)
+      selected = await historicalRelease(api, rollback.summary.origin.runId, rollback.summary.origin.runAttempt)
+      if (rollback.summary.previousOrigin) previous = await historicalRelease(api, rollback.summary.previousOrigin.runId, rollback.summary.previousOrigin.runAttempt)
     } else selected = await release(api, env.INPUT_RELEASE_RUN)
   }
   if (!rollback) {
     const prior = await priorDeployment(api, env.GITHUB_RUN_ID)
     const origin = prior && baselineOrigin(prior.summary)
-    if (origin) previous = await release(api, origin.runId, origin.runAttempt)
+    if (origin) previous = await historicalRelease(api, origin.runId, origin.runAttempt)
   }
   const cloud = await api('alexj11324/mikka-cloud/git/ref/heads/main')
   assert.match(cloud.object?.sha ?? '', sha)
@@ -275,7 +299,7 @@ export async function selectPromotion({ env = process.env, api = github } = {}) 
   assert.equal(stage.files['pipeline-summary.json'].rollback, undefined)
   const prior = await priorDeployment(api, env.GITHUB_RUN_ID, undefined, 'production')
   const previousOrigin = prior && baselineOrigin(prior.summary, 'production')
-  const previous = previousOrigin && await release(api, previousOrigin.runId, previousOrigin.runAttempt)
+  const previous = previousOrigin && await historicalRelease(api, previousOrigin.runId, previousOrigin.runAttempt)
   const qualification = await qualificationOrigin(api)
   const report = resolve(env.RUNNER_TEMP, 'deploy-production')
   await mkdir(report, { recursive: true, mode: 0o700 })

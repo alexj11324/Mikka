@@ -52,7 +52,8 @@ environment without checkout, Registry or deployment credentials.
 `scripts/release/service-builds.mjs` hashes sorted file names, file bytes, file
 type, executable permission and declared build parameters. A new Git commit or
 run ID alone does not change a context. Import-closure checks reject omitted
-public source dependencies. Database migration files have a separate digest.
+public source dependencies. Database migrations have a separate identity covering
+both SQL and the code and toolchain that check and execute it.
 
 | Service | Actual input boundary | Output |
 | --- | --- | --- |
@@ -139,6 +140,47 @@ The private publisher verifies the original workflow/job/upload step and archive
 before using any service. It then compares the candidate with the deployed
 manifest, rather than treating every main merge as a six-service deployment.
 Build success alone does not authorize production promotion.
+
+### Migration identity and admission
+
+New release candidates require `migrations.version: 2`. `migrations.files` stays
+the complete, sorted SQL snapshot under `drizzle/`. The separate
+`migrations.execution` object contains exactly `entrypoint`, `files` and
+`contextDigest`; its entrypoint is `scripts/migrate.mjs`.
+
+`scripts/release/migration-inputs.mjs` follows the existing migrator's static
+imports, re-exports and literal dynamic imports. The fixed roots also include
+`scripts/check-migrations.mjs` and `scripts/migration-steps.mjs`, which the private
+publisher imports during admission. Inputs include Node's checked-in version,
+the root and workspace package manifests, the pnpm lock/workspace files, patches,
+and tracked npm configuration or pnpm hooks. Hook module dependencies follow the
+same closure rules. A helper or toolchain change changes both the execution digest
+and the aggregate migration digest even when every SQL file is unchanged.
+
+The scanner parses source without linking or evaluating it. Computed imports,
+import attributes, alternate module loaders, missing dependencies, file symlinks
+and symlinked parent directories stop planning. Node 22's parser metadata is
+accepted only with its existing import-attribute information; unsupported older
+metadata is rejected. The parser host's version is never part of a digest.
+
+The independent private verifier reproduces each digest from the fixed source's
+Git bytes and file modes. Files are sorted and unique. SHA-256 starts with UTF-8
+`JSON.stringify(parameters)` followed by a NUL byte; each file adds
+`JSON.stringify([path, 'file', executable, byteLength])`, a NUL byte and its exact
+bytes. Git mode `100644` maps to executable `0`, and `100755` maps to `73`.
+Execution parameters, in that property order, are
+`{version: 2, kind: 'migration-execution', entrypoint: 'scripts/migrate.mjs'}`.
+The aggregate applies the same algorithm to the SQL files with
+`{version: 2, kind: 'migrations', execution: execution.contextDigest}`.
+
+Every forward candidate path requires the complete v2 contract. The historical
+reader retains an old SQL-only receipt for baseline evidence or rollback without
+rewriting it or treating it as execution authorization. A private publisher must
+independently reconstruct the baseline from its authenticated source and compare
+the execution inputs before importing candidate checkers, planning or obtaining
+deployment/database credentials. Execution changes require independent review;
+unchanged execution still must pass the original SQL admission rules. Neither a
+changed digest nor an already-applied database ledger grants migration permission.
 
 ## What current docs are authoritative?
 

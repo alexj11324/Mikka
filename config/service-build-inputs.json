@@ -20,6 +20,7 @@
       "patches/**",
       "config/service-build-inputs.json",
       "scripts/release/service-builds.mjs",
+      "scripts/release/migration-inputs.mjs",
       "packages/*/package.json",
       "apps/*/package.json",
       "scripts/release/service-build-ci.mjs",

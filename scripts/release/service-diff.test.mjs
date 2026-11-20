@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { serviceDigest } from './service-builds.mjs'
-import { planServiceRelease } from './service-diff.mjs'
+import { planHistoricalServiceRelease, planServiceRelease } from './service-diff.mjs'
+import { migrationRoots, migrationToolchain } from './migration-inputs.mjs'
 
 const digest = value => 'sha256:' + createHash('sha256').update(value).digest('hex')
 function release() {
@@ -23,7 +24,9 @@ function release() {
           image: 'registry.cloudflare.com/' + 'c'.repeat(32) + '/mikka-' + name + '@' + imageDigest } : {}) }
       return [name, { ...service, digest: serviceDigest(service) }]
     })),
-    migrations: { contextDigest: digest('initial migrations'), files: ['drizzle/20261120000000_initial.sql'] } }
+    migrations: { version: 2, contextDigest: digest('initial migrations'), files: ['drizzle/20261120000000_initial.sql'],
+      execution: { entrypoint: 'scripts/migrate.mjs', contextDigest: digest('initial migration execution'),
+        files: [...migrationRoots, ...migrationToolchain].sort() } } }
 }
 function change(manifest, name) {
   const service = manifest.services[name]
@@ -71,7 +74,7 @@ test('a Worker artifact change deploys even without a container image change', (
 
 test('a migration-only release has no service deployment and preserves the previous ledger', () => {
   const current = release(), next = structuredClone(current)
-  next.migrations = { contextDigest: digest('expanded migrations'),
+  next.migrations = { ...current.migrations, contextDigest: digest('expanded migrations'),
     files: [...current.migrations.files, 'drizzle/20261120010000_add_title.sql'] }
   const plan = planServiceRelease(current, next)
   assert.deepEqual(plan.deploymentOrder, [])
@@ -80,6 +83,45 @@ test('a migration-only release has no service deployment and preserves the previ
   assert.deepEqual(plan.migrations.after, next.migrations)
   next.migrations.files.shift()
   assert.throws(() => planServiceRelease(current, next), /cannot remove previously released migrations/)
+})
+
+test('SQL-only history cannot become a new candidate or claim an unchanged execution identity', () => {
+  const next = release(), current = structuredClone(next)
+  delete current.migrations.version
+  delete current.migrations.execution
+  const before = structuredClone(current)
+  const plan = planServiceRelease(current, next)
+  assert.equal(plan.migrations.changed, true)
+  assert.deepEqual(plan.changedServices, [])
+  assert.deepEqual(plan.migrations.before, current.migrations)
+  assert.deepEqual(current, before)
+  assert.throws(() => planServiceRelease(next, current), /execution identity v2/)
+  assert.throws(() => planServiceRelease(null, current), /execution identity v2/)
+})
+
+test('the explicit historical comparator describes rollback artifacts without authorizing SQL removal or a legacy forward candidate', () => {
+  const old = release(), current = structuredClone(old)
+  change(current, 'web')
+  current.migrations.files.push('drizzle/20261120010000_add_title.sql')
+  current.migrations.contextDigest = digest('expanded migrations')
+  assert.throws(() => planServiceRelease(current, old), /cannot remove previously released migrations/)
+  delete old.migrations.version
+  delete old.migrations.execution
+  const before = structuredClone(current)
+  const rollback = planHistoricalServiceRelease(current, old)
+  assert.deepEqual(rollback.changedServices, ['web'])
+  assert.deepEqual(rollback.migrations.before, current.migrations)
+  assert.deepEqual(rollback.migrations.after, old.migrations)
+  assert.deepEqual(current, before)
+  assert.throws(() => planServiceRelease(current, old), /execution identity v2/)
+  const firstRollback = planHistoricalServiceRelease(null, old)
+  assert.equal(firstRollback.bootstrap, true)
+  assert.equal(firstRollback.previousSourceCommit, null)
+  assert.deepEqual(firstRollback.changedServices, ['world', 'task', 'litellm', 'eve', 'api', 'web'])
+  assert.ok(Object.values(firstRollback.services).every(service => service.before === null))
+  assert.throws(() => planHistoricalServiceRelease(undefined, old))
+  old.services.web.digest = digest('forged rollback artifact')
+  assert.throws(() => planHistoricalServiceRelease(current, old), /artifact digest differs/)
 })
 
 test('incomplete manifests and forged deployment digests fail before producing a plan', () => {

@@ -11,6 +11,49 @@ const services = ['web', 'api', 'eve', 'task', 'world', 'litellm']
 const marker = '<!-- deploy-pipeline-failure -->'
 const failedSteps = ['selection', 'artifacts', 'existing-resources', 'migrations', ...services, 'manifest-readback', 'staging-probes', 'production-probes', 'unknown']
 const features = ['coordinator', 'credentialVault', 'approvedWrites', 'cloudComputer']
+const admissionFailures = ['migration_identity_required', 'migration_identity_mismatch', 'migration_execution_changed']
+
+/** Only the private migration guard's rejection before any plan or writer has
+ * this empty service shape. Provenance is validated elsewhere; recording a
+ * failure here never grants release eligibility. */
+function rejectedAdmission(raw, summary) {
+  assert.deepEqual(Object.keys(raw).sort(), [
+    'admission', 'changedServices', 'deployment', 'failedStep', 'failureCode', 'manifestSha256', 'operationsQualification', 'origin',
+    'previousOrigin', 'previousSourceCommit', 'productionPromoted', 'retainedServices', 'services', 'sourceCommit',
+    'status', 'target', 'version',
+  ])
+  assert.equal(raw.admission, 'rejected')
+  assert.equal(raw.status, 'failed')
+  assert.equal(raw.failedStep, 'migration-identity')
+  assert.ok(admissionFailures.includes(raw.failureCode), 'pipeline_record_admission_code_invalid')
+  assert.equal(raw.productionPromoted, false)
+  assert.deepEqual(raw.changedServices, [])
+  assert.deepEqual(raw.retainedServices, [])
+  assert.deepEqual(raw.services, {})
+  assert.match(raw.manifestSha256, /^[a-f0-9]{64}$/)
+  const origin = (value, source) => {
+    assert.deepEqual(Object.keys(value ?? {}).sort(), ['archiveSha256', 'artifactId', 'event', 'runAttempt', 'runId', 'source'])
+    assert.equal(value.source, source)
+    assert.equal(value.event, 'push')
+    assert.match(value.archiveSha256, /^[a-f0-9]{64}$/)
+    for (const key of ['runId', 'runAttempt', 'artifactId']) assert.match(value[key], number)
+  }
+  origin(raw.origin, summary.sourceCommit)
+  assert.equal(raw.previousOrigin === null, raw.previousSourceCommit === null)
+  if (raw.previousSourceCommit !== null) {
+    assert.match(raw.previousSourceCommit, sha)
+    origin(raw.previousOrigin, raw.previousSourceCommit)
+    summary.previousSourceCommit = raw.previousSourceCommit
+  }
+  assert.deepEqual(Object.keys(raw.deployment ?? {}).sort(), ['driverSource', 'operationsSource', 'runAttempt', 'runId'])
+  for (const key of ['runId', 'runAttempt']) assert.match(raw.deployment[key], number)
+  for (const key of ['driverSource', 'operationsSource']) assert.match(raw.deployment[key], sha)
+  assert.deepEqual(Object.keys(raw.operationsQualification ?? {}).sort(), ['artifactId', 'privateSource', 'runAttempt', 'runId'])
+  for (const key of ['runId', 'runAttempt', 'artifactId']) assert.match(raw.operationsQualification[key], number)
+  assert.match(raw.operationsQualification.privateSource, sha)
+  return { ...summary, status: 'failed', manifestSha256: raw.manifestSha256,
+    failedStep: 'migration-identity', failureCode: raw.failureCode, admission: 'rejected' }
+}
 
 /** Re-project private output before writing public records. Unknown properties
  * cannot become an accidental address, body, account or credential disclosure. */
@@ -27,6 +70,7 @@ export function publicSummary(raw, { source, result, target = 'staging' }) {
     changedServices: [], retainedServices: [], services: {}, productionPromoted: raw?.productionPromoted === true }
   if (!raw) { summary.failedStep = 'selection'; return summary }
   assert.equal(raw.version, 1)
+  if (raw.admission !== undefined || raw.failedStep === 'migration-identity') return rejectedAdmission(raw, summary)
   for (const key of ['changedServices', 'retainedServices']) {
     assert.ok(Array.isArray(raw[key]) && raw[key].every(name => services.includes(name)))
     assert.equal(new Set(raw[key]).size, raw[key].length)
@@ -90,23 +134,27 @@ export function publicSummary(raw, { source, result, target = 'staging' }) {
 export function recordBody(summary, runId, attempt) {
   assert.match(String(runId), number); assert.match(String(attempt), number)
   const url = `https://github.com/${repository}/actions/runs/${runId}/attempts/${attempt}`
+  const rejected = summary.admission === 'rejected'
   const rows = Object.entries(summary.services).map(([name, service]) =>
     `| ${name} | ${summary.changedServices.includes(name) ? 'changed' : 'retained'} | \`${service.digest}\` | \`${service.sourceCommit}\` |`)
-  return [`## Deployment ${summary.status}`, '', `Workflow: [${runId} / attempt ${attempt}](${url})`,
+  return [rejected ? '## Deployment admission rejected' : `## Deployment ${summary.status}`, '', `Workflow: [${runId} / attempt ${attempt}](${url})`,
     `Source: \`${summary.sourceCommit}\`; target: **${summary.target}**.`,
-    `Changed: ${summary.changedServices.join(', ') || 'none'}; retained: ${summary.retainedServices.join(', ') || 'none'}.`,
+    rejected ? 'Service plan: **not created**; deployment writes: **not started**.'
+      : `Changed: ${summary.changedServices.join(', ') || 'none'}; retained: ${summary.retainedServices.join(', ') || 'none'}.`,
     `Production promoted: **${summary.productionPromoted ? 'yes' : 'no'}**.`,
     ...(summary.failedStep ? [`Failed check: **${summary.failedStep}**.`] : []),
+    ...(rejected ? [`Failure code: \`${summary.failureCode}\`.`] : []),
     ...(summary.verification?.failureDrill ? [`Staging failure drill: **${summary.verification.failureDrill.kind}** (HTTP 404).`] : []),
     ...(summary.manifestSha256 ? [`Manifest SHA-256: \`${summary.manifestSha256}\`.`] : []),
     ...(summary.rollback ? [`Rollback: **${summary.rollback.status}**, services: ${summary.rollback.services.join(', ') || 'none'}; additive schema retained.`] : []),
     ...(summary.rollback && summary.previousSourceCommit ? [`Restored source: \`${summary.previousSourceCommit}\`.`] : []),
-    '', '| Service | Action | Deployment digest | Artifact source |', '| --- | --- | --- | --- |', ...rows,
+    ...(rejected ? [] : ['', '| Service | Action | Deployment digest | Artifact source |', '| --- | --- | --- | --- |', ...rows]),
     ...(summary.verification ? ['', 'Verification:', '```json', JSON.stringify(summary.verification, null, 2), '```'] : []), ''].join('\n')
 }
 
 export async function recordPipeline({ summary, runId, attempt, api = github }) {
   const body = recordBody(summary, runId, attempt)
+  const rejected = summary.admission === 'rejected'
   const log = `https://github.com/${repository}/actions/runs/${runId}/attempts/${attempt}`
   const environment = summary.target === 'production' ? 'Production' : 'Staging'
   const servingSource = summary.rollback?.status === 'passed' && summary.previousSourceCommit
@@ -115,16 +163,16 @@ export async function recordPipeline({ summary, runId, attempt, api = github }) 
   let deployment = prior.find(item => item.payload?.pipelineRun === String(runId) && item.payload?.pipelineAttempt === String(attempt))
   if (!deployment) deployment = await api(`${repository}/deployments`, { method: 'POST', body: {
     ref: servingSource, task: 'deploy', environment, auto_merge: false,
-    // This is a record of the already-completed, independently gated release;
-    // it does not authorize or trigger a deployment writer.
+    // This records the workflow outcome; it does not authorize or trigger a deployment writer.
     required_contexts: [], production_environment: summary.target === 'production', transient_environment: false,
-    description: `Verified service pipeline ${runId}/${attempt}`,
+    description: rejected ? `Migration admission rejected ${runId}/${attempt}` : `Verified service pipeline ${runId}/${attempt}`,
     payload: { pipelineRun: String(runId), pipelineAttempt: String(attempt), manifest: summary },
   } })
   assert.ok(Number.isSafeInteger(deployment.id))
   await api(`${repository}/deployments/${deployment.id}/statuses`, { method: 'POST', body: {
     state: summary.status === 'passed' ? 'success' : 'failure', log_url: log,
-    description: `Services: ${summary.changedServices.join(', ') || 'retained'}; ${summary.rollback ? 'rollback ' + summary.rollback.status : summary.status}`.slice(0, 140),
+    description: rejected ? 'Migration admission rejected; no service plan or deployment writes.'
+      : `Services: ${summary.changedServices.join(', ') || 'retained'}; ${summary.rollback ? 'rollback ' + summary.rollback.status : summary.status}`.slice(0, 140),
     auto_inactive: summary.status === 'passed',
   } })
   await api(`${repository}/issues/2895/comments`, { method: 'POST', body: { body } })

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { validateReleaseManifest } from './service-builds.mjs'
+import { validateHistoricalReleaseManifest, validateReleaseManifest } from './service-builds.mjs'
 
 // Deploy dependencies before their callers. Migrations are a separate step
 // before this list; retained services never reach a deployment writer.
@@ -13,11 +13,24 @@ export const deploymentOrder = ['world', 'task', 'litellm', 'eve', 'api', 'web']
 export function planServiceRelease(currentManifest, nextManifest) {
   // Only an explicit null starts the first manifest-driven release. The private
   // publisher must capture the real previous deployment before any writer runs.
-  const current = currentManifest === null ? null : validateReleaseManifest(currentManifest)
+  const current = currentManifest === null ? null : validateHistoricalReleaseManifest(currentManifest)
   const next = validateReleaseManifest(nextManifest)
   const migrationFiles = new Set(next.migrations.files)
   assert.ok(!current || current.migrations.files.every(file => migrationFiles.has(file)),
     'A service release cannot remove previously released migrations')
+  return compareServices(current, next)
+}
+
+/** Only the rollback handler may compare previously authenticated artifacts.
+ * This describes old services; it never authorizes running or removing SQL.
+ * The rollback writer keeps the already-applied additive database schema. */
+export function planHistoricalServiceRelease(currentManifest, nextManifest) {
+  const current = currentManifest === null ? null : validateHistoricalReleaseManifest(currentManifest)
+  const next = validateHistoricalReleaseManifest(nextManifest)
+  return compareServices(current, next)
+}
+
+function compareServices(current, next) {
   const services = Object.fromEntries(deploymentOrder.map(name => [name, {
     changed: !current || current.services[name].digest !== next.services[name].digest,
     before: current?.services[name] ?? null,
@@ -35,7 +48,7 @@ export function planServiceRelease(currentManifest, nextManifest) {
     deploymentOrder: changedServices,
     services,
     migrations: {
-      changed: !current || current.migrations.contextDigest !== next.migrations.contextDigest,
+      changed: !current || current.migrations.version !== 2 || current.migrations.contextDigest !== next.migrations.contextDigest,
       before: current?.migrations ?? null,
       after: next.migrations,
     },
