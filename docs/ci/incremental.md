@@ -64,6 +64,24 @@ The trusted selector parses candidate files as data. It never imports a candidat
 plugin or executes candidate configuration. Forks use the same path without
 secrets. The tested checkout remains GitHub's synthetic merge candidate; the
 classification diff uses the PR base/head SHAs. Unsupported events/ranges run all.
+
+A frozen dependency branch can retain an older command inventory after main's
+registry changes. In the unmerged-base fallback, a candidate with main's complete
+registry keeps the normal main-policy path. For a different registry, the current
+trusted selector proves a unique common ancestor in the fetched main history and
+reads that ancestor's registry as JSON. The base and tested checkout must retain
+its complete CI configuration, manifests, runner and plugin bytes. Test paths and
+Git modes must match, including TypeScript type tests and Go tests; working files
+must match the committed checkout. Existing self-hosted dependency declarations
+cannot be changed or removed; appended declarations still pass the normal
+self-hosted acceptance checks. Same-name test bodies can change as part of the
+reviewed backport. The proof preserves task names, commands, kinds and environments,
+and selects every task in that registry with full validation of all other lanes
+and the entire candidate DB inventory. It never executes the ancestor's selector,
+trusts a branch-name allowlist, drops unknown tasks or converts a failed proof to
+a partial selection. The selection report records the policy, ancestor and registry
+blob identities. The original runner still rejects unknown tasks.
+
 When introducing the selector on a base that predates it, inventory is validated
 with the old trusted runner and every lane runs in full. Candidate shadow reports
 have no job outputs and cannot authorize skips.

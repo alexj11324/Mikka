@@ -6,7 +6,7 @@ import { filterAffected } from 'nx/src/project-graph/affected/affected-project-g
 import { buildGraph, dbId, taskId } from './graph.mjs'
 import { isSelfHostedBackendInput } from './self-hosted-requirements.mjs'
 import { isDocsOnly } from '../ci-docs-only.mjs'
-import tasks from './tasks.json' with { type: 'json' }
+import { frozenUnitInventory } from './frozen-inventory.mjs'
 
 export const GLOBAL = /^(?:\.github\/(?!workflows\/README\.md$)|scripts\/|tests\/(?:helpers|support)\/|patches\/|packages\/(?:config|protocol|subscription-worker)\/|services\/|cloudflare\/|(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|nx\.json|[^/]*config[^/]*|[^/]*lock[^/]*|Dockerfile|docker-compose[^/]*|\.dockerignore|\.npmrc)$|lib\/(?:db(?:\/|\.)|auth|api-auth|fresh-session|credentials\/|secrets\/|permissions|.*authorization|.*tenant|.*scope))/
 // Keep the expression readable without a trailing whitespace token.
@@ -33,6 +33,7 @@ export function diffRange(env, event) {
   return [] // Manual, nightly, tag and unsupported events always run all checks.
 }
 export async function select(plan, changes, { force = false } = {}) {
+  const { tasks } = plan
   const files = changes.map(c => c.file)
   const areas = [...new Set(files.map(area))].sort()
   const reasons = []
@@ -88,8 +89,14 @@ export function emit(result, env = process.env) {
 }
 export async function main(env = process.env) {
   const root = env.CI_CANDIDATE_ROOT || process.cwd()
-  const plan = buildGraph(root) // Always validates the entire candidate DB inventory.
   const event = env.GITHUB_EVENT_PATH ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH)) : {}
+  const provenance = diffRange(env, event)
+  let frozen = null
+  if (env.CI_POLICY_FALLBACK === 'true' && ['pull_request', 'merge_group'].includes(env.GITHUB_EVENT_NAME)) {
+    if (env.CI_FORCE_FULL !== 'true' || provenance.length !== 2) throw Error('frozenCiFullCoverageRequired')
+    frozen = frozenUnitInventory(root, { policy: env.CI_POLICY_SHA, base: provenance[0], head: provenance[1], checkout: env.GITHUB_SHA })
+  }
+  const plan = buildGraph(root, frozen?.tasks) // Always validates the entire candidate DB inventory.
   const range = env.CI_BASE && env.CI_HEAD ? [env.CI_BASE, env.CI_HEAD] : diffRange(env, event)
   let changes = [], force = env.CI_FORCE_FULL === 'true'
   try {
@@ -102,6 +109,10 @@ export async function main(env = process.env) {
     }
   } catch { force = true }
   const result = await select(plan, changes, { force })
+  if (frozen) {
+    result.unit_inventory = frozen.proof
+    result.reasons.push('frozen dependency: complete unit inventory from reviewed main ancestor')
+  }
   if (env.CI_SELECTION_FILE) writeFileSync(env.CI_SELECTION_FILE, JSON.stringify(result, null, 2) + '\n')
   emit(result, env)
 }
