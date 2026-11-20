@@ -2230,6 +2230,10 @@
         "title": "指令",
         "keywords": "记忆 建议"
       },
+      "threads": {
+        "title": "线程",
+        "keywords": "标题"
+      },
       "memory": {
         "title": "记忆与建议"
       },

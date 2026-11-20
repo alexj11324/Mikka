@@ -29,6 +29,7 @@ import { PrivacySettings } from '@/components/settings/privacy-settings'
 import { SecretsPage } from '@/components/settings/secrets-page'
 import { DevicesSettings } from '@/components/devices/devices-settings'
 import { MemorySettings } from '@/components/settings/memory-settings'
+import { ThreadSettings } from '@/components/settings/thread-settings'
 import { NotificationSettings } from '@/components/settings/notifications-settings'
 import { AccessTokensSettings } from '@/components/settings/access-tokens-settings'
 import { AuditLogSettings } from '@/components/settings/audit-log-settings'
@@ -165,6 +166,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'preferences': return <><PreferencesSettings />{workspaceId && !preview && !workspaceError && <RestoreSetupChecklist key={workspaceId} workspaceId={workspaceId} />}</>
     case 'appearance': return <AppearanceSettings />
     case 'instructions': return <MemorySettings />
+    case 'threads': return <ThreadSettings workspaceId={workspaceId} personal={personal} />
     case 'notifications': return <NotificationSettings />
     case 'connections': return <PluginsView section="connections" rootLabel={t('sections.connections.title')} linearNotice={linearNotice} workspaceId={!preview ? workspaceId : undefined} workspaceName={workspaceName} />
     case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} team={team} cloudUserKey={community ? userKey : undefined} /> : waiting}</>

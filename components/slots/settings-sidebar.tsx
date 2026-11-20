@@ -5,7 +5,7 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from '@/components/settings/settings-link'
 import { useSearchParams } from '@/lib/client-runtime/navigation'
 import useSWR from 'swr'
-import { Bell, Blocks, Brain, Building2, ChartColumn, CircleCheck, CircleDashed, Cloud, Container, CreditCard, FileText, Folder, Gauge, GitPullRequest, HardDrive, History, Keyboard, KeyRound, Landmark, Lightbulb, Monitor, Plus, Shield, ShieldCheck, SlidersHorizontal, SquareTerminal, SquareUserRound, Star, Sun, UserRound, Users, type IconGlyph } from '@/components/icons'
+import { Bell, Blocks, Brain, Building2, ChartColumn, CircleCheck, CircleDashed, Cloud, Container, CreditCard, FileText, Folder, Gauge, GitPullRequest, HardDrive, History, Keyboard, KeyRound, Landmark, Lightbulb, MessageSquareText, Monitor, Plus, Shield, ShieldCheck, SlidersHorizontal, SquareTerminal, SquareUserRound, Star, Sun, UserRound, Users, type IconGlyph } from '@/components/icons'
 import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { SearchInput } from '@/components/ui/search-input'
@@ -18,7 +18,7 @@ import type { SettingsSidebarProps } from '@/components/slots/settings-sidebar-c
 const icons = {
   preferences: SlidersHorizontal, appearance: Sun, account: UserRound, security: Shield, notifications: Bell,
   models: Gauge, environments: Container, connections: Blocks, logins: KeyRound, developer: SquareTerminal, computers: Monitor,
-  instructions: Brain, shortcuts: Keyboard, git: GitPullRequest, 'review-repositories': Folder, 'review-config': CircleCheck, activity: History,
+  instructions: Brain, threads: MessageSquareText, shortcuts: Keyboard, git: GitPullRequest, 'review-repositories': Folder, 'review-config': CircleCheck, activity: History,
   general: Building2, 'issue-states': CircleDashed, members: Users, teams: SquareUserRound, permissions: ShieldCheck, secrets: HardDrive,
   audit: FileText, organization: Landmark, usage: ChartColumn, billing: CreditCard, cloud: Cloud,
   referrals: Star, experiments: Lightbulb, 'cloud-credentials': Cloud,

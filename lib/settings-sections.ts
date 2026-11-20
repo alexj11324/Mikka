@@ -9,7 +9,7 @@ export const SETTINGS_GROUPS = ['personal', 'agent', 'review', 'workspace'] as c
 export type SettingsSectionId =
   | 'preferences' | 'appearance' | 'account' | 'security' | 'notifications' | 'models'
   | 'environments' | 'connections' | 'logins' | 'developer' | 'computers'
-  | 'instructions'
+  | 'instructions' | 'threads'
   | 'shortcuts' | 'git' | 'review-repositories' | 'review-config' | 'activity'
   | 'general' | 'issue-states' | 'members' | 'teams' | 'permissions' | 'secrets'
   | 'audit' | 'organization' | 'usage' | 'billing' | 'cloud'
@@ -49,6 +49,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'developer', group: 'personal', title: 'Personal access tokens' },
   { id: 'computers', group: 'personal', title: 'Devices' },
   { id: 'instructions', group: 'agent', title: 'Instructions' },
+  { id: 'threads', group: 'agent', title: 'Threads' },
   // Hidden until #2956 merges. Do not render placeholder data for these.
   // shortcuts: P9. git, review-repositories, review-config: P5. activity: P8.
   // MCP server detail (P4) stays on 集成 until that API exists.

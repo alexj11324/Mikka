@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test'
 
-const SECTIONS = new Set(['members', 'preferences', 'appearance', 'instructions', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'environments', 'audit', 'usage', 'billing'])
+const SECTIONS = new Set(['members', 'preferences', 'appearance', 'instructions', 'threads', 'memory', 'account', 'teams', 'notifications', 'security', 'connections', 'bot-permissions', 'models', 'logins', 'privacy', 'computers', 'general', 'permissions', 'secrets', 'environments', 'audit', 'usage', 'billing'])
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
 
 function sectionId(id) {
@@ -80,6 +80,10 @@ export async function settingsReady(page, id, fixture, messages) {
     case 'appearance':
       await selected(role('radiogroup', 'Settings.appearance.themeLabel'))
       await enabled(role('radio', 'Settings.appearance.light'))
+      break
+    case 'threads':
+      await visible(role('textbox', 'Settings.threadTitles.instructions').first())
+      await visible(role('combobox', 'Settings.threadTitles.triggers').first())
       break
     case 'instructions':
     case 'memory':

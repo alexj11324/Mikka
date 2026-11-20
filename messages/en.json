@@ -2230,6 +2230,10 @@
         "title": "Instructions",
         "keywords": "memory suggestions"
       },
+      "threads": {
+        "title": "Threads",
+        "keywords": "titles"
+      },
       "memory": {
         "title": "Memory and suggestions"
       },

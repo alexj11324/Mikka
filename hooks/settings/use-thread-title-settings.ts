@@ -41,6 +41,7 @@ export function useThreadTitleSettings(scope: 'mine' | 'workspace', workspaceId:
   return {
     loaded: Boolean(view),
     loadFailed: Boolean(read.error || (read.data && 'error' in read.data)),
+    reload: () => { void read.mutate() },
     canEdit, busy, message,
     instructions,
     type: (value: string) => setDraft(value),

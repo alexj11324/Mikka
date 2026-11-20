@@ -38,6 +38,7 @@ type Result<F extends (...args: never[]) => unknown> = Awaited<ReturnType<F>>
  */
 const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: Key, read: () => Promise<unknown>][]>> = {
   preferences: () => [[settingsKeys.issuePrefix(), () => settingsRead<Result<typeof getIssuePrefixState>>('issue-prefix')]],
+  threads: id => [[settingsKeys.threadTitles(id), () => settingsRead('thread-titles', { workspace: id })]],
   security: () => [[settingsKeys.password(), () => settingsRead<Result<typeof getPasswordStatus>>('password')], [settingsKeys.sessions(), () => settingsRead<Result<typeof listSessions>>('sessions')]],
   notifications: () => [[settingsKeys.preferences(), () => settingsRead<Result<typeof getPreferences>>('preferences')]],
   logins: () => [[settingsKeys.savedLogins(), () => settingsRead<Result<typeof listSavedLogins>>('saved-logins')]],

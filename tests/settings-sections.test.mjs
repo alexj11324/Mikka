@@ -4,7 +4,7 @@ import { SETTINGS_SECTIONS, isSettingsSectionParam, resolveSettingsSection, sett
 
 test('every nav item has exactly one section, in the Figma 1508:2 group order', () => {
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'personal' && !s.withheld && !s.unbuilt && s.sidebar !== false).map(s => s.id), ['preferences', 'appearance', 'account', 'security', 'notifications', 'models', 'environments', 'connections', 'developer', 'computers'])
-  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'agent' && !s.unbuilt).map(s => s.id), ['instructions'])
+  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'agent' && !s.unbuilt).map(s => s.id), ['instructions', 'threads'])
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'review' && !s.unbuilt).map(s => s.id), [])
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace' && !s.unbuilt && s.sidebar !== false).map(s => s.id), ['general', 'issue-states', 'members', 'teams', 'permissions', 'audit', 'organization', 'usage', 'billing', 'cloud'])
 })
