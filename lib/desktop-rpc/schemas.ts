@@ -22,6 +22,7 @@ import { MAX_READ_BATCH, READ_BATCH_ACTIONS, type ReadBatchCall } from './read-b
 import { USER_FACT_KINDS } from '@/lib/profile/kinds'
 import { definitionSchema as scheduleDefinition, webhookBatchListInput, webhookBatchInput } from '@/lib/schedules/contract'
 import { DEVICE_DESCRIPTION_MAX } from '@/lib/device-name'
+import { savedViewScopes, saveViewInput } from '@/lib/saved-views'
 
 const uuid = z.uuid()
 const id = z.string().min(1).max(200)
@@ -345,6 +346,11 @@ export const desktopActionSchemas = {
   'task-runs.syncThreadList': tuple(version.optional(), listPositions(200).optional()),
   'task-runs.findThreadReferences': z.union([tuple(uuid, text(120)), tuple(uuid, text(120), z.enum(['task', 'thread', 'pr']))]),
   'task-runs.listConversations': tuple(directoryInput),
+  'list-views.listPullPins': oneId,
+  'list-views.setPullPins': tuple(uuid, z.array(text(500)).min(1).max(100), bool),
+  'list-views.listSavedViews': tuple(uuid, z.enum(savedViewScopes)),
+  'list-views.saveView': tuple(saveViewInput),
+  'list-views.deleteSavedView': tuple(uuid, uuid),
   'task-runs.listConversationSidebar': none,
   'task-runs.readConversationOrganization': tuple(conversationTargetInput),
   'task-runs.setConversationOrganization': tuple(conversationTargetInput, object({ field: z.enum(['archived', 'pinned']), value: bool })),

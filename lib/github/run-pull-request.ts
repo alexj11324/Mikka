@@ -38,6 +38,9 @@ const prSchema = z.object({
   changed_files: z.number().int().nonnegative().optional(),
   head: z.object({ ref: z.string(), sha: z.string().regex(/^[a-f0-9]{40,64}$/i).optional(), repo: z.object({ id }).nullable() }),
   base: z.object({ repo: z.object({ id }) }),
+  // Who opened it and when, for the PR directory's author column and Since filter.
+  user: z.object({ login: z.string().max(100) }).nullable().optional(),
+  created_at: z.iso.datetime({ offset: true }).optional(),
 })
 
 export function githubRepository(key: string) {
@@ -171,8 +174,9 @@ export async function openRunPullRequest(options: Options & {
       else throw new PublicationError('factory_public_evidence_required')
     }
     const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : {}
-    const review: Partial<PublishedPullRequest> = pr.head.sha ? { branch: pr.head.ref, headSha: pr.head.sha.toLowerCase(),
-      ...(pr.changed_files === undefined ? {} : { changedFiles: pr.changed_files }) } : {}
+    const review: Partial<PublishedPullRequest> = { ...(pr.head.sha ? { branch: pr.head.ref, headSha: pr.head.sha.toLowerCase(),
+      ...(pr.changed_files === undefined ? {} : { changedFiles: pr.changed_files }) } : {}),
+      ...(pr.user?.login ? { author: pr.user.login } : {}), ...(pr.created_at ? { createdAt: new Date(pr.created_at).toISOString() } : {}) }
     if (!readChecks) review.reviewChecks = null
     else if (pr.head.sha) {
       try { review.reviewChecks = await readReviewChecks(p => request(p, access.token), path, pr.head.sha) }

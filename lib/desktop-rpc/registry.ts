@@ -44,6 +44,7 @@ import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
 import * as actions36 from '@/app/actions/thread-title-settings'
 import * as automations from '@/app/actions/automations'
+import * as listViews from '@/app/actions/list-views'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
@@ -268,6 +269,11 @@ const functions = {
   'task-runs.syncThreadList': actions26.syncThreadList,
   'task-runs.findThreadReferences': actions26.findThreadReferences,
   'task-runs.listConversations': actions26.listConversations,
+  'list-views.listPullPins': listViews.listPullPins,
+  'list-views.setPullPins': listViews.setPullPins,
+  'list-views.listSavedViews': listViews.listSavedViews,
+  'list-views.saveView': listViews.saveView,
+  'list-views.deleteSavedView': listViews.deleteSavedView,
   'task-runs.listConversationSidebar': actions26.listConversationSidebar,
   'task-runs.readConversationOrganization': actions26.readConversationOrganization,
   'task-runs.setConversationOrganization': actions26.setConversationOrganization,

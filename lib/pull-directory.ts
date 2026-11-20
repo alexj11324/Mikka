@@ -54,6 +54,8 @@ export const pullPageInput = z.strictObject({
     .max(200),
   cursor: z.string().min(1).max(1024).nullable().default(null),
   view: z.enum(pullViews).default("open"),
+  /** Only pull requests opened at or after this instant. */
+  since: z.iso.datetime({ offset: true }).nullable().default(null),
 });
 
 /** The query for one pull request's changed files (app/api/integrations/github/repositories/pulls/files). */
@@ -240,3 +242,42 @@ export function groupDirectoryPulls(
     groups.has(key) ? [{ key, rows: groups.get(key)! }] : [],
   );
 }
+
+/** One pull request as its own page reads it (app/api/integrations/github/repositories/pulls/detail). */
+export type PullCheck = {
+  name: string;
+  /** Collapsed to the page's words: passed, failed, pending, skipped. */
+  state: "success" | "failure" | "pending" | "skipped";
+  url: string | null;
+};
+export type PullReview = {
+  author: string | null;
+  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "DISMISSED" | "PENDING";
+  submittedAt: string | null;
+};
+export type PullDetail = Omit<PullDirectoryRow, "threads"> & {
+  changedFiles: number;
+  mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
+  checkRuns: PullCheck[];
+  /** GitHub stopped listing at the read's cap. */
+  moreChecks: boolean;
+  reviews: PullReview[];
+};
+
+/** The query for one pull request's page and its merge: the same admitted repository as the directory. */
+export const pullDetailQuery = pullFilesQuery;
+
+/** Merging one PR by itself, bound to the head the person looked at (app/api/integrations/github/repositories/pulls/merge). */
+export const pullMergeInput = z.strictObject({
+  repo: pullPageInput.shape.repo,
+  number: z.number().int().positive().max(9_999_999_999),
+  expectedHeadSha: z.string().regex(/^[a-f0-9]{40}$/),
+  method: z.enum(["merge", "squash", "rebase"]).optional(),
+  /** The person saw failing checks and merges anyway (the review page's 仍然合并). */
+  confirmFailedChecks: z.boolean().default(false),
+});
+export type PullMergeInput = z.input<typeof pullMergeInput>;
+export type PullMergeResult =
+  | { kind: "merged"; mergeCommitSha: string | null }
+  | { kind: "needs_confirm"; failing: number }
+  | { kind: "refused"; code: string };
