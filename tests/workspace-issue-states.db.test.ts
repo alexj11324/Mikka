@@ -2,12 +2,18 @@
 // workspace, `issues.status` and `issues.state_id` stay in step both ways, automatic moves land on the category's
 // default, and the settings writers (create, rename, reorder, default, MoveAndDelete) keep the list consistent.
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
+import { mock, test } from 'node:test'
 import { dbUrl, seedIssue, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 test('workspace issue states: seeding, status sync, automatic moves and MoveAndDelete', { skip: !dbUrl, timeout: 120_000 }, async t => {
   const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: dbUrl, max: 2 })
+  // Which task lists each writer refreshes: a real copy of the live module, with workspaceListChanged recorded.
+  const listCalls: { workspaceId: string; kinds: string[] }[] = []
+  const real = await import(new URL('../lib/live/lists.ts?actual', import.meta.url).href)
+  mock.module(new URL('../lib/live/lists.ts', import.meta.url).href, { namedExports: { ...real,
+    workspaceListChanged: (executor: object, workspaceId: string, kinds: string[]) => { listCalls.push({ workspaceId, kinds: [...kinds] }); return real.workspaceListChanged(executor, workspaceId, kinds) } } })
+  const refreshed = () => listCalls.splice(0).flatMap(call => call.kinds)
   const store = await import('../lib/issue-states-store')
   const { advanceIssueStatus } = await import('../lib/task-status-advance')
   const { pool: appPool, db } = await import('../lib/db')
@@ -15,6 +21,7 @@ test('workspace issue states: seeding, status sync, automatic moves and MoveAndD
   const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   const other = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   t.after(async () => {
+    await pool.query('delete from coordinator_events where "issueId" in (select id from issues where "workspaceId" = any($1))', [[workspace.id, other.id]])
     await pool.query('delete from issue_versions where "issueId" in (select id from issues where "workspaceId" = any($1))', [[workspace.id, other.id]])
     await pool.query('delete from issues where "workspaceId" = any($1)', [[workspace.id, other.id]])
     await pool.query('delete from workspace_issue_states where workspace_id = any($1)', [[workspace.id, other.id]])
@@ -57,7 +64,10 @@ test('workspace issue states: seeding, status sync, automatic moves and MoveAndD
   await assert.rejects(pool.query('update issues set state_id=$2 where id=$1', [task, foreign.id]), { code: '23503' })
 
   // Automatic moves (lib/task-status-advance.ts) land on the category's default, which the workspace can change.
+  refreshed()
   await store.setDefaultIssueState({ workspaceId: workspace.id, id: building })
+  // Tasks on a category default carry no stateId in list rows, so a new default must refresh the task lists too.
+  assert.deepEqual(new Set(refreshed()), new Set(['workspace_settings', 'issue_list']))
   const defaults = (await store.listIssueStates(db, workspace.id)).filter(state => state.category === 'doing')
   assert.deepEqual(defaults.map(state => [state.id, state.isDefault]), [[byCategory.doing.id, false], [building, true]])
   assert.equal(await advanceIssueStatus(pool, { issueId: task, to: 'doing', since: null, source: 'run-started' }), true)
@@ -87,7 +97,12 @@ test('workspace issue states: seeding, status sync, automatic moves and MoveAndD
   await assert.rejects(store.deleteIssueState({ workspaceId: workspace.id, id: building, moveTo: building }, actor), { code: 'issueStateMoveTargetInvalid' })
   await assert.rejects(store.deleteIssueState({ workspaceId: workspace.id, id: building, moveTo: foreign.id }, actor), { code: 'issueStateNotFound' })
   const before = (await read(task)).revision
+  const eventsBefore = Number((await pool.query(`select count(*) from coordinator_events where "issueId" = any($1)`, [[task, second]])).rows[0].count)
   assert.deepEqual(await store.deleteIssueState({ workspaceId: workspace.id, id: building, moveTo: byCategory.done.id }, actor), { moved: 2 })
+  // As a single status change does, each moved task tells its owner's Coordinator (doing → done is issue_done).
+  const { rows: events } = await pool.query<{ kind: string; issueId: string }>(`select kind, "issueId" from coordinator_events where "issueId" = any($1) order by "createdAt" offset $2`, [[task, second], eventsBefore])
+  assert.deepEqual(events.map(event => event.kind).sort(), ['issue_done', 'issue_done'])
+  assert.deepEqual(new Set(events.map(event => event.issueId)), new Set([task, second]))
   for (const id of [task, second]) {
     const row = await read(id)
     assert.equal(row.state_id, byCategory.done.id)

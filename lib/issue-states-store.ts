@@ -4,6 +4,9 @@ import { db } from '@/lib/db'
 import { issues, workspaceIssueStates } from '@/lib/db/schema'
 import { WorkspaceError } from '@/lib/workspace-access'
 import { workspaceListChanged } from '@/lib/live/lists'
+import { coordinatorBot } from '@/lib/coordinator/coordinator-bot'
+import { issueStatusEvent } from '@/lib/coordinator-events'
+import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import type { ActivityActor } from '@/lib/activity-actor'
 import type { IssueStatus } from '@/lib/issue-meta'
 import { issueStateType, type CreateIssueStateInput, type DeleteIssueStateInput, type IssueStateIcon, type IssueStateView, type ReorderIssueStatesInput, type SetDefaultIssueStateInput, type UpdateIssueStateInput } from '@/lib/issue-states'
@@ -111,7 +114,9 @@ export async function setDefaultIssueState(input: SetDefaultIssueStateInput): Pr
     await tx.update(workspaceIssueStates).set({ isDefault: false, updatedAt: new Date() })
       .where(and(eq(workspaceIssueStates.workspaceId, input.workspaceId), eq(workspaceIssueStates.category, state.category), eq(workspaceIssueStates.isDefault, true)))
     await tx.update(workspaceIssueStates).set({ isDefault: true, updatedAt: new Date() }).where(eq(workspaceIssueStates.id, input.id))
-    await changed(tx, input.workspaceId)
+    // List rows carry no stateId while a task sits on its category's default (app/actions/issues.ts listStateId), so
+    // those tasks now show the new default: the task lists must refresh, not only settings.
+    await changed(tx, input.workspaceId, true)
   })
 }
 
@@ -120,19 +125,29 @@ export async function setDefaultIssueState(input: SetDefaultIssueStateInput): Pr
  * state is deleted. A category's default cannot be deleted: make another state the default first.
  */
 export async function deleteIssueState(input: DeleteIssueStateInput, actor: ActivityActor): Promise<{ moved: number }> {
+  // A move that changes a task's status tells its owner's Coordinator, as a single status change does
+  // (app/actions/issues.ts persistIssue). The bot is resolved before the transaction, as there.
+  const owners = await db.selectDistinct({ id: issues.userId }).from(issues)
+    .where(and(eq(issues.workspaceId, input.workspaceId), eq(issues.stateId, input.id)))
+  const bots = new Map(await Promise.all(owners.map(async owner => [owner.id, (await coordinatorBot(owner.id, input.workspaceId, { backfill: false })).botId] as const)))
   return write(input.workspaceId, async tx => {
     if (input.id === input.moveTo) throw new WorkspaceError('issueStateMoveTargetInvalid')
     const state = await lockedState(tx, input.workspaceId, input.id)
     if (state.isDefault) throw new WorkspaceError('issueStateDefaultLocked')
     const target = await lockedState(tx, input.workspaceId, input.moveTo)
-    const moved = await tx.execute<{ issueId: string }>(sql`with moved as (
+    const moved = await tx.execute<{ issueId: string; userId: string; revision: number; title: string; status: string }>(sql`with moved as (
       update issues set state_id = ${target.id}::uuid, status = ${target.category}, revision = revision + 1, "updatedAt" = now()
       where "workspaceId" = ${input.workspaceId}::uuid and state_id = ${state.id}::uuid
       returning id, "userId", revision, title, content, status, priority
     )
     insert into issue_versions (id, "issueId", "userId", revision, title, content, status, priority, actor_type, actor_id)
     select gen_random_uuid(), id, "userId", revision, title, content, status, priority, ${actor.actorType}, ${actor.actorId} from moved
-    returning "issueId"`)
+    returning "issueId", "userId", revision, title, status`)
+    for (const row of moved.rows) {
+      const botId = bots.get(row.userId)
+      const event = botId ? issueStatusEvent({ status: state.category }, { id: row.issueId, userId: row.userId, title: row.title, status: row.status, revision: row.revision }, botId) : null
+      if (event) await recordCoordinatorEvent(tx, event)
+    }
     await tx.delete(workspaceIssueStates).where(and(eq(workspaceIssueStates.id, state.id), ne(workspaceIssueStates.isDefault, true)))
     await changed(tx, input.workspaceId, true)
     return { moved: moved.rows.length }
