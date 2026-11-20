@@ -28,11 +28,15 @@ export function useTimingSummary() {
   }
 }
 
+const viewerZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return 'UTC' } }
+
 function useScheduleSummary() {
   const t = useTranslations('Automations.summary')
   const format = useFormatter()
   return (definition: Pick<Definition, 'timing' | 'timezone'>) => {
     const timing = definition.timing
+    // Capy's row names the zone beside the time (`Monday at 9:00 AM (America/New_York)`); its own zone is left off.
+    const zone = definition.timezone === viewerZone() ? '' : ` (${definition.timezone})`
     if (timing.kind === 'manual') return t('manual')
     if (timing.kind === 'once') return t('once', { time: format.dateTime(new Date(timing.at), { dateStyle: 'medium', timeStyle: 'short', timeZone: definition.timezone }) })
     if (timing.kind === 'interval') {
@@ -41,21 +45,19 @@ function useScheduleSummary() {
       if (minutes % 60 === 0) return t('intervalHours', { count: minutes / 60 })
       return t('intervalMinutes', { count: minutes })
     }
-    if (timing.kind === 'daily') { const [hour, minute] = timing.time.split(':').map(Number); return t('daily', { time: clock(hour!, minute!) }) }
+    if (timing.kind === 'daily') { const [hour, minute] = timing.time.split(':').map(Number); return t('daily', { time: clock(hour!, minute!) }) + zone }
     const shape = cronShape(timing.expression)
     if (!shape) return t('cron', { expression: timing.expression })
     const time = clock(shape.hour, shape.minute)
-    if (shape.kind === 'monthly') return t('monthly', { day: shape.day, time })
+    if (shape.kind === 'monthly') return t('monthly', { day: shape.day, time }) + zone
     if (shape.kind === 'weekly') {
       // 2026-11-15 is a Sunday: day 0 maps to it, 1 to Monday and so on.
       const weekday = format.dateTime(new Date(Date.UTC(2026, 10, 15 + shape.day, 12)), { weekday: 'long', timeZone: 'UTC' })
-      return t('weekly', { weekday, time })
+      return t('weekly', { weekday, time }) + zone
     }
-    return t(shape.kind, { time })
+    return t(shape.kind, { time }) + zone
   }
 }
-
-const viewerZone = () => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return 'UTC' } }
 
 /** The next run as the automation's own clock reads it, naming the zone when it is not the viewer's, so it agrees with the summary. */
 export function useNextRunLabel() {

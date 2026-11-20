@@ -186,7 +186,7 @@ export function useSkillsSearch(query: string, enabled: boolean) {
 }
 
 /**
- * The 应用 store's data: its sections (热门 with ours first, 新品推荐, then Composio's categories), the open section
+ * The 应用 store's data: its sections (推荐给你 with ours, 精选, 新品推荐, then Composio's categories), the open section
  * (`&category=`), search results, what 添加 offers, each item's state and what connecting it does. Shared with UI layers.
  */
 export function usePluginStore({ apps, ownRead, category, query, go }: { apps: ConnectedApps; ownRead: OwnAppsRead; category: string | null; query: string; go: PluginsGo }) {
@@ -204,18 +204,23 @@ export function usePluginStore({ apps, ownRead, category, query, go }: { apps: C
   const stateOf = (id: string): StoreItemState | null => id === 'slack' && !byId.has(id) ? 'add' : isOwnApp(id)
     ? ownRead.data?.failed.includes(id) && ownRead.data.states[id] === undefined ? 'unavailable' : storeItemState({ kind: 'own', state: ownRead.data?.states[id] })
     : storeItemState({ kind: 'composio', connect: byId.get(id)?.connect, accounts: apps.accountsFor(id).length, canLink: byId.get(id)?.connect === 'credentials' ? apps.canEnterKey : apps.canLink, loading: apps.loading })
-  // The sections, as Codex's: 热门 (ours first, then Composio's usage order), 新品推荐, then Composio's categories.
+  // The sections as Capy's Explore groups them (2026-11-19): 推荐给你 — ours, the apps Mikka builds itself — then 精选
+  // (Composio's most used, the rest behind 查看全部), then 新品推荐 and Composio's categories. Ours are the first group
+  // before the catalogue has loaded, so the page is never empty while it reads.
+  const ownIds = new Set<string>([...OWN_APPS, 'slack'])
+  const others = (ids: readonly string[]) => entries(ids.filter(id => !ownIds.has(id)))
   const sections: StoreSectionData[] = [
-    { id: 'popular', name: t('popular'), items: [...own, ...entries(catalog.data?.popular ?? [])], preview: SECTION_PREVIEW },
+    { id: 'recommended', name: t('recommended'), items: own, preview: SECTION_PREVIEW },
     ...catalog.data ? [
-      { id: 'latest', name: t('latest'), items: entries(catalog.data.latest), preview: SECTION_PREVIEW },
+      { id: 'featured', name: t('featured'), items: others(catalog.data.popular), preview: SECTION_PREVIEW },
+      { id: 'latest', name: t('latest'), items: others(catalog.data.latest), preview: SECTION_PREVIEW },
       ...catalog.data.categories.map(item => ({ id: `c:${item.id}`, name: item.name, items: entries(item.apps), preview: CATEGORY_PREVIEW })),
     ] : [],
   ].filter(item => item.items.length)
   const openSection = sections.find(item => item.id === category) ?? null
   const results = trimmedQuery ? [...own, ...entries(store.map(item => item.id))].filter(item => matchesStoreQuery(item, trimmedQuery)) : null
-  // 添加 offers ours and Composio's 热门 that are not connected yet.
-  const addable = [...own, ...entries(catalog.data?.popular ?? [])].filter(item => stateOf(item.id) === 'add')
+  // 添加 offers ours and Composio's 精选 that are not connected yet.
+  const addable = [...own, ...others(catalog.data?.popular ?? [])].filter(item => stateOf(item.id) === 'add')
   /** + : ours open their own page, where their connect flow lives; a key opens the key form; the rest Composio's link. */
   function connect(id: string) {
     if (isOwnApp(id) || id === 'slack') go({ app: id, category })

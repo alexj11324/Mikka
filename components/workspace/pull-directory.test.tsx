@@ -40,7 +40,7 @@ const linkedPage: ConversationDirectoryPage = {
 };
 const githubPage: PullDirectoryPage = {
   cursor: null,
-  total: 1,
+  total: 2,
   items: [
     {
       url,
@@ -64,6 +64,28 @@ const githubPage: PullDirectoryPage = {
       labels: ["ui"],
       threads: [],
     },
+    {
+      url: "https://github.com/Owner/Repo/pull/8",
+      repo: "Owner/Repo",
+      number: 8,
+      title: "Broken checks on the sidebar",
+      state: "open",
+      author: "alex",
+      authorAvatar: null,
+      updatedAt: "2026-11-17T00:00:00Z",
+      createdAt: "2026-11-16T00:00:00Z",
+      body: null,
+      head: "fix/sidebar",
+      base: "main",
+      headSha: "b".repeat(40),
+      checks: "FAILURE",
+      mergeState: "DIRTY",
+      reviewDecision: "CHANGES_REQUESTED",
+      additions: 4,
+      deletions: 40,
+      labels: [],
+      threads: [],
+    },
   ],
 };
 mock.module("@/lib/intl/i18n-client", {
@@ -72,13 +94,16 @@ mock.module("@/lib/intl/i18n-client", {
     useFormatter: () => ({ dateTime: () => "Today" }),
   },
 });
+/** What the GitHub connection read answers, per test: the page's one state that
+ *  replaces the list rather than sitting above it is read from here. */
+let repositoryStatus = {
+  viewerId: "owner",
+  connected: true,
+  repositories: [{ fullName: "Owner/Repo" }],
+};
 mock.module("swr", {
   defaultExport: () => ({
-    data: {
-      viewerId: "owner",
-      connected: true,
-      repositories: [{ fullName: "Owner/Repo" }],
-    },
+    data: repositoryStatus,
     isValidating: false,
     mutate: async () => {},
   }),
@@ -235,6 +260,62 @@ test("a row press opens the pull request in the app's review page, and GitHub st
     assert.equal(github.getAttribute("target"), "_blank");
     assert.equal(github.getAttribute("rel"), "noopener noreferrer");
   } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+test("rows land in Capy's two buckets, and the reading view is a chip you can drop", async () => {
+  const { root } = await mount();
+  try {
+    const source = document.querySelector('select[aria-label="source"]');
+    assert.ok(source instanceof browser.HTMLSelectElement);
+    await act(async () =>
+      change(source as unknown as HTMLSelectElement, "Owner/Repo"),
+    );
+    const headings = [...document.querySelectorAll("section[aria-label]")]
+      .map((section) => section.getAttribute("aria-label"))
+      .filter((label) => label?.startsWith("states."));
+    // Ready first, then what is stuck, in the order the list shows them.
+    assert.deepEqual(headings, ["states.ready", "states.attention"]);
+    // The stuck row is the failing check, not the clean one next to it.
+    const attention = document.querySelector(
+      'section[aria-label="states.attention"]',
+    );
+    assert.match(attention?.textContent ?? "", /Broken checks on the sidebar/);
+    assert.doesNotMatch(attention?.textContent ?? "", /Better PR overview/);
+    // The reading view shows up as a condition, so the tab is not a hidden filter.
+    const conditions = document.querySelector("[data-pull-conditions]");
+    assert.ok(conditions);
+    assert.match(conditions.textContent ?? "", /state/);
+    assert.match(conditions.textContent ?? "", /eitherOfStates/);
+    const remove = conditions.querySelector(
+      'button[aria-label="removeFilter"]',
+    );
+    assert.ok(remove);
+    await act(async () => (remove as HTMLButtonElement).click());
+    // Dropping the condition widens the reading view to everything.
+    assert.equal(document.querySelector("[data-pull-conditions]"), null);
+    assert.match(document.body.textContent ?? "", /Broken checks on the sidebar/);
+    assert.match(document.body.textContent ?? "", /Better PR overview/);
+  } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+test("an unconnected GitHub is one state, not a notice above an empty list", async () => {
+  repositoryStatus = { viewerId: "owner", connected: false, repositories: [] };
+  const { root } = await mount();
+  try {
+    assert.match(document.body.textContent ?? "", /connectGitHub/);
+    // The list's own "nothing matched" block would be a second answer beside it.
+    assert.equal(document.querySelector('[data-slot="empty"]'), null);
+    assert.equal(document.querySelectorAll('[role="status"]').length, 1);
+  } finally {
+    repositoryStatus = {
+      viewerId: "owner",
+      connected: true,
+      repositories: [{ fullName: "Owner/Repo" }],
+    };
     await act(async () => root.unmount());
   }
 });

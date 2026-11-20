@@ -92,3 +92,6 @@ yarn-error.log*
 /.mikka-cloud/
 /.mikka-web/
 /.cloudflare-marketing/
+
+# eve dev-server runtime state (cache, dev-hosts) — any agent directory
+**/.eve/

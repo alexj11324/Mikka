@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils'
 import { BOARD_FILTERS_KEY, LEGACY_BOARD_FILTERS_KEY, boardProjectFilters, migrateBoardFilters, personFilters } from '@/lib/board-filters'
 import { BoardScreenView } from './board-screen'
 import { BOARD_SETTINGS_KEY as SETTINGS_KEY, BOARD_VIEW_EVENT as VIEW_EVENT } from './board-view'
-import type { BoardMenuItem } from '@/components/slots/board-contract'
+import type { BoardFilterChip, BoardMenuItem } from '@/components/slots/board-contract'
 import { ISSUE_PRIORITIES } from './issue-properties'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 
@@ -50,6 +50,12 @@ const DEFAULT_SETTINGS = { view: 'board' as 'board' | 'list', display: DEFAULT_D
 const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, normal: 2, low: 3 }
 const COMPLETED_DAYS: Record<Completed, number> = { all: Infinity, week: 7, month: 30 }
 const FILTER_FIELDS: FilterField[] = ['status', 'priority', 'assignee', 'creator', 'labels', 'project', 'agentState']
+/** The presets above the board, in Capy's order and with its meaning (2026-11-19). `all` is the default: a board
+ *  holds every task of its workspace (2026-11-13-1405), and Capy's `for you` default would hide a colleague's tasks
+ *  from a person who has not been assigned any yet. */
+const SCOPES = ['forYou', 'assigned', 'created', 'all'] as const
+type Scope = typeof SCOPES[number]
+const SCOPE_KEY = 'board:scope'
 
 /** Browser preferences remain durable; named filters belong to the authenticated view scope. */
 function useBoardSettings() {
@@ -97,11 +103,13 @@ function useStoredFlag(key: string, fallback: boolean) {
  * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues, userId, workspaceId, teamId, presentationRead, onOpen, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string; teamId?: string;
+export function BoardPage({ issues, userId, workspaceId, teamId, presentationRead, onOpen, onOpenInColumn, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string; teamId?: string;
   presentationRead: { isLoading: boolean; error?: unknown; mutate: () => Promise<unknown> }
   issues: Issue[]
   userId: string
   onOpen: (id: string) => boolean | void
+  /** ⌘/Ctrl+click on a row of the list: the task opens in the right column and the list stays (board-contract.ts). */
+  onOpenInColumn?: (id: string) => void
   onUpdated: () => Promise<unknown>
   onBusyChange: (busy: boolean) => void
 }) {
@@ -113,10 +121,19 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   const titleId = useId()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  // Capy's five presets, minus Mentioned: a task records no mentions (lib/issue-metadata.ts), so that chip could only
+  // ever show what All shows.
+  const scopeLabel: Record<Scope, string> = { forYou: t('scope.forYou'), assigned: t('scope.assigned'), created: t('scope.created'), all: t('scope.all') }
   const [settings, update] = useBoardSettings()
   const { view, display } = settings
   const [legacyFilters] = useViewState<Filters | null>(LEGACY_BOARD_FILTERS_KEY, null)
   const [storedFilters, setFilters] = useViewState<Filters | null>(BOARD_FILTERS_KEY, null)
+  // Which preset is on is browsing state, like the filters; a name this build no longer knows means 全部.
+  // Capy opens on `For you` rather than on everything, so a reader lands on what
+  // concerns them instead of the whole workspace's backlog (Alex, 2026-11-19:
+  // 「这个东西肯定要按照 capy 对齐」). An unknown saved value falls back to the same.
+  const [savedScope, setScope] = useViewState<string>(SCOPE_KEY, 'forYou')
+  const scope = SCOPES.find(entry => entry === savedScope) ?? 'forYou'
   const savedFilters = useMemo(() => storedFilters ?? migrateBoardFilters(legacyFilters) ?? NO_FILTERS, [storedFilters, legacyFilters])
   const projects = useMemo(() => new Map(issues.flatMap(issue => issue.projectId && issue.metadata.project
     ? [[issue.projectId, issue.metadata.project] as const] : [])), [issues])
@@ -208,10 +225,27 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
       case 'agentState': return [agentStates.get(issue.id) ?? NONE]
     }
   }
+  /**
+   * Capy's presets (2026-11-19). `assigned` and `created` are strict, as Capy's `assigneeMe` and `creatorMe` are:
+   * responsibility and delegation stay apart (#1687). `forYou` is Capy's `match=any` union — the task is mine when I am
+   * its human assignee, when I created it, or when one of my Captains holds it: an Agent I configured, or a Bot of mine
+   * whose run a live read names on the task.
+   */
+  function inScope(issue: Issue, id: Scope) {
+    if (id === 'all') return true
+    const person = personFilters(issue, userId, { agents: myAgents, heldByMyBot: !!owners.get(issue.id)?.bot })
+    if (id === 'assigned') return person.assignee
+    if (id === 'created') return person.creator
+    const delegate = issue.metadata.delegate
+    return person.assignee || person.creator || (delegate?.kind === 'agent' && myAgents.has(delegate.id)) || !!owners.get(issue.id)?.bot
+  }
   const now = Date.now()
-  const shown = issues
+  // Everything the filters let through, before the preset narrows it: each chip's count is what choosing it shows.
+  const filtered = issues
     .filter(issue => Object.entries(filters).every(([field, values]) => !values?.length || valuesOf(issue, field as FilterField).some(value => values.includes(value))))
     .filter(issue => issue.status !== 'done' || now - new Date(issue.updatedAt).getTime() <= COMPLETED_DAYS[display.completed] * 86400000)
+  const shown = filtered
+    .filter(issue => inScope(issue, scope))
     .toSorted((a, b) => display.sort === 'priority' ? (PRIORITY_RANK[a.priority] ?? 9) - (PRIORITY_RANK[b.priority] ?? 9) || +new Date(b.updatedAt) - +new Date(a.updatedAt)
       : +new Date(display.sort === 'created' ? b.createdAt : b.updatedAt) - +new Date(display.sort === 'created' ? a.createdAt : a.updatedAt))
   const count = (column: BoardColumn) => shown.filter(issue => column === BLOCKED_COLUMN ? blocks.has(issue.id) : issue.status === column && !blocks.has(issue.id)).length
@@ -244,8 +278,9 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
   const refreshButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" aria-label={linearSynced ? t('synced') : t('refresh')} className={cn(linearSynced && 'text-success-foreground')} onClick={() => { void onUpdated(); void refreshLinear() }} />}><RefreshCw /></TooltipTrigger><TooltipContent side="bottom">{linearSynced ? t('synced') : t('refresh')}</TooltipContent></Tooltip>
   const panelButton = <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', sidebar && 'xl:hidden')} aria-expanded={sheet} aria-label={t('expand')} aria-keyshortcuts="Control+j Meta+j" onClick={openPanel} />}><PanelRightOpen data-icon="inline-start" /></TooltipTrigger><TooltipContent>{t('expand')}<ShortcutKeys keys={['mod', 'J']} /></TooltipContent></Tooltip>
   // The template's own menus (the `board` slot's BoardScreen) carry the filters and the 显示 options.
-  // No tabs: the board holds every task of its workspace, and one tab that does nothing reads as a broken filter.
-  const scopes: { id: string; label: string; count: number }[] = []
+  // The chips above the board are Capy's presets, each counted against the filters that are on.
+  const scopes: { id: string; label: string; count: number }[] = SCOPES.map(id =>
+    ({ id, label: scopeLabel[id], count: id === 'all' ? filtered.length : filtered.filter(issue => inScope(issue, id)).length }))
   const filterItems: BoardMenuItem[] = [
     ...FILTER_FIELDS.map((field): BoardMenuItem => field === 'creator'
       ? { label: t(`filterField.${field}`), checked: filters.creator?.includes(ME) ?? false, onSelect: () => toggleFilter(field, ME) }
@@ -253,6 +288,14 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
     { label: t('columns'), divider: true, submenu: BOARD_COLUMNS.map(column => ({ label: statusLabel(column.value), checked: !display.hidden.includes(column.value), onSelect: () => setDisplay({ hidden: display.hidden.includes(column.value) ? display.hidden.filter(item => item !== column.value) : [...display.hidden, column.value] }) })) },
     { label: t('showEmpty'), checked: display.showEmpty, onSelect: () => setDisplay({ showEmpty: !display.showEmpty }) },
   ]
+  // The filters that are on, where the person reads them (Capy's Match row): one chip per value, each with the ✕ that
+  // turns that value off. A 我创建的 chip has no value to name, so it shows its property alone.
+  const filterChips: BoardFilterChip[] = activeFilters.flatMap(([field, values]) => values.map(value => ({
+    key: `${field}:${value}`,
+    property: t(`filterField.${field}`),
+    value: field === 'creator' ? undefined : options[field].find(option => option.value === value)?.label ?? value,
+    clear: () => toggleFilter(field, value),
+  })))
   const sortItems: BoardMenuItem[] = [
     ...(['priority', 'updated', 'created'] as const).map(value => ({ label: t(`sortBy.${value}`), checked: display.sort === value, onSelect: () => setDisplay({ sort: value }) })),
     { label: t('completed'), divider: true, submenu: (['week', 'month', 'all'] as const).map(value => ({ label: t(`completedRange.${value}`), checked: display.completed === value, onSelect: () => setDisplay({ completed: value }) })) },
@@ -269,9 +312,9 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
       {/* R-100: the page's title, at the size 设置 and the other rail pages use, so switching pages does not move it. */}
       <h1 id={titleId} className="shrink-0 px-6 pt-4 text-xl font-semibold text-foreground">{t('title')}</h1>
       {readNotice ?? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks }}
-        view={view} onView={next => update({ view: next })} scopes={scopes} scope="all" onScope={() => {}}
-        filterItems={filterItems} filterCount={activeFilters.length} sortItems={sortItems} tools={<span className="flex items-center gap-1 max-md:hidden">{refreshButton}{panelButton}</span>}
-        onNew={() => setNewTask(true)} onOpen={id => { onOpen(id) }} onDiscuss={discuss} onUpdated={onUpdated} onBusyChange={onBusyChange} />}
+        view={view} onView={next => update({ view: next })} scopes={scopes} scope={scope} onScope={id => setScope(id)}
+        filterItems={filterItems} filterCount={activeFilters.length} filterChips={filterChips} sortItems={sortItems} tools={<span className="flex items-center gap-1 max-md:hidden">{refreshButton}{panelButton}</span>}
+        onNew={() => setNewTask(true)} onOpen={id => { onOpen(id) }} onOpenInColumn={onOpenInColumn} onDiscuss={discuss} onUpdated={onUpdated} onBusyChange={onBusyChange} />}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}

@@ -410,3 +410,131 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 业务组件不要收 `className` 再往下传（本体 `git grep 'className={className}' components/workspace` 里没有先例，这是原因）。要换尺寸就开 `size` prop，用字面量三元；要换颜色就开语义枚举 prop。
   2. 需要"名字 → token class"的查找表，放到 `lib/`（如 `lib/status-appearance.ts`）再 import，本文件里写表会被判不可静态检查。
   3. 加新 UI 前先跑一遍 `node scripts/lint-ui.mjs`，比写完再回来拆便宜。
+
+## 2026-11-19 UI 变更必须先做视觉对比，没问题才准提交
+
+- 用户原话：「凡是涉及到 UI 变更的，你必须都要进行 UI 对齐，需要从视觉上进行对比，没问题才准提交」。
+- 现象：我把「lint 通过 + 单测通过 + 入口能点」当成了对齐完成。被问「你有从视觉角度去检查过吗」时，答案是**没有**。并排一比，详情页属性行 Capy 9 行我们 5 行、新建任务 chips Capy 6 个我们 3 个、issue 详情我们是整页 Capy 是右侧面板——这些 lint 和单测全都发现不了。
+- 规则：
+  1. UI 改动的完成标准是**并排截图对比**：我们的界面 vs Capy 对应界面，两张图一起看。
+  2. 提交前必须有视觉证据：`agent-browser --session <s> screenshot` 存图并**实际 Read 这张图**，不能只跑 `eval` 查 DOM。DOM 里有 `data-mark` 不代表看起来对。
+  3. 差异要分类说清：真缺口 / 故意不画（没数据）/ 结构差异（详情页是面板还是整页）。不要笼统说「对齐了」。
+  4. dev server 和 Capy 登录态都在时，直接用它做对照，不要靠回忆和推测。
+  5. 造数据用于对照时，用本地 dev 账号在 UI 里真建一条，比读代码想象行样式可靠。
+
+## 2026-11-19 改 UI 前先用 DOM 确认是哪个组件在渲染
+
+- 现象：给 `components/workspace/issue-list.tsx` 加了 ⌘+点击开右侧面板。改完 typecheck 通过、代码确实在文件里、dev server 也重启了，但实测点击仍然整页跳转（URL 还是 `?issue=`）。查 DOM 祖先链才发现列表行是 `DIV.ui-kb-row → SECTION.ui-kb-group → DIV.ui-kb`，渲染它的是 overlay 的 `.hosted-ui/components/kanban.tsx`，`issue-list.tsx` 在那条路径上**根本没被渲染**。
+- 根因：同一个界面有两套实现（公开仓库的开源 UI + 私有 overlay）。凭文件名猜会改错地方，而 typecheck / lint / 单测**全都发现不了**——它们只证明代码能编译。
+- 规则：
+  1. 改 UI 前先 `agent-browser eval` 看目标元素的 tag + class + 祖先链，确认是哪个文件渲染的。已知标记：`ui-kb-*` = overlay `kanban.tsx`；`data-mark` = `lib/state-mark.ts` 的注册表；`data-focus-id` 在**两个**文件里都有（`kanban-board.tsx` 和 `issue-list.tsx`），不能只凭它判断。
+  2. 改完必须真的点一次，看 URL / DOM 有没有按预期变化。typecheck 通过 ≠ 渲染路径对。
+  3. 另一个坑：Base UI 的 `Button` 不会把原生事件交给你的 `onClick`，在它上面读 `event.metaKey` 永远读到 false。要么用捕获阶段（`onClickCapture`），要么改在普通元素上。
+
+## 2026-11-19 别用 git checkout 撤自己的一处改动
+
+- 现象：想撤销一次把 `messages/*.json` 整文件重排的 python 操作，用了
+  `git checkout messages/en.json messages/zh-CN.json`。这两个文件里有 **6 个 agent 未提交的
+  i18n 改动**，一起被回退掉了，包括自动化页 26 个 key —— 页面整片显示成 key 本身。
+- 恢复：`~/.claude/projects/<proj>/<session>/subagents/agent-*.jsonl` 存着每个 agent 的
+  Edit 调用，逐条提取 `old_string`/`new_string` 就能重放。22 条唯一编辑，重放 18 条。
+- 规则：
+  1. 只想撤自己那处，就用精确 Edit 反向替换；`git checkout <file>` 是**文件级**回退，
+     会把别人未提交的东西一起带走。
+  2. 用 Python 改 JSON 时不要 `json.dump` 整个文件 —— 键序、缩进、数组换行都会变，
+     diff 从 6 行膨胀到 131 行。用精确字符串替换。
+  3. 判断「该不该补回某个 key」看**代码还引用吗**，不是看「跟 HEAD 比少了什么」。
+     `PullDirectory.states.failed` 被删是重构（`PullState` 只剩 7 个值），补回去等于塞回死 key。
+  4. 验证 i18n 完整性最可靠的办法是让应用自己报：把所有页面打开，抓
+     `MISSING_MESSAGE` / `Could not resolve`，比静态扫 key 准。
+
+## 2026-11-19 dev server 只能有一个，第二个会把第一个挤死
+
+- 现象：后台又起了一个 dev server 做验证，之后服务出现
+  `ENOENT: rename '.../steps.mjs.api-aliases' -> '.../steps.mjs'` 然后退出。
+  但端口还返回 200 —— 主进程变僵尸：页面能出，`api` 全 404，eve 端口无响应，
+  界面显示「无法连接 Mikka」。
+- 根因：两个 dev server 共用 `.cache/dev-runtime/3100/`，互相 rename 对方刚写的临时文件。
+- 规则：
+  1. 起之前先 `lsof -nP -iTCP:3100 -sTCP:LISTEN`。已经有一个就别再起。
+  2. 崩过一次之后先 `rm -rf .cache/dev-runtime/3100` 再起，残留会让下一次继续失败。
+  3. 健康检查用 `curl http://localhost:3100/mikka/api/version`——**带 base path**。
+     不带的话 404 是正常路由，会被误判成服务挂了。
+  4. 端口 200 不等于服务健康。要同时看 `api` 和 eve 端口。
+
+## 2026-11-19 agent-browser 的 `media` 是 `set media` 的子命令
+
+- 现象：`tasks/alignment-shot.sh` 里写的是 `agent-browser ... media light`，实际返回
+  `Unknown command: media`，退出码又被 `>/dev/null 2>&1` 吞掉。结果**之前所有「亮色」截图
+  全是暗色**，等于从来没验过亮色。
+- 规则：
+  1. 正确形式是 `agent-browser --session <s> set media light|dark`（在 `set` 分组下）。
+  2. 必须**先设 scheme 再 open**：页面加载时才按 `prefers-color-scheme` 求值；
+     先 open 之后 `html.dark` 已经加上，再设也不会重算。
+  3. 截图脚本里不要静默吞掉退出码。`&& echo ✓ || echo ✗` 至少留个痕迹。
+
+## 2026-11-19 Capy 登录态靠固定 profile，不靠导 cookie
+
+- 三层原因，逐个排除过：
+  1. agent-browser 默认用 `/var/folders/.../T/agent-browser-chrome-<uuid>` 做 Chrome profile，
+     浏览器一关就被系统清理，登录态必丢。
+  2. `agent-browser auth save` 只存「用户名+密码+表单选择器」，Capy 走邮箱 OTP，没有密码字段。
+  3. 导 cookie 也不行：Clerk 的 `__session` 是 **60 秒寿命 JWT**（实测 `iat`/`exp` 差 60），
+     导出那一刻就开始作废；它能长期保持登录靠的是 `__client`（长效），而临时 profile 从没写下来。
+- 复制 Brave profile 也走不通：macOS 上 Chromium 的 cookie 密钥在 Keychain、不在 profile 文件里。
+  实测把 Brave 的 `Cookies` + `Local State` 复制给 Chrome，13 条 capy cookie 被当成无效清成 0 条；
+  用 `--executable-path` 指到 Brave 内核结果一样。
+- 正确做法：`--profile "$HOME/.cache/mikka-capy-profile"` 固定目录，让 Chrome 自己维护
+  `Default/Network/Cookies`（落盘 12 条，含 `__client`）。**关闭重开验证过**仍在 `/new`。
+- 判断是否登录不能看 `document.cookie`（`__session` 是 httpOnly，JS 读不到），要看
+  `location.pathname` 有没有被重定向到 `/sign-in`。
+
+## 2026-11-19 CSS 模板字符串里的反引号会白屏整个应用
+
+- 现象：给 `kanban.tsx` 的 Match 行加样式注释时，写成
+  ``/* ... a quiet chip per condition, `property is value`, with its own ✕ */``，
+  结果**整个应用白屏**——不是 Match 行不显示，是所有页面都不渲染。Vite 报
+  `[plugin:vite:oxc] Transform failed` / `[PARSE_ERROR] ... kanban.tsx:1446:76`。
+- 根因：这整段 CSS 是 `const css = /* css */ \`...\``，一个 JS 模板字符串。
+  注释里的反引号**提前结束**了模板字符串，后面全被当非法 JS 解析。
+  我以为「反引号在注释里」是安全的——在 CSS 注释里安全，在**模板字符串**里不安全。
+- 规则：
+  1. 往这种 CSS-in-template-string 里写任何东西，**注释也算**：不能有反引号、不能有 `${`。
+     要引用代码单词就用普通单引号：`'property is value'`。
+  2. 改完这类文件立刻验白屏，别等截图：
+     `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3100/mikka/api/version`
+     （必须带 base path），再
+     `agent-browser --session mikka eval "document.body.innerText.includes('PARSE_ERROR')"` → `false`。
+     白屏时页面上是红底报错面板，不是纯空白，很容易看出来。
+  3. 看到报错面板先修语法，**绝不能把那帧截图当视觉证据**。
+  4. 这类改动静态检查抓不到（`.hosted-ui` 不在公开仓 tsconfig 的 include 里），
+     语法错误只有 dev server / 浏览器会告诉你。
+
+## 2026-11-20 提交 merge 时漏了 `git add`，把带语法错误的 commit 推了上去
+
+- 现象：解决完 13 个 merge 冲突、跑完 typecheck 和 lint、又修好 5 个让合并结果能编译的文件，
+  然后 `git commit`——但**这 5 个文件没有 `git add`**。推上去的 merge commit 里
+  `apps/api/scripts/dev.mjs` 还留着 `words.split('` 加一个真实换行，文件根本无法解析。
+- 根因：`git commit` 只提交**暂存区**。lint 和 typecheck 看的是**工作区**，两者不一致时
+  检查全绿、提交却是坏的。我脑子里想的是「冲突都标完了」，忘了新修的文件也要进暂存区。
+- 规则：
+  1. 修完就 `git add`，不要攒到最后。
+  2. commit 之后、push 之前，抽查一个刚修过的地方确认它在 HEAD 里：
+     `git show HEAD:<path>` 再看那一行。这次是 push 之后才发现，只能补一个 fix commit。
+  3. 已经 push 的错误 commit 不要 amend 加 force push，补一个 fix commit。
+
+## 2026-11-20 改 `allowBuilds` 会改变构建行为，不只是消掉 pnpm 的报错
+
+- 现象：`pnpm-workspace.yaml` 里 11 个包的 `allowBuilds` 值是 pnpm 自己的提示文本
+  `set this to true or false`，每次 `pnpm install` 都以 `ERR_PNPM_IGNORED_BUILDS` 失败。
+  我把其中 4 个改成 `true`（理由是「它们需要 native 绑定」），install 过了，
+  但 CI 上 7 个 check 全挂：`UNLOADABLE_DEPENDENCY: Could not load .../zstd.node`。
+- 根因：那个字符串在 pnpm 眼里**不是 true，等于不跑构建脚本**。设成 `true` 之后
+  `@mongodb-js/zstd` 真的编译出 `zstd.node`，Eve 的 rolldown bundler 去读它、
+  发现是二进制就报 `stream did not contain valid UTF-8`。
+- 规则：
+  1. 修「值非法导致失败」的配置，先弄清旧值实际生效为什么。一个从未被解析成 true 的值，
+     实际语义就是 false；改成 true 是功能变更，不是修复。
+  2. 只想消掉 `ERR_PNPM_IGNORED_BUILDS` 而不改变构建行为，就全部显式写 `false`。
+  3. 验证要复现 CI 条件：删掉已编译的 `.node` 再跑 `node scripts/build-eve.mjs`，
+     而不是只看 `pnpm install` 绿了。

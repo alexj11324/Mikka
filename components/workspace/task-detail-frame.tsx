@@ -267,25 +267,50 @@ export function FramedTask(props: FramedTaskProps) {
     } })) },
     // Capy's Created by: whoever made the task's first revision (the same actor 活动 starts with).
     ...creator ? [{ id: 'createdBy', label: tProperty('createdBy'), value: { text: creator, mark: { kind: 'person', name: creator } } } satisfies TaskDetailRow] : [],
-    ...meta.dueDate ? [{ id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'), value: { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) } } satisfies TaskDetailRow] : [],
+    // Capy's Due date, set from the line itself: the date once there is one, otherwise the words that open its dialog.
+    { id: 'dueDate', label: tProperty('dueDate'), disabled: locked, onClick: () => props.requestAction('dueDate'),
+      value: meta.dueDate
+        ? { text: formatDateOnly(format, meta.dueDate, { month: 'short', day: 'numeric' }), mark: { kind: 'icon', icon: 'calendar' }, danger: overdue(meta.dueDate, props.status, now) }
+        : { text: tProperty('setDueDate'), mark: { kind: 'icon', icon: 'calendar' }, muted: true } },
     ...meta.estimate !== null ? [{ id: 'estimate', label: tProperty('estimate'), disabled: locked, onClick: () => props.requestAction('estimate'), value: { text: tProperty('estimatePoints', { count: meta.estimate }), mark: { kind: 'icon', icon: 'estimate' } } } satisfies TaskDetailRow] : [],
-    ...conversations.length ? [{ id: 'conversations', label: tProperty(conversations.length > 1 ? 'threadMany' : 'threadOne'), stacked: true,
+    // Capy's Thread row is drawn even when there is none (2026-11-19). We have no
+    // "link an existing thread" action — a conversation is started from the task, not
+    // attached to it — so the empty state says so rather than offering a + with nothing
+    // behind it. Keeping the row means the panel has the same height either way.
+    { id: 'conversations', label: tProperty(conversations.length > 1 ? 'threadMany' : 'threadOne'),
+      stacked: conversations.length > 0,
       chips: conversations.map(({ id, text, detail, mark, open }) => ({ id, text, ...detail ? { detail } : {}, ...mark ? { mark: { kind: 'node' as const, node: mark } } : {}, menu: [{ id: 'open', label: tFrame('open'), onSelect: open }] })),
-    } satisfies TaskDetailRow] : [],
+      ...conversations.length ? {} : { note: tProperty('threadNone') },
+    } satisfies TaskDetailRow,
     ...reviewBranch ? [{ id: 'branch', label: tArtifact('branch'), value: { text: reviewBranch } } satisfies TaskDetailRow] : [],
     // Capy's Pull requests lines: repo#n and its title, its live state, and + to link one, shown even before there is one.
     ...preview ? [] : [{ id: 'pullRequests', label: tProperty(pullRequests.length > 1 ? 'pullRequestMany' : 'pullRequestOne'), disabled: locked, stacked: true, chips: pullRequests.map(pr => ({ id: pr.url, text: [pullLabel(pr.url), pr.title].filter(Boolean).join(' '), href: pr.url, mark: { kind: 'icon', icon: 'pullRequest' }, ...pr.state ? { state: pr.state } : {}, live: draw => <PullRequestStatus issueId={task.id} pr={pr}>{view => draw({ text: [pullLabel(pr.url), view.text || pr.title].filter(Boolean).join(' '), title: view.title, state: view.state, confirmed: view.confirmed })}</PullRequestStatus> })), add: { label: tProperty('linkPullRequest'), onClick: () => props.requestProperty('pullRequests') } } satisfies TaskDetailRow],
-    ...preview ? [] : connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
-      id: `relation-${group.kind}`, label: group.label, disabled: locked || connections.pending,
-      chips: group.items.map(row => ({
-        id: row.id, text: [row.identifier, row.title].filter(Boolean).join(' '), title: row.title,
-        mark: { kind: 'icon', icon: group.kind === 'parent' ? 'parent' : group.kind === 'blockedBy' || group.kind === 'blocks' ? 'flag' : 'link' },
-        menu: [
-          { id: 'open', label: tFrame('open'), mark: { kind: 'icon', icon: 'open' }, onSelect: () => onOpen(row.id) },
-          { id: 'remove', label: tRelations('removeAria', { label: group.label, title: row.title }), mark: { kind: 'icon', icon: 'remove' }, danger: true, onSelect: () => { void connections.remove(relationOf(group.kind, row, connections.current, task.id), row.id) } },
-        ],
+    ...preview ? [] : [
+      ...connections.groups.filter(group => group.items.length).map((group): TaskDetailRow => ({
+        id: `relation-${group.kind}`, label: group.label, disabled: locked || connections.pending,
+        chips: group.items.map(row => ({
+          id: row.id, text: [row.identifier, row.title].filter(Boolean).join(' '), title: row.title,
+          mark: { kind: 'icon', icon: group.kind === 'parent' ? 'parent' : group.kind === 'blockedBy' || group.kind === 'blocks' ? 'flag' : 'link' },
+          menu: [
+            { id: 'open', label: tFrame('open'), mark: { kind: 'icon', icon: 'open' }, onSelect: () => onOpen(row.id) },
+            { id: 'remove', label: tRelations('removeAria', { label: group.label, title: row.title }), mark: { kind: 'icon', icon: 'remove' }, danger: true, onSelect: () => { void connections.remove(relationOf(group.kind, row, connections.current, task.id), row.id) } },
+          ],
+        })),
       })),
-    })),
+      // Capy's `+ Add relation` (2026-11-19): with no relation at all the row is still drawn,
+      // its + opening the kinds. Hiding it made the panel shrink whenever a task had none,
+      // so the same task read as two different shapes depending on data.
+      // 子任务 has its own row, so `child` is not one of the kinds here.
+      ...connections.groups.every(group => !group.items.length) ? [{
+        id: 'relations', label: tRelations('label'), disabled: locked || connections.pending,
+        add: {
+          label: tRelations('add'),
+          menu: (['parent', 'blockedBy', 'blocks', 'duplicate', 'related'] as const).map(kind => ({
+            id: kind, label: tRelations(`groupLabel.${kind}`), onSelect: () => props.requestAction(kind),
+          })),
+        },
+      } satisfies TaskDetailRow] : [],
+    ],
   ]
 
   // 子任务: ticking one sets it done, unticking puts it back to 待办; its menu holds every status and removing it.
