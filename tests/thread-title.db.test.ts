@@ -339,9 +339,21 @@ test('a thread\'s stored title: bounded by the schema, generated per trigger, sh
     assert.equal(published?.pulls[0].state, 'open')
     await pool.query(`UPDATE run_publications SET "pullRequest"="pullRequest" || '{"state":"merged","additions":12,"deletions":4}'::jsonb WHERE "runId"=$1`, [second])
     assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { pullState: 'open' })).items, [])
-    assert.deepEqual((await delivered()).items[0].pulls, [{
+    const [{ createdAt, ...pull }] = (await delivered()).items[0].pulls
+    assert.deepEqual([pull], [{
       title: 'Keep the workspace prefix after sign-in', url: 'https://github.com/o/r/pull/7', state: 'merged', additions: 12, deletions: 4,
     }])
+    // A record from before the author/createdAt fields falls back to when Mikka published it (the Since filter's floor).
+    assert.ok(createdAt && Math.abs(Date.parse(createdAt) - Date.now()) < 600_000)
+    // The PR directory's Project and Created conditions (S3): the caller's authorized project tasks, and PRs opened from an instant.
+    const linkedIn = async (extra: Record<string, unknown>, projectIssueIds?: string[]) =>
+      (await conversationDirectory(pool, 'owner', workspaceId, { archived: 'any', pullState: 'linked', ...extra }, projectIssueIds ? { projectIssueIds } : undefined)).items.length
+    const project = randomUUID()
+    assert.equal(await linkedIn({ projectId: project }, []), 0)
+    assert.ok(await linkedIn({ projectId: project }, [issueId]) > 0)
+    await assert.rejects(linkedIn({ projectId: project }), /conversationDirectoryProjectUnresolved/)
+    assert.ok(await linkedIn({ since: new Date(Date.now() - 3_600_000).toISOString() }) > 0)
+    assert.equal(await linkedIn({ since: new Date(Date.now() + 3_600_000).toISOString() }), 0)
     await organize(first, 'archived', true)
     assert.equal((await delivered()).items[0].id, first, 'the PR destination includes archived conversations')
     for (const [reader, space] of [['other', workspaceId], ['owner', foreignWorkspace]]) {

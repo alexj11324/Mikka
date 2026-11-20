@@ -8681,6 +8681,23 @@
     "linkedSnapshot": "上次交付时的状态。当前检查与审阅请在 GitHub 查看。",
     "resizePreview": "调整拉取请求预览宽度",
     "is": "为",
-    "eitherOfStates": "以下 {count} 种之一"
+    "eitherOfStates": "以下 {count} 种之一",
+    "openNewTab": "在新标签页打开",
+    "copyBranch": "复制分支名",
+    "created": "创建时间",
+    "anyTime": "任意时间",
+    "project": "项目",
+    "anyProject": "任意项目",
+    "unknownProject": "无法访问的项目",
+    "since": {
+      "day": "最近一天",
+      "week": "最近一周",
+      "month": "最近一个月"
+    },
+    "checkCounts": "{passed} 通过 · {failing} 失败 · {pending} 进行中",
+    "reviewers": "审阅者",
+    "merge": "合并",
+    "mergeAnyway": "仍然合并，{count} 项失败",
+    "mergeFailed": "合并没有完成。"
   }
 }

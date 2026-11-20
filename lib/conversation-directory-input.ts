@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { IssuePullRequest } from './issue-metadata'
+import { pullRequestSchema } from './issue-metadata'
 
 export const archiveIdleDays = [0, 3, 7, 14, 30, 90] as const
 
@@ -13,6 +13,10 @@ export const directoryInput = z.strictObject({
   archived: z.union([z.boolean(), z.literal('any')]).default(false),
   pullState: z.enum(['all', 'linked', 'open', 'draft', 'merged', 'closed']).default('all'),
   botId: z.uuid().optional(),
+  /** Threads of tasks in this workspace project (workspace_project_tasks). */
+  projectId: z.uuid().optional(),
+  /** Threads with a pull request opened at or after this instant. */
+  since: z.iso.datetime({ offset: true }).optional(),
   cursor: z.object({ pinned: z.boolean(), at: z.iso.datetime({ precision: 6 }), id: z.uuid(), kind: z.enum(['run', 'chat']).optional() }).optional(),
 })
 export type DirectoryInput = z.input<typeof directoryInput>
@@ -30,9 +34,18 @@ export function directoryTaskNumbers(row: { linkedTasks?: DirectoryTaskLink[]; i
   return tasks.flatMap(({ id, identifier }) => identifier ? [{ key: id ?? identifier, identifier }] : [])
 }
 
+/** A delivered pull request as the directory lists it: the task's record plus who opened it, when, and from which branch. */
+export const directoryPullSchema = pullRequestSchema.extend({
+  head: z.string().max(1024).optional(),
+  headSha: z.string().regex(/^[a-f0-9]{40,64}$/i).optional(),
+  author: z.string().max(100).optional(),
+  createdAt: z.iso.datetime({ offset: true }).optional(),
+})
+export type DirectoryPull = z.infer<typeof directoryPullSchema>
+
 export interface ConversationDirectoryPage {
   items: {
-    pulls: IssuePullRequest[]; taskTitle: string | null; kind: 'run' | 'chat'; id: string; issueId: string | null; identifier: string | null; title: string
+    pulls: DirectoryPull[]; taskTitle: string | null; kind: 'run' | 'chat'; id: string; issueId: string | null; identifier: string | null; title: string
     linkedTasks?: DirectoryTaskLink[]
     state: DirectoryState; at: string; pinned: boolean; unread?: boolean
   }[]

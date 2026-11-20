@@ -3870,5 +3870,40 @@
     "behavior": "Provides trusted preset endpoint metadata for LiteLLM request routing and read-only credential/model discovery; it does not make model requests or hold provider keys.",
     "test": "lib/model-api-key-providers.test.ts",
     "suite": "test:execution-rules"
+  },
+  "app/api/integrations/github/repositories/pulls/detail/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in person reads one pull request of a repository their GitHub connection admits: summary, checks on its current head and reviews. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-detail.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/github/pull-detail.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one pull request through the person's admitted repository credential and refuse another repository's identity. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-detail.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "app/api/integrations/github/repositories/pulls/merge/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in person merges one pull request as themselves with their own GitHub token, bound to the head they saw; failing checks need their confirmation. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-merge.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/github/pull-merge.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Merge one pull request with the person's own GitHub token through the existing merge port, bound to the expected head. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-merge.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/factory/merge.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Map GitHub's merge refusal to the existing stable codes for both task merges and merging one pull request; no new service.",
+    "test": "lib/github/pull-merge.test.ts",
+    "suite": "test:github-pulls"
   }
 }

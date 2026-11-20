@@ -8681,6 +8681,23 @@
     "linkedSnapshot": "Last delivered state. Open on GitHub for current checks and review.",
     "resizePreview": "Resize pull request preview",
     "is": "is",
-    "eitherOfStates": "either of {count} states"
+    "eitherOfStates": "either of {count} states",
+    "openNewTab": "Open in new tab",
+    "copyBranch": "Copy branch",
+    "created": "Created",
+    "anyTime": "Any time",
+    "project": "Project",
+    "anyProject": "Any project",
+    "unknownProject": "Unavailable project",
+    "since": {
+      "day": "Past day",
+      "week": "Past week",
+      "month": "Past month"
+    },
+    "checkCounts": "{passed} passed · {failing} failed · {pending} pending",
+    "reviewers": "Reviewers",
+    "merge": "Merge",
+    "mergeAnyway": "Merge anyway, {count} failing",
+    "mergeFailed": "Could not merge."
   }
 }
