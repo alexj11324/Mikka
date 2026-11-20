@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { buildEnvironment, runMarketingCi, sourceContext } from './cloudflare-marketing-ci.mjs'
+import { buildEnvironment, checkedMarketingRepository, resolveMarketingRepository, runMarketingCi, sourceContext } from './cloudflare-marketing-ci.mjs'
 
 const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
   GITHUB_ACTOR_ID: '183887963', GITHUB_ACTOR: 'alexj11324', GITHUB_TRIGGERING_ACTOR: 'alexj11324',
@@ -13,6 +13,27 @@ const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GIT
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/marketing-build.yml@refs/heads/main',
   GITHUB_RUN_ID: '12345', GITHUB_RUN_ATTEMPT: '1', MIKKA_MARKETING_SOURCE_SHA: 'b'.repeat(40) }
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
+
+test('the private website source resolves by immutable identity before and after its approved transfer', async () => {
+  const old = { id: 1429004608, full_name: 'alexj11324/mikka-web', private: true, fork: false,
+    owner: { id: 183887963, login: 'alexj11324' } }
+  const moved = { ...old, full_name: 'aspectly-labs/mikka-web', owner: { id: 359279274, login: 'aspectly-labs' } }
+  for (const metadata of [old, moved]) {
+    assert.equal(checkedMarketingRepository(metadata), metadata.full_name)
+    assert.equal(await resolveMarketingRepository('fixture-read-token', async (url, options) => {
+      assert.equal(url, 'https://api.github.com/repositories/1429004608')
+      assert.equal(options.headers.authorization, 'Bearer fixture-read-token')
+      assert.equal(options.redirect, 'error')
+      return Response.json(metadata)
+    }), metadata.full_name)
+    assert.equal(sourceContext(env, env.GITHUB_SHA, metadata.full_name).privateRepository, metadata.full_name)
+  }
+  for (const patch of [{ id: 42 }, { private: false }, { fork: true }, { full_name: 'someone/mikka-web' },
+    { owner: moved.owner }, { owner: { ...old.owner, login: 'aspectly-labs' } }, { full_name: '__proto__', owner: {} }]) {
+    assert.throws(() => checkedMarketingRepository({ ...old, ...patch }), /MARKETING_PUBLIC_CI_PRIVATE_REPOSITORY/)
+  }
+  assert.throws(() => sourceContext(env, env.GITHUB_SHA, 'someone/mikka-web'), /PRIVATE_REPOSITORY/)
+})
 
 test('marketing requires public supplier identity and an exact website pin without passing credentials to compilation', () => {
   assert.equal(sourceContext(env, env.GITHUB_SHA).privateRepository, 'alexj11324/mikka-web')
@@ -60,6 +81,14 @@ test('verification binds the public checkout, private checkout, public workflow 
     await writeFile(join(output, 'receipt.json'), JSON.stringify(receipt))
     const selected = { ...env, GITHUB_SHA: publicSource, MIKKA_MARKETING_SOURCE_SHA: privateSource }
     assert.deepEqual(await runMarketingCi({ env: selected, verify: true, publicRoot }), receipt)
+    const movedReceipt = structuredClone(receipt)
+    movedReceipt.context.privateRepository = 'aspectly-labs/mikka-web'
+    await writeFile(join(output, 'receipt.json'), JSON.stringify(movedReceipt))
+    await assert.rejects(runMarketingCi({ env: selected, verify: true, publicRoot }), /CHECKOUT_MISMATCH/)
+    git(privateRoot, 'remote', 'set-url', 'origin', 'https://github.com/aspectly-labs/mikka-web.git')
+    assert.deepEqual(await runMarketingCi({ env: selected, verify: true, publicRoot }), movedReceipt)
+    await writeFile(join(output, 'receipt.json'), JSON.stringify(receipt))
+    git(privateRoot, 'remote', 'set-url', 'origin', 'https://github.com/alexj11324/mikka-web.git')
     await assert.rejects(runMarketingCi({ env: { ...selected, GITHUB_RUN_ID: '9876' }, verify: true, publicRoot }), /RECEIPT_SOURCE_MISMATCH/)
     await assert.rejects(runMarketingCi({ env: { ...selected, MIKKA_MARKETING_SOURCE_SHA: 'c'.repeat(40) }, verify: true, publicRoot }), /CHECKOUT_MISMATCH/)
     await writeFile(join(output, 'marketing-worker.tgz'), 'changed artifact')
