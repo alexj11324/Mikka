@@ -51,6 +51,8 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 ## Verify and operate
 
 - [Acceptance](acceptance.md) defines required evidence, identities and cleanup.
+- [Recorded agent fixtures](recorded-fixtures.md) imports existing run exports,
+  scans their sanitized replay files and explains the library and runtime gates.
 - [Isolated test accounts](test-accounts.md) describes the loopback account pool
   and its application, database and lease boundaries.
 - [UI review checklist](review-checklist.md) applies before presenting UI.
