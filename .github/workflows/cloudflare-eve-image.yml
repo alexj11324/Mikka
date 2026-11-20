@@ -22,6 +22,10 @@ on:
         description: Existing Eve owner routing release to maintain with this accepted API build
         type: string
         required: false
+      maintenance_workflow_postgres_patch:
+        description: SHA256 of the reviewed World Postgres 5.2.0 patch to backport to the maintenance image
+        type: string
+        required: false
   pull_request:
     paths:
       - 'apps/eve/**'
@@ -118,6 +122,19 @@ jobs:
           API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
           OVERLAY_SHA: ${{ inputs.overlay_sha }}
         run: node scripts/load-cloudflare-api-receipt.mjs
+      - name: Preserve the verified Workflow Postgres patch from the main driver
+        if: inputs.maintenance_workflow_postgres_patch != ''
+        env:
+          WORKFLOW_POSTGRES_PATCH_SHA256: ${{ inputs.maintenance_workflow_postgres_patch }}
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
+        run: |
+          set -euo pipefail
+          [[ "$WORKFLOW_POSTGRES_PATCH_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          test -n "$MAINTENANCE_OWNER_RELEASE"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          patch_file="$RUNNER_TEMP/eve-workflow-postgres.patch"
+          git show "$GITHUB_SHA:patches/@workflow__world-postgres@5.2.0.patch" > "$patch_file"
+          printf '%s  %s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256" "$patch_file" | sha256sum --check --status
       - name: Check out the original API product source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -127,6 +144,31 @@ jobs:
       - uses: ./.github/actions/pnpm-install
         with:
           skip-electron: 'true'
+      - name: Apply the verified Workflow Postgres patch
+        if: inputs.maintenance_workflow_postgres_patch != ''
+        env:
+          WORKFLOW_POSTGRES_PATCH_SHA256: ${{ inputs.maintenance_workflow_postgres_patch }}
+        run: |
+          set -euo pipefail
+          patch_file="$RUNNER_TEMP/eve-workflow-postgres.patch"
+          printf '%s  %s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256" "$patch_file" | sha256sum --check --status
+          world=$(node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          import { createRequire } from 'node:module'
+          import { dirname, resolve } from 'node:path'
+          const require = createRequire(resolve('apps/eve/package.json'))
+          const root = dirname(dirname(require.resolve('@workflow/world-postgres')))
+          const installed = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+          assert.equal(installed.name, '@workflow/world-postgres')
+          assert.equal(installed.version, '5.2.0')
+          console.log(root)
+          NODE
+          )
+          patch --directory="$world" --strip=1 --fuzz=0 --forward --batch --input="$patch_file"
+          git diff --exit-code
+          git diff --cached --exit-code
+          printf 'MIKKA_EVE_WORKFLOW_POSTGRES_PATCH=%s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256"
       - name: Issue a short-lived credential to read the original API image
         id: registry-read
         uses: ./.github/actions/cloudflare-registry-credentials

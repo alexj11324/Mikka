@@ -304,3 +304,84 @@ set -euo pipefail
     }
   } finally { await rm(work, { recursive: true, force: true }) }
 })
+
+test('maintenance patch is captured from the genuine driver and changes only installed Eve World Postgres 5.2.0', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/cloudflare-eve-image.yml', import.meta.url), 'utf8')
+  const steps = workflow.split('\n  publish:\n')[1]
+  const step = name => steps.split('      - name: ' + name + '\n')[1].split('\n      - ')[0]
+  const script = name => step(name).split('        run: |\n')[1].replace(/^ {10}/gm, '')
+  const captureName = 'Preserve the verified Workflow Postgres patch from the main driver'
+  const applyName = 'Apply the verified Workflow Postgres patch'
+  for (const name of [captureName, applyName]) assert.ok(step(name).includes("if: inputs.maintenance_workflow_postgres_patch != ''"))
+  assert.ok(steps.indexOf(captureName) < steps.indexOf('Check out the original API product source'))
+  assert.ok(steps.indexOf(applyName) > steps.indexOf('uses: ./.github/actions/pnpm-install'))
+  assert.ok(steps.indexOf(applyName) < steps.indexOf('Compile the official Eve runtime'))
+  const work = await mkdtemp(join(tmpdir(), 'mikka-eve-postgres-backport-'))
+  try {
+    const run = (command, args, env = {}) => spawnSync(command, args, { cwd: work, env: { ...process.env, ...env }, encoding: 'utf8' })
+    const git = (...args) => {
+      const child = run('git', args)
+      assert.equal(child.status, 0, child.stderr)
+      return child.stdout.trim()
+    }
+    const commit = message => git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', message)
+    git('init', '-q')
+    await mkdir(join(work, 'apps/eve'), { recursive: true })
+    await writeFile(join(work, 'apps/eve/package.json'), '{}\n')
+    await writeFile(join(work, '.gitignore'), 'node_modules/\n')
+    git('add', '.')
+    commit('accepted API source')
+    const original = git('rev-parse', 'HEAD')
+    const patch = 'diff --git a/dist/storage.js b/dist/storage.js\n--- a/dist/storage.js\n+++ b/dist/storage.js\n@@ -1,3 +1,3 @@\n before\n-old\n+patched\n after\n'
+    const sha = createHash('sha256').update(patch).digest('hex')
+    await mkdir(join(work, 'patches'))
+    await writeFile(join(work, 'patches/@workflow__world-postgres@5.2.0.patch'), patch)
+    git('add', 'patches')
+    commit('reviewed startup patch on current main')
+    const driver = git('rev-parse', 'HEAD')
+    const runnerTemp = join(work, 'node_modules/runner-temp')
+    await mkdir(runnerTemp, { recursive: true })
+    const environment = { GITHUB_SHA: driver, RUNNER_TEMP: runnerTemp, WORKFLOW_POSTGRES_PATCH_SHA256: sha, MAINTENANCE_OWNER_RELEASE: ownerRelease }
+    const invoke = (name, extra = {}) => run('bash', ['--noprofile', '--norc', '-c', script(name)], { ...environment, ...extra })
+    for (const invalid of [{ MAINTENANCE_OWNER_RELEASE: '' }, { WORKFLOW_POSTGRES_PATCH_SHA256: sha.toUpperCase() },
+      { WORKFLOW_POSTGRES_PATCH_SHA256: 'a'.repeat(64) }, { WORKFLOW_POSTGRES_PATCH_SHA256: sha.slice(1) }, { GITHUB_SHA: original }]) {
+      const child = invoke(captureName, invalid)
+      assert.notEqual(child.status, 0, 'invalid maintenance request must stop before checkout')
+      assert.ok(!child.stdout.includes('MIKKA_EVE_WORKFLOW_POSTGRES_PATCH='))
+    }
+    const capturedResult = invoke(captureName)
+    assert.equal(capturedResult.status, 0, capturedResult.stderr)
+    git('checkout', '--detach', '-q', original)
+    const world = join(work, 'node_modules/.pnpm/fixture/node_modules/@workflow/world-postgres')
+    await mkdir(join(world, 'dist'), { recursive: true })
+    const packageJson = version => JSON.stringify({ name: '@workflow/world-postgres', version, main: 'dist/index.js' })
+    await writeFile(join(world, 'package.json'), packageJson('5.2.0'))
+    await writeFile(join(world, 'dist/index.js'), '')
+    const storage = join(world, 'dist/storage.js')
+    await writeFile(storage, 'before\nold\nafter\n')
+    await mkdir(join(work, 'apps/eve/node_modules/@workflow'), { recursive: true })
+    await symlink(world, join(work, 'apps/eve/node_modules/@workflow/world-postgres'))
+    const captured = join(runnerTemp, 'eve-workflow-postgres.patch')
+    assert.equal(await readFile(captured, 'utf8'), patch, 'the old API checkout cannot replace the reviewed driver patch')
+    await writeFile(captured, patch + '\n')
+    assert.notEqual(invoke(applyName).status, 0, 'installer-time changes to the captured patch are rejected')
+    await writeFile(captured, patch)
+    await writeFile(join(world, 'package.json'), packageJson('5.1.0'))
+    assert.notEqual(invoke(applyName).status, 0, 'the patch is only valid for the pinned package version')
+    await writeFile(join(world, 'package.json'), packageJson('5.2.0'))
+    await writeFile(storage, 'changed-context\nold\nafter\n')
+    const fuzz = invoke(applyName)
+    assert.notEqual(fuzz.status, 0, 'context mismatch must not be accepted with patch fuzz')
+    assert.ok(!fuzz.stdout.includes('MIKKA_EVE_WORKFLOW_POSTGRES_PATCH='))
+    await writeFile(storage, 'before\nold\nafter\n')
+    const child = invoke(applyName)
+    assert.equal(child.status, 0, child.stderr)
+    assert.equal(child.stdout.split('\n').filter(line => line.startsWith('MIKKA_EVE_WORKFLOW_POSTGRES_PATCH=')).join('\n'), 'MIKKA_EVE_WORKFLOW_POSTGRES_PATCH=' + sha)
+    assert.equal(await readFile(storage, 'utf8'), 'before\npatched\nafter\n')
+    assert.equal(git('rev-parse', 'HEAD'), original)
+    assert.equal(git('status', '--porcelain', '--untracked-files=no'), '')
+    const repeated = invoke(applyName)
+    assert.notEqual(repeated.status, 0, 'already applied patches stop instead of reporting a fresh success')
+    assert.ok(!repeated.stdout.includes('MIKKA_EVE_WORKFLOW_POSTGRES_PATCH='))
+  } finally { await rm(work, { recursive: true, force: true }) }
+})

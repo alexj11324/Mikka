@@ -4,6 +4,7 @@ set -euo pipefail
 candidate="$PWD"
 trusted="$(mktemp -d)"
 trap 'rm -rf "$trusted"' EXIT
+unset CI_POLICY_FALLBACK
 # Use the base of a PR (including forks); main push uses its previous version.
 # Read event fields as data, never shell interpolation from a PR title/ref.
 trusted_sha="$(node --input-type=module -e '
@@ -14,7 +15,9 @@ if ! git cat-file -e "$trusted_sha^{commit}" || ! git merge-base --is-ancestor "
   echo 'Policy base is not in trusted main history; use main policy and full coverage.'
   trusted_sha=origin/main
   export CI_FORCE_FULL=true
+  export CI_POLICY_FALLBACK=true
 fi
+export CI_POLICY_SHA="$(git rev-parse "$trusted_sha^{commit}")"
 git archive "$trusted_sha" | tar -x -C "$trusted"
 if test -f "$trusted/scripts/ci/select.mjs"; then
   # Install only trusted manifests; lifecycle scripts and Nx plugins never run
