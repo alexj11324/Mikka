@@ -7,7 +7,7 @@ export const LOCAL_SLACK_SIGNING_SECRET = 'mikka-local-slack-signing'
 /** The real Slack client sends ordinary Web API JSON to this HTTP boundary. */
 export function createSlackFake({ now = () => Date.now(), channels = ['C1'], scopes = ['chat:write', 'chat:write.customize'] } = {}) {
   const requests = [], messages = []
-  const state = { failure: null, scopes: new Set(scopes), channels: new Set(channels) }
+  const state = { failure: /** @type {string | null} */ (null), scopes: new Set(scopes), channels: new Set(channels) }
   async function routes(request, response, url) {
     if (!url.pathname.startsWith('/slack/api/')) return false
     const body = await bodyJson(request)
@@ -20,7 +20,7 @@ export function createSlackFake({ now = () => Date.now(), channels = ['C1'], sco
     if (!state.scopes.has('chat:write') || ((body.username || body.icon_url || body.icon_emoji) && !state.scopes.has('chat:write.customize')))
       return json(response, { ok: false, error: 'missing_scope', needed: body.username || body.icon_url || body.icon_emoji ? 'chat:write.customize' : 'chat:write' })
     if (typeof body.text !== 'string' || !body.text.trim()) return json(response, { ok: false, error: 'no_text' })
-    if (body.icon_url && !/^https:\/\//.test(body.icon_url)) return json(response, { ok: false, error: 'invalid_arguments' })
+    if (body.icon_url && (typeof body.icon_url !== 'string' || !body.icon_url.startsWith('https://'))) return json(response, { ok: false, error: 'invalid_arguments' })
     const message = { ...body, ts: `${Math.floor(now() / 1000)}.${String(messages.length + 1).padStart(6, '0')}` }
     messages.push(message)
     return json(response, { ok: true, channel: body.channel, ts: message.ts, message })

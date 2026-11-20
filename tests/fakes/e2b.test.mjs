@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { Sandbox, SandboxNotFoundError, NotFoundError, RateLimitError, AuthenticationError } from 'e2b'
+import { Sandbox, SandboxNotFoundError, SandboxError, RateLimitError, AuthenticationError } from 'e2b'
 import { startExternalServices } from './external-services.mjs'
 
 test('real E2B SDK creates, reconnects, streams commands, reads/writes files and kills over HTTP', async t => {
@@ -28,7 +28,9 @@ test('real E2B SDK rejects auth, unknown templates, allocation limits, reclaimed
   t.after(() => services.close())
   const options = services.e2bOptions
   await assert.rejects(Sandbox.create('base', { ...options, apiKey: 'invalid-fixture-key' }), AuthenticationError)
-  await assert.rejects(Sandbox.create('missing-template', options), NotFoundError)
+  // e2b@2.61 maps the control API's template 404 to SandboxError.statusCode;
+  // SandboxNotFoundError is reserved for the connect/get-info path.
+  await assert.rejects(Sandbox.create('missing-template', options), error => error instanceof SandboxError && error.statusCode === 404)
   const sandbox = await Sandbox.create('base', options)
   await assert.rejects(Sandbox.create('base', options), RateLimitError)
   await assert.rejects(sandbox.commands.run('long command'), /timed out|deadline/i)

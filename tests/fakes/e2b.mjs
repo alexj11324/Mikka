@@ -14,7 +14,8 @@ function connectFrame(value, end = false) {
 export function createE2BFake({ now = () => Date.now(), templates = ['base', 'desktop', 'claude', 'codex'], limit = 8, commands = {} } = {}) {
   const requests = [], sandboxes = new Map(), idempotency = new Map()
   let sequence = 0, pid = 100
-  const state = { limit, templates: new Set(templates), commands, createError: null }
+  const state = { limit, templates: new Set(templates), commands, createError: null,
+    metrics: /** @type {null | ((input: { sandbox: { id: string }, url: URL }) => unknown[])} */ (null) }
   const view = sandbox => ({ sandboxID: sandbox.id, templateID: sandbox.template, clientID: 'local-client',
     domain: 'localhost', envdVersion: '0.5.6', envdAccessToken: sandbox.access,
     startedAt: new Date(sandbox.created).toISOString(), endAt: new Date(sandbox.expires).toISOString(),
@@ -69,7 +70,8 @@ export function createE2BFake({ now = () => Date.now(), templates = ['base', 'de
         response.writeHead(204); response.end(); return true
       }
       if (method === 'POST' && match[2] === 'pause') { sandbox.state = 'paused'; response.writeHead(204); response.end(); return true }
-      if (method === 'GET' && match[2] === 'metrics') return json(response, [{ timestamp: new Date(now()).toISOString(), cpuCount: 1, cpuUsedPct: 0, memUsed: 0, memTotal: 512 * 1024 * 1024 }])
+      if (method === 'GET' && match[2] === 'metrics') return json(response, state.metrics ? state.metrics({ sandbox, url })
+        : [{ timestamp: new Date(now()).toISOString(), cpuCount: 1, cpuUsedPct: 0, memUsed: 0, memTotal: 512 * 1024 * 1024, memCache: 0, diskUsed: 0, diskTotal: 1024 * 1024 * 1024 }])
       return json(response, { code: 405, message: 'Method not allowed' }, 405)
     }
     if (!url.pathname.startsWith('/e2b/envd/')) return json(response, { message: 'Unknown E2B endpoint' }, 404)
