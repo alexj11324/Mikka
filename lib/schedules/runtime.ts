@@ -1,7 +1,8 @@
 import 'server-only'
+import { sql } from 'drizzle-orm'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { pool, withDatabaseClient } from '@/lib/db'
-import { workspacePool } from '@/lib/workspace-db'
+import { workspaceDb, workspacePool } from '@/lib/workspace-db'
 import { issueForUser } from '@/lib/issue-access'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { armDueTimerSoon } from '@/lib/due-timer'
@@ -11,17 +12,17 @@ import { ScheduleError, type Actor, type Command, type DispatchTask, type Schedu
 
 const guard: WorkspaceGuard = async(owner,workspace,work)=>{
   if(!workspace)return work({role:'member'})
-  const tx=await workspacePool.connect()
-  try{
-    await tx.query('BEGIN')
-    const member=await tx.query<{role:'owner'|'admin'|'member'}>(`SELECT role FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,owner])
+  // Reuse a settings writer's existing membership transaction. Taking a
+  // second checkout here deadlocks against its own FOR UPDATE membership.
+  return workspaceDb.transaction(async tx=>{
+    const member=await tx.execute<{role:'owner'|'admin'|'member'}>(sql`SELECT role FROM mikka_workspace_members WHERE "workspaceId"=${workspace} AND "userId"=${owner} AND status='active' FOR SHARE`)
     if(!member.rowCount)throw new ScheduleError('scheduleWorkspaceAccessDenied',403)
     const requireActiveMember=async(userId:string)=>{
-      const found=await tx.query(`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=$2 AND status='active' FOR SHARE`,[workspace,userId])
+      const found=await tx.execute(sql`SELECT 1 FROM mikka_workspace_members WHERE "workspaceId"=${workspace} AND "userId"=${userId} AND status='active' FOR SHARE`)
       if(!found.rowCount)throw new ScheduleError('scheduleWorkspaceAccessDenied',403)
     }
-    const value=await work({role:member.rows[0].role,requireActiveMember});await tx.query('COMMIT');return value
-  }catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
+    return work({role:member.rows[0].role,requireActiveMember})
+  })
 }
 /** The Bot a dispatch_task hands its request to: the named Bot, or the creator's Coordinator in that workspace. */
 async function dispatchBot(ownerId:string,workspaceId:string,task:DispatchTask){
@@ -56,7 +57,7 @@ export const automationSeams:AutomationSeams={
   },
   /** The creator's 创建并派发, keyed by the occurrence: a retried run finds the same request and the same task. */
   async dispatch(input){
-    const {ownerId,workspaceId,scheduleId,occurrenceId,task,event,source,single,thread,run} = await (await import('@/lib/code-review/automation')).configuredReviewDispatch(input)
+    return (await import('@/lib/code-review/automation')).configuredReviewDispatch(input, async ({ownerId,workspaceId,scheduleId,occurrenceId,task,event,source,single,thread,run}) => {
     const botId=await dispatchBot(ownerId,workspaceId,task)
     const [{db},{recordPersonalSubmission},{createIssueFromRequest}]=await Promise.all([import('@/lib/db'),import('@/lib/coordinator-submission'),import('@/lib/coordinator/issue-create')])
     // An event-started run carries the event after the creator's request, marked as GitHub's data or the webhook's.
@@ -81,6 +82,7 @@ export const automationSeams:AutomationSeams={
       LEFT JOIN task_creation_receipts r ON r."taskId"=i.id AND r."userId"=$2 WHERE i.id=$1`,[created.issueId,ownerId])).rows[0]
     if(!row)throw new ScheduleError('scheduleDispatchUnavailable',503)
     return {id:created.issueId,title:row.title,status:row.status,identifier:row.identifier,eventId,requestedBy:ownerId}
+    })
   },
   async changed(tx,workspaceId){await (await import('@/lib/live/lists')).scheduleListChanged(tx,workspaceId)},
   /** Teams of the person's own Linear connection; null without one. Linear unreachable is retryable, not a lost authority. */
