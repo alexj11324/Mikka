@@ -4,6 +4,7 @@ import { mkdir, realpath, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { actionsMikkaRepository, hasGitHubOrigin, privateMikkaRepository } from './cloudflare-source.mjs'
+import { assertPrivateRunnerPlacement } from './ci/private-runner-placement.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const fullSha = /^[a-f0-9]{40}$/
@@ -104,6 +105,9 @@ export async function runCloudCi({ env = process.env, verify = false, publish = 
       !hasOrigin(privateRoot, privateRepository) || git(privateRoot, 'rev-parse', 'HEAD') !== context.privateSource ||
       git(privateRoot, 'status', '--porcelain', '--untracked-files=no') !== '') fail('CLOUD_PUBLIC_CI_PRIVATE_SOURCE_MISMATCH')
   git(privateRoot, 'ls-files', '--error-unmatch', 'scripts/cloudflare-ci.mjs')
+  // New qualification cannot add private hosted runners. Original verification
+  // and publication keep the workflow bytes of their authenticated release.
+  if (!verify) assertPrivateRunnerPlacement(privateRoot, context.privateSource)
   const { runCi } = await import(pathToFileURL(resolve(privateRoot, 'scripts/cloudflare-ci.mjs')).href)
   const receipt = await runCi({ env, verify, publicRoot, publicSource: context.publicSource })
   if (git(publicRoot, 'rev-parse', 'HEAD') !== context.publicSource || git(privateRoot, 'rev-parse', 'HEAD') !== context.privateSource) fail('CLOUD_PUBLIC_CI_SOURCE_CHANGED')
