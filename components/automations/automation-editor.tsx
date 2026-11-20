@@ -26,6 +26,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { InlineLoadError } from '@/components/load-error'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { AutomationSettings } from '@ui-slot/automation-editor'
+import type { AutomationSettingControl, AutomationSettingOption, AutomationSettingRow } from '@/components/slots/automation-editor-contract'
 import { useAgentProfiles } from '@/components/settings/factory-profiles-data'
 import { useTaskProfileChoices } from '@/components/coordinator/task-profile-picker'
 import { openTask } from '@/components/workspace/workspace-navigation'
@@ -268,6 +270,50 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const efforts = draft.model && draft.agent ? supportedModelEfforts(draft.model, draft.agent) : []
   const shownEnvironments = (environments.data ?? []).filter(environment => !environment.archived || environment.id === draft.environmentId)
   const targets = workspaces.data?.accounts[0]?.choices ?? []
+  // Runs in takes Hand to's place (decision 2026-11-19-2105): who dispatches a new or standing thread, or the thread every
+  // run goes to. The section is the automation-editor slot's (decision 2026-11-19-2120); the choices and saves are here.
+  const select = (label: string, value: string, options: AutomationSettingOption[], onChange: (value: string) => void, disabled?: boolean): AutomationSettingControl =>
+    ({ kind: 'select', label, value, options, onChange, ...(disabled ? { disabled } : {}) })
+  const settingRows: AutomationSettingRow[] = [
+    { id: 'runs-in', label: t('runsIn'), controls: [
+      select(t('runsIn'), draft.eachRun, [{ value: 'new_task', label: t('runsInNew') }, { value: 'same_task', label: t('runsInSame') }, { value: 'existing_thread', label: t('runsInExisting') }],
+        value => { if (value === 'new_task' || value === 'same_task' || value === 'existing_thread') set({ eachRun: value }) }),
+      ...(draft.eachRun !== 'existing_thread' ? [select(t('bot'), draft.botId ?? '', [{ value: '', label: tAll('coordinator') },
+        ...ownBots.map(bot => ({ value: bot.id, label: bot.name })), ...(otherBot ? [{ value: otherBot.id, label: otherBot.name }] : [])],
+      value => set({ botId: value || null }))] : []),
+    ] },
+    ...(draft.eachRun === 'existing_thread' && workspaceId ? [{ id: 'thread', content: <ThreadPicker workspaceId={workspaceId} value={draft.singleThreadId} onChange={singleThreadId => set({ singleThreadId })} /> }] : []),
+    { id: 'environment', label: t('environment'), controls: [select(t('environment'), draft.environmentId ?? '', [{ value: '', label: t('environmentDefault') },
+      ...(draft.environmentId && !shownEnvironments.some(environment => environment.id === draft.environmentId) ? [{ value: draft.environmentId, label: draft.environmentId }] : []),
+      ...shownEnvironments.map(environment => ({ value: environment.id, label: environment.name }))], value => set({ environmentId: value || null }))] },
+    // A failed device read leaves the list empty; the disabled line says why the person's own devices are missing.
+    { id: 'machine', label: t('machine'), controls: [select(t('machine'), draft.machine, [{ value: 'auto', label: t('machineDefault') }, { value: 'cloud', label: t('machineCloud') },
+      ...(draft.machine === 'cloudflare' ? [{ value: 'cloudflare', label: t('machineCloud') }] : []),
+      ...localDevices.map(device => ({ value: device.id, label: device.name })),
+      ...(devicesError ? [{ value: '', label: t('devicesError'), disabled: true }] : [])], value => set({ machine: value }))] },
+    { id: 'agent', label: t('agent'), controls: [select(t('agent'), draft.agent ?? '', [{ value: '', label: t('agentNone'), disabled: true },
+      { value: 'claude_code', label: harnessName('claude_code') }, { value: 'codex', label: harnessName('codex') }],
+    value => set({ agent: value === 'claude_code' || value === 'codex' ? value : null, model: null, effort: null }))] },
+    ...(draft.agent ? [{ id: 'model', label: t('model'), controls: [
+      select(t('model'), draft.model ?? '', [{ value: '', label: t('modelDefault') }, ...models.map(model => ({ value: model, label: model }))], value => set({ model: value || null, effort: null })),
+      ...(efforts.length ? [select(t('effort'), draft.effort ?? '', [{ value: '', label: t('effortDefault') }, ...efforts.map(effort => ({ value: effort, label: t(`efforts.${effort}`) }))],
+        value => set({ effort: value && (AUTOMATION_EFFORTS as readonly string[]).includes(value) ? value as AutomationEffort : null }))] : []),
+    ] }] : []),
+    { id: 'machine-size', label: t('machineSize'), controls: [select(t('machineSize'), draft.machineSize ?? '', [{ value: '', label: t('machineSizeDefault') },
+      ...(Object.keys(MACHINE_SIZES) as MachineSize[]).map(size => ({ value: size, label: t('machineSizeOption', { vcpu: MACHINE_SIZES[size].vcpu, gib: MACHINE_SIZES[size].gib }) }))],
+    value => set({ machineSize: value in MACHINE_SIZES ? value as MachineSize : null }))] },
+    { id: 'profile', label: t('profile'), controls: [select(t('profile'), draft.profileId, profileChoices.choices.map(choice => ({ value: choice.value, label: choice.label,
+      ...('disabled' in choice && choice.disabled ? { disabled: true } : {}) })), value => set({ profileId: value }), !workspaceId)] },
+    ...(draft.eachRun === 'new_task' ? [{ id: 'pin', label: t('pin'), controls: [{ kind: 'switch' as const, label: t('pin'), checked: draft.pin, onChange: (pin: boolean) => set({ pin }) }] }] : []),
+    { id: 'notify', label: t('notify'), controls: [slackWanted || draft.notify
+      ? select(t('notify'), draft.notify?.channel ?? '', [{ value: '', label: t('notifyOff') },
+        ...(draft.notify && !slackChannels.data?.channels.some(channel => channel.id === draft.notify!.channel) ? [{ value: draft.notify.channel, label: draft.notify.channel }] : []),
+        ...(slackChannels.data?.channels ?? []).map(channel => ({ value: channel.id, label: `#${channel.name}` }))],
+      value => set({ notify: value ? { channel: value, locale: locale === 'en' ? 'en' : 'zh-CN' } : null }), !slackChannels.data && !draft.notify)
+      : { kind: 'button', label: t('notifyChoose'), onClick: () => setSlackWanted(true), disabled: busy !== null }] },
+    { id: 'timezone', label: t('timezone'), controls: [select(t('timezone'), draft.timezone, (zones.includes(draft.timezone) ? zones : [draft.timezone, ...zones]).map(zone => ({ value: zone, label: zone })),
+      value => set({ timezone: value, fold: null }))] },
+  ]
   const field = (label: string, control: React.ReactNode) => <SettingRow title={label}><div className="flex flex-wrap items-center justify-end gap-2">{control}</div></SettingRow>
 
   return <EditorFrame onBack={onBack} backLabel={t('back')}>
@@ -316,82 +362,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     {!canManage && <p role="status" className="px-6 pt-1 text-sm text-muted-foreground">{t('viewOnly')}</p>}
 
     <FieldSet disabled={!canManage} className="contents">
-    {!draft.otherTask && <SettingsSection id="automation-settings" title={t('settings')}>
-      {/* Runs in takes Hand to's place (decision 2026-11-19-2105): who dispatches a new or standing thread, or the thread every run goes to. */}
-      {field(t('runsIn'), <>
-        <NativeSelect aria-label={t('runsIn')} value={draft.eachRun} onChange={event => {
-          const value = event.target.value
-          if (value === 'new_task' || value === 'same_task' || value === 'existing_thread') set({ eachRun: value })
-        }}>
-          <NativeSelectOption value="new_task">{t('runsInNew')}</NativeSelectOption>
-          <NativeSelectOption value="same_task">{t('runsInSame')}</NativeSelectOption>
-          <NativeSelectOption value="existing_thread">{t('runsInExisting')}</NativeSelectOption>
-        </NativeSelect>
-        {draft.eachRun !== 'existing_thread' && <NativeSelect aria-label={t('bot')} value={draft.botId ?? ''} onChange={event => set({ botId: event.target.value || null })}>
-          <NativeSelectOption value="">{tAll('coordinator')}</NativeSelectOption>
-          {ownBots.map(bot => <NativeSelectOption key={bot.id} value={bot.id}>{bot.name}</NativeSelectOption>)}
-          {otherBot && <NativeSelectOption value={otherBot.id}>{otherBot.name}</NativeSelectOption>}
-        </NativeSelect>}
-      </>)}
-      {draft.eachRun === 'existing_thread' && workspaceId && <ThreadPicker workspaceId={workspaceId} value={draft.singleThreadId} onChange={singleThreadId => set({ singleThreadId })} />}
-      {field(t('environment'), <NativeSelect aria-label={t('environment')} value={draft.environmentId ?? ''} onChange={event => set({ environmentId: event.target.value || null })}>
-        <NativeSelectOption value="">{t('environmentDefault')}</NativeSelectOption>
-        {draft.environmentId && !shownEnvironments.some(environment => environment.id === draft.environmentId) && <NativeSelectOption value={draft.environmentId}>{draft.environmentId}</NativeSelectOption>}
-        {shownEnvironments.map(environment => <NativeSelectOption key={environment.id} value={environment.id}>{environment.name}</NativeSelectOption>)}
-      </NativeSelect>)}
-      {field(t('machine'), <NativeSelect aria-label={t('machine')} value={draft.machine} onChange={event => set({ machine: event.target.value })}>
-        <NativeSelectOption value="auto">{t('machineDefault')}</NativeSelectOption>
-        <NativeSelectOption value="cloud">{t('machineCloud')}</NativeSelectOption>
-        {draft.machine === 'cloudflare' && <NativeSelectOption value="cloudflare">{t('machineCloud')}</NativeSelectOption>}
-        {localDevices.map(device => <NativeSelectOption key={device.id} value={device.id}>{device.name}</NativeSelectOption>)}
-        {/* A failed read leaves the list empty; without this the only machine
-            choices are the two defaults, with nothing saying why the person's
-            own devices are missing. */}
-        {devicesError && <NativeSelectOption value="" disabled>{t('devicesError')}</NativeSelectOption>}
-      </NativeSelect>)}
-      {field(t('agent'), <NativeSelect aria-label={t('agent')} value={draft.agent ?? ''} onChange={event => set({ agent: event.target.value === 'claude_code' || event.target.value === 'codex' ? event.target.value : null, model: null, effort: null })}>
-        <NativeSelectOption value="" disabled>{t('agentNone')}</NativeSelectOption>
-        <NativeSelectOption value="claude_code">{harnessName('claude_code')}</NativeSelectOption>
-        <NativeSelectOption value="codex">{harnessName('codex')}</NativeSelectOption>
-      </NativeSelect>)}
-      {draft.agent && field(t('model'), <>
-        <NativeSelect aria-label={t('model')} value={draft.model ?? ''} onChange={event => set({ model: event.target.value || null, effort: null })}>
-          <NativeSelectOption value="">{t('modelDefault')}</NativeSelectOption>
-          {models.map(model => <NativeSelectOption key={model} value={model}>{model}</NativeSelectOption>)}
-        </NativeSelect>
-        {efforts.length > 0 && <NativeSelect aria-label={t('effort')} value={draft.effort ?? ''} onChange={event => {
-          const value = event.target.value as AutomationEffort | ''
-          set({ effort: value && (AUTOMATION_EFFORTS as readonly string[]).includes(value) ? value : null })
-        }}>
-          <NativeSelectOption value="">{t('effortDefault')}</NativeSelectOption>
-          {efforts.map(effort => <NativeSelectOption key={effort} value={effort}>{t(`efforts.${effort}`)}</NativeSelectOption>)}
-        </NativeSelect>}
-      </>)}
-      {field(t('machineSize'), <NativeSelect aria-label={t('machineSize')} value={draft.machineSize ?? ''} onChange={event => {
-        const value = event.target.value
-        set({ machineSize: value in MACHINE_SIZES ? value as MachineSize : null })
-      }}>
-        <NativeSelectOption value="">{t('machineSizeDefault')}</NativeSelectOption>
-        {(Object.keys(MACHINE_SIZES) as MachineSize[]).map(size => <NativeSelectOption key={size} value={size}>{t('machineSizeOption', { vcpu: MACHINE_SIZES[size].vcpu, gib: MACHINE_SIZES[size].gib })}</NativeSelectOption>)}
-      </NativeSelect>)}
-      {field(t('profile'), <NativeSelect aria-label={t('profile')} value={draft.profileId} disabled={!workspaceId} onChange={event => set({ profileId: event.target.value })}>
-        {profileChoices.choices.map(choice => <NativeSelectOption key={choice.value} value={choice.value} disabled={'disabled' in choice && choice.disabled}>{choice.label}</NativeSelectOption>)}
-      </NativeSelect>)}
-      {draft.eachRun === 'new_task' && <SettingRow title={t('pin')}>
-        <Switch aria-label={t('pin')} checked={draft.pin} onCheckedChange={pin => set({ pin })} />
-      </SettingRow>}
-      {field(t('notify'), slackWanted || draft.notify
-        ? <NativeSelect aria-label={t('notify')} value={draft.notify?.channel ?? ''} disabled={!slackChannels.data && !draft.notify}
-          onChange={event => set({ notify: event.target.value ? { channel: event.target.value, locale: locale === 'en' ? 'en' : 'zh-CN' } : null })}>
-          <NativeSelectOption value="">{t('notifyOff')}</NativeSelectOption>
-          {draft.notify && !slackChannels.data?.channels.some(channel => channel.id === draft.notify!.channel) && <NativeSelectOption value={draft.notify.channel}>{draft.notify.channel}</NativeSelectOption>}
-          {(slackChannels.data?.channels ?? []).map(channel => <NativeSelectOption key={channel.id} value={channel.id}>#{channel.name}</NativeSelectOption>)}
-        </NativeSelect>
-        : <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => setSlackWanted(true)}>{t('notifyChoose')}</Button>)}
-      {field(t('timezone'), <NativeSelect aria-label={t('timezone')} value={draft.timezone} onChange={event => set({ timezone: event.target.value, fold: null })}>
-        {(zones.includes(draft.timezone) ? zones : [draft.timezone, ...zones]).map(zone => <NativeSelectOption key={zone} value={zone}>{zone}</NativeSelectOption>)}
-      </NativeSelect>)}
-    </SettingsSection>}
+    {!draft.otherTask && <AutomationSettings id="automation-settings" title={t('settings')} disabled={!canManage} rows={settingRows} />}
 
     <SettingsSection id="automation-triggers" title={t('triggers')}>
       <SettingRow title={t('schedule')}>
