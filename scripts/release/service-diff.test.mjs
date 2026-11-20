@@ -16,9 +16,11 @@ function release() {
       const imageDigest = digest(name + ':image')
       const service = { kind: worker ? 'worker' : 'container', contextDigest: digest(name + ':context'),
         sourceCommit: 'a'.repeat(40), reused: false,
+        ...(['api', 'web'].includes(name) ? { overlayCommit: 'b'.repeat(40) } : {}),
         build: { runId: '101', runAttempt: '1', artifactId: '201', workflow: 'cloudflare-api-image.yml' },
         artifacts: { worker: { path: name + '/worker.mjs', digest: digest(name + ':worker') } },
-        ...(!worker ? { imageDigest, image: 'registry.cloudflare.com/' + 'c'.repeat(32) + '/mikka-' + name + '@' + imageDigest } : {}) }
+        ...(!worker ? { localImageId: digest(name + ':local image'), imageDigest,
+          image: 'registry.cloudflare.com/' + 'c'.repeat(32) + '/mikka-' + name + '@' + imageDigest } : {}) }
       return [name, { ...service, digest: serviceDigest(service) }]
     })),
     migrations: { contextDigest: digest('initial migrations'), files: ['drizzle/20261120000000_initial.sql'] } }

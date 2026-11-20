@@ -28,14 +28,13 @@ on:
       - 'lib/model-gateway/**'
       - 'tests/model-gateway-litellm.test.ts'
       - '.github/workflows/cloudflare-litellm-image.yml'
-  push:
-    branches: [main]
-    paths: *litellm_paths
 permissions:
   contents: read
 jobs:
   image:
-    if: github.event_name != 'workflow_dispatch'
+    # Trusted builds and these same image gates now run in cloudflare-api-image.yml.
+    # Fork and other untrusted PRs retain the existing credential-free qualification.
+    if: github.event_name == 'pull_request' && (github.repository_id != '1427517699' || github.actor_id != '183887963' || github.triggering_actor != 'alexj11324' || github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.head.repo.fork != false || github.event.pull_request.user.id != 183887963)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
