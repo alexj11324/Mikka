@@ -5,6 +5,7 @@ import { upstreamRequest } from './upstream'
 import { parseGatewayFeatures, withoutDisabledFeatures } from './features'
 import { gatewayLiteLlm, SELF_HOSTED_DEFAULT_CATALOG_ID } from './config'
 import { parseCreditsOption, creditsOptionId } from '../bot-model-menu-view'
+import { liteLlmByokRoute } from '../model-api-key-providers'
 import { GatewayRefusal, handleModelGateway, type GatewayDependencies } from './handler'
 import type { GatewayGrant } from './token'
 import { PaidResourceError } from '@/lib/abuse/policy'
@@ -67,6 +68,18 @@ test('credits and BYOK reach only LiteLLM; credentials and routing come from the
   assert.equal(codex.body.stream, true)
   assert.equal(codex.body.previous_response_id, 'previous')
   assert.throws(() => upstreamRequest({ protocol: 'openai', operation: 'messages', model: 'm', body: {}, clientHeaders, upstream }))
+  const deepseekClaude = liteLlmByokRoute({ provider: 'deepseek', protocol: 'openai', baseUrl: null, responsesApi: true }, 'claude_code')
+  assert.ok(deepseekClaude)
+  const dual = upstreamRequest({ protocol: 'anthropic', operation: 'messages', model: 'deepseek-chat', body, clientHeaders,
+    upstream: { ...upstream, credential: { key: 'person-key', ...deepseekClaude } } })
+  assert.deepEqual([dual.body.model, dual.body.custom_llm_provider, dual.body.api_base],
+    ['anthropic/deepseek-chat', 'anthropic', 'https://api.deepseek.com/anthropic'])
+  const openaiClaude = liteLlmByokRoute({ provider: 'openai', protocol: 'openai', baseUrl: null, responsesApi: true }, 'claude_code')
+  assert.ok(openaiClaude)
+  const converted = upstreamRequest({ protocol: 'anthropic', operation: 'messages', model: 'gpt-4o', body, clientHeaders,
+    upstream: { ...upstream, credential: { key: 'person-key', ...openaiClaude } } })
+  assert.deepEqual([converted.body.model, converted.body.custom_llm_provider, converted.body.api_base],
+    ['openai/gpt-4o', 'openai', 'https://api.openai.com/v1'])
 })
 
 test('turned-off features are removed before the request leaves', () => {

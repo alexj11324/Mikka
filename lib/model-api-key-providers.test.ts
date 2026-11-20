@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { API_KEY_PRESETS, apiKeyEndpoint, apiKeyHarnesses, apiKeyProtocols } from './model-api-key-providers'
+import { API_KEY_PRESETS, apiKeyEndpoint, apiKeyHarnesses, apiKeyProtocols, liteLlmByokRoute } from './model-api-key-providers'
 
 const preset = (provider: (typeof API_KEY_PRESETS)[number]) => ({ provider, protocol: 'anthropic' as const, baseUrl: null, responsesApi: true })
 
@@ -28,6 +28,37 @@ test('a custom provider serves only the protocol the person picked, at its own b
   assert.deepEqual(apiKeyEndpoint(gateway, 'codex'), { protocol: 'openai', baseUrl: 'https://gateway.example.com/v1' })
   assert.equal(apiKeyEndpoint(gateway, 'claude_code'), null)
   assert.deepEqual(apiKeyHarnesses({ ...gateway, protocol: 'anthropic' }), ['claude_code'])
+})
+
+test('LiteLLM BYOK follows the Agent, not the stored protocol column', () => {
+  assert.deepEqual(liteLlmByokRoute(preset('deepseek'), 'claude_code'), {
+    provider: 'anthropic', apiBase: 'https://api.deepseek.com/anthropic', chatCompletionsOnly: false,
+  })
+  assert.deepEqual(liteLlmByokRoute({ ...preset('deepseek'), protocol: 'openai' }, 'claude_code'), {
+    provider: 'anthropic', apiBase: 'https://api.deepseek.com/anthropic', chatCompletionsOnly: false,
+  })
+  assert.deepEqual(liteLlmByokRoute(preset('deepseek'), 'codex'), {
+    provider: 'openai', apiBase: 'https://api.deepseek.com/v1', chatCompletionsOnly: true,
+  })
+  assert.deepEqual(liteLlmByokRoute(preset('kimi'), 'claude_code'), {
+    provider: 'anthropic', apiBase: 'https://api.moonshot.cn/anthropic', chatCompletionsOnly: false,
+  })
+  assert.deepEqual(liteLlmByokRoute(preset('openai'), 'codex'), {
+    provider: 'openai', apiBase: 'https://api.openai.com/v1', chatCompletionsOnly: false,
+  })
+  assert.deepEqual(liteLlmByokRoute(preset('openai'), 'claude_code'), {
+    provider: 'openai', apiBase: 'https://api.openai.com/v1', chatCompletionsOnly: false,
+  })
+  assert.deepEqual(liteLlmByokRoute(preset('anthropic'), 'claude_code'), {
+    provider: 'anthropic', apiBase: 'https://api.anthropic.com', chatCompletionsOnly: false,
+  })
+  const gateway = { provider: 'custom' as const, protocol: 'openai' as const, baseUrl: 'https://gateway.example.com/v1', responsesApi: true }
+  assert.deepEqual(liteLlmByokRoute(gateway, 'codex'), {
+    provider: 'openai', apiBase: 'https://gateway.example.com/v1', chatCompletionsOnly: true,
+  })
+  assert.deepEqual(liteLlmByokRoute(gateway, 'claude_code'), {
+    provider: 'openai', apiBase: 'https://gateway.example.com/v1', chatCompletionsOnly: true,
+  })
 })
 
 test('Codex runs on the Responses API: an OpenAI-protocol provider without it serves no Agent, but still speaks its protocol', () => {

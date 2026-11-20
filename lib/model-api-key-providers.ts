@@ -62,6 +62,32 @@ export function apiKeyEndpoint(key: ApiKeyAgentFields & Pick<ApiKeyView, 'baseUr
   return baseUrl ? { protocol, baseUrl } : null
 }
 
+/**
+ * LiteLLM routing for one BYOK run: the Agent's own protocol and host when
+ * the key speaks it, never the stored protocol column. DeepSeek and Kimi
+ * speak both; Claude Code must keep the Anthropic host. A Chat Completions
+ * key with no Anthropic endpoint still serves Claude Code through conversion
+ * (decision 2026-11-15-2000).
+ */
+export function liteLlmByokRoute(key: ApiKeyAgentFields & Pick<ApiKeyView, 'baseUrl'>, harness: ApiKeyHarness): {
+  provider: 'anthropic' | 'openai'
+  apiBase: string
+  chatCompletionsOnly: boolean
+} | null {
+  const endpoint = apiKeyEndpoint(key, harness)
+  if (endpoint) {
+    const anthropic = endpoint.protocol === 'anthropic'
+    return {
+      provider: anthropic ? 'anthropic' : 'openai',
+      apiBase: endpoint.baseUrl,
+      chatCompletionsOnly: !anthropic && key.provider !== 'openai',
+    }
+  }
+  const chat = apiKeyChatBaseUrl(key)
+  if (!chat || harness !== 'claude_code') return null
+  return { provider: 'openai', apiBase: chat, chatCompletionsOnly: key.provider !== 'openai' }
+}
+
 /** One credential row as the page and the model picker read it. Never the key itself. */
 export interface ApiKeyView {
   id: string
