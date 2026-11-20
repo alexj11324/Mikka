@@ -16,8 +16,7 @@ await assertNoFixtureAuthInOutput(process.cwd())
 const instance = await startFixture({ scenario: selection })
 const layer = instance.build.overlaySha ? 'official' : 'default'
 const directory = resolve('.cache/screenshots', layer)
-await mkdir(directory, { recursive: true })
-const browser = await chromium.launch(process.env.MIKKA_CHROMIUM_EXECUTABLE ? { executablePath: process.env.MIKKA_CHROMIUM_EXECUTABLE } : {})
+let browser
 const results = []
 
 async function capture(scene, editor = false) {
@@ -36,7 +35,10 @@ async function capture(scene, editor = false) {
     } else if (scene === 'task') {
       await expect(page.getByText('评审 HTTP fake', { exact: true }).first()).toBeVisible()
       await expect(page.getByText('HTTP fake 验收', { exact: true }).first()).toBeVisible()
-    } else if (scene === 'automations') await expect(page.getByText('检查待验收任务', { exact: true }).first()).toBeVisible()
+    } else if (scene === 'automations') {
+      if (editor) await expect(page.getByRole('textbox', { name: '名称', exact: true })).toHaveValue('检查待验收任务')
+      else await expect(page.getByText('检查待验收任务', { exact: true }).first()).toBeVisible()
+    }
     else if (scene === 'pulls') await expect(page.getByText('HTTP fake acceptance', { exact: true }).first()).toBeVisible()
     else if (scene === 'bot-settings') {
       await page.getByRole('button', { name: '概览', exact: true }).first().click()
@@ -53,6 +55,8 @@ async function capture(scene, editor = false) {
 }
 
 try {
+  await mkdir(directory, { recursive: true })
+  browser = await chromium.launch(process.env.MIKKA_CHROMIUM_EXECUTABLE ? { executablePath: process.env.MIKKA_CHROMIUM_EXECUTABLE } : {})
   for (const scene of instance.scenes) for (const editor of scene === 'automations' ? [false, true] : [false]) {
     const name = editor ? 'automation-editor' : scene, first = await capture(scene, editor), second = await capture(scene, editor)
     const left = await sharp(first).ensureAlpha().raw().toBuffer({ resolveWithObject: true }), right = await sharp(second).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
@@ -68,4 +72,4 @@ try {
   await writeFile(resolve(directory, 'manifest.json'), JSON.stringify({ version: 1, target: instance.build.target, revision: instance.build.revision,
     overlaySha: instance.build.overlaySha ?? null, layer, browser: browser.version(), viewport: { width: 1440, height: 1000 }, fixedTime: FIXTURE_TIME, results }, null, 2) + '\n')
   console.log(JSON.stringify({ directory, layer, captured: results.length, stable: true }))
-} finally { await browser.close(); await instance.close() }
+} finally { try { await browser?.close() } finally { await instance.close() } }
