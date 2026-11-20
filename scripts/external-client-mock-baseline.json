@@ -1,0 +1,19 @@
+{
+  "app/api/github/pull-request-status/route.test.ts:lib/github/user-access": 1,
+  "lib/cloud-computer/credential-reviews.test.ts:lib/computer/e2b-provider": 1,
+  "lib/cloud-computer/unattended.db.test.ts:lib/computer/e2b-provider": 1,
+  "lib/coding-workspace/diff/github-delivery.db.test.ts:lib/github/user-access": 1,
+  "lib/coding-workspace/diff/github-native.test.ts:lib/github/user-access": 1,
+  "lib/coding-workspace/diff/github-write.test.ts:lib/github/user-access": 1,
+  "lib/coding-workspace/diff/github.test.ts:lib/github/user-access": 1,
+  "lib/coding-workspace/preview/runtime.test.ts:lib/computer/e2b-provider": 1,
+  "lib/coding-workspace/task-review/merge.db.test.ts:lib/github/user-access": 1,
+  "lib/coding-workspace/task-review/send.db.test.ts:lib/github/user-access": 1,
+  "lib/coding-workspace/terminal/runtime.test.ts:e2b": 1,
+  "lib/device-route-fence.db.test.ts:lib/github/user-access": 1,
+  "lib/github/cloud.test.ts:lib/github/user-access": 1,
+  "lib/github/pull-detail.test.ts:lib/github/user-access": 1,
+  "lib/github/pull-directory.test.ts:lib/github/user-access": 1,
+  "lib/github/user-access.test.ts:lib/github/cloud": 1,
+  "tests/project-dependency-repositories.db.test.ts:lib/github/user-access": 1
+}
