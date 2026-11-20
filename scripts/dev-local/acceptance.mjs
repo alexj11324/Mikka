@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { access, appendFile, chmod, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import { resolve, join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
@@ -29,10 +30,13 @@ const needsModels = selectedItems.some(item => item !== '11')
 // Keep the daemon Unix socket below Linux's 108-byte pathname limit even in
 // the separate fixed acceptance checkout. Evidence retains the full runId.
 const runId = randomUUID(), directory = resolve(root, '.cache/dev-local', `acceptance-${runId.replaceAll('-', '').slice(0, 16)}`)
+// Unix sockets have a fixed platform path bound independent of checkout depth.
+// This run owns the short private directory; its location remains in runtime evidence.
+const daemonDataRoot = resolve(tmpdir(), `mikka-loop-${runId}`)
 const progressFile = resolve(root, '.cache/dev-local/progress.jsonl')
 const started = Date.now(), children = [], secrets = new Set(), expectedChildExits = new WeakSet()
 const completedItems = []
-const cleanupHooks = [], daemonDirectories = [join(directory, 'daemon')]
+const cleanupHooks = [], daemonDirectories = [join(daemonDataRoot, 'daemon')]
 let cloudRelease, cloudApiKey, pool, accounts, environment, runtime, localStackChild, secondDaemonPromise, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
 async function fingerprint() {
   const paths = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).sort()
@@ -155,6 +159,7 @@ async function setup() {
   assert.ok(Number(process.versions.node.split('.')[0]) >= 22, 'Use Node 22 or newer')
   for (const name of ['CI', 'GITHUB_ACTIONS', 'RUNNER_ENVIRONMENT', 'GITHUB_RUN_ID']) assert.ok(!process.env[name], 'Local acceptance must not impersonate CI')
   await privateDirectory(directory)
+  if (needsDaemon) await privateDirectory(daemonDataRoot)
   for (const name of ['BETTER_AUTH_SECRET', 'DEEPSEEK_API_KEY', 'INFISICAL_CLIENT_SECRET']) if (process.env[name]) secrets.add(process.env[name])
   const existing = process.argv.includes('--existing')
   if (selectedItems.includes('8') && !existing) {
@@ -195,7 +200,7 @@ async function setup() {
     process.env.BETTER_AUTH_SECRET ||= randomBytes(32).toString('base64url')
     secrets.add(process.env.BETTER_AUTH_SECRET)
     process.env.MIKKA_DEV_PORT = new URL(origin).port
-    process.env.MIKKA_DEV_DAEMON_DIR = join(directory, 'daemon')
+    process.env.MIKKA_DEV_DAEMON_DIR = join(daemonDataRoot, 'daemon')
     await step('migrate', 180_000, () => command(['--import', 'tsx', 'scripts/setup-e2e-db.mjs']))
   }
   process.env.BETTER_AUTH_URL = origin
@@ -270,7 +275,7 @@ async function setup() {
     // credential would defeat the account-pool boundary, so log in our own CLI.
     await writeFile(join(directory, 'daemon.gitconfig'), `[url "${pathToFileURL(runtime.scenario.barePath).href}"]\n\tinsteadOf = https://github.com/mikka-e2e/core-loop.git\n[protocol "file"]\n\tallow = always\n`, { mode: 0o600 })
     daemonCode = undefined
-    standaloneDaemon(['daemon', 'login', '--server', runtime.server, '--data-dir', join(directory, 'daemon')])
+    standaloneDaemon(['daemon', 'login', '--server', runtime.server, '--data-dir', join(daemonDataRoot, 'daemon')])
   }
   await step('device-login', 60_000, async signal => {
     const code = await until(signal, () => daemonCode)
@@ -278,8 +283,8 @@ async function setup() {
     await json(accounts.owner, '/api/auth/device/approve', { userCode: code })
   })
   if (existing) {
-    await step('device-credential-ready', 30_000, signal => until(signal, () => access(join(directory, 'daemon/device.json')).then(() => true, () => false)))
-    standaloneDaemon(['daemon', '--no-auto-update', '--server', runtime.server, '--data-dir', join(directory, 'daemon')], true)
+    await step('device-credential-ready', 30_000, signal => until(signal, () => access(join(daemonDataRoot, 'daemon/device.json')).then(() => true, () => false)))
+    standaloneDaemon(['daemon', '--no-auto-update', '--server', runtime.server, '--data-dir', join(daemonDataRoot, 'daemon')], true)
   }
   const devices = await step('daemon-ready', 60_000, signal => until(signal, async () => {
     const result = await json(accounts.owner, '/api/mobile/threads')
@@ -322,7 +327,7 @@ async function stopSecondDaemon() {
 }
 
 async function startSecondDaemon(signal) {
-  const dataDir = join(directory, 'daemon-b')
+  const dataDir = join(daemonDataRoot, 'daemon-b')
   if (!daemonDirectories.includes(dataDir)) daemonDirectories.push(dataDir)
   await mkdir(dataDir, { recursive: true, mode: 0o700 })
   const daemonUser = process.getuid?.() === 0 && process.env.MIKKA_DEV_DAEMON_USER

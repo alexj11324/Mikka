@@ -2,8 +2,6 @@ import {evaluationBindingId} from '../../../../lib/eve/evaluation-context'
 import { defineHook } from 'eve/hooks'
 import { sessions } from 'eve/server'
 import { scopeFromAuth, registerSession } from '../../../../lib/eve/scope'
-import { projectEveTurn, projectTurnState, stoppedTurnDisplay } from '../../../../lib/eve/projection'
-import { productRpc } from '../../../../lib/eve/product-rpc'
 import { turnModel, turnPolicy, turnRequest } from '../../../../lib/eve/runtime'
 
 export default defineHook({events:{
@@ -42,11 +40,17 @@ export default defineHook({events:{
       turnModel.update(() => runtime)
       turnPolicy.update(() => policy)
     })
-    if (!scheduled && !ctx.session.parent) await projectTurnState(scope,ctx.session.id,event.data.turnId,true)
+    if (!scheduled && !ctx.session.parent) {
+      const { projectTurnState } = await import('../../../../lib/eve/projection')
+      await projectTurnState(scope,ctx.session.id,event.data.turnId,true)
+    }
   },
   async 'turn.settled'(event,ctx) {
     if(evaluationBindingId(ctx.session.auth.current))return
     const scope = scopeFromAuth(ctx.session.auth.current)
+    const [{ projectEveTurn, stoppedTurnDisplay }, { productRpc }] = await Promise.all([
+      import('../../../../lib/eve/projection'), import('../../../../lib/eve/product-rpc'),
+    ])
     const stoppedText = !ctx.session.parent && scope.surface === 'web' && event.data.outcome === 'cancelled'
       ? await stoppedTurnDisplay(sessions.attach(ctx.session.id),event.data.turnId,turnRequest.get().startIndex ?? 0)
       : undefined
