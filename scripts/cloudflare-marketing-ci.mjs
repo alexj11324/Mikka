@@ -17,6 +17,11 @@ const archiveName = 'marketing-worker.tgz'
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const git = (cwd, args, env) => command('git', args, { cwd, env, stage: 'MARKETING_SOURCE', encoding: 'utf8', timeout: 120000 }).trim()
 
+export function marketingGitHubOwner(owner = 'alexj11324') {
+  assert.ok(Object.values(privateRepositories).some(value => value.login === owner), 'MARKETING_PUBLIC_CI_INSTALLATION_OWNER_REQUIRED')
+  return owner
+}
+
 export function checkedMarketingRepository(metadata) {
   const owner = Object.hasOwn(privateRepositories, metadata?.full_name) ? privateRepositories[metadata.full_name] : null
   assert.ok(metadata?.id === 1429004608 && metadata.private === true && metadata.fork === false
@@ -62,7 +67,18 @@ export function buildEnvironment(env) {
     CI: 'true', WRANGLER_SEND_METRICS: 'false' }
 }
 
+function withoutAppAuthority(env) {
+  const scoped = { ...env }
+  // Private modules execute here as well as in compiler children.
+  for (const name of ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'ACTIONS_ID_TOKEN_REQUEST_URL']) {
+    delete scoped[name]
+    delete process.env[name]
+  }
+  return scoped
+}
+
 export async function runMarketingCi({ env = process.env, verify = false, publicRoot = root } = {}) {
+  env = withoutAppAuthority(env)
   if (!verify) assert.ok(Number(process.versions.node.split('.')[0]) >= 22, 'MARKETING_PUBLIC_CI_NODE_22_REQUIRED')
   publicRoot = await realpath(publicRoot)
   assert.ok(git(publicRoot, ['rev-parse', '--show-toplevel']) === publicRoot
@@ -124,6 +140,7 @@ export async function runMarketingCi({ env = process.env, verify = false, public
 }
 
 export async function publishMarketingCi({ env = process.env, publicRoot = root } = {}) {
+  env = withoutAppAuthority(env)
   const receipt = await runMarketingCi({ env, verify: true, publicRoot })
   assert.equal(receipt.publication, 'none', 'MARKETING_PUBLIC_CI_ALREADY_PUBLISHED')
   const output = join(publicRoot, '.cloudflare-marketing')
