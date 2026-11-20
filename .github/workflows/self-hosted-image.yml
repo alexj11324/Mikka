@@ -116,7 +116,7 @@ jobs:
           node --input-type=module <<'JS'
           import { randomBytes } from 'node:crypto'
           import { appendFileSync } from 'node:fs'
-          for (const [name, value] of Object.entries({ POSTGRES_PASSWORD: randomBytes(24).toString('hex'), SELF_HOSTED_FIXTURE_KEY: randomBytes(32).toString('base64') })) {
+          for (const [name, value] of Object.entries({ POSTGRES_PASSWORD: randomBytes(24).toString('hex'), SELF_HOSTED_FIXTURE_KEY: randomBytes(32).toString('base64'), MIKKA_LITELLM_MASTER_KEY: 'synthetic-selfhost-litellm' })) {
             console.log(`::add-mask::${value}`)
             appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`)
           }
@@ -185,7 +185,8 @@ jobs:
             false) ;;
             *) echo 'Invalid declared database-test selection' >&2; exit 1 ;;
           esac
-          node scripts/ci/self-hosted-requirements.mjs --run-tests
+          env -u MIKKA_LITELLM_MASTER_KEY -u MIKKA_LITELLM_URL \
+            node scripts/ci/self-hosted-requirements.mjs --run-tests
       - name: Exercise the real daemon against the registered community user
         timeout-minutes: 6
         run: |

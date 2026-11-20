@@ -1,6 +1,6 @@
 // A person with only their own API key runs threads on Claude Code or Codex,
 // on their own device and on a cloud computer: the run is frozen on the key
-// by id at dispatch, and the key is opened only when the run is claimed.
+// by id at dispatch, and the claim returns only its Mikka gateway token.
 // Real PostgreSQL, the real dispatch and claim route; only Next's `after`
 // (no request scope in node:test) and the provider's model list are replaced.
 import assert from 'node:assert/strict'
@@ -11,18 +11,22 @@ import { join, resolve } from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { mock, test } from 'node:test'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { MODEL_CREDENTIAL_HEADER, PROJECT_ENVIRONMENT_HEADER, REPO_ORIGIN_HEADER, runAssignmentSchema } from '@mikka/protocol/device'
+import { MODEL_CREDENTIAL_HEADER, MODEL_GATEWAY_LOOPBACK_HEADER, PROJECT_ENVIRONMENT_HEADER, REPO_ORIGIN_HEADER, runAssignmentSchema, type RunAssignment } from '@mikka/protocol/device'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { apiKeyHarnesses } from '../lib/model-api-key-providers'
 import { dbUrl, seedBot, seedIssue, seedPersonalWorkspace, seedProjectTasks, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { recordPushGrant } from './support/github-app-stub'
 import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
 import { fakeThreadMachines } from './support/thread-machine-fake'
+import { verifyGatewayToken } from '../lib/model-gateway/token'
+import { withBasePath } from '../lib/base-path'
 
-test('API-key runs: frozen by id at dispatch, opened only at claim, subscription first, withdrawn key refused', { skip: !dbUrl }, async t => {
-  const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
+test('API-key runs: frozen by id at dispatch, scoped gateway token at claim, subscription first, withdrawn key refused', { skip: !dbUrl }, async t => {
+  const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED, liteLLMUrl: process.env.MIKKA_LITELLM_URL, liteLLMKey: process.env.MIKKA_LITELLM_MASTER_KEY }
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
+  process.env.MIKKA_LITELLM_URL = 'https://models.example.test/v1'
+  process.env.MIKKA_LITELLM_MASTER_KEY = 'synthetic-claim-only'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
   const next = await import('@/lib/server-runtime/server')
@@ -38,7 +42,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
   const claimRoute = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const users: string[] = []
   t.after(async () => {
-    for (const [name, value] of [['WORKSPACE_SECRETS_KEY', saved.key], ['MIKKA_BYOS_ENABLED', saved.byos]] as const) if (value === undefined) delete process.env[name]; else process.env[name] = value
+    for (const [name, value] of [['WORKSPACE_SECRETS_KEY', saved.key], ['MIKKA_BYOS_ENABLED', saved.byos], ['MIKKA_LITELLM_URL', saved.liteLLMUrl], ['MIKKA_LITELLM_MASTER_KEY', saved.liteLLMKey]] as const) if (value === undefined) delete process.env[name]; else process.env[name] = value
     await pool.query('DELETE FROM model_api_key_runs m USING agent_runs r WHERE r.id=m."runId" AND r."userId" = ANY($1)', [users])
     await pool.query('DELETE FROM byos_native_runs n USING agent_runs r WHERE r.id=n."runId" AND r."userId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
@@ -91,9 +95,22 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     return { id, workspaceId: ws.id, botId, issueId, remote, deviceId, agents, token }
   }
   const definition = async (runId: string) => (await pool.query('SELECT "agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0].agentDefinition
-  const claim = (deviceId: string, runId: string, token: string, credentialHeader = true, environmentHeader = false) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${deviceId}/runs/${runId}/claim`, {
-    method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', ...(credentialHeader ? { [MODEL_CREDENTIAL_HEADER]: '1' } : {}), ...(environmentHeader ? { [PROJECT_ENVIRONMENT_HEADER]: '1' } : {}) },
+  const claim = (deviceId: string, runId: string, token: string, credentialHeader = true, environmentHeader = false, origin = 'https://mikka.test', loopbackCapability = true) => claimRoute.POST(new Request(`${origin}/v1/devices/${deviceId}/runs/${runId}/claim`, {
+    method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, [REPO_ORIGIN_HEADER]: '1', ...(credentialHeader ? { [MODEL_CREDENTIAL_HEADER]: '1' } : {}), ...(loopbackCapability ? { [MODEL_GATEWAY_LOOPBACK_HEADER]: '1' } : {}), ...(environmentHeader ? { [PROJECT_ENVIRONMENT_HEADER]: '1' } : {}) },
   }), { params: Promise.resolve({ deviceId, runId }) })
+  const assertGatewayCredential = async (assignment: Pick<RunAssignment, 'runId' | 'model' | 'modelCredential'>, protocol: 'anthropic' | 'openai', secret: string, origin = 'https://mikka.test') => {
+    const credential = assignment.modelCredential
+    assert.ok(credential?.kind === 'provider')
+    assert.equal(credential.protocol, protocol)
+    assert.equal(credential.baseUrl, origin + withBasePath(protocol === 'anthropic' ? '/api/model-gateway/anthropic' : '/api/model-gateway/openai/v1'))
+    assert.match(credential.key, /^mkg_[A-Za-z0-9_-]{43}$/)
+    assert.ok(!JSON.stringify(assignment).includes(secret), 'the provider key never reaches the daemon')
+    const grant = await verifyGatewayToken(pool, credential.key)
+    assert.equal(grant?.runId, assignment.runId)
+    assert.equal(grant?.model, assignment.model)
+    assert.equal(grant?.source.kind, 'api_key')
+    return grant
+  }
   const recorded = async (runId: string) => (await pool.query('SELECT "keyId" FROM model_api_key_runs WHERE "runId"=$1', [runId])).rows[0]?.keyId ?? null
   /** A connected Claude subscription bound to the person's Claude Code Agent. */
   const subscribe = async (p: Awaited<ReturnType<typeof person>>) => {
@@ -289,8 +306,14 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.equal(accepted.status, 200, await accepted.text())
   })
 
-  await t.test('own device: a bot saved on a key model is frozen on the key by id; the claim opens it for that run', async () => {
+  await t.test('own device: a bot saved on a key model receives a token pinned to that run, model and key', async () => {
     const p = await person('key-device')
+    const { ModelAdmissionStore } = await import('../lib/model-admission/store')
+    const { modelAdmissionRevision } = await import('../lib/model-admission/contract')
+    await new ModelAdmissionStore(pool).set({ workspaceId: p.workspaceId, ownerId: p.id }, modelAdmissionRevision(null), {
+      schemaVersion: 1, routes: [{ provider: 'litellm', endpoint: process.env.MIKKA_LITELLM_URL, model: 'key-model-a',
+        servingProviders: ['litellm'], principalIds: [p.id], dataRegions: ['unknown'] }],
+    })
     const secret = `sk-ant-${randomBytes(16).toString('hex')}`
     const key = await addKey(p.id, 'anthropic', secret, ['key-model-a', 'key-model-b'])
     await keys.setBotApiKeyChoice(pool, { ownerId: p.id, workspaceId: p.workspaceId }, p.botId, key.id, 'key-model-a')
@@ -313,15 +336,20 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const text = await response.text()
     assert.equal(response.status, 200, text)
     const assignment = JSON.parse(text)
-    assert.deepEqual(assignment.modelCredential, { kind: 'provider', protocol: 'anthropic', baseUrl: 'https://api.anthropic.com', key: secret })
+    const grant = await assertGatewayCredential(assignment, 'anthropic', secret)
+    assert.deepEqual(grant?.source, { kind: 'api_key', keyId: key.id })
+    assert.equal(grant?.ownerId, p.id)
+    assert.equal(grant?.workspaceId, p.workspaceId)
     assert.equal(assignment.model, 'key-model-a')
+    const audits = await pool.query(`SELECT metadata FROM workspace_audit_events WHERE "workspaceId"=$1 AND action='model.admitted'`, [p.workspaceId])
+    assert.ok(audits.rows.some(row => row.metadata.provider === 'litellm' && row.metadata.model === 'key-model-a' && row.metadata.endpoint === process.env.MIKKA_LITELLM_URL))
     assert.equal(assignment.subscriptionBinding, undefined)
     assert.equal(await recorded(runId), key.id, 'recorded so withdrawing the key stops the run')
     await keys.removeApiKey(pool, p.id, key.id)
     assert.ok((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [runId])).rows[0].stopRequestedAt, 'the claimed run is stopped')
   })
 
-  await t.test('own device on Codex: an OpenAI key runs on the Codex Agent with its provider', async () => {
+  await t.test('own device on Codex: an OpenAI key runs through the scoped Mikka gateway', async () => {
     const p = await person('key-codex')
     const secret = `sk-${randomBytes(16).toString('hex')}`
     const key = await addKey(p.id, 'openai', secret, ['key-model-c'])
@@ -330,10 +358,10 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.deepEqual((await definition(runId)).apiKey, { keyId: key.id, model: 'key-model-c' })
     const response = await claim(p.deviceId, runId, p.token)
     assert.equal(response.status, 200, await response.clone().text())
-    assert.deepEqual((await response.json()).modelCredential, { kind: 'provider', protocol: 'openai', baseUrl: 'https://api.openai.com/v1', key: secret })
-    // A Claude Code run: the saved key is Codex's, so the device's own login runs it.
+    await assertGatewayCredential(await response.json(), 'openai', secret)
+    // LiteLLM converts the selected OpenAI key's protocol for Claude Code too.
     const other = await queueRun(p.id, { issueId: await task(p.id, p.workspaceId), agentId: p.agents.claude_code, repo: p.remote, model: 'key-model-c' }, p.botId)
-    assert.equal((await definition(other.runId)).apiKey, undefined)
+    assert.deepEqual((await definition(other.runId)).apiKey, { keyId: key.id, model: 'key-model-c' })
   })
 
   await t.test('own device signed in, a key stored, no key model saved: the key is not injected', async () => {
@@ -369,6 +397,58 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.notEqual(run.status, 'queued', 'the run does not wait for a key that is gone')
     assert.notEqual(run.status, 'preparing')
     assert.equal(await recorded(runId), null)
+  })
+
+  await t.test('HTTP local claims use only the configured loopback gateway and require a compatible daemon', async () => {
+    const savedOrigin = process.env.BETTER_AUTH_URL
+    try {
+      process.env.BETTER_AUTH_URL = 'http://127.0.0.1:3000'
+      for (const origin of ['http://127.0.0.1:3000', 'http://localhost:3000', 'http://127.0.0.1:3001', 'http://remote.example:3000']) {
+        const allowed = origin === 'http://127.0.0.1:3000'
+        if (origin === 'http://remote.example:3000') process.env.BETTER_AUTH_URL = origin
+        const p = await person('key-loopback-claim'), secret = `sk-ant-${randomBytes(16).toString('hex')}`
+        const key = await addKey(p.id, 'anthropic', secret, ['key-model-a'])
+        const { runId } = await queueRun(p.id, { issueId: p.issueId, agentId: p.agents.claude_code, repo: p.remote, model: 'key-model-a', apiKeyId: key.id }, p.botId)
+        if (allowed) {
+          const old = await claim(p.deviceId, runId, p.token, true, false, origin, false)
+          assert.equal(old.status, 409)
+          assert.equal((await old.json()).code, 'daemonUpgradeRequired')
+          assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [runId])).rows[0].status, 'queued')
+        }
+        const response = await claim(p.deviceId, runId, p.token, true, false, origin), body = await response.text()
+        assert.ok(!body.includes(secret))
+        if (allowed) {
+          assert.equal(response.status, 200, body)
+          const assignment = runAssignmentSchema.parse(JSON.parse(body))
+          const grant = await assertGatewayCredential(assignment, 'anthropic', secret, origin)
+          assert.deepEqual(grant?.source, { kind: 'api_key', keyId: key.id })
+        } else {
+          assert.equal(response.status, 409, body)
+          assert.equal(JSON.parse(body).code, 'apiKeyUnavailable')
+          assert.equal(await recorded(runId), null)
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM model_gateway_tokens WHERE "runId"=$1', [runId])).rows[0].n, 0)
+        }
+      }
+    } finally { if (savedOrigin === undefined) delete process.env.BETTER_AUTH_URL; else process.env.BETTER_AUTH_URL = savedOrigin }
+  })
+
+  await t.test('a cloud runner cannot receive an HTTP loopback gateway token even when the server origin matches', async () => {
+    const p = await person('key-cloud-loopback'), secret = `sk-ant-${randomBytes(16).toString('hex')}`
+    await addKey(p.id, 'anthropic', secret, ['key-model-a'])
+    const { agentId, repoId } = await botComputer(p)
+    const { runId } = await queueCloudRun(pool, { userId: p.id, workspaceId: p.workspaceId }, { botId: p.botId, issueId: p.issueId, agentId, deviceRepoId: repoId, title: 'Task', body: '', model: 'key-model-a' })
+    const machines = await fakeThreadMachines(pool, taskMachine)
+    const thread = await machines.start({ userId: p.id, workspaceId: p.workspaceId }, runId).finally(() => machines.restore())
+    const savedOrigin = process.env.BETTER_AUTH_URL
+    try {
+      process.env.BETTER_AUTH_URL = 'http://127.0.0.1:3000'
+      const response = await claim(thread.deviceId, runId, thread.token, true, false, process.env.BETTER_AUTH_URL)
+      assert.equal(response.status, 409)
+      const body = await response.text()
+      assert.equal(JSON.parse(body).code, 'apiKeyUnavailable')
+      assert.ok(!body.includes(secret))
+      assert.equal(await recorded(runId), null)
+    } finally { if (savedOrigin === undefined) delete process.env.BETTER_AUTH_URL; else process.env.BETTER_AUTH_URL = savedOrigin }
   })
 
   await t.test('subscription and key on a device: the subscription goes first, also when used up; the bot\'s saved key model picks the key', async () => {
@@ -535,7 +615,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     assert.deepEqual(await snapshot(), before, 'a refused credential creates no run, binding, task machine or publication')
   })
 
-  await t.test('cloud computer: queued with no subscription, the claim returns the key', async () => {
+  await t.test('cloud computer: queued with no subscription, the claim returns a gateway token', async () => {
     const p = await person('key-cloud')
     const secret = `sk-ant-${randomBytes(16).toString('hex')}`
     const key = await addKey(p.id, 'anthropic', secret, ['key-model-a'])
@@ -555,7 +635,10 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
     const text = await response.text()
     assert.equal(response.status, 200, text)
     const assignment = JSON.parse(text)
-    assert.deepEqual(assignment.modelCredential, { kind: 'provider', protocol: 'anthropic', baseUrl: 'https://api.anthropic.com', key: secret })
+    const grant = await assertGatewayCredential(assignment, 'anthropic', secret)
+    assert.deepEqual(grant?.source, { kind: 'api_key', keyId: key.id })
+    assert.equal(grant?.ownerId, p.id)
+    assert.equal(grant?.workspaceId, p.workspaceId)
     assert.equal(assignment.subscriptionBinding, undefined)
     assert.equal(assignment.computer.botId, p.botId)
     assert.equal(await recorded(runId), key.id)
@@ -577,7 +660,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       const response = await claim(thread.deviceId,runId,thread.token), text = await response.text()
       assert.equal(response.status,200,text)
       const assignment = JSON.parse(text)
-      assert.equal(assignment.modelCredential.key,secret)
+      await assertGatewayCredential(assignment, 'anthropic', secret)
       assert.equal(assignment.policy.readOnly,true)
       assert.equal(assignment.policy.permissions.computer_use,'deny')
       assert.equal(assignment.computer,undefined,'the hosted runner rejects a computer envelope whose read-only policy cannot obtain a broker grant')
@@ -616,7 +699,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       const text = await response.text()
       assert.equal(response.status, 200, text)
       const assignment = JSON.parse(text)
-      assert.equal(assignment.modelCredential.key, secret)
+      await assertGatewayCredential(assignment, 'anthropic', secret)
       assert.equal(assignment.computer, undefined, 'a machine with no desktop gets no desktop')
       assert.equal(await status(runId), 'preparing')
 
@@ -655,7 +738,7 @@ test('API-key runs: frozen by id at dispatch, opened only at claim, subscription
       const text = await response.text()
       assert.equal(response.status, 200, text)
       const assignment = JSON.parse(text)
-      assert.equal(assignment.modelCredential.key, secret)
+      await assertGatewayCredential(assignment, 'anthropic', secret)
       assert.equal(assignment.computer, undefined, 'a repository task gets no computer')
       assert.notEqual(assignment.policy.permissions.computer_use, 'allow', 'a deny workspace grants no computer use')
 

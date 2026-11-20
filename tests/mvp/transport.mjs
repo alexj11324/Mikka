@@ -10,7 +10,7 @@ const responseHeader = 'x-mikka-fixture-response'
 function binding(env) {
   try {
     assertMvpEnvironment(env)
-    if (env.AI_GATEWAY_API_KEY !== MVP_DECISION_KEY) return null
+    if (env.MIKKA_LITELLM_MASTER_KEY !== MVP_DECISION_KEY) return null
     const value = globalThis[marker]
     return value && Object.isFrozen(value) && value.version === 1 && value.endpoint === MVP_SERVICES
       && typeof value.verify === 'function' && typeof value.isCurrent === 'function' ? value : null
@@ -20,7 +20,7 @@ function binding(env) {
 /** Installed only by the isolated MVP preload. No application provider uses it. */
 export function installMvpTransport(env = process.env, upstreamFetch = globalThis.fetch) {
   assertMvpEnvironment(env)
-  if (env.AI_GATEWAY_API_KEY !== MVP_DECISION_KEY) throw new Error('MVP transport requires its public synthetic marker')
+  if (env.MIKKA_LITELLM_MASTER_KEY !== MVP_DECISION_KEY) throw new Error('MVP transport requires its public synthetic marker')
   const previousFetch = globalThis.fetch
   const previousMarker = Object.getOwnPropertyDescriptor(globalThis, marker)
   const challenges = new Map()
@@ -37,9 +37,9 @@ export function installMvpTransport(env = process.env, upstreamFetch = globalThi
     }
     if (url.origin === 'https://api.github.com')
       return upstreamFetch(new Request(`${MVP_SERVICES}/github${url.pathname}${url.search}`, request), { redirect: 'error' })
-    if (url.href === 'https://ai-gateway.vercel.sh/v1/decisions')
+    if (url.href === `${MVP_SERVICES}/litellm/v1/decisions`)
       return upstreamFetch(new Request(`${MVP_SERVICES}/decisions`, request), { redirect: 'error' })
-    if (!['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) throw new Error('MVP fixture refused an unstubbed external request')
+    if (url.href.startsWith(`${MVP_SERVICES}/litellm/`) || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) throw new Error('MVP fixture refused an unstubbed external request')
     return upstreamFetch(request, { redirect: 'error' })
   }
   const installed = Object.freeze({

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { DECISION_MODEL } from '../../lib/coordinator/decision.ts'
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -46,7 +47,7 @@ export async function runGroupProductionAcceptance({ env = process.env, fetchImp
   function observeDecisions(turn, quality) {
     const token = value => typeof value === 'string' && /^[A-Za-z0-9_.:-]{1,180}$/.test(value) ? value : null
     const receipt = value => value && token(value.executionId) && token(value.providerGenerationId)
-      && value.modelId === 'openai/gpt-6-luna-decisions' && /^[a-f0-9]{64}$/.test(value.requestDigest ?? '')
+      && value.modelId === DECISION_MODEL && /^[a-f0-9]{64}$/.test(value.requestDigest ?? '')
       && Number.isFinite(Date.parse(value.startedAt)) && Number.isFinite(Date.parse(value.completedAt))
       && Date.parse(value.completedAt) >= Date.parse(value.startedAt)
       ? { executionId: value.executionId, providerGenerationId: value.providerGenerationId, modelId: value.modelId,

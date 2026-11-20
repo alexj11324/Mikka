@@ -14,7 +14,7 @@ export interface RunApiKey { keyId: string; model: string }
 interface Binding { id: string; ownerId: string; connectionId: string; connectionRevision: number; modelId?: string }
 
 /**
- * The keys a run may use, as `apiKeyForRun` checks them at claim: in a bot's
+ * The keys a run may use, as `validateRunApiKey` checks them at claim: in a bot's
  * workspace its owner's own keys, then teammates' shared ones; with no bot
  * (the Coordinator), the owner's own keys only.
  */
@@ -110,7 +110,7 @@ async function subscriptionState(query: Query, binding: Binding, harness: string
  * kept as found, so nothing changes for a person without one. On a device
  * the CLI's own login counts as a subscription: only the bot's saved key
  * choice runs on a key there. The key is
- * not opened here: only `apiKeyForRun` does, at claim.
+ * not opened here: the model gateway opens it for each authorized request.
  */
 export async function runCredentialSource<S extends Binding>(query: Query, input: {
   ownerId: string; botId: string | null; harness: string; model?: string
