@@ -46,6 +46,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --ignore-scripts --prefix cloudflare/litellm
+      - run: node --test cloudflare/litellm/worker.test.mjs
       - name: Build the LiteLLM image and check its health and master-key guard offline
         run: |
           docker build --platform linux/amd64 -t mikka-litellm deploy/litellm
