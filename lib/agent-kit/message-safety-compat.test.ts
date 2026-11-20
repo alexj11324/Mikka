@@ -22,6 +22,7 @@ stub('../coordinator/store.ts', { loadConversation: async () => conversation, lo
 stub('../coordinator/prompt-context.ts', { loadProductPromptContext: async () => ({ ...conversation, personalInstructions: '', memoryEnabled: true }) })
 stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
 stub('../coordinator/bot-instructions.ts', { botInstructions: async (_owner: string, _bot: string | null, base: string) => base })
+stub('../coordinator/workspace-instructions.ts', { readWorkspaceInstructionsForBot: async () => '' })
 stub('../coordinator/personal-instructions.ts', { withPersonalInstructions: async (_owner: string, base: string) => base, withPersonalInstructionText: async (_owner: string, base: string) => base })
 const forbidDatabase = () => { throw Error('No database transaction in prompt fixture') }
 stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: forbidDatabase, withDatabaseTransaction: forbidDatabase })
