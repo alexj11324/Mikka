@@ -3826,5 +3826,12 @@
     "behavior": "The one mark registry: a status, priority, thread group or run indicator in, the shape and tone every surface draws out. Pure data, no installation dependency.",
     "test": "lib/state-mark.test.ts",
     "suite": "test:lib-units"
+  },
+  "drizzle/20261120044919_issues_source_schedule.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds issues.source_schedule_id: a task an automation's run made remembers that automation, so the thread directory can list one automation's runs (View runs). Backfilled from schedule_occurrences in the installation database; nothing outside it.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
   }
 }
