@@ -103,7 +103,8 @@ test('producer identity and the actual manifest job must pass before any artifac
     calls++
     if (calls === 1) return { total_count: 1, workflow_runs: [run] }
     if (calls === 2) return run
-    return { total_count: 1, jobs: [{ name: 'release-manifest', head_sha: source, status: 'completed', conclusion: 'skipped', steps: [] }] }
+    return { total_count: 1, jobs: [{ name: 'release-manifest', run_id: run.id, run_attempt: run.run_attempt,
+      head_sha: source, status: 'completed', conclusion: 'skipped', steps: [] }] }
   } }))
   assert.equal(calls, 3)
 })
