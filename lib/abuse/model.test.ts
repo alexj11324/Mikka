@@ -22,6 +22,12 @@ const admissions: unknown[][] = []
 let denyAt: 'prepare' | 'send' | null = null
 let beforeSettlement: ((cost: number | null) => Promise<void>) | undefined, generationFailure: Error | undefined
 const modelOptions: unknown[] = []
+const factories: Array<{ callId?: string }> = []
+let workflowIdentity: { workflowRunId: string; stepId: string; attempt: number } | undefined
+mock.module('workflow', { namedExports: {
+  getStepMetadata: () => { if (!workflowIdentity) throw Error('not_in_step'); return workflowIdentity },
+  getWorkflowMetadata: () => { if (!workflowIdentity) throw Error('not_in_workflow'); return workflowIdentity },
+} })
 type Generation = { distinctId: string; event: string; properties?: Record<string, unknown> }
 const captured: Generation[] = []
 let selectedModel: unknown
@@ -65,7 +71,7 @@ mock.module(new URL('../posthog-server.ts', import.meta.url).href, {
   namedExports: { serverPostHog: () => ({ capture: (event: Generation) => captured.push(event) }) },
 })
 mock.module(new URL('../model-gateway/litellm-client.ts', import.meta.url).href, { namedExports: {
-  createLiteLLMModel: () => selectedModel ?? model,
+  createLiteLLMModel: (_model: string, options: { callId?: string }) => { factories.push(options); return selectedModel ?? model },
   liteLLMBaseUrl: () => 'https://litellm.fixture.invalid/v1',
   liteLLMCost: (value: { litellm?: { cost?: unknown } }) => {
     const cost = value?.litellm?.cost
@@ -121,6 +127,21 @@ beforeEach(() => {
   denyAt = null
   beforeSettlement = undefined
   generationFailure = undefined
+  factories.length = 0
+  workflowIdentity = undefined
+})
+
+test('each actual reservation reaches its own LiteLLM call with the trusted native step identity', async () => {
+  workflowIdentity = { workflowRunId: 'wrun_native', stepId: 'step_model', attempt: 2 }
+  const wrapped = await hostedModel('workspace', 'fixture-model')
+  const [generated, streamed] = await Promise.all([wrapped.doGenerate({ prompt: [] }), wrapped.doStream({ prompt: [] })])
+  await streamed.stream.pipeTo(new WritableStream())
+  assert.ok(generated.content.length)
+  const bound = factories.flatMap(options => options.callId ? [options.callId] : [])
+  assert.equal(bound.length, 2)
+  assert.equal(new Set(bound).size, 2)
+  assert.deepEqual(bound.sort(), reservations.map(id => `mikka-hosted:${id}:wrun_native:step_model:2`).sort())
+  assert.deepEqual(settlements.map(row => row.cost), [2000, 2000])
 })
 
 test('verification and zero balance prevent provider I/O, including another tool step', async () => {

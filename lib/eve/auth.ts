@@ -46,9 +46,17 @@ export function internalEveRequestScope(request: Request): EveScope | null {
   return internalEveScope(request.headers.get('authorization'))
 }
 
-export async function authenticateEveRequest(request: Request): Promise<EveAuthResult | null> {
+type EveScopeExpectation = { expectedOwnerId?: string; expectedWorkspaceId?: string }
+
+export async function authenticateEveRequest(request: Request, readExpectation?: () => Promise<EveScopeExpectation | null>): Promise<EveAuthResult | null> {
   const internal = internalEveRequestScope(request)
-  if (internal) return {...scopeAuth(await assertEveScope(internal)),allowAgentInfo:true}
+  if (internal) {
+    const scope = await assertEveScope(internal)
+    const expected = await readExpectation?.()
+    if (expected === null || (expected?.expectedOwnerId && expected.expectedOwnerId !== scope.ownerId) ||
+        (expected?.expectedWorkspaceId && expected.expectedWorkspaceId !== scope.workspaceId)) return null
+    return { ...scopeAuth(scope), allowAgentInfo: true }
+  }
   if (request.method !== 'GET' && request.method !== 'HEAD' && !request.headers.has('authorization')) {
     if (request.headers.get('sec-fetch-site') === 'cross-site') return null
     let origin:string, expected:string
@@ -65,7 +73,9 @@ export async function authenticateEveRequest(request: Request): Promise<EveAuthR
   if (credentials.has('authorization')) credentials.delete('cookie')
   const session = await auth.api.getSession({ headers: credentials, query: { disableCookieCache: true } })
   if (!session) return null
-  const bot=await (await import('./auth-bot')).resolveEveRequestBot(request,session)
+  const expected = await readExpectation?.()
+  if (expected === null || (expected?.expectedOwnerId && expected.expectedOwnerId !== session.user.id)) return null
+  const bot=await (await import('./auth-bot')).resolveEveRequestBot(request,session,expected?.expectedWorkspaceId)
   if (!bot) return null
   return scopeAuth({ ownerId: session.user.id, ...bot, surface: 'web' })
 }

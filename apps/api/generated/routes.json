@@ -609,7 +609,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "696dd72b2ed7ef89ea4db3752ee8d463b29298984e731eac0e229a3c117a0501"
+      "sourceHash": "19fbccb335f36dbd2ddfc93f3879cf35ea99d51fb8f5f0a3b058bbdc593e8731"
     },
     {
       "path": "/mikka/api/coordinator/runtime",
@@ -1664,7 +1664,7 @@
         "GET",
         "POST"
       ],
-      "sourceHash": "79f0d5aa7c15fbe6e9d2c651ebc1efe86b669dcd23f89ba56b6a68d6b4ed00bc"
+      "sourceHash": "050871b99df70c7ec9e26249d995d7725ecfff799304f8b15f4adcbf0fa52e62"
     },
     {
       "path": "/mikka/api/mobile/chat-order",
