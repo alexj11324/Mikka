@@ -37,9 +37,11 @@ the target object must pass the ACL above.
 
 `resource_access_grants."subjectKind"` gains `bot` and `run`. A `bot`/`run`
 subject is authorized **only by an explicit grant** — the ownership and
-`shared` visibility shortcuts stay `account`-only, so granting a Bot access to a
-thread never also exposes it to every teammate, and no Bot inherits anything by
-existing. Reads ask `canReadContent`; sends ask `canSteer`.
+`shared` visibility shortcuts stay `account`-only on the resource itself, so
+granting a Bot access to a thread never also exposes it to every teammate, and
+no Bot inherits anything by existing. Each ancestor must be shared within the
+tenant or carry the subject's own grant: an artifact under a private thread
+needs a grant on the thread too, as it would for an account. Reads ask `canReadContent`; sends ask `canSteer`.
 
 ## 2. Reading
 

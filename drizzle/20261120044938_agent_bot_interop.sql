@@ -5,8 +5,9 @@
 -- 1. A Bot or a run can be the subject of an explicit content grant. Unlike an
 --    account, a bot/run subject never inherits ownership or `shared`
 --    visibility: only an explicit, unexpired grant on the exact resource
---    authorizes it, and the tenant and quarantine checks over the whole
---    ancestry are unchanged, so no grant reaches another Workspace.
+--    authorizes it; each ancestor must be shared within the tenant or carry
+--    the subject's own grant, and the tenant and quarantine checks over the
+--    whole ancestry are unchanged, so no grant reaches another Workspace.
 -- 2. Drive gains the bot, thread and environment scopes. Each such volume and
 --    its blobs live in their own storage namespace
 --    `drive-scope:<workspace>:<scope>:<scopeId>`, never a person's.
@@ -55,12 +56,13 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
       OR NOT coalesce((
         -- Neither ownership nor sharing authorizes personal credentials,
         -- machines or a billing account. Those require their separate grants.
-        -- Ownership and visibility are account-only: a bot, run or service
-        -- subject needs a grant on the exact resource, like a share link. Its
-        -- ancestors still bind the tenant and quarantine above but do not need
-        -- their own grant. (A service's existing grants are all depth-0 Project
-        -- grants, so this widens nothing that exists.)
-        (subject_kind IN ('bot','run','service') AND d.depth>0)
+        -- Ownership is account-only: a bot, run or service subject needs a
+        -- grant on the exact resource, like a share link. An ancestor passes
+        -- for it only when that ancestor is shared within the tenant or the
+        -- subject holds its own grant there (below), so a private parent keeps
+        -- every child closed, exactly as it does for an account.
+        (subject_kind IN ('bot','run','service') AND d.depth>0 AND d.visibility='shared'
+          AND d.action=ANY(ARRAY['canDiscover','canReadMetadata','canReadContent','canComment','canSteer']))
         OR (subject_kind='account' AND d."ownerId"=subject_id AND d.action=ANY(ARRAY['canDiscover','canReadMetadata','canReadContent','canComment','canSteer','canApprove','canManageAccess','canTransfer','canViewUsage']))
         OR (subject_kind='account' AND d.visibility='shared' AND d.action=ANY(ARRAY['canDiscover','canReadMetadata','canReadContent','canComment','canSteer']))
         OR EXISTS(SELECT 1 FROM resource_access_grants g WHERE g."resourceKind"=d.kind AND g."resourceId"=d.id

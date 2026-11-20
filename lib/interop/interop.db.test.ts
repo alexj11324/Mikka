@@ -91,6 +91,9 @@ test('interop reads, sends and Drive follow the ACL of the caller\'s own Workspa
     assert.deepEqual(await runInteropTool(asRun, 'read_artifact', { artifactId: artifact }), notFound)
     // The thread grant above belongs to the Bot, not to this run.
     await grant('artifact', artifact, 'run', teammateRun, ['canReadContent'])
+    // The artifact's thread is private: a grant on the artifact alone does not open it.
+    assert.deepEqual(await runInteropTool(asRun, 'read_artifact', { artifactId: artifact }), notFound)
+    await grant('thread', thread, 'run', teammateRun, ['canReadContent'])
     const read = await runInteropTool(asRun, 'read_artifact', { artifactId: artifact }) as { content: string; version: number }
     assert.equal(read.content, '# Design')
     assert.equal(read.version, 1)
@@ -169,9 +172,11 @@ test('interop reads, sends and Drive follow the ACL of the caller\'s own Workspa
     const asService = { kind: 'service' as const, serviceId, workspaceId: team.id }
     assert.deepEqual(await runInteropTool(asService, 'read_artifact', { artifactId: artifact }), notFound)
     await grant('artifact', artifact, 'service', serviceId, ['canReadContent'])
+    // A private parent keeps the child closed: the artifact's thread needs the service's own grant too.
+    assert.deepEqual(await runInteropTool(asService, 'read_artifact', { artifactId: artifact }), notFound)
+    await grant('thread', thread, 'service', serviceId, ['canReadContent'])
     assert.equal((await runInteropTool(asService, 'read_artifact', { artifactId: artifact }) as { content: string }).content, '# Design')
-    // Ancestors still bind the tenant, but a grant on the artifact is not one on its thread.
-    assert.deepEqual(await runInteropTool(asService, 'read_thread_messages', { runId: thread }), notFound)
+    assert.equal((await runInteropTool(asService, 'read_thread_messages', { runId: thread }) as { rootRunId: string }).rootRunId, thread)
     assert.deepEqual(await runInteropTool(asService, 'drive_list', { scope: 'workspace' }), notFound)
   })
 
@@ -215,6 +220,7 @@ test('interop reads, sends and Drive follow the ACL of the caller\'s own Workspa
       VALUES($1,$2,'Interop service',$3,$4,'Interop service',$5)`, [serviceId, team.id, owner, randomUUID(), createHash('sha256').update(token).digest('hex')])
     const read = () => artifactRoute.GET(new Request(`http://localhost/mikka/api/v1/artifacts/${artifact}`, { headers: { authorization: `Bearer ${token}` } }), { params: Promise.resolve({ artifactId: artifact }) })
     assert.equal((await read()).status, 404)
+    await grant('thread', thread, 'service', serviceId, ['canReadContent'])
     await grant('artifact', artifact, 'service', serviceId, ['canReadContent'])
     const served = await read()
     assert.equal(served.status, 200)
