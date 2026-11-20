@@ -1,10 +1,39 @@
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
+import type { Page } from '@playwright/test'
 import { Pool } from 'pg'
-import { test, expect, app, register, seedCoordinatorError } from './fixtures'
+import { test as base, expect, app, browserClientHeaders, captureAuthenticationCookies, seedCoordinatorError, skipOnboarding } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
+import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 
 // Second usability review C1, C4, C5: the chat never shows what the model was told (English, ids,
 // instructions) or a raw step error, and a past failure keeps one way on.
+
+// These cases start with an authenticated person, as group-chat-send does. The
+// real same-origin signup supplies the cookies before the browser opens the app;
+// registration UI coverage stays in its own cases and runtimeGuard stays active.
+const test = base.extend<{ register: (page: Page) => Promise<{ email: string }> }>({
+  register: async ({ playwright, baseURL }, use) => {
+    const client = await playwright.request.newContext({ baseURL, extraHTTPHeaders: browserClientHeaders() })
+    const origin = new URL(baseURL!).origin
+    try {
+      await use(async page => {
+        const email = `e2e-${randomUUID()}@example.com`
+        const password = randomBytes(32).toString('base64url')
+        if (process.env.MIKKA_TEST_ENVIRONMENT_FILE) await recordAuthenticationSecrets([password])
+        try {
+          const signed = await client.post(app('/api/auth/sign-up/email'), {
+            headers: { origin }, data: { email, password, name: '回归测试成员' },
+          })
+          expect(signed.ok()).toBeTruthy()
+          await page.context().addCookies((await client.storageState()).cookies)
+          await page.goto(app('/'))
+          await skipOnboarding(page, email)
+          return { email }
+        } finally { await captureAuthenticationCookies(page.context()) }
+      })
+    } finally { await client.dispose() }
+  },
+})
 
 function isolatedPool() {
   const connectionString = process.env.E2E_DATABASE_URL
@@ -14,7 +43,7 @@ function isolatedPool() {
   return new Pool({ connectionString, max: 1 })
 }
 
-test('runtime events read as lines in the person\'s language, with the thread as a chip (C1)', async ({ page }, testInfo) => {
+test('runtime events read as lines in the person\'s language, with the thread as a chip (C1)', async ({ page, register }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   const { email } = await register(page)
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
@@ -60,7 +89,7 @@ test('runtime events read as lines in the person\'s language, with the thread as
   await attachLightDark(page, testInfo, 'chat-event-lines')
 })
 
-test('a failed reply says 回复失败 with 重试, never the step error; later it keeps 重新发送 (C4, C5)', async ({ page }, testInfo) => {
+test('a failed reply says 回复失败 with 重试, never the step error; later it keeps 重新发送 (C4, C5)', async ({ page, register }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await register(page)
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
@@ -91,7 +120,7 @@ test('a failed reply says 回复失败 with 重试, never the step error; later 
   await expect(chat.getByText('帮我看看 CI 为什么红了', { exact: true })).toHaveCount(1)
 })
 
-test('a cold start shows the shapes of the chat and the thread list, never 还没有线程 (C7)', async ({ page }, testInfo) => {
+test('a cold start shows the shapes of the chat and the thread list, never 还没有线程 (C7)', async ({ page, register }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 })
   await register(page)
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
