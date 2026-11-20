@@ -4767,7 +4767,10 @@
     "untitled": "Untitled conversation",
     "more": "Load more",
     "emptyTitle": "No threads yet.",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "automationFilter": "Automation is {name}",
+    "automationUnknown": "this automation",
+    "clearAutomation": "Remove automation filter"
   },
   "ThreadReferences": {
     "sourceUnavailable": "Source file and folder references are unavailable for this thread.",
@@ -7710,6 +7713,20 @@
     "waitingOnYou": "Waiting on you",
     "inProgress": "Running"
   },
+  "HostedAutomations": {
+    "aroundNow": "Around now",
+    "now": "Now",
+    "runningNow": "Running now",
+    "next": "Next",
+    "nothingNext": "No runs in the next 8 hours",
+    "more": "Show all",
+    "less": "Show less",
+    "activity": "Runs",
+    "perTen": "runs / 10 min",
+    "perTenOne": "run / 10 min",
+    "nextRun": "next",
+    "lastRun": "last run"
+  },
   "HostedThread": {
     "placeholder": "What should it do?",
     "open": "Open",
@@ -8653,6 +8670,59 @@
       "message": "New message in a channel",
       "mention": "Mikka is mentioned",
       "reaction_added": "Reaction added"
+    },
+    "tabs": {
+      "mine": "My automations",
+      "all": "All automations",
+      "scheduled": "Scheduled"
+    },
+    "filterMenu": "Filter",
+    "displayMenu": "Display",
+    "chip": {
+      "creatorIsMe": "Creator is me",
+      "scheduled": "Trigger is schedule",
+      "status": "Status is {status}"
+    },
+    "removeFilter": "Remove filter",
+    "filterCreator": "Created by me",
+    "filterScheduled": "Runs on a schedule",
+    "filterStatus": "Status",
+    "grouping": "Group by",
+    "groupStatus": "State",
+    "groupFolder": "Folder",
+    "showTemplates": "Show templates",
+    "groups": {
+      "active": "Active",
+      "paused": "Paused",
+      "ended": "Ended",
+      "deleted": "Deleted"
+    },
+    "clearFilters": "Clear filters",
+    "templatesTitle": "Templates",
+    "viewRuns": "View runs",
+    "trigger": {
+      "schedule": "Schedule",
+      "manual": "Manual",
+      "github": "GitHub",
+      "linear": "Linear",
+      "slack": "Slack",
+      "webhook": "Webhook"
+    },
+    "create": {
+      "title": "Create automation",
+      "scratchDescription": "Set the triggers, instructions and limits yourself",
+      "templateDescription": "Pick a ready automation and fit it to your work",
+      "askBot": "Create with Mikka",
+      "askBotDescription": "Say what you want and a Bot builds it in a thread",
+      "back": "Back"
+    },
+    "templateDescriptions": {
+      "standup": "Summarize yesterday’s merged PRs and closed issues every weekday morning",
+      "prReview": "Give every new pull request a first review",
+      "ciFix": "When a check fails on a PR, find the cause and fix it",
+      "linearTriage": "Prioritize and route new Linear issues",
+      "slackQuestion": "Answer questions in Slack from the code and docs",
+      "weeklyDeps": "Open dependency update PRs once a week"
     }
   },
   "SetupChecklist": {

@@ -179,7 +179,7 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
   const input = directoryInput.parse(raw)
   if (input.projectId && !scope?.projectIssueIds) throw new Error('conversationDirectoryProjectUnresolved')
   const param = (i: number) => '$' + (facts.params.length + i)
-  const [archived,bot,search,state,id,pinned,at,pullState,kind,project,since] = Array.from({length:11}, (_,i) => param(4+i))
+  const [archived,bot,search,state,id,pinned,at,pullState,kind,project,since,automation] = Array.from({length:12}, (_,i) => param(4+i))
   const statement = conversationQuery() + `, candidates AS (
     SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,pinned,touched,asked,state,at,archived,"botId" FROM visible
     UNION ALL
@@ -191,12 +191,13 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
     AND (${bot}::uuid IS NULL OR "botId"=${bot}) AND (${state}='all' OR state=${state})
     AND (${project}::uuid[] IS NULL OR "issueId"=ANY(${project}::uuid[]))
     AND (${since}::timestamptz IS NULL OR EXISTS (SELECT 1 FROM jsonb_array_elements(pulls) pull WHERE (pull->>'createdAt')::timestamptz>=${since}::timestamptz))
+    AND (${automation}::uuid IS NULL OR (kind='run' AND EXISTS (SELECT 1 FROM issues made WHERE made.id=candidates."issueId" AND made.source_schedule_id=${automation}::uuid)))
     AND (${search}='' OR strpos(lower(coalesce(title,nullif(trim(asked),''),"taskTitle","agentName")),lower(${search}))>0)
     AND (${id}::uuid IS NULL OR (pinned,touched,candidates.id,kind)<(${pinned}::boolean,${at}::timestamptz,${id}::uuid,coalesce(${kind}::text,'')))
     ORDER BY pinned DESC,touched DESC,candidates.id DESC,kind DESC LIMIT 101`
   const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,input.archived === 'any' ? null : input.archived,input.botId ?? null,
     input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState,input.cursor?.kind ?? null,
-    scope?.projectIssueIds ?? null,input.since ?? null])).rows as Row[]
+    scope?.projectIssueIds ?? null,input.since ?? null,input.automationId ?? null])).rows as Row[]
   const page = rows.slice(0,100), last = page.at(-1)
   const linked = await linkedTasksForChats(database, userId, workspaceId, page.filter(row => row.kind === 'chat').map(row => row.id))
   return { items: page.map(row => item(row, row.kind === 'chat' ? linked.get(row.id) : undefined)).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase())),

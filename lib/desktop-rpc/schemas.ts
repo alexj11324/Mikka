@@ -196,7 +196,7 @@ export const desktopActionSchemas = {
   'bots.listArchivedOwnBots': inWorkspace,
   'bots.listWorkspaceBots': inWorkspace,
   'bots.getWorkspaceBotDefaults': inWorkspace,
-  'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional() }), workspace),
+  'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional(), owner: z.literal('me').optional(), trigger: z.literal('schedule').optional() }), workspace),
   'automations.getAutomation': tuple(uuid, workspace),
   'automations.flushAutomationBatch': tuple(webhookBatchInput, workspace),
   'automations.cancelAutomationBatch': tuple(webhookBatchInput, workspace),

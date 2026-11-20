@@ -155,6 +155,7 @@ test('dispatch_task automations run as their creator through the existing create
     assert.deepEqual([receipt.taskId, receipt.identifier], [run.result!.id, run.result!.identifier])
     const task = (await fixture.query('SELECT "userId","workspaceId",title FROM issues WHERE id=$1', [run.result!.id])).rows[0]
     assert.deepEqual([task.userId, task.workspaceId, task.title], [owner, workspace.id, 'Fix main CI'], 'an ordinary task of its creator, in its workspace')
+    assert.equal((await fixture.query('SELECT source_schedule_id FROM issues WHERE id=$1', [run.result!.id])).rows[0].source_schedule_id, schedule.id, '查看运行: the task remembers the automation that made it')
     const report = (await fixture.query('SELECT message FROM coordinator_messages WHERE id=(SELECT operation_id FROM schedule_occurrences WHERE id=$1)', [run.id])).rows[0]
     assert.equal(report.message.mikkaDisplay.line.issueId, run.result!.id, 'the reports chat shows the task line')
 
@@ -683,6 +684,10 @@ test('dispatch_task automations run as their creator through the existing create
     const made = await occurrence(first.occurrence.id)
     assert.equal(made.status, 'succeeded')
     const taskId = made.result!.id
+    const source = async () => (await fixture.query('SELECT source_schedule_id FROM issues WHERE id=$1', [taskId])).rows[0].source_schedule_id
+    assert.equal(await source(), standing.id, '查看运行: the task the first run made remembers the automation')
+    // A continued run reaches a task it did not make (as an existing thread would): it must not claim it.
+    await fixture.query('UPDATE issues SET source_schedule_id=NULL WHERE id=$1', [taskId])
     const second = await runNow(standing)
     await tick()
     assert.deepEqual(await occurrence(second.occurrence.id).then(run => [run.status, run.error]), ['pending', 'scheduleStandingTaskNotStarted'], 'until the Bot starts the task, a later run waits; it never makes a second task')
@@ -695,6 +700,7 @@ test('dispatch_task automations run as their creator through the existing create
     const added = await occurrence(second.occurrence.id)
     assert.equal(added.status, 'succeeded')
     assert.deepEqual([added.result!.id, (added.result as { continued?: boolean }).continued], [taskId, true])
+    assert.equal(await source(), null, 'a continued run leaves the task it reached unlinked')
     assert.equal(Number((await fixture.query('SELECT count(*) FROM run_messages WHERE "runId"=$1', [run])).rows[0].count), 1, 'the request reached the running thread once')
     assert.equal(Number((await fixture.query(`SELECT count(*) FROM schedule_occurrences WHERE schedule_id=$1 AND result ? 'eventId'`, [standing.id])).rows[0].count), 1, 'one task in all')
     const history = () => page<{ occurrences: Occurrence[] }>(owner, chat, { action: 'history', scheduleId: standing.id })

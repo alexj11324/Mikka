@@ -13,27 +13,32 @@ function unwrap<T>(result: Read<T>): T {
   return result as T
 }
 
-const listKey = (workspaceId: string, deleted: boolean) => (index: number, previous: AutomationList | null) =>
-  index > 0 && !previous?.nextCursor ? null : ['automations', workspaceId, deleted, previous?.nextCursor ?? null] as const
+/** 我的 (owner) and 定时 (trigger) narrow the list on the server: it arrives a page at a time, so the page cannot filter it. */
+export type AutomationListFilter = { deleted?: boolean; owner?: 'me'; trigger?: 'schedule' }
+const FILTER_VARIANTS: Pick<AutomationListFilter, 'owner' | 'trigger'>[] = [{}, { owner: 'me' }, { trigger: 'schedule' }, { owner: 'me', trigger: 'schedule' }]
+
+const listKey = (workspaceId: string, { deleted = false, owner, trigger }: AutomationListFilter) => (index: number, previous: AutomationList | null) =>
+  index > 0 && !previous?.nextCursor ? null : ['automations', workspaceId, deleted, previous?.nextCursor ?? null, owner ?? null, trigger ?? null] as const
 
 // Forget each old cursor before refreshing its infinite key. Revalidation also clears SWR's
 // in-flight deduplication when the destination filter is hidden, so reopening it reads the writer's result.
+// Every 我的 / 定时 variant of the list is refreshed: a write can move a row into or out of any of them.
 export async function invalidateAutomationList(mutate: ReturnType<typeof useSWRConfig>['mutate'], workspaceId: string, deleted: boolean) {
   await mutate(key => Array.isArray(key) && key[0] === 'automations' && key[1] === workspaceId && key[2] === deleted, undefined, { revalidate: false })
-  await mutate(unstable_serialize(listKey(workspaceId, deleted)), undefined, { revalidate: true })
+  await Promise.all(FILTER_VARIANTS.map(variant => mutate(unstable_serialize(listKey(workspaceId, { deleted, ...variant })), undefined, { revalidate: true })))
 }
 
 /**
  * 自动化: the workspace's automations, a page at a time. Read when the page opens and again only when the live
  * channel says a schedule changed (`schedule_list`); no timer.
  */
-export function useAutomations(workspaceId: string | null, deleted = false) {
-  const getKey = workspaceId ? listKey(workspaceId, deleted) : () => null
-  const pages = useSWRInfinite<AutomationList>(getKey, ([, selectedWorkspace, deleted, cursor]: readonly [string, string, boolean, string | null]) =>
-    listAutomations({ deleted, ...(cursor ? { cursor } : {}) }, selectedWorkspace).then(unwrap<AutomationList>), { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
+export function useAutomations(workspaceId: string | null, filter: AutomationListFilter = {}) {
+  const getKey = workspaceId ? listKey(workspaceId, filter) : () => null
+  const pages = useSWRInfinite<AutomationList>(getKey, ([, selectedWorkspace, deleted, cursor, owner, trigger]: readonly [string, string, boolean, string | null, 'me' | null, 'schedule' | null]) =>
+    listAutomations({ deleted, ...(cursor ? { cursor } : {}), ...(owner ? { owner } : {}), ...(trigger ? { trigger } : {}) }, selectedWorkspace).then(unwrap<AutomationList>), { revalidateOnFocus: false, shouldRetryOnError: false, revalidateFirstPage: false })
   useLiveKey('schedule_list', workspaceId, workspaceId ? [unstable_serialize(getKey)] : [], workspaceId, { revalidate: pages.mutate })
   const automations = [...new Map((pages.data ?? []).flatMap(page => page.schedules).map(row => [row.id, row])).values()]
-  return { ...pages, automations, more: Boolean(pages.data?.at(-1)?.nextCursor) }
+  return { ...pages, automations, counts: pages.data?.[0]?.counts, more: Boolean(pages.data?.at(-1)?.nextCursor) }
 }
 
 export const automationKey = (workspaceId: string, id: string) => ['automation', workspaceId, id] as const

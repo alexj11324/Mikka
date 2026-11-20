@@ -4010,5 +4010,12 @@
     "behavior": "Count the task list's views and read or set the person's unread flags through the installation's own session and workspace checks.",
     "test": "tests/task-list-filters.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261120044919_issues_source_schedule.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds issues.source_schedule_id: a task an automation's run made remembers that automation, so the thread directory can list one automation's runs (View runs). Backfilled from schedule_occurrences in the installation database; nothing outside it.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
   }
 }

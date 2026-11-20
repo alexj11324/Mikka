@@ -17,6 +17,8 @@ export const directoryInput = z.strictObject({
   projectId: z.uuid().optional(),
   /** Threads with a pull request opened at or after this instant. */
   since: z.iso.datetime({ offset: true }).optional(),
+  /** 查看运行: only the threads of tasks this automation's runs made. */
+  automationId: z.uuid().optional(),
   cursor: z.object({ pinned: z.boolean(), at: z.iso.datetime({ precision: 6 }), id: z.uuid(), kind: z.enum(['run', 'chat']).optional() }).optional(),
 })
 export type DirectoryInput = z.input<typeof directoryInput>

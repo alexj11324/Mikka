@@ -4767,7 +4767,10 @@
     "untitled": "未命名线程",
     "more": "加载更多",
     "emptyTitle": "还没有线程。",
-    "clearFilters": "清除筛选"
+    "clearFilters": "清除筛选",
+    "automationFilter": "自动化是 {name}",
+    "automationUnknown": "这个自动化",
+    "clearAutomation": "移除自动化筛选"
   },
   "ThreadReferences": {
     "sourceUnavailable": "此线程暂时无法引用源码文件或目录。",
@@ -7710,6 +7713,20 @@
     "waitingOnYou": "等你处理",
     "inProgress": "进行中"
   },
+  "HostedAutomations": {
+    "aroundNow": "近几小时",
+    "now": "现在",
+    "runningNow": "正在运行",
+    "next": "下一次",
+    "nothingNext": "接下来 8 小时没有运行",
+    "more": "显示全部",
+    "less": "收起",
+    "activity": "运行",
+    "perTen": "次 / 10 分钟",
+    "perTenOne": "次 / 10 分钟",
+    "nextRun": "下次",
+    "lastRun": "上次运行"
+  },
   "HostedThread": {
     "placeholder": "想让它做什么？",
     "open": "打开",
@@ -8653,6 +8670,59 @@
       "message": "频道新消息",
       "mention": "提到 Mikka",
       "reaction_added": "加了表情回应"
+    },
+    "tabs": {
+      "mine": "我的自动化",
+      "all": "全部自动化",
+      "scheduled": "定时"
+    },
+    "filterMenu": "筛选",
+    "displayMenu": "显示",
+    "chip": {
+      "creatorIsMe": "创建者是我",
+      "scheduled": "触发方式是定时",
+      "status": "状态是{status}"
+    },
+    "removeFilter": "移除筛选",
+    "filterCreator": "我创建的",
+    "filterScheduled": "按定时运行",
+    "filterStatus": "状态",
+    "grouping": "分组",
+    "groupStatus": "状态",
+    "groupFolder": "文件夹",
+    "showTemplates": "显示模板",
+    "groups": {
+      "active": "已启用",
+      "paused": "已暂停",
+      "ended": "已结束",
+      "deleted": "已删除"
+    },
+    "clearFilters": "清除筛选",
+    "templatesTitle": "模板",
+    "viewRuns": "查看运行",
+    "trigger": {
+      "schedule": "定时",
+      "manual": "手动",
+      "github": "GitHub",
+      "linear": "Linear",
+      "slack": "Slack",
+      "webhook": "Webhook"
+    },
+    "create": {
+      "title": "新建自动化",
+      "scratchDescription": "自己设置触发方式、指令和限制",
+      "templateDescription": "选一个现成的自动化，再按你的工作调整",
+      "askBot": "让 Mikka 帮你建",
+      "askBotDescription": "说出你想要什么，Bot 在线程里帮你建好",
+      "back": "返回"
+    },
+    "templateDescriptions": {
+      "standup": "每个工作日早上汇总昨天合并的 PR 和关闭的议题",
+      "prReview": "每个新 PR 先审一遍",
+      "ciFix": "PR 上的检查失败时，找到原因并修好",
+      "linearTriage": "给新的 Linear 议题定优先级并分给合适的人",
+      "slackQuestion": "根据代码和文档回答 Slack 里的提问",
+      "weeklyDeps": "每周开一次依赖升级 PR"
     }
   },
   "SetupChecklist": {
