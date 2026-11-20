@@ -395,7 +395,8 @@ const pages: Record<string, () => Promise<ReactNode>> = {
   // 自动化: the list, and one automation with its history; both read again only on a schedule_list push.
   automations: async () => {
     const { AutomationsPage } = await import('../components/automations/automations-page')
-    return <AutomationsPage userId="user-1" workspaceId={WORKSPACE} href={id => `?section=automations&automation=${id}`} onOpen={noop} onAskBot={noop} />
+    // The page opens on 我的, so the reader is the fixture's creator (owner_id) for the row to be in the list.
+    return <AutomationsPage userId={OWNER} workspaceId={WORKSPACE} href={id => `?section=automations&automation=${id}`} onOpen={noop} onAskBot={noop} />
   },
   'automation-editor': async () => {
     const { AutomationEditor } = await import('../components/automations/automation-editor')

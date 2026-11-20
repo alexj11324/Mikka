@@ -9,6 +9,7 @@ import { useTranslations } from '@/lib/intl/i18n-client'
 import type { JSONContent } from '@tiptap/react'
 import { ArrowLeft } from '@/components/icons'
 import type { IssueDetailNavigation } from './issue-detail-header'
+import { TaskPageLoading } from './workspace-loading'
 import type { IssueActionRequest } from './issue-detail-actions'
 import { IssueDescriptionHistory } from './issue-description-history'
 import type { MetadataRequest } from './issue-metadata-controls'
@@ -82,51 +83,6 @@ async function loadIssue(id: string, viewerId: string, previous?: IssueRead, inc
 }
 type WorkspaceUser = { id: string; name: string; email: string }
 type DetailProps = { /** The thread open in the right column, from the address (R-82). */ thread: string | null; /** Where the task was opened from: the first crumb. */ origin: string; navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
-
-/** The property column's seven rows: a label bar, then a value bar at a plausible width. */
-function PropertySkeleton() {
-  return <>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-14" /><Skeleton className="h-3 w-1/4" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-12" /><Skeleton className="h-3 w-16" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-14" /><Skeleton className="h-3 w-1/5" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-8" /><Skeleton className="h-3 w-1/3" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-10" /><Skeleton className="h-3 w-2/5" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-10" /><Skeleton className="h-3 w-20" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-12" /><Skeleton className="h-3 w-24" /></div>
-  </>
-}
-
-/**
- * The page before its task arrives: the same shape as the page it becomes, so
- * nothing moves when the data lands (R-96). A 48px bar, then the reading column
- * at its own width — title, the code line, the property rows, the description's
- * first lines.
- */
-function TaskDetailSkeleton({ label }: { label: string }) {
-  return <div role="status" aria-label={label} className="flex min-h-0 flex-1 flex-col">
-    <div className="flex h-12 shrink-0 items-center gap-3 px-3">
-      <Skeleton className="h-3.5 w-24" />
-      <Skeleton className="h-3.5 w-56" />
-      <span className="flex-1" />
-      <Skeleton className="size-6 rounded-md" />
-      <Skeleton className="size-6 rounded-md" />
-    </div>
-    <div className="flex min-h-0 flex-1 justify-center overflow-hidden px-6 pt-7">
-      <div className="flex w-full max-w-170 flex-col">
-        <Skeleton className="h-7 w-3/4" />
-        <Skeleton className="mt-2 h-3 w-40" />
-        <div className="mt-5 flex flex-col gap-0.5">
-          <PropertySkeleton />
-        </div>
-        <div className="mt-6 flex flex-col gap-2">
-          <Skeleton className="h-3 w-12" />
-          <Skeleton className="h-3.5 w-full" />
-          <Skeleton className="h-3.5 w-4/5" />
-        </div>
-      </div>
-    </div>
-  </div>
-}
 
 function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () => void; onClose: () => void }) {
   const t = useTranslations('IssueDetail')
@@ -217,7 +173,7 @@ export function TaskDetail({ id, deferWork = false, ...props }: DetailProps & { 
     return () => { toast.dismiss(notice) }
   }, [backgroundFailed, id, mutate, readFailedMessage, retryLabel])
   if (error && !backgroundFailed) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
-  if (!data) return <TaskDetailSkeleton label={t('reading')} />
+  if (!data) return <TaskPageLoading />
   // Show a local snapshot immediately, but do not seed a writable Y.Doc from
   // it before the normal read rechecks access and the current body fingerprint.
   return <SectionBoundary key={id} onClose={props.onClose}><TaskForm key={loadedId !== id ? 'cached' : data.canSteer === false ? 'reader' : 'editor'} initial={data} refreshDetail={mutate} preview={loadedId !== id} {...props} /></SectionBoundary>
