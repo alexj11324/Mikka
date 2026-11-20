@@ -302,6 +302,29 @@ a frozen install on a miss. PRs do not upload dependency caches. See
 `ci-dependencies.yml` warms Desktop's Linux dependency key when install
 inputs change on main; dispatch it to repopulate evicted or changed-image keys.
 
+## Scheduled offline journeys and deployment route probes
+
+`nightly-journey.yml` runs `pnpm test:e2e:mvp --grep @journey` at 06:43 UTC
+and on manual dispatch, on `main` only. It uses a fresh local PostgreSQL 17
+`mikka_e2e` service and scripted LiteLLM, E2B, Slack and GitHub boundaries.
+It does not read model keys or create a preview database. The `@p0` tag
+identifies core journeys; it does not add browser execution to pull-request CI.
+
+The nightly job restores the official compiled renderer from the successful
+public service producer for its exact main source, using the normal Actions
+artifact token only during that read. It verifies the original web build and
+archive, compiles the local API/Eve, and reports the tested source separately
+from the actual reused web source and private overlay SHA. Missing exact-source
+publication fails the job. The evidence audit must pass before reports upload.
+This proves the local scripted composition, not a live model or deployment.
+
+`production-smoke.yml` resolves the API's serving source through the anonymous
+version endpoint and reads that immutable main commit's generated route list.
+Its route probe uses undeclared methods, checking dispatch status and `Allow`
+without credentials or business handlers; a missing route or 5xx fails before
+the existing account sign-in and capability-read smoke. Internal production
+rollout and flag deadlines follow the [production acceptance decision](../../docs/design/decisions/2026-11-20-1905-internal-production-acceptance.md).
+
 ## Engineering sandbox
 
 `engineering-sandbox.yml` authenticates explicitly dispatched main jobs to the configured engineering Worker and runs the Factory handoff, startup-timing and isolated PostgreSQL 17 policy-migration suites there. External agents can dispatch a supported suite on a committed source SHA using the [engineering runner instructions](../../docs/operations/engineering-sandbox.md).
