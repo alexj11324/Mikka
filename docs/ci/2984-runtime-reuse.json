@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "issue": 2984,
+  "pr": 3000,
+  "scope": [
+    "B",
+    "F"
+  ],
+  "base": "ee36d52f3ee391ddd529f1135ff86fa8f55bd99d",
+  "regressionCheckpoint": "d86dade94a7977c14e073820dc8c98e22d27f475",
+  "sourceBlobs": {
+    "before": "caf1450463e6293c82ef9c012808b0edfaf00183",
+    "after": "a230dbc02dd3882799690f185163fe32db4bf374",
+    "nodeRegression": "f77fd0c802315eab6b74f743b06a8c29edd9b2d9",
+    "artifactIdentityAndDownload": "a55edb760f77913f12595e476e55b9f47645f35c",
+    "reportIdentity": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f"
+  },
+  "problem": "The history reader ignores the official templates publication job and treats the workflow head as the published worker source, even though a later main dispatch can publish an earlier served source.",
+  "existingPublication": {
+    "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/44140435060/attempts/1",
+    "runId": 44140435060,
+    "attempt": 1,
+    "workflowPath": ".github/workflows/e2b-official-runtime.yml",
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "success",
+    "workflowHead": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+    "jobsInExactAttempt": 9,
+    "publicationJob": {
+      "id": 134248391647,
+      "name": "release / templates",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Make only fully accepted candidates public",
+          "conclusion": "success",
+          "startedAt": "2026-11-17T17:56:57Z",
+          "completedAt": "2026-11-17T17:56:57Z"
+        },
+        {
+          "name": "Preserve the complete public release report",
+          "conclusion": "success",
+          "startedAt": "2026-11-17T17:56:57Z",
+          "completedAt": "2026-11-17T17:56:59Z"
+        }
+      ]
+    },
+    "sourceBindingFromOriginalJobLog": {
+      "at": "2026-11-17T17:56:43.765985Z",
+      "event": "runtime_report_verified",
+      "sourceCommit": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "workerSha": "3c001413e47063cc68108c84938c697f4cf18357",
+      "candidateReportSha256": "c5f9c6ca054b3e0a599e84f59df412c777b88579a465c5fd3a39eff8d14fb914",
+      "qualification": "This is the candidate verifier's actual log; the same source and worker bindings appear in the subsequent successful publication step. It is not a claim that this reviewer parsed the original release ZIP."
+    },
+    "artifact": {
+      "id": 14354323589,
+      "name": "e2b-release-evidence-44140435060-1",
+      "sizeBytes": 46376,
+      "archiveDigestReportedByGitHub": "sha256:eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429",
+      "expiredAtRead": false,
+      "expiresAt": "2026-11-24T17:56:58Z",
+      "archiveBytesIndependentlyVerified": false
+    },
+    "sampleDenominator": 1,
+    "qualification": "Existing historical publication only. No new E2B build, deployment, sandbox or real model execution was triggered for this evidence."
+  },
+  "sourceOnlyValidation": {
+    "runtime": "Existing functions V8 isolate; no persistent runner or validation framework added",
+    "before": {
+      "source": "ee36d52f3ee391ddd529f1135ff86fa8f55bd99d",
+      "productionBlob": "caf1450463e6293c82ef9c012808b0edfaf00183",
+      "scope": "Exact original lastPublishedSource/githubRead/pages JavaScript executed in the available V8 isolate with one fixed native run/jobs response fixture; AbortSignal and HTTP I/O injected, no actual network or Node suite",
+      "runId": 44140435060,
+      "attempt": 1,
+      "workflowHead": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "expectedPublishedSource": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "observedResult": null,
+      "assertionPassed": false,
+      "requests": 2
+    },
+    "diagnosticNameOnlyChange": {
+      "scope": "Diagnostic-only expression change in the V8 source-only reproduction; not committed production code",
+      "change": "Recognize templates as well as subscriptions, leaving return run.head_sha unchanged",
+      "runId": 44140435060,
+      "attempt": 1,
+      "observedSource": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "expectedSource": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "assertionPassed": false
+    },
+    "after": {
+      "scope": "Source-only V8 execution of the new production history functions and the unchanged original pure artifact/report identity checks; HTTP responses mocked; Node-only archive download/digest/ZIP code replaced at the import binding by a synthetic report transport fixture, not executed or claimed passed",
+      "realRunId": 44140435060,
+      "realAttempt": 1,
+      "expectedPublishedSource": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "workflowHead": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "artifactHelperBlob": "a55edb760f77913f12595e476e55b9f47645f35c",
+      "reportHelperBlob": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f",
+      "total": 14,
+      "passed": 14,
+      "results": [
+        {
+          "name": "published served source differs from workflow head",
+          "passed": true,
+          "observed": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+          "error": null,
+          "httpReads": 5,
+          "archiveTransportCalls": 1
+        },
+        {
+          "name": "legacy publication job remains readable",
+          "passed": true,
+          "observed": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+          "error": null,
+          "httpReads": 5,
+          "archiveTransportCalls": 1
+        },
+        {
+          "name": "foreign run refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 1,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "nonpublication event refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 1,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "failed run refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 1,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "wrong publication attempt refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 2,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "skipped publication step refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 2,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "missing original artifact refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "runtimeInputs:publicationArtifactRequired",
+          "httpReads": 3,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "expired original artifact refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "task_secret_ci:artifact_identity",
+          "httpReads": 3,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "foreign artifact repository refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "task_secret_ci:artifact_identity",
+          "httpReads": 3,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "changed artifact digest metadata refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "runtimeInputs:publicationArtifactChanged",
+          "httpReads": 4,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "old report attempt refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "runtime_report_attempt_mismatch",
+          "httpReads": 4,
+          "archiveTransportCalls": 1
+        },
+        {
+          "name": "nonpublic template refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "runtimeInputs:publicationNotPublic",
+          "httpReads": 4,
+          "archiveTransportCalls": 1
+        },
+        {
+          "name": "newer run attempt refuses stale selection",
+          "passed": true,
+          "observed": null,
+          "error": "runtimeInputs:publicationAttemptChanged",
+          "httpReads": 5,
+          "archiveTransportCalls": 1
+        }
+      ]
+    },
+    "measurement": "For this one fixed run/jobs metadata sample the original reader returns null; the repaired source-only path returns the logged served source with a synthetic report transport fixture. This does not measure wall-time or paid-resource savings."
+  },
+  "nodeRegression": {
+    "command": "node --test scripts/e2b/runtime-inputs.test.mjs",
+    "declaredTests": 16,
+    "status": "authored_not_executed",
+    "reason": "The shared execution environment became unavailable during the first local test command. No local exit or completion receipt was returned. Node-only archive/hash/Python and canonical Git worker-input regressions are not claimed passed."
+  },
+  "ownership": [
+    {
+      "pr": 2821,
+      "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+      "checkedFiles": 107,
+      "relationship": "Runtime inputs files are absent from its diff; its report-retention and attestation work is separate."
+    },
+    {
+      "pr": 2978,
+      "head": "0633b43e6149749e62503e6537997b480131ab23",
+      "checkedFiles": 26,
+      "relationship": "Touches runtime-inputs for official repository transfer identity and immutable API addressing; leaves the subscriptions-only matcher and return run.head_sha. Preserve that owner's changes during normal integration; this PR does not copy the transfer implementation."
+    },
+    {
+      "pr": 2981,
+      "head": "eebbed5dca0ddba5841ec43d0e870678a1f313f5",
+      "checkedFiles": 58,
+      "relationship": "Touches runtime-inputs for official repository transfer identity and immutable API addressing; leaves the subscriptions-only matcher and return run.head_sha. Preserve that owner's changes during normal integration; this PR does not copy the transfer implementation."
+    }
+  ],
+  "retainedBoundaries": [
+    "Fixed official workflow/repository and main history",
+    "Successful exact-attempt publication job and step",
+    "Existing artifact identity, expiry, size, digest and bounded ZIP reader",
+    "Existing complete runtime-report source/run/attempt/template identity",
+    "Latest run attempt recheck after reading evidence",
+    "No workflow, permission, timeout, trigger, publisher or model-policy change"
+  ],
+  "remaining": [
+    "Full original Node suites and applicable protected CI",
+    "Independent review of the current head",
+    "Normal merge and exact merged-source verification by the root coordinator",
+    "No claim of production acceptance or measured paid-build savings"
+  ]
+}
