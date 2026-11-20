@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { FIXTURE_LOGIN_PROXY_MARKER } from './proxy.mjs'
 
 /** The same product graph ships for a fixture and a release. Auth helpers stay in the harness. */
-export async function assertNoFixtureAuthInOutput(root) {
+export async function assertNoFixtureAuthInDirectories(directories) {
   let checked = 0
   async function scan(directory) {
     for (const entry of await readdir(directory, { withFileTypes: true })) {
@@ -17,10 +17,12 @@ export async function assertNoFixtureAuthInOutput(root) {
       }
     }
   }
-  await scan(join(root, '.output/server'))
-  await scan(join(root, 'apps/frontend/dist/web'))
+  for (const directory of directories) await scan(directory)
   if (!checked) throw new Error('FIXTURE_PRODUCT_OUTPUT_MISSING')
   return checked
+}
+export function assertNoFixtureAuthInOutput(root) {
+  return assertNoFixtureAuthInDirectories([join(root, '.output/server'), join(root, 'apps/frontend/dist/web')])
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const checked = await assertNoFixtureAuthInOutput(process.cwd())

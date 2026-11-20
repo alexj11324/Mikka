@@ -7,6 +7,7 @@ import { configuredDeploymentId } from '../../../lib/deployment-id.mjs'
 import { nodeRuntimePackages } from '../build-contract.mjs'
 import { cloudServiceRewrite } from '../cloud-service-rewrite.mjs'
 import { deduplicateVercelFunctions } from './dedupe-functions.mjs'
+import { assertNoFixtureAuthInDirectories } from '../../../scripts/fixtures/bundle-check.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const within = (root, path) => path === root || path.startsWith(`${root}${sep}`)
@@ -114,6 +115,9 @@ export async function finalizeBuild({ root, output, preset, revision }) {
     // paths are retained when starting from this output directory.
     await copyResources(output)
   } else throw new Error('API_BUILD_PRESET_UNSUPPORTED')
+  evidence.fixtureAuthExclusion = { checkedFiles: await assertNoFixtureAuthInDirectories([
+    join(output, preset === 'vercel' ? 'functions' : 'server'),
+  ]) }
   await writeFile(join(output, 'mikka-build.json'), `${JSON.stringify(evidence, null, 2)}\n`)
   return evidence
 }

@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import { assertFixtureBuild } from './fixtures/guard.mjs'
+import { assertNoFixtureAuthInOutput } from './fixtures/bundle-check.mjs'
 
 const flags = process.argv.slice(2)
 if (flags.length > 1 || flags.some(flag => !['--server-pages', '--public-test-fixture', '--local-fixture'].includes(flag))) {
@@ -22,3 +23,4 @@ for (const [script, ...args] of [
   if (result.error) throw result.error
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
+await assertNoFixtureAuthInOutput(process.cwd())
