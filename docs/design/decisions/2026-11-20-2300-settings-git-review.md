@@ -16,7 +16,13 @@
 
 PR 草稿默认值不能把失败验证变成 ready。核对 main 发现 `publicationGate` 对 verify=failed 直接跳过发布；保留这个更严格门槛，并让 draft 决策本身也对失败返回 true。Factory 缺少预设验证命令的既有语义保留；用户选择 draft 始终有效。
 
-auto merge 使用 GitHub 原生队列与已有任务/GitHub 身份权限；draft、验证未通过或 Factory 独立审阅未通过不能自动合并。设置不能伪造审批、绕过仓库保护或替另一个人发出有权限的合并请求。
+auto merge 使用 GitHub 原生队列与已有任务/GitHub 身份权限；draft、验证未通过或 Factory 独立审阅未通过不能自动合并。Factory 尚在审阅时复用已有 publication 工作流等待，进入交付时重新验证当前候选 SHA、独立审阅与既有 evidence。设置不能伪造审批、绕过仓库保护或替另一个人发出有权限的合并请求。关闭设置会阻止尚未交给 GitHub 的自动合并；GitHub 已确认接收的队列不会由此撤回。保存的设置是新运行的默认值，不是外部队列取消操作。
+
+自动审阅保存到现有 schedules。每次分发与受控 `github_call` 均重验当前管理员身份、同一工作区、仓库安装、配置所有者和运行人、启用状态；改为普通成员、转移所有者、暂停、删除或移除安装后，旧请求不能借旧配置继续使用该能力。请求里的 host marker 和实际 occurrence 保留来源绑定；删除配置不会把旧请求降级成无限制 GitHub 调用。
+
+`summary` 模式在现有受控 GitHub MCP 入口拒绝写工具；`comments` 只允许绑定仓库和 PR 的 COMMENT review 及其待发布行评论，不能 approve、request changes、merge 或写别的 PR。工具只读属性取自原生 GitHub MCP catalogue，工作区 deny 和调用人身份仍先检查。该边界覆盖 Coordinator 的 `github_call`；工作线程另保留原生 readOnly 策略。按照既有决策，原生任务仍能读取自己的 GitHub 凭据并使用已有网络，因此本项不声称网络范围内绝对禁止写入，也不引入网络限制或凭据代理。
+
+自定义分支使用协议中的同一个安全任务分支 schema，经 admission、daemon assignment 和签名 workflow result 解析；具体 branch、owner、workspace、任务及 repository 的相等验证不变。新 daemon 用既有 capability header 模式声明接受自定义 `github.branch`。旧 daemon 保留已支持的 `pushBranch`，自定义前缀时省略不兼容的可选 `github.branch`，走既有 native push 与服务端 PR 发布。冻结的已发布 daemon fixture 不修改。
 
 ## 重叠与迁移
 

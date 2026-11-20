@@ -25,7 +25,7 @@ async function originalReviewRequest(userId: string, sourceEventId?: string | nu
   const { rows: [original] } = await pool.query<Source>(`SELECT e.id,e."botId",e."issueId",e.payload FROM coordinator_events e
     WHERE e."userId"=$1 AND e."botId" IS NOT DISTINCT FROM $2::uuid AND e.kind='user_message'
       AND e.payload->'schedule'->>'codeReview'='true' AND (e.id=$3::uuid OR e."issueId"=$4::uuid)
-    ORDER BY e.position LIMIT 1`, [userId, source.botId, retry.success ? retry.data : null, source.issueId])
+    ORDER BY e."createdAt",e.id LIMIT 1`, [userId, source.botId, retry.success ? retry.data : null, source.issueId])
   return original ?? null
 }
 

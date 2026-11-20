@@ -2,6 +2,8 @@
 
 The [registered settings backend](settings-backend/registry.md) defines typed
 writes, workspace inheritance, reset and row-search metadata for #2956.
+The [Git and review backend](settings-backend/git-review.md) describes PR
+defaults, repository automation and the existing execution boundaries.
 
 Each section is a small heading over one card of rows, as in
 Comma's 「模型与 API」 (decision 2026-10-30). This is the open-source default

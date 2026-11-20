@@ -88,7 +88,7 @@ test('requires canonical github.com identity; user-controlled URLs cannot receiv
 })
 
 test('custom branch/title prefixes preserve the exact task binding and verified drafts describe their preference', async () => {
-  const branch = 'engineering/fix/mik-42', { calls, fetcher } = stub({ branch })
+  const branch = 'engineering/fix/mik-42', { calls, fetcher } = stub({ branch, title: '[Team] MIK-42: Fix redirect' })
   await openRunPullRequest({ ...input, branch, titlePrefix: '[Team]', draft: true, verificationStatus: 'passed', fetcher })
   const created = calls.find(call => call.method === 'POST' && call.path.endsWith('/pulls'))!
   assert.equal(created.body?.title, '[Team] MIK-42: Fix redirect')
@@ -99,6 +99,62 @@ test('custom branch/title prefixes preserve the exact task binding and verified 
   for (const wrong of ['engineering/another-42', 'engineering/mik-43', 'refs/../mik-42', 'mikka/mik-42;echo']) {
     await assert.rejects(openRunPullRequest({ ...input, branch: wrong, fetcher }), { code: 'publication_mismatch' })
   }
+})
+
+test('a native-created PR receives the frozen prefix through the current write fence without replacing its public title', async () => {
+  let current = { ...pr, title: 'Public agent summary', head: { ...pr.head, sha: commit } }
+  const fixture = stub({ existing: [current] })
+  let inside = false, patches = 0
+  const fetcher: typeof fetch = async (url, init) => {
+    const path = new URL(String(url)).pathname
+    if (path.endsWith('/pulls/77')) {
+      if (init?.method === 'PATCH') {
+        assert.equal(inside, true)
+        const body = JSON.parse(String(init.body))
+        assert.deepEqual(Object.keys(body), ['title'])
+        assert.equal(body.title, '[Team] Public title edited after lookup')
+        current = { ...current, title: body.title }; patches++
+      }
+      return Response.json(current)
+    }
+    return fixture.fetcher(url, init)
+  }
+  const withWrite = async <T>(write: () => Promise<T>) => {
+    inside = true
+    // The write must read current public text, not the stale list receipt.
+    current = { ...current, title: 'Public title edited after lookup' }
+    try { return await write() } finally { inside = false }
+  }
+  const options = { ...input, title: 'PRIVATE task title', titlePrefix: '[Team]', fetcher }
+  assert.equal((await openRunPullRequest({ ...options, withWrite })).title, '[Team] Public title edited after lookup')
+  assert.equal((await openRunPullRequest(options)).title, current.title)
+  assert.equal(patches, 1)
+  assert.equal(fixture.calls.some(call => call.method === 'POST'), false)
+})
+
+test('prefix adoption refuses stale authority, a changed provider head and an unacknowledged title', async () => {
+  const current = { ...pr, title: 'Public title', head: { ...pr.head, sha: commit } }
+  for (const kind of ['authority', 'head', 'acknowledgement'] as const) {
+    const fixture = stub({ existing: [current] })
+    let writes = 0, inside = false
+    const fetcher: typeof fetch = async (url, init) => {
+      const path = new URL(String(url)).pathname
+      if (path.endsWith('/pulls/77')) {
+        if (init?.method === 'PATCH') { writes++; return Response.json(current) }
+        return Response.json(inside && kind === 'head' ? { ...current, head: { ...current.head, sha: 'b'.repeat(40) } } : current)
+      }
+      return fixture.fetcher(url, init)
+    }
+    await assert.rejects(openRunPullRequest({ ...input, titlePrefix: '[Team]', fetcher, withWrite: async write => {
+      if (kind === 'authority') throw new PublicationError('issue_unavailable')
+      inside = true
+      try { return await write() } finally { inside = false }
+    } }), { code: kind === 'authority' ? 'issue_unavailable' : kind === 'head' ? 'branch_changed' : 'github_request_failed' })
+    assert.equal(writes, kind === 'acknowledgement' ? 1 : 0)
+  }
+  const fixture = stub({ existing: [{ ...current, state: 'closed' }] })
+  assert.equal((await openRunPullRequest({ ...input, titlePrefix: '[Team]', fetcher: fixture.fetcher })).title, current.title)
+  assert.equal(fixture.calls.some(call => call.method !== 'GET'), false)
 })
 
 test('auto merge uses the verified user and native expected-head merge queue inside the current authority fence', async () => {

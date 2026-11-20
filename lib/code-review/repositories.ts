@@ -46,24 +46,24 @@ export async function saveReviewRepository(context: SettingsContext, raw: unknow
     try {
       await tx.query('BEGIN')
       await withDatabaseClient(tx, async () => {
-      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['code-review-repository', context.workspaceId, input.repository])])
-      const { rows: [prior] } = await tx.query<{ scheduleId: string | null; ownerId: string }>('SELECT "scheduleId","ownerId" FROM workspace_code_review_repositories WHERE "workspaceId"=$1 AND repository=$2 FOR UPDATE', [context.workspaceId, input.repository])
-      const { rows: [schedule] } = prior?.scheduleId ? await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 FOR UPDATE', [prior.scheduleId]) : { rows: [] }
-      const actor = { ownerId: context.userId, workspaceId: context.workspaceId, botId: null, direct: true as const }
-      let scheduleId = schedule?.id ?? null, ownerId = schedule?.owner_id ?? context.userId
-      if (input.enabled && (!schedule || schedule.status_before_delete || schedule.status === 'cancelled')) {
-        const { rows: [preference] } = await tx.query<{ preferredHarness: 'claude_code' | 'codex' }>('SELECT "preferredHarness" FROM model_order_settings WHERE "ownerId"=$1 AND "workspaceId"=$2', [context.userId, context.workspaceId])
-        const created = await schedules().command(actor, { action: 'create', requestId: `code-review:${randomUUID()}`, definition: reviewAutomation(input.repository, preference?.preferredHarness ?? 'claude_code', coordinator!.botId) }, tx)
-        if (!('schedule' in created) || !created.schedule) throw new ScheduleError('scheduleDispatchUnavailable', 503)
-        scheduleId = created.schedule.id; ownerId = created.schedule.owner_id
-      } else if (input.enabled && schedule?.status === 'paused') {
-        await schedules().command(actor, { action: 'resume', scheduleId: schedule.id, version: schedule.version }, tx)
-      } else if (!input.enabled && schedule && schedule.status === 'active') {
-        await schedules().command(actor, { action: 'pause', scheduleId: schedule.id, version: schedule.version }, tx)
-      }
-      await tx.query(`INSERT INTO workspace_code_review_repositories ("workspaceId",repository,enabled,"ownerId","scheduleId") VALUES($1,$2,$3,$4,$5)
-        ON CONFLICT ("workspaceId",repository) DO UPDATE SET enabled=excluded.enabled,"ownerId"=excluded."ownerId","scheduleId"=excluded."scheduleId","updatedAt"=now()`,
-      [context.workspaceId, input.repository, input.enabled, ownerId, scheduleId])
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['code-review-repository', context.workspaceId, input.repository])])
+        const { rows: [prior] } = await tx.query<{ scheduleId: string | null; ownerId: string }>('SELECT "scheduleId","ownerId" FROM workspace_code_review_repositories WHERE "workspaceId"=$1 AND repository=$2 FOR UPDATE', [context.workspaceId, input.repository])
+        const { rows: [schedule] } = prior?.scheduleId ? await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 FOR UPDATE', [prior.scheduleId]) : { rows: [] }
+        const actor = { ownerId: context.userId, workspaceId: context.workspaceId, botId: null, direct: true as const }
+        let scheduleId = schedule?.id ?? null, ownerId = schedule?.owner_id ?? context.userId
+        if (input.enabled && (!schedule || schedule.status_before_delete || schedule.status === 'cancelled')) {
+          const { rows: [preference] } = await tx.query<{ preferredHarness: 'claude_code' | 'codex' }>('SELECT "preferredHarness" FROM model_order_settings WHERE "ownerId"=$1 AND "workspaceId"=$2', [context.userId, context.workspaceId])
+          const created = await schedules().command(actor, { action: 'create', requestId: `code-review:${randomUUID()}`, definition: reviewAutomation(input.repository, preference?.preferredHarness ?? 'claude_code', coordinator!.botId) }, tx)
+          if (!('schedule' in created) || !created.schedule) throw new ScheduleError('scheduleDispatchUnavailable', 503)
+          scheduleId = created.schedule.id; ownerId = created.schedule.owner_id
+        } else if (input.enabled && schedule?.status === 'paused') {
+          await schedules().command(actor, { action: 'resume', scheduleId: schedule.id, version: schedule.version }, tx)
+        } else if (!input.enabled && schedule && schedule.status === 'active') {
+          await schedules().command(actor, { action: 'pause', scheduleId: schedule.id, version: schedule.version }, tx)
+        }
+        await tx.query(`INSERT INTO workspace_code_review_repositories ("workspaceId",repository,enabled,"ownerId","scheduleId") VALUES($1,$2,$3,$4,$5)
+          ON CONFLICT ("workspaceId",repository) DO UPDATE SET enabled=excluded.enabled,"ownerId"=excluded."ownerId","scheduleId"=excluded."scheduleId","updatedAt"=now()`,
+        [context.workspaceId, input.repository, input.enabled, ownerId, scheduleId])
       })
       await tx.query('COMMIT')
     } catch (error) { await tx.query('ROLLBACK'); throw error }
@@ -81,11 +81,11 @@ export async function deleteReviewRepository(context: SettingsContext, raw: unkn
     try {
       await tx.query('BEGIN')
       await withDatabaseClient(tx, async () => {
-      await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['code-review-repository', context.workspaceId, repository])])
-      const { rows: [row] } = await tx.query<{ scheduleId: string | null }>('SELECT "scheduleId" FROM workspace_code_review_repositories WHERE "workspaceId"=$1 AND repository=$2 FOR UPDATE', [context.workspaceId, repository])
-      const { rows: [schedule] } = row?.scheduleId ? await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 FOR UPDATE', [row.scheduleId]) : { rows: [] }
-      if (schedule && !schedule.status_before_delete) await schedules().command({ ownerId: context.userId, workspaceId: context.workspaceId, botId: null, direct: true }, { action: 'delete', scheduleId: schedule.id, version: schedule.version }, tx)
-      await withDatabaseClient(tx, () => db.delete(workspaceCodeReviewRepositories).where(and(eq(workspaceCodeReviewRepositories.workspaceId, context.workspaceId), eq(workspaceCodeReviewRepositories.repository, repository))))
+        await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['code-review-repository', context.workspaceId, repository])])
+        const { rows: [row] } = await tx.query<{ scheduleId: string | null }>('SELECT "scheduleId" FROM workspace_code_review_repositories WHERE "workspaceId"=$1 AND repository=$2 FOR UPDATE', [context.workspaceId, repository])
+        const { rows: [schedule] } = row?.scheduleId ? await tx.query<Schedule>('SELECT * FROM user_schedules WHERE id=$1 FOR UPDATE', [row.scheduleId]) : { rows: [] }
+        if (schedule && !schedule.status_before_delete) await schedules().command({ ownerId: context.userId, workspaceId: context.workspaceId, botId: null, direct: true }, { action: 'delete', scheduleId: schedule.id, version: schedule.version }, tx)
+        await db.delete(workspaceCodeReviewRepositories).where(and(eq(workspaceCodeReviewRepositories.workspaceId, context.workspaceId), eq(workspaceCodeReviewRepositories.repository, repository)))
       })
       await tx.query('COMMIT')
     } catch (error) { await tx.query('ROLLBACK'); throw error }

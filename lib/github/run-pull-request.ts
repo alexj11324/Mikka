@@ -185,6 +185,28 @@ export async function openRunPullRequest(options: Options & {
       if (pr.body === bodyWithPublicationEvidence(pr.body!, options.issueId, visualEvidence)) evidenceDigest = visualEvidence.digest
       else throw new PublicationError('factory_public_evidence_required')
     }
+    // The native agent may already have opened this task's PR. Apply a saved
+    // prefix on that path too, without replacing its public title with private
+    // task prose. Replays never prepend the same prefix twice.
+    const titlePrefix = maskCredentials(prefix.data)
+    const prefixedTitle = (title: string) => title === titlePrefix || title.startsWith(titlePrefix + ' ')
+      ? title : `${titlePrefix} ${title}`.slice(0, 256)
+    if (titlePrefix && pr.state === 'open' && !pr.merged_at && (!pr.title || prefixedTitle(pr.title) !== pr.title)) {
+      pr = await write(async () => {
+        const latest = verified(await request(`${path}/pulls/${pr.number}`, writeToken))
+        if (latest.number !== pr.number || latest.node_id !== pr.node_id || latest.state !== 'open' || latest.merged_at) throw new PublicationError('pull_request_conflict')
+        if (!latest.title?.trim()) throw new PublicationError('github_request_failed')
+        if (latest.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+        const head = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, writeToken))
+        if (head.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+        const title = prefixedTitle(latest.title)
+        if (title === latest.title) return latest
+        const saved = verified(await request(`${path}/pulls/${pr.number}`, writeToken, { method: 'PATCH', body: { title } }))
+        if (saved.number !== latest.number || saved.node_id !== latest.node_id || saved.title !== title || saved.state !== 'open' || saved.merged_at) throw new PublicationError('github_request_failed')
+        if (saved.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+        return saved
+      })
+    }
     const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : {}
     const review: Partial<PublishedPullRequest> = { ...(pr.head.sha ? { branch: pr.head.ref, headSha: pr.head.sha.toLowerCase(),
       ...(pr.changed_files === undefined ? {} : { changedFiles: pr.changed_files }) } : {}),

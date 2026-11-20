@@ -178,11 +178,21 @@ dbTest('repository configuration uses the native durable GitHub event queue and 
   const outcome = (await pool.query('SELECT status,result,error FROM schedule_occurrences WHERE id=$1', [occurrence.id])).rows[0]
   assert.equal(outcome.status, 'succeeded', outcome.error)
   assert.ok(outcome.result.eventId)
-  const event = (await pool.query('SELECT payload,"botId" FROM coordinator_events WHERE id=$1', [outcome.result.eventId])).rows[0]
+  const event = (await pool.query('SELECT payload,"botId","issueId" FROM coordinator_events WHERE id=$1', [outcome.result.eventId])).rows[0]
   assert.equal(event.payload.schedule.codeReview, true)
   assert.equal(event.payload.taskCommand.run.model.id, 'fixture-review-model')
   const { requestedCodeReviewReadOnly } = await import('./request-authority')
   assert.equal(await requestedCodeReviewReadOnly(owner, outcome.result.eventId), true)
+  // Continuations and explicit retries recover their real host request. An
+  // unrelated ordinary request must remain usable on the same production SQL.
+  const followUp = randomUUID(), retry = randomUUID(), ordinary = randomUUID()
+  for (const [id, issueId, payload] of [[followUp, event.issueId, {}], [retry, null, { taskRequestSourceEventId: outcome.result.eventId }], [ordinary, null, {}]] as const) {
+    await pool.query(`INSERT INTO coordinator_events (id,"userId","botId","issueId",kind,"dedupeKey",payload)
+      VALUES ($1::uuid,$2,$3,$4,'user_message',$1::text,$5)`, [id, owner, event.botId, issueId, JSON.stringify(payload)])
+  }
+  assert.equal(await requestedCodeReviewReadOnly(owner, followUp), true)
+  assert.equal(await requestedCodeReviewReadOnly(owner, retry), true)
+  assert.equal(await requestedCodeReviewReadOnly(owner, ordinary), false)
   const { reviewGitHubCall } = await import('./github-call')
   const [repoOwner, repoName] = name.split('/')
   const call = { name: 'pull_request_review_write', arguments: { owner: repoOwner, repo: repoName, pullNumber: 7, method: 'create', event: 'COMMENT' } }
@@ -194,6 +204,8 @@ dbTest('repository configuration uses the native durable GitHub event queue and 
     written++; return { accepted: true }
   }
   assert.deepEqual(await reviewGitHubCall(owner, caller, call, execute), { error: 'githubActionDenied' })
+  assert.deepEqual(await reviewGitHubCall(owner, { ...caller, sourceEventId: followUp }, call, execute), { error: 'githubActionDenied' })
+  assert.deepEqual(await reviewGitHubCall(owner, { ...caller, sourceEventId: retry }, call, execute), { error: 'githubActionDenied' })
   assert.equal(written, 0)
   assert.equal((await workspace.PATCH(request(`workspace/${workspaceId}`, 'PATCH', patch({ codeReviewOutput: 'comments' })), context())).status, 200)
   assert.deepEqual(await reviewGitHubCall(owner, caller, call, execute), { accepted: true })
@@ -241,5 +253,6 @@ dbTest('repository configuration uses the native durable GitHub event queue and 
   assert.ok(deleted.status_before_delete, 'the native automation preserves its deletion history')
   assert.equal((await pool.query('SELECT 1 FROM workspace_code_review_repositories WHERE "workspaceId"=$1', [workspaceId])).rowCount, 0)
   assert.deepEqual(await reviewGitHubCall(owner, caller, call, execute), { error: 'githubActionDenied' }, 'deletion does not turn an old managed request into an unrestricted GitHub call')
+  assert.deepEqual(await reviewGitHubCall(owner, { ...caller, sourceEventId: followUp }, call, execute), { error: 'githubActionDenied' }, 'a continuation keeps its original managed authority after deletion')
   assert.equal(written, 1)
 })
