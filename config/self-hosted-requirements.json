@@ -3842,5 +3842,12 @@
     "behavior": "An automation's run settings (Environment, model and effort, machine size, pin) are stored on its request event in the installation PostgreSQL database and read back only from that event when the run is created.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
+  },
+  "lib/task-run-settings-schema.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The shape of an automation's run settings (Environment, model and effort, machine size, pin) carried on a task command; no environment input and no server dependency.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
   }
 }
