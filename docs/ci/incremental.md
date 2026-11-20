@@ -27,8 +27,8 @@ imports, so deleting a test cannot remove its enrollment requirement.
 
 | Change | Selection / reason |
 | --- | --- |
-| Mobile-only | Mobile consumers, source policies/typechecks; no unrelated DB, daemon, image or native desktop |
-| Web components/hooks | Import and source-contract consumers plus source policies; no unrelated DB/image |
+| Mobile-only | Mobile consumers, source policies/typechecks; no unrelated DB, daemon or native desktop |
+| Web components/hooks | Import and source-contract consumers plus source policies; no unrelated DB |
 | Daemon | Package and imported consumers, daemon tests, required downstream contracts |
 | API/Factory/Coordinator | Reverse source closure and mapped DB suites; server path without DB proof runs all DB |
 | Protocol/shared, migrations, DB core, permissions, auth | Full validation |
@@ -100,7 +100,7 @@ Required status names remain `UI policy (strict)`, `Production build and browser
 interactions`, `Browser tests (before merge)` and external GitGuardian. Gates
 check each selected lane must succeed and each unselected lane must be skipped;
 failure, timeout, cancellation, missing output or unexpected skip cannot pass.
-Selected Docker, Desktop and Analytics PR workflows are reusable jobs of CI and their actual conclusions feed `UI policy (strict)`. They no longer also start a duplicate standalone PR run. Main keeps the existing independent image publication and release entrypoints. No workflow-level path filter is added to required workflows. Main concurrency,
+Selected Analytics runs as a reusable CI job, and its conclusion feeds `UI policy (strict)`. Desktop keeps its separate acceptance workflow. No workflow-level path filter is added to required workflows. Main concurrency,
 OIDC, daemon/Desktop exact-source CI gates, E2B release pairs and publication
 checks are unchanged. Existing browser-gate remains a compatibility status only;
 this change adds no browser tests.
