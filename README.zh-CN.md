@@ -11,7 +11,7 @@
 
 从本地到云端，所有 Agent 协作如一。
 
-[访问 Mikka](https://app.aspectlylabs.com/mikka) · [文档](https://aspectlylabs.com/mikka/docs) · [快速入门](https://aspectlylabs.com/mikka/docs/quickstart)
+[Mikka 官网](https://aspectlylabs.com/mikka) · [打开应用](https://app.aspectlylabs.com/mikka) · [文档](https://aspectlylabs.com/mikka/docs) · [快速入门](https://aspectlylabs.com/mikka/docs/quickstart) · [定价](https://aspectlylabs.com/pricing)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
@@ -20,7 +20,7 @@
 
 </div>
 
-Mikka 为 Claude Code、Codex 和受支持的 Cursor 运行环境组织工作：Bot 负责协调任务，Agent 负责执行。
+Mikka 把 Claude Code 和 Codex 跑在隔离的云端机器上，与你自己电脑上的 Agent 连成一体，并把所有会话收进与 Coordinator 的同一个聊天里。Bot 负责协调 Claude Code、Codex 和受支持的 Cursor 运行环境的工作，Agent 负责执行。
 
 向 Bot 描述一个任务，Mikka 就能将编码工作派发给运行在 Mac、Linux 设备、SSH 服务器或符合条件的云端沙盒中的 Agent，并把进度、提问和结果汇总到同一个地方。你可以通过网页、macOS 或 iOS App 使用 Mikka。
 
