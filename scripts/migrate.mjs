@@ -113,4 +113,9 @@ try {
     const access = await backfillProjectResourceAccess(application, workspace)
     console.log(`migrate: project ACL registered=${access.registered} quarantined=${access.quarantined} tasksBound=${access.tasksBound}`)
   }
+  if (application && workspace && files.includes('20261120044916_bot_settings.sql')) {
+    const { backfillBotEnvironments } = await import('./bot-environment-backfill.mjs')
+    const moved = await backfillBotEnvironments(application, workspace)
+    console.log(`migrate: bot environments bound=${moved.bound} created=${moved.created} skipped=${moved.skipped}`)
+  }
 } finally { await Promise.all(states.map(({ pool }) => pool.end())) }

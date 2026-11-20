@@ -158,15 +158,34 @@ export const bots = pgTable('bots', {
   shape: text('shape').notNull().default('cercle'),
   /** Model family a new bot starts with ('mikka' | 'codex' | 'claude'); copied from workspace_settings. */
   model: text('model').$type<WorkspaceBotModel | null>(),
-  /** GitHub repository (owner/repo remote key) a new bot starts with; copied from workspace_settings. */
+  /** Retired (drizzle/20261120044916): moved into the Environment's repositories. Read only through lib/bot-environment.ts until every caller reads the Environment; never written. */
   repository: text('repository'),
+  /** The Environment (workspace database, workspace_environments) whose repositories, setup and variables the Bot works with. No foreign key: the tables live in different databases. */
+  environmentId: uuid('environmentId'),
+  /** Slack `@Mikka bot=<alias>`: lowercase, 1–32 of [a-z0-9_-], unique in the workspace. */
+  alias: text('alias'),
+  /** Where tasks this Bot dispatches run unless the task names a place (lib/task-destination.ts). */
+  crewTarget: jsonb('crewTarget').$type<import('@/lib/task-destination').TaskDestination>(),
+  /** The Agent those tasks run on unless the task names one. */
+  defaultAgent: text('defaultAgent').$type<'claude_code' | 'codex'>(),
+  /** The owner's Agent profile (factory_agent_profiles) those tasks use unless the task names one. */
+  defaultProfileId: uuid('defaultProfileId'),
+  /** Where the Bot itself runs (lib/bot-settings.ts botRunsOnSchema). */
+  runsOn: jsonb('runsOn').$type<import('@/lib/bot-settings').BotRunsOn>(),
   /** Monthly credit cap for this bot; null uses workspace_settings.botMonthlyCreditLimit. */
   monthlyCreditLimit: integer('monthlyCreditLimit'),
   /** Set when the owner left or was suspended; the bot stays paused until an admin takes it over (§8.3). */
   archivedAt: timestamp('archivedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
+}, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`), uniqueIndex('bots_workspace_alias_key').on(table.workspaceId, table.alias).where(sql`${table.alias} IS NOT NULL`)])
+
+/** People following a Bot they do not own (drizzle/20261120044916). */
+export const botSubscribers = pgTable('bot_subscribers', {
+  botId: uuid('botId').notNull().references(() => bots.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.botId, table.userId] }), index('bot_subscribers_user_idx').on(table.userId)])
 
 /** The bot row that is a person's Coordinator in a workspace (drizzle/20261101140000); see lib/coordinator/coordinator-bot.ts. */
 export const coordinatorBots = pgTable('coordinator_bots', {
@@ -191,6 +210,8 @@ export const botModelChoices = pgTable('bot_model_choices', {
   apiKeyId:uuid('apiKeyId'),apiKeyModel:text('apiKeyModel'),
   /** Or a catalogue model (`vendor/model`) run on Mikka 额度; a row with none of the three is no choice (decision 2026-11-15-1900). */
   creditsModel:text('creditsModel'),
+  /** Reasoning effort for the chat model (lib/model-routing.ts); null is the model's default. */
+  effort:text('effort').$type<import('@/lib/model-routing').ModelRoutingEffort>(),
 }, table=>[primaryKey({columns:[table.ownerId,table.workspaceId,table.botKey]})])
 
 export const agentSessions = pgTable('agent_sessions', {
