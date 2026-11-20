@@ -35,14 +35,14 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type AssigneeCandidate = { id: string; email: string }
 
 export class LinearSyncConflictError extends Error {
-  constructor(message: string, readonly retryable = false) { super(message); this.name = 'LinearSyncConflictError' }
+  constructor(message: string, readonly retryable = false, options?: ErrorOptions) { super(message, options); this.name = 'LinearSyncConflictError' }
 }
 
 async function localLabels(tx: Transaction, workspaceId: string, labels: LinearIssueSnapshot['labels']) {
   try { return await resolveTaskLabelNames(tx, workspaceId, labels.map(label => label.name)) }
   catch (error) {
     if (error instanceof ActionFailureError && error.code === 'issueMetadataInvalid')
-      throw new LinearSyncConflictError('A Linear label is not registered in this workspace; a workspace admin must create it first')
+      throw new LinearSyncConflictError('A Linear label is not registered in this workspace; a workspace admin must create it first', false, { cause: error })
     throw error
   }
 }
