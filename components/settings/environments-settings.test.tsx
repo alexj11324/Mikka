@@ -77,7 +77,7 @@ before(async () => {
 })
 beforeEach(() => {
   const data: EnvironmentsView = { canManage: true, projects: [], environments: [{
-    id: environmentId, name: 'Private environment fixture', revision: 7, archived: false,
+    id: environmentId, name: 'Private environment fixture', revision: 7, archived: false, defaultMachineSize: null,
     configuration: { runtime: 'local', harness: 'any', variables: {}, secretIds: [], repositoryKeys: [],
       setup: { command: 'node --version', copyFiles: ['fixture.local'], approved: false } },
   }] }

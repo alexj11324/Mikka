@@ -150,3 +150,21 @@ test("denied repository access never sends GraphQL, nor leaks provider errors", 
   response = () => new Response("private body", { status: 401 });
   await assert.rejects(run(), { message: "githubReconnectRequired" });
 });
+test("since keeps PRs opened from that instant and stops paging once updates fall before it", async () => {
+  response = () => {
+    const data = fixture();
+    const [row] = data.data.repository.pullRequests.nodes;
+    data.data.repository.pullRequests.nodes = [
+      row,
+      { ...row, number: 6, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-11-17T00:00:00Z" },
+    ];
+    return Response.json(data);
+  };
+  const open = await run({ repo: "Owner/Repo", since: "2026-11-01T00:00:00Z" });
+  assert.deepEqual(open.items.map((item) => item.number), [7]);
+  assert.equal(open.cursor, "next-page", "every update on this page is after the cut-off, so older PRs may follow");
+  const stale = await run({ repo: "Owner/Repo", since: "2026-11-17T06:00:00Z" });
+  assert.deepEqual(stale.items.map((item) => item.number), [7]);
+  assert.equal(stale.cursor, null, "a page reaching updates before the cut-off is the last one that can match");
+  assert.equal("since" in variables, false, "GitHub is never asked to filter: the cut-off is applied to what it returns");
+});

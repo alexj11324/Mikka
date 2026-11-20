@@ -349,8 +349,10 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
   const { newThread, sourceEventId, target: offeredTarget, ...request } = input
   let target = offeredTarget
   let creation: { eventId: string; botId: string; workspaceId: string } | undefined
+  let botDefaults: import('@/lib/bot-settings').BotDispatchDefaults | null = null
   // The task form's or schedule's Agent: undefined without one of those commands, null when it named none.
   let commanded: 'claude_code' | 'codex' | null | undefined
+  let commandedModel: string | undefined
   requestEventId ??= sourceEventId
   try {
     const workspaceId = await timedPhase('executionWorkspace', async () => (await import('@/lib/execution-settings')).executionWorkspace(userId, botId))
@@ -361,7 +363,9 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
       request.requestKey = `task-command:${requestEventId}`
     }
     request.profileId = selection.profileId
-    if (selection.commandIssueId) commanded = selection.agent ?? null
+    botDefaults = await timedPhase('botDispatchDefaults', async () => (await import('@/lib/bot-settings-store')).botDispatchDefaults(pool, botId))
+    // Task explicit > Bot default > the person's own defaults (lib/bot-settings.ts withBotDispatchDefaults).
+    if (selection.commandIssueId) { commanded = selection.agent ?? botDefaults?.defaultAgent ?? null; commandedModel = selection.model }
     if (selection.taskDestination?.kind === 'cloud') target = 'cloud'
     // The computer the person named, when the model left the place out, and
     // its Agent whatever the model passed. A different place stays refused.
@@ -374,6 +378,8 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
   // task's, whatever the model passed; a command that named none is refused.
   if (commanded === null) return { error: 'agentRequired' as const, issueId: request.issueId }
   if (commanded && request.model?.harness !== commanded) request.model = { harness: commanded }
+  // The command's own model (an automation's) wins over one the Bot named.
+  if (commanded && commandedModel) request.model = { harness: commanded, model: commandedModel }
   // The Agent or model the Bot named must be one of 优先使用的模型, the list its prompt shows; otherwise nothing is queued.
   if (request.model) {
     const { modelNotAllowed } = await import('@/lib/model-dispatch')
@@ -390,15 +396,21 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
   }
   // A bare name ("Mikka_test") becomes the one repository this user authorized by that name, or a card; only a new run needs it.
   const { withResolvedRepository } = await import('@/lib/coordinator/repository-resolution')
+  const { withBotDispatchDefaults } = await import('@/lib/bot-settings')
   // A new thread runs in the repository named; the thread's next run only ever in the thread's own (never the one the model passed).
   // A new thread runs on the Agent the dispatch names; nothing picks one (decision 2026-11-17-1800).
   // The thread's next run keeps the thread's own Agent, never the other one.
   const byRules = (note: string | undefined, place: import('@/lib/dispatch-target').DispatchTarget | undefined, named: string | null | undefined, previous?: { id: string; harness: string | null }) => {
     if (!named?.trim()) return Promise.resolve({ error: 'repositoryRequired' as const, issueId: request.issueId })
     const own: { harness: 'claude_code' | 'codex' } | undefined = previous?.harness === 'claude_code' || previous?.harness === 'codex' ? { harness: previous.harness } : undefined
-    const model: { harness: 'claude_code' | 'codex'; model?: string } | undefined = previous ? request.model ?? own : request.model
-    if (!model && !request.agentId) return Promise.resolve({ error: 'agentRequired' as const, issueId: request.issueId })
-    return withResolvedRepository(userId, request.issueId, named, repo => dispatchByRules(userId, { ...request, ...(model ? { model } : {}), repo, note, threadRunId: previous?.id }, scope, botId, execution, requestEventId, place))
+    // A new thread falls back on the Bot's defaults for what the task left open; a thread's next run keeps its own (never a move).
+    const asked = previous
+      ? { place, model: request.model ?? own, profileId: request.profileId, agentId: request.agentId }
+      : withBotDispatchDefaults({ place, model: request.model, profileId: request.profileId, agentId: request.agentId }, botDefaults)
+    if (!asked.model && !asked.agentId) return Promise.resolve({ error: 'agentRequired' as const, issueId: request.issueId })
+    const sponsoredDefault = 'sponsored' in asked && asked.sponsored === true
+    return withResolvedRepository(userId, request.issueId, named, repo => dispatchByRules(userId, { ...request, ...(asked.model ? { model: asked.model } : {}), ...(asked.profileId ? { profileId: asked.profileId } : {}), ...(asked.agentId ? { agentId: asked.agentId } : {}), repo, note, threadRunId: previous?.id,
+      ...(sponsoredDefault ? { sponsoredDefault: true as const } : {}) }, scope, botId, execution, requestEventId, asked.place))
   }
   // The thread's repository is not the one named: a different one, or a name that is not one repository yet (its card comes from the new thread's lookup).
   let repositoryMove = false
@@ -416,7 +428,7 @@ async function dispatchRunBody(userId: string, input: { issueId: string; profile
     explicit: async () => (repositoryMove && await personNamed(userId, botId, sourceEventId, request.repo!)) || explicitNewThread(userId, botId, sourceEventId),
     start: async (previous, note, replaces) => {
       // A new thread runs in the repository the person named, else in the one of the thread it replaces.
-      if (!previous) return byRules(note, target, request.repo?.trim() || replaces?.remoteUrl)
+      if (!previous) return byRules(note, target, request.repo?.trim() || replaces?.remoteUrl || botDefaults?.repository)
       // The thread's next run goes where the thread ran, so its session can be resumed; elsewhere it starts fresh with the note's context.
       // It keeps the thread's own model and account, or the one the person just named; never another one silently.
       const { latestThreadRunModel, chooseCloudRunModel, chooseLocalRunModel } = await import('@/lib/computer/run-model')
@@ -475,7 +487,7 @@ async function namedDeviceAgent(userId: string, deviceId: string, agentId: strin
   return (await import('@/lib/dispatch-target')).chooseDeviceAgent(rows, installed, agentId, harness)
 }
 
-async function dispatchByRules(userId: string, { followed, ...input }: { threadRunId?: string; issueId: string; profileId?: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; origin?: RunOrigin; originRef?: RunOriginRef | null; model?: { harness: 'claude_code' | 'codex'; model?: string }; followed?: true }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
+async function dispatchByRules(userId: string, { followed, sponsoredDefault, ...input }: { threadRunId?: string; issueId: string; profileId?: string; agentId?: string; repo: string; note?: string; requestKey?:string; readOnly?: boolean; needsSpec?: boolean; origin?: RunOrigin; originRef?: RunOriginRef | null; model?: { harness: 'claude_code' | 'codex'; model?: string }; followed?: true; /** The Bot's default is the Cloudflare coding machine and the task named no place. */ sponsoredDefault?: true }, scope: NativeToolScope | undefined, botId: string, execution?: AgentExecution, requestEventId?: string, place?: import('@/lib/dispatch-target').DispatchTarget) {
   if (!input.threadRunId) input = { ...input, needsSpec: await (await import('@/lib/factory/task-dispatch')).factoryTaskNeedsSpec(pool, userId, { issueId: input.issueId, botId, needsSpec: input.needsSpec }) }
   const stage = input.needsSpec ? 'spec' : 'execute'
   // A computer the person named: theirs, not removed, online; otherwise refused or the card at once, never another computer.
@@ -514,7 +526,7 @@ async function dispatchByRules(userId: string, { followed, ...input }: { threadR
     const workspaceId = await timedPhase('executionWorkspace', () => executionWorkspace(userId, botId))
     const { resolveModelDispatch } = await import('@/lib/model-dispatch')
     const { resolveAgentProfileDispatch } = await import('@/lib/factory/agent-profile')
-    let sponsored = false
+    let sponsored = place === 'cloud' && sponsoredDefault === true
     if (requestEventId) {
       const event=(await pool.query(`SELECT "userId","botId","issueId",kind,"deliveredAt",
         payload ? 'taskDestination' AS "hasTaskDestination",payload->'taskDestination' AS "taskDestination"

@@ -68,6 +68,8 @@ export const issues = pgTable('issues', {
   shortTitle: varchar('shortTitle', { length: 60 }), shortTitleFrom: varchar('shortTitleFrom', { length: 200 }),
   content: jsonb('content').$type<JSONContent>().notNull(),
   status: text('status').notNull(), priority: text('priority').notNull(),
+  /** The workspace state (workspace_issue_states). A trigger keeps `status` equal to its category, both ways. */
+  stateId: uuid('state_id'),
   // Compatibility label only. workspaceId is the tenant; provider bindings control sync.
   scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
   scopeVersion: integer('scopeVersion').notNull().default(1),
@@ -76,10 +78,38 @@ export const issues = pgTable('issues', {
   scopeSetBy: text('scopeSetBy').$type<'agent' | 'user'>().notNull().default('agent'),
   scopeConfidence: real('scopeConfidence'),
   revision: integer('revision').notNull().default(1),
+  /** The automation (user_schedules) whose run made this task; null for every other task. */
+  sourceScheduleId: uuid('source_schedule_id'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc()),
+  index('issues_source_schedule_idx').on(table.sourceScheduleId).where(sql`${table.sourceScheduleId} IS NOT NULL`),
   check('issues_short_title_compact', sql`mikka_issue_short_title_valid(${table.shortTitle})`)])
+/**
+ * A workspace's task states (Capy's Issue states). `category` is one of ISSUE_STATUS_CODES and fixes `type`; each
+ * category has one default. `name` NULL shows the category's translated name. Seeded by mikka_ensure_issue_states.
+ */
+export const workspaceIssueStates = pgTable('workspace_issue_states', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull(),
+  name: varchar('name', { length: 60 }),
+  icon: text('icon').notNull(),
+  color: text('color').notNull(),
+  category: text('category').notNull(),
+  type: text('type').$type<'open' | 'closed'>().notNull(),
+  isDefault: boolean('is_default').notNull().default(false),
+  position: integer('position').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('workspace_issue_states_position_idx').on(table.workspaceId, table.position)])
+/** Capy's "Mark as unread" (drizzle/20261120063603_task_reads.sql): a person's own unread flag on a task. */
+export const taskReads = pgTable('task_reads', {
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  issueId: uuid('issue_id').notNull().references(() => issues.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspace_id').notNull(),
+  unread: boolean('unread').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.userId, table.issueId] })])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),
@@ -158,15 +188,44 @@ export const bots = pgTable('bots', {
   shape: text('shape').notNull().default('cercle'),
   /** Model family a new bot starts with ('mikka' | 'codex' | 'claude'); copied from workspace_settings. */
   model: text('model').$type<WorkspaceBotModel | null>(),
-  /** GitHub repository (owner/repo remote key) a new bot starts with; copied from workspace_settings. */
+  /** Retired (drizzle/20261120044916): moved into the Environment's repositories. Read only through lib/bot-environment.ts until every caller reads the Environment; never written. */
   repository: text('repository'),
+  /** The Environment (workspace database, workspace_environments) whose repositories, setup and variables the Bot works with. No foreign key: the tables live in different databases. */
+  environmentId: uuid('environmentId'),
+  /** Slack `@Mikka bot=<alias>`: lowercase, 1–32 of [a-z0-9_-], unique in the workspace. */
+  alias: text('alias'),
+  /** Where tasks this Bot dispatches run unless the task names a place (lib/task-destination.ts). */
+  crewTarget: jsonb('crewTarget').$type<import('@/lib/task-destination').TaskDestination>(),
+  /** The Agent those tasks run on unless the task names one. */
+  defaultAgent: text('defaultAgent').$type<'claude_code' | 'codex'>(),
+  /** The owner's Agent profile (factory_agent_profiles) those tasks use unless the task names one. */
+  defaultProfileId: uuid('defaultProfileId'),
+  /** Where the Bot itself runs (lib/bot-settings.ts botRunsOnSchema). */
+  runsOn: jsonb('runsOn').$type<import('@/lib/bot-settings').BotRunsOn>(),
   /** Monthly credit cap for this bot; null uses workspace_settings.botMonthlyCreditLimit. */
   monthlyCreditLimit: integer('monthlyCreditLimit'),
   /** Set when the owner left or was suspended; the bot stays paused until an admin takes it over (§8.3). */
   archivedAt: timestamp('archivedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
-}, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`)])
+}, table => [unique('bots_id_workspace_owner_key').on(table.id, table.workspaceId, table.ownerId), index('bots_owner_workspace_idx').on(table.ownerId, table.workspaceId), uniqueIndex('bots_owner_workspace_name_key').on(table.ownerId, table.workspaceId, sql`lower(${table.name})`), uniqueIndex('bots_workspace_alias_key').on(table.workspaceId, table.alias).where(sql`${table.alias} IS NOT NULL`)])
+
+/** People following a Bot they do not own (drizzle/20261120044916). */
+export const botSubscribers = pgTable('bot_subscribers', {
+  botId: uuid('botId').notNull().references(() => bots.id, { onDelete: 'cascade' }),
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.botId, table.userId] }), index('bot_subscribers_user_idx').on(table.userId)])
+
+/** A Slack thread started with `@Mikka bot=<alias>` and the Bot its later replies go to (lib/slack/thread-bots.ts). */
+export const slackThreadBots = pgTable('slack_thread_bots', {
+  linkId: uuid('linkId').notNull(),
+  channelId: text('channelId').notNull(),
+  threadTs: text('threadTs').notNull(),
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  botId: uuid('botId').notNull().references(() => bots.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.linkId, table.channelId, table.threadTs] }), index('slack_thread_bots_bot_idx').on(table.botId)])
 
 /** The bot row that is a person's Coordinator in a workspace (drizzle/20261101140000); see lib/coordinator/coordinator-bot.ts. */
 export const coordinatorBots = pgTable('coordinator_bots', {
@@ -191,6 +250,8 @@ export const botModelChoices = pgTable('bot_model_choices', {
   apiKeyId:uuid('apiKeyId'),apiKeyModel:text('apiKeyModel'),
   /** Or a catalogue model (`vendor/model`) run on Mikka 额度; a row with none of the three is no choice (decision 2026-11-15-1900). */
   creditsModel:text('creditsModel'),
+  /** Reasoning effort for the chat model (lib/model-routing.ts); null is the model's default. */
+  effort:text('effort').$type<import('@/lib/model-routing').ModelRoutingEffort>(),
 }, table=>[primaryKey({columns:[table.ownerId,table.workspaceId,table.botKey]})])
 
 export const agentSessions = pgTable('agent_sessions', {
@@ -600,8 +661,11 @@ export const runTokens = pgTable('run_tokens', {
  * `matter_handoff` carries hidden evidence from connected apps
  * (lib/attention): the person has not seen it, and the Coordinator alone
  * decides whether to tell them.
+ * `issue_assigned` wakes a Bot a task was assigned to, and `issue_activity` one
+ * whose task got a comment or that was @-mentioned (Capy's issue_activity);
+ * the Bot decides whether to start work on it.
  */
-export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'issue_status_changed', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched', 'run_credential_switched', 'run_quota_paused'] as const
+export const COORDINATOR_EVENT_KINDS = ['user_message', 'run_finished', 'issue_done', 'issue_status_changed', 'run_report', 'run_question', 'run_blocked', 'run_retried', 'action_decided', 'artifact_submitted', 'daily_briefing', 'matter_handoff', 'run_dispatch_failed', 'run_redispatched', 'run_credential_switched', 'run_quota_paused', 'issue_assigned', 'issue_activity'] as const
 export type CoordinatorEventKind = (typeof COORDINATOR_EVENT_KINDS)[number]
 /**
  * How much an event matters: `attention` needs the person, `result` is worth

@@ -242,11 +242,12 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   const [title, setTitle] = useState(initial.title)
   const [content, setContent] = useState<JSONContent>(initial.content)
   const [status, setStatus] = useState(initial.status)
+  const [stateId, setStateId] = useState<string | null>(initial.stateId ?? null)
   const [priority, setPriority] = useState(initial.priority)
   const [dirty, setDirty] = useState(false)
   const [pending, setPending] = useState(false)
   const flight = useRef<Promise<boolean> | null>(null)
-  const draft = useRef({ title: initial.title, content: initial.content, status: initial.status, priority: initial.priority, generation: 0 })
+  const draft = useRef({ title: initial.title, content: initial.content, status: initial.status, stateId: (initial.stateId ?? null) as string | null, priority: initial.priority, generation: 0 })
   const savedRef = useRef(initial)
   const acknowledged = useRef(0)
   const conflictingRead = useRef<Issue | null>(null)
@@ -314,7 +315,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
     // Only fields unchanged since the last server snapshot adopt its newer
     // value. Updating the draft too keeps a later text save from reopening Done.
     if (current.title === previous.title && !composing.current) { next.title = fresh.title; setTitle(fresh.title) }
-    if (current.status === previous.status) { next.status = fresh.status; setStatus(fresh.status) }
+    if (current.status === previous.status && current.stateId === (previous.stateId ?? null)) { next.status = fresh.status; setStatus(fresh.status); next.stateId = fresh.stateId ?? null; setStateId(fresh.stateId ?? null) }
     if (current.priority === previous.priority) { next.priority = fresh.priority; setPriority(fresh.priority) }
     if (JSON.stringify(current.content) === JSON.stringify(previous.content)) { next.content = fresh.content; setContent(fresh.content) }
     draft.current = next
@@ -331,12 +332,13 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [hasUnsavedChanges])
-  function changed(patch: Partial<Pick<Issue, 'title' | 'content' | 'status' | 'priority'>>) {
+  function changed(patch: Partial<Pick<Issue, 'title' | 'content' | 'status' | 'stateId' | 'priority'>>) {
     if (locked) return
     draft.current = { ...draft.current, ...patch, generation: draft.current.generation + 1 }
     if (patch.title !== undefined) setTitle(patch.title)
     if (patch.content !== undefined) setContent(patch.content)
     if (patch.status !== undefined) setStatus(patch.status)
+    if (patch.stateId !== undefined) setStateId(patch.stateId)
     if (patch.priority !== undefined) setPriority(patch.priority)
     setDirty(true)
     setError('')
@@ -367,7 +369,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
           if (snapshot.generation !== acknowledged.current) {
             let result: Awaited<ReturnType<typeof saveIssue>> | undefined
             try {
-              result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
+              result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, stateId: snapshot.stateId && snapshot.stateId !== previous.stateId ? snapshot.stateId : undefined, priority: snapshot.priority })
             } catch (error) {
               if (error && typeof error === 'object') {
                 if ('code' in error && error.code === 'desktop_session_changed') throw error
@@ -393,6 +395,8 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
             if (confirmed.revision >= savedRef.current.revision) {
               savedRef.current = confirmed
               setSaved(confirmed)
+              // A status saved without a state took its category's default: the draft follows the server's choice.
+              if (draft.current.stateId === snapshot.stateId && draft.current.status === confirmed.status) { draft.current = { ...draft.current, stateId: confirmed.stateId ?? null }; setStateId(confirmed.stateId ?? null) }
             }
             conflictingRead.current = null
             acknowledged.current = snapshot.generation
@@ -432,8 +436,8 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   function adopt(issue: Issue) {
     if (issue.revision < savedRef.current.revision) return
     const previousStatus = savedRef.current.status
-    savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
-    draft.current = { ...draft.current, status: issue.status, priority: issue.priority }
+    savedRef.current = issue; setSaved(issue); setStatus(issue.status); setStateId(issue.stateId ?? null); setPriority(issue.priority)
+    draft.current = { ...draft.current, status: issue.status, stateId: issue.stateId ?? null, priority: issue.priority }
     void refreshVersions().catch(() => {}); publishSaved(issue, previousStatus)
   }
   async function getCurrent() { return await save() ? savedRef.current : null }
@@ -480,7 +484,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   const titleChange = (value: string) => changed({ title: value })
   const titleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }
   return <FramedTask Frame={TaskDetailFrame} rootRef={rootRef} onKeyDown={onKeyDown} label={title || t('titleLabel')} preview={preview} locked={locked} origin={origin} navigation={navigation} onClose={onClose} onOpen={onOpen} onDeleted={onDeleted} userId={user.id}
-    task={saved} title={title} status={status} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
+    task={saved} title={title} status={status} stateId={stateId} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
     discussionSave={sync ? { afterAcknowledged: sync.afterAcknowledged, retry: () => { void save() } } : undefined}
     titleField={{ value: title, label: t('titleLabel'), readOnly: locked, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
     saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: retryAutosave, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
@@ -489,7 +493,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
     teamSnapshot={!preview && initial.taskWork?.teamId !== undefined ? { teamId: initial.taskWork.teamId, refresh: refreshDetail } : undefined}
     versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} agentActivity={agentActivity}
     documentTools={documentTools} actionRequest={actionRequest} propertyRequest={propertyRequest} requestAction={requestAction} requestProperty={requestProperty} getCurrent={getCurrent} adopt={adopt} onMetadataBusy={setMetadataSaving}
-    onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
+    onStatus={(value, picked) => { changed(picked === undefined ? { status: value, stateId: null } : { status: value, stateId: picked }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
     onHistory={() => { void openHistory() }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
     panel={threadPanel || null} wide={wide} resize={{ handle: wide && threadPanel ? <ResizeHandle resize={threadWidth} label={tCommon('resize.taskPanel')} edge="start" /> : null, width: threadWidth.width, dragging: threadWidth.dragging }} dialogs={dialogs} />
 

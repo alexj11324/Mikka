@@ -134,7 +134,7 @@ test('a conflict names the paths to re-read, and only the ones that really diffe
 })
 
 test('the Drive scopes are distinct from the tenant, and project-user names both', () => {
-  assert.deepEqual([...DRIVE_SCOPES], ['user', 'project', 'project-user', 'team-workspace'])
+  assert.deepEqual([...DRIVE_SCOPES], ['user', 'project', 'project-user', 'team-workspace', 'bot', 'thread', 'environment'])
   assert.equal(driveScopeProblem('team-workspace', 'team-id', null), null)
   assert.equal(driveScopeProblem('team-workspace', 'team-id', 'someone'), 'scope_user_unexpected')
   // `workspace` is the tenant everywhere else in this codebase; a volume's

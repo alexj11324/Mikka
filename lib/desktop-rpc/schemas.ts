@@ -10,7 +10,10 @@ import { threadHistoryInput, threadHistoryPosition } from '@/lib/thread-history'
 import { projectInput, projectPatch } from '@/lib/project-input'
 import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
 import { ISSUE_STATUS_CODES, ISSUE_PRIORITY_CODES } from '@/lib/issue-meta'
+import { createIssueStateInput, deleteIssueStateInput, reorderIssueStatesInput, setDefaultIssueStateInput, updateIssueStateInput } from '@/lib/issue-states'
 import { taskDestinationSchema } from '@/lib/task-destination'
+import { BOT_DEFAULT_AGENTS, botRunsOnSchema } from '@/lib/bot-settings'
+import { MODEL_ROUTING_EFFORTS } from '@/lib/model-routing'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { API_KEY_PRESETS } from '@/lib/model-api-key-providers'
@@ -38,6 +41,9 @@ const object = z.strictObject
 const oneId = tuple(uuid)
 const none = tuple()
 const inWorkspace = tuple(workspace)
+/** Bot Profile's settings (lib/bot-settings.ts); the server checks each again. */
+const botSettingFields = { alias: text(64).nullable().optional(), environmentId: uuid.nullable().optional(), crewTarget: taskDestinationSchema.nullable().optional(),
+  defaultAgent: z.enum(BOT_DEFAULT_AGENTS).nullable().optional(), defaultProfileId: uuid.nullable().optional(), runsOn: botRunsOnSchema.nullable().optional() }
 const memoryScope = z.discriminatedUnion('kind', [
   object({ kind: z.literal('global'), ids: z.tuple([]) }),
   object({ kind: z.literal('workspaces'), ids: z.array(uuid).min(1).max(50) }),
@@ -188,14 +194,22 @@ export const desktopActionSchemas = {
   'billing.startCardVerification': inWorkspace,
   'bots.listBots': none,
   'bots.pollBots': inWorkspace,
-  'bots.createBot': tuple(object({ name: text(200).trim().min(1), color: text(50).min(1), shape: text(50).min(1), model: text(1000).nullish(), repository: text(2048).nullish() }), workspace),
-  'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional() }), workspace),
+  'bots.createBot': tuple(object({ name: text(200).trim().min(1), color: text(50).min(1), shape: text(50).min(1), model: text(1000).nullish(), repository: text(2048).nullish(), ...botSettingFields,
+    visibility: z.enum(['shared', 'private']).optional(), subscribers: z.array(id).max(200).optional() }), workspace),
+  'bots.updateBot': tuple(object({ botId: uuid, name: text(200).trim().min(1).optional(), color: text(50).min(1).optional(), shape: text(50).min(1).optional(), publicRole: text(2000).optional(), ...botSettingFields }), workspace),
+  'bots.getBotSettings': tuple(uuid, workspace),
+  'bots.listBotEnvironments': inWorkspace,
+  'bots.setBotEffort': tuple(uuid, z.enum(MODEL_ROUTING_EFFORTS).nullable(), workspace),
+  'bots.getBotAccess': tuple(uuid, workspace),
+  'bots.setBotAccess': tuple(uuid, object({ visibility: z.enum(['shared', 'private']).optional(), subscribers: z.array(id).max(200).optional() }), workspace),
+  'bots.followBot': tuple(uuid, bool, workspace),
+  'bots.transferBot': tuple(uuid, id, workspace),
   'bots.archiveBot': tuple(uuid, bool, workspace),
   'bots.deleteBot': tuple(uuid, workspace),
   'bots.listArchivedOwnBots': inWorkspace,
   'bots.listWorkspaceBots': inWorkspace,
   'bots.getWorkspaceBotDefaults': inWorkspace,
-  'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional() }), workspace),
+  'automations.listAutomations': tuple(object({ cursor: text(100).optional(), deleted: z.boolean().optional(), owner: z.literal('me').optional(), trigger: z.literal('schedule').optional() }), workspace),
   'automations.getAutomation': tuple(uuid, workspace),
   'automations.flushAutomationBatch': tuple(webhookBatchInput, workspace),
   'automations.cancelAutomationBatch': tuple(webhookBatchInput, workspace),
@@ -207,6 +221,9 @@ export const desktopActionSchemas = {
   'automations.pauseAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
   'automations.takeOverAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
   'automations.automationWebhookKey': tuple(object({ scheduleId: uuid, version: positive }), workspace),
+  'automations.duplicateAutomation': tuple(object({ scheduleId: uuid, targetWorkspaceId: uuid, requestId: uuid }), workspace),
+  'automations.setAutomationRunAs': tuple(object({ scheduleId: uuid, version: positive, userId: id.nullable() }), workspace),
+  'automations.automationRunAsChoices': inWorkspace,
   'automations.automationLinearLabels': tuple(uuid),
   'automations.automationLinearTeams': none,
   'automations.automationSlackChannels': inWorkspace,
@@ -244,6 +261,7 @@ export const desktopActionSchemas = {
   'execution-settings.refreshBotModelMenuAction': tuple(bot),
   'execution-settings.chooseBotModel': tuple(bot, text(1000).min(1)),
   'issue-metadata.getIssuePropertyOptions': oneId,
+  'issue-metadata.getNewTaskOptions': oneId,
   'issue-metadata.updateIssueMetadata': tuple(object({ id: uuid, revision: positive, patch: metadata, inviteEmail: z.email().max(254).optional() })),
   'issue-operations.listIssueConnections': oneId,
   'issue-operations.updateIssueRelation': tuple(object({ id: uuid, revision: positive, targetId: uuid.nullable(), kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']), remove: bool.optional() })),
@@ -253,6 +271,15 @@ export const desktopActionSchemas = {
   'issue-operations.setIssueDeleted': tuple(object({ id: uuid, revision: positive.optional(), restore: bool.optional() })),
   'issue-prefix.getIssuePrefixState': none,
   'issue-prefix.saveIssuePrefix': tuple(object({ prefix: text(20).min(1) })),
+  'issue-states.getIssueStates': oneId,
+  'task-list.countTaskListViews': oneId,
+  'task-list.listUnreadTaskIds': oneId,
+  'task-list.setTaskUnread': tuple(object({ id: uuid, unread: bool })),
+  'issue-states.createWorkspaceIssueState': tuple(createIssueStateInput),
+  'issue-states.updateWorkspaceIssueState': tuple(updateIssueStateInput),
+  'issue-states.reorderWorkspaceIssueStates': tuple(reorderIssueStatesInput),
+  'issue-states.setDefaultWorkspaceIssueState': tuple(setDefaultIssueStateInput),
+  'issue-states.deleteWorkspaceIssueState': tuple(deleteIssueStateInput),
   'thread-title-settings.getThreadTitleSettings': inWorkspace,
   'thread-title-settings.saveThreadTitleSettings': tuple(object({ workspaceId: workspace, scope: z.enum(['workspace', 'mine']), instructions: text(1000).optional(), triggers: z.enum(['first_run_ended', 'pull_opened', 'either']).nullable().optional() })),
   'issues.listIssues': none,
@@ -266,9 +293,9 @@ export const desktopActionSchemas = {
   'issues.pollIssue': tuple(uuid, version.optional()),
   'issues.createTaskOnly': tuple(createOnlyCommand),
   'issues.getDispatchedTaskReceipt': tuple(dispatchReceiptInput),
-  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), workspaceId: uuid.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),
+  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), workspaceId: uuid.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), stateId: uuid.nullable().optional(), priority: z.enum(ISSUE_PRIORITY_CODES) })),
   'issues.promoteIssueToTeam': tuple(object({ requestId: uuid, issueId: uuid, revision: positive, teamId: uuid, expectedTeamId: uuid.nullable() })),
-  'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), revision: positive, block: blockFlagSchema.strict().optional() })),
+  'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), stateId: uuid.optional(), revision: positive, block: blockFlagSchema.strict().optional() })),
   'issues.changeIssuePriority': tuple(object({ id: uuid, priority: z.enum(ISSUE_PRIORITY_CODES), revision: positive })),
   'issues.listIssueVersions': oneId,
   'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(5000).optional()),

@@ -83,6 +83,9 @@ import {
 } from "./errors"
 import { DAEMON_VERSION } from "./paths"
 import { createRunMailbox } from './run-mailbox'
+import { createRunDrive } from './run-drive'
+import { homedir } from 'node:os'
+import { join as joinPath } from 'node:path'
 import { daemonTracer, routeTemplate } from "./tracing"
 import { runRuntimeTimings } from "./run-runtime-timing"
 import type {
@@ -237,6 +240,11 @@ export class HttpServerLink implements ServerLink {
   }
   async prepareRunMailbox(assignment: RunAssignment, signal: AbortSignal, check: () => void) {
     return createRunMailbox({ assignment, signal, check, endpoint: serverUrl(this.baseUrl, '/api/mcp'), fetch: (url, init) => this.taskFetch(assignment.runId, 'mailbox_operation', url, init),
+      headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...deviceSessionHeaders, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
+  }
+  async prepareRunDrive(assignment: RunAssignment, signal: AbortSignal) {
+    return createRunDrive({ assignment, signal, endpoint: serverUrl(this.baseUrl, '/api/mcp'), root: joinPath(process.env.HOME || homedir(), '.mikka', 'drive'),
+      fetch: (url, init) => this.taskFetch(assignment.runId, 'task_data', url, init),
       headers: { [CLIENT_VERSION_HEADER]: this.clientVersion, ...deviceSessionHeaders, ...(this.protectionBypass ? { 'x-vercel-protection-bypass': this.protectionBypass } : {}) } })
   }
   async claimCoordinator(deviceId: string, signal: AbortSignal) {

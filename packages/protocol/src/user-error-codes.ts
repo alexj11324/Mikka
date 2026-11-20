@@ -155,6 +155,14 @@ export const USER_ERROR_CODES = {
     "adapter_start_failed",
     "cleanup_failed",
   ],
+  /** Agent/Bot interop: reads, sends and Drive across threads and Bots (decision 2026-11-19-2200). */
+  interop_not_found: [],
+  interop_invalid_request: [],
+  interop_scope_required: [],
+  interop_send_unavailable: ["run_not_active", "thread_replaced", "thread_cannot_continue", "delivery_unavailable", "delivery_uncertain", "bot_unavailable", "continuation_requires_grant"],
+  interop_diff_unavailable: ["no_checkpoint", "masked"],
+  interop_drive_conflict: [],
+  interop_drive_unavailable: ["file_too_large"],
   cloud_machine_unfunded: [],
 } as const satisfies Record<string, readonly string[]>
 
