@@ -29,7 +29,7 @@ const isGlyph = (value: unknown): value is ProfileGlyph => typeof value === 'str
 const isColor = (value: unknown): value is ProfileColor => typeof value === 'string' && (PROFILE_COLORS as readonly string[]).includes(value)
 /** Colours before 2026-11-20, still in frozen runs and admitted by the column during a deploy: each keeps a colour of its own. */
 const LEGACY_COLORS: Readonly<Record<string, ProfileColor>> = { ink: 'blue', graphite: 'violet' }
-const storedColor = (value: unknown): ProfileColor | undefined =>
+export const storedProfileColor = (value: unknown): ProfileColor | undefined =>
   isColor(value) ? value : typeof value === 'string' ? LEGACY_COLORS[value] : undefined
 
 /** Responsibility words, English and Chinese; on a tie of position the earlier entry wins. */
@@ -77,7 +77,7 @@ export function deriveProfileMark(profile: { name: string; roles?: readonly stri
 /** A stored (or frozen) mark with any missing or unknown part filled from the derived default. */
 export function resolveProfileMark(profile: { name: string; roles?: readonly string[]; description?: string }, stored?: { icon?: unknown; color?: unknown } | null): ProfileMarkValue {
   const icon = isGlyph(stored?.icon) ? stored.icon : undefined
-  const color = storedColor(stored?.color)
+  const color = storedProfileColor(stored?.color)
   if (icon && color) return { icon, color }
   const derived = deriveProfileMark(profile)
   return { icon: icon ?? derived.icon, color: color ?? derived.color }
