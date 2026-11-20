@@ -8,6 +8,7 @@ import { readRendererActions, rendererActionContract } from '../../../lib/render
 import gateway from '../../../cloudflare/web/gateway.mjs'
 import release from '../../../cloudflare/web/release.mjs'
 import { gatewayConfig, prepareRelease } from '../../../cloudflare/web/prepare.mjs'
+import { runRouteProbe } from '../../../scripts/ops/route-probe.mjs'
 
 const request = (path, init) => new Request(new URL(path, 'https://app.example'), init)
 const services = () => ({
@@ -139,6 +140,27 @@ test('GitHub callback keeps one ingress across pins and forwards the signed byte
   assert.equal((await gateway.fetch(request('/mikka/api/webhooks/github'), env)).status, 503)
   delete env.GITHUB_WEBHOOK
   assert.equal(await (await gateway.fetch(request('/mikka/api/webhooks/github?dpl=old'), env)).text(), 'old')
+})
+
+test('the discrete GitHub ingress preserves the declared safe OPTIONS contract without webhook dispatch', async () => {
+  const inventory = JSON.parse(await readFile(new URL('../generated/routes.json', import.meta.url), 'utf8'))
+  const manifest = { ...inventory, routes: inventory.routes.filter(route => route.path === '/mikka/api/webhooks/github') }
+  assert.equal(manifest.routes.length, 1)
+  let calls = 0
+  const env = { GITHUB_WEBHOOK: { fetch() { calls++; return new Response(null, { status: 405 }) } } }
+  const report = await runRouteProbe({ baseUrl: 'https://app.example', manifest,
+    fetchImpl: (url, init) => gateway.fetch(new Request(url, init), env) })
+  assert.equal(report.status, 'pass')
+  assert.equal(report.passed, 1)
+  for (const path of ['/mikka/api/webhooks/github/', '/mikka/%61pi/webhooks/%67ithub?dpl=retired']) {
+    const response = await gateway.fetch(request(path, { method: 'OPTIONS' }), env)
+    assert.equal(response.status, 204)
+    assert.equal(response.headers.get('allow'), 'OPTIONS, POST')
+    assert.equal(response.headers.get('cache-control'), 'no-store')
+    assert.equal(await response.text(), '')
+  }
+  assert.equal(calls, 0)
+  assert.equal((await gateway.fetch(request('/mikka/api/webhooks/github', { method: 'OPTIONS' }), { GITHUB_WEBHOOK: null })).status, 503)
 })
 
 test('gateway config can bind a discrete webhook service for both current and rollback gateways', () => {
