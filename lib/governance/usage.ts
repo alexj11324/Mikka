@@ -12,6 +12,7 @@ import { GovernanceError } from './errors'
 import { csvCell } from './policy'
 import { writeTransaction } from '@/lib/operations/write-transaction'
 import { enterprisePrincipal, type EnterpriseReader } from '@/lib/enterprise/principal'
+import { threadCostsPending } from '@/lib/settings/device-activity-contract'
 
 /**
  * Every dimension this report can answer by. `day` and `model` are always
@@ -109,7 +110,7 @@ export async function readWorkspaceUsage(workspaceId: string, reader: string | E
     // reading the source, so the dimensions added here are discoverable rather than
     // sitting unused because nobody knew to pass a parameter.
     return { from: from.toISOString(), toExclusive: to.toISOString(), currency: 'USD', costUnit: 'microUSD',
-      groupBy: subdivision, availableGroupBy: [...USAGE_GROUP_BY], hosted: rows, runs }
+      groupBy: subdivision, availableGroupBy: [...USAGE_GROUP_BY], hosted: rows, runs, threadCosts: threadCostsPending }
   }))
 }
 

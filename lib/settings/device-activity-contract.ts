@@ -22,7 +22,7 @@ export interface DeviceSettingsDetail {
     harnesses: HarnessInfo[]
   }
   access: { ownerId: string; canManage: boolean }
-  directories: { environmentId: string; root: string; updatedAt: string }[]
+  directories: { environmentIds: string[]; root: string; updatedAt: string }[]
   scheduling: {
     enabled: boolean
     maxConcurrentRuns: number
@@ -30,6 +30,12 @@ export interface DeviceSettingsDetail {
     availableSlots: number
   }
   checkpoints: DeviceCheckpoint[]
+  cloudCheckpoints: {
+    runId: string
+    state: 'none' | 'creating' | 'ready' | 'failed' | 'unavailable'
+    capturedAt: string | null
+    available: boolean
+  }[]
   migration: DeviceMigrationCapability
 }
 
@@ -51,6 +57,16 @@ export interface DeviceMigrationCapability {
   excludes: ['process_memory', 'native_session', 'ignored_files', 'credentials']
 }
 
+export interface DeviceMigrationInspection {
+  workspaceId: string
+  sourceDeviceId: string
+  targetDeviceId: string
+  runId: string
+  taskId: null
+  state: 'blocked'
+  capability: DeviceMigrationCapability
+}
+
 export interface WorkspaceContributionDay {
   day: string
   memberId: string
@@ -65,7 +81,13 @@ export interface WorkspaceSettingsActivity {
   toExclusive: string
   timeZone: 'UTC'
   groupBy: 'member'
+  /** Calendar dates are the persisted Mikka event dates, not inferred GitHub dates. */
+  dateSource: 'recorded_events'
   contributions: WorkspaceContributionDay[]
   /** The complete model/machine ledger is owned by #2934. Unknown cost is null. */
   threadCosts: { available: false; reason: 'thread_cost_ledger_pending'; items: null }
+}
+
+export const threadCostsPending: WorkspaceSettingsActivity['threadCosts'] = {
+  available: false, reason: 'thread_cost_ledger_pending', items: null,
 }
