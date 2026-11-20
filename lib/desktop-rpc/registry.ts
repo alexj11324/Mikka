@@ -43,6 +43,7 @@ import * as actions33 from '@/app/actions/workspace'
 import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
 import * as actions36 from '@/app/actions/thread-title-settings'
+import * as issueStateActions from '@/app/actions/issue-states'
 import * as automations from '@/app/actions/automations'
 
 // This literal is the complete callable surface, independent of Next build IDs.
@@ -175,6 +176,12 @@ const functions = {
   'issue-operations.setIssueDeleted': actions12.setIssueDeleted,
   'issue-prefix.getIssuePrefixState': actions13.getIssuePrefixState,
   'issue-prefix.saveIssuePrefix': actions13.saveIssuePrefix,
+  'issue-states.getIssueStates': issueStateActions.getIssueStates,
+  'issue-states.createWorkspaceIssueState': issueStateActions.createWorkspaceIssueState,
+  'issue-states.updateWorkspaceIssueState': issueStateActions.updateWorkspaceIssueState,
+  'issue-states.reorderWorkspaceIssueStates': issueStateActions.reorderWorkspaceIssueStates,
+  'issue-states.setDefaultWorkspaceIssueState': issueStateActions.setDefaultWorkspaceIssueState,
+  'issue-states.deleteWorkspaceIssueState': issueStateActions.deleteWorkspaceIssueState,
   'thread-title-settings.getThreadTitleSettings': actions36.getThreadTitleSettings,
   'thread-title-settings.saveThreadTitleSettings': actions36.saveThreadTitleSettings,
   'issues.listIssues': actions14.listIssues,

@@ -17,6 +17,7 @@ export const REQUIRED_SUITES = [
   { marker: 'lib/coding-workspace/review-authority.ts', file: 'lib/coding-workspace/review-authority.db.test.ts', script: 'test:coding-workspace-db' },
   { marker: 'lib/coding-workspace/review-sessions.ts', file: 'lib/coding-workspace/review-team-scope.db.test.ts', script: 'test:coding-workspace-db' },
   { marker: 'lib/task-presentation-read.ts', file: 'tests/task-presentation.db.test.ts', script: 'test:task-presentation-db' },
+  { marker: 'lib/issue-states-store.ts', file: 'tests/workspace-issue-states.db.test.ts', script: 'test:task-presentation-db' },
   { marker: 'lib/telegram/handler.ts', file: 'tests/telegram-task-link.db.test.ts', script: 'test:task-identity-db' },
   { marker: 'lib/linear-sync/issue-sync.ts', file: 'tests/linear-responsibility.db.test.ts', script: 'test:task-identity-db' },
   { marker: 'lib/project-lifecycle.ts', file: 'tests/project-lifecycle.db.test.ts', script: 'test:project-v2-db' },

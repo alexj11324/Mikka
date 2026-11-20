@@ -224,7 +224,8 @@ test('Task property menus expose every writable value, send precisely that value
   const propertyCodes = { status: ISSUE_STATUS_CODES, priority: ISSUE_PRIORITY_CODES }
   const saveInput = z.toJSONSchema(save, { io: 'input', unrepresentable: 'any' }).prefixItems[0]
   assert.deepEqual(Object.keys(saveInput.properties).sort(),
-    ['id', 'revision', 'workspaceId', 'title', 'content', ...Object.keys(propertyCodes)].sort(),
+    // stateId refines status to one of the workspace's states (decision 2026-11-19-2115); tests/workspace-issue-states.db.test.ts covers it.
+    ['id', 'revision', 'workspaceId', 'title', 'content', 'stateId', ...Object.keys(propertyCodes)].sort(),
     'classify each new save field and cover its consumer')
   const input = { title: 'Task', content: { type: 'doc', content: [] }, status: 'todo', priority: 'normal' }
   const dispose = await mount({
