@@ -65,7 +65,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
   { id: 'billing', group: 'workspace', title: 'Billing' },
   { id: 'usage', group: 'workspace', title: 'Usage' },
   { id: 'activity', group: 'workspace', title: 'Activity', unbuilt: true },
-  { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true },
+  { id: 'permissions', group: 'workspace', title: 'Team permissions', adminOnly: true, sidebar: false },
   { id: 'secrets', group: 'workspace', title: 'Secrets and environment', sidebar: false },
   { id: 'audit', group: 'workspace', title: 'Audit log', adminOnly: true },
   { id: 'cloud', group: 'workspace', title: 'Mikka Cloud' },
@@ -90,7 +90,7 @@ const LEGACY: Record<string, SettingsSectionId> = {
  * What only a team has: what is between people (decision 2026-11-02-0203). A
  * personal workspace has every setting of the workspace itself and none of these.
  */
-export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['members', 'teams', 'permissions', 'audit'])
+export const TEAM_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Set(['organization', 'members', 'teams', 'permissions', 'audit'])
 
 export type SettingsVisibility = {
   admin: boolean
@@ -102,13 +102,13 @@ export type SettingsVisibility = {
 }
 
 /** One place decides whether a section is listed. The sidebar and search both ask this. */
-export function settingsSectionShown(section: SettingsSectionDef, { admin, personal = false, billing = true, cloudAdmin = false, organization = false }: SettingsVisibility): boolean {
+export function settingsSectionShown(section: SettingsSectionDef, { admin, personal = false, billing = true, cloudAdmin = false }: SettingsVisibility): boolean {
   if (section.withheld || section.unbuilt || section.sidebar === false) return false
   if (section.adminOnly && !admin) return false
   if (personal && TEAM_ONLY_SECTIONS.has(section.id)) return false
   if (!billing && section.id === 'billing') return false
   if (!cloudAdmin && section.id === 'cloud') return false
-  if (!organization && section.id === 'organization') return false
+  // 身份与访问 is in the public list too. The official slot draws the identity page; without it the page shows team permissions.
   return true
 }
 

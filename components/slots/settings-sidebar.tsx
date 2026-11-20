@@ -46,7 +46,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   const joinedTeams = teams.filter(team => team.role && (!workspaceId || team.workspaceId === workspaceId) && `${team.name} ${team.identifier}`.toLowerCase().includes(normalizedQuery))
   const href = (id: SettingsSectionId) => settingsHref(id, workspaceId)
   const groups = SETTINGS_GROUPS.map(group => {
-    const groupLabel = group === 'workspace' && workspaceName ? workspaceName : i18nText(`Settings.groups.${group}`)
+    const groupLabel = i18nText(`Settings.groups.${group}`)
     const items = visibleSettingsSections({ admin, personal, billing, cloudAdmin, organization }).filter(item => item.group === group && settingsItemVisible({
       query, groupTitle: GROUP_TITLES[group], groupLabel, itemTitle: item.title,
       label: i18nText.has(`Settings.sections.${item.id}.nav` as never) ? i18nText(`Settings.sections.${item.id}.nav` as never) : i18nText(`Settings.sections.${item.id}.title` as never),
@@ -71,7 +71,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
           const Icon = icons[item.id]
           const label = i18nText.has(`Settings.sections.${item.id}.nav` as never) ? i18nText(`Settings.sections.${item.id}.nav` as never) : i18nText(`Settings.sections.${item.id}.title` as never)
           const selected = item.id === section && !selectedTeamId && !creating
-          return <SidebarMenuItem key={item.id}><SidebarMenuButton className="data-active:bg-[#e9f1ff] data-active:text-[#2365db]" aria-label={label} render={activeSection ? <Link href={href(item.id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onPointerEnter={() => onIntent?.(item.id)} onFocus={() => onIntent?.(item.id)} onClick={() => { if (!activeSection) onSectionChange(item.id); setOpenMobile(false) }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
+          return <SidebarMenuItem key={item.id}><SidebarMenuButton className="data-active:bg-[color-mix(in_oklch,var(--label-blue)_16%,transparent)] data-active:text-[var(--label-blue)]" aria-label={label} render={activeSection ? <Link href={href(item.id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onPointerEnter={() => onIntent?.(item.id)} onFocus={() => onIntent?.(item.id)} onClick={() => { if (!activeSection) onSectionChange(item.id); setOpenMobile(false) }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>
       })}
       {showTeams && <SidebarGroup className="py-2"><SidebarGroupLabel>{i18nText("Settings.groups.yourTeams")}</SidebarGroupLabel><SidebarMenu>{joinedTeams.map(team => {

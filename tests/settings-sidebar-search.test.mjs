@@ -11,11 +11,11 @@ test('zh-CN 下中文标题与英文名都能搜到工作区', () => {
   assert.equal(settingsItemVisible({ ...workspaceItem, query: 'zzz-no-match' }), false)
 })
 
-test('团队、成员仅在路由设置页显示，搜索不改变该规则', () => {
+test('团队、成员在每个设置页都列出，搜索不改变该规则', () => {
   for (const [section, itemTitle, label] of [['teams', 'Teams', zh.sections.teams.title], ['members', 'Members', zh.sections.members.title]]) {
     const item = { groupTitle: 'Workspace', groupLabel: zh.groups.workspace, itemTitle, label, section }
     for (const query of ['', label, itemTitle]) {
-      assert.equal(settingsItemVisible({ ...item, query, routed: false }), false, `${section} hidden: ${query}`)
+      assert.equal(settingsItemVisible({ ...item, query, routed: false }), true, `${section} listed: ${query}`)
       assert.equal(settingsItemVisible({ ...item, query, routed: true }), true, `${section} routed: ${query}`)
     }
   }

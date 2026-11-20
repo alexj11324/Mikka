@@ -38,8 +38,14 @@ const THEME_IDS = UI_THEMES.map(theme => theme.id) as [UiThemeId, ...UiThemeId[]
 const RAIL_IDS = RAIL_PAGE_IDS
 const HEX = z.string().regex(/^#[0-9a-fA-F]{6}$/)
 
+export const BACKGROUND_EFFECTS = ['none', 'gradient', 'grid'] as const
+export const WALLPAPERS = ['none', 'color'] as const
+
+export interface CustomTheme { id: string; name: string; accent: string; fill: string; foreground: string }
+
 export interface UiPreferences {
-  sidebarPages: RailPageId[]
+  /** null shows every rail page. An empty array shows none. */
+  sidebarPages: RailPageId[] | null
   sidebarLayout: (typeof SIDEBAR_LAYOUTS)[number]
   pinPages: boolean
   openInDesktop: boolean
@@ -54,7 +60,14 @@ export interface UiPreferences {
   accent: string
   fill: string
   foreground: string
+  accentDark: string | null
+  fillDark: string | null
+  foregroundDark: string | null
+  border: string | null
   background: (typeof BACKGROUNDS)[number]
+  backgroundEffect: (typeof BACKGROUND_EFFECTS)[number]
+  wallpaper: (typeof WALLPAPERS)[number]
+  customThemes: CustomTheme[]
   codeSize: (typeof CODE_SIZES)[number]
   diffView: (typeof DIFF_VIEWS)[number]
   diffColor: (typeof DIFF_COLORS)[number]
@@ -62,7 +75,7 @@ export interface UiPreferences {
 }
 
 export const DEFAULT_UI: UiPreferences = {
-  sidebarPages: [],
+  sidebarPages: null,
   sidebarLayout: 'hybrid',
   pinPages: false,
   openInDesktop: false,
@@ -77,7 +90,14 @@ export const DEFAULT_UI: UiPreferences = {
   accent: '#2365db',
   fill: '#ffffff',
   foreground: '#171717',
+  accentDark: null,
+  fillDark: null,
+  foregroundDark: null,
+  border: null,
   background: 'none',
+  backgroundEffect: 'none',
+  wallpaper: 'none',
+  customThemes: [],
   codeSize: 'default',
   diffView: 'unified',
   diffColor: 'redGreen',
@@ -85,7 +105,6 @@ export const DEFAULT_UI: UiPreferences = {
 }
 
 export const uiPreferencesSchema = z.object({
-  sidebarPages: z.array(z.enum(RAIL_IDS)).max(RAIL_IDS.length),
   sidebarLayout: z.enum(SIDEBAR_LAYOUTS),
   pinPages: z.boolean(),
   openInDesktop: z.boolean(),
@@ -100,7 +119,15 @@ export const uiPreferencesSchema = z.object({
   accent: HEX,
   fill: HEX,
   foreground: HEX,
+  accentDark: HEX.nullable(),
+  fillDark: HEX.nullable(),
+  foregroundDark: HEX.nullable(),
+  border: HEX.nullable(),
   background: z.enum(BACKGROUNDS),
+  backgroundEffect: z.enum(BACKGROUND_EFFECTS),
+  wallpaper: z.enum(WALLPAPERS),
+  customThemes: z.array(z.object({ id: z.string().min(1).max(40), name: z.string().min(1).max(40), accent: HEX, fill: HEX, foreground: HEX })).max(24),
+  sidebarPages: z.array(z.enum(RAIL_IDS)).max(RAIL_IDS.length).nullable(),
   codeSize: z.enum(CODE_SIZES),
   diffView: z.enum(DIFF_VIEWS),
   diffColor: z.enum(DIFF_COLORS),
@@ -128,16 +155,33 @@ export function resolvedColors(ui: UiPreferences) {
 }
 
 let published = DEFAULT_UI
+const listeners = new Set<() => void>()
 
 export function currentUiPreferences() {
   return published
 }
 
-/** Paints the open document and remembers the value for the composer and the rail. */
+export function subscribeUiPreferences(listener: () => void) {
+  listeners.add(listener)
+  return () => { listeners.delete(listener) }
+}
+
+function paintToken(root: HTMLElement, name: string, value: string | null) {
+  if (value) root.style.setProperty(name, value)
+  else root.style.removeProperty(name)
+}
+
+/** Paints the open document and tells every reader. Named themes and custom colors map onto the tokens the app already uses. */
 export function publishUiPreferences(ui: UiPreferences, root: HTMLElement | null = typeof document === 'undefined' ? null : document.documentElement) {
   published = ui
+  for (const listener of listeners) listener()
   if (!root) return
   const colors = resolvedColors(ui)
+  const dark = root.classList.contains('dark') || root.dataset.theme === 'dark'
+  const accent = dark && ui.accentDark ? ui.accentDark : colors.accent
+  const fill = dark && ui.fillDark ? ui.fillDark : colors.fill
+  const foreground = dark && ui.foregroundDark ? ui.foregroundDark : colors.foreground
+  const custom = ui.themeId !== 'mikka' || ui.background === 'color' || accent !== DEFAULT_UI.accent || fill !== DEFAULT_UI.fill || foreground !== DEFAULT_UI.foreground
   root.dataset.sidebarLayout = ui.sidebarLayout
   root.dataset.pinPages = String(ui.pinPages)
   root.dataset.scrollNewToTop = String(ui.scrollNewToTop)
@@ -147,10 +191,18 @@ export function publishUiPreferences(ui: UiPreferences, root: HTMLElement | null
   root.dataset.diffColor = ui.diffColor
   root.dataset.hiddenFiles = ui.hiddenFiles
   root.dataset.uiTheme = ui.themeId
-  root.style.setProperty('--ui-accent', colors.accent)
-  root.style.setProperty('--ui-fill', colors.fill)
-  root.style.setProperty('--ui-foreground', colors.foreground)
+  root.dataset.backgroundEffect = ui.backgroundEffect
+  root.dataset.wallpaper = ui.wallpaper
+  root.style.setProperty('--ui-accent', accent)
+  root.style.setProperty('--ui-fill', fill)
+  root.style.setProperty('--ui-foreground', foreground)
   root.style.setProperty('--code-font-size', ui.codeSize === 'small' ? '12px' : ui.codeSize === 'large' ? '16px' : '14px')
+  paintToken(root, '--mk-accent', custom ? accent : null)
+  paintToken(root, '--primary', custom ? accent : null)
+  paintToken(root, '--background', custom ? fill : null)
+  paintToken(root, '--foreground', custom ? foreground : null)
+  paintToken(root, '--card', custom ? fill : null)
+  paintToken(root, '--border', ui.border)
 }
 
 export interface RunKeyEvent { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; isComposing: boolean }

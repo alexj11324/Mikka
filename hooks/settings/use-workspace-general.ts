@@ -17,7 +17,7 @@ import { useActionError } from '@/lib/use-action-error'
 export const WORKSPACE_ICON_MAX_BYTES = 200 * 1024
 export const WORKSPACE_ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
 
-type Field = 'name' | 'slug' | 'icon'
+type Field = 'name' | 'slug' | 'icon' | 'taskPrefix'
 export interface WorkspaceFailedSave { field: Field; value: string | null; message: string }
 
 function readDataUrl(file: File) {
@@ -38,6 +38,7 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
   const readError = status === 401 ? 'authRequired' : status === 403 ? 'workspaceAccessDenied' : general.data?.error
   const [name, setName] = useState<string | null>(null)
   const [slug, setSlug] = useState<string | null>(null)
+  const [prefix, setPrefix] = useState<string | null>(null)
   const [saving, setSaving] = useState<Field | null>(null)
   const [failed, setFailed] = useState<WorkspaceFailedSave | null>(null)
   // One save at a time: Enter followed by the blur from disabling the field must not send it twice.
@@ -49,6 +50,7 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
   function clearDraft(field: Field) {
     if (field === 'name') setName(null)
     if (field === 'slug') setSlug(null)
+    if (field === 'taskPrefix') setPrefix(null)
   }
 
   async function save(field: Field, value: string | null) {
@@ -75,14 +77,14 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
     }
   }
 
-  function commit(field: 'name' | 'slug') {
+  function commit(field: 'name' | 'slug' | 'taskPrefix') {
     if (!data) return
-    const draft = field === 'name' ? name : slug
+    const draft = field === 'name' ? name : field === 'slug' ? slug : prefix
     if (draft === null) return
-    const value = field === 'slug' ? draft.trim().toLowerCase() : draft.trim()
-    const saved = field === 'name' ? data.name : data.slug ?? ''
-    if (!value || value === saved) { clearDraft(field); return }
-    void save(field, value)
+    const value = field === 'slug' ? draft.trim().toLowerCase() : field === 'taskPrefix' ? draft.trim().toUpperCase() : draft.trim()
+    const saved = field === 'name' ? data.name : field === 'slug' ? data.slug ?? '' : data.taskPrefix ?? ''
+    if (value === saved || (field !== 'taskPrefix' && !value)) { clearDraft(field); return }
+    void save(field, field === 'taskPrefix' && !value ? null : value)
   }
 
   /** Checks type and size, then saves the picture as a data URL. */
@@ -97,7 +99,7 @@ export function useWorkspaceGeneral(workspaceId: string | undefined) {
     data,
     loadError: data ? null : actionError(readError),
     reload: () => { void general.mutate() },
-    host, name, setName, slug, setSlug, saving, failed, save, commit, pickIcon,
+    host, name, setName, slug, setSlug, prefix, setPrefix, saving, failed, save, commit, pickIcon,
     removeIcon: () => { void save('icon', null) },
     /** True when the failure was a picked icon, which 重试 picks again */
     failedPick: failed?.field === 'icon' && failed.value === null,
@@ -173,9 +175,10 @@ export function useArchivedBots(workspaceId: string) {
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<{ botId: string; message: string } | null>(null)
   const bots = list.data && !list.data.error ? list.data.bots : []
-  // Members intentionally have no archived-bot section; other failures are not an empty list.
-  const denied = list.data?.error === 'workspaceAccessDenied'
-  const readError = !denied && (list.error || list.data?.error) ? actionError(list.data?.error) : null
+  // Members have no section. A thrown call has no code and used to paint 操作未成功 on this page; only a catalogued failure stays.
+  const coded = typeof list.data?.error === 'string' ? list.data.error : null
+  const denied = coded === 'workspaceAccessDenied'
+  const readError = coded && !denied && actionError(coded) !== actionError() ? actionError(coded) : null
 
   async function takeOver(botId: string) {
     setPending(botId)

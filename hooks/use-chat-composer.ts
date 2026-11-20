@@ -17,7 +17,7 @@ import type { ChatComposerProps } from '@/components/slots/chat-composer-contrac
  * drop and paste, the length limit. The default slot and the hosted layer both
  * call it, so the two composers cannot behave differently.
  */
-export function useChatComposer({ ref, value, onChange, onSubmit, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, sendKey = 'enter', thread = false, attachmentScope, attachmentDisabled = false }: ChatComposerProps) {
+export function useChatComposer({ ref, value, onChange, onSubmit, sending = false, running = false, editableWhileSending = false, submitDisabled = false, disabled = false, onStop, onRunKey, sendKey = 'enter', thread = false, attachmentScope, attachmentDisabled = false }: ChatComposerProps) {
   const tShell = useTranslations('Shell')
   const fileRef = useRef<HTMLInputElement>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -100,8 +100,8 @@ export function useChatComposer({ ref, value, onChange, onSubmit, sending = fals
       const chord = { key, shiftKey, metaKey, ctrlKey, altKey: event.altKey, isComposing: event.nativeEvent.isComposing }
       if (running) {
         const action = runKeyAction(chord, currentUiPreferences())
-        if (action === 'interrupt' && onStop) { event.preventDefault(); onStop(); return }
-        if (action === 'steer' || action === 'queue') { event.preventDefault(); submit(); return }
+        if (action === 'interrupt') { event.preventDefault(); if (onRunKey) onRunKey('interrupt'); else onStop?.(); return }
+        if (action === 'steer' || action === 'queue') { event.preventDefault(); if (onRunKey) onRunKey(action); else submit(); return }
       }
       if (!sendsMessage(chord, sendKey)) return
       event.preventDefault()

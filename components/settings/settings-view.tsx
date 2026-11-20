@@ -79,12 +79,12 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   const billing = workspace !== undefined && workspace.edition !== 'community'
   const community = workspace?.edition === 'community'
   const cloudAdmin = community && workspace?.serverAdmin === true
-  // 组织 exists only where a UI layer draws it (slot settings-organization).
-  const section = (requestedSection === 'billing' && !billing) || (requestedSection === 'cloud' && !cloudAdmin) || (requestedSection === 'organization' && !ORGANIZATION_SETTINGS) ? 'preferences' : requestedSection
   const admin = workspace?.role === 'admin'
   const personal = workspace?.workspace.kind === 'personal'
   // Team settings show once the workspace is known to be a team, as admin-only ones wait for the role.
   const team = workspace !== undefined && !personal
+  // A personal workspace has no 身份与访问. The public page draws team permissions; the official slot replaces that body.
+  const section = (requestedSection === 'billing' && !billing) || (requestedSection === 'cloud' && !cloudAdmin) || (requestedSection === 'organization' && !team) ? 'preferences' : requestedSection
   const router = useRouter()
   // A personal workspace has no team settings (decision 2026-11-01-2310); an old link to one opens 偏好设置 instead.
   const teamOnly = personal && TEAM_ONLY_SECTIONS.has(requestedSection)
@@ -179,7 +179,9 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
         ? <SectionErrorBoundary key={`audit-${workspaceId}`} message={t('audit.loadFailed')} retryLabel={common('retry')}><AuditLogSettings key={workspaceId} workspaceId={workspaceId} /></SectionErrorBoundary>
         : <p role="status" className="text-sm text-muted-foreground">{t('audit.adminOnly')}</p>
       : waiting
-    case 'organization': return !preview ? <OrganizationSettings key={workspaceId ?? 'organization-only'} workspaceId={workspaceId ?? ''} personal={!team} /> : waiting
+    case 'organization': return !preview ? (ORGANIZATION_SETTINGS
+      ? <OrganizationSettings key={workspaceId ?? 'organization-only'} workspaceId={workspaceId ?? ''} personal={!team} />
+      : workspaceId ? <TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /> : null) : waiting
     case 'usage': return workspaceId && !preview ? <><UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />{team && <GovernanceUsage key={`governance-${workspaceId}`} workspaceId={workspaceId} />}</> : waiting
     case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}<BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} admin={admin} /></> : waiting
     // Bots of people who left are a team's (decision 2026-11-02-0203); they moved here with Bot 与 Agents' removal (2026-11-02-1400).

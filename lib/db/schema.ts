@@ -1420,7 +1420,7 @@ export const userPreferences = pgTable('user_preferences', {
   /** Composio app id -> false for each app turned off as a suggestions source; a missing app is on. */
   suggestionSources: jsonb('suggestionSources').$type<Record<string, boolean>>().notNull().default({}),
   /** Interface preferences (常规, 外观). Empty means the defaults in lib/ui-preferences.ts. */
-  uiPreferences: jsonb('uiPreferences').$type<UiPreferences>().notNull().default({}),
+  uiPreferences: jsonb('uiPreferences').$type<Partial<UiPreferences>>().notNull().default({}),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 

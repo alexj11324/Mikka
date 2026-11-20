@@ -425,4 +425,7 @@ html[data-diff-color="blue"] [data-diff="add"] { background: color-mix(in oklab,
 html[data-diff-color="redGreen"] [data-diff="add"] { background: color-mix(in oklab, #3f8f4e 18%, transparent); }
 html[data-diff-color="redGreen"] [data-diff="remove"] { background: color-mix(in oklab, #d14343 18%, transparent); }
 html[data-diff-view="split"] [data-diff-row] { display: grid; grid-template-columns: 1fr 1fr; }
+html[data-background-effect="gradient"] body { background-image: linear-gradient(to bottom, var(--background), color-mix(in oklab, var(--ui-accent) 14%, var(--background))); }
+html[data-background-effect="grid"] body { background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px; }
+html[data-wallpaper="color"] body { background-color: color-mix(in oklab, var(--ui-accent) 10%, var(--background)); }
 

@@ -57,7 +57,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member'), stranger = await seedUser(pool, 'stranger')
     const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
     const other = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
-    assert.deepEqual(await general.readWorkspaceGeneral(member, ws.id), { id: ws.id, name: ws.name, slug: ws.slug, icon: null, canEdit: false, canTransfer: false, personal: false })
+    assert.deepEqual(await general.readWorkspaceGeneral(member, ws.id), { id: ws.id, name: ws.name, slug: ws.slug, icon: null, taskPrefix: null, canEdit: false, canTransfer: false, personal: false })
     assert.equal((await general.readWorkspaceGeneral(admin, ws.id)).canEdit, true)
     await rejects(general.readWorkspaceGeneral(stranger, ws.id), 'workspaceAccessDenied')
     await seedBot(pool, ws.id, admin); await seedBot(pool, ws.id, member); await seedBot(pool, other.id, admin)

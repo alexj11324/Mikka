@@ -23,10 +23,11 @@ export const updateWorkspaceInput = z.object({
   name: z.string().trim().min(1).max(120).optional(),
   slug: workspaceSlugSchema.optional(),
   icon: z.string().max(400_000).nullable().optional(),
+  taskPrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{2,4}$/).nullable().optional(),
 }).strict()
 export type UpdateWorkspaceInput = z.input<typeof updateWorkspaceInput>
 
-export interface WorkspaceGeneral { id: string; name: string; slug: string | null; icon: string | null }
+export interface WorkspaceGeneral { id: string; name: string; slug: string | null; icon: string | null; taskPrefix: string | null }
 
 /** Subscription states that still bill the customer. */
 export const BILLING_LIVE_STATUSES = ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'] as const
@@ -55,6 +56,7 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
     const changes: Partial<typeof workspaces.$inferInsert> = {}
     if (values.name !== undefined && values.name !== workspace.name) changes.name = values.name
     if (icon !== undefined && icon !== workspace.icon) changes.icon = icon
+    if (values.taskPrefix !== undefined && values.taskPrefix !== workspace.taskPrefix) changes.taskPrefix = values.taskPrefix
     if (values.slug !== undefined && values.slug !== workspace.slug) {
       // Serialize namespace changes across Workspaces before checking redirects.
       await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('mikka-workspace-slugs', 0))`)
@@ -64,9 +66,9 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
       if (workspace.slug) await tx.insert(workspaceSlugRedirects).values({ slug: workspace.slug, workspaceId }).onConflictDoNothing()
       changes.slug = values.slug
     }
-    if (!Object.keys(changes).length) return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon }
+    if (!Object.keys(changes).length) return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon, taskPrefix: workspace.taskPrefix }
     const [updated] = await tx.update(workspaces).set(changes).where(eq(workspaces.id, workspaceId))
-      .returning({ id: workspaces.id, name: workspaces.name, slug: workspaces.slug, icon: workspaces.icon })
+      .returning({ id: workspaces.id, name: workspaces.name, slug: workspaces.slug, icon: workspaces.icon, taskPrefix: workspaces.taskPrefix })
     await workspaceListScopeChanged(tx, workspaceId, [])
     if (changes.slug && changes.slug !== workspace.slug && workspace.slug) await enqueueWorkspaceAudit(tx, {
       workspaceId, actor: { type: 'user', id: actorId, name: membership.name }, action: 'workspace.slug_changed',
@@ -95,7 +97,7 @@ export async function readWorkspaceGeneral(actorId: string, workspaceId: string)
   return workspaceDb.transaction(async tx => {
     const { workspace, membership } = await requireWorkspace(tx, workspaceId, actorId)
     const canTransfer = await mayTransfer(tx, workspace, membership.role, actorId)
-    return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon, canEdit: membership.role === 'admin', canTransfer, personal: workspace.kind === 'personal' }
+    return { id: workspace.id, name: workspace.name, slug: workspace.slug, icon: workspace.icon, taskPrefix: workspace.taskPrefix, canEdit: membership.role === 'admin', canTransfer, personal: workspace.kind === 'personal' }
   })
 }
 

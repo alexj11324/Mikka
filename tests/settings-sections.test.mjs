@@ -6,7 +6,7 @@ test('every nav item has exactly one section, in the Figma 1508:2 group order', 
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'personal' && !s.withheld && !s.unbuilt && s.sidebar !== false).map(s => s.id), ['preferences', 'appearance', 'account', 'security', 'notifications', 'models', 'environments', 'connections', 'developer', 'computers'])
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'agent' && !s.unbuilt).map(s => s.id), ['instructions', 'threads'])
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'review' && !s.unbuilt).map(s => s.id), [])
-  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace' && !s.unbuilt && s.sidebar !== false).map(s => s.id), ['general', 'organization', 'issue-states', 'members', 'teams', 'billing', 'usage', 'permissions', 'audit', 'cloud'])
+  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace' && !s.unbuilt && s.sidebar !== false).map(s => s.id), ['general', 'organization', 'issue-states', 'members', 'teams', 'billing', 'usage', 'audit', 'cloud'])
 })
 
 test('old links keep landing on the page that now holds their content', () => {
@@ -31,9 +31,7 @@ test('hrefs keep the workspace and use the routed paths for members and teams', 
 
 const UNBUILT = ['shortcuts', 'git', 'review-repositories', 'review-config', 'activity']
 const WITHHELD = ['referrals', 'experiments', 'cloud-credentials']
-const SIDEBAR_OFF = ['logins', 'secrets']
-// 组织 shows only where a UI layer draws it (`organization: true`); the open-source UI has none.
-const LAYER_ONLY = ['organization']
+const SIDEBAR_OFF = ['logins', 'secrets', 'permissions']
 
 test('members do not see admin-only sections; admins see every built one', () => {
   const member = visibleSettingsSections({ admin: false }).map(s => s.id)
@@ -43,7 +41,7 @@ test('members do not see admin-only sections; admins see every built one', () =>
   for (const id of ['general', 'members', 'teams', 'computers', 'usage', 'billing', 'environments']) assert.equal(member.includes(id), true, id)
   for (const id of SIDEBAR_OFF) assert.equal(member.includes(id), false, id)
   for (const id of ['audit']) assert.equal(member.includes(id), false, id)
-  assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !WITHHELD.includes(s.id) && !SIDEBAR_OFF.includes(s.id) && !LAYER_ONLY.includes(s.id) && s.id !== 'cloud').map(s => s.id))
+  assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !WITHHELD.includes(s.id) && !SIDEBAR_OFF.includes(s.id) && s.id !== 'cloud').map(s => s.id))
 })
 
 test('cloud server settings require the explicit server administrator capability', () => {
@@ -52,18 +50,18 @@ test('cloud server settings require the explicit server administrator capability
     assert.equal(visibleSettingsSections({ admin, cloudAdmin: false }).some(s => s.id === 'cloud'), false)
     assert.equal(visibleSettingsSections({ admin, cloudAdmin: true }).some(s => s.id === 'cloud'), true)
   }
-  assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !WITHHELD.includes(s.id) && !SIDEBAR_OFF.includes(s.id) && !LAYER_ONLY.includes(s.id)).map(s => s.id))
+  assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !WITHHELD.includes(s.id) && !SIDEBAR_OFF.includes(s.id)).map(s => s.id))
 })
 
-test('组织 requires the official UI layer, including Organization-only personal members without team permissions', () => {
+test('身份与访问 is in the public team sidebar; a personal workspace has no organization', () => {
   for (const admin of [false, true]) {
-    assert.equal(visibleSettingsSections({ admin }).some(s => s.id === 'organization'), false)
+    assert.equal(visibleSettingsSections({ admin }).some(s => s.id === 'organization'), true)
     assert.equal(visibleSettingsSections({ admin, personal: true }).some(s => s.id === 'organization'), false)
-    assert.equal(visibleSettingsSections({ admin, organization: true, personal: true }).some(s => s.id === 'organization'), true)
+    assert.equal(visibleSettingsSections({ admin, organization: true, personal: true }).some(s => s.id === 'organization'), false)
   }
   assert.equal(visibleSettingsSections({ admin: true, organization: true }).some(s => s.id === 'organization'), true)
   const personalMember = visibleSettingsSections({ admin: false, organization: true, personal: true }).map(s => s.id)
-  for (const teamOnly of ['members', 'teams', 'permissions', 'audit']) assert.equal(personalMember.includes(teamOnly), false, teamOnly)
+  for (const teamOnly of ['organization', 'members', 'teams', 'permissions', 'audit']) assert.equal(personalMember.includes(teamOnly), false, teamOnly)
   assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true, organization: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !WITHHELD.includes(s.id) && !SIDEBAR_OFF.includes(s.id)).map(s => s.id))
 })
 
@@ -101,6 +99,7 @@ test('a personal workspace has every setting of the workspace itself; only what 
   const account = SETTINGS_SECTIONS.filter(s => (s.group === 'personal' || s.group === 'agent') && !UNBUILT.includes(s.id) && !WITHHELD.includes(s.id) && s.sidebar !== false).map(s => s.id)
   assert.deepEqual(personal, [...account, 'general', 'issue-states', 'billing', 'usage'])
   const team = visibleSettingsSections({ admin: true }).map(s => s.id)
-  for (const id of ['general', 'members', 'teams', 'permissions', 'environments', 'audit', 'usage', 'billing']) assert.ok(team.includes(id), id)
+  for (const id of ['general', 'organization', 'members', 'teams', 'environments', 'audit', 'usage', 'billing']) assert.ok(team.includes(id), id)
+  assert.equal(team.includes('permissions'), false)
   assert.equal(team.includes('secrets'), false)
 })

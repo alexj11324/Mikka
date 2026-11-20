@@ -6,6 +6,8 @@ export const workspaces = pgTable('mikka_workspaces', {
   userId: text('userId').notNull(),
   name: varchar('name', { length: 120 }).notNull(),
   slug: varchar('slug', { length: 64 }).unique('mikka_workspaces_slug_unique'),
+  /** Four-letter prefix shown for this workspace. Issued task numbers do not change. */
+  taskPrefix: varchar('taskPrefix', { length: 4 }),
   /** A small image data URL (≤200 KB decoded); see lib/workspace-admin/icon.ts. */
   icon: text('icon'),
   /** 'personal': the one workspace each person has, with only them as a member (decision 2026-10-31-2130). */

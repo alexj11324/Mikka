@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
+import { Pencil } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SettingRow, SettingSelect, SettingSwitch, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { useUiPreferences } from '@/hooks/settings/use-ui-preferences'
 import { RAIL_ITEMS } from '@/components/nav/rail-items'
-import type { RunKeyAction } from '@/lib/ui-preferences'
+import { RAIL_PAGE_IDS, type RailPageId, type RunKeyAction } from '@/lib/ui-preferences'
 
 const ACTIONS = ['steer', 'interrupt', 'queue'] as const satisfies readonly RunKeyAction[]
 
@@ -18,17 +19,17 @@ export function GeneralInterface() {
   const common = useTranslations('Common')
   const prefs = useUiPreferences()
   const [pagesOpen, setPagesOpen] = useState(false)
-  const [draftPages, setDraftPages] = useState<string[]>([])
+  const [draftPages, setDraftPages] = useState<RailPageId[]>([])
   if (prefs.loading) return <SettingsLoading label={t('interface')} rows={4} />
   if (prefs.denied) return <p role="status" className="text-sm text-muted-foreground">{t('noPermission')}</p>
   if (prefs.failed) return <SettingsSaveError message={t('unavailable')} retryLabel={common('retry')} onRetry={prefs.reload} />
   const { ui, save } = prefs
   const actionOptions = ACTIONS.map(value => ({ value, label: t(value) }))
-  const shown = ui.sidebarPages.length ? ui.sidebarPages.length : RAIL_ITEMS.length
+  const pages = ui.sidebarPages ?? RAIL_PAGE_IDS
   return <>
     <SettingsSection title={t('interface')}>
       <SettingRow title={t('sidebarPages')} description={t('sidebarPagesHint')}>
-        <Button type="button" size="sm" variant="outline" aria-label={t('sidebarPages')} onClick={() => { setDraftPages(ui.sidebarPages); setPagesOpen(true) }}>{shown}</Button>
+        <Button type="button" size="icon" variant="ghost" aria-label={t('sidebarPages')} onClick={() => { setDraftPages([...pages]); setPagesOpen(true) }}><Pencil /></Button>
       </SettingRow>
       <SettingRow title={t('sidebarLayout')} description={t('sidebarLayoutHint')}>
         <SettingSelect label={t('sidebarLayout')} value={ui.sidebarLayout} options={[{ value: 'hybrid', label: t('hybrid') }, { value: 'columns', label: t('columns') }]} onValueChange={value => { if (value === 'hybrid' || value === 'columns') void save({ sidebarLayout: value }) }} />
@@ -62,19 +63,17 @@ export function GeneralInterface() {
         <DialogHeader><DialogTitle>{t('sidebarPages')}</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-2">
           {RAIL_ITEMS.map(item => {
-            const checked = draftPages.length === 0 || draftPages.includes(item.id)
+            const checked = draftPages.includes(item.id)
             return <label key={item.id} className="flex items-center justify-between gap-3 text-sm">
               <span>{nav(item.label)}</span>
               <SettingSwitch label={nav(item.label)} checked={checked} onCheckedChange={next => {
-                const all = RAIL_ITEMS.map(entry => entry.id)
-                const current = draftPages.length === 0 ? all : draftPages
-                setDraftPages(next ? [...current, item.id] : current.filter(id => id !== item.id))
+                setDraftPages(current => next ? [...current, item.id] : current.filter(id => id !== item.id))
               }} />
             </label>
           })}
         </div>
         <DialogFooter>
-          <Button type="button" onClick={() => { void save({ sidebarPages: draftPages.length === RAIL_ITEMS.length ? [] : draftPages }); setPagesOpen(false) }}>{common('save')}</Button>
+          <Button type="button" onClick={() => { void save({ sidebarPages: draftPages.length === RAIL_PAGE_IDS.length ? null : draftPages }); setPagesOpen(false) }}>{common('save')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
