@@ -249,7 +249,9 @@ export class ScheduleStore {
       if(!row) throw new ScheduleError('scheduleNotFound',404)
       if(row.visibility==='owner'&&(row.owner_id!==actor.ownerId||row.bot_id!==actor.botId)) throw new ScheduleError('scheduleNotFound',404)
       if(row.visibility==='workspace'&&!actor.workspaceId) throw new ScheduleError('scheduleNotFound',404)
-      if((cmd.action==='update'||cmd.action==='restore'||cmd.action==='resume'||cmd.action==='run_now'||cmd.action==='flush_batch'||cmd.action==='cancel_batch')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+      // The run-as person may start and resume what they agreed to run, not change it.
+      const runsAsActor=Boolean(row.run_as_user_id)&&row.run_as_user_id===actor.ownerId&&cmd.action!=='update'
+      if((cmd.action==='update'||cmd.action==='restore'||cmd.action==='resume'||cmd.action==='run_now'||cmd.action==='flush_batch'||cmd.action==='cancel_batch')&&row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&!runsAsActor&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
       if(cmd.action==='history'){
         // Seeing that a workspace schedule ran is collaboration; reading what it returned is not. Only the
         // creator, and an owner/admin, get result, error and the operation identity; any other active member
@@ -385,6 +387,8 @@ export class ScheduleStore {
         // The URL is a secret: it is made on the page and shown to the person, never handed to a chat model.
         if(!actor.direct) throw new ScheduleError('scheduleWebhookPageOnly',403)
         if(row.visibility==='workspace'&&row.owner_id!==actor.ownerId&&access.role==='member') throw new ScheduleError('scheduleAdminRequired',403)
+        // The URL starts runs as the run-as person: making one is theirs (or an owner/admin's) to do.
+        this.consented(actor,access,row)
         if(!row.definition.webhook||row.status==='completed') throw new ScheduleError('scheduleWebhookOff',409)
         const key=newWebhookKey()
         const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET webhook_key_hash=$2,updated_at=$3 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,webhookKeyHash(key),this.clock()])).rows[0]
@@ -411,7 +415,8 @@ export class ScheduleStore {
           await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
         }
       }
-      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5,status_before_delete=CASE WHEN $6 THEN status END,disabled_reason=CASE WHEN $3='paused' OR $6 THEN disabled_reason END,run_as_user_id=$7 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock(),cmd.action==='delete',runAs])).rows[0]
+      const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET definition=$2,status=$3,next_at=$4,version=version+1,updated_at=$5,status_before_delete=CASE WHEN $6 THEN status END,disabled_reason=CASE WHEN $3='paused' OR $6 THEN disabled_reason END,run_as_user_id=$7,
+        webhook_key_hash=CASE WHEN run_as_user_id IS DISTINCT FROM $7 THEN NULL ELSE webhook_key_hash END WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,def,status,next,this.clock(),cmd.action==='delete',runAs])).rows[0]
       await this.listChanged(tx,row.workspace_id)
       return {schedule:updated}
     }))
@@ -540,7 +545,7 @@ export class ScheduleStore {
         await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
       }
     }
-    const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET run_as_user_id=$2,definition=$4,version=version+1,updated_at=$3 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,target,this.clock(),def])).rows[0]
+    const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET run_as_user_id=$2,definition=$4,webhook_key_hash=NULL,version=version+1,updated_at=$3 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,target,this.clock(),def])).rows[0]
     await this.listChanged(tx,row.workspace_id)
     return {schedule:updated}
   }
@@ -567,7 +572,7 @@ export class ScheduleStore {
         await this.report(tx,row,item,'cancelled',null,'scheduleChanged')
       }
     }
-    const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET owner_id=$2,run_as_user_id=NULL,bot_id=$3,source_event_id=NULL,status=$4,next_at=$5,disabled_reason=$6,version=version+1,updated_at=$7 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,actor.ownerId,actor.botId,status,next,reason,this.clock()])).rows[0]
+    const updated=(await tx.query<Schedule>(`UPDATE user_schedules SET owner_id=$2,webhook_key_hash=CASE WHEN run_as_user_id IS NULL THEN webhook_key_hash END,run_as_user_id=NULL,bot_id=$3,source_event_id=NULL,status=$4,next_at=$5,disabled_reason=$6,version=version+1,updated_at=$7 WHERE id=$1 RETURNING ${SCHEDULE_COLUMNS}`,[row.id,actor.ownerId,actor.botId,status,next,reason,this.clock()])).rows[0]
     await this.listChanged(tx,row.workspace_id)
     return {schedule:updated}
   }
@@ -840,14 +845,17 @@ export class ScheduleStore {
   private async notice(occurrenceId:string,status:'succeeded'|'failed'){
     if(!this.automation.notify)return
     try{
-      const o=(await this.pool.query<Occurrence&{result:DispatchResult|null;runner:string;workspace_id:string|null}>(`UPDATE schedule_occurrences o SET notified_at=clock_timestamp() FROM user_schedules s
-        WHERE o.id=$1 AND s.id=o.schedule_id AND o.notified_at IS NULL AND o.definition ? 'notify' RETURNING o.*,COALESCE(s.run_as_user_id,s.owner_id) AS runner,s.workspace_id`,[occurrenceId])).rows[0]
+      const o=(await this.pool.query<Occurrence&{result:DispatchResult|null;runner:string;workspace_id:string|null;post_as_runner:boolean}>(`UPDATE schedule_occurrences o SET notified_at=clock_timestamp() FROM user_schedules s
+        WHERE o.id=$1 AND s.id=o.schedule_id AND o.notified_at IS NULL AND o.definition ? 'notify' RETURNING o.*,COALESCE(s.run_as_user_id,s.owner_id) AS runner,s.workspace_id,
+          (s.definition#>>'{notify,slack,postAsRunner}')='true' AS post_as_runner`,[occurrenceId])).rows[0]
       const slack=o?.definition.notify?.slack
       if(!o||!slack||!o.workspace_id)return
-      // Posted through the run-as person's Slack membership, which the run's own check held.
+      // Posted through the current run-as person's Slack membership, else the creator's.
       await this.automation.notify({ownerId:o.runner,workspaceId:o.workspace_id,scheduleId:o.schedule_id,title:o.definition.title,channel:slack.channel,locale:slack.locale,status,
         task:o.result?.id?{id:o.result.id,identifier:o.result.identifier,title:o.result.title}:null,error:o.error,
-        ...(slack.postAsRunner?{postAsRunner:true as const}:{}),...(slack.quiet?{quiet:true as const}:{})})
+        // Posting as a person follows the automation as it is now (who it runs as, whether they still want it), not the
+        // definition the run was queued with.
+        ...(slack.postAsRunner&&o.post_as_runner?{postAsRunner:true as const}:{}),...(slack.quiet?{quiet:true as const}:{})})
     }catch(error){console.error('schedule_notice_failed',error instanceof ScheduleError?error.code:error instanceof Error?error.name:'unknown')}
   }
   /** Whether maxRunsPerDay runs already started (or wait) today in the automation's time zone, not counting `except`. */
