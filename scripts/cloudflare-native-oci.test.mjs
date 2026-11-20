@@ -11,7 +11,7 @@ import { buildEnvironment, digestFromRepoDigests, releaseDockerfile, releaseId, 
 
 const publicSha = 'a'.repeat(40)
 const privateSha = 'b'.repeat(40)
-const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
+const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: publicSha,
   GITHUB_WORKFLOW_SHA: publicSha, GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@refs/heads/main',
   GITHUB_RUN_ID: '90001', GITHUB_RUN_ATTEMPT: '2', GITHUB_ACTOR: 'alexj11324', GITHUB_ACTOR_ID: '183887963',

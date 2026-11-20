@@ -36,7 +36,7 @@ env:
 
 jobs:
   publish:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

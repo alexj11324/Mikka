@@ -1,3 +1,4 @@
+import { privateMikkaRepository } from './cloudflare-source.mjs'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { copyFile, mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
@@ -214,7 +215,7 @@ export function verifyOverlayMain(work, privateSha, env = process.env) {
   if (!SHA.test(privateSha ?? '')) fail('CF_OCI_OVERLAY_SOURCE_REQUIRED')
   const shallow = stdout('git', ['rev-parse', '--is-shallow-repository'], {cwd:work,env,stage:'OVERLAY_HISTORY'})
   command('git', ['fetch','--quiet','--no-tags','--filter=blob:none',...(shallow === 'true' ? ['--unshallow'] : []),
-    'git@github.com:alexj11324/mikka-hosted-ui.git','refs/heads/main'], {cwd:work,env,stage:'OVERLAY_MAIN_FETCH'})
+    'git@github.com:' + privateMikkaRepository('mikka-hosted-ui', env) + '.git','refs/heads/main'], {cwd:work,env,stage:'OVERLAY_MAIN_FETCH'})
   command('git', ['merge-base','--is-ancestor',privateSha,'FETCH_HEAD'], {cwd:work,env,stage:'OVERLAY_MAIN_ANCESTRY'})
 }
 
@@ -317,7 +318,7 @@ async function publish() {
     const broker = digestFromRepoDigests(brokerRefs, process.env.CLOUDFLARE_ACCOUNT_ID, selected.id, 'mikka-credential-broker')
     await readSelection(process.env)
     const receipt = { version: 1, ...selected.context, ...verified,
-      overlayCheckout: { repository: 'alexj11324/mikka-hosted-ui', requestedSha: selected.privateSha, actualSha: selected.privateSha },
+      overlayCheckout: { repository: privateMikkaRepository('mikka-hosted-ui'), requestedSha: selected.privateSha, actualSha: selected.privateSha },
       localImageId: record.localImageId, webRenderer: record.webRenderer,
       brokerImage: broker.image, brokerDigest: broker.digest, brokerLocalImageId: record.brokerLocalImageId,
       brokerOfflineVerification: record.brokerOfflineVerification,

@@ -5,7 +5,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { artifactFor, baselineOrigin, checkedRun, priorDeployment, readArtifactMembers, selectAutomaticCandidate, selectPipeline, selectPromotion } from './pipeline-inputs.mjs'
+import { artifactFor, baselineOrigin, checkedRun, github, priorDeployment, readArtifactMembers, selectAutomaticCandidate, selectPipeline, selectPromotion } from './pipeline-inputs.mjs'
 import { migrationRoots, migrationToolchain } from './migration-inputs.mjs'
 import { serviceDigest, serviceNames } from './service-builds.mjs'
 
@@ -173,7 +173,7 @@ test('archive bytes are authenticated and traversal, duplicate members and unexp
 test('automatic, manual staging and production candidate selection require migration execution v2 before further requests', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-migration-candidate-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
-  const env = { GITHUB_REPOSITORY: repo.full_name, GITHUB_REF: 'refs/heads/main', GITHUB_ACTOR_ID: '183887963',
+  const env = { GITHUB_REPOSITORY: repo.full_name, GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_REF: 'refs/heads/main', GITHUB_ACTOR_ID: '183887963',
     GITHUB_EVENT_NAME: 'workflow_run', GITHUB_EVENT_PATH: join(directory, 'event.json'), RUNNER_TEMP: directory,
     GITHUB_RUN_ID: '201', GITHUB_RUN_ATTEMPT: '1', INPUT_STAGE_ARTIFACT: '401', INPUT_OPERATIONS_SOURCE: 'f'.repeat(40) }
   await writeFile(env.GITHUB_EVENT_PATH, JSON.stringify(event(run())))
@@ -215,4 +215,28 @@ test('automatic, manual staging and production candidate selection require migra
   const valid = candidateApi(manifest)
   assert.equal((await selectPipeline({ env, api: valid.api })).status, 'superseded')
   assert.equal(valid.calls.length, 4)
+})
+
+test('canonical GitHub reads keep the Actions and private operations token scopes separate', async t => {
+  const original = [process.env.GH_TOKEN, process.env.MIKKA_PUBLIC_ACTIONS_TOKEN]
+  process.env.GH_TOKEN = 'private-fixture'
+  process.env.MIKKA_PUBLIC_ACTIONS_TOKEN = 'public-fixture'
+  t.after(() => {
+    for (const [index, key] of ['GH_TOKEN', 'MIKKA_PUBLIC_ACTIONS_TOKEN'].entries()) {
+      if (original[index] === undefined) delete process.env[key]
+      else process.env[key] = original[index]
+    }
+  })
+  const calls = []
+  t.mock.method(globalThis, 'fetch', (url, options) => {
+    calls.push([url, options.headers.authorization])
+    return Promise.resolve(Response.json({}))
+  })
+  await github('alexj11324/Mikka/actions/runs/1')
+  await github('alexj11324/mikka-cloud/git/ref/heads/main')
+  await assert.rejects(github('other/Mikka/actions/runs/1'), /pipeline_repository_scope/)
+  assert.deepEqual(calls, [
+    ['https://api.github.com/repositories/1427517699/actions/runs/1', 'Bearer public-fixture'],
+    ['https://api.github.com/repositories/1448851980/git/ref/heads/main', 'Bearer private-fixture'],
+  ])
 })

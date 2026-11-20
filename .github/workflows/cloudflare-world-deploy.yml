@@ -8,9 +8,11 @@ on:
         required: true
 permissions:
   contents: read
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
 jobs:
   deploy-worlds:
-    if: github.repository_id == '1427517699' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963'
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 10
@@ -42,7 +44,9 @@ jobs:
           const claims = JSON.parse(Buffer.from(value.split('.')[1], 'base64url'))
           assert.equal(claims.repository_id, '1427517699')
           assert.equal(claims.ref, 'refs/heads/main')
-          assert.equal(claims.workflow_ref, 'alexj11324/Mikka/.github/workflows/cloudflare-world-deploy.yml@refs/heads/main')
+          const owner = {'183887963': 'alexj11324', '359279274': 'aspectly-labs'}[claims.repository_owner_id]
+          assert.ok(owner && claims.repository === owner + '/Mikka')
+          assert.equal(claims.workflow_ref, claims.repository + '/.github/workflows/cloudflare-world-deploy.yml@refs/heads/main')
           console.log(JSON.stringify({subject: claims.sub, repositoryId: claims.repository_id, ref: claims.ref, workflowRef: claims.workflow_ref}))
           JS
       - name: Read the existing source App id
@@ -75,7 +79,7 @@ jobs:
         with:
           app-id: ${{ env.GITHUB_APP_ID }}
           private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
-          owner: alexj11324
+          owner: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
           repositories: mikka-cloud
           permission-contents: read
       - name: Remove App credentials before loading private operations code
@@ -84,7 +88,7 @@ jobs:
           echo 'GITHUB_APP_PRIVATE_KEY=' >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: alexj11324/mikka-cloud
+          repository: ${{ format('{0}/mikka-cloud', vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324') }}
           ref: ${{ inputs.cloud_source_sha }}
           token: ${{ steps.source-token.outputs.token }}
           path: operations
@@ -97,7 +101,7 @@ jobs:
         run: node operations/business-api/deploy-world-artifact.mjs prepare
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: alexj11324/Mikka
+          repository: ${{ github.repository }}
           ref: ${{ steps.artifact.outputs.source }}
           path: operations/product
           persist-credentials: false

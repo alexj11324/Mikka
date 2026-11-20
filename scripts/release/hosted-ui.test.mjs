@@ -101,10 +101,59 @@ test('official jobs keep private code out of public artifacts and pin desktop to
   assert.ok(signing.indexOf(approved(desktop.jobs.macos)[0]) < signing.findIndex(step => step.uses?.startsWith('Infisical/')))
   assert.equal(signing.indexOf(approved(desktop.jobs.macos)[1]) + 1, signing.findIndex(step => step.uses?.startsWith('softprops/')))
   assert.ok(signing.some(step => step.run?.includes('evidence.mjs verify')))
-  const checkout = desktop.jobs.macos.steps.find(step => step.with?.repository === 'alexj11324/mikka-hosted-ui')
+  const checkout = desktop.jobs.macos.steps.find(step => step.with?.path === '.hosted-ui')
   assert.equal(checkout.with.ref, '${{ needs.preflight.outputs.overlay-sha }}')
   assert.equal(checkout.with['persist-credentials'], false)
   assert.equal(checkout.with['ssh-key'], '${{ env.HOSTED_UI_READ_KEY }}')
   assert.equal(checkout.with.token, undefined)
   assert.ok(desktop.jobs.macos.steps.some(step => step.run?.includes('audit "$RUNNER_TEMP/official-packaged-app"')))
+})
+test('native release admission requires a coherent official identity before credentials or paid work', async () => {
+  for (const [file, job] of [['desktop-release', 'preflight'], ['mobile-update', 'update'], ['mobile-native', 'release'], ['e2b-official-runtime', 'check'], ['e2b-runtime-release', 'recheck'], ['e2b-runtime-release', 'cleanup'], ['e2b-template', 'build'], ['publish-daemon', 'publish']]) {
+    const workflow = yaml.load(await readFile(new URL(`../../.github/workflows/${file}.yml`, import.meta.url), 'utf8'))
+    const allowed = new Function('github', 'needs', 'always', `return ${workflow.jobs[job].if ?? "true"}`)
+    for (const repository of ['alexj11324/Mikka', 'aspectly-labs/Mikka', 'foreign/Mikka']) {
+      for (const repository_id of ['1427517699', '999']) {
+        for (const repository_owner_id of ['183887963', '359279274', '999']) {
+          const github = { repository, repository_id, repository_owner_id, ref: 'refs/heads/main', event_name: 'workflow_dispatch' }
+          const expected = repository_id === '1427517699' && ((repository === 'alexj11324/Mikka' && repository_owner_id === '183887963') || (repository === 'aspectly-labs/Mikka' && repository_owner_id === '359279274'))
+          assert.equal(allowed(github, { recheck: { result: 'success', outputs: {} } }, () => true), expected, `${file}:${job}:${JSON.stringify(github)}`)
+        }
+      }
+    }
+  }
+})
+test('native private UI selection rejects unknown owners before reading credentials', async () => {
+  for (const [file, job] of [['desktop-release', 'macos'], ['mobile-update', 'update'], ['mobile-native', 'release']]) {
+    const workflow = yaml.load(await readFile(new URL(`../../.github/workflows/${file}.yml`, import.meta.url), 'utf8'))
+    const steps = workflow.jobs[job].steps
+    const check = steps.find(step => step.name === 'Validate the selected private UI owner before credential access')
+    assert.ok(check, `${file}: private owner validation is required`)
+    assert.ok(steps.indexOf(check) < steps.findIndex(step => step.uses?.startsWith('Infisical/')), file)
+    const checkout = steps.find(step => step.with?.path === '.hosted-ui')
+    const select = new Function('vars', 'format', `return ${checkout.with.repository.slice(3, -3)}`)
+    for (const owner of ['', 'alexj11324', 'aspectly-labs', 'foreign']) {
+      const run = () => execFileSync('bash', ['-e', '-c', check.run], { cwd: new URL('../../', import.meta.url), env: { ...process.env, MIKKA_PRIVATE_GITHUB_OWNER: owner }, stdio: 'pipe' })
+      if (owner === 'foreign') assert.throws(run, /CI_PRIVATE_REPOSITORY_OWNER_REQUIRED/)
+      else {
+        run()
+        assert.equal(select({ MIKKA_PRIVATE_GITHUB_OWNER: owner }, (_, value) => `${value}/mikka-hosted-ui`), `${owner || 'alexj11324'}/mikka-hosted-ui`)
+      }
+    }
+  }
+})
+test('daemon metadata follows official Actions identities while fork builds retain the canonical source', async () => {
+  const script = await readFile(new URL('../../packages/daemon/scripts/build.mjs', import.meta.url), 'utf8')
+  // Exercise only the metadata preflight; do not start a local package build.
+  const preflight = script.slice(script.indexOf('const repository ='), script.indexOf('const root ='))
+  const select = new Function('process', `${preflight}; return repository`)
+  const url = new Function('repository', `return ${script.match(/repository: \{ type: 'git', url: (.+), directory:/)[1]}`)
+  assert.equal(url(select({ env: {} })), 'git+https://github.com/alexj11324/Mikka.git')
+  for (const [owner, id] of [['alexj11324', '183887963'], ['aspectly-labs', '359279274']]) {
+    const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: `${owner}/Mikka`, GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: id }
+    assert.equal(url(select({ env })), `git+https://github.com/${owner}/Mikka.git`)
+    for (const patch of [{ GITHUB_REPOSITORY: 'foreign/Mikka' }, { GITHUB_REPOSITORY_ID: '1' }, { GITHUB_REPOSITORY_OWNER_ID: id === '183887963' ? '359279274' : '183887963' }]) {
+      assert.equal(url(select({ env: { ...env, ...patch } })), 'git+https://github.com/alexj11324/Mikka.git')
+    }
+  }
 })
