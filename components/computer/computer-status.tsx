@@ -1,6 +1,8 @@
 'use client'
 
-import { Hand, Moon } from '@/components/icons'
+import { Moon } from '@/components/icons'
+import { Mark } from '@/components/workspace/state-mark'
+import { NEEDS_YOU_MARK } from '@/lib/state-mark'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Badge } from '@/components/reui/badge'
 import { Spinner } from '@/components/ui/spinner'
@@ -32,7 +34,7 @@ export function taskStatus(task: ComputerTaskState, state: ComputerState | undef
 /** The pill beside a computer: Agent 操作中 / 等你审批 / 完成 and the machine states (Figma 115:1265, 110:735). */
 export function ComputerStatusBadge({ status, end = false }: { status: ComputerStatus; end?: boolean }) {
   const t = useTranslations('Computer.status')
-  const icon = status === 'sleeping' ? <Moon aria-hidden="true" /> : status === 'waking' ? <Spinner aria-hidden="true" /> : status === 'user' ? <Hand aria-hidden="true" /> : <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
+  const icon = status === 'sleeping' ? <Moon aria-hidden="true" /> : status === 'waking' ? <Spinner aria-hidden="true" /> : status === 'user' ? <Mark {...NEEDS_YOU_MARK} /> : <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-current" />
   return <Badge radius="full" size="lg" variant="outline" className={cn('shrink-0 border-transparent px-2 font-normal', end && 'ml-auto',
     (status === 'working' || status === 'waking') && 'bg-sidebar-primary/10 text-sidebar-primary',
     (status === 'approval' || status === 'user') && 'bg-attention/10 text-attention-foreground',

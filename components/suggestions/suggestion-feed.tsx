@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { WorkspaceContentLoading } from '@/components/workspace/workspace-loading'
+import { ConversationPageLoading } from '@/components/workspace/workspace-loading'
 import { withBasePath } from '@/lib/base-path'
 import type { SuggestionCard } from '@/lib/suggestions/card'
 import { useActionError } from '@/lib/use-action-error'
@@ -25,7 +25,7 @@ import { InlineLoadError } from '@/components/load-error'
 import { FieldError } from '@/components/ui/field'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 
-const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: WorkspaceContentLoading })
+const CoordinatorChat = dynamic(() => import('@/components/coordinator/coordinator-chat').then(module => module.CoordinatorChat), { loading: ConversationPageLoading })
 
 type SuggestionItem = SuggestionCard & { id: string }
 type SuggestionsView = { groups: { items: SuggestionItem[] }[] }

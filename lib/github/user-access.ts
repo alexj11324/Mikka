@@ -8,6 +8,8 @@ import { GitHubAccessError } from './user-access-error'
 import { noteGitHubRequest } from '@/lib/dispatch-timing'
 import { remainingRequestBudget, requestBudgetSignal, type RequestBudget } from '../request-budget'
 import { githubRepository } from './run-pull-request'
+import { pullRequestDiffText, type PullFileEntry } from '../pull-request-diff'
+import { parseUnifiedDiff, type ThreadChanges } from '../thread-changes'
 
 export type AuthorizedGitHubRepository = { id: string; installationId: string; fullName: string; htmlUrl: string; private: boolean; description?: string | null; homepage?: string | null; pushedAt?: string | null }
 type Json = Record<string, unknown>
@@ -267,6 +269,90 @@ export async function readRepositoryTree(userId: string, fullName: string, ref: 
   return { repository: repository.fullName, commitSha: commit.sha, treeSha: sha, entries }
 }
 
+/** GitHub serves a pull request's files a hundred at a time; three pages is what one review read draws. */
+const PULL_FILES_PAGES = 3
+/** Past this much patch text the rest of the change is left to the per-file read (R12 「按文件加载」). */
+const PULL_FILES_MAX_PATCH_BYTES = 512 * 1024
+/** A repository-relative path: no leading slash, no backslash (a dotfile like `.github/x` is fine). */
+const PULL_FILE_PATH = /^[^/\\][^\\]{0,1023}$/
+/** The statuses the files endpoint reports, as the diff's own four. */
+const PULL_FILE_STATUS: Record<string, PullFileEntry['status'] | undefined> = {
+  added: 'added', copied: 'added', removed: 'deleted', renamed: 'renamed', modified: 'modified', changed: 'modified',
+}
+
+/** A path GitHub reported; anything else is a provider fault, not a path to draw. */
+function pullFilePathIn(value: unknown): string {
+  if (typeof value !== 'string' || !PULL_FILE_PATH.test(value) || value.includes('\u0000')
+    || value.split('/').some(part => !part || part === '.' || part === '..')) throw new GitHubAccessError('githubUnavailable', 502)
+  return value
+}
+
+/** A pull request's changed files as the review page reads them: the reference, where its diff starts and ends, and the diff. */
+export interface PullRequestFiles {
+  /** The admitted repository, `owner/name`. */
+  repository: string
+  number: number
+  url: string
+  title: string
+  state: 'open' | 'closed' | 'merged'
+  base: { ref: string; sha: string }
+  head: { ref: string; sha: string }
+  /** The diff, parsed by lib/thread-changes.ts. */
+  changes: ThreadChanges
+  /** GitHub had changed files this read did not reach: the page cap or the patch-byte cap stopped it. */
+  moreFiles: boolean
+  /** Files GitHub sent no patch for — binary, or a diff it truncated — so they list with no lines. */
+  patchUnavailable: number
+}
+
+/**
+ * A pull request's changed files, read as the diff the review page draws (`lib/thread-changes.ts`).
+ * Same admitted repository as the PR directory: the number is resolved inside the repository's
+ * verified immutable ID, so a call can never name another repository's pull request, and never
+ * takes a URL. Nothing provider-specific leaves here: no token, no response body.
+ */
+export async function readPullRequestFiles(userId: string, fullName: string, number: number, budget: RequestBudget): Promise<PullRequestFiles> {
+  const { token, repository } = await githubRepositoryReadCredential(userId, 'v2/github.com/' + fullName.toLowerCase(), budget)
+  const path = `/repositories/${repository.id}/pulls/${number}`
+  const { data: pr } = await githubGet(token, path, budget)
+  const base = object(pr.base), head = object(pr.head)
+  const url = `https://github.com/${repository.fullName}/pull/${number}`
+  // The provider's own URL has to name this repository and this number, or the read is not the one asked for.
+  if (pr.number !== number || githubId(object(base.repo).id) !== repository.id || typeof pr.html_url !== 'string'
+    || pr.html_url.toLowerCase() !== url.toLowerCase() || (pr.state !== 'open' && pr.state !== 'closed') || typeof pr.title !== 'string'
+    || typeof base.sha !== 'string' || !/^[0-9a-f]{40}$/.test(base.sha) || typeof base.ref !== 'string'
+    || typeof head.sha !== 'string' || !/^[0-9a-f]{40}$/.test(head.sha) || typeof head.ref !== 'string') throw new GitHubAccessError('githubUnavailable', 502)
+  const files: PullFileEntry[] = []
+  let moreFiles = false, patchUnavailable = 0, patchBytes = 0, next = false
+  for (let index = 1; index <= PULL_FILES_PAGES; index++) {
+    const { data, next: another } = await githubRequest(token, `${path}/files?per_page=100&page=${index}`, budget)
+    if (!Array.isArray(data) || data.length > 100) throw new GitHubAccessError('githubUnavailable', 502)
+    next = another
+    for (const value of data) {
+      const file = object(value)
+      const status = typeof file.status === 'string' ? PULL_FILE_STATUS[file.status] : undefined
+      const previous = file.previous_filename === undefined ? null : pullFilePathIn(file.previous_filename)
+      if (!status || (file.patch != null && typeof file.patch !== 'string')) throw new GitHubAccessError('githubUnavailable', 502)
+      const patch = typeof file.patch === 'string' ? file.patch : null
+      // GitHub leaves the patch out for binary files and for diffs it truncated itself: the file
+      // still lists, with no lines, which is exactly what the diff draws for both.
+      if (patch) patchBytes += patch.length
+      if (!patch) patchUnavailable++
+      if (patchBytes > PULL_FILES_MAX_PATCH_BYTES) { moreFiles = true; break }
+      files.push({ path: pullFilePathIn(file.filename), previousPath: previous, status, patch })
+    }
+    if (moreFiles || !next) break
+  }
+  // A page cap reached with another page waiting is still a change we did not read.
+  if (next) moreFiles = true
+  const merged = typeof pr.merged_at === 'string' || pr.merged === true
+  return {
+    repository: repository.fullName, number, url, title: pr.title.slice(0, 1000),
+    state: pr.state === 'closed' && merged ? 'merged' : pr.state,
+    base: { ref: base.ref, sha: base.sha }, head: { ref: head.ref, sha: head.sha },
+    changes: parseUnifiedDiff(pullRequestDiffText(files)), moreFiles, patchUnavailable,
+  }
+}
 /** For server code acting for a user id with no browser request (the Coordinator). Never returns the token. */
 export async function listRepositoriesForUser(userId: string) {
   const { token: _token, ...result } = await repositoriesForUser(userId)

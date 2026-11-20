@@ -8,7 +8,7 @@ import test from 'node:test'
 import { getEventListeners } from 'node:events'
 import { waitForApiReady } from '../../../scripts/dev-local/shutdown.mjs'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
-import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, staleRouteFiles, staleRoutesRefusal } from './dev.mjs'
+import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, openPublicPort, staleRouteFiles, staleRoutesRefusal } from './dev.mjs'
 
 const request = (path, options) => new Request(`http://localhost:3000${path}`, options)
 const html = '<!doctype html><html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
@@ -151,6 +151,30 @@ test('a worker ready message arriving before the wait is retained', async () => 
   await worker.wait(new AbortController().signal)
   assert.equal(api.listenerCount, 0)
   worker.dispose()
+})
+
+test('the public port opens only after the worker has an address', async () => {
+  // A browser reaching the port during the first build gets the runner's own
+  // six-second wait as a 500 ("Runner did not become ready in time") and shows a
+  // failed thread for a server that is merely still starting.
+  const api = workerMessages(), worker = developmentWorkerReady(api), opened = []
+  const pending = openPublicPort(worker, async () => { opened.push('listen') }, AbortSignal.timeout(30_000))
+  api.emit({ event: 'compiled' })
+  await Promise.resolve()
+  assert.deepEqual(opened, [], 'compiled is not an address; nothing may listen yet')
+  api.emit({ address: { host: '127.0.0.1', port: 43003 } })
+  await pending
+  assert.deepEqual(opened, ['listen'])
+  worker.dispose()
+})
+
+test('a worker that never becomes ready never opens the public port', async () => {
+  const api = workerMessages(), worker = developmentWorkerReady(api), opened = []
+  const pending = openPublicPort(worker, async () => { opened.push('listen') }, AbortSignal.timeout(30_000))
+  api.emit({ event: 'init-error', error: 'private initialization detail' })
+  await assert.rejects(pending, { code: 'API_DEV_WORKER_INIT_FAILED' })
+  assert.deepEqual(opened, [], 'a server with no worker behind it must not accept requests')
+  assert.equal(api.listenerCount, 0)
 })
 
 test('a real worker init error fails immediately without an HTTP retry or raw error disclosure', async () => {

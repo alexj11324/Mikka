@@ -3540,6 +3540,13 @@
     "test": "app/api/integrations/github/repositories/pulls/route.test.ts",
     "suite": "test:github-pulls"
   },
+  "app/api/integrations/github/repositories/pulls/files/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads one pull request's changed files through the signed-in owner's existing GitHub repository authorization. A missing session, an unknown query key or a denied repository is refused before any provider call, and the credential never leaves the server.",
+    "test": "app/api/integrations/github/repositories/pulls/files/route.test.ts",
+    "suite": "test:github-pulls"
+  },
   "lib/github/pull-directory.ts": {
     "mode": "built-in",
     "environment": [],
@@ -3798,5 +3805,26 @@
     ],
     "behavior": "Prepares what pnpm dev needs before anything listens: a loopback PostgreSQL database created and migrated, the official UI overlay’s own dependencies installed when missing, and one development account whose password is generated on the machine and kept in a gitignored file. Refuses to create a database anywhere but this machine.",
     "test": "apps/api/scripts/dev-preflight.test.mjs"
+  },
+  "lib/hooks/use-sidebar-view.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Stores the rail’s collapsed-or-open choice per workspace in the person’s own browser. No server read, no installation dependency.",
+    "test": "lib/hooks/use-sidebar-view.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/pull-request-diff.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validates and folds a pull request’s changed-file pages into one bounded summary. Text only: no provider call, no credential and no filesystem access.",
+    "test": "lib/pull-request-diff.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/state-mark.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The one mark registry: a status, priority, thread group or run indicator in, the shape and tone every surface draws out. Pure data, no installation dependency.",
+    "test": "lib/state-mark.test.ts",
+    "suite": "test:lib-units"
   }
 }

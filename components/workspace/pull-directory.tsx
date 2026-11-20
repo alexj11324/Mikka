@@ -57,8 +57,8 @@ type RepoStatus = {
 };
 const stateKeys: Record<PullState, `states.${PullState}`> = {
   ready: "states.ready",
+  attention: "states.attention",
   pending: "states.pending",
-  failed: "states.failed",
   draft: "states.draft",
   open: "states.open",
   merged: "states.merged",
@@ -205,6 +205,12 @@ export function PullDirectory({
       ]
     : linkedRows;
   const error = repo ? github.error : linked.error;
+  // GitHub's connection is the one state that replaces the list rather than
+  // sitting above it: an empty result under "connect GitHub" was two answers to
+  // one question.
+  const disconnected =
+    Boolean(repositoryError) ||
+    (repositories ? !repositories.connected : false);
   const busy = repo ? github.isValidating : linked.isValidating;
   const more = Boolean(data?.at(-1)?.cursor);
   const visible = filterDirectoryPulls(rows, filters);
@@ -261,10 +267,6 @@ export function PullDirectory({
       : grouping === "state"
         ? t(stateKeys[key as PullState])
         : key;
-  // A repository that is not connected gets one state, not two: the banner that
-  // offers 连接 already says why the list is empty, and offering 清除筛选 beside it
-  // would point at a filter that changes nothing (R-96).
-  const notConnected = Boolean(repositoryError) || Boolean(repositories && !repositories.connected);
   const filtered =
     filters.search ||
     filters.state ||
@@ -393,14 +395,14 @@ export function PullDirectory({
           )}
         >
           <div className="px-2">
-            {repositoryError || (repositories && !repositories.connected) ? (
+            {disconnected ? (
               <PullConnectState
                 error={Boolean(repositoryError)}
                 busy={busy}
                 onRetry={() => void retryRepositories()}
               />
             ) : null}
-            {error && (
+            {!disconnected && error && (
               <div role="alert" className="mx-4 mt-6 flex flex-col items-start gap-3 rounded-xl bg-control px-4 py-4">
                 <p className="text-sm text-foreground">{t("loadError")}</p>
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => void refresh()}>
@@ -408,14 +410,14 @@ export function PullDirectory({
                 </Button>
               </div>
             )}
-            {!data && !error && (
+            {!disconnected && !error && !data && (
               <div role="status" aria-label={t("loading")} className="flex flex-col py-1">
                 {[0, 1, 2, 3, 4, 5, 6].map((key) => (
                   <PullRowSkeleton key={key} />
                 ))}
               </div>
             )}
-            {data && !visible.length && !error && !notConnected && (
+            {!disconnected && !error && data && !visible.length && (
               <Empty className="min-h-72 border-0">
                 <EmptyHeader>
                   <EmptyMedia variant="icon">
@@ -437,10 +439,14 @@ export function PullDirectory({
                 </EmptyContent>
               </Empty>
             )}
-            {groups.map((group) => {
+            {groups.map((group, position) => {
               const open = !collapsed.includes(group.key);
               return (
-                <section key={group.key} aria-label={heading(group.key)} className="flex flex-col">
+                <section
+                  key={group.key}
+                  aria-label={heading(group.key)}
+                  className={cn("flex flex-col", position > 0 && "pt-1")}
+                >
                   <PullGroupHeader
                     label={heading(group.key)}
                     count={group.rows.length}

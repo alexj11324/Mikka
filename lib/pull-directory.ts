@@ -5,12 +5,15 @@ import type { ConversationDirectoryPage } from "./conversation-directory-input";
 
 export const pullViews = ["open", "ready", "merged", "all"] as const;
 export const pullGroups = ["state", "repo", "author", "none"] as const;
+/** One vocabulary for the row's verdict, the group a row lands in and the state
+ *  filter: `attention` is the coarse one — failing checks, a review that asked
+ *  for changes, or a base it cannot merge into. */
 export const pullStates = [
   "ready",
+  "attention",
   "pending",
-  "failed",
-  "draft",
   "open",
+  "draft",
   "merged",
   "closed",
 ] as const;
@@ -53,6 +56,35 @@ export const pullPageInput = z.strictObject({
   view: z.enum(pullViews).default("open"),
 });
 
+/** The query for one pull request's changed files (app/api/integrations/github/repositories/pulls/files). */
+export const pullFilesQuery = z.strictObject({
+  repo: pullPageInput.shape.repo,
+  number: z
+    .string()
+    .regex(/^[1-9]\d{0,9}$/)
+    .refine((value) => Number.isSafeInteger(Number(value)), "invalid number"),
+});
+
+/**
+ * A row's pull request as the review page opens it: `repo` holds `owner/name` on
+ * the row, and the page needs the two halves apart. Null when the row does not
+ * name a repository, so nothing offers a review it cannot read.
+ */
+export function pullReviewRef(
+  pull: Pick<PullDirectoryRow, "repo" | "number">,
+): { owner: string; repo: string; number: number } | null {
+  const [owner, name, ...rest] = pull.repo.split("/");
+  if (!owner || !name || rest.length) return null;
+  return { owner, repo: name, number: pull.number };
+}
+
+/**
+ * What a row is waiting on, in the words the page groups by. A pull request
+ * needs a person when something is red — failing checks, a review that asked
+ * for changes, a base GitHub will not merge into — before it is merely open;
+ * `ready` is GitHub's own verdict (a clean merge state, nobody asking for
+ * changes), never a green check alone.
+ */
 export function pullDirectoryState(pull: PullDirectoryRow): PullState {
   if (
     pull.state === "merged" ||
@@ -60,14 +92,12 @@ export function pullDirectoryState(pull: PullDirectoryRow): PullState {
     pull.state === "draft"
   )
     return pull.state;
-  if (pull.checks === "FAILURE" || pull.checks === "ERROR") return "failed";
+  if (pull.checks === "FAILURE" || pull.checks === "ERROR") return "attention";
+  if (pull.reviewDecision === "CHANGES_REQUESTED") return "attention";
+  if (pull.mergeState === "DIRTY" || pull.mergeState === "BLOCKED")
+    return "attention";
   if (pull.checks === "PENDING" || pull.checks === "EXPECTED") return "pending";
-  // A green check alone is not GitHub's mergeability or review decision.
-  if (
-    pull.mergeState === "CLEAN" &&
-    pull.reviewDecision !== "CHANGES_REQUESTED" &&
-    pull.reviewDecision !== "REVIEW_REQUIRED"
-  )
+  if (pull.mergeState === "CLEAN" && pull.reviewDecision !== "REVIEW_REQUIRED")
     return "ready";
   return "open";
 }
@@ -131,17 +161,26 @@ export type PullFilters = {
   linked: boolean;
   label: string;
 };
+/** The states a reading view admits, so the tab and the state chip beside it are
+ *  one condition rather than two that can disagree. All is no condition at all. */
+export function pullViewStates(view: PullView): PullState[] {
+  if (view === "all") return [];
+  if (view !== "open") return [view];
+  return ["attention", "pending", "ready", "open", "draft"];
+}
+
 export function filterDirectoryPulls(
   rows: PullDirectoryRow[],
   filter: PullFilters,
 ) {
   const search = filter.search.trim().toLocaleLowerCase();
+  // One state condition at a time: a chosen state replaces the view's own, which
+  // is what the chip row shows — the view's chip steps aside while it is on.
+  const admitted = filter.state ? [] : pullViewStates(filter.view);
   return rows.filter((pull) => {
     const state = pullDirectoryState(pull);
     return (
-      (filter.view !== "open" || !["merged", "closed"].includes(state)) &&
-      (filter.view !== "merged" || state === "merged") &&
-      (filter.view !== "ready" || state === "ready") &&
+      (!admitted.length || admitted.includes(state)) &&
       (!filter.state || state === filter.state) &&
       (!filter.author || pull.author === filter.author) &&
       (!filter.linked || pull.threads.length > 0) &&
@@ -158,11 +197,12 @@ export function filterDirectoryPulls(
   });
 }
 
-/** Groups read in the order someone works them: what is broken, what is running, what is ready, then history. */
-export const pullAttentionOrder: readonly PullState[] = [
-  "failed",
-  "pending",
+/** Groups read in the order Capy shows them: what can ship now, then what is
+ *  stuck, then what is simply in flight, then history. */
+export const pullGroupOrder: readonly PullState[] = [
   "ready",
+  "attention",
+  "pending",
   "open",
   "draft",
   "merged",
@@ -194,7 +234,7 @@ export function groupDirectoryPulls(
   }
   const order: string[] =
     grouping === "state"
-      ? ["pinned", ...pullAttentionOrder]
+      ? ["pinned", ...pullGroupOrder]
       : ["pinned", ...[...groups.keys()].filter((key) => key !== "pinned")];
   return order.flatMap((key) =>
     groups.has(key) ? [{ key, rows: groups.get(key)! }] : [],

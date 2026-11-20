@@ -99,7 +99,7 @@ mock.module('@/hooks/use-live-lists', { namedExports: {
 for (const [file, names] of [
   ['../../app/actions/projects.ts', ['listProjects', 'listWorkspaceProjects']], ['../../app/actions/teams.ts', ['listTeams']],
   ['../../app/actions/team-relations.ts', ['listProjectTeams']], ['../../app/actions/workspace-secrets.ts', ['saveE2BKey']],
-  ['../../app/actions/bots.ts', ['listBots', 'archiveBot', 'deleteBot', 'listArchivedOwnBots']], ['../../app/actions/agents.ts', ['getThreadName', 'findThreadIssue']],
+  ['../../app/actions/bots.ts', ['listBots', 'listBotsForWorkspace', 'archiveBot', 'deleteBot', 'listArchivedOwnBots']], ['../../app/actions/agents.ts', ['listAgents', 'getThreadName', 'findThreadIssue']],
 ] as const) mock.module(new URL(file, import.meta.url).href, { namedExports: Object.fromEntries(names.map(name => [name, async () => []])) })
 
 // Exercise the production lazy/Suspense boundary, with its chunk deliberately
@@ -506,12 +506,13 @@ test('Team Issues first-page readiness is independent of the unrelated workspace
   browser.history.replaceState({}, '', `/?workspace=${workspaceId}&team=${teamIssuesId}&section=team-issues`)
   await render({ initialSection: 'team-issues' })
   assert.ok(container.querySelector('[data-team-board-visible]'), 'the ready Team list must be reachable without waiting for global pagination')
-  assert.equal(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'), null)
+  assert.equal(container.querySelector('[role="status"][aria-label="Workspace.loading"]'), null)
 
   scopedTasksPending = true // The Team-scoped read itself remains a real loading gate.
   await render({ initialSection: 'team-issues' })
   assert.equal(container.querySelector('[data-team-board-visible]'), null)
-  assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loadingEditor"]'))
+  // The board's own frame stands while its first page reads; it is a page placeholder, not a task editor.
+  assert.ok(container.querySelector('[role="status"][aria-label="Workspace.loading"]'))
 })
 
 test('a Team board write refreshes its visible page while the workspace refresh is pending', async () => {

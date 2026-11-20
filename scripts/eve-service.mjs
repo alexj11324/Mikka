@@ -2,6 +2,10 @@ import { spawn } from 'node:child_process'
 import { mkdir, readFile, realpath, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createServer } from 'node:net'
+import { EVE_PARENT_WATCH } from './eve-parent-watch-source.mjs'
+
+/** The peer guard as `--import` takes it: a data URL, because a built chunk has no scripts/ beside it. */
+export const EVE_PARENT_WATCH_IMPORT = `data:text/javascript;base64,${Buffer.from(EVE_PARENT_WATCH).toString('base64')}`
 
 export async function availableEvePort() {
   const listener = createServer()
@@ -9,6 +13,44 @@ export async function availableEvePort() {
   const port = listener.address().port
   await new Promise((resolve, reject) => listener.close(error => error ? reject(error) : resolve()))
   return port
+}
+
+/** eve names its own local server exactly once, on stdout. That line, and only
+ * that line, means the peer is serving. */
+const READY_ADDRESS = /(?:Listening on:?|Local:|server[^\n]*?)\s*(http:\/\/127\.0\.0\.1:\d+)/i
+
+/** The peer's real reason for refusing to start is printed on stderr and
+ * nowhere else ("A dev server is already running for this eve agent"). Keep a
+ * bounded tail so a failed start can say what happened instead of only naming
+ * the exit. */
+const OUTPUT_LIMIT = 16_384
+
+/** eve colors every bundler diagnostic, so the readable reason is full of CSI
+ * sequences. Built from a string: the escape is this pattern's whole subject, and
+ * a control character written into a literal is exactly what the lint forbids. */
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
+
+/** eve's stderr is mostly bundler diagnostics, and they are long enough to crowd
+ * the one sentence that explains a refusal out of any tail. Keep the raw text on
+ * the error, and hand callers the last sentences a developer can act on: no ANSI,
+ * no box drawing, no `[WARNING_CODE]` blocks. */
+export function eveFailureReason(stderr) {
+  return stderr.replace(ANSI, '').split('\n')
+    .filter(line => line.trim() && !/^\s*[│╭╰╮╯─]/.test(line) && !/\[[A-Z][A-Z0-9_]{3,}\]/.test(line))
+    .slice(-8)
+    .join('\n')
+}
+
+/** Stop the peer's whole process group. eve forks its own local server into a
+ * separate group, so signaling the pid alone leaves that server, its workflow
+ * world and its listening port behind — the residue that made every later start
+ * fail. A child without a pid (a test double, or one that never spawned) still
+ * gets the direct signal. */
+function signalProcess(child, signal) {
+  try { process.kill(-child.pid, signal); return }
+  catch { /* not a group leader, or already gone */ }
+  try { child.kill(signal) }
+  catch { /* nothing left to signal */ }
 }
 
 /** Start the pinned eve host as a peer process, with its own Workflow world.
@@ -56,34 +98,54 @@ export async function startEveService({ root = process.cwd(), env = process.env,
   const args = development
     ? [join(root, 'node_modules/eve/bin/eve.js'), 'dev', '--no-ui', '--host', '127.0.0.1', '--port', String(port)]
     : [join(directory, 'server/index.mjs')]
-  const child = spawnProcess(process.execPath, args, { cwd: directory, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] })
-  child.stderr.resume()
+  // `--import` makes the peer stop when this process does, including after a
+  // `kill -9` that leaves no chance to clean up here. `detached` makes it a
+  // process-group leader, so one signal reaps everything it started.
+  const child = spawnProcess(process.execPath, ['--import', EVE_PARENT_WATCH_IMPORT, ...args], {
+    cwd: directory, env: { ...childEnv, MIKKA_EVE_PARENT_PID: String(process.pid) },
+    stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+  })
+  let output = '', errors = ''
+  const remember = chunk => { output = (output + chunk).slice(-OUTPUT_LIMIT) }
+  child.stderr.on('data', chunk => { errors = (errors + chunk).slice(-OUTPUT_LIMIT) })
+  // The failure carries the peer's own last words: its exit status alone cannot
+  // distinguish a port clash from a module error from another instance already
+  // holding this app root.
+  const failure = (code, detail = {}) => {
+    const cause = { ...detail, reason: eveFailureReason(errors), stderr: errors.trim(), stdout: output.trim() }
+    return Object.assign(new Error(code, { cause }), { code, detail: cause })
+  }
   let closing
   const close = () => closing ??= new Promise(resolve => {
     if (child.exitCode !== null || child.signalCode !== null) { resolve(); return }
-    const timer = setTimeout(() => child.kill('SIGKILL'), 30_000).unref()
+    const timer = setTimeout(() => signalProcess(child, 'SIGKILL'), 30_000).unref()
     child.once('exit', () => { clearTimeout(timer); resolve() })
-    child.kill('SIGTERM')
+    signalProcess(child, 'SIGTERM')
   })
   try {
     await new Promise((resolve, reject) => {
-      let pending = ''
-      const timer = setTimeout(() => reject(new Error('EVE_SERVICE_START_TIMEOUT')), 180_000).unref()
-      const finish = (error, origin) => {
+      const timer = setTimeout(() => reject(failure('EVE_SERVICE_START_TIMEOUT')), 180_000).unref()
+      const finish = (error, address) => {
         clearTimeout(timer)
         child.stdout.off('data', onOutput)
-        if (error) reject(error); else resolve(origin)
+        child.off('close', onExit)
+        if (error) reject(error); else resolve(address)
       }
       const onOutput = chunk => {
-        pending = (pending + chunk.toString()).slice(-16_384)
-        const match = /(?:Listening on:?|Local:|server[^\n]*?)\s*(http:\/\/127\.0\.0\.1:\d+)/i.exec(pending)
+        remember(chunk)
+        const match = READY_ADDRESS.exec(output)
         if (match && match[1] === origin) finish(null, match[1])
       }
+      const onExit = (code, signal) => finish(failure('EVE_SERVICE_EXITED', { exitCode: code, signal }))
       child.stdout.on('data', onOutput)
-      child.once('error', cause => finish(new Error('EVE_SERVICE_START_FAILED', { cause })))
-      child.once('exit', () => finish(new Error('EVE_SERVICE_EXITED')))
+      child.once('error', cause => finish(Object.assign(new Error('EVE_SERVICE_START_FAILED', { cause }), { code: 'EVE_SERVICE_START_FAILED' })))
+      // 'close', not 'exit': a peer that dies mid-sentence still gets its last
+      // stderr line read before this reports the failure.
+      child.once('close', onExit)
     })
-    child.stdout.resume()
+    // Keep draining the peer's stdout, so a chatty host never blocks on a full
+    // pipe once nobody is waiting for its address.
+    child.stdout.on('data', remember)
     env.MIKKA_EVE_ORIGIN = origin
     return { origin, close }
   } catch (error) { await close(); throw error }

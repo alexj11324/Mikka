@@ -250,6 +250,26 @@
       "density": "Density",
       "compact": "Compact",
       "detailed": "Detailed",
+      "sortBy": "Sort by",
+      "sortPinned": "Pinned first",
+      "sortRecent": "Latest activity",
+      "sortName": "Name",
+      "groupBy": "Group by",
+      "groupNone": "None",
+      "groupUnread": "Unread",
+      "groupWaiting": "Threads waiting on you",
+      "groupWorking": "Working",
+      "groupOther": "Other",
+      "filters": "Filters",
+      "clearFilters": "Clear filters",
+      "sectionOptions": "List options",
+      "searchThreads": "Search threads",
+      "searchThreadsPlaceholder": "Search Bots or threads",
+      "closeSearch": "Close search",
+      "markAllRead": "Mark all as read",
+      "allRead": "Everything is marked read",
+      "viewAllThreads": "View all threads",
+      "noMatches": "No matches",
       "botOptions": "Bot options",
       "threadActions": "Thread actions",
       "showThreads": "Show threads",
@@ -5338,7 +5358,8 @@
       "noneToday": "No new suggestions today."
     },
     "newTaskDialog": {
-      "defaultProject": "My default project",
+      "project": "Project",
+      "status": "Status",
       "projectPreferenceUnavailable": "Could not load or save your project.",
       "intent": "Action",
       "backlogTitlePlaceholder": "Title (optional, defaults to the first line)",
@@ -8595,9 +8616,9 @@
       "none": "No grouping"
     },
     "states": {
-      "ready": "Ready",
+      "ready": "Ready to merge",
+      "attention": "Needs attention",
       "pending": "Pending",
-      "failed": "Failed",
       "draft": "Draft",
       "open": "Open",
       "merged": "Merged",
@@ -8657,6 +8678,8 @@
       "unknown": "Not reported"
     },
     "linkedSnapshot": "Last delivered state. Open on GitHub for current checks and review.",
-    "resizePreview": "Resize pull request preview"
+    "resizePreview": "Resize pull request preview",
+    "is": "is",
+    "eitherOfStates": "either of {count} states"
   }
 }

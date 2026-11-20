@@ -24,13 +24,31 @@ export type NewTaskProfile = { value: string; label: string; detail?: string; di
 /** An Agent the task can run on (Claude Code or Codex). */
 export type NewTaskAgent = { value: 'claude_code' | 'codex'; label: string }
 
+/** A Project the task can go to, in the window's context line. */
+export type NewTaskProject = { value: string; label: string }
+
+/** A status the task can be created in (Mikka's own statuses), as a chip in the row of pills. */
+export type NewTaskStatus = { value: string; label: string; /** Its mark, as Mikka draws it (`TaskStatusIcon`). */ mark: ReactNode }
+
 export type NewTaskProps = {
   intent?: 'create_only' | 'create_and_dispatch'
   /** 创建方式, when the person may switch between 只创建 and 创建并派发 (a page that can open the created task). */
   chooseIntent?: { onChange: (intent: 'create_only' | 'create_and_dispatch') => void; disabled: boolean }
   onClose: () => void
-  /** The project page the request came from. */
+  /** The Project the task goes to: the project page's, else the person's default. The window reads it as a breadcrumb
+   * before the title; absent, there is no context line (and the task is created without a Project). */
   project?: string | null
+  /**
+   * The Projects the person may switch to, when the page leaves the Project open (the personal default). Absent when
+   * the page fixes it or there is nothing to choose; then the context line is the name alone. Never a precondition:
+   * 创建任务 sends with whatever is chosen, including none.
+   */
+  projects?: { choices: NewTaskProject[]; value: string; onChange: (value: string) => void; disabled: boolean; noneLabel: string }
+  /**
+   * The status the task is created in. Absent when the request that creates it cannot carry one (a dispatched task is
+   * created by its Bot's own command, which has no status field), so the window then draws no status chip.
+   */
+  status?: { choices: NewTaskStatus[]; value: string; onChange: (value: string) => void; disabled: boolean }
   /** 标题 the person wrote (optional; empty, the Bot writes one). */
   title: string
   onTitle: (title: string) => void

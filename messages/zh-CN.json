@@ -250,6 +250,26 @@
       "density": "显示密度",
       "compact": "紧凑",
       "detailed": "详细",
+      "sortBy": "排序",
+      "sortPinned": "置顶优先",
+      "sortRecent": "最近活动",
+      "sortName": "名称",
+      "groupBy": "分组",
+      "groupNone": "无",
+      "groupUnread": "未读",
+      "groupWaiting": "有线程在等你",
+      "groupWorking": "正在工作",
+      "groupOther": "其他",
+      "filters": "筛选",
+      "clearFilters": "清除筛选",
+      "sectionOptions": "列表选项",
+      "searchThreads": "搜索线程",
+      "searchThreadsPlaceholder": "搜索 Bot 或线程",
+      "closeSearch": "关闭搜索",
+      "markAllRead": "全部标为已读",
+      "allRead": "已全部标为已读",
+      "viewAllThreads": "全部线程",
+      "noMatches": "没有匹配的结果",
       "botOptions": "Bot 选项",
       "threadActions": "线程操作",
       "showThreads": "显示线程",
@@ -5338,7 +5358,8 @@
       "noneToday": "今天还没有新的建议。"
     },
     "newTaskDialog": {
-      "defaultProject": "我的默认项目",
+      "project": "项目",
+      "status": "状态",
       "projectPreferenceUnavailable": "未能读取或保存项目。",
       "intent": "创建方式",
       "backlogTitlePlaceholder": "标题（可选，默认为首行）",
@@ -8596,8 +8617,8 @@
     },
     "states": {
       "ready": "可合并",
+      "attention": "需处理",
       "pending": "检查中",
-      "failed": "检查失败",
       "draft": "草稿",
       "open": "打开",
       "merged": "已合并",
@@ -8657,6 +8678,8 @@
       "unknown": "未报告"
     },
     "linkedSnapshot": "上次交付时的状态。当前检查与审阅请在 GitHub 查看。",
-    "resizePreview": "调整拉取请求预览宽度"
+    "resizePreview": "调整拉取请求预览宽度",
+    "is": "为",
+    "eitherOfStates": "以下 {count} 种之一"
   }
 }

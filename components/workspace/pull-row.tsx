@@ -6,6 +6,10 @@
 // different products. The row's own actions hold a reserved slot that stays
 // empty until the pointer is on the row or focus is inside it
 // (decision 2026-11-18-1400, R-92…R-94).
+//
+// A press opens the pull request's review in the app, whichever PR it is: the
+// list holds every PR the person can read, not only the ones Mikka produced
+// (hooks/code-review/use-review-page.ts). GitHub stays one explicit icon away.
 import { ChevronDown, ChevronRight, ExternalLink, Pin } from "lucide-react";
 import { useTranslations } from "@/lib/intl/i18n-client";
 import { cn } from "cn";
@@ -13,6 +17,7 @@ import { compactAge } from "@/components/nav/compact-age";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { openPullReview } from "@/hooks/code-review/use-review-page";
 import {
   PULL_REQUEST_COLORS,
   PULL_REQUEST_ICONS,
@@ -20,6 +25,7 @@ import {
 } from "@/lib/pull-request-appearance";
 import {
   pullDirectoryState,
+  pullReviewRef,
   type PullDirectoryRow,
   type PullState,
 } from "@/lib/pull-directory";
@@ -27,7 +33,7 @@ import {
 const stateKeys: Record<PullState, `states.${PullState}`> = {
   ready: "states.ready",
   pending: "states.pending",
-  failed: "states.failed",
+  attention: "states.attention",
   draft: "states.draft",
   open: "states.open",
   merged: "states.merged",
@@ -84,7 +90,11 @@ export function PullRow({
         variant="ghost"
         data-pull-index={index}
         aria-pressed={selected}
-        onClick={() => onSelect(row)}
+        onClick={() => {
+          onSelect(row);
+          const pull = pullReviewRef(row);
+          if (pull) openPullReview(pull);
+        }}
         className="h-full min-w-0 flex-1 flex-row items-center justify-start gap-2 rounded-none px-1 text-start font-normal hover:bg-transparent"
       >
         <Icon aria-hidden="true" className={cn("size-3.5 shrink-0", PULL_REQUEST_COLORS[row.state])} />
