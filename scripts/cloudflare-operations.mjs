@@ -22,6 +22,8 @@ export function operationsInput(env) {
     'cloudflare-billing-evidence': ['read'],
     'container-identity-metadata': ['inspect'],
     'private-source-download': ['deliver'],
+    'vercel-project-billing': ['read'],
+    'vercel-workflow-inventory': ['read'],
   }
   check(Object.hasOwn(actions, operation) && actions[operation].includes(action), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   check(sha.test(env.MIKKA_CF_OPERATIONS_SHA ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
@@ -29,6 +31,17 @@ export function operationsInput(env) {
     check(id.test(env[key] ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   }
   if (operation === 'private-source-download') check(id.test(env.MIKKA_SOURCE_COMMENT_ID ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+  if (operation === 'vercel-project-billing') {
+    const from = env.MIKKA_BILLING_FROM || '2026-11-01', to = env.MIKKA_BILLING_TO || '2026-11-12'
+    for (const date of [from, to]) check(/^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date))
+      && new Date(date).toISOString().slice(0, 10) === date, 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    const days = (Date.parse(to) - Date.parse(from)) / 86400000
+    check(days >= 1 && days <= 31, 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+  }
+  if (operation === 'vercel-workflow-inventory') {
+    check(sha.test(env.MIKKA_OPERATOR_PRODUCT_SHA ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    check(['true', 'false'].includes(env.MIKKA_OBSERVE_ORIGINAL_EVE), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+  }
   const target = env.WORLD_ENVIRONMENT || 'staging'
   check(['staging', 'production'].includes(target), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   return {operation, action, ...(operation === 'eve-world-resources' ? {target} : {})}
@@ -118,9 +131,41 @@ export async function verifyOperationsCheckout(env = process.env, {directory = r
   return {status:'checked', operationsSource:identity.operationsSource}
 }
 
+/** Only the reviewed public inventory reader and its locked SDK run in this product checkout. */
+export async function verifyOperationsProduct(env = process.env, {directory = resolve('.mikka-cloud/product'), fetchImpl = fetch} = {}) {
+  operationsInput(env)
+  const identity = operationsIdentity(env), source = env.MIKKA_OPERATOR_PRODUCT_SHA
+  check(env.MIKKA_OPERATION === 'vercel-workflow-inventory' && sha.test(source ?? ''), 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+  const git = args => execFileSync('git', ['-C', directory, ...args], {encoding:'utf8', stdio:['ignore', 'pipe', 'pipe'],
+    env:{PATH:env.PATH ?? process.env.PATH, HOME:env.HOME ?? process.env.HOME}}).trim()
+  check(await realpath(directory) === resolve(directory) && git(['rev-parse', '--show-toplevel']) === directory
+    && git(['rev-parse', 'HEAD']) === source
+    && hasGitHubOrigin(git(['remote', 'get-url', 'origin']), identity.repository)
+    && git(['status', '--porcelain', '--untracked-files=no']) === '', 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+  for (const entry of ['package.json', 'pnpm-lock.yaml', 'scripts/ops/vercel-workflow-inventory.mjs']) {
+    check((await lstat(join(directory, entry))).isFile(), 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+    git(['ls-files', '--error-unmatch', entry])
+  }
+  check(typeof env.MIKKA_PUBLIC_ACTIONS_TOKEN === 'string' && env.MIKKA_PUBLIC_ACTIONS_TOKEN.length > 0,
+    'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+  const path = `/compare/${source}...${identity.driverSource}`
+  const response = await fetchImpl('https://api.github.com/repositories/1427517699' + path + '?per_page=1', {
+    headers:{authorization:'Bearer ' + env.MIKKA_PUBLIC_ACTIONS_TOKEN, accept:'application/vnd.github+json'},
+    redirect:'error', cache:'no-store', signal:AbortSignal.timeout(20000),
+  })
+  check(response.ok, 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+  const comparison = await response.json()
+  check(comparison.url === `https://api.github.com/repos/${identity.repository}${path}`
+    && comparison.base_commit?.sha === source && comparison.merge_base_commit?.sha === source
+    && ['identical', 'ahead'].includes(comparison.status) && comparison.behind_by === 0
+    && Number.isSafeInteger(comparison.ahead_by) && comparison.ahead_by >= 0, 'PUBLIC_OPERATIONS_SOURCE_REQUIRED')
+  return {status:'checked', productSource:source}
+}
+
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   try {
     if (process.argv.length === 3 && process.argv[2] === 'source') console.log(JSON.stringify(await verifyOperationsCheckout()))
+    else if (process.argv.length === 3 && process.argv[2] === 'product') console.log(JSON.stringify(await verifyOperationsProduct()))
     else {
       check(process.argv.length === 2, 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
       const selected = await admitOperations()
@@ -128,7 +173,7 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
       console.log(JSON.stringify({status:'admitted', operation:selected.operation, action:selected.action, driverSource:selected.driverSource}))
     }
   } catch (error) {
-    console.error(JSON.stringify({status:'refused', code:codes.has(error.code) ? error.code : process.argv[2] === 'source' ? 'PUBLIC_OPERATIONS_SOURCE_REQUIRED' : 'PUBLIC_OPERATIONS_IDENTITY_REQUIRED'}))
+    console.error(JSON.stringify({status:'refused', code:codes.has(error.code) ? error.code : ['source', 'product'].includes(process.argv[2]) ? 'PUBLIC_OPERATIONS_SOURCE_REQUIRED' : 'PUBLIC_OPERATIONS_IDENTITY_REQUIRED'}))
     process.exitCode = 1
   }
 }

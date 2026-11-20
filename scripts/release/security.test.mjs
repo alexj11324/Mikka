@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { assessAudit } from './audit-policy.mjs'
-import { admitOperations, operationsClaims, operationsInput, verifyOperationsCheckout } from '../cloudflare-operations.mjs'
+import { admitOperations, operationsClaims, operationsInput, verifyOperationsCheckout, verifyOperationsProduct } from '../cloudflare-operations.mjs'
 import { checkWorkflowRuns, releaseIdentity, RELEASE_WORKFLOWS, waitForReleaseChecks } from './ci-gate.mjs'
 import { artifactInventory, pinRuntime, sealArtifact, stageDesktop, verifyArtifact } from './evidence.mjs'
 import { workspaceSbom } from './workspace-sbom.mjs'
@@ -255,6 +255,8 @@ test('operator admission binds the real OIDC producer before any private credent
   assert.throws(() => operationsInput({...env, MIKKA_OPERATION:'capture-retention', MIKKA_OPERATION_ACTION:'read'}))
   assert.equal(operationsInput({...env, MIKKA_OPERATION:'private-source-download', MIKKA_OPERATION_ACTION:'deliver', MIKKA_SOURCE_COMMENT_ID:'123'}).action, 'deliver')
   assert.throws(() => operationsInput({...env, MIKKA_OPERATION:'private-source-download', MIKKA_OPERATION_ACTION:'deliver', MIKKA_SOURCE_COMMENT_ID:'../123'}))
+  assert.equal(operationsInput({...env, MIKKA_OPERATION:'vercel-project-billing', MIKKA_OPERATION_ACTION:'read', MIKKA_BILLING_FROM:'2026-11-01', MIKKA_BILLING_TO:'2026-11-20'}).action, 'read')
+  for (const date of ['2026-02-30', '2026-01-01', '../2026-11-01']) assert.throws(() => operationsInput({...env, MIKKA_OPERATION:'vercel-project-billing', MIKKA_OPERATION_ACTION:'read', MIKKA_BILLING_FROM:date, MIKKA_BILLING_TO:'2026-11-20'}))
 })
 
 test('the public operator scopes source credentials, keeps provider delivery private and never publishes raw evidence', async () => {
@@ -306,4 +308,36 @@ test('the public source fence rejects unmerged or dirty operations before privat
   await assert.rejects(verifyOperationsCheckout({...env, MIKKA_CF_OPERATIONS_SHA:pending}, {directory, fetchImpl}))
   canonicalMain = pending
   assert.equal((await verifyOperationsCheckout({...env, MIKKA_CF_OPERATIONS_SHA:pending}, {directory, fetchImpl})).operationsSource, pending)
+})
+
+
+test('the legacy inventory SDK source is an exact public main ancestor before dependency installation', async t => {
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'protected-inventory-source-')))
+  t.after(() => rm(directory, {recursive:true, force:true}))
+  await mkdir(join(directory, 'scripts/ops'), {recursive:true})
+  for (const file of ['package.json', 'pnpm-lock.yaml', 'scripts/ops/vercel-workflow-inventory.mjs']) await writeFile(join(directory, file), '{}\n')
+  const git = args => execFileSync('git', ['-C', directory, ...args], {encoding:'utf8', stdio:['ignore', 'pipe', 'pipe']}).trim()
+  git(['init', '--quiet'])
+  git(['remote', 'add', 'origin', 'https://github.com/alexj11324/Mikka.git'])
+  git(['add', '.'])
+  git(['-c', 'user.name=CI fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'public inventory reader'])
+  const source = git(['rev-parse', 'HEAD'])
+  const env = {...operatorEnv(), MIKKA_OPERATION:'vercel-workflow-inventory', MIKKA_OPERATION_ACTION:'read',
+    MIKKA_OPERATOR_PRODUCT_SHA:source, MIKKA_OBSERVE_ORIGINAL_EVE:'true', MIKKA_PUBLIC_ACTIONS_TOKEN:'synthetic-public-token'}
+  let mainAncestor = true
+  const fetchImpl = async (url, options) => {
+    assert.equal(url, `https://api.github.com/repositories/1427517699/compare/${source}...${env.GITHUB_SHA}?per_page=1`)
+    assert.equal(options.redirect, 'error')
+    assert.equal(options.headers.authorization, 'Bearer synthetic-public-token')
+    return Response.json({url:`https://api.github.com/repos/alexj11324/Mikka/compare/${source}...${env.GITHUB_SHA}`,
+      base_commit:{sha:source}, merge_base_commit:{sha:mainAncestor ? source : 'c'.repeat(40)},
+      status:mainAncestor ? 'ahead' : 'diverged', behind_by:mainAncestor ? 0 : 1, ahead_by:1})
+  }
+  assert.equal((await verifyOperationsProduct(env, {directory, fetchImpl})).productSource, source)
+  mainAncestor = false
+  await assert.rejects(verifyOperationsProduct(env, {directory, fetchImpl}))
+  mainAncestor = true
+  await writeFile(join(directory, 'pnpm-lock.yaml'), 'dirty\n')
+  await assert.rejects(verifyOperationsProduct(env, {directory, fetchImpl}))
+  await assert.rejects(verifyOperationsProduct({...env, MIKKA_OPERATOR_PRODUCT_SHA:sourceSha}, {directory, fetchImpl}))
 })
