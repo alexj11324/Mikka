@@ -2700,6 +2700,16 @@
       "sourceHash": "3578ae62ccaa91c089a1c969af0976a19bf562568b8cecd2db641818c5546e3d"
     },
     {
+      "path": "/mikka/api/tasks/dictation",
+      "template": "/api/tasks/dictation",
+      "source": "app/api/tasks/dictation/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "maxDuration": 120,
+      "sourceHash": "df8038322870969e198a94f9b22aac6d5726f42b86161a681f34e223fc0c5897"
+    },
+    {
       "path": "/mikka/api/tasks/[taskId]/attachments",
       "template": "/api/tasks/[taskId]/attachments",
       "source": "app/api/tasks/[taskId]/attachments/route.ts",

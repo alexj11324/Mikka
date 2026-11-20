@@ -811,7 +811,6 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       key={JSON.stringify([user.id, listWorkspaceId, section, activeTeam?.id, selectedProject?.id, activeBot?.id])}
       workspaceId={listWorkspaceId} open={creating} initialBotId={activeBot?.id}
       teamId={section.startsWith('team-') ? activeTeam?.id : undefined} projectId={selectedProject?.id} project={selectedProject?.name}
-      initialIntent={['my-issues', 'all-issues', 'team-issues', 'projects', 'team-projects'].includes(section) ? 'create_only' : 'create_and_dispatch'}
       onCreated={id => { refreshTaskPages(); open(id) }} onAdded={() => { void refreshTaskPages() }} initialText={typedAhead}
 
       onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />}

@@ -245,6 +245,7 @@ export const desktopActionSchemas = {
   'execution-settings.refreshBotModelMenuAction': tuple(bot),
   'execution-settings.chooseBotModel': tuple(bot, text(1000).min(1)),
   'issue-metadata.getIssuePropertyOptions': oneId,
+  'issue-metadata.getNewTaskOptions': oneId,
   'issue-metadata.updateIssueMetadata': tuple(object({ id: uuid, revision: positive, patch: metadata, inviteEmail: z.email().max(254).optional() })),
   'issue-operations.listIssueConnections': oneId,
   'issue-operations.updateIssueRelation': tuple(object({ id: uuid, revision: positive, targetId: uuid.nullable(), kind: z.enum(['parent', 'child', 'related', 'blockedBy', 'blocks', 'duplicate']), remove: bool.optional() })),

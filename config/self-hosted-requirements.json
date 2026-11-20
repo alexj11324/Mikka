@@ -600,6 +600,13 @@
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
   },
+  "app/api/tasks/dictation/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Transcribe a spoken new-task description with the person's own authorized OpenAI transcription key; nothing is stored.",
+    "test": "app/api/tasks/dictation/route.test.ts",
+    "suite": "test:issues"
+  },
   "app/api/tasks/[taskId]/review/machine-sessions/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -3832,6 +3839,48 @@
     "behavior": "Serialize one person's writes to a list in one workspace with a transaction-scoped PostgreSQL advisory lock, so pin and saved-view limits hold under concurrent requests.",
     "test": "lib/saved-views-store.db.test.ts",
     "suite": "test:settings-prefs-db"
+  },
+  "app/actions/issue-metadata.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task property reads and writes use PostgreSQL; the new-task options read lists active workspace members and visible labels, and assigning a Bot records its wake in the same transaction.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/coordinator-events.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Coordinator event inputs, including the task assignment and task activity wakes, are pure values stored in the installation's own PostgreSQL.",
+    "test": "lib/coordinator-events.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/task-activity-wake-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A task document save records Bot wakes for new comments and Bot mentions in the installation's own PostgreSQL, in the same transaction.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-activity-wake.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure rules for which Bots a task comment or mention wakes; no external service.",
+    "test": "lib/task-activity-wake.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/task-create-properties.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create-only task properties (assignee, due date, labels, access) are applied in the create transaction in the installation's own PostgreSQL.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-due-presets.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure local-date shortcuts for a new task's due date; no external service.",
+    "test": "lib/task-due-presets.test.ts",
+    "suite": "test:issues"
   },
   "lib/model-gateway/litellm-client.ts": {
     "mode": "operator-configured",

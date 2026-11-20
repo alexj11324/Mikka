@@ -2,7 +2,7 @@
 
 import { githubPullRequestKey, taskWorkOwner } from '@/lib/issue-metadata'
 
-import { useEffect, useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState, type ComponentType, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import useSWR from 'swr'
 import { useFormatter, useMessages, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
@@ -40,6 +40,9 @@ import type { IssueDiscussions } from './issue-editor'
 import { chronologicalActivity, pullRequestActivityEvents, taskActivityThreads, taskDiscussionEvents, type PullRequestActivitySource } from '@/lib/task-activity-timeline'
 import type { ActivityVersion } from '@/lib/issue-activity'
 import { PullRequestStatus } from './issue-pull-request-link'
+
+// Start work's window loads when it opens: its pickers read devices, Bots and profiles the task page does not need.
+const StartWorkDialog = lazy(() => import('@/components/coordinator/start-work-dialog').then(module => ({ default: module.StartWorkDialog })))
 
 type Issue = IssueView
 
@@ -143,6 +146,8 @@ export function FramedTask(props: FramedTaskProps) {
   const t = useTranslations('IssueDetail')
   const tCommon = useTranslations('Common')
   const tFrame = useTranslations('IssueDetail.frame')
+  const tNewTask = useTranslations('Shell.newTaskDialog')
+  const [startingWork, setStartingWork] = useState(false)
   const tDetail = useTranslations('Workspace.detail')
   const tDirectory = useTranslations('ConversationDirectory')
   const tThreads = useTranslations('IssueThreads')
@@ -380,6 +385,9 @@ export function FramedTask(props: FramedTaskProps) {
     : [...menu.items.map(item => item.id === 'assignee' ? { ...item, onSelect: undefined, submenu: assigneeItems } : item.id === 'project' ? { ...item, onSelect: undefined, submenu: projectItems } : item.id === 'labels' ? { ...item, onSelect: undefined, submenu: labelItems } : item),
       // The task page shows the team only once it has one (as Capy shows only set properties): the ⋯ menu sets it.
       ...team.unavailable || team.selected ? [] : [{ id: 'team', label: team.label, mark: { kind: 'icon', icon: 'team' } as const, submenu: rows.find(row => row.id === 'team')?.menu ?? [] } satisfies TaskMenuItem]]
+  // Start work: 新建任务 only registers a task, so its work starts here (decision 2026-11-19-2110).
+  const startWork = preview || locked ? undefined : { label: tNewTask('startWork'), onStart: () => setStartingWork(true) }
+  const startWorkItem: TaskMenuItem[] = startWork ? [{ id: 'startWork', label: startWork.label, mark: { kind: 'icon', icon: 'open' }, onSelect: startWork.onStart }] : []
   const created = new Date(task.createdAt)
   return <Frame
     taskId={preview ? undefined : task.id}
@@ -396,7 +404,8 @@ export function FramedTask(props: FramedTaskProps) {
       anchorRemoved: tActivity('anchorRemoved'), copyLink: tMenu('copyLink'), commentBy: name => tActivity('comment', { author: name }),
     }}
     favorite={menu.favorite}
-    menu={{ items: menuItems, disabled: !readerMenu && menu.disabled, onOpen: loadOptions }}
+    startWork={startWork}
+    menu={{ items: [...startWorkItem, ...menuItems], disabled: !readerMenu && menu.disabled, onOpen: loadOptions }}
     titleField={props.titleField} saveError={props.saveError} syncNotice={props.syncNotice}
     descriptionEditable={props.descriptionEditable}
     description={({ afterDescription, activity }) => props.editor(afterDescription, current => { discussions.current = current; return activity(current) })}
@@ -414,7 +423,8 @@ export function FramedTask(props: FramedTaskProps) {
     // Capy's line under the title: the code and how long ago it was made.
     meta={[task.identifier, format.relativeTime(created, now)].filter(Boolean).join(' · ')}
     panel={props.panel} wide={props.wide} resize={props.resize}
-    dialogs={<>{props.dialogs}{menu.dialogs}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={locked} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
+    dialogs={<>{props.dialogs}{menu.dialogs}{startingWork && <Suspense fallback={null}><StartWorkDialog open onOpenChange={setStartingWork} workspaceId={task.workspaceId ?? undefined}
+      task={{ id: task.id, identifier: task.identifier, title: props.title || task.title }} initialBotId={meta.delegate?.kind === 'bot' ? meta.delegate.id : undefined} /></Suspense>}<AccessChangeDialog change={metadata.accessChange} pending={metadata.pending} onConfirm={metadata.confirmAccess} onCancel={metadata.cancelAccessChange} /><IssueMetadataControls task={task} section="dialog" disabled={locked} onSaved={adopt} onBusyChange={props.onMetadataBusy} request={props.propertyRequest} /></>}
   />
 }
 
