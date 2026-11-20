@@ -30,7 +30,7 @@ test('a successful job cannot turn a failed or missing verification receipt into
   assert.equal(publicSummary(receipt(), { result: 'success' }).status, 'failed')
   const missing = publicSummary(null, { source: 'a'.repeat(40), result: 'failure' })
   assert.equal(missing.status, 'failed')
-  assert.equal(missing.failedStep, 'selection')
+  assert.equal(missing.failedStep, 'unknown')
   assert.throws(() => publicSummary(null, { source: 'not-a-sha', result: 'failure' }))
   const noProbe = { ...receipt(), status: 'passed', verification: undefined }
   assert.equal(publicSummary(noProbe, { result: 'success' }).status, 'failed')
@@ -43,7 +43,7 @@ test('early selection failures retain the requested target and receipts cannot c
   const failed = publicSummary(null, { source, result: 'failure', target: 'production' })
   assert.equal(failed.sourceCommit, source)
   assert.equal(failed.target, 'production')
-  assert.equal(failed.failedStep, 'selection')
+  assert.equal(failed.failedStep, 'unknown')
   assert.equal(failed.status, 'failed')
   assert.throws(() => publicSummary(receipt(), { source: 'b'.repeat(40), result: 'failure' }), /source_mismatch/)
   assert.throws(() => publicSummary(receipt(), { source, result: 'failure', target: 'production' }), /target_mismatch/)
@@ -183,4 +183,109 @@ test('a rejected admission creates or updates the failure issue without recordin
     assert.equal(calls.some(call => call.path.endsWith('/issues/2894/comments')), false)
     assert.doesNotMatch(JSON.stringify(calls), /Verified|Services: retained|operationsSource|operationsQualification|archiveSha256|9000|9001/)
   }
+})
+
+const preflightStep = 'Verify migration admission before preparing the product'
+const selectionStep = 'Select the latest verified main candidate and staging baseline'
+
+// The failed original attempt had selection success, preflight failure and a
+// skipped writer. No private summary was produced, so these API facts locate
+// the failure without proving a service plan, deployment or zero-writer receipt.
+function failedAttempt(target = 'staging') {
+  return { total_count: 1, jobs: [{ id: 2001, run_id: 1001, run_attempt: 2,
+    head_sha: 'e'.repeat(40), head_branch: 'main', name: target === 'production' ? 'pipeline-production' : 'pipeline',
+    status: 'completed', conclusion: 'failure', steps: [
+      { number: 9, name: selectionStep, status: 'completed', conclusion: 'success' },
+      { number: 15, name: preflightStep, status: 'completed', conclusion: 'failure' },
+      { number: 20, name: 'Deploy and verify staged service manifest', status: 'completed', conclusion: 'skipped' },
+      { number: 21, name: 'Upload pipeline receipts', status: 'completed', conclusion: 'success' },
+    ] }] }
+}
+
+async function missingSummaryRecord({ target = 'staging', jobs = failedAttempt(target), unavailable = false, result = 'failure' } = {}) {
+  const calls = []
+  const api = async (path, options = {}) => {
+    calls.push({ path, ...options })
+    if (path.includes('/actions/runs/')) {
+      if (unavailable) throw new Error('private.example synthetic-secret')
+      return jobs
+    }
+    if (!options.method && (path.includes('/deployments?') || path.includes('/issues?'))) return []
+    if (path.endsWith('/deployments')) return { id: 42 }
+    return { id: 1 }
+  }
+  await recordPipeline({ summary: publicSummary(null, { source: 'a'.repeat(40), result, target }),
+    runId: '1001', attempt: '2', driverSource: 'e'.repeat(40), api })
+  const deployment = calls.find(call => call.path.endsWith('/deployments')).body
+  const status = calls.find(call => call.path.endsWith('/statuses')).body
+  const issue = calls.find(call => call.path.endsWith('/issues')).body
+  return { calls, deployment, status, issue, summary: deployment.payload.manifest }
+}
+
+test('missing summaries record the actual failed workflow step without inventing deployment evidence', async () => {
+  for (const target of ['staging', 'production']) {
+    const { calls, deployment, status, issue, summary } = await missingSummaryRecord({ target })
+    assert.equal(summary.failedStep, 'migration-preflight')
+    assert.equal(summary.summaryAvailable, false)
+    assert.equal(deployment.payload.manifest.changedServices, null)
+    assert.equal(deployment.payload.manifest.retainedServices, null)
+    assert.equal(deployment.payload.manifest.services, null)
+    assert.equal(deployment.payload.manifest.productionPromoted, null)
+    assert.deepEqual(summary.workflowFailure, { jobId: '2001', stepNumber: 15, name: preflightStep })
+    assert.equal(status.state, 'failure')
+    assert.equal(status.auto_inactive, false)
+    assert.equal(deployment.ref, 'a'.repeat(40))
+    assert.match(issue.body, /Failed check: \*\*migration-preflight\*\*/)
+    assert.ok(issue.body.includes(preflightStep))
+    assert.match(issue.body, /deployment summary: \*\*unavailable\*\*/)
+    assert.match(issue.body, /Service changes: \*\*unknown\*\*/)
+    assert.doesNotMatch(JSON.stringify(calls), /Changed: none|retained: none|Services: retained|Verified service|not started|admission rejected|Production promoted: \*\*no\*\*/)
+    assert.equal(calls.some(call => call.path.endsWith('/issues/2894/comments')), false)
+    assert.equal(calls.filter(call => call.path.includes('/actions/runs/')).length, 1)
+    assert.equal(calls.find(call => call.path.includes('/actions/runs/')).path,
+      'alexj11324/Mikka/actions/runs/1001/attempts/2/jobs?per_page=100')
+  }
+})
+
+test('failure recording binds the original job attempt and never copies arbitrary step names or errors', async () => {
+  const cases = [
+    ['different run', jobs => { jobs.jobs[0].run_id = 1002 }],
+    ['different attempt', jobs => { jobs.jobs[0].run_attempt = 1 }],
+    ['different driver source', jobs => { jobs.jobs[0].head_sha = 'b'.repeat(40) }],
+    ['different branch', jobs => { jobs.jobs[0].head_branch = 'fork-branch' }],
+    ['different target', jobs => { jobs.jobs[0].name = 'pipeline-production' }],
+    ['incomplete job', jobs => { jobs.jobs[0].status = 'in_progress' }],
+    ['successful job', jobs => { jobs.jobs[0].conclusion = 'success' }],
+    ['skipped step', jobs => { jobs.jobs[0].steps[1].conclusion = 'skipped' }],
+    ['unknown step', jobs => { jobs.jobs[0].steps[1].name = 'private.example synthetic-secret' }],
+    ['ambiguous jobs', jobs => { jobs.jobs.push(structuredClone(jobs.jobs[0])); jobs.total_count++ }],
+    ['incomplete inventory', jobs => { jobs.total_count++ }],
+  ]
+  for (const [name, mutate] of cases) {
+    const jobs = failedAttempt()
+    mutate(jobs)
+    const { calls, summary, status, issue } = await missingSummaryRecord({ jobs })
+    assert.equal(summary.failedStep, 'unknown', name)
+    assert.equal(summary.workflowFailure, undefined, name)
+    assert.equal(status.state, 'failure', name)
+    assert.match(issue.body, /Service changes: \*\*unknown\*\*/, name)
+    assert.doesNotMatch(JSON.stringify(calls), /private\.example|synthetic-secret/, name)
+  }
+  const unavailable = await missingSummaryRecord({ unavailable: true })
+  assert.equal(unavailable.summary.failedStep, 'unknown')
+  assert.equal(unavailable.status.state, 'failure')
+  assert.doesNotMatch(JSON.stringify(unavailable.calls), /private\.example|synthetic-secret/)
+  const missingAfterSuccess = await missingSummaryRecord({ result: 'success' })
+  assert.equal(missingAfterSuccess.status.state, 'failure')
+})
+
+test('a verified selection failure remains selection and the earliest failure wins over receipt upload', async () => {
+  const jobs = failedAttempt()
+  jobs.jobs[0].steps[0].conclusion = 'failure'
+  jobs.jobs[0].steps[1].conclusion = 'skipped'
+  jobs.jobs[0].steps[3].conclusion = 'failure'
+  const { summary, issue } = await missingSummaryRecord({ jobs })
+  assert.equal(summary.failedStep, 'selection')
+  assert.deepEqual(summary.workflowFailure, { jobId: '2001', stepNumber: 9, name: selectionStep })
+  assert.match(issue.body, /Failed check: \*\*selection\*\*/)
 })
