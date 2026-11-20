@@ -64,7 +64,7 @@ export type AutomationDraft = {
   /** 满足任一条件就运行: Slack event triggers, on channels of the workspace's Slack installation. */
   slack: SlackTriggerDraft[]
   /** 运行后发到 Slack: the channel and the locale the posts are written in; null is off. */
-  notify: { channel: string; locale: 'zh-CN' | 'en' } | null
+  notify: { channel: string; locale: 'zh-CN' | 'en'; postAsRunner?: boolean; quiet?: boolean } | null
   /** Webhook: its own URL starts a run; null is off, otherwise the minutes requests are gathered into one run. */
   webhook: number | null
   /** A chat-made automation's own task (reminder, snapshot, read): kept as it is. */

@@ -209,6 +209,8 @@ export const desktopActionSchemas = {
   'automations.takeOverAutomation': tuple(object({ scheduleId: uuid, version: positive }), workspace),
   'automations.automationWebhookKey': tuple(object({ scheduleId: uuid, version: positive }), workspace),
   'automations.duplicateAutomation': tuple(object({ scheduleId: uuid, targetWorkspaceId: uuid, requestId: uuid }), workspace),
+  'automations.setAutomationRunAs': tuple(object({ scheduleId: uuid, version: positive, userId: id.nullable() }), workspace),
+  'automations.automationRunAsChoices': inWorkspace,
   'automations.automationLinearLabels': tuple(uuid),
   'automations.automationLinearTeams': none,
   'automations.automationSlackChannels': inWorkspace,

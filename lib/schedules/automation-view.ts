@@ -18,6 +18,10 @@ export type AutomationView = {
   owner_name?: string | null
   /** The creator's picture (null without one). */
   owner_image?: string | null
+  /** Runs as: the member each dispatched run acts, is billed and posts as; null is the creator. */
+  run_as_user_id?: string | null
+  /** That member's name in this workspace (null when they left it). */
+  run_as_name?: string | null
   /** Why the host paused it (the creator lost the authority it runs on); null when a person paused it or it runs. */
   disabled_reason?: string | null
   /** 接手 is offered: the reader is an owner or admin and someone else created it. */

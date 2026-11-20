@@ -80,7 +80,8 @@ test('a stored request keeps its valid run settings when one field does not fit,
   assert.deepEqual(parseRunSettings('pin'), { settings: {}, dropped: ['run'] })
 })
 
-test('a command the store has no branch for is refused, never read as another action', () => {
+test('run_as is a command of its own; an action the store has no branch for is refused', () => {
   const id = '0f8a4a62-8f3f-4c2f-a1f8-5d6b2a0c9e11'
-  assert.equal(commandSchema.safeParse({ action: 'run_as', scheduleId: id, version: 1, userId: null }).success, false)
+  assert.equal(commandSchema.safeParse({ action: 'run_as', scheduleId: id, version: 1, userId: null }).success, true)
+  assert.equal(commandSchema.safeParse({ action: 'run_as_someone', scheduleId: id, version: 1, userId: null }).success, false)
 })
