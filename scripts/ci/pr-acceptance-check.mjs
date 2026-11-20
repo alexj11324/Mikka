@@ -22,11 +22,11 @@ export function acceptanceSection(body = '') {
     }
     const heading = !fence && line.match(/^ {0,3}(#{1,2})\s+(.+?)\s*#*\s*$/)
     if (heading) {
-      if (current) sections.push(current.join('\n').trim())
+      if (current) sections.push(current.join('\n'))
       current = heading[1] === '##' && /^Acceptance\s*:?$/i.test(heading[2]) ? [] : null
     } else if (current) current.push(line)
   }
-  if (current) sections.push(current.join('\n').trim())
+  if (current) sections.push(current.join('\n'))
   return sections
 }
 
@@ -35,10 +35,23 @@ function field(section, name) {
   return match?.[1]?.trim() ?? ''
 }
 
+function withoutExamples(section) {
+  let fence = null
+  return section.split('\n').filter(line => {
+    const delimiter = line.match(/^ {0,3}(`{3,}|~{3,})/)
+    if (delimiter) {
+      if (!fence) fence = delimiter[1]
+      else if (delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length) fence = null
+      return false
+    }
+    return !fence && !/^(?: {4}|\t)/.test(line)
+  }).join('\n')
+}
+
 function hasImage(section) {
   // GitHub uploads usually have no filename extension. Only rendered Markdown
   // images, img tags, or explicit image-file links establish screenshot syntax.
-  const visible = section.replace(/^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?^ {0,3}\1[ \t]*$/gm, '')
+  const visible = withoutExamples(section)
   return /!\[[^\]]*\]\(\s*https?:\/\/[^\s)]+(?:\s+["'][^"']*["'])?\s*\)/i.test(visible) ||
     /<img\b[^>]*\bsrc\s*=\s*["']https?:\/\/[^"']+["'][^>]*>/i.test(visible) ||
     /https?:\/\/[^\s)<>]+\.(?:png|jpe?g|webp|gif)(?=[\s)<>?]|$)/i.test(visible)
@@ -54,7 +67,7 @@ export function inspectAcceptance({ body, files = [], draft = false } = {}) {
   if (sections.length !== 1) return {
     status: 'fail', mode: null, errors: [sections.length ? 'acceptance.duplicate' : 'acceptance.missing'], uiFiles,
   }
-  const section = sections[0]
+  const section = withoutExamples(sections[0])
   const errors = []
   const notNeeded = section.match(/^[ \t]*(?:[-*][ \t]+)?Not needed[ \t]*:[ \t]*([^\n]*)/im)
   const productionOnly = section.match(/^[ \t]*(?:[-*][ \t]+)?Production only[ \t]*:[ \t]*([^\n]*)/im)

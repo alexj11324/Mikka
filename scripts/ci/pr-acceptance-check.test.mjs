@@ -22,6 +22,9 @@ test('requires a visible non-placeholder section', async t => {
     ['placeholder', '## Acceptance\nTBD', 'acceptance.placeholder'],
     ['commented section', '<!-- ## Acceptance\nNot needed: documentation -->', 'acceptance.missing'],
     ['example in a fence', '```md\n## Acceptance\nNot needed: documentation\n```', 'acceptance.missing'],
+    ['fenced declaration', '## Acceptance\n```md\nNot needed: documentation\n```', 'acceptance.placeholder'],
+    ['unclosed fenced declaration', '## Acceptance\n```md\nNot needed: documentation', 'acceptance.placeholder'],
+    ['indented declaration', '## Acceptance\n    Not needed: documentation', 'acceptance.placeholder'],
     ['duplicate', `${evidence}\n## Acceptance\nNot needed: docs`, 'acceptance.duplicate'],
   ]) await t.test(name, () => assert(inspectAcceptance({ body }).errors.includes(error)))
 })

@@ -4,7 +4,7 @@ import test from 'node:test'
 import { checkPullRequest } from './pr-acceptance-github.mjs'
 
 const head = '679022e02d24c445bcf23235e1e68ff757830d84'
-async function github(t, { files = [{ filename: 'docs/guide.md' }], body = '', draft = false, changeOnRead } = {}) {
+async function github(t, { files = [{ filename: 'docs/guide.md' }], body = '', draft = false, changeOnRead, readStatus = 200 } = {}) {
   const pr = { state: 'open', head: { sha: head }, base: { sha: 'b'.repeat(40) }, body, draft, changed_files: files.length, labels: [] }
   const writes = [], pages = []
   let reads = 0, labelExists = false
@@ -18,7 +18,7 @@ async function github(t, { files = [{ filename: 'docs/guide.md' }], body = '', d
     if (req.url === '/repos/example/project/pulls/7') {
       reads++
       if (changeOnRead) changeOnRead(pr, reads)
-      reply(200, pr)
+      reply(readStatus, pr)
     } else if (req.url.startsWith('/repos/example/project/pulls/7/files?')) {
       const page = Number(new URL(req.url, 'http://127.0.0.1').searchParams.get('page'))
       pages.push(page)
@@ -101,4 +101,21 @@ test('publishing fails closed for an incomplete GitHub file inventory', async t 
   fixture.pr.changed_files = 3001
   await assert.rejects(checkPullRequest(fixture.args), { code: 'prAcceptanceFileInventoryIncomplete' })
   assert.deepEqual(fixture.writes.map(item => item.data.state), ['pending'])
+})
+
+test('an edited webhook invalidates the same-head success before a failed PR read', async t => {
+  const fixture = await github(t, { readStatus: 503 })
+  await assert.rejects(checkPullRequest({ ...fixture.args, eventHead: head }), { code: 'prAcceptanceGitHubHttp503' })
+  assert.deepEqual(fixture.writes.map(item => [item.path, item.data.state]), [
+    [`/repos/example/project/statuses/${head}`, 'pending'],
+  ])
+})
+
+test('a delayed webhook checks and publishes the current head instead of reusing its event head', async t => {
+  const fixture = await github(t, { body: '## Acceptance\nNot needed: documentation only.' })
+  fixture.pr.head.sha = 'c'.repeat(40)
+  assert.equal((await checkPullRequest({ ...fixture.args, eventHead: head })).head, fixture.pr.head.sha)
+  assert.deepEqual(fixture.writes.map(item => [item.path.split('/').at(-1), item.data.state]), [
+    [head, 'pending'], [fixture.pr.head.sha, 'pending'], [fixture.pr.head.sha, 'success'],
+  ])
 })
