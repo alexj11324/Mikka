@@ -11,30 +11,33 @@ pmOnFail: ignore
 
 # pnpm 11 stops an install while any dependency's build script has no decision (ERR_PNPM_IGNORED_BUILDS), so every
 # package that ships one needs a value here — a placeholder reads as a string and fails the install just as loudly.
+# A value also decides the build itself, so the ones main left undecided stay `false`: that is the behaviour those
+# installs already had, and compiling a native binding that nothing externalizes makes Eve's bundler read a .node
+# file as JavaScript (UNLOADABLE_DEPENDENCY on @mongodb-js/zstd).
 allowBuilds:
-  # true: the script is what makes the package usable — it compiles or downloads a native binding, or fetches the
-  # Workers runtime every dev server and deploy runs on.
-  '@mongodb-js/zstd': true
+  # true: the script is what makes the package usable — it compiles or downloads the native binary the app loads.
   '@parcel/watcher': true
   '@swc/core': true
-  cbor-extract: true
   electron: true
   esbuild: true
   ffmpeg-static: true
-  node-liblzma: true
   sharp: true
-  workerd: true
 
   # false: the script only prints a funding message, registers a daemon cache, refreshes a data file that ships with
-  # the package, copies a Windows-only 7-Zip binary onto a repo that has no Windows runner, or sends telemetry it
-  # already guards with try/catch. None of it is needed to run what this repo uses the package for.
+  # the package, compiles a native binding this repo does not externalize from Eve's bundle, copies a Windows-only
+  # 7-Zip binary onto a repo that has no Windows runner, or sends telemetry it already guards with try/catch. None of
+  # it is needed to run what this repo uses the package for.
+  '@mongodb-js/zstd': false
   '@openuidev/lang-core': false
+  cbor-extract: false
   core-js: false
   core-js-pure: false
   electron-winstaller: false
   free-email-domains: false
+  node-liblzma: false
   nx: false
   tesseract.js: false
+  workerd: false
 
 patchedDependencies:
   '@fantasticfour/world-cloudflare@2.4.3': patches/@fantasticfour__world-cloudflare@2.4.3.patch
