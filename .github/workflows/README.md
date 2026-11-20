@@ -266,6 +266,22 @@ publish from a red PR. The workflows bootstrap the trusted Nx selector from
 `origin/main` and the immutable base; documentation-only PRs still publish their required gate names.
 CI source changes are not classified as documentation-only.
 
+## Protected Cloudflare operations
+
+`cloudflare-operations.yml` is the public protected entry for existing private
+operator capabilities. It verifies the actual main workflow, owner and OIDC
+claims before source credential access, then verifies the selected private
+checkout belongs to canonical operations main before installing or importing it.
+The private driver independently checks source and original Cloud Services
+qualification before selecting provider credentials and the fixed operation.
+
+The entry uses `cloudflare-runtime-release`, a read-only repository-scoped source
+App token and a separate public Actions token. Provider locators, operation
+requests, raw reports and recovery records stay private. Public output contains
+the operation status and a checksum for evidence retained and read back from the
+existing private storage. The original private workflows and prior receipts stay
+intact during the transition; source checks do not establish runtime acceptance.
+
 ## Official UI overlay
 
 There is one UI ([decision](../../docs/design/decisions/2026-11-08-2133-one-ui.md)).
