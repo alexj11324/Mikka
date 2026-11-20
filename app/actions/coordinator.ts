@@ -2,7 +2,6 @@
 
 import { singleFlight } from '@/lib/single-flight'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
-import { desktopHumanSessionId } from '@/lib/desktop-rpc/session'
 import { ownerListRead } from '@/lib/live/list-read-server'
 import { beginOwnerListRead, readRevisions } from '@/lib/live/revision-read'
 import { withReadOnlyPolicyObservation } from '@/lib/desktop-rpc/read-batch-context'
@@ -17,9 +16,8 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
-import type { UserImageInput } from '@/lib/coordinator/user-attachments'
-import { personalSubmissionInput, personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
-import { botChats, chatVersionState, chatView, citationSources, storedReasoning, sendRetryOf, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
+import { personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
+import { botChats, chatVersionState, chatView, citationSources, storedReasoning, type BotChatSummary, type ChatView } from '@/lib/coordinator/store'
 import * as chatStore from '@/lib/coordinator/store'
 import { refreshChatMetadata, type UnchangedChat } from '@/lib/coordinator/chat-poll'
 import type { CitationSource } from '@/lib/coordinator/citations'
@@ -27,24 +25,17 @@ import { reasoningText } from '@/lib/coordinator/reasoning-mask'
 import { credentialChatFingerprints } from '@/lib/credentials/chat-guard'
 import { and, eq, sql } from 'drizzle-orm'
 import { chatBotId, type openChatBotId } from '@/lib/coordinator/coordinator-bot'
-import { bots, devices } from '@/lib/db/schema'
-import { taskDestinationSchema, type TaskDestination } from '@/lib/task-destination'
-import { taskTitleInputSchema } from '@/lib/task-title-input'
-import { QUOTE_TEXT_MAX, withQuote, type ArtifactQuote } from '@/lib/artifacts/quote'
-import { NOTE_MAX, NOTES_MAX, withBrowserNotes, type BrowserNote } from '@/lib/browser/note'
+import { bots } from '@/lib/db/schema'
 import { coordinatorEnabled, wakeCoordinator } from '@/lib/coordinator/wake'
 import { coordinatorWelcome } from '@/lib/agent-welcome'
 import { suggestionInboxChanged } from '@/lib/inbox/live'
 import { claimSuggestion, readClaimedSuggestion } from '@/lib/suggestions/store'
 import { suggestionMessage } from '@/lib/suggestions/card'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
-import { AgentProfileError } from '@/lib/factory/agent-profile-definition'
-import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from '@/lib/factory/agent-profile-reference'
 import { cacheReadAction } from '@/lib/cache-read-action'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
-import { actAs } from '@/lib/acting-user'
 
 async function getUser() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -60,23 +51,18 @@ async function getUserId(): Promise<string> {
 export type CoordinatorChat = ChatView & { botId: string; enabled: boolean; version?: string; after?: number; baseCursor?: number; metadataRefresh?: boolean; live?: ListLiveRead }
 
 const botIdSchema = z.uuid().nullable()
-const expectedWorkspaceIdSchema = z.uuid().transform(value => value.toLowerCase()).optional()
 
 /**
  * The bot whose chat this is: `botId` if it is one of the person's, or their
  * Coordinator's bot row when the caller names none (the Coordinator's entry
  * in the bot list).
  */
-async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string | null | undefined, expectedWorkspaceId?: string): Promise<{ id: string; name: string; coordinator: boolean; workspaceId: string }> {
+async function ownBot(user: Parameters<typeof openChatBotId>[0], botId: string | null | undefined): Promise<{ id: string; name: string; coordinator: boolean; workspaceId: string }> {
   const userId = user.id
   const parsed = botIdSchema.safeParse(botId ?? null)
-  const expected = expectedWorkspaceIdSchema.safeParse(expectedWorkspaceId)
-  if (!parsed.success || !expected.success) throw new ActionFailureError('validationGeneric')
+  if (!parsed.success) throw new ActionFailureError('validationGeneric')
   // No bot named: the Coordinator of the workspace the person has open.
   const context = await loadWorkspaceContext(undefined, user)
-  // A captured expectation cannot select or authorize a workspace. Refuse it
-  // before ensuring a Coordinator, then resolve in this same trusted context.
-  if (expected.data !== undefined && expected.data !== context.workspace.id) throw new ActionFailureError('workspaceAccessDenied')
   const id = await chatBotId(userId, parsed.data, context.workspace.id)
   const [bot] = await db.select({ id: bots.id, name: bots.name, workspaceId: bots.workspaceId, coordinator: sql<boolean>`exists (select 1 from coordinator_bots cb where cb."botId" = ${bots.id})` })
     .from(bots).where(and(eq(bots.id, id), eq(bots.ownerId, userId), eq(bots.workspaceId, context.workspace.id))).limit(1)
@@ -180,18 +166,6 @@ export async function coordinatorHistory(botId: string | null, through: number, 
   })
 }
 
-const quoteSchema = z.object({
-  artifactId: z.uuid(), version: z.number().int().min(1), kind: z.enum(['text', 'element']),
-  text: z.string().trim().min(1).max(QUOTE_TEXT_MAX), label: z.string().max(200).optional(), selector: z.string().max(1000).optional(),
-})
-
-const notesSchema = z.array(z.object({
-  n: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER), kind: z.enum(['element', 'region']), url: z.url({ protocol: /^https?$/ }).max(2000),
-  label: z.string().trim().min(1).max(200), note: z.string().trim().min(1).max(NOTE_MAX),
-  selector: z.string().max(1000).optional(),
-  rect: z.object({ x: z.number(), y: z.number(), width: z.number().min(0), height: z.number().min(0), viewportWidth: z.number().min(0), viewportHeight: z.number().min(0) }).optional(),
-}).strict()).max(NOTES_MAX)
-
 const citedIdsSchema = z.array(z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/)).min(1).max(50)
 
 /**
@@ -241,72 +215,6 @@ async function readBotChatSummaries() {
   const begun = await beginOwnerListRead(ownerId, ['bot_chat_list'])
   const snapshot = await chatStore.botChatSnapshot({ ...user, [tokenWorkspace]: context.workspace.id })
   return { items: snapshot.items, live: await ownerListRead(ownerId, snapshot.expiries, snapshot.observedAt, begun) }
-}
-
-/** Sends a message to the Coordinator or one of the person's bots, with a quote from an artifact and notes from the browser in front if given; the reply shows up in the chat. */
-export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote | null, botId: string | null = null, submissionId?: string, taskDestination?: TaskDestination, notes?: readonly BrowserNote[] | null, images?: readonly UserImageInput[], retryOf?: number, profileId?: string, expectedWorkspaceId?: string, taskTitle?: string): Promise<ActionResult<{ queued: true }>> {
-  return runAction(async () => {
-    const requestHeaders=await headers()
-    const session=await auth.api.getSession({headers:requestHeaders})
-    if(!session?.user)throw new ActionFailureError('authRequired')
-    const userId=session.user.id
-    let humanSessionId:string|undefined=desktopHumanSessionId()===session.session.id?session.session.id:undefined
-    if(!requestHeaders.has('authorization')&&requestHeaders.get('cookie')){
-      try{const origin=new URL(requestHeaders.get('origin')??'');const host=requestHeaders.get('x-forwarded-host')??requestHeaders.get('host')
-        if(['http:','https:'].includes(origin.protocol)&&origin.host===host)humanSessionId=session.session.id
-      }catch{/* Missing/malformed origin is no approval provenance. */}
-    }
-    const bot = await ownBot(session.user, botId, expectedWorkspaceId)
-    const parsed = personalSubmissionInput.safeParse({ text, submissionId, ...(images?.length ? { images } : {}) })
-    if (!parsed.success) throw new ActionFailureError('messageRequired')
-    const quoted = quote ? quoteSchema.safeParse(quote) : null
-    if (quoted && !quoted.success) throw new ActionFailureError('messageRequired')
-    const noted = notes != null ? notesSchema.safeParse(notes) : null
-    if (noted && !noted.success) throw new ActionFailureError('messageRequired')
-    const withNotes = withBrowserNotes(parsed.data.text, noted?.data)
-    if (withNotes === null) throw new ActionFailureError('messageTooLong')
-    const destination = taskDestinationSchema.optional().safeParse(taskDestination)
-    if (!destination.success) throw new ActionFailureError('validationGeneric')
-    const profile = agentProfileReferenceSchema.optional().safeParse(profileId)
-    if (!profile.success) throw new ActionFailureError('validationGeneric')
-    const title = taskTitleInputSchema.optional().safeParse(taskTitle)
-    if (!title.success) throw new ActionFailureError('validationGeneric')
-    const taskSubmission = Boolean(destination.data || profile.data || title.data)
-    if (profile.data && profile.data !== BUILTIN_AGENT_PROFILE_ID) {
-      try {
-        const row = await (await import('@/lib/factory/agent-profile-store')).readProfileRow((await import('@/lib/db')).pool, { ownerId: userId, workspaceId: await (await import('@/lib/execution-settings')).executionWorkspace(userId, bot.id) }, profile.data)
-        if (row.archivedAt || !row.definition.enabled) throw new ActionFailureError('runInvalid')
-      } catch (error) { if (error instanceof AgentProfileError) throw new ActionFailureError('runInvalid'); throw error }
-    }
-    if (taskSubmission && !issueMutationsEnabled()) throw new ActionFailureError('issueToolsDisabled')
-    // A new task is handed to the Coordinator to create; with no Coordinator here, say so instead of queueing it silently.
-    if (taskSubmission && !await coordinatorEnabled(userId, bot.id)) throw new ActionFailureError('coordinatorUnavailable')
-    if (taskSubmission && !parsed.data.submissionId) throw new ActionFailureError('validationGeneric')
-    if (destination.data?.kind === 'device') {
-      const [device] = await db.select({ id: devices.id }).from(devices)
-        .where(and(eq(devices.id, destination.data.deviceId), eq(devices.ownerId, userId), eq(devices.kind, 'local'), eq(devices.enabled, true))).limit(1)
-      if (!device) throw new ActionFailureError('deviceNotFound')
-    }
-    // 重新发送 on a failed message (retryOf: its position) retries it in place: that message is marked and the
-    // new attempt stands for it (store.sendRetryOf). A position that does not qualify is ignored.
-    const retried = z.number().int().positive().optional().safeParse(retryOf)
-    const message = withQuote(withNotes, quoted?.data)
-    // Validate files before a retry holds its message row/connection; concurrent retries must not exhaust the pool.
-    if (message.includes('[mikka-file:')) { const { validateChatFiles } = await import('@/lib/chat-attachments/store'); try { await validateChatFiles(userId, { kind: 'bot', id: bot.id }, message) } catch { throw new ActionFailureError('messageRequired') } }
-    const reader = { id: userId, [tokenWorkspace]: bot.workspaceId, [enterprisePrincipal]: { kind: 'session' as const, sessionId: session.session.id } }
-    const record = (executor: Parameters<typeof recordPersonalSubmission>[0]) => actAs(reader, () => recordPersonalSubmission(executor, userId, message, { botId: bot.id, submissionId: parsed.data.submissionId, images: parsed.data.images, taskDestination: destination.data, profileId: profile.data, taskTitle: title.data, filesValidated: true, ...(humanSessionId ? { humanSessionId } : {}) }))
-    try {
-      // Already retried (a double click, two sends at once): nothing more is sent.
-      if (retried.success && retried.data !== undefined) { if (await sendRetryOf(userId, bot.id, retried.data, record) === null) return { queued: true as const } }
-      else await record(db)
-    }
-    catch (error) {
-      if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
-      throw error
-    }
-    afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
-    return { queued: true as const }
-  })
 }
 
 /**

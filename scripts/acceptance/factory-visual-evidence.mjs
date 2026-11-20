@@ -11,6 +11,7 @@
  * program never emits an HTTP body, cookie, prompt, tool output or raw error.
  * Outputs are closed projections plus the fixture's actual downloaded media.
  */
+import { submitEveMessage } from './eve-session.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -885,9 +886,10 @@ export async function runProductionCase(proof, item, { env = process.env, fetchI
     live = await openLiveImpl(path => client.json(path), scope.workspaceId, { now })
     const trace = sampledRequestTrace()
     const input = initialRequest(fixtureData, { issueId: record.issueId, botId, profileId: profile.id, item })
-    const queued = await lease.write(() => client.rpc('coordinator.sendCoordinatorMessage', [input, null, botId, randomUUID(), { kind: 'cloud' }, null, [], { $mikka: 'undefined' }, profile.id],
-      { headers: { traceparent: trace.traceparent } }))
-    check(queued.queued === true, 'dispatch'); result.initialRequestSent = true
+    await lease.write(() => submitEveMessage(client, botId, input, randomUUID(),
+      { taskDestination: { kind: 'cloud' }, profileId: profile.id, expectedWorkspaceId: scope.workspaceId, expectedOwnerId: scope.ownerId },
+      { traceparent: trace.traceparent }))
+    result.initialRequestSent = true
     const deadline = now() + timeoutMs
     let positiveState
     if (!fixtureData.repository) {
