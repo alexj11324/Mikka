@@ -3849,5 +3849,14 @@
     "behavior": "The shape of an automation's run settings (Environment, model and effort, machine size, pin) carried on a task command; no environment input and no server dependency.",
     "test": "lib/schedules/dispatch.db.test.ts",
     "suite": "test:schedules-db"
+  },
+  "drizzle/20261120052101_schedule_run_as.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Keep the workspace member an automation runs as in the installation PostgreSQL database; NULL runs as its creator.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
   }
 }
