@@ -22,6 +22,7 @@ import { Alert, AlertTitle } from '@/components/ui/alert'
 import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import { Message, MessageContent, MessageFooter } from '@/components/ui/message'
 import { MessageScroller, MessageScrollerButton, MessageScrollerContent, MessageScrollerItem, MessageScrollerProvider, MessageScrollerViewport, useMessageScroller } from '@/components/ui/message-scroller'
+import { currentUiPreferences } from '@/lib/ui-preferences'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
@@ -155,7 +156,12 @@ function FollowSentMessages({ count }: { count: number | null }) {
   const seen = useRef(count)
   useEffect(() => {
     if (count === null) return
-    if (seen.current !== null && count > seen.current) scrollToEnd()
+    if (seen.current !== null && count > seen.current) {
+      if (currentUiPreferences().scrollNewToTop) {
+        const items = document.querySelectorAll('[data-slot="message-scroller-item"]')
+        items[items.length - 1]?.scrollIntoView({ block: 'start' })
+      } else scrollToEnd()
+    }
     seen.current = count
   }, [count, scrollToEnd])
   return null

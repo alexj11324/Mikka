@@ -3,6 +3,7 @@ import test from 'node:test'
 import { ActionFailureError } from './action-error'
 import { instructionsWithMemory, instructionsWithPersonal } from './coordinator/context'
 import { parsePreferencesPatch, PERSONAL_INSTRUCTIONS_MAX } from './preferences'
+import { DEFAULT_UI, normalizeUi, runKeyAction } from './ui-preferences'
 import { sendsMessage, type ComposerKey } from './send-key'
 import { isIanaTimeZone } from './suggestions/time-zone'
 
@@ -60,5 +61,12 @@ test('preferences patch: new fields parse, bad input becomes an action error', (
   assert.equal(code({ sendKey: 'space' }), 'validationGeneric')
   assert.equal(code({ dailySuggestions: 'yes' }), 'validationGeneric')
   assert.equal(code({ suggestionSources: {} }), 'validationGeneric', 'sources have their own action')
+  assert.deepEqual(parsePreferencesPatch({ ui: { scrollNewToTop: false, enterAction: 'queue' } }).ui, { scrollNewToTop: false, enterAction: 'queue' })
+  assert.equal(code({ ui: { enterAction: 'send' } }), 'validationGeneric')
+  assert.deepEqual(normalizeUi({}), DEFAULT_UI)
+  assert.equal(normalizeUi({ pinPages: true }).pinPages, true)
+  assert.equal(runKeyAction({ key: 'Enter', metaKey: false, ctrlKey: false, altKey: true, shiftKey: false, isComposing: false }), 'queue')
+  assert.equal(runKeyAction({ key: 'Enter', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, isComposing: false }), 'interrupt')
+  assert.equal(runKeyAction({ key: 'Enter', metaKey: false, ctrlKey: false, altKey: false, shiftKey: true, isComposing: false }), null)
   assert.equal(code(null), 'validationGeneric')
 })

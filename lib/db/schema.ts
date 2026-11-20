@@ -1,6 +1,7 @@
 import type { ExecutionIdentity } from '../execution-identity'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
 import type { SendKey } from '../send-key'
+import type { UiPreferences } from '../ui-preferences'
 import { pgTable, text, uuid, smallint, varchar, jsonb, bigint, integer, real, date, timestamp, primaryKey, index, unique, uniqueIndex, boolean, customType, check, foreignKey, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type { JSONContent } from '@tiptap/react'
@@ -1418,6 +1419,8 @@ export const userPreferences = pgTable('user_preferences', {
   dailySuggestions: boolean('dailySuggestions').notNull().default(true),
   /** Composio app id -> false for each app turned off as a suggestions source; a missing app is on. */
   suggestionSources: jsonb('suggestionSources').$type<Record<string, boolean>>().notNull().default({}),
+  /** Interface preferences (常规, 外观). Empty means the defaults in lib/ui-preferences.ts. */
+  uiPreferences: jsonb('uiPreferences').$type<UiPreferences>().notNull().default({}),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
 

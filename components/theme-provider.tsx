@@ -4,6 +4,7 @@ import * as React from "react"
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes"
 import { MotionConfig } from "motion/react"
 import { typingOrDialog } from "@/lib/shortcut-guard"
+import { useUiPreferences } from "@/hooks/settings/use-ui-preferences"
 
 function ThemeProvider({
   children,
@@ -18,10 +19,16 @@ function ThemeProvider({
       {...props}
     >
       <ThemeHotkey />
+      <UiPreferencesApply />
       {/* Every motion component follows the OS reduced-motion setting, without its own useReducedMotion. */}
       <MotionConfig reducedMotion="user">{children}</MotionConfig>
     </NextThemesProvider>
   )
+}
+
+function UiPreferencesApply() {
+  useUiPreferences()
+  return null
 }
 
 function ThemeHotkey() {

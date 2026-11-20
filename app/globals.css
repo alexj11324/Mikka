@@ -414,3 +414,15 @@ body {
 }
 }
 
+/* Interface preferences (lib/ui-preferences.ts). Unset, these match the previous defaults. */
+html[data-code-size] pre,
+html[data-code-size] code {
+  font-size: var(--code-font-size, 14px);
+}
+html[data-hidden-files="hide"] [data-hidden-file] { display: none; }
+html[data-hidden-files="dim"] [data-hidden-file] { opacity: 0.4; }
+html[data-diff-color="blue"] [data-diff="add"] { background: color-mix(in oklab, #2365db 18%, transparent); }
+html[data-diff-color="redGreen"] [data-diff="add"] { background: color-mix(in oklab, #3f8f4e 18%, transparent); }
+html[data-diff-color="redGreen"] [data-diff="remove"] { background: color-mix(in oklab, #d14343 18%, transparent); }
+html[data-diff-view="split"] [data-diff-row] { display: grid; grid-template-columns: 1fr 1fr; }
+

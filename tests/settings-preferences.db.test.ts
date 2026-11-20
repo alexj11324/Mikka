@@ -70,6 +70,7 @@ dbTest('every action needs a session', async () => {
 
 dbTest('preferences read both optional owner rows in one statement without losing defaults or isolation', async t => {
   const { readPreferences, DEFAULT_PREFERENCES } = await import('@/lib/preferences')
+  const { DEFAULT_UI } = await import('@/lib/ui-preferences')
   const { withDatabaseClient } = await import('@/lib/db')
   const { db, pool, schema } = m
   const owner = 'test-preference-read-' + randomUUID(), peer = 'test-preference-peer-' + randomUUID()
@@ -90,7 +91,7 @@ dbTest('preferences read both optional owner rows in one statement without losin
     memoryEnabled: false, sendKey: 'modEnter' as const, personalInstructions: 'Synthetic owner preference',
     dailySuggestions: true,
   }
-  const shown = { ...stored, dailySuggestions: false, proactive: true }
+  const shown = { ...stored, dailySuggestions: false, proactive: true, ui: DEFAULT_UI }
   try {
     await withDatabaseClient(client, async () => {
       await client.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now()),($3,$3,$4,true,now(),now())',
