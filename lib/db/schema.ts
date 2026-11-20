@@ -76,9 +76,12 @@ export const issues = pgTable('issues', {
   scopeSetBy: text('scopeSetBy').$type<'agent' | 'user'>().notNull().default('agent'),
   scopeConfidence: real('scopeConfidence'),
   revision: integer('revision').notNull().default(1),
+  /** The automation (user_schedules) whose run made this task; null for every other task. */
+  sourceScheduleId: uuid('source_schedule_id'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc()),
+  index('issues_source_schedule_idx').on(table.sourceScheduleId).where(sql`${table.sourceScheduleId} IS NOT NULL`),
   check('issues_short_title_compact', sql`mikka_issue_short_title_valid(${table.shortTitle})`)])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),

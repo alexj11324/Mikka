@@ -40,20 +40,26 @@ async function command<T>(input: Command, workspaceId?: string, finish?: (worksp
 
 const id = z.uuid()
 
-/** 创建者: each row's creator as the workspace's member list names them (members only read their own workspace). */
+/** 创建者: each row's creator as the workspace's member list names them, with their picture (members only read their own workspace). */
 async function withCreators(workspaceId: string, list: AutomationList): Promise<AutomationList> {
   const owners = [...new Set(list.schedules.map(row => row.owner_id))]
   if (!owners.length) return list
-  const { workspacePool } = await import('@/lib/workspace-db')
-  const { rows } = await workspacePool.query<{ userId: string; name: string }>('SELECT "userId",name FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[])', [workspaceId, owners])
-  const names = new Map(rows.map(row => [row.userId, row.name]))
-  return { ...list, schedules: list.schedules.map(row => ({ ...row, owner_name: names.get(row.owner_id) ?? null })) }
+  const [{ workspacePool }, { pool }] = await Promise.all([import('@/lib/workspace-db'), import('@/lib/db')])
+  // Members live in the workspace database, accounts (and their pictures) in Mikka's: two reads, no cross-database join.
+  const [members, accounts] = await Promise.all([
+    workspacePool.query<{ userId: string; name: string }>('SELECT "userId",name FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[])', [workspaceId, owners]),
+    pool.query<{ id: string; image: string | null }>('SELECT id,image FROM "user" WHERE id=ANY($1::text[])', [owners]),
+  ])
+  const names = new Map(members.rows.map(row => [row.userId, row.name]))
+  // A picture only for someone still a member, as the name.
+  const images = new Map(accounts.rows.filter(row => names.has(row.id)).map(row => [row.id, row.image]))
+  return { ...list, schedules: list.schedules.map(row => ({ ...row, owner_name: names.get(row.owner_id) ?? null, owner_image: images.get(row.owner_id) ?? null })) }
 }
 const versioned = z.object({ scheduleId: z.uuid(), version: z.number().int().positive() }).strict()
 
-/** The workspace's automations, newest first; `cursor` continues a page. */
-export async function listAutomations(input: { cursor?: string; deleted?: boolean } = {}, workspaceId?: string): Promise<ActionResult<AutomationList>> {
-  const parsed = scheduleListInput.safeParse({ cursor: input.cursor, deleted: input.deleted })
+/** The workspace's automations, newest first; `cursor` continues a page; `owner` and `trigger` are 我的 and 定时. */
+export async function listAutomations(input: { cursor?: string; deleted?: boolean; owner?: 'me'; trigger?: 'schedule' } = {}, workspaceId?: string): Promise<ActionResult<AutomationList>> {
+  const parsed = scheduleListInput.safeParse({ cursor: input.cursor, deleted: input.deleted, owner: input.owner, trigger: input.trigger })
   if (!parsed.success) return { error: 'validationGeneric' }
   return command<AutomationList>({ action: 'list', ...parsed.data }, workspaceId, withCreators)
 }
