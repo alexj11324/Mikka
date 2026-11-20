@@ -12,7 +12,7 @@ input.on('line', line => {
   if (message.op === 'start') {
     const options = message.process
     const command = message.user === 'root' ? options.cmd : '/usr/bin/setpriv'
-    const args = message.user === 'root' ? options.args : ['--reuid', userUid, '--regid', userGid, '--keep-groups', options.cmd, ...options.args]
+    const args = message.user === 'root' ? options.args : ['--reuid', userUid, '--regid', userGid, process.getuid() === 0 ? '--clear-groups' : '--keep-groups', options.cmd, ...options.args]
     const child = spawn(command, args, { cwd: options.cwd ?? '/home/user',
       env: { ...process.env, ...options.envs, HOME: message.user === 'root' ? '/root' : '/home/user', USER: message.user },
       detached: true, stdio: ['pipe', 'pipe', 'pipe'] })
