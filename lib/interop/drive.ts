@@ -238,3 +238,30 @@ export class InteropDriveConflict extends InteropError {
     this.paths = cause.detail?.paths ?? []
   }
 }
+
+export interface DriveSyncScope { scope: InteropDriveScope; scopeId: string; write: boolean }
+
+/**
+ * The folders a run mirrors to `~/.mikka/drive/` (decision 2026-11-19-2200 §4):
+ * its thread, its Bot and its team Workspace, each only when the run may read
+ * it, and marked writable only when it may also write. The server decides; the
+ * machine never chooses scope ids.
+ */
+export async function driveSyncScopes(principal: InteropPrincipal): Promise<DriveSyncScope[]> {
+  if (principal.kind !== 'run') throw new InteropError('interop_invalid_request')
+  const { rows: [run] } = await pool.query<{ botId: string | null }>('SELECT "botId" FROM agent_runs WHERE id=$1', [principal.runId])
+  const candidates: { scope: InteropDriveScope; scopeId?: string }[] = [{ scope: 'thread', scopeId: principal.runId }]
+  if (run?.botId) candidates.push({ scope: 'bot', scopeId: run.botId })
+  candidates.push({ scope: 'workspace' })
+  const scopes: DriveSyncScope[] = []
+  for (const candidate of candidates) {
+    let target: DriveTarget
+    try { target = await resolveDriveTarget(principal, candidate, 'read') }
+    catch (error) { if (error instanceof InteropError) continue; throw error }
+    let write = true
+    try { await resolveDriveTarget(principal, candidate, 'write') }
+    catch (error) { if (error instanceof InteropError) write = false; else throw error }
+    scopes.push({ scope: target.scope, scopeId: target.scopeId, write })
+  }
+  return scopes
+}

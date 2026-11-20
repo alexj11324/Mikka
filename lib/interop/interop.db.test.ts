@@ -207,6 +207,16 @@ test('interop reads, sends and Drive follow the ACL of the caller\'s own Workspa
     assert.equal((await read()).status, 401)
   })
 
+  await t.test('a run mirrors its own thread and the team folder; a Bot thread adds its Bot', async () => {
+    const { driveSyncScopes } = await import('./drive')
+    const scopes = await driveSyncScopes(await runPrincipal(teammate, teammateRun))
+    assert.deepEqual(scopes, [{ scope: 'thread', scopeId: teammateRun, write: true }, { scope: 'workspace', scopeId: team.id, write: true }])
+    const botRun = randomUUID()
+    await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","workspaceId","botId",status) VALUES($1,$2,$3,$4,$5,'running')`, [botRun, teammate, teammateAgent, team.id, teammateBot])
+    assert.deepEqual((await driveSyncScopes(await runPrincipal(teammate, botRun))).map(row => row.scope), ['thread', 'bot', 'workspace'])
+    await assert.rejects(driveSyncScopes(asTeammateBot), { code: 'interop_invalid_request' })
+  })
+
   await t.test('/api/v1/grants: only the owner creates; an admin lists and revokes; subjects stay in the tenant', async () => {
     const { createPersonalAccessToken } = await import('../tokens/store')
     const collection = await import('../../app/api/v1/grants/[kind]/[resourceId]/route')

@@ -341,6 +341,15 @@ function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return creat
     })
   }
 
+  // The machine's Drive mirror asks which folders this run syncs; the server decides.
+  server.registerTool('drive_sync_scopes', { description: 'The shared Drive folders this run mirrors to ~/.mikka/drive, and whether each is writable.',
+    inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true } }, async (_input, ctx) => {
+    const run = worker.workerRun(ctx.http?.authInfo)
+    const [{ runPrincipal }, { driveSyncScopes }, { interopFailure }] = await Promise.all([import('@/lib/interop/principal'), import('@/lib/interop/drive'), import('@/lib/interop/tools')])
+    try { return json({ scopes: await driveSyncScopes(await runPrincipal(run.userId, run.id)) }) }
+    catch (error) { return outcome(interopFailure(error)) }
+  })
+
   server.registerTool('list_runs', { ...WORKER_RUN_TOOLS.list_runs, annotations: { readOnlyHint: true } },
     async (input, ctx) => json(await withMcpWorkspace(ctx.http?.authInfo, undefined, userId => tools.listRuns(userId, input))))
 
