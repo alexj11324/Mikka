@@ -29,6 +29,9 @@ try {
   assert.ok(!unsubscribed.issue?.metadata.subscriberUserIds.includes(owner), 'Unsubscribe left the task in the inbox')
   console.log('inbox subscribe, durable read, ownership and unsubscribe passed')
 } finally {
+  // The real post-commit notification opens this process's LISTEN/NOTIFY bus.
+  // Its dedicated connection is independent of the application pools below.
+  await (await import('../../lib/builtin-gateway/runtime.ts')).builtinGateway()?.stop()
   await pool.end()
   if (workspacePool !== pool) await workspacePool.end()
 }
