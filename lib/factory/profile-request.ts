@@ -5,7 +5,7 @@ import { agentProfileReferenceSchema, BUILTIN_AGENT_PROFILE_ID } from './agent-p
 import { readProfileRow } from './agent-profile-store'
 import { taskDestinationSchema, type TaskDestination } from '../task-destination'
 import { taskAgentSchema, type TaskAgent } from '../task-create-command'
-import { taskRunSettingsSchema } from '../task-run-settings'
+import { storedRunSettings } from '../task-run-settings'
 
 /** A selection from the owner's task form is authoritative. Otherwise the
  * Coordinator may choose one of the owner's Agent 配置 itself (decision
@@ -31,9 +31,9 @@ export async function requestedTaskSelection(pool: Pick<Pool, 'query'>, scope: {
   // The command's Agent (task form or schedule) is the task's; a command without one is refused by dispatch.
   const agent = explicit ? taskAgentSchema.safeParse(event.payload.taskCommand.agent) : undefined
   // The command's model (an automation's), on its Agent; checked against 优先使用的模型 like any named model.
-  const run = explicit ? taskRunSettingsSchema.safeParse(event.payload.taskCommand.run ?? undefined) : undefined
+  const run = explicit ? storedRunSettings(event.payload.taskCommand.run, eventId) : undefined
   const selection = { ...(destination.success ? { taskDestination: destination.data } : {}), ...(explicit ? { commandIssueId: String(event.commandIssueId) } : {}),
-    ...(agent?.success ? { agent: agent.data } : {}), ...(agent?.success && run?.success && run.data?.model ? { model: run.data.model.id } : {}) }
+    ...(agent?.success ? { agent: agent.data } : {}), ...(agent?.success && run?.model ? { model: run.model.id } : {}) }
   const selected = agentProfileReferenceSchema.safeParse(event?.payload?.profileId)
   if (selected.success) return { ...selection, profileId: selected.data }
   return chosen(selection)

@@ -20,3 +20,21 @@ export const taskRunSettingsSchema = z.strictObject({
   pin: z.literal(true).optional(),
 })
 export type TaskRunSettings = z.infer<typeof taskRunSettingsSchema>
+
+const RUN_SETTING_FIELDS = Object.keys(taskRunSettingsSchema.shape) as (keyof TaskRunSettings)[]
+/**
+ * A stored request's run settings, field by field: a field that does not fit (an older or hand-edited event) is left
+ * out and named in `dropped`, and the rest still apply. Anything that is not an object is no settings.
+ */
+export function parseRunSettings(raw: unknown): { settings: TaskRunSettings; dropped: string[] } {
+  if (raw === undefined || raw === null) return { settings: {}, dropped: [] }
+  if (typeof raw !== 'object' || Array.isArray(raw)) return { settings: {}, dropped: ['run'] }
+  const settings: Record<string, unknown> = {}, dropped: string[] = []
+  for (const [key, value] of Object.entries(raw)) {
+    const field = (RUN_SETTING_FIELDS as string[]).includes(key) ? taskRunSettingsSchema.shape[key as keyof TaskRunSettings] : undefined
+    const parsed = field?.safeParse(value)
+    if (parsed?.success) { if (parsed.data !== undefined) settings[key] = parsed.data }
+    else dropped.push(key)
+  }
+  return { settings: settings as TaskRunSettings, dropped }
+}

@@ -21,7 +21,7 @@ import { runListChanged } from '@/lib/live/lists'
 import { runChanged } from '@/lib/live/panels'
 import { resolveRunOrigin, type RunOrigin, type RunOriginRef } from '@/lib/run-origin'
 import type { ProjectExecutionSnapshot } from '@/lib/project-resources/contracts'
-import { requestedRunSettings, taskRunSettingsSchema, withRequestedEffort } from '@/lib/task-run-settings'
+import { requestedRunSettings, storedRunSettings, withRequestedEffort } from '@/lib/task-run-settings'
 import { assertFrozenProjectExecution, assertProjectExecutionTarget, requireProjectResourceLease } from '@/lib/project-resources/store'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
@@ -109,7 +109,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       WHERE id=$1 AND "userId"=$2 AND kind='user_message' AND ("issueId"=$3 OR "issueId" IS NULL) FOR SHARE`, [input.sourceEventId, actor.userId, input.issueId])).rows[0] : undefined
     const sponsored = request?.destination?.kind === 'cloud' && request.destination.provider === 'cloudflare'
     // The request's run settings apply to the thread it starts, not to a continuation.
-    const settings = !input.threadRunId && request ? taskRunSettingsSchema.safeParse(request.run ?? undefined).data ?? {} : {}
+    const settings = !input.threadRunId && request ? storedRunSettings(request.run, input.sourceEventId) : {}
     if (input.modelDispatch) input = { ...input, modelDispatch: withRequestedEffort(input.modelDispatch, settings, model) }
     const allowLocalRecovery = input.allowLocalRecovery === true && request && request.destination == null ? true as const : undefined
     // Absent stays byte-compatible with historical fingerprints; a replay

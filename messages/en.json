@@ -8518,7 +8518,7 @@
       "threadChosen": "Chosen thread",
       "threadChange": "Change",
       "environment": "Environment",
-      "environmentDefault": "Project default",
+      "environmentDefault": "Default environment",
       "model": "Model",
       "modelDefault": "Agent default",
       "effort": "Effort",

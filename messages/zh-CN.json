@@ -8518,7 +8518,7 @@
       "threadChosen": "已选线程",
       "threadChange": "更换",
       "environment": "环境",
-      "environmentDefault": "按项目默认",
+      "environmentDefault": "默认环境",
       "model": "模型",
       "modelDefault": "按 Agent 默认",
       "effort": "推理强度",
