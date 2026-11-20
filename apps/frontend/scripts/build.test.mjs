@@ -11,6 +11,7 @@ import { join, relative, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import test from 'node:test'
 import { buildFrontend } from './build.mjs'
+import { frontendConfig } from '../vite.config.mjs'
 
 /** Every asset under `assets/`, keyed by its path relative to the outdir and hashed by content. */
 async function emittedAssets(directory) {
@@ -41,6 +42,14 @@ test('real frontend builds retain incremental files without fingerprinting them 
     const clean = await buildFrontend({ target: 'web', outdir: directory, publicTestFixture: true })
     await assert.rejects(readFile(stale), { code: 'ENOENT' })
     assert.equal(clean.publicTestFixture, true)
+    // The revision is injected into every module that reads it, so two builds of
+    // one process must inject the same one. If the identities below ever drift
+    // again, this separates "the injected revision moved" from "the bundler split
+    // the same modules differently" — two causes a bare fingerprint cannot tell apart.
+    const firstConfig = await frontendConfig({ target: 'web', outdir: directory, clean: false, publicTestFixture: true })
+    const secondConfig = await frontendConfig({ target: 'web', outdir: directory, publicTestFixture: true })
+    assert.equal(firstConfig.define['process.env.NEXT_PUBLIC_MIKKA_BUILD'], secondConfig.define['process.env.NEXT_PUBLIC_MIKKA_BUILD'],
+      'two builds of one process inject one application revision')
     // A failure here has to say *which* kind of drift happened: an asset only one
     // run emitted, or the same name carrying different bytes. Those are different
     // bugs, and the bare fingerprint comparison hides which one occurred.
