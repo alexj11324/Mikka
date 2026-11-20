@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { publicationBranch, publicationGate } from './run-publication-policy'
+import { publicationBranch, publicationDraft, publicationGate } from './run-publication-policy'
 import type { RunReport } from '@mikka/protocol/run'
 
 const report: RunReport = { summary: 'Done.', filesChanged: ['a.ts'], verify: { status: 'passed' }, openQuestions: [], nextStep: null, publish: { branch: 'mikka/mik-42', commit: 'a'.repeat(40), pushed: true, remote: 'origin' } }
@@ -10,6 +10,20 @@ test('ADR 0024 uses existing task team and number without inventing a team', () 
   assert.equal(publicationBranch('MIK-42'), 'mikka/mik-42')
   assert.equal(publicationBranch('ALEX-7'), 'mikka/alex-7')
   for (const identifier of [null, '', '#7', 'MIK-0', 'MIK-01', 'MIK-999999999999999999999', 'MIK/42']) assert.equal(publicationBranch(identifier), null)
+})
+
+test('branch prefixes never replace the issued identifier and failed verification always forces draft', () => {
+  assert.equal(publicationBranch('TEAM-12', 'team/fix/'), 'team/fix/team-12')
+  assert.equal(publicationBranch('TEAM-12', ''), 'team-12')
+  for (const invalid of ['../', 'main..', 'refs//heads', 'fix;push', '/fix', 'fix@{1}']) {
+    assert.equal(publicationBranch('TEAM-12', invalid), null)
+  }
+  assert.equal(publicationDraft(false, 'passed'), false)
+  assert.equal(publicationDraft(true, 'passed'), true)
+  assert.equal(publicationDraft(false, 'not_run'), true)
+  assert.equal(publicationDraft(false, 'not_run', true), false)
+  assert.equal(publicationDraft(true, 'not_run', true), true)
+  assert.equal(publicationDraft(false, 'failed', true), true)
 })
 
 test('only approved, matching pushes enter PR publication', () => {

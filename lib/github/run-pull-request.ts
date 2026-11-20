@@ -127,7 +127,10 @@ export async function openRunPullRequest(options: Options & {
   /** Bookkeeping once the repository is read with the owner's token; it must not throw. */
   onVerified?: (binding: GitHubRepositoryBinding) => Promise<void>
 }): Promise<PublishedPullRequest> {
-  if (!validPublicationBranch(options.branch, options.identifier) || !/^[a-f0-9]{40,64}$/i.test(options.commit) || !z.uuid().safeParse(options.issueId).success) throw new PublicationError('publication_mismatch')
+  // Factory's private identifier/title are intentionally unused. Its frozen
+  // host branch and issue-bound evidence remain the publication authority.
+  const branchIdentifier = options.visualEvidence ? options.branch.slice(options.branch.lastIndexOf('/') + 1) : options.identifier
+  if (!validPublicationBranch(options.branch, branchIdentifier) || !/^[a-f0-9]{40,64}$/i.test(options.commit) || !z.uuid().safeParse(options.issueId).success) throw new PublicationError('publication_mismatch')
   const prefix = pullRequestTitlePrefix.safeParse(options.titlePrefix ?? '')
   if (!prefix.success) throw new PublicationError('publication_mismatch')
   if (options.autoMerge && (options.draft || options.verificationStatus !== 'passed')) throw new PublicationError('publication_mismatch')

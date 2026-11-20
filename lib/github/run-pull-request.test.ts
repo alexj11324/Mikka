@@ -10,10 +10,12 @@ const input = { remoteKey: 'v2/github.com/owner/repo', githubAccountId: '456', t
 const marker = `<!-- mikka-issue:${issueId} -->`
 const pr = { number: 77, node_id: 'PR_synthetic_77', html_url: 'https://github.com/owner/repo/pull/77', state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: input.branch, repo: { id: 789 } }, base: { repo: { id: 789 } } }
 
-function stub(options: { installation?: 'allowed' | 'denied'; title?: string; userId?: number; repository?: 'missing' | 'renamed'; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; lines?: { additions: number; deletions: number }; review?: boolean; checksDenied?: boolean; detailFailure?: number | 'timeout'; detailOverride?: Record<string, unknown>; createdOverride?: Record<string, unknown> } = {}) {
+function stub(options: { branch?: string; autoMerge?: 'enabled' | 'denied' | 'wrong-id'; installation?: 'allowed' | 'denied'; title?: string; userId?: number; repository?: 'missing' | 'renamed'; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; lines?: { additions: number; deletions: number }; review?: boolean; checksDenied?: boolean; detailFailure?: number | 'timeout'; detailOverride?: Record<string, unknown>; createdOverride?: Record<string, unknown> } = {}) {
   const calls: { path: string; method: string; body: Record<string, unknown> | null; authorization: string }[] = []
+  const branch = options.branch ?? input.branch
+  const fixturePr = { ...pr, head: { ...pr.head, ref: branch } }
   let created = false
-  let createdPr: typeof pr & { title?: string; additions?: number; deletions?: number; changed_files?: number } = pr
+  let createdPr: typeof pr & { title?: string; additions?: number; deletions?: number; changed_files?: number } = fixturePr
   const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
     const parsed = new URL(String(url))
     assert.equal(parsed.origin, 'https://api.github.com')
@@ -28,17 +30,17 @@ function stub(options: { installation?: 'allowed' | 'denied'; title?: string; us
     if (path === '/installation/repositories') return Response.json({ repositories: options.installation === 'allowed' ? [{ id: 789, full_name: 'owner/repo', default_branch: 'trunk' }] : [] })
     if (path === '/repos/owner/repo') return options.repository === 'missing' ? Response.json({}, { status: 404 })
       : Response.json({ id: 789, full_name: options.repository === 'renamed' ? 'owner/other' : 'owner/repo', default_branch: 'trunk' })
-    if (path.endsWith('/git/ref/heads/mikka/mik-42')) return Response.json({ object: { sha: options.head ?? commit } })
+    if (path.endsWith(`/git/ref/heads/${branch}`)) return Response.json({ object: { sha: options.head ?? commit } })
     if (path.endsWith('/pulls') && method === 'GET') {
-      assert.equal(parsed.searchParams.get('head'), 'owner:mikka/mik-42')
+      assert.equal(parsed.searchParams.get('head'), `owner:${branch}`)
       assert.equal(parsed.searchParams.get('state'), 'all')
       return Response.json(created ? [createdPr] : options.existing ?? [])
     }
     if (path.endsWith('/pulls/77') && method === 'GET') {
       if (options.detailFailure === 'timeout') throw new Error('synthetic-detail-secret')
       if (options.detailFailure) return Response.json({ message: 'synthetic-detail-secret' }, { status: options.detailFailure })
-      return Response.json({ ...(created ? createdPr : options.existing?.[0] as object ?? pr), ...options.lines,
-        ...(options.review ? { head: { ...pr.head, sha: commit }, changed_files: 3 } : {}), ...options.detailOverride })
+      return Response.json({ ...(created ? createdPr : options.existing?.[0] as object ?? fixturePr), ...options.lines,
+        ...(options.review ? { head: { ...fixturePr.head, sha: commit }, changed_files: 3 } : {}), ...options.detailOverride })
     }
     if (path.endsWith('/check-runs')) return options.checksDenied ? Response.json({}, { status: 403 }) : Response.json({ total_count: 1, check_runs: [
       { id: 1, name: 'CI', head_sha: commit, app: { id: 10 }, check_suite: { id: 100 }, status: 'completed', conclusion: 'success', started_at: '2026-11-09T13:00:00Z', completed_at: '2026-11-09T13:01:00Z' },
@@ -46,11 +48,15 @@ function stub(options: { installation?: 'allowed' | 'denied'; title?: string; us
     if (path.endsWith('/status')) return Response.json({ sha: commit, total_count: 0, statuses: [] })
     if (path.endsWith('/pulls') && method === 'POST') {
       created = true
-      createdPr = { ...pr, ...(options.title ? { title: options.title } : {}), ...options.lines, draft: body?.draft === true, ...options.createdOverride }
+      createdPr = { ...fixturePr, ...(options.title ? { title: options.title } : {}), ...options.lines, draft: body?.draft === true, ...options.createdOverride }
       if (options.create === 'timeout') throw new Error('transport failure containing synthetic-secret')
       if (options.create === '422') return Response.json({ message: 'synthetic-secret' }, { status: 422 })
       if (options.create === 'malformed') return Response.json({}, { status: 201 })
       return Response.json(createdPr, { status: 201 })
+    }
+    if (path === '/graphql' && String(body?.query).includes('enablePullRequestAutoMerge')) {
+      if (options.autoMerge === 'denied') return Response.json({}, { status: 403 })
+      return Response.json({ data: { enablePullRequestAutoMerge: { pullRequest: { id: options.autoMerge === 'wrong-id' ? 'different-pr' : pr.node_id, autoMergeRequest: { enabledAt: '2026-11-20T19:00:00Z' } } } } })
     }
     if (path === '/graphql') return Response.json({ data: { convertPullRequestToDraft: { pullRequest: { id: pr.node_id, isDraft: true } } } })
     throw new Error(`Unexpected test request ${method} ${path}`)
@@ -61,6 +67,56 @@ function stub(options: { installation?: 'allowed' | 'denied'; title?: string; us
 test('requires canonical github.com identity; user-controlled URLs cannot receive credentials', () => {
   assert.deepEqual(githubRepository('v2/github.com/a/b'), { owner: 'a', repo: 'b', path: '/repos/a/b' })
   for (const key of ['github.com/a/b', 'https://github.com/a/b', 'v2/github.com.evil/a/b', 'v2/github.com/a/b/extra', 'v2/github.com/a/..', 'v2/file/localhost/tmp/origin', 'v2/github.com/Owner/repo']) assert.throws(() => githubRepository(key), PublicationError)
+})
+
+test('custom branch/title prefixes preserve the exact task binding and verified drafts describe their preference', async () => {
+  const branch = 'engineering/fix/mik-42', { calls, fetcher } = stub({ branch })
+  await openRunPullRequest({ ...input, branch, titlePrefix: '[Team]', draft: true, verificationStatus: 'passed', fetcher })
+  const created = calls.find(call => call.method === 'POST' && call.path.endsWith('/pulls'))!
+  assert.equal(created.body?.title, '[Team] MIK-42: Fix redirect')
+  assert.equal(created.body?.head, branch)
+  assert.equal(created.body?.draft, true)
+  assert.match(String(created.body?.body), /Opened as a draft by the pull request defaults/)
+  assert.doesNotMatch(String(created.body?.body), /Verification was not run/)
+  for (const wrong of ['engineering/another-42', 'engineering/mik-43', 'refs/../mik-42', 'mikka/mik-42;echo']) {
+    await assert.rejects(openRunPullRequest({ ...input, branch: wrong, fetcher }), { code: 'publication_mismatch' })
+  }
+})
+
+test('auto merge uses the verified user and native expected-head merge queue inside the current authority fence', async () => {
+  const { calls, fetcher } = stub({ review: true, autoMerge: 'enabled' })
+  let fenced = false
+  const guarded = (async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (new URL(String(url)).pathname === '/graphql' && String(init?.body).includes('enablePullRequestAutoMerge')) assert.equal(fenced, true)
+    return fetcher(url, init)
+  }) as typeof fetch
+  const result = await openRunPullRequest({ ...input, autoMerge: true, verificationStatus: 'passed', fetcher: guarded,
+    withWrite: async write => { fenced = true; try { return await write() } finally { fenced = false } } })
+  assert.equal(result.state, 'open', 'queued is not merged')
+  assert.equal(result.autoMergeEnabled, true)
+  const mutation = calls.find(call => call.path === '/graphql')!
+  assert.deepEqual(mutation.body?.variables, { id: pr.node_id, head: commit })
+  assert.match(String(mutation.body?.query), /expectedHeadOid: \$head, mergeMethod: MERGE/)
+  for (const invalid of [{ verificationStatus: 'failed' as const }, { verificationStatus: 'not_run' as const }, { draft: true }]) {
+    const denied = stub({ review: true })
+    await assert.rejects(openRunPullRequest({ ...input, autoMerge: true, verificationStatus: 'passed', ...invalid, fetcher: denied.fetcher }), { code: 'publication_mismatch' })
+    assert.equal(denied.calls.length, 0)
+  }
+  const installation = stub({ installation: 'allowed' })
+  await assert.rejects(openRunPullRequest({ ...input, installationId: '99', autoMerge: true, verificationStatus: 'passed', fetcher: installation.fetcher }), { code: 'github_identity_required' })
+  assert.equal(installation.calls.length, 0)
+})
+
+test('auto merge reports native refusal, wrong identity and changed head without inventing a queue receipt', async () => {
+  for (const [options, code] of [
+    [{ autoMerge: 'denied' as const }, 'github_access_denied'],
+    [{ autoMerge: 'wrong-id' as const }, 'github_request_failed'],
+    [{ head: 'b'.repeat(40) }, 'branch_changed'],
+    [{ detailOverride: { head: { ...pr.head, sha: 'b'.repeat(40) } } }, 'branch_changed'],
+  ] as const) {
+    const { fetcher } = stub({ review: true, ...options })
+    await assert.rejects(openRunPullRequest({ ...input, autoMerge: true, verificationStatus: 'passed', fetcher }), { code })
+  }
 })
 
 test('opens one issue-marked PR on the default branch with the person\'s own token, after checking it is theirs', async () => {
