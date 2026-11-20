@@ -71,6 +71,13 @@ export async function startApp({ root = process.cwd(), args = process.argv.slice
   root = await realpath(root)
   const options = serverOptions(args, env)
   const built = await readCompiledBuild(root, { env })
+  if (env.MIKKA_FIXTURE) {
+    const { assertFixtureRuntime } = await import('./fixtures/guard.mjs')
+    const origin = `http://${options.hostname}:${options.port}`
+    assertFixtureRuntime({ env, built, origin })
+    const { startFixture } = await import('./fixtures/start.mjs')
+    return startFixture({ root, env, origin, scenario: env.MIKKA_FIXTURE })
+  }
   // Keep the launch cwd: relative environment descriptors and runtime resources
   // already share this root. In particular, do not move lease files into output.
   if (root !== await realpath(process.cwd())) fail('APP_START_ROOT_MISMATCH')
