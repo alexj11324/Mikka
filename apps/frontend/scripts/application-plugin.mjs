@@ -107,10 +107,13 @@ export async function applicationPlugin(target, { deploymentId = '', serverPages
       if (serverSpecifier(source)) throw new Error(`FRONTEND_SERVER_IMPORT: ${source}`)
       const action = /^@\/app\/actions\/([\w-]+)$/.exec(source)
       if (action) return `${virtualAction}${action[1]}`
+      // An alias resolves like any other import of its file, so the module carries the same package metadata (and with
+      // it the same CommonJS interop) whichever importer reaches it first. A bare path id left that to resolution order,
+      // and React's interop in the shared chunk flipped between builds of one source.
       const alias = commonAliases.get(source)
-      if (alias && importer?.split('?')[0] !== resolve(clientRuntime, alias)) return resolve(clientRuntime, alias)
+      if (alias && importer?.split('?')[0] !== resolve(clientRuntime, alias)) return this.resolve(resolve(clientRuntime, alias), importer, { ...options, skipSelf: true })
       const desktopAlias = target === 'desktop' ? desktopAliases.get(source) : undefined
-      if (desktopAlias && importer?.split('?')[0] !== resolve(renderer, desktopAlias)) return resolve(renderer, desktopAlias)
+      if (desktopAlias && importer?.split('?')[0] !== resolve(renderer, desktopAlias)) return this.resolve(resolve(renderer, desktopAlias), importer, { ...options, skipSelf: true })
       if (source === '@/lib/client-runtime/script') {
         if (target === 'desktop') throw new Error('FRONTEND_DESKTOP_REMOTE_SCRIPT_FORBIDDEN')
         return resolve(clientRuntime, 'script.tsx')
