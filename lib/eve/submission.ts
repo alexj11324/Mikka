@@ -16,7 +16,7 @@ const notes = z.array(z.object({n:z.number().int().positive(),kind:z.enum(['elem
 export const eveProductContext = z.object({
   taskCommand:dispatchTaskIntent.optional(),confirmTaskAccess:z.boolean().optional(),quote:quote.nullish(),notes:notes.nullish(),taskDestination:taskDestinationSchema.optional(),
   profileId:agentProfileReferenceSchema.optional(),taskTitle:taskTitleInputSchema.optional(),
-  expectedOwnerId:z.string().min(1).max(256).optional(),expectedWorkspaceId:z.uuid().optional(),retryOf:z.number().int().positive().optional(),botId:z.uuid().nullish(),
+  expectedOwnerId:z.string().min(1).max(256).optional(),expectedWorkspaceId:z.uuid().transform(value=>value.toLowerCase()).optional(),retryOf:z.number().int().positive().optional(),botId:z.uuid().nullish(),
 }).strict()
 
 const ingress = new WeakMap<Request, { scope:EveScope; eventId:string }>()

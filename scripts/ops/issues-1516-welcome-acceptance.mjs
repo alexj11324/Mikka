@@ -1,5 +1,5 @@
 import { readRendererActions } from '../../lib/renderer-actions.mjs'
-import { observeEveSession } from '../acceptance/eve-session.mjs'
+import { observeEveSession, submitEveMessage } from '../acceptance/eve-session.mjs'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -18,7 +18,7 @@ const ORIGIN = 'https://app.aspectlylabs.com'
 const BRANCH = 'refs/heads/ops/1515-1517-acceptance'
 const ACTIONS = new Set(['workspace.switchWorkspace', 'bots.createBot', 'agents.stopRun', 'issue-operations.setIssueDeleted', 'issue-operations.getDeletedIssue',
   'execution-settings.getBotModelMenu', 'execution-settings.chooseBotModel',
-  'coordinator.welcomeCoordinator', 'coordinator.sendCoordinatorMessage', 'coordinator.syncCoordinatorChat', 'coordinator.stopCoordinatorTurn'])
+  'coordinator.welcomeCoordinator', 'coordinator.syncCoordinatorChat', 'coordinator.stopCoordinatorTurn'])
 const cases = [
   ...['a', 'b', 'c', 'd'].map(option => ({ id: 'claude-' + option, model: 'claude-haiku-5-5', provider: 'claude', option })),
   { id: 'codex-d', model: 'gpt-6-luna', provider: 'codex', option: 'd' },
@@ -67,14 +67,22 @@ export function welcomeOptions(text) {
   return found
 }
 
-export function requestAllowed(path, method, body) {
+export function requestAllowed(path, method, body, submission) {
   if (method === 'GET') return ['/api/version', '/api/auth/get-session', '/api/bots', '/renderer-manifest.json', '/renderer-actions.json'].includes(path)
     || isTeamWorkspaceReadPath('/mikka' + path)
     || /^\/api\/settings\/model-order\?workspace=[a-f0-9-]{36}$/.test(path)
     || /^\/api\/(?:bots|factory\/tasks)\/[a-f0-9-]{36}$/.test(path)
     || /^\/api\/agents\/eve\/v1\/session\/wrun_[A-Za-z0-9_-]+\/stream\?botId=[a-f0-9-]{36}&startIndex=\d{1,9}$/.test(path)
   if (method !== 'POST') return false
-  if (/^\/api\/agents\/eve\/v1\/session\?botId=[a-f0-9-]{36}$/.test(path)) return body && Object.keys(body).length === 0
+  if (/^\/api\/agents\/eve\/v1\/session\?botId=[a-f0-9-]{36}$/.test(path)) {
+    if (body && Object.keys(body).length === 0) return true
+    return Boolean(submission && UUID.test(submission.botId) && UUID.test(submission.id)
+      && path === '/api/agents/eve/v1/session?botId=' + submission.botId
+      && typeof submission.ownerId === 'string' && submission.ownerId.length > 0 && UUID.test(submission.workspaceId)
+      && typeof submission.message === 'string' && submission.message.length > 0
+      && JSON.stringify(body) === JSON.stringify({ message: submission.message, clientContext: {
+        expectedOwnerId: submission.ownerId, expectedWorkspaceId: submission.workspaceId } }))
+  }
   if (['/api/auth/sign-in/email', '/api/auth/sign-out'].includes(path)) return true
   if (/^\/api\/factory\/tasks\/[a-f0-9-]{36}$/.test(path)) return body?.action === 'cancel' && body.binding?.taskId === path.split('/').at(-1)
   if (/^\/api\/threads\/[a-f0-9-]{36}\/machine$/.test(path)) return body?.action === 'end'
@@ -94,15 +102,17 @@ export async function runAcceptance() {
   const { Pool } = require('pg')
   const pool = new Pool({ connectionString: process.env.MIKKA_DATABASE_URL, max: 1, connectionTimeoutMillis: 15000, application_name: 'mikka-1516-acceptance-readonly' })
   const report = { issue: 1516, applicationSha, driverRevision: process.env.GITHUB_SHA, startedAt: new Date().toISOString(), cases: [],
-    mode: selection === 'diagnose-b' ? 'readonly_original_welcome_shape' : 'welcome_acceptance', transport: 'published_web_rpc_and_real_ndjson_stream', status: 'running', ordinaryAccountSession: false }
+    mode: selection === 'diagnose-b' ? 'readonly_original_welcome_shape' : 'welcome_acceptance', transport: 'native_eve_submission_and_real_ndjson_stream', status: 'running', ordinaryAccountSession: false }
   const jar = new Map()
   let published, ownerId, originalWorkspace, teamScope, baseline, baselineAt, baselineBotIds = []
   const fixtures = new Map(), baselineIssueIds = new Set()
-  const request = async (path, body, timeout = 30000) => {
+  let authorizedSubmission
+  const request = async (path, body, timeout = 30000, headers = {}) => {
     const method = body === undefined ? 'GET' : 'POST'
-    check(requestAllowed(path, method, body), 'acceptance_request_denied')
+    check(requestAllowed(path, method, body, authorizedSubmission), 'acceptance_request_denied')
+    if (body?.message) check(headers['x-mikka-submission-id'] === authorizedSubmission?.id, 'acceptance_request_denied')
     const response = await fetch(ORIGIN + '/mikka' + path, { method, redirect: 'error', signal: AbortSignal.timeout(timeout),
-      headers: { origin: ORIGIN, 'cache-control': 'no-store', accept: 'application/json',
+      headers: { ...headers, origin: ORIGIN, 'cache-control': 'no-store', accept: 'application/json',
         ...(jar.size ? { cookie: [...jar].map(([key, value]) => key + '=' + value).join('; ') } : {}),
         ...(body ? { 'content-type': 'application/json' } : {}), ...(path === '/api/rpc' ? { 'x-mikka-rpc': '1' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}) })
@@ -430,7 +440,12 @@ export async function runAcceptance() {
         check(welcome.evidence.toolNames.length===0,'welcome_business_tool_called')
         const choices=welcomeOptions(welcome.text),label=choices.get(item.option).label
         result.option={value:item.option,labelSha256:hash(label),labelChars:label.length,count:choices.size}
-        check((await rpc('coordinator.sendCoordinatorMessage', [label, null, botId, randomUUID()])).queued === true, 'selection_not_queued')
+        check(fixtures.has(botId) && !baselineBotIds.includes(botId), 'acceptance_fixture_mismatch')
+        authorizedSubmission = { botId, message: label, id: randomUUID(), ownerId, workspaceId: teamScope.workspaceId }
+        try {
+          await submitEveMessage({ request: (path, init, timeout) => request(path, JSON.parse(init.body), timeout, init.headers) },
+            botId, label, authorizedSubmission.id, { expectedOwnerId: ownerId, expectedWorkspaceId: teamScope.workspaceId })
+        } finally { authorizedSubmission = undefined }
         const answer = await streamTurn(botId); result.answer = answer.evidence
         passTurn(answer.evidence)
         result.executions=await readSql(`SELECT status,snapshot->'runtime'->>'harness' AS harness,snapshot->'runtime'->>'model' AS model,
@@ -516,6 +531,16 @@ if (process.argv.includes('--self-test')) {
   assert.equal(requestAllowed('/api/coordinator/stream?botId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&wait=1&after=0','GET'),false)
   assert.equal(requestAllowed('/api/agents/eve/v1/session?botId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','POST',{}),true)
   assert.equal(requestAllowed('/api/agents/eve/v1/session?botId=aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','POST',{message:'forbidden direct model turn'}),false)
+  const bot = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  const submission = { botId: bot, id: bot, ownerId: 'owner', workspaceId: bot, message: 'chosen welcome option' }
+  const selectionBody = { message: submission.message, clientContext: { expectedOwnerId: 'owner', expectedWorkspaceId: bot } }
+  const selectionPath = '/api/agents/eve/v1/session?botId=' + bot
+  assert.equal(requestAllowed(selectionPath, 'POST', selectionBody, submission), true)
+  assert.equal(requestAllowed(selectionPath, 'POST', selectionBody), false)
+  assert.equal(requestAllowed(selectionPath, 'POST', { ...selectionBody, message: 'arbitrary prompt' }, submission), false)
+  assert.equal(requestAllowed(selectionPath, 'POST', { ...selectionBody, clientContext: { ...selectionBody.clientContext, expectedOwnerId: 'other' } }, submission), false)
+  assert.equal(requestAllowed(selectionPath, 'POST', { ...selectionBody, turnPolicy: 'steer' }, submission), false)
+  assert.equal(requestAllowed('/api/rpc', 'POST', { version: 1, action: 'coordinator.sendCoordinatorMessage', args: [] }), false)
   const text = 'root = Stack([TextContent("Hi"), BeQuestions("Start", [{id:"start", title:"What", options:[{value:"a", label:"A"},{value:"b",label:"B"},{value:"c",label:"C"},{value:"d",label:"D"}], allowCustom:true}])])'
   assert.equal(welcomeOptions(text).get('d').label, 'D')
   assert.equal(welcomeOptions(text.slice(0,-1)).get('b').label,'B','the real web renderer closes a complete card tree with one missing trailing parenthesis')
@@ -537,5 +562,5 @@ if (process.argv.includes('--self-test')) {
   for(const change of forbidden)assert.throws(()=>verifySharedSelection({...row,...change},scope),/shared_binding_unverified/)
   assert.throws(()=>verifySharedSelection(row,{...scope,adminId:scope.ownerId}),/shared_binding_unverified/)
   assert.equal(verifySharedSelection({...row,provider:'codex',modelId:'gpt-6-luna',route:'codex_cpa'}, {...scope,provider:'codex',model:'gpt-6-luna'}).route,'codex_cpa')
-  console.log('29 acceptance-driver identity, web-parser and request boundary checks passed')
+  console.log('35 acceptance-driver identity, web-parser and request boundary checks passed')
 } else await runAcceptance()

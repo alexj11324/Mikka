@@ -142,7 +142,15 @@ async function main() {
     assert.equal(await page.evaluate(() => window.__selfHostedAcceptance.failed), false)
     passed('actual_builtin_live_ticket_and_socket')
     phase = 'chat_reply'
-    await rpc('coordinator.sendCoordinatorMessage', ['selfhost_turn_32', null, fixture.botId, randomUUID()])
+    const accepted = await page.evaluate(async input => {
+      const response = await fetch(`/mikka/api/agents/eve/v1/session?botId=${input.botId}`, {
+        method: 'POST', credentials: 'omit', headers: { 'content-type': 'application/json', 'x-mikka-submission-id': input.submissionId },
+        body: JSON.stringify({ message: 'selfhost_turn_32', clientContext: { expectedOwnerId: input.ownerId, expectedWorkspaceId: input.workspaceId } }),
+      })
+      return { status: response.status, body: await response.json() }
+    }, { botId: fixture.botId, ownerId: fixture.ownerId, workspaceId: fixture.workspaceId, submissionId: randomUUID() })
+    assert.equal(accepted.status, 202); assert.equal(accepted.body.ok, true)
+    assert.match(accepted.body.sessionId, /^wrun_/); assert.ok(accepted.body.deliveryId)
     const deadline = Date.now() + 60_000
     for (;;) {
       const before = await page.evaluate(() => window.__selfHostedAcceptance.chatEvents)

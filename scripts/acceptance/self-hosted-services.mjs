@@ -354,7 +354,7 @@ export async function runAcceptance(env = process.env) {
     for (let turn = 1; turn <= 31; turn++) {
       const number = String(turn).padStart(2, '0'), reply = `SELF_HOSTED_REPLY_${number}`
       const chatRequest = turn === 1 ? webRequest : request
-      await chatRequest('/mikka/api/mobile/chat', { method: 'POST', expected: [202], body: { botId: bot.id, text: `selfhost_turn_${number}`, submissionId: randomUUID() } })
+      await chatRequest(`/mikka/api/agents/eve/v1/session?botId=${bot.id}`, { method: 'POST', expected: [202], headers: { 'x-mikka-submission-id': randomUUID() }, body: { message: `selfhost_turn_${number}`, clientContext: { botId: bot.id } } })
       const deadline = Date.now() + 45_000
       for (;;) {
         const chat = await (await chatRequest(`/mikka/api/mobile/chat?bot=${bot.id}`)).json()
