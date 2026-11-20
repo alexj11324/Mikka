@@ -136,7 +136,18 @@ test('a cold start shows the shapes of the chat and the thread list, never 还�
     await route.fallback()
   })
   try {
-    await page.reload()
+    // Registration has already opened the app and populated its persistent read
+    // cache. Unload the app's IndexedDB connections before clearing that cache
+    // so these held reads start without a stored chat or thread-list value.
+    const applicationUrl = page.url()
+    await page.goto(app('/api/version'))
+    await page.evaluate(() => new Promise<void>((resolve, reject) => {
+      const deletion = indexedDB.deleteDatabase('mikka-read-cache')
+      deletion.onsuccess = () => resolve()
+      deletion.onerror = () => reject(deletion.error ?? new Error('Could not clear the read cache before a cold start'))
+      deletion.onblocked = () => reject(new Error('The read cache is still open before a cold start'))
+    }))
+    await page.goto(applicationUrl)
     const chat = page.getByRole('region', { name: 'Coordinator 线程', exact: true })
     await expect(chat.getByRole('status', { name: '加载中…', exact: true })).toBeVisible()
     await expect(page.getByText('还没有线程', { exact: true })).toHaveCount(0)
