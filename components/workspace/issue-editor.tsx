@@ -34,6 +34,7 @@ import { useRichTextOutline, scrollToRichTextHeading } from "@/components/blocks
 import { RichTextTableBubble, RICH_TEXT_TABLE_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-table"
 import { DeleteTableDialog } from "@/components/blocks/rich-text-editor-2/components/delete-table-dialog"
 import { RICH_TEXT_MENTION_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-mention"
+import { BOT_MENTION_PREFIX } from "@/lib/task-activity-wake"
 import { useRichTextChanges, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_MARKUP_VIEW, type RichTextMarkupView } from "@/components/blocks/rich-text-editor-3/components/rich-text-changes"
 import { addThread, createThreadStore, replyToThread, setThreadResolved, bindThreadRepaint, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
 import { FieldError } from '@/components/ui/field'
@@ -107,13 +108,17 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     const id = mentionScope.current
     if (!id || signal.aborted) return []
     try {
-      const { listMembers } = await import('@/app/actions/collaboration')
-      const { owner, members } = await listMembers(id)
+      const [{ listMembers }, { listBots }] = await Promise.all([import('@/app/actions/collaboration'), import('@/app/actions/bots')])
+      // The person's own Bots can be mentioned too: a Bot chip wakes that Bot (lib/task-activity-wake.ts).
+      const [{ owner, members }, bots] = await Promise.all([listMembers(id), listBots().catch(() => [])])
       if (signal.aborted || id !== mentionScope.current) return []
-      return [owner, ...members].map(person => {
-        const label = person.name.trim() || tMembers('role.member')
-        return { id: person.id, label, initials: Array.from(label)[0].toUpperCase(), avatar: avatarImageSrc(person.image) }
-      })
+      return [
+        ...[owner, ...members].map(person => {
+          const label = person.name.trim() || tMembers('role.member')
+          return { id: person.id, label, initials: Array.from(label)[0].toUpperCase(), avatar: avatarImageSrc(person.image) }
+        }),
+        ...bots.filter(bot => !bot.coordinator).map(bot => ({ id: `${BOT_MENTION_PREFIX}${bot.id}`, label: bot.name, initials: Array.from(bot.name)[0]?.toUpperCase() ?? 'B', description: 'Bot' })),
+      ]
     } catch {
       if (!signal.aborted && id === mentionScope.current) toast.error(tMembers('readFailed'))
       return []

@@ -288,6 +288,6 @@ export function BoardPage({ issues, userId, workspaceId, teamId, presentationRea
         <CoordinatorChat compact prefill={prefill} onOpenIssue={id => { setSheet(false); onOpen(id) }} />
       </SheetContent>
     </Sheet>
-    <NewTaskDialog readerId={userId} teamId={teamId} workspaceId={workspaceId} open={newTask} onOpenChange={setNewTask} onSent={openPanel} initialIntent="create_only" onCreated={id => { void onUpdated(); onOpen(id) }} onAdded={() => { void onUpdated() }} />
+    <NewTaskDialog readerId={userId} teamId={teamId} workspaceId={workspaceId} open={newTask} onOpenChange={setNewTask} onCreated={id => { void onUpdated(); onOpen(id) }} onAdded={() => { void onUpdated() }} />
   </div>
 }
