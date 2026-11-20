@@ -67,9 +67,8 @@ export class McpDeviceChecks {
       await client.query('UPDATE mcp_device_checks SET completed_at=now(),outcome=$2 WHERE id=$1', [receipt.id, receipt.status])
       await client.query('UPDATE personal_mcp_servers SET connection_status=$2,last_checked_at=now(),check_failure=$3 WHERE id=$1', [check.server_id, receipt.status, receipt.status === 'check_failed' ? receipt.failureReason : null])
       if (receipt.status === 'connected') {
-        const connection = await this.personal.mcpConnection(userId, check.server_id)
-        if (connection.native?.transport !== 'stdio') throw new PluginError('invalidMcpCheckReceipt', 400)
-        const tools = scrubMcpCheckTools(receipt.tools, connection.native)
+        const configuration = await this.personal.ownedStdioConfiguration(userId, check.server_id, client)
+        const tools = scrubMcpCheckTools(receipt.tools, configuration)
         await client.query('UPDATE mcp_server_tools SET available=false WHERE server_id=$1', [check.server_id])
         for (const tool of tools) await client.query(`INSERT INTO mcp_server_tools(server_id,tool_name,description) VALUES($1,$2,$3)
           ON CONFLICT(server_id,tool_name) DO UPDATE SET description=$3,available=true,updated_at=now()`, [check.server_id, tool.name, tool.description])

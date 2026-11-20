@@ -14,6 +14,7 @@ const mcpColumns = 'id,name,url,transport,enabled,revision,auth_header,ciphertex
 const skillColumns = 'id,name,source,slug,source_kind AS "sourceKind",source_revision AS "sourceRevision",source_path AS "sourcePath",sha256,enabled,created_at AS "createdAt"'
 const mcpView = (row: McpRow): McpServerView => ({ id: row.id, name: row.name, url: row.url, transport: row.transport, enabled: row.enabled, revision: row.revision, authKind: row.oauth_enabled ? 'oauth' : row.transport === 'stdio' ? 'env' : row.auth_header ? 'header' : 'none', createdAt: row.created_at.toISOString() })
 const aad = (userId: string, id: string, url: string, header: string) => JSON.stringify(['personal-mcp', userId, id, url, header.toLowerCase()])
+const stdioConfiguration = (row: McpRow, value: string) => taskMcpServerSchema.options[1].parse({ name: `mcp_${row.id.replaceAll('-', '')}`, transport: 'stdio', ...JSON.parse(value) })
 
 export class PersonalPluginStore {
   constructor(readonly pool: Pool, readonly env: Record<string, string | undefined> = process.env, readonly membership?: Pick<Pool | PoolClient, 'query'>) {}
@@ -70,6 +71,14 @@ export class PersonalPluginStore {
   async deleteMcp(userId: string, id: string) {
     if (!(await this.pool.query('DELETE FROM personal_mcp_servers WHERE id=$1 AND user_id=$2', [id, userId])).rowCount) throw new PluginError('mcpNotFound', 404)
   }
+  /** Receipt validation already holds the server lock. Read on that same
+   * executor; no pool checkout or OAuth refresh belongs inside that transaction. */
+  async ownedStdioConfiguration(userId: string, id: string, query: Pick<PoolClient, 'query'>) {
+    const { rows: [row] } = await query.query<McpRow>(`SELECT ${mcpColumns} FROM personal_mcp_servers WHERE id=$1 AND user_id=$2 AND enabled=true AND transport='stdio'`, [id, userId])
+    if (!row) throw new PluginError('mcpUnavailable', 404)
+    const value = openSecret({ ciphertext: row.ciphertext!, iv: row.iv!, keyVersion: row.key_version! }, aad(userId, row.id, row.url, row.auth_header!), this.env)
+    return stdioConfiguration(row, value)
+  }
   /** Called immediately before remote discovery/call. Never returned by an API. */
   async mcpConnection(userId: string, id: string, revision?: number, authority?: McpAuthority) {
     const grant = authority ? (await new WorkspaceMcpStore(this.pool, this.membership).validate(userId, singleMcpAuthority(authority, id))).servers[0] : null
@@ -78,7 +87,7 @@ export class PersonalPluginStore {
     if (!row || revision !== undefined && row.revision !== revision) throw new PluginError('mcpUnavailable', 404)
     if (grant && row.revision !== grant.revision) throw new PluginError('mcpUnavailable', 404)
     const value = row.auth_header ? openSecret({ ciphertext: row.ciphertext!, iv: row.iv!, keyVersion: row.key_version! }, aad(ownerId,row.id,row.url,row.auth_header),this.env) : null
-    const native = row.transport === 'stdio' ? taskMcpServerSchema.parse({ name: `mcp_${row.id.replaceAll('-','')}`, transport: 'stdio', ...JSON.parse(value!) }) : undefined
+    const native = row.transport === 'stdio' ? stdioConfiguration(row, value!) : undefined
     const headers: Record<string,string> = row.auth_header === '__headers__' ? JSON.parse(value!) : row.auth_header && row.transport !== 'stdio' ? { [row.auth_header]:value! } : {}
     if (row.oauth_enabled) {
       for (const name of Object.keys(headers)) if (name.toLowerCase() === 'authorization') delete headers[name]

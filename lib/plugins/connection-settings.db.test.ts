@@ -224,6 +224,26 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
       await pool.query(`UPDATE devices SET "removedAt"=now() WHERE id=$1`, [device])
       await assert.rejects(deviceChecks.request(owner, local.id, device), /mcpCheckDeviceNotFound/)
     })
+    await t.test('STDIO discovery and receipt commit finish through a one-connection Postgres pool', async () => {
+      const single = new Pool({ connectionString: target.toString(), max: 1, connectionTimeoutMillis: 5_000 })
+      try {
+        const own = new PersonalPluginStore(single, env, single), checks = new McpDeviceChecks(own)
+        const device = randomUUID()
+        await single.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'Single connection fixture\')', [device, owner])
+        const local = await own.createMcp(owner, createMcpSchema.parse({ name: 'Single connection docs', transport: 'stdio', command: process.execPath,
+          args: [fileURLToPath(new URL('../../packages/daemon/test/fakes/mcp-settings.mjs', import.meta.url))], env: { SERVICE_TOKEN: fixtureToken } }))
+        const queued = await checks.request(owner, local.id, device)
+        const [command] = await checks.pending(owner, device)
+        assert.equal(command.id, queued.id)
+        const receipt = await checkStdioMcp(command)
+        assert.equal(receipt.status, 'connected')
+        await checks.complete(owner, device, receipt)
+        const detail = await new McpConnectionStore(own).detail(owner, local.id)
+        assert.equal(detail.status, 'connected'); assert.equal(detail.deviceCheck, null)
+        assert.deepEqual(detail.tools, [{ name: 'read_docs', description: 'Read [redacted]', enabled: true, available: true }])
+        await assert.rejects(checks.complete(owner, device, receipt), /mcpCheckReceiptExpired/)
+      } finally { await single.end() }
+    })
     await t.test('real API handlers reject unauthenticated, delegated, nonowner and cross-workspace calls before mutations', async () => {
       let actor: string | null = owner
       mock.module('../api-auth.ts', { namedExports: { auth: { api: { getSession: async () => actor ? { user: { id: actor } } : null } } } })
