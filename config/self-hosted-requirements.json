@@ -3896,5 +3896,12 @@
     "behavior": "Adds the Bot's saved reasoning effort to the chat model's provider options; pure code, the provider is whatever the installation already uses.",
     "test": "lib/model-effort.test.ts",
     "suite": "test:lib-units"
+  },
+  "lib/bot-model-effort.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads the Bot's saved reasoning effort beside its model choice in the installation PostgreSQL database; absent, the model's default applies.",
+    "test": "lib/bot-model-selection.test.ts",
+    "suite": "test:agent-kit-model"
   }
 }
