@@ -17,6 +17,9 @@ bindings. Current workflow files define the triggers and selected coverage.
   Current Cloudflare native CI and the transitionary private-triggered OCI issuer
   are **different** operations; neither changes long-term public build ownership.
   See [build-source-of-truth.md](../../docs/operations/build-source-of-truth.md).
+- A pull request that changes the interface must include a screenshot or
+  recording in its description. `frontend-screenshots.yml` checks that on
+  open, push, and description edits. It does not launch a browser.
 - Ordinary acceptance uses API/CLI flows under decision 2026-11-01-1520.
   Targeted Desktop and Analytics jobs retain their selected browser
   checks. `browser-gate.yml` only keeps the protected check name

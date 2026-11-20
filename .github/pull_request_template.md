@@ -4,7 +4,11 @@
 
 ## UI changes
 
-<!-- Delete this section if the PR has no UI. -->
+<!-- Delete this section if the PR has no UI. A change under components/, apps/frontend/, apps/mobile/, the desktop renderer, or messages/ must include a screenshot or recording below. CI rejects the pull request otherwise. Opt out only with `Screenshots: not needed: <reason>`. -->
+
+| Before | After |
+| ------ | ----- |
+|        |       |
 
 - For changes to a business entity, field, state or command, list its entry points and link the shared implementation and behavior test.
 - Review page (Artifact):
