@@ -105,7 +105,7 @@ export function findDroppedCauses(file, source) {
  * entry). Fix a drop by passing `{ cause: error }`; do not add files here.
  */
 export const droppedCauseAllowlist = {
-  'app/actions/coordinator.ts': 4,
+  'app/actions/coordinator.ts': 1,
   'app/api/factory/tasks/[taskId]/approval/route.ts': 1,
   'lib/abuse/card-checkout.ts': 1,
   'lib/agent-runs.ts': 2,

@@ -291,6 +291,10 @@ and [measured results](../../docs/ci/1699-results.md).
 
 Selected reusable jobs consume CI's trusted decision without running another
 selector. The Analytics conclusion contributes to `UI policy (strict)`.
+The actual Analytics build, SSR checks and browser run own the `analytics-ssr`
+check name; no second runner summarizes that job. An absent or invalid trusted
+selection fails before setup, and the parent gate rejects selected runs that
+fail, cancel or skip. See the [measured queue samples](../../docs/ci/2984-analytics-baseline.json).
 Independent dispatches still classify their changes.
 Desktop checks and Electron acceptance run on Linux. Mac packaged acceptance,
 local-driver permission probes and installer acceptance are removed from CI;

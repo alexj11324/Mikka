@@ -125,8 +125,8 @@ Each selected case uses its exact existing subscription:
 - Codex: gpt-6-luna.
 
 API execution creates one temporary fixed Agent Profile, selects the corresponding
-Coordinator composer subscription, and calls coordinator.sendCoordinatorMessage
-through /api/rpc with a cloud destination and the Profile ID. The task requests a
+Coordinator composer subscription, and submits through the authenticated Eve
+session endpoint with a cloud destination and the Profile ID. The task requests a
 tiny text Artifact with exact bytes, plus the ordinary independent review and
 normal delivery acceptance. The frozen Factory flowVersion controls the checks:
 v2 requires execute and one independent review; historical tasks also require

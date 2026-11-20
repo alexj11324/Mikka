@@ -46,6 +46,7 @@ test('selected specialty calls reuse the parent decision; direct dispatch still 
     assert.equal(w.on.workflow_call.inputs.selected.default, false)
     assert.equal(evaluate(w.jobs.changes.if, { inputs: { selected: true } }), false)
     assert.equal(evaluate(w.jobs.changes.if, { inputs: { selected: false } }), true)
+    if (name === 'analytics-ssr') continue // Its native job validates malformed selection before any build step.
     for (const job of Object.values(w.jobs).filter(j => j.needs?.includes('changes') && j.if?.includes('inputs.selected'))) {
       for (const [selected, result, output, expected] of [[true, 'skipped', 'false', true], [false, 'success', 'true', true], [false, 'success', 'false', false], [false, 'failure', 'true', false]]) {
         assert.equal(evaluate(job.if, { inputs: { selected }, needs: { changes: { result, outputs: { [lane]: output } } } }), expected, `${name}: ${selected}/${result}/${output}`)
@@ -54,14 +55,47 @@ test('selected specialty calls reuse the parent decision; direct dispatch still 
   }
 })
 
-test('the analytics gate accepts a reused decision but rejects failed, cancelled and skipped selected work', () => {
-  const gate = workflow('analytics-ssr').jobs['analytics-ssr'].steps[0]
-  for (const selected of [true, false]) {
-    for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
-      const context = { inputs: { selected }, needs: { changes: { result: selected ? 'skipped' : 'success', outputs: { analytics: 'true' } }, 'analytics-ssr-full': { result } } }
-      const env = Object.fromEntries(Object.entries(gate.env).map(([key, value]) => [key, evaluate(value, context)]))
-      assert.equal(spawnSync('bash', ['-e', '-c', gate.run], { env }).status, result === 'success' ? 0 : 1, `${selected}/${result}`)
-    }
+test('Analytics reports its real build and browser result without a second queued summary runner', () => {
+  const w = workflow('analytics-ssr')
+  const [jobId, job] = Object.entries(w.jobs).find(([, job]) => job.name === 'analytics-ssr')
+  assert(job.steps.some(step => step.run === 'pnpm build'), 'the named check must perform the actual build')
+  assert(job.steps.some(step => step.run === 'node scripts/check-analytics-ssr.mjs --check-build'))
+  assert(job.steps.some(step => step.run === 'node scripts/check-analytics-ssr.mjs'), 'the named check must render the real compiled pages')
+  assert.equal(job['continue-on-error'], undefined)
+  assert(job.steps.every(step => !step['continue-on-error']), 'native step failures must fail the check')
+  assert(!Object.values(w.jobs).some(candidate => [candidate.needs].flat().includes(jobId)), 'native job status needs no second summary allocation')
+
+  const gate = job.steps[0]
+  for (const [selected, result, output, scheduled, status] of [
+    [true, 'skipped', undefined, true, 0],
+    [false, 'success', 'true', true, 0],
+    [false, 'success', 'false', false, null],
+    [false, 'failure', 'true', true, 1],
+    [false, 'cancelled', 'true', true, 1],
+    [false, 'skipped', 'true', true, 1],
+    [false, 'success', undefined, true, 1],
+    [false, 'success', 'invalid', true, 1],
+  ]) {
+    const context = { inputs: { selected }, needs: { changes: { result, outputs: { analytics: output } } } }
+    assert.equal(evaluate(job.if, context), scheduled, `${selected}/${result}/${output}`)
+    if (!scheduled) continue
+    const env = Object.fromEntries(Object.entries(gate.env).map(([key, value]) => [key, evaluate(value, context)]))
+    assert.equal(spawnSync('bash', ['-e', '-c', gate.run], { env }).status, status, `${selected}/${result}/${output}`)
+  }
+  assert.equal(evaluate(job.if, { inputs: { selected: true }, needs: { changes: {} }, cancelled: () => true }), false)
+})
+
+test('the protected parent requires success from selected Analytics work', () => {
+  const gate = workflow('ui-policy').jobs['ui-policy'].steps[0]
+  for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
+    const context = { github: { event_name: 'pull_request' }, needs: {
+      changes: { result: 'success', outputs: { core: 'false', integration: 'false', source: 'false', daemon: 'false', analytics: 'true', db: 'false' } },
+      'ui-policy-full': { result: 'skipped' }, 'ui-policy-integrations': { result: 'skipped' },
+      'source-checks': { result: 'skipped' }, 'daemon-checks': { result: 'skipped' },
+      'workspace-governance-checks': { result: 'skipped' }, 'analytics-checks': { result },
+    } }
+    const env = { ...Object.fromEntries(Object.entries(gate.env).map(([key, value]) => [key, evaluate(value, context)])), GITHUB_STEP_SUMMARY: '/dev/null' }
+    assert.equal(spawnSync('bash', ['-e', '-c', gate.run], { env }).status, result === 'success' ? 0 : 1, result)
   }
 })
 
