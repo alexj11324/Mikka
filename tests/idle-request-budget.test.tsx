@@ -9,7 +9,7 @@ import { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE } from '..
 import { issueWithMetadata } from '../lib/issue-metadata'
 import { taskPresentation } from '../lib/task-presentation'
 import type { BoardScreenProps } from '../components/slots/board-contract'
-import type { ThreadScreenProps } from '../components/slots/thread-contract'
+import type { ThreadScreenProps, ThreadTranscriptScreenProps } from '../components/slots/thread-contract'
 
 // Idle request budget (#1212): each main page's real client component, real SWR with the app's defaults
 // (components/swr-defaults.tsx) and a healthy live channel, over one idle, visible minute on fake timers.
@@ -66,9 +66,11 @@ mock.module(new URL('components/slots/task-detail.tsx', root).href, { namedExpor
 mock.module(new URL('components/slots/new-task.tsx', root).href, { namedExports: { NewTask: () => null } })
 
 // The full Bot container still owns all measured reads. Its official slot only paints data.
+let ThreadTranscript: typeof import('../components/slots/thread-transcript')['ThreadTranscript']
 let observeThread: ((props: ThreadScreenProps) => void) | undefined
-mock.module(new URL('components/slots/thread.tsx', root).href, { namedExports: { ThreadScreen: (props: ThreadScreenProps) => {
-  useLayoutEffect(() => { observeThread?.(props) })
+mock.module(new URL('components/slots/thread.tsx', root).href, { namedExports: { ThreadScreen: (props: ThreadScreenProps | ThreadTranscriptScreenProps) => {
+  useLayoutEffect(() => { if (!('transcript' in props)) observeThread?.(props) })
+  if ('transcript' in props) return <ThreadTranscript {...props} />
   return <section>{props.entries?.map(entry => <div key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, i) =>
     part.kind === 'text' ? <span key={i}>{part.node || part.text}</span> : null)}</div>)}</section>
 } } })
@@ -142,6 +144,7 @@ before(async () => {
   for (const [key, value] of Object.entries({ window: browser, requestAnimationFrame: timers.requestAnimationFrame, cancelAnimationFrame: timers.cancelAnimationFrame, WebSocket: FakeSocket, IS_REACT_ACT_ENVIRONMENT: true })) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
   // The official board supplies the layout. Mount the real toolbar, card menus
   // and their subscriptions while the public-only fixture renders their props.
+  ;({ ThreadTranscript } = await import('../components/slots/thread-transcript'))
   const board = await import('../components/slots/board')
   const { Button } = await import('../components/ui/button')
   mock.module('@ui-slot/board', { namedExports: { ...board,
