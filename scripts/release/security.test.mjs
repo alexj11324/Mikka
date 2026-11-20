@@ -148,14 +148,28 @@ test('the release SBOM skips optional platform packages pnpm did not install, an
   } }), /EACCES/)
 })
 
+// Match the whole YAML key: `statuses: write` is a permission, not `uses: write`.
+const workflowUses = content => [...content.matchAll(/\buses:\s+([^\s#]+)/g)].map(match => match[1])
+
+test('action ref scanning distinguishes statuses permissions and still rejects unpinned uses', () => {
+  const pinned = `actions/checkout@${'a'.repeat(40)}`
+  assert.deepEqual(workflowUses(`permissions:\n  statuses: write\nsteps:\n  - uses: ${pinned}\n  - uses: ./.github/actions/install`),
+    [pinned, './.github/actions/install'])
+  for (const ref of ['actions/checkout@v4', 'actions/checkout@main', 'actions/checkout', `actions/checkout@${'a'.repeat(39)}`]) {
+    const actual = workflowUses(`permissions:\n  statuses: write\nsteps:\n  - uses: ${ref}`)
+    assert.deepEqual(actual, [ref])
+    assert.throws(() => assert.match(actual[0], /^[^@]+@[a-f0-9]{40}$/))
+  }
+})
+
 test('third-party actions in workflows and local composite actions use immutable SHA refs', async () => {
   for (const folder of ['workflows', 'actions']) {
     const directory = new URL(`../../.github/${folder}/`, import.meta.url)
     for (const name of await readdir(directory, { recursive: true })) {
       if (!/\.ya?ml$/.test(name)) continue
       const content = await readFile(new URL(name, directory), 'utf8')
-      for (const match of content.matchAll(/uses:\s+([^\s#]+)/g)) {
-        if (!match[1].startsWith('./')) assert.match(match[1], /^[^@]+@[a-f0-9]{40}$/, `${folder}/${name}: ${match[1]}`)
+      for (const ref of workflowUses(content)) {
+        if (!ref.startsWith('./')) assert.match(ref, /^[^@]+@[a-f0-9]{40}$/, `${folder}/${name}: ${ref}`)
       }
     }
   }
