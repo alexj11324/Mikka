@@ -35,25 +35,13 @@ on:
       - 'patches/@fantasticfour*'
       - 'pnpm-lock.yaml'
       - '.github/workflows/cloudflare-eve-image.yml'
-  push:
-    branches: [main]
-    paths:
-      - 'apps/eve/**'
-      - 'lib/eve/**'
-      - 'packages/eve-cloudflare-world/**'
-      - 'cloudflare/eve-runtime/**'
-      - 'scripts/build-eve.mjs'
-      - 'scripts/package-cf-eve-host.mjs'
-      - 'scripts/build-cloudflare-eve-image.sh'
-      - 'scripts/compile-cloudflare-eve-host.sh'
-      - 'patches/@fantasticfour*'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/cloudflare-eve-image.yml'
 permissions:
   contents: read
 jobs:
   image:
-    if: github.event_name != 'workflow_dispatch'
+    # All PRs retain their existing credential-free qualification. The
+    # protected Registry producer is allowed to run only on real main pushes.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:

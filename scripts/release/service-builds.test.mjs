@@ -28,15 +28,16 @@ async function fixture(t) {
 }
 
 function plan(contexts = {}) {
-  return { version: 1, sourceCommit: firstSource, overlayCommit: null,
+  return { version: 1, sourceCommit: firstSource, overlayCommit: firstSource,
     services: Object.fromEntries(serviceNames.map(name => [name, { kind: ['web', 'world'].includes(name) ? 'worker' : 'container', contextDigest: contexts[name] ?? digest('1') }])),
     migrations: { contextDigest: digest('2'), files: ['drizzle/202611200001_add_column.sql'] } }
 }
 
 function publications(context) {
-  return Object.fromEntries(serviceNames.map(name => [name, { ...context.services[name], sourceCommit: context.sourceCommit, build,
+  return Object.fromEntries(serviceNames.map(name => [name, { ...context.services[name], sourceCommit: context.sourceCommit,
+    overlayCommit: ['api', 'web'].includes(name) ? context.overlayCommit : null, build,
     artifacts: { worker: { digest: digest('3'), path: 'workers/' + name + '.mjs' } },
-    ...(context.services[name].kind === 'container' ? { image: 'registry.cloudflare.com/' + 'c'.repeat(32) + '/mikka-' + name + '@' + digest('4'), imageDigest: digest('4') } : {}) }]))
+    ...(context.services[name].kind === 'container' ? { image: 'registry.cloudflare.com/' + 'c'.repeat(32) + '/mikka-' + name + '@' + digest('4'), imageDigest: digest('4'), localImageId: digest('5') } : {}) }]))
 }
 
 test('an unrelated commit and repeat runs retain every context, while a LiteLLM edit changes only LiteLLM', async t => {
@@ -58,6 +59,24 @@ test('overlay and public build settings affect only the declared consumers', asy
   const before = await buildContexts({ directory, overlayCommit: firstSource, publicSettings: { NAME: 'old' } })
   const after = await buildContexts({ directory, overlayCommit: secondSource, publicSettings: { NAME: 'new' } })
   assert.deepEqual(serviceNames.filter(name => before.services[name].contextDigest !== after.services[name].contextDigest), ['web'])
+})
+
+test('the production input declarations isolate a proxy configuration edit and do not rebuild it for API-only code', async t => {
+  const { directory, put, git } = await fixture(t)
+  const inputs = await readBuildInputs()
+  await put('config/service-build-inputs.json', JSON.stringify(inputs))
+  await put('package.json', '{"private":true}\n')
+  await put('deploy/litellm/config.yaml', 'model_list: []\n')
+  await put('apps/api/runtime/http-policy.mjs', 'export const limit = 1\n')
+  git(['add', '.'])
+  const first = await buildContexts({ directory, inputs })
+  await put('deploy/litellm/config.yaml', 'model_list: []\n# reviewed proxy setting\n')
+  const proxy = await buildContexts({ directory, inputs })
+  assert.deepEqual(serviceNames.filter(name => proxy.services[name].contextDigest !== first.services[name].contextDigest), ['litellm'])
+  await put('apps/api/runtime/http-policy.mjs', 'export const limit = 2\n')
+  const api = await buildContexts({ directory, inputs })
+  assert.notEqual(api.services.api.contextDigest, proxy.services.api.contextDigest)
+  assert.equal(api.services.litellm.contextDigest, proxy.services.litellm.contextDigest)
 })
 
 test('migrations have an independent context so a migration-only change does not rebuild services', async t => {
@@ -82,6 +101,7 @@ test('removing an imported path from the declared inputs fails coverage at that 
 test('the checked-in service entries cover their current transitive repository imports', async () => {
   assert.deepEqual(await assertInputCoverage(), { services: 6 })
   const inputs = await readBuildInputs()
+  inputs.groups.toolchain = inputs.groups.toolchain.filter(path => path !== 'lib/deployment-id.mjs')
   inputs.services.world.paths = inputs.services.world.paths.filter(path => path !== 'lib/deployment-id.mjs')
   await assert.rejects(assertInputCoverage({ inputs }), /"service":"world"[^\n]+"imported":"lib\/deployment-id.mjs"/)
 })
@@ -94,6 +114,7 @@ test('a repeated release reuses all original immutable artifacts and source rece
     assert.equal(next.services[name].reused, true)
     assert.equal(next.services[name].sourceCommit, firstSource)
     assert.deepEqual(next.services[name].build, build)
+    assert.equal(next.services[name].overlayCommit, ['api', 'web'].includes(name) ? firstSource : null)
     assert.equal(next.services[name].digest, first.services[name].digest)
   }
 })
@@ -125,6 +146,7 @@ test('a manifest rejects mutable image references, traversal, and forged artifac
     value => { value.services.api.artifacts.worker.path = '../private/token' },
     value => { value.services.eve.digest = digest('f') },
     value => { value.services.task.build.artifactId = '' },
+    value => { value.services.web.overlayCommit = null },
   ]) {
     const altered = structuredClone(release); mutate(altered)
     assert.throws(() => validateReleaseManifest(altered))

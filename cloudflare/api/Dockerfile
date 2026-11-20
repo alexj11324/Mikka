@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # "release" is the node-server output built for this exact public+private release.
-FROM node:24-bookworm-slim
+FROM node:24-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
 RUN apt-get update && apt-get install --yes --no-install-recommends ca-certificates \
     && test -s /etc/ssl/certs/ca-certificates.crt && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
@@ -17,6 +17,6 @@ COPY --from=release --chown=node:node /mikka-build.json /world-business.mjs ./
 COPY --chown=node:node start.mjs ./
 RUN ln -s server/node_modules node_modules
 USER node
-RUN node start.mjs verify-image
+RUN --network=none node start.mjs verify-image
 EXPOSE 3000
 CMD ["node", "start.mjs"]
