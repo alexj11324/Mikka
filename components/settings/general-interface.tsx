@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Pencil } from '@/components/icons'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { SettingRow, SettingSelect, SettingSwitch, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { useUiPreferences } from '@/hooks/settings/use-ui-preferences'
@@ -64,12 +65,12 @@ export function GeneralInterface() {
         <div className="flex flex-col gap-2">
           {RAIL_ITEMS.map(item => {
             const checked = draftPages.includes(item.id)
-            return <label key={item.id} className="flex items-center justify-between gap-3 text-sm">
+            return <Label key={item.id} className="flex items-center justify-between gap-3 text-sm">
               <span>{nav(item.label)}</span>
               <SettingSwitch label={nav(item.label)} checked={checked} onCheckedChange={next => {
                 setDraftPages(current => next ? [...current, item.id] : current.filter(id => id !== item.id))
               }} />
-            </label>
+            </Label>
           })}
         </div>
         <DialogFooter>

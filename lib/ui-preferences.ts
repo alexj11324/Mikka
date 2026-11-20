@@ -203,6 +203,19 @@ export function publishUiPreferences(ui: UiPreferences, root: HTMLElement | null
   paintToken(root, '--foreground', custom ? foreground : null)
   paintToken(root, '--card', custom ? fill : null)
   paintToken(root, '--border', ui.border)
+  const accentMix = `color-mix(in srgb, ${accent} 14%, ${fill})`
+  if (ui.backgroundEffect === 'gradient') {
+    root.style.backgroundImage = `linear-gradient(to bottom, ${fill}, ${accentMix})`
+    root.style.backgroundSize = ''
+  } else if (ui.backgroundEffect === 'grid') {
+    root.style.backgroundImage = 'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)'
+    root.style.backgroundSize = '24px 24px'
+  } else {
+    root.style.backgroundImage = ''
+    root.style.backgroundSize = ''
+  }
+  if (ui.wallpaper === 'color') root.style.backgroundColor = accentMix
+  else if (!custom) root.style.backgroundColor = ''
 }
 
 export interface RunKeyEvent { key: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; isComposing: boolean }

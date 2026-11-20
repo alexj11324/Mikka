@@ -60,7 +60,7 @@ function TitleScope({ scope, workspaceId }: { scope: 'mine' | 'workspace'; works
       <Button type="button" size="sm" variant="outline" disabled={!titles.canEdit || titles.busy} onClick={() => { setDraft(titles.instructions); setEditing(true) }}>{t('edit')}</Button>
     </SettingRow>
     <SettingRow title={t('regenerate')} description={t('triggersHint')}>
-      <SettingSelect label={t('regenerate')} className="w-52" value={triggerValue} disabled={!titles.canEdit || titles.busy} options={options} onValueChange={value => {
+      <SettingSelect label={t('regenerate')} value={triggerValue} disabled={!titles.canEdit || titles.busy} options={options} onValueChange={value => {
         if (!value || value === triggerValue || !TRIGGERS.includes(value as ThreadTitleTriggers) && value !== 'workspace') return
         titles.setTriggers(value === 'workspace' ? null : value as ThreadTitleTriggers)
       }} />

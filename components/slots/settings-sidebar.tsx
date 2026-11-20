@@ -10,6 +10,8 @@ import { listTeams } from '@/app/actions/teams'
 import { switchWorkspace } from '@/app/actions/workspace'
 import { fetchSettingsData } from '@/lib/settings-data'
 import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
+import { Button } from '@/components/ui/button'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { SearchInput } from '@/components/ui/search-input'
 import { RAIL_ITEMS } from '@/components/nav/icon-rail'
@@ -61,7 +63,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   const noMatch = Boolean(normalizedQuery) && !showTeams && groups.every(({ items }) => items.length === 0)
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-2">
-      <button type="button" className="flex h-8 items-center gap-1 px-2 text-sm font-semibold" onClick={() => onRail('chats')}><ChevronLeft />{i18nText("Settings.title")}</button>
+      <Button type="button" variant="ghost" className="h-8 justify-start px-2 font-semibold" onClick={() => onRail('chats')}><ChevronLeft data-icon />{i18nText("Settings.title")}</Button>
       <SearchInput className="mt-1" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} />
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">
@@ -71,7 +73,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
           const Icon = icons[item.id]
           const label = i18nText.has(`Settings.sections.${item.id}.nav` as never) ? i18nText(`Settings.sections.${item.id}.nav` as never) : i18nText(`Settings.sections.${item.id}.title` as never)
           const selected = item.id === section && !selectedTeamId && !creating
-          return <SidebarMenuItem key={item.id}><SidebarMenuButton className="data-active:bg-[color-mix(in_oklch,var(--label-blue)_16%,transparent)] data-active:text-[var(--label-blue)]" aria-label={label} render={activeSection ? <Link href={href(item.id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onPointerEnter={() => onIntent?.(item.id)} onFocus={() => onIntent?.(item.id)} onClick={() => { if (!activeSection) onSectionChange(item.id); setOpenMobile(false) }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
+          return <SidebarMenuItem key={item.id}><SidebarMenuButton className="data-active:bg-primary/15 data-active:text-primary" aria-label={label} render={activeSection ? <Link href={href(item.id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onPointerEnter={() => onIntent?.(item.id)} onFocus={() => onIntent?.(item.id)} onClick={() => { if (!activeSection) onSectionChange(item.id); setOpenMobile(false) }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>
       })}
       {showTeams && <SidebarGroup className="py-2"><SidebarGroupLabel>{i18nText("Settings.groups.yourTeams")}</SidebarGroupLabel><SidebarMenu>{joinedTeams.map(team => {
@@ -92,12 +94,12 @@ function WorkspaceSwitch({ currentId, currentName }: { currentId: string; curren
   const { data } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
   const choices = data?.accounts[0]?.choices ?? []
   if (choices.length < 2) return <p className="mt-auto border-t px-4 py-3 text-sm">{currentName}</p>
-  return <label className="mt-auto flex items-center gap-2 border-t px-3 py-2 text-sm">
+  return <div className="mt-auto flex items-center gap-2 px-3 py-2 text-sm">
     <Users />
-    <select aria-label={currentName} className="min-w-0 flex-1 bg-transparent" value={currentId} onChange={event => { void switchWorkspace({ workspaceId: event.target.value }) }}>
-      {choices.map(choice => <option key={choice.id} value={choice.id}>{choice.name}</option>)}
-    </select>
-  </label>
+    <NativeSelect aria-label={currentName} className="min-w-0 flex-1" value={currentId} onChange={event => { void switchWorkspace({ workspaceId: event.target.value }) }}>
+      {choices.map(choice => <NativeSelectOption key={choice.id} value={choice.id}>{choice.name}</NativeSelectOption>)}
+    </NativeSelect>
+  </div>
 }
   // On desktop the section list is the card's first column, where the bot list sits elsewhere in the app.
   return <ResizablePane data-slot="settings-list" storageKey="mikka:settings-list-width" defaultWidth={256} min={208} max={400} edge="end" from="md" label={i18nText('Common.resize.settingsList')} className="hidden shrink-0 border-r md:block">

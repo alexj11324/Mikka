@@ -63,12 +63,12 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
     <SettingsSection id="workspace-general" title={t('profile')}>
       <SettingRow title={t('icon')} description={t('iconHint')}>
         <div className="flex items-center gap-2">
-          <button type="button" className="relative" aria-label={t('changeIcon')} disabled={saving !== null} onClick={() => fileRef.current?.click()}>
+          <Button type="button" variant="ghost" aria-label={t('changeIcon')} disabled={saving !== null} onClick={() => fileRef.current?.click()}>
             {icon}
-            <Pencil className="absolute -right-1 -bottom-1 size-3.5" />
-          </button>
+            <Pencil data-icon />
+          </Button>
           <Input ref={fileRef} type="file" accept={WORKSPACE_ICON_TYPES.join(',')} className="sr-only" tabIndex={-1} aria-hidden="true" onChange={event => void pickIcon(event)} />
-          {current.icon ? <Button type="button" variant="ghost" size="sm" disabled={saving !== null} onClick={() => void save('icon', null)}>{t('removeIcon')}</Button> : null}
+          {current.icon ? <Button type="button" variant="ghost" disabled={saving !== null} onClick={() => void save('icon', null)}>{t('removeIcon')}</Button> : null}
         </div>
       </SettingRow>
       <SettingRow title={t('name')} description={t('nameHint')}>

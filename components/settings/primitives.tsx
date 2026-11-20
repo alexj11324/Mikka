@@ -1,7 +1,7 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 
@@ -121,18 +121,17 @@ export function SettingSwitch({ label, checked, disabled, onCheckedChange }: {
 }
 
 /** A select row's control. Options are the caller's; the value is not read from a new API. */
-export function SettingSelect({ label, value, onValueChange, options, disabled, className }: {
+export function SettingSelect({ label, value, onValueChange, options, disabled }: {
   label: string
   value: string
   onValueChange: (value: string | null) => void
   options: readonly { value: string; label: string }[]
   disabled?: boolean
-  className?: string
 }) {
   const current = options.find(option => option.value === value)
   return <Select value={value} onValueChange={onValueChange} disabled={disabled}>
-    <SelectTrigger aria-label={label} className={className ? `w-40 ${className}` : 'w-40'}><span>{current?.label ?? value}</span></SelectTrigger>
-    <SelectContent>{options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+    <SelectTrigger aria-label={label} className="w-40"><span>{current?.label ?? value}</span></SelectTrigger>
+    <SelectContent><SelectGroup>{options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectGroup></SelectContent>
   </Select>
 }
 

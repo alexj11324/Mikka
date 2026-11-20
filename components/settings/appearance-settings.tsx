@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { Plus } from '@/components/icons'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { SettingRow, SettingSelect, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { useUiPreferences } from '@/hooks/settings/use-ui-preferences'
 import { UI_THEMES, type UiPreferences } from '@/lib/ui-preferences'
@@ -39,11 +39,11 @@ export function AppearanceSettings() {
         {MODES.map(mode => {
           const selected = ui.colorScheme === mode
           const label = mode === 'system' ? t('system') : t(mode)
-          return <button key={mode} type="button" role="radio" aria-checked={selected} onClick={() => { setTheme(mode); paint({ colorScheme: mode }) }}
-            className={cn('flex w-28 flex-col items-center gap-2 rounded-lg border p-2 text-xs', selected ? 'border-[var(--label-blue)] ring-2 ring-[var(--label-blue)]' : 'border-border')}>
+          return <Button key={mode} type="button" role="radio" aria-checked={selected} variant={selected ? 'secondary' : 'outline'} onClick={() => { setTheme(mode); paint({ colorScheme: mode }) }}
+            className="h-auto w-28 flex-col gap-2 p-2 text-xs">
             <ModeThumb mode={mode} />
             {label}
-          </button>
+          </Button>
         })}
       </div>
       <SettingRow title={t('sync')} description={t('syncHint')}>
@@ -55,31 +55,31 @@ export function AppearanceSettings() {
       <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
         {UI_THEMES.map(theme => {
           const selected = ui.themeId === theme.id
-          return <button key={theme.id} type="button" aria-pressed={selected} onClick={() => paint({ themeId: theme.id, accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}
-            className={cn('flex flex-col gap-2 rounded-lg border p-2 text-left text-xs', selected && 'border-[var(--label-blue)] ring-2 ring-[var(--label-blue)]')}>
-            <span className="flex h-14 w-full overflow-hidden rounded-md border" style={{ background: theme.fill }}>
-              <span className="w-3" style={{ background: theme.accent }} />
-              <span className="m-1.5 h-2 flex-1 rounded-sm" style={{ background: theme.foreground, opacity: 0.7 }} />
+          return <Button key={theme.id} type="button" aria-pressed={selected} variant={selected ? 'secondary' : 'outline'} onClick={() => paint({ themeId: theme.id, accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}
+            className="h-auto flex-col items-start gap-2 p-2 text-xs">
+            <span className="flex h-14 w-full overflow-hidden bg-muted">
+              <span className="w-3 bg-primary" />
+              <span className="m-1.5 h-2 flex-1 bg-foreground/70" />
             </span>
             {t(`theme_${theme.id}` as 'theme_mikka')}
-          </button>
+          </Button>
         })}
       </div>
       {naming ? <div className="flex items-center gap-2 px-5 pb-4">
         <Input aria-label={t('themeName')} value={themeName} maxLength={40} onChange={event => setThemeName(event.target.value)} />
-        <Button type="button" size="sm" disabled={!themeName.trim()} onClick={() => {
+        <Button type="button" disabled={!themeName.trim()} onClick={() => {
           const name = themeName.trim()
           paint({ customThemes: [...ui.customThemes, { id: `custom-${ui.customThemes.length + 1}`, name, accent: ui.accent, fill: ui.fill, foreground: ui.foreground }] })
           setThemeName('')
           setNaming(false)
         }}>{common('save')}</Button>
       </div> : <div className="px-5 pb-4">
-        <Button type="button" variant="outline" size="sm" onClick={() => setNaming(true)}><Plus />{t('createTheme')}</Button>
+        <Button type="button" variant="outline" size="sm" onClick={() => setNaming(true)}><Plus data-icon />{t('createTheme')}</Button>
       </div>}
     </SettingsSection>
     <SettingsSection title={t('colors')}>
       <div className="flex gap-2 px-5 pt-4" role="radiogroup" aria-label={t('colors')}>
-        {(['light', 'dark'] as const).map(value => <button key={value} type="button" role="radio" aria-checked={side === value} onClick={() => setSide(value)} className={cn('rounded-md border px-3 py-1 text-sm', side === value && 'border-[var(--label-blue)] text-[var(--label-blue)]')}>{t(value)}</button>)}
+        {(['light', 'dark'] as const).map(value => <Button key={value} type="button" role="radio" aria-checked={side === value} size="sm" variant={side === value ? 'secondary' : 'outline'} onClick={() => setSide(value)}>{t(value)}</Button>)}
       </div>
       <ColorRow label={t('accent')} value={accent} onChange={next => paint(side === 'dark' ? { accentDark: next } : { themeId: 'mikka', accent: next })} />
       <ColorRow label={t('surface')} value={fill} onChange={next => paint(side === 'dark' ? { fillDark: next } : { themeId: 'mikka', fill: next })} />
@@ -127,17 +127,17 @@ export function AppearanceSettings() {
 function ModeThumb({ mode }: { mode: 'light' | 'dark' | 'system' }) {
   const light = mode !== 'dark'
   const dark = mode !== 'light'
-  return <span className="flex h-14 w-full overflow-hidden rounded-md border border-border">
-    {light ? <span className="flex flex-1 bg-white"><span className="m-1 w-3 rounded-sm bg-neutral-200" /><span className="m-1 h-2 flex-1 rounded-sm bg-neutral-300" /></span> : null}
-    {dark ? <span className="flex flex-1 bg-neutral-900"><span className="m-1 w-3 rounded-sm bg-neutral-700" /><span className="m-1 h-2 flex-1 rounded-sm bg-neutral-600" /></span> : null}
+  return <span className="flex h-14 w-full overflow-hidden bg-muted">
+    {light ? <span className="flex flex-1 bg-card"><span className="m-1 w-3 bg-muted" /><span className="m-1 h-2 flex-1 bg-foreground/20" /></span> : null}
+    {dark ? <span className="flex flex-1 bg-foreground"><span className="m-1 w-3 bg-background/30" /><span className="m-1 h-2 flex-1 bg-background/50" /></span> : null}
   </span>
 }
 
 function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return <SettingRow title={label}>
-    <label className="flex items-center gap-2 text-sm">
-      <input aria-label={label} type="color" value={value} onChange={event => onChange(event.target.value)} className="size-6 border-0 bg-transparent p-0" />
+    <Label className="flex items-center gap-2 text-sm">
+      <Input aria-label={label} type="color" value={value} onChange={event => onChange(event.target.value)} className="size-8 p-1" />
       <span className="font-mono text-xs">{value}</span>
-    </label>
+    </Label>
   </SettingRow>
 }

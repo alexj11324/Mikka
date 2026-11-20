@@ -1,6 +1,7 @@
 'use client'
 
 import { useUiPreferenceSnapshot } from '@/hooks/use-ui-preference-snapshot'
+import { cn } from '@/lib/utils'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useMemo, type ReactNode } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
@@ -52,8 +53,8 @@ function hiddenEntry(name: string) {
 
 function folderNodes(folder: Folder, prefix: string, mode: 'hide' | 'dim' | 'show'): ReactNode[] {
   return [
-    ...[...folder.folders].flatMap(([name, child]) => hiddenEntry(name) && mode === 'hide' ? [] : [<FileTreeFolder key={`${prefix}${name}/`} value={`${prefix}${name}/`} name={name} className={hiddenEntry(name) && mode === 'dim' ? 'opacity-40' : undefined}>{folderNodes(child, `${prefix}${name}/`, mode)}</FileTreeFolder>]),
-    ...folder.files.flatMap(name => hiddenEntry(name) && mode === 'hide' ? [] : [<FileTreeFile key={`${prefix}${name}`} value={`${prefix}${name}`} name={name} className={hiddenEntry(name) && mode === 'dim' ? 'opacity-40' : undefined} />]),
+    ...[...folder.folders].flatMap(([name, child]) => hiddenEntry(name) && mode === 'hide' ? [] : [<FileTreeFolder key={`${prefix}${name}/`} value={`${prefix}${name}/`} name={name} className={cn(hiddenEntry(name) && mode === 'dim' && 'opacity-40')}>{folderNodes(child, `${prefix}${name}/`, mode)}</FileTreeFolder>]),
+    ...folder.files.flatMap(name => hiddenEntry(name) && mode === 'hide' ? [] : [<FileTreeFile key={`${prefix}${name}`} value={`${prefix}${name}`} name={name} className={cn(hiddenEntry(name) && mode === 'dim' && 'opacity-40')} />]),
   ]
 }
 
