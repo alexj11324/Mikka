@@ -11,29 +11,32 @@ export const deploymentOrder = ['world', 'task', 'litellm', 'eve', 'api', 'web']
 /** Compare verified immutable deployment units, not the release commit or tag.
  * The private publisher owns environment selection, execution and receipts. */
 export function planServiceRelease(currentManifest, nextManifest) {
-  const current = validateReleaseManifest(currentManifest)
+  // Only an explicit null starts the first manifest-driven release. The private
+  // publisher must capture the real previous deployment before any writer runs.
+  const current = currentManifest === null ? null : validateReleaseManifest(currentManifest)
   const next = validateReleaseManifest(nextManifest)
   const migrationFiles = new Set(next.migrations.files)
-  assert.ok(current.migrations.files.every(file => migrationFiles.has(file)),
+  assert.ok(!current || current.migrations.files.every(file => migrationFiles.has(file)),
     'A service release cannot remove previously released migrations')
   const services = Object.fromEntries(deploymentOrder.map(name => [name, {
-    changed: current.services[name].digest !== next.services[name].digest,
-    before: current.services[name],
+    changed: !current || current.services[name].digest !== next.services[name].digest,
+    before: current?.services[name] ?? null,
     after: next.services[name],
   }]))
   const changedServices = deploymentOrder.filter(name => services[name].changed)
   const retainedServices = deploymentOrder.filter(name => !services[name].changed)
   return {
     version: 1,
+    bootstrap: current === null,
     sourceCommit: next.sourceCommit,
-    previousSourceCommit: current.sourceCommit,
+    previousSourceCommit: current?.sourceCommit ?? null,
     changedServices,
     retainedServices,
     deploymentOrder: changedServices,
     services,
     migrations: {
-      changed: current.migrations.contextDigest !== next.migrations.contextDigest,
-      before: current.migrations,
+      changed: !current || current.migrations.contextDigest !== next.migrations.contextDigest,
+      before: current?.migrations ?? null,
       after: next.migrations,
     },
   }

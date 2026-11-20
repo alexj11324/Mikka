@@ -89,6 +89,20 @@ test('incomplete manifests and forged deployment digests fail before producing a
   assert.throws(() => planServiceRelease(current, forged), /artifact digest differs/)
 })
 
+test('explicit first-release bootstrap keeps the previous state unknown instead of inventing a manifest', () => {
+  const next = release()
+  const plan = planServiceRelease(null, next)
+  assert.equal(plan.bootstrap, true)
+  assert.equal(plan.previousSourceCommit, null)
+  assert.deepEqual(plan.changedServices, ['world', 'task', 'litellm', 'eve', 'api', 'web'])
+  assert.deepEqual(plan.retainedServices, [])
+  assert.equal(plan.migrations.before, null)
+  assert.equal(plan.migrations.changed, true)
+  assert.equal(Object.values(plan.services).every(service => service.before === null && service.changed), true)
+  assert.throws(() => planServiceRelease(undefined, next))
+  assert.equal(planServiceRelease(next, next).bootstrap, false)
+})
+
 test('the CLI writes the full plan and prints only the release summary', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-service-diff-'))
   try {
