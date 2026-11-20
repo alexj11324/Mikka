@@ -207,7 +207,7 @@ old module owners (backend was Codex's).
 
 ### Reuse exact proof and diagnose failures
 
-Keep a recovery branch and Draft PR while implementing. Mark it Ready when
+Keep a recovery branch and Draft PR while implementing. Mark it Ready for review when
 the source, focused regression and review are ready; this activates the
 existing deferred checks without an empty commit. Drafts run the required
 aggregators, which fail closed while expensive selected jobs wait for Ready;
