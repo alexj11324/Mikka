@@ -8,6 +8,8 @@ At this baseline both a missing hosted file in a configured layer and an entirel
 
 The official layer subsequently added SSO sign-in, governance and organization settings to the three slots originally served by public no-content contracts. A version-pinned Web or Desktop build now requires all 51 provider files and their 75 named exports. The public server keeps its sign-in and handoff pages. [Official provider integration](https://github.com/alexj11324/mikka-hosted-ui/pull/106)
 
+The [chat-message contract](../../components/slots/chat-message-contract.ts) also owns received group messages, embedded pending/failed messages and the extra words below a sent suggestion (#2914). Callers supply content, status copy and retry actions through `@ui-slot/chat-message`. The official slot reuses the existing shared primitive frames for those presentations; its default message frame is unchanged. The scripted first-run setup guide in `components/onboarding/onboarding.tsx` has no chat reader or sender and keeps its separate feedback bubbles.
+
 | Slot and providers | Public implementation | Production imports | Decision |
 | --- | --- | --- | --- |
 | [all-threads](https://github.com/alexj11324/Mikka/blob/b753107a4db339cf8db3f903b591f0550d18145a/components/slots/all-threads.tsx) · [official](https://github.com/alexj11324/mikka-hosted-ui/blob/8644668fe6687c721f7ae033757b99b0414882de/slots/all-threads.tsx) | Workbench view | [components/nav/all-threads.tsx](https://github.com/alexj11324/Mikka/blob/b753107a4db339cf8db3f903b591f0550d18145a/components/nav/all-threads.tsx#L4) | Use the official list and the shared task collection from #1975. |
