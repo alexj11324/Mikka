@@ -1,0 +1,54 @@
+name: Eve PostgreSQL startup diagnostic
+on:
+  push:
+    branches: [codex/2869-eve-fence-diagnostic]
+permissions:
+  contents: read
+jobs:
+  startup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: mikka
+          POSTGRES_USER: mikka
+          POSTGRES_PASSWORD: isolated-eve-fixture
+        ports:
+          - 5449:5432
+        options: >-
+          --health-cmd "pg_isready -U mikka -d mikka"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      MIKKA_SELF_HOSTED_ACCEPTANCE: '1'
+      WORKFLOW_POSTGRES_URL: postgres://mikka:isolated-eve-fixture@127.0.0.1:5449/mikka
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - run: pnpm --filter @mikka/eve install --frozen-lockfile --ignore-scripts
+      - run: node apps/eve/node_modules/@workflow/world-postgres/bin/setup.js
+      - name: Verify patched PostgreSQL World
+        run: node --test scripts/acceptance/workflow-postgres-startup-race.test.mjs
+      - name: Verify original package fails the same forced interleaving
+        run: |
+          set -euo pipefail
+          target=apps/eve/node_modules/@workflow/world-postgres
+          file=patches/@workflow__world-postgres@5.2.0.patch
+          patch -R -d "$target" -p1 < "$file"
+          if node --test scripts/acceptance/workflow-postgres-startup-race.test.mjs > "$RUNNER_TEMP/startup-red.log" 2>&1; then
+            cat "$RUNNER_TEMP/startup-red.log"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/startup-red.log"
+          grep -E '^[[:space:]]+actual: undefined' "$RUNNER_TEMP/startup-red.log"
+          grep -E '^[[:space:]-]+seqInBand: 1' "$RUNNER_TEMP/startup-red.log"
