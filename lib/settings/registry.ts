@@ -65,22 +65,22 @@ export const SETTINGS_REGISTRY = {
     type: 'boolean', guard: z.boolean(), defaultValue: false, personalContext: 'workspace', storage: 'pull-request',
   },
   codeReviewModel: {
-    key: 'codeReviewModel', scope: ['workspace'], group: 'code-review', page: 'review',
+    key: 'codeReviewModel', scope: ['workspace'], group: 'code-review', page: 'review-config',
     ...settingMetadata('codeReviewModel'),
     type: 'string', guard: reviewModel, defaultValue: '', personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', storage: 'code-review',
   },
   codeReviewSeverity: {
-    key: 'codeReviewSeverity', scope: ['workspace'], group: 'code-review', page: 'review',
+    key: 'codeReviewSeverity', scope: ['workspace'], group: 'code-review', page: 'review-config',
     ...settingMetadata('codeReviewSeverity'),
     type: 'string', guard: z.enum(REVIEW_SEVERITIES), defaultValue: 'medium', options: [...REVIEW_SEVERITIES], personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', storage: 'code-review',
   },
   codeReviewIgnoredPaths: {
-    key: 'codeReviewIgnoredPaths', scope: ['workspace'], group: 'code-review', page: 'review',
+    key: 'codeReviewIgnoredPaths', scope: ['workspace'], group: 'code-review', page: 'review-config',
     ...settingMetadata('codeReviewIgnoredPaths'),
     type: 'string-array', guard: reviewIgnoredPaths, defaultValue: [], personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', storage: 'code-review',
   },
   codeReviewOutput: {
-    key: 'codeReviewOutput', scope: ['workspace'], group: 'code-review', page: 'review',
+    key: 'codeReviewOutput', scope: ['workspace'], group: 'code-review', page: 'review-config',
     ...settingMetadata('codeReviewOutput'),
     type: 'string', guard: z.enum(REVIEW_OUTPUTS), defaultValue: 'comments', options: [...REVIEW_OUTPUTS], personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', storage: 'code-review',
   },
