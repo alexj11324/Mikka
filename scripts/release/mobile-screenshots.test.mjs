@@ -308,3 +308,15 @@ test('pinned Maestro command reports project only closed command metadata and fi
     assert.throws(() => nativeFlowDiagnostics(directory, 'FAKE_PRIVATE_FLOW'))
   } finally { rmSync(directory, { recursive: true, force: true }) }
 })
+
+
+test('screenshot and stock-driver identity accept the organization without accepting mixed owner claims', () => {
+  const org = { ...env, GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274' }
+  assert.equal(screenshotIdentity(org).repository, 'aspectly-labs/Mikka')
+  assert.equal(driverPreflightIdentity(org).sha, org.GITHUB_SHA)
+  for (const patch of [{ GITHUB_REPOSITORY_ID: '1' }, { GITHUB_REPOSITORY_OWNER_ID: '183887963' },
+    { GITHUB_REPOSITORY: 'alexj11324/Mikka' }, { GITHUB_REPOSITORY: 'foreign/Mikka' }]) {
+    assert.throws(() => screenshotIdentity({ ...org, ...patch }))
+    assert.throws(() => driverPreflightIdentity({ ...org, ...patch }))
+  }
+})

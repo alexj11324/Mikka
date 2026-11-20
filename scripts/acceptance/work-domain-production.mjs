@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
 import { observeEveSession } from './eve-session.mjs'
 /** Epic #1687. Ordinary shared-account APIs, only inside the existing OIDC job.
  * Preflight sends no model prompt. Active retains useful Tasks and reports.
@@ -63,7 +64,7 @@ export function publicFailure(error) {
 export function domainOptions(env = process.env) {
   check(!env.DOMAIN_OTHER_AUDIT_SHA && (!env.DOMAIN_OTHER_AUDIT_LEASE || env.DOMAIN_OTHER_AUDIT_LEASE === 'false')
     && (!env.DOMAIN_OTHER_AUDIT_RECOVERY_RUN || env.DOMAIN_OTHER_AUDIT_RECOVERY_RUN === 'none'), 'inputs_conflict')
-  check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === 'alexj11324/Mikka'
+  check(env.GITHUB_ACTIONS === 'true' && actionsMikkaRepository(env)
     && env.GITHUB_REF === 'refs/heads/main' && env.GITHUB_EVENT_NAME === 'workflow_dispatch'
     && SHA.test(env.DOMAIN_MODEL_SHA ?? '') && env.GITHUB_SHA === env.DOMAIN_MODEL_SHA, 'target_refused')
   const mode = env.DOMAIN_MODEL_MODE ?? 'preflight'

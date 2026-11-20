@@ -10,7 +10,7 @@ const ownerId = 'PRIVATE_SHARED_ACCOUNT', adminId = 'PRIVATE_SHARED_ADMIN', sha 
 const source = item => id(item.id === 'claude' ? 40 : 41)
 const scope = () => ({ workspaceId, projectId, environmentId, repositoryKey: 'v2/github.com/alexj11324/mikka', botId,
   models: { claude: { connectionId: id(40) }, codex: { connectionId: id(41) } } })
-const env = (mode = 'preflight', selected = null) => ({ GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka',
+const env = (mode = 'preflight', selected = null) => ({ GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
   GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: sha, DOMAIN_MODEL_SHA: sha,
   DOMAIN_MODEL_MODE: mode, DOMAIN_MODEL_SCOPE: selected ? JSON.stringify(selected) : '', DOMAIN_MODEL_TIMEOUT_MS: '1000',
   SMOKE_OWNER_EMAIL: 'acceptance+mikka-smoke@example.invalid', SMOKE_OWNER_PASSWORD: 'PRIVATE_PASSWORD' })
@@ -23,9 +23,10 @@ const now = () => Date.parse('2026-11-08T08:00:00Z')
 
 test('workflow-only exact SHA and explicit strict scope fail before credentials', () => {
   assert.equal(domainOptions(env()).mode, 'preflight')
+  assert.equal(domainOptions({ ...env(), GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274' }).mode, 'preflight')
   assert.deepEqual(domainOptions(env('active', scope())).scope, scope())
   for (const change of [{ GITHUB_ACTIONS: 'false' }, { GITHUB_REF: 'refs/heads/feature' }, { GITHUB_EVENT_NAME: 'push' },
-    { GITHUB_SHA: 'b'.repeat(40) }, { DOMAIN_MODEL_SHA: 'main' }, { GITHUB_REPOSITORY: 'foreign/Mikka' }])
+    { GITHUB_SHA: 'b'.repeat(40) }, { DOMAIN_MODEL_SHA: 'main' }, { GITHUB_REPOSITORY: 'foreign/Mikka' }, { GITHUB_REPOSITORY_ID: '9' }, { GITHUB_REPOSITORY_ID: undefined }, { GITHUB_REPOSITORY_OWNER_ID: undefined }, { GITHUB_REPOSITORY_OWNER_ID: '359279274' }, { GITHUB_REPOSITORY: 'aspectly-labs/Mikka' }])
     assert.throws(() => domainOptions({ ...env(), ...change }), { code: 'target_refused' })
   assert.throws(() => domainOptions(env('active')), { code: 'scope_required' })
   assert.throws(() => domainOptions(env('candidate')), { code: 'mode_invalid' })

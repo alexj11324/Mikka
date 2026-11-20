@@ -73,13 +73,14 @@ jobs:
           import { appendFileSync } from 'node:fs'
           import { randomBytes } from 'node:crypto'
           import { assertDevLocal } from './scripts/dev-local/guard.mjs'
+          import { actionsMikkaRepository } from './scripts/cloudflare-source.mjs'
           
           assert.equal(process.platform, 'linux')
           assert.equal(Number(process.versions.node.split('.')[0]), 24)
           assert.equal(process.env.CI, 'true')
           assert.equal(process.env.GITHUB_ACTIONS, 'true')
           assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
-          assert.equal(process.env.GITHUB_REPOSITORY, 'alexj11324/Mikka')
+          assert.ok(actionsMikkaRepository(process.env))
           assert.ok(['pull_request', 'merge_group', 'push'].includes(process.env.GITHUB_EVENT_NAME))
           if (process.env.GITHUB_EVENT_NAME === 'pull_request') {
             assert.match(process.env.GITHUB_REF, /^refs\/pull\/[0-9]+\/merge$/)
