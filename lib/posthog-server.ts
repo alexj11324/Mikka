@@ -48,12 +48,13 @@ const flagCache = new Map<string, { enabled: boolean; at: number }>()
  * without a project uses the explicit production defaults. Invalid local
  * override configuration throws before contacting PostHog; remote failures do not.
  */
-export async function serverFlagEnabled(key: string, userId: string, { posthog = serverPostHog(), now = Date.now(), timeoutMs = FLAG_TIMEOUT_MS }: { posthog?: ServerPostHog | null; now?: number; timeoutMs?: number } = {}): Promise<boolean> {
+export async function serverFlagEnabled(key: string, userId: string, { posthog, now = Date.now(), timeoutMs = FLAG_TIMEOUT_MS }: { posthog?: ServerPostHog | null; now?: number; timeoutMs?: number } = {}): Promise<boolean> {
   const local = localFlagOverride(key)
   if (local !== undefined) return local
   const cacheKey = `${key}|${userId}`
   const cached = flagCache.get(cacheKey)
   if (cached && now - cached.at < FLAG_CACHE_MS) return cached.enabled
+  if (posthog === undefined) posthog = serverPostHog()
   let enabled = posthog ? false : productionFlagDefault(key)
   if (posthog) {
     let timer: ReturnType<typeof setTimeout> | undefined
