@@ -65,6 +65,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
       id-token: write
     env:
       MIKKA_CLOUD_SOURCE_SHA: ${{ inputs.cloud_source_sha }}
@@ -222,6 +223,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
       id-token: write
     outputs:
       selected: ${{ steps.select.outputs.status }}
@@ -440,6 +442,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
       id-token: write
     outputs:
       selected: ${{ steps.select.outputs.status }}
