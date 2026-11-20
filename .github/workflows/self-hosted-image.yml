@@ -185,7 +185,8 @@ jobs:
             false) ;;
             *) echo 'Invalid declared database-test selection' >&2; exit 1 ;;
           esac
-          node scripts/ci/self-hosted-requirements.mjs --run-tests
+          env -u MIKKA_LITELLM_MASTER_KEY -u MIKKA_LITELLM_URL \
+            node scripts/ci/self-hosted-requirements.mjs --run-tests
       - name: Exercise the real daemon against the registered community user
         timeout-minutes: 6
         run: |
