@@ -1,7 +1,9 @@
 import 'server-only'
 import { createHash, randomBytes } from 'node:crypto'
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
-import { db, pool } from '@/lib/db'
+import { db, pool, withDatabaseTransaction } from '@/lib/db'
+import type { CreatedArtifactShare } from '@mikka/protocol/artifact-share'
+import type { ShareVisibility } from '@mikka/protocol/settings'
 import { executionIdentityForRun } from '@/lib/execution-identity'
 import { agentRuns, agents, artifactShares, artifactVersions, artifacts, bots, issueMembers, issues, type ArtifactKind } from '@/lib/db/schema'
 import { runAgentName, runBotName } from '@/lib/run-bot-name'
@@ -15,8 +17,10 @@ import { artifactStorage, getArtifactObject, putArtifactObject } from '@/lib/art
 import { artifactChanged } from '@/lib/live/artifacts'
 import { taskActivityChanged } from '@/lib/factory/activity-live'
 import { artifactAccess, artifactReadAccess, artifactWorkspace, submissionWorkspace, type ArtifactReader } from './access'
-import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
+import { activeTaskWorkspaces, taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'
+import { readWorkspaceSharingDefaults } from '@/lib/settings/workspace-sharing'
+import { artifactShareVisibilityInput } from './share-input'
 
 // Artifacts in Neon (who, which version, share links) with their files in R2.
 // Every read is scoped to the owner, or to a live share token.
@@ -257,17 +261,24 @@ export async function readArtifactContent(reader: ArtifactReader, artifactId: st
 
 const SHARE_PREFIX = 'mks_'
 
-/** A new link anyone can open; returns the token once. */
-export async function createShare(reader: ArtifactReader, artifactId: string): Promise<{ token: string } | null> {
+/** A new link freezes the explicit choice or current workspace default. */
+export async function createShare(reader: ArtifactReader, artifactId: string, visibility?: ShareVisibility): Promise<CreatedArtifactShare | null> {
+  const explicit = artifactShareVisibilityInput.optional().parse(visibility)
   const workspaceId = await artifactWorkspace(reader, artifactId)
   if (!workspaceId) return null
   const { userId } = taskReaderScope(reader)
-  return withTaskWorkspace(reader, workspaceId, async () => {
+  return withTaskWorkspace(reader, workspaceId, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
+    // Hold the admitted artifact through the insert, including concurrent deletion.
+    const [artifact] = await tx.select({ id: artifacts.id }).from(artifacts)
+      .where(and(eq(artifacts.id, artifactId), eq(artifacts.userId, userId), eq(artifacts.workspaceId, workspaceId))).for('share')
+    if (!artifact) return null
+    const inherited = (await readWorkspaceSharingDefaults(workspaceId)).artifact
+    const selected = explicit ?? inherited.value
     const token = `${SHARE_PREFIX}${randomBytes(24).toString('base64url')}`
-    await db.insert(artifactShares).values({ id: crypto.randomUUID(), artifactId, tokenHash: sha256(token), createdBy: userId })
-    await artifactChanged(db, userId, artifactId)
-    return { token }
-  })
+    await tx.insert(artifactShares).values({ id: crypto.randomUUID(), artifactId, tokenHash: sha256(token), createdBy: userId, visibility: selected })
+    await artifactChanged(tx, userId, artifactId)
+    return { token, scope: { visibility: selected, workspaceId }, source: explicit ? 'explicit' : inherited.source === 'workspace' ? 'workspace' : 'default' } satisfies CreatedArtifactShare
+  })))
 }
 
 /** Ends every live link to the artifact. */
@@ -284,18 +295,27 @@ export async function revokeShares(reader: ArtifactReader, artifactId: string): 
   })
 }
 
-async function sharedArtifactAccess(token: string) {
-  if (!token.startsWith(SHARE_PREFIX)) return null
-  const [share] = await db.select({ artifactId: artifactShares.artifactId, createdBy: artifactShares.createdBy }).from(artifactShares)
+type ShareViewer = ArtifactReader | null | (() => Promise<ArtifactReader | null>)
+
+async function sharedArtifactAccess(token: string, viewer?: ShareViewer) {
+  if (!/^mks_[A-Za-z0-9_-]{1,124}$/.test(token)) return null
+  const [share] = await db.select({ artifactId: artifactShares.artifactId, createdBy: artifactShares.createdBy,
+    visibility: artifactShares.visibility, workspaceId: artifacts.workspaceId }).from(artifactShares)
+    .innerJoin(artifacts, eq(artifacts.id, artifactShares.artifactId))
     .where(and(eq(artifactShares.tokenHash, sha256(token)), isNull(artifactShares.revokedAt))).limit(1)
-  if (!share) return null
+  if (!share?.workspaceId) return null
+  if (share.visibility !== 'link') {
+    const reader = typeof viewer === 'function' ? await viewer() : viewer
+    if (!reader || share.visibility === 'private' && taskReaderScope(reader).userId !== share.createdBy) return null
+    if (!(await activeTaskWorkspaces(reader, share.workspaceId)).length) return null
+  }
   // A removed/suspended issuer cannot leave an anonymous back door into a tenant.
   return and(eq(artifacts.id, share.artifactId), await artifactAccess(share.createdBy))
 }
 
 /** Markdown is rendered inline. An HTML share's iframe reads its own body. */
-export async function sharedArtifact(token: string): Promise<(ArtifactDetail & { content: string | null }) | null> {
-  const access = await sharedArtifactAccess(token)
+export async function sharedArtifact(token: string, viewer?: ShareViewer): Promise<(ArtifactDetail & { content: string | null }) | null> {
+  const access = await sharedArtifactAccess(token, viewer)
   if (!access) return null
   const found = await detail(access)
   if (!found) return null
@@ -305,8 +325,8 @@ export async function sharedArtifact(token: string): Promise<(ArtifactDetail & {
 }
 
 /** The sandboxed frame needs the latest HTML body without author/version history. */
-export async function sharedArtifactFrame(token: string): Promise<string | null> {
-  const access = await sharedArtifactAccess(token)
+export async function sharedArtifactFrame(token: string, viewer?: ShareViewer): Promise<string | null> {
+  const access = await sharedArtifactAccess(token, viewer)
   if (!access) return null
   const [row] = await db.select({ storageKey: artifactVersions.storageKey, inlineContent: artifactVersions.inlineContent })
     .from(artifacts).innerJoin(artifactVersions, and(eq(artifactVersions.artifactId, artifacts.id), eq(artifactVersions.version, artifacts.latestVersion)))
