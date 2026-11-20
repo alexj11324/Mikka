@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from 'node:fs'
 /** Files allowed to listen for focus, visibility or app state, and why. */
 export const focusListenerAllowlist = {
   'components/agents/voice-orb/renderer.ts': 'pauses and resumes the orb animation; reads no data',
+  'components/labels/profile-mark.tsx': 'pauses and resumes ProfileMark Web Animations when the page hides; reads no data',
   'components/slots/bot-avatar.tsx': 'resyncs avatar animation clocks; reads no data',
   'lib/hooks/use-unread-indicators.ts': 'flushes read receipts when the page hides; nothing runs on show',
   'lib/hooks/use-check-on-return.ts': 'checks armed only by a hand-off to the browser or Telegram (one, or each return until the link is done), never by plain focus',
