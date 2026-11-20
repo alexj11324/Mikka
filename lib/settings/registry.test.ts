@@ -8,6 +8,9 @@ test('inheritance retains explicit zero/empty overrides and falls through null t
   assert.deepEqual(resolveSettingValue('archiveIdleAfterDays', null, null), { value: 30, source: 'default' })
   assert.deepEqual(resolveSettingValue('threadTitleInstructions', '', 'team'), { value: '', source: 'personal' })
   assert.deepEqual(resolveSettingValue('subagentMaxConcurrent', 20, null), { value: 6, source: 'default' })
+  assert.deepEqual(resolveSettingValue('protectManualThreadTitles', false, true), { value: false, source: 'personal' })
+  assert.deepEqual(resolveSettingValue('keepPinnedThreadsActive', null, false), { value: false, source: 'workspace' })
+  assert.deepEqual(resolveSettingValue('keepPinnedThreadsActive', null, null), { value: true, source: 'default' })
 })
 
 test('server guards reject unknown fields, invalid scope, coercion and out-of-range values', () => {

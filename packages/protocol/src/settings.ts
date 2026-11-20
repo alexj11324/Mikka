@@ -30,3 +30,5 @@ export interface SettingsView {
 export interface SettingsPatch {
   values: Record<string, SettingValue | null>
 }
+/** Device capacity is explicit device state, not an inherited personal preference. */
+export interface DeviceConcurrencySettings { deviceId: string; maxConcurrentRuns: number }

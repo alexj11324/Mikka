@@ -13,6 +13,7 @@ import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import { threadName } from './issue-threads'
 import { directoryPullSchema, type DirectoryPull } from './conversation-directory-input'
 import { threadTitle } from './short-title'
+import { SETTINGS_REGISTRY } from './settings/registry'
 
 type Row = {
   kind: 'run' | 'chat'; pulls: unknown[]
@@ -32,7 +33,16 @@ function conversationQuery() {
   const owner = '$' + (facts.params.length + 1), workspace = '$' + (facts.params.length + 2)
   const depth = '$' + (facts.params.length + 3)
   const scope = `r."userId"=${owner} AND r."workspaceId"=${workspace}`
-  return `WITH RECURSIVE ${runChainSql(scope,depth)}, latest AS (
+  return `WITH RECURSIVE thread_settings AS (
+    SELECT coalesce(CASE WHEN p.key IS NULL THEN legacy."archiveIdleAfterDays" ELSE p."integerValue" END,w."integerValue",${SETTINGS_REGISTRY.archiveIdleAfterDays.defaultValue}) AS days,
+      coalesce(pin."booleanValue",wpin."booleanValue",${SETTINGS_REGISTRY.keepPinnedThreadsActive.defaultValue}) AS "keepPins"
+    FROM (SELECT 1) seed
+    LEFT JOIN personal_setting_values p ON p."userId"=${owner} AND p."workspaceId" IS NULL AND p.key='archiveIdleAfterDays'
+    LEFT JOIN user_preferences legacy ON legacy."userId"=${owner}
+    LEFT JOIN workspace_setting_values w ON w."workspaceId"=${workspace} AND w.key='archiveIdleAfterDays'
+    LEFT JOIN personal_setting_values pin ON pin."userId"=${owner} AND pin."workspaceId"=${workspace} AND pin.key='keepPinnedThreadsActive'
+    LEFT JOIN workspace_setting_values wpin ON wpin."workspaceId"=${workspace} AND wpin.key='keepPinnedThreadsActive'
+  ), ${runChainSql(scope,depth)}, latest AS (
     SELECT DISTINCT ON (a.root) a.root,r.id,
       max(greatest(r."lastReplyAt",r."updatedAt",r."createdAt")) OVER (PARTITION BY a.root) AS touched
     FROM assigned a JOIN agent_runs r ON r.id=a.id WHERE NOT a."depthExceeded"
@@ -47,7 +57,7 @@ function conversationQuery() {
       root."conversationRestoredAt" AS restored,latest.touched,root.source,
       CASE WHEN root."promptTaskStart">=0 AND root."promptTaskLength" BETWEEN 0 AND length(root.prompt)-root."promptTaskStart"::bigint
         THEN left(substr(root.prompt,root."promptTaskStart"+1,root."promptTaskLength"),400) ELSE '' END AS asked,
-      bot.id AS "botId", coalesce(pref."archiveIdleAfterDays",30) AS days,
+      bot.id AS "botId", settings.days,settings."keepPins",
       CASE WHEN agent_runs."threadReplacedBy" IS NOT NULL THEN 'idle'
         WHEN f.offline OR agent_runs."stopReason" IN ('device_lost','quota_exhausted') OR agent_runs.status IN ('waiting_input','paused')
           OR agent_runs."failureDetails"->>'category' IN ('quota','subscription','api_key','access_denied')
@@ -61,7 +71,7 @@ function conversationQuery() {
     LEFT JOIN issues i ON i.id=root."issueId" AND i."workspaceId"=root."workspaceId" AND i."ownershipState"='bound'
       AND coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' IS NULL
       AND mikka_resource_acl_allowed('account',${owner},i."workspaceId",'task',i.id,'canReadContent')
-    LEFT JOIN user_preferences pref ON pref."userId"=${owner}
+    CROSS JOIN thread_settings settings
     CROSS JOIN LATERAL (${facts.sql}) f
     LEFT JOIN LATERAL (SELECT matched.id FROM agent_runs JOIN agents ON agents.id=agent_runs."agentId"
       CROSS JOIN LATERAL (${attribution.sql}) resolved JOIN bots matched ON matched.id=resolved.id
@@ -85,7 +95,9 @@ function conversationQuery() {
     WHERE root."issueId" IS NULL OR i.id IS NOT NULL
   ), visible AS (
     SELECT *,to_char(touched AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
-      (manual IS NOT NULL OR (days>0 AND NOT pinned AND state='idle' AND greatest(touched,restored)<now()-days*interval '1 day')) AS archived
+      (manual IS NOT NULL OR (days>0 AND NOT (pinned AND "keepPins") AND state='idle'
+        AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(pulls) pull WHERE pull->>'state' IN ('open','draft'))
+        AND greatest(touched,restored)<now()-days*interval '1 day')) AS archived
     FROM roots
   ), named_chats AS (
     SELECT 'chat'::text AS kind,'[]'::jsonb AS pulls,
@@ -96,12 +108,12 @@ function conversationQuery() {
       NULL::text AS "runStatus",(c."conversationPinnedAt" IS NOT NULL) AS pinned,activity.touched,NULL::text AS source, c.title AS asked,
       CASE WHEN turn.status IN ('running','queued') THEN 'working' WHEN turn.status='failed' THEN 'failed' ELSE 'idle' END AS state,
       to_char(activity.touched AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS at,
-      (c."conversationArchivedAt" IS NOT NULL OR (c."conversationPinnedAt" IS NULL AND coalesce(pref."archiveIdleAfterDays",30)>0
+      (c."conversationArchivedAt" IS NOT NULL OR ((c."conversationPinnedAt" IS NULL OR NOT settings."keepPins") AND settings.days>0
         AND coalesce(turn.status,'idle') NOT IN ('running','queued','failed')
-        AND greatest(activity.touched,c."conversationRestoredAt")<now()-coalesce(pref."archiveIdleAfterDays",30)*interval '1 day')) AS archived
+        AND greatest(activity.touched,c."conversationRestoredAt")<now()-settings.days*interval '1 day')) AS archived
     FROM conversations c JOIN conversation_members cm ON cm."conversationId"=c.id AND cm."memberType"='user'
       AND cm."memberId"=${owner} AND cm."leftAt" IS NULL
-    LEFT JOIN user_preferences pref ON pref."userId"=${owner}
+    CROSS JOIN thread_settings settings
     LEFT JOIN conversation_reads receipt ON receipt."userId"=${owner} AND receipt."conversationId"=c.id::text
     LEFT JOIN chat_preferences cp ON cp."userId"=${owner} AND cp."chatKey"=c.id::text
     LEFT JOIN LATERAL (SELECT m."createdAt" FROM conversation_messages m WHERE m."conversationId"=c.id ORDER BY position DESC LIMIT 1) last ON true

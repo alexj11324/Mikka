@@ -58,6 +58,7 @@ const functions = {
   'settings.resetPersonalSettings': settingsActions.resetPersonalSettings,
   'settings.resetWorkspaceSettings': settingsActions.resetWorkspaceSettings,
   'settings.getSettingsSchema': settingsActions.getSettingsSchema,
+  'settings.patchDeviceConcurrency': settingsActions.patchDeviceConcurrency,
   'desktop.readBatch': createReadBatch(() => desktopActions),
   'desktop.bootstrap': desktopBootstrap,
   'desktop.session': desktopSession,

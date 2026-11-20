@@ -1,5 +1,5 @@
 import 'server-only'
-import { and, eq, isNull, or } from 'drizzle-orm'
+import { and, eq, isNull, or, sql } from 'drizzle-orm'
 import type { ResolvedSetting, SettingScope, SettingValue, SettingsView } from '@mikka/protocol/settings'
 import { db } from '@/lib/db'
 import { threadTitleSettings, userPreferences, users } from '@/lib/db/schema'
@@ -7,6 +7,7 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace } from '@/lib/workspace-access'
 import { DEFAULT_TITLE_TRIGGERS, type ThreadTitleTriggers } from '@/lib/thread-title'
 import { archivePreferenceChanged, workspaceListChanged } from '@/lib/live/lists'
+import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
 import { personalSettingValues, workspaceSettingValues } from './schema'
 
@@ -79,6 +80,15 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
       await tx.insert(threadTitleSettings).values({ workspaceId: context.workspaceId, userId: scope === 'workspace' ? '' : context.userId, ...change })
         .onConflictDoUpdate({ target: [threadTitleSettings.workspaceId, threadTitleSettings.userId], set: { ...change, updatedAt: new Date() } })
     }
+  }
+  if (scope === 'workspace' && Object.hasOwn(values, 'subagentMaxConcurrent')) {
+    // Raising capacity wakes the existing waiting workflows after commit; no new polling loop.
+    const limit = Number(values.subagentMaxConcurrent ?? SETTINGS_REGISTRY.subagentMaxConcurrent.defaultValue)
+    const { rows } = await tx.execute<{ id: string }>(sql`SELECT id FROM (
+      SELECT id,row_number() OVER (PARTITION BY "ownerId" ORDER BY "createdAt",id) AS position
+      FROM bot_subagents WHERE "workspaceId"=${context.workspaceId} AND status='queued'
+    ) waiting WHERE position<=${limit}`)
+    for (const { id } of rows) wakeWorkflowAfterCommit(tx, wakeTokens.subagent(id))
   }
 }
 

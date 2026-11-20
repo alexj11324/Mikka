@@ -47,10 +47,10 @@ export type ThreadTitlePlan = { do: 'keep' } | { do: 'copy'; title: string; sour
  * What a trigger does, given the run's own stored title, the title its chain already carries (a manual one first)
  * and how many runs the chain has. Pure, so every trigger's rule is tested without a model or a database.
  */
-export function threadTitlePlan(trigger: ThreadTitleTrigger, run: Stored, chain: Stored, attempts: number): ThreadTitlePlan {
+export function threadTitlePlan(trigger: ThreadTitleTrigger, run: Stored, chain: Stored, attempts: number, protectManual = true): ThreadTitlePlan {
   if (trigger === 'regenerate') return { do: 'generate' }
   // A person's rename is the title: later runs of the thread take it, and nothing generated replaces it.
-  if (chain.titleSource === 'manual' && chain.title) return run.title === chain.title && run.titleSource === 'manual' ? { do: 'keep' } : { do: 'copy', title: chain.title, source: 'manual' }
+  if (chain.titleSource === 'manual' && chain.title && (protectManual || trigger === 'created')) return run.title === chain.title && run.titleSource === 'manual' ? { do: 'keep' } : { do: 'copy', title: chain.title, source: 'manual' }
   if (trigger === 'created') {
     if (run.title) return { do: 'keep' }
     return chain.title ? { do: 'copy', title: chain.title, source: 'generated' } : { do: 'generate' }

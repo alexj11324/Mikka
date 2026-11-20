@@ -142,3 +142,107 @@ dbTest('migration upgrade preserves zero and scoped title overrides; replay pres
   assert.equal(view.values.archiveIdleAfterDays.source, 'default')
   await assert.rejects(pool.query('INSERT INTO workspace_setting_values ("workspaceId",key,"integerValue","booleanValue") VALUES ($1,\'invalid\',1,true)', [workspaceId]), { code: '23514' })
 })
+
+dbTest('device concurrency authenticates owner/admin, rejects other members and foreign workspaces, and persists scheduler capacity', async () => {
+  const { PATCH } = await import('@/app/api/devices/[deviceId]/settings/route')
+  const deviceId = randomUUID(), unbound = randomUUID(), foreignDevice = randomUUID(), runId = randomUUID(), agentId = randomUUID()
+  const send = (id = deviceId, value: unknown = 5, space = workspaceId) => PATCH(
+    new Request(`http://127.0.0.1/api/devices/${id}/settings?workspaceId=${space}`, { method: 'PATCH', body: JSON.stringify({ maxConcurrentRuns: value }) }),
+    { params: Promise.resolve({ deviceId: id }) })
+  await pool.query('INSERT INTO devices (id,"ownerId",name) VALUES ($1,$4,\'bound\'),($2,$4,\'private\'),($3,$5,\'foreign\')', [deviceId, unbound, foreignDevice, member, outsider])
+  await pool.query('INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,\'device-test\',\'codex\')', [agentId, member])
+  await pool.query('INSERT INTO agent_runs (id,"userId","workspaceId","agentId",status,prompt) VALUES ($1,$2,$3,$4,\'succeeded\',\'fixture\')', [runId, member, workspaceId, agentId])
+  await pool.query('INSERT INTO thread_machines ("runId","workspaceId","ownerId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,$3,\'fixture\',$4,\'ended\',$5)', [runId, workspaceId, member, randomUUID(), deviceId])
+  try {
+    as(null); assert.equal((await send()).status, 401)
+    as(outsider); assert.equal((await send()).status, 403)
+    as(member); assert.equal((await send(foreignDevice)).status, 403)
+    assert.equal((await send(deviceId, 5, otherWorkspaceId)).status, 403)
+    for (const invalid of [0, 65, 1.5, '5', null]) assert.equal((await send(deviceId, invalid)).status, 400)
+    let response = await send(); assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { deviceId, maxConcurrentRuns: 5 })
+    as(owner); assert.equal((await send(unbound)).status, 403)
+    assert.equal((await send(foreignDevice)).status, 403)
+    response = await send(deviceId, 8); assert.equal(response.status, 200)
+    assert.equal((await pool.query('SELECT "maxConcurrentRuns" FROM devices WHERE id=$1', [deviceId])).rows[0].maxConcurrentRuns, 8)
+    assert.equal((await send(randomUUID())).status, 404)
+  } finally {
+    await pool.query('DELETE FROM agent_runs WHERE id=$1', [runId])
+    await pool.query('DELETE FROM agents WHERE id=$1', [agentId])
+    await pool.query('DELETE FROM devices WHERE id=ANY($1::uuid[])', [[deviceId, unbound, foreignDevice]])
+  }
+})
+
+dbTest('real thread directory resolves workspace archive defaults, protects open/draft PRs and honors explicit personal and pin settings', async () => {
+  const { conversationDirectory } = await import('@/lib/conversation-directory')
+  const { directoryInput } = await import('@/lib/conversation-directory-input')
+  const { writeSettings } = await import('./store')
+  const issueId = randomUUID(), agentId = randomUUID(), runId = randomUUID()
+  await pool.query('INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,\'archive-test\',\'codex\')', [agentId, member])
+  await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority) VALUES ($1,$2,$3,'Archive fixture','{"type":"doc"}','doing','normal')`, [issueId, member, workspaceId])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","workspaceId","issueId","agentId",status,prompt,"createdAt","updatedAt","finishedAt")
+    VALUES ($1,$2,$3,$4,$5,'succeeded','Archive fixture',now()-interval '10 days',now()-interval '10 days',now()-interval '10 days')`, [runId, member, workspaceId, issueId, agentId])
+  const archived = async () => (await conversationDirectory(pool, member, workspaceId, directoryInput.parse({ archived: true }))).items.some(row => row.id === runId)
+  try {
+    await writeSettings({ userId: owner, workspaceId }, 'workspace', patch({ archiveIdleAfterDays: 7 }))
+    await writeSettings({ userId: member, workspaceId }, 'personal', patch({ archiveIdleAfterDays: null }))
+    assert.equal(await archived(), true)
+    await pool.query(`INSERT INTO run_publications ("runId","userId","issueId","remoteUrl","remoteKey",status,"pullRequest")
+      VALUES ($1,$2,$3,'https://github.com/settings/fixture','settings/fixture','published',$4)`, [runId, member, issueId, JSON.stringify({ url: 'https://github.com/settings/fixture/pull/1', state: 'open', title: 'Fixture PR' })])
+    for (const state of ['open', 'draft', 'closed', 'merged']) {
+      await pool.query(`UPDATE run_publications SET "pullRequest"=jsonb_set("pullRequest",'{state}',to_jsonb($2::text)) WHERE "runId"=$1`, [runId, state])
+      assert.equal(await archived(), ['closed', 'merged'].includes(state), state)
+    }
+    await writeSettings({ userId: member, workspaceId }, 'personal', patch({ archiveIdleAfterDays: 0 }))
+    assert.equal(await archived(), false)
+    await writeSettings({ userId: member, workspaceId }, 'personal', patch({ archiveIdleAfterDays: null }))
+    await pool.query('UPDATE agent_runs SET "conversationPinnedAt"=now() WHERE id=$1', [runId])
+    assert.equal(await archived(), false)
+    await writeSettings({ userId: owner, workspaceId }, 'workspace', patch({ keepPinnedThreadsActive: false }))
+    assert.equal(await archived(), true)
+    await writeSettings({ userId: member, workspaceId }, 'personal', patch({ keepPinnedThreadsActive: true }))
+    assert.equal(await archived(), false)
+    as(member)
+    assert.equal((await workspace.PATCH(request(`workspace/${workspaceId}`, 'PATCH', patch({ protectManualThreadTitles: false, keepPinnedThreadsActive: false })), context())).status, 403)
+    const { nameThread, renameThreadTitle } = await import('@/lib/thread-title-server')
+    await pool.query('UPDATE agent_runs SET title=\'My title\',"titleSource"=\'manual\',"promptTaskStart"=0,"promptTaskLength"=length(prompt) WHERE id=$1', [runId])
+    let calls = 0
+    const generate = async () => { calls++; return 'Generated title' }
+    assert.equal(await nameThread(pool, runId, member, 'pull_opened', generate), null)
+    assert.equal(calls, 0, 'protected titles never invoke the supplied fake generator')
+    await writeSettings({ userId: owner, workspaceId }, 'workspace', patch({ protectManualThreadTitles: false }))
+    assert.equal(await nameThread(pool, runId, member, 'pull_opened', generate), 'Generated title')
+    assert.equal(calls, 1)
+    await renameThreadTitle(pool, runId, member, 'Observed title', workspaceId)
+    assert.equal(await nameThread(pool, runId, member, 'pull_opened', async () => {
+      await renameThreadTitle(pool, runId, member, 'Newer rename', workspaceId)
+      return 'Late generated title'
+    }), null, 'even an unprotected automatic rename cannot overwrite a newer human edit')
+    assert.equal((await pool.query('SELECT title FROM agent_runs WHERE id=$1', [runId])).rows[0].title, 'Newer rename')
+  } finally {
+    await pool.query('DELETE FROM agent_runs WHERE id=$1', [runId])
+    await pool.query('DELETE FROM issues WHERE id=$1', [issueId])
+    await pool.query('DELETE FROM agents WHERE id=$1', [agentId])
+  }
+})
+
+dbTest('subagent admission reads the workspace cap and leaves a saturated queued task unclaimed', async () => {
+  const { SubagentStore } = await import('@/lib/cloud-computer/subagents')
+  const { writeSettings } = await import('./store')
+  const { readRuntimeSetting } = await import('./runtime')
+  const botId = randomUUID(), active = randomUUID(), waiting = randomUUID()
+  await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'cap fixture\')', [botId, member, workspaceId])
+  await pool.query(`INSERT INTO bot_subagents (id,"ownerId","workspaceId","botId",task,status) VALUES ($1,$3,$4,$5,'active','running'),($2,$3,$4,$5,'waiting','queued')`, [active, waiting, member, workspaceId, botId])
+  try {
+    await writeSettings({ userId: owner, workspaceId }, 'workspace', patch({ subagentMaxConcurrent: 1 }))
+    assert.deepEqual(await readRuntimeSetting(pool, 'subagentMaxConcurrent', { userId: member, workspaceId }), { value: 1, source: 'workspace' })
+    const result = await new SubagentStore(pool).start({ userId: member, workspaceId }, botId, waiting)
+    assert.equal(result.status, 'queued')
+    assert.equal((await pool.query('SELECT "startLeaseId" FROM bot_subagents WHERE id=$1', [waiting])).rows[0].startLeaseId, null)
+    await assert.rejects(new SubagentStore(pool).get({ userId: outsider, workspaceId }, botId, waiting), { status: 404 })
+    await assert.rejects(new SubagentStore(pool).get({ userId: member, workspaceId: otherWorkspaceId }, botId, waiting), { status: 404 })
+  } finally {
+    await pool.query('DELETE FROM bot_subagents WHERE "botId"=$1', [botId])
+    await pool.query('DELETE FROM bots WHERE id=$1', [botId])
+  }
+})

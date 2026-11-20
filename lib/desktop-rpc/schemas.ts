@@ -1,4 +1,5 @@
 import { settingsPatchInput, settingsResetInput } from '@/lib/settings/registry'
+import { deviceConcurrencyInput } from '@/lib/settings/device-input'
 import { AVATAR_MAX_BYTES, isAvatarContentType } from '../account/avatar-file'
 import { threadModelChoice } from '@/lib/thread-model-choice'
 import { archiveIdleDays, conversationTargetInput, directoryInput } from '@/lib/conversation-directory-input'
@@ -288,6 +289,7 @@ export const desktopActionSchemas = {
   'settings.resetPersonalSettings': tuple(settingsResetInput, workspace),
   'settings.resetWorkspaceSettings': tuple(uuid, settingsResetInput),
   'settings.getSettingsSchema': none,
+  'settings.patchDeviceConcurrency': tuple(uuid, deviceConcurrencyInput, workspace),
   'thread-title-settings.getThreadTitleSettings': inWorkspace,
   'thread-title-settings.saveThreadTitleSettings': tuple(object({ workspaceId: workspace, scope: z.enum(['workspace', 'mine']), instructions: text(1000).optional(), triggers: z.enum(['first_run_ended', 'pull_opened', 'either']).nullable().optional() })),
   'issues.listIssues': none,

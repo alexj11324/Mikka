@@ -911,6 +911,15 @@
       "sourceHash": "b06f9c685cbf147c32ea37d2b60f92475bae5db7b3308ebf3b50ae82eb85bd4a"
     },
     {
+      "path": "/mikka/api/devices/[deviceId]/settings",
+      "template": "/api/devices/[deviceId]/settings",
+      "source": "app/api/devices/[deviceId]/settings/route.ts",
+      "methods": [
+        "PATCH"
+      ],
+      "sourceHash": "ceb3b567f9b2198acb46315b4ddb5032afc5232dd1b242a98399c0808b4fa861"
+    },
+    {
       "path": "/mikka/api/drive/scopes",
       "template": "/api/drive/scopes",
       "source": "app/api/drive/scopes/route.ts",
