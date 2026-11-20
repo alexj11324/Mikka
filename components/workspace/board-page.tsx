@@ -9,7 +9,8 @@ import { ShortcutKeys } from '@/components/shortcut-keys'
 import useSWR from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { PanelRightClose, PanelRightOpen, RefreshCw } from '@/components/icons'
-import { listWorkspaceTaskPage, type listIssues } from '@/app/actions/issues'
+import type { listIssues } from '@/app/actions/issues'
+import { useTaskViewPage } from '@/hooks/use-task-view-page'
 import { countTaskListViews } from '@/app/actions/task-list'
 import { useTaskUnread } from '@/hooks/use-task-unread'
 import { useLiveKey } from '@/hooks/use-live-key'
@@ -104,7 +105,9 @@ function useStoredFlag(key: string, fallback: boolean) {
  * Coordinator) over the status columns and 受阻 (lib/task-blocked.ts), with the
  * Coordinator conversation in a sidebar that folds into a pill (MIK-45).
  */
-export function BoardPage({ issues: allIssues, userId, workspaceId, teamId, presentationRead, onOpen, onUpdated, onBusyChange }: { stateKey?: string; workspaceId?: string; teamId?: string;
+export function BoardPage({ issues: allIssues, userId, workspaceId, teamId, presentationRead, onOpen, onUpdated, onBusyChange, onListView }: { stateKey?: string; workspaceId?: string; teamId?: string;
+  /** The task list tab in view; the page's own All paging only applies to All. */
+  onListView?: (view: TaskListView) => void
   presentationRead: { isLoading: boolean; error?: unknown; mutate: () => Promise<unknown> }
   issues: Issue[]
   userId: string
@@ -117,6 +120,7 @@ export function BoardPage({ issues: allIssues, userId, workspaceId, teamId, pres
   const tIssue = useTranslations('Issue')
   const tCommon = useTranslations('Common')
   const tWorkspace = useTranslations('Workspace')
+  const tHostedTasks = useTranslations('HostedTasks')
   const titleId = useId()
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
@@ -128,11 +132,12 @@ export function BoardPage({ issues: allIssues, userId, workspaceId, teamId, pres
   const listView: TaskListView = tabs && TASK_LIST_VIEWS.includes(settings.listView) ? settings.listView : 'all'
   const countsKey = tabs ? ['task-list-views', userId, workspaceId!] as const : null
   const { data: viewCounts } = useSWR(countsKey, ([, , workspace]) => countTaskListViews(workspace), { revalidateOnFocus: false, shouldRetryOnError: false })
-  const viewKey = tabs && listView !== 'all' ? ['task-list-view-page', userId, workspaceId!, listView] as const : null
-  const viewPage = useSWR(viewKey, ([, , workspace, view]) => listWorkspaceTaskPage({ workspaceId: workspace, view, after: null }), { revalidateOnFocus: false, shouldRetryOnError: false })
-  useLiveKey('issue_list', tabs ? workspaceId : null, [countsKey, viewKey].flatMap(key => key ? [unstable_serialize(key)] : []), workspaceId, { minIntervalMs: 2000 })
+  // A tab other than All pages through its own server list, as All does (load more under the board).
+  const viewPage = useTaskViewPage(userId, tabs ? workspaceId : null, listView)
+  useEffect(() => { onListView?.(listView) }, [listView, onListView])
+  useLiveKey('issue_list', countsKey ? workspaceId : null, countsKey ? [unstable_serialize(countsKey)] : [], workspaceId, { minIntervalMs: 2000 })
   const { unread, set: setUnread } = useTaskUnread(tabs ? workspaceId : null)
-  const issues = listView === 'all' ? allIssues : viewPage.data?.items ?? []
+  const issues = viewPage.active ? viewPage.items : allIssues
   const [legacyFilters] = useViewState<Filters | null>(LEGACY_BOARD_FILTERS_KEY, null)
   const [storedFilters, setFilters] = useViewState<Filters | null>(BOARD_FILTERS_KEY, null)
   const savedFilters = useMemo(() => storedFilters ?? migrateBoardFilters(legacyFilters) ?? NO_FILTERS, [storedFilters, legacyFilters])
@@ -292,11 +297,16 @@ export function BoardPage({ issues: allIssues, userId, workspaceId, teamId, pres
     <section aria-labelledby={titleId} className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       {/* R-100: the page's title, at the size 设置 and the other rail pages use, so switching pages does not move it. */}
       <h1 id={titleId} className="shrink-0 px-6 pt-4 text-xl font-semibold text-foreground">{t('title')}</h1>
-      {readNotice ?? (viewKey && viewPage.error ? <InlineLoadError message={tWorkspace('taskStatesReadFailed')} retryLabel={tCommon('retry')} onRetry={() => { void viewPage.mutate() }} /> : null) ?? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks }}
+      {readNotice ?? (viewPage.active && viewPage.error ? <InlineLoadError message={tWorkspace('listError')} retryLabel={tCommon('retry')} onRetry={() => { void viewPage.retry() }} /> : null) ?? <BoardScreenView issues={shown} columns={columns} hidden={display.hidden} blocks={blocks} newestRuns={newestRuns} context={{ properties: new Set(display.properties), agentStates, taskStates, subtasks, owners, blocks }}
         view={view} onView={next => update({ view: next })} scopes={scopes} scope={listView} onScope={next => { if ((TASK_LIST_VIEWS as readonly string[]).includes(next)) update({ listView: next as TaskListView }) }}
         grouping={display.grouping} unread={unread} onUnread={tabs ? (task, next) => { void setUnread(task.id, next) } : undefined}
         filterItems={filterItems} filterCount={activeFilters.length} sortItems={sortItems} tools={<span className="flex items-center gap-1 max-md:hidden">{refreshButton}{panelButton}</span>}
         onNew={() => setNewTask(true)} onOpen={id => { onOpen(id) }} onDiscuss={discuss} onUpdated={onUpdated} onBusyChange={onBusyChange} />}
+      {viewPage.active && !viewPage.error && viewPage.hasMore && <div className="flex shrink-0 justify-center p-2">
+        <Button variant="ghost" size="sm" disabled={viewPage.loading} onClick={() => void viewPage.loadMore()}>
+          {viewPage.failed ? tCommon('retry') : tHostedTasks('loadMore')}
+        </Button>
+      </div>}
     </section>
     {sidebar && <ResizablePane render="aside" aria-label={tNav('coordinator')} storageKey="mikka:board-sidebar-width" defaultWidth={360} min={280} max={560} edge="start" from="xl" label={tCommon('resize.boardSidebar')} className="hidden shrink-0 flex-col border-l xl:flex">
       {/* Same centered pill as the Coordinator page, so the two read as one conversation. */}
