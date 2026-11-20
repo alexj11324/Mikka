@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
-import { test, expect, register, seedCoordinatorError } from './fixtures'
+import { test, expect, app, register, seedCoordinatorError } from './fixtures'
 import { attachLightDark } from './settings-v4-shots'
 
 // Second usability review C1, C4, C5: the chat never shows what the model was told (English, ids,
@@ -23,12 +23,16 @@ test('runtime events read as lines in the person\'s language, with the thread as
   const pool = isolatedPool()
   try {
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
+    const { rows: [coordinator] } = await pool.query<{ botId: string; workspaceId: string }>(`SELECT c."botId", c."workspaceId"
+      FROM coordinator_bots c JOIN mikka_workspaces w ON w.id = c."workspaceId"
+      WHERE c."ownerId" = $1 AND w."userId" = $1 AND w.kind = 'personal' LIMIT 1`, [user.id])
+    if (!coordinator) throw new Error('The new account has no personal Coordinator')
     const agentId = randomUUID()
     await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Coordinator'])
     // The recorded task range is the only thing allowed to name a thread (lib/run-bot-name.ts); without it the
     // citation falls back to the agent name and the waiting sentence could not name the task it links.
-    await pool.query('INSERT INTO agent_runs (id, "userId", "agentId", status, prompt, "promptTaskStart", "promptTaskLength") VALUES ($1, $2, $3, $4, $5, 0, char_length($5))',
-      [runId, user.id, agentId, 'waiting_input', '改用 msw 还是只改这两个测试'])
+    await pool.query('INSERT INTO agent_runs (id, "userId", "workspaceId", "agentId", status, prompt, "promptTaskStart", "promptTaskLength") VALUES ($1, $2, $3, $4, $5, $6, 0, char_length($6))',
+      [runId, user.id, coordinator.workspaceId, agentId, 'waiting_input', '改用 msw 还是只改这两个测试'])
     // What the server stores for each event (eventPrompt + sourcedEventMessage): the model's text and its kind.
     const events = [
       { kind: 'run_question', text: `[Event] The agent in run ${runId} asks the person: msw or just these two tests?\nCheck the current run state and existing task facts first. Never invent their permission. send_to_run does not itself prove the run resumed.` },
@@ -37,8 +41,8 @@ test('runtime events read as lines in the person\'s language, with the thread as
     ]
     for (const event of events) {
       await pool.query(`INSERT INTO coordinator_messages (id, "userId", "botId", position, message)
-        SELECT $1, $2, (SELECT "botId" FROM coordinator_bots WHERE "ownerId" = $2 LIMIT 1), coalesce(max(position), 0) + 1, $3 FROM coordinator_messages WHERE "userId" = $2`,
-      [randomUUID(), user.id, JSON.stringify({ role: 'user', content: event.text, mikkaEvent: { packet: '', eventKind: event.kind, observedState: null } })])
+        SELECT $1, $2, $3, coalesce(max(position), 0) + 1, $4 FROM coordinator_messages WHERE "userId" = $2 AND "botId" = $3`,
+      [randomUUID(), user.id, coordinator.botId, JSON.stringify({ role: 'user', content: event.text, mikkaEvent: { packet: '', eventKind: event.kind, observedState: null } })])
     }
   } finally { await pool.end() }
   await page.reload()
@@ -91,11 +95,15 @@ test('a cold start shows the shapes of the chat and the thread list, never 还�
   await page.setViewportSize({ width: 1440, height: 900 })
   await register(page)
   await expect(page.getByRole('textbox', { name: '给 Coordinator 发消息', exact: true })).toBeVisible()
-  // Hold every server action (the chat, the threads) as a slow network would on a cold start.
+  // Hold the current Web RPC reads for the chat and threads as a slow network
+  // would on a cold start; bootstrap must finish before either surface mounts.
   let release!: () => void
   const held = new Promise<void>(resolve => { release = resolve })
+  const heldReads = new Set(['coordinator.syncCoordinatorChat', 'task-runs.syncThreadList'])
   await page.route('**/*', async route => {
-    if (route.request().method() === 'POST' && route.request().headers()['next-action']) await held
+    const request = route.request()
+    if (request.method() === 'POST' && new URL(request.url()).pathname === app('/api/rpc')
+      && heldReads.has(request.postDataJSON()?.action)) await held
     await route.fallback()
   })
   try {
