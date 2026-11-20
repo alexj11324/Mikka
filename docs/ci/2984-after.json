@@ -1,7 +1,7 @@
 {
   "issue": "https://github.com/alexj11324/Mikka/issues/2984",
   "kind": "Exact-version after evidence; native pending and partial execution remain explicitly unaccepted",
-  "observed_at": "2026-11-20T23:19:50.270Z",
+  "observed_at": "2026-11-20T23:43:08.387Z",
   "methods": {
     "timing_formatter": "scripts/ci/timings.mjs timingReceipt from exact merged 603d1d95f0266827549f858624a872920344034a, using native Actions matching attempt and jobs API captures",
     "ready_to_merge": "Recorded ready_for_review event to recorded merged event. Missing events remain null.",
@@ -814,56 +814,56 @@
             {
               "id": 136593785082,
               "name": "Integration unit checks",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
               "started_at": "2026-11-20T22:07:29Z",
-              "completed_at": null
+              "completed_at": "2026-11-20T22:14:31Z"
             },
             {
               "id": 136593785106,
               "name": "Core unit checks (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:11:18Z",
+              "completed_at": "2026-11-20T22:21:40Z"
             },
             {
               "id": 136593785107,
               "name": "Source checks",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
               "started_at": "2026-11-20T22:07:40Z",
-              "completed_at": null
+              "completed_at": "2026-11-20T22:11:59Z"
             },
             {
               "id": 136593785113,
               "name": "Core unit checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:13:57Z",
+              "completed_at": "2026-11-20T22:20:00Z"
             },
             {
               "id": 136593785119,
               "name": "Integration unit checks (Node 22)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
               "started_at": "2026-11-20T22:07:52Z",
-              "completed_at": null
+              "completed_at": "2026-11-20T22:16:01Z"
             },
             {
               "id": 136593785121,
               "name": "Daemon checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:08:37Z",
+              "completed_at": "2026-11-20T22:12:54Z"
             },
             {
               "id": 136593785153,
@@ -877,74 +877,74 @@
             {
               "id": 136593785198,
               "name": "Database checks (1/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:09:09Z",
+              "completed_at": "2026-11-20T22:12:31Z"
             },
             {
               "id": 136593785241,
               "name": "Database checks (4/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:12:24Z",
+              "completed_at": "2026-11-20T22:20:35Z"
             },
             {
               "id": 136593785253,
               "name": "Database checks (2/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:16:40Z",
+              "completed_at": "2026-11-20T22:21:48Z"
             },
             {
               "id": 136593785255,
               "name": "Database checks (3/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:12:48Z",
+              "completed_at": "2026-11-20T22:18:50Z"
             },
             {
               "id": 136593785266,
               "name": "Database checks (4/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:16:40Z",
+              "completed_at": "2026-11-20T22:22:24Z"
             },
             {
               "id": 136593785278,
               "name": "Database checks (3/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:12:09Z",
+              "completed_at": "2026-11-20T22:17:52Z"
             },
             {
               "id": 136593785293,
               "name": "Database checks (1/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:13:33Z",
+              "completed_at": "2026-11-20T22:18:01Z"
             },
             {
               "id": 136593785316,
               "name": "Database checks (2/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:55:39Z",
-              "started_at": "2026-11-20T21:55:39Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:17:23Z",
+              "completed_at": "2026-11-20T22:21:54Z"
             },
             {
               "id": 136593786920,
@@ -963,13 +963,29 @@
               "created_at": "2026-11-20T21:55:39Z",
               "started_at": "2026-11-20T21:55:39Z",
               "completed_at": "2026-11-20T21:55:39Z"
+            },
+            {
+              "id": 136606441051,
+              "name": "UI policy (strict)",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:21:40Z",
+              "started_at": "2026-11-20T22:21:49Z",
+              "completed_at": "2026-11-20T22:21:58Z"
+            },
+            {
+              "id": 136606793735,
+              "name": "Production build and browser interactions",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:22:24Z",
+              "started_at": "2026-11-20T22:25:15Z",
+              "completed_at": "2026-11-20T22:25:25Z"
             }
           ],
-          "observed_at": "2026-11-20T23:19:49.892Z",
+          "observed_at": "2026-11-20T23:43:08.387Z",
           "job_conclusions": {
-            "success": 2,
-            "in_progress": 3,
-            "queued": 11,
+            "success": 18,
             "skipped": 2
           }
         },
@@ -1157,41 +1173,54 @@
             {
               "id": 136595072053,
               "name": "litellm-qualification",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:58:22Z",
-              "started_at": "2026-11-20T21:58:22Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:01:07Z",
+              "completed_at": "2026-11-20T22:02:37Z"
             },
             {
               "id": 136595072066,
               "name": "service-build (web)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:58:22Z",
-              "started_at": "2026-11-20T21:58:22Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:02:17Z",
+              "completed_at": "2026-11-20T22:04:29Z"
             },
             {
               "id": 136595072166,
               "name": "service-build (eve)",
-              "status": "in_progress",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:58:22Z",
               "started_at": "2026-11-20T22:00:02Z",
-              "completed_at": null
+              "completed_at": "2026-11-20T22:04:23Z"
             },
             {
               "id": 136595072289,
               "name": "service-build (api)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T21:58:22Z",
-              "started_at": "2026-11-20T21:58:22Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:01:08Z",
+              "completed_at": "2026-11-20T22:06:29Z"
+            },
+            {
+              "id": 136599033501,
+              "name": "release-manifest",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:06:29Z",
+              "started_at": "2026-11-20T22:14:31Z",
+              "completed_at": "2026-11-20T22:14:55Z"
             }
           ],
-          "observed_at": "2026-11-20T23:19:49.851Z"
+          "observed_at": "2026-11-20T23:43:08.387Z",
+          "job_conclusions": {
+            "success": 7,
+            "skipped": 1
+          }
         },
         {
           "id": 44824190911,
@@ -2700,7 +2729,7 @@
               }
             ]
           },
-          "observed_at": "2026-11-20T23:19:49.665Z",
+          "observed_at": "2026-11-20T23:43:08.387Z",
           "jobs": [
             {
               "id": 136595832465,
@@ -2714,47 +2743,47 @@
             {
               "id": 136596435364,
               "name": "Integration unit checks (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:18:37Z",
+              "completed_at": "2026-11-20T22:25:54Z"
             },
             {
               "id": 136596435401,
               "name": "Source checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:18:24Z",
+              "completed_at": "2026-11-20T22:22:42Z"
             },
             {
               "id": 136596435411,
               "name": "Core unit checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:20:37Z",
+              "completed_at": "2026-11-20T22:29:18Z"
             },
             {
               "id": 136596435424,
               "name": "Daemon checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:19:32Z",
+              "completed_at": "2026-11-20T22:22:44Z"
             },
             {
               "id": 136596435429,
               "name": "Core unit checks (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:19:32Z",
+              "completed_at": "2026-11-20T22:29:58Z"
             },
             {
               "id": 136596435494,
@@ -2768,83 +2797,83 @@
             {
               "id": 136596435591,
               "name": "Integration unit checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:22:26Z",
+              "completed_at": "2026-11-20T22:29:42Z"
             },
             {
               "id": 136596435642,
               "name": "Database checks (1/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:23:43Z",
+              "completed_at": "2026-11-20T22:28:05Z"
             },
             {
               "id": 136596435682,
               "name": "Database checks (3/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:21:26Z",
+              "completed_at": "2026-11-20T22:26:50Z"
             },
             {
               "id": 136596435715,
               "name": "Database checks (1/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:22:49Z",
+              "completed_at": "2026-11-20T22:28:07Z"
             },
             {
               "id": 136596435734,
               "name": "Database checks (3/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:22:55Z",
+              "completed_at": "2026-11-20T22:29:11Z"
             },
             {
               "id": 136596435772,
               "name": "Database checks (2/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:26:24Z",
+              "completed_at": "2026-11-20T22:31:29Z"
             },
             {
               "id": 136596435773,
               "name": "Database checks (4/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:24:49Z",
+              "completed_at": "2026-11-20T22:30:11Z"
             },
             {
               "id": 136596435866,
               "name": "Database checks (4/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:25:23Z",
+              "completed_at": "2026-11-20T22:33:35Z"
             },
             {
               "id": 136596436376,
               "name": "Database checks (2/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:01:12Z",
-              "started_at": "2026-11-20T22:01:12Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:28:07Z",
+              "completed_at": "2026-11-20T22:34:08Z"
             },
             {
               "id": 136596437705,
@@ -2863,11 +2892,28 @@
               "created_at": "2026-11-20T22:01:13Z",
               "started_at": "2026-11-20T22:01:13Z",
               "completed_at": "2026-11-20T22:01:12Z"
+            },
+            {
+              "id": 136610331071,
+              "name": "UI policy (strict)",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:29:58Z",
+              "started_at": "2026-11-20T22:33:02Z",
+              "completed_at": "2026-11-20T22:33:19Z"
+            },
+            {
+              "id": 136612292514,
+              "name": "Production build and browser interactions",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:34:08Z",
+              "started_at": "2026-11-20T22:34:35Z",
+              "completed_at": "2026-11-20T22:34:46Z"
             }
           ],
           "job_conclusions": {
-            "success": 2,
-            "queued": 14,
+            "success": 18,
             "skipped": 2
           }
         },
@@ -4879,7 +4925,7 @@
               }
             ]
           },
-          "observed_at": "2026-11-20T23:19:49.791Z",
+          "observed_at": "2026-11-20T23:43:08.387Z",
           "jobs": [
             {
               "id": 136597037569,
@@ -4893,137 +4939,137 @@
             {
               "id": 136597908743,
               "name": "Core unit checks (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:29:58Z",
+              "completed_at": "2026-11-20T22:38:49Z"
             },
             {
               "id": 136597908765,
               "name": "Cloud credential access (OIDC)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:11:10Z",
+              "completed_at": "2026-11-20T22:11:16Z"
             },
             {
               "id": 136597908805,
               "name": "Daemon checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:31:00Z",
+              "completed_at": "2026-11-20T22:35:06Z"
             },
             {
               "id": 136597908833,
               "name": "Integration unit checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:29:48Z",
+              "completed_at": "2026-11-20T22:35:15Z"
             },
             {
               "id": 136597908845,
               "name": "Core unit checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:28:09Z",
+              "completed_at": "2026-11-20T22:34:23Z"
             },
             {
               "id": 136597908891,
               "name": "Source checks",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:30:49Z",
+              "completed_at": "2026-11-20T22:35:03Z"
             },
             {
               "id": 136597908919,
               "name": "Integration unit checks (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:29:59Z",
+              "completed_at": "2026-11-20T22:37:54Z"
             },
             {
               "id": 136597908982,
               "name": "Database checks (3/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:31:21Z",
+              "completed_at": "2026-11-20T22:37:31Z"
             },
             {
               "id": 136597908988,
               "name": "Database checks (1/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:31:27Z",
+              "completed_at": "2026-11-20T22:35:56Z"
             },
             {
               "id": 136597909002,
               "name": "Database checks (1/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:31:52Z",
+              "completed_at": "2026-11-20T22:36:23Z"
             },
             {
               "id": 136597909032,
               "name": "Database checks (2/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:31:52Z",
+              "completed_at": "2026-11-20T22:37:52Z"
             },
             {
               "id": 136597909052,
               "name": "Database checks (3/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:32:04Z",
+              "completed_at": "2026-11-20T22:36:59Z"
             },
             {
               "id": 136597909073,
               "name": "Database checks (2/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:31:17Z",
+              "completed_at": "2026-11-20T22:37:52Z"
             },
             {
               "id": 136597909085,
               "name": "Database checks (4/4) (Node 22)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:32:02Z",
+              "completed_at": "2026-11-20T22:40:08Z"
             },
             {
               "id": 136597909296,
               "name": "Database checks (4/4)",
-              "status": "queued",
-              "conclusion": null,
+              "status": "completed",
+              "conclusion": "success",
               "created_at": "2026-11-20T22:04:13Z",
-              "started_at": "2026-11-20T22:04:13Z",
-              "completed_at": null
+              "started_at": "2026-11-20T22:17:02Z",
+              "completed_at": "2026-11-20T22:25:31Z"
             },
             {
               "id": 136597911841,
@@ -5042,11 +5088,28 @@
               "created_at": "2026-11-20T22:04:14Z",
               "started_at": "2026-11-20T22:04:14Z",
               "completed_at": "2026-11-20T22:04:13Z"
+            },
+            {
+              "id": 136614446436,
+              "name": "UI policy (strict)",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:38:49Z",
+              "started_at": "2026-11-20T22:38:51Z",
+              "completed_at": "2026-11-20T22:39:11Z"
+            },
+            {
+              "id": 136615033666,
+              "name": "Production build and browser interactions",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:40:09Z",
+              "started_at": "2026-11-20T22:40:10Z",
+              "completed_at": "2026-11-20T22:40:19Z"
             }
           ],
           "job_conclusions": {
-            "success": 1,
-            "queued": 15,
+            "success": 18,
             "skipped": 2
           }
         }
@@ -9665,6 +9728,19 @@
     "secondary_review_correction": {
       "observed_at": "2026-11-20T23:19:50.270Z",
       "scope": "All 21 retained post-merge workflow metadata records refreshed against their exact original attempts after review found two queued snapshots and obsolete capture timestamps. Source/run/attempt identity was checked. This is metadata recovery, not a rerun or release acceptance."
+    },
+    "raw_job_snapshot_correction": {
+      "observed_at": "2026-11-20T23:43:08.387Z",
+      "scope": "Four nested original-attempt job snapshots and their conclusion counts refreshed after independent review found obsolete queued records. Complete native jobs exactly match the existing timing.jobs identities, timestamps and terminal results.",
+      "run_ids": [
+        44824190898,
+        44824191022,
+        44825168243,
+        44825529454
+      ],
+      "repository_id": 1427517699,
+      "api_repository": "aspectly-labs/Mikka",
+      "limits": "Metadata correction only; no rerun or release acceptance. Explicitly timestamped historical run inventories and all existing measurements remain unchanged."
     }
   },
   "descriptive_after_metrics": {
