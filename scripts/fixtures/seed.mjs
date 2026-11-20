@@ -79,7 +79,7 @@ export async function seedFixture(database, scene, env = process.env) {
         const definition = { title: index ? '每周发布检查' : '检查待验收任务', description: '本地确定性自动化，不触发外部运行。', timezone: 'UTC', timing: { kind: 'manual' },
           task: { kind: 'dispatch_task', botId, prompt: '检查任务并汇总验收结果。', agent: 'claude_code' }, misfire: 'skip', maxLatenessMinutes: 60 }
         await tx.query(`INSERT INTO user_schedules (id,owner_id,workspace_id,bot_id,request_id,request_origin,definition,request_definition,status,visibility,created_at,updated_at)
-          VALUES ($1,$2,$3,$4,$1,'page',$5,$5,$6,'owner',$7,$7) ON CONFLICT DO NOTHING`,
+          VALUES ($1::uuid,$2,$3,$4,$1::text,'page',$5,$5,$6,'owner',$7,$7) ON CONFLICT DO NOTHING`,
         [id(`automation-${index}`), userId, workspaceId, botId, JSON.stringify(definition), index ? 'paused' : 'active', FIXTURE_TIME])
       }
     }
