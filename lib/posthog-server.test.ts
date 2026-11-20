@@ -53,3 +53,50 @@ test('a flag value is reused for a few minutes per person and key', async () => 
   await serverFlagEnabled('k', 'u1', { posthog: client.posthog, now: now + FLAG_CACHE_MS })
   assert.equal(client.checks(), 4)
 })
+
+test('local overrides exercise on and off without inheriting cached remote values', async () => {
+  const previous = { node: process.env.NODE_ENV, flags: process.env.MIKKA_FLAG_OVERRIDES }
+  try {
+    process.env.NODE_ENV = 'test'
+    clearFlagCache()
+    const client = fake(async () => true)
+    assert.equal(await serverFlagEnabled('local-example', 'u1', { posthog: client.posthog }), true)
+    process.env.MIKKA_FLAG_OVERRIDES = '{"local-example":false}'
+    assert.equal(await serverFlagEnabled('local-example', 'u1', { posthog: client.posthog }), false)
+    process.env.MIKKA_FLAG_OVERRIDES = '{"local-example":true}'
+    assert.equal(await serverFlagEnabled('local-example', 'u1', { posthog: null }), true)
+    assert.equal(client.checks(), 1)
+    process.env.MIKKA_FLAG_OVERRIDES = '{"local-example":"false"}'
+    await assert.rejects(serverFlagEnabled('local-example', 'u1', { posthog: null }), /REQUIRE_BOOLEANS/)
+    process.env.MIKKA_FLAG_OVERRIDES = 'not-json'
+    await assert.rejects(serverFlagEnabled('local-example', 'u1', { posthog: null }), /INVALID_JSON/)
+  } finally {
+    if (previous.node === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = previous.node
+    if (previous.flags === undefined) delete process.env.MIKKA_FLAG_OVERRIDES
+    else process.env.MIKKA_FLAG_OVERRIDES = previous.flags
+    clearFlagCache()
+  }
+})
+
+test('production and unclassified runtimes ignore local overrides, including malformed JSON', async () => {
+  const previous = { node: process.env.NODE_ENV, flags: process.env.MIKKA_FLAG_OVERRIDES }
+  try {
+    for (const runtime of ['production', 'preview', undefined]) {
+      if (runtime === undefined) delete process.env.NODE_ENV
+      else process.env.NODE_ENV = runtime
+      for (const flags of ['{"mikka-cloud-computer":false,"mikka-computer-billing":true}', 'not-json']) {
+        process.env.MIKKA_FLAG_OVERRIDES = flags
+        clearFlagCache()
+        assert.equal(await serverFlagEnabled('mikka-cloud-computer', 'u1', { posthog: null }), true)
+        assert.equal(await serverFlagEnabled('mikka-computer-billing', 'u1', { posthog: null }), false)
+      }
+    }
+  } finally {
+    if (previous.node === undefined) delete process.env.NODE_ENV
+    else process.env.NODE_ENV = previous.node
+    if (previous.flags === undefined) delete process.env.MIKKA_FLAG_OVERRIDES
+    else process.env.MIKKA_FLAG_OVERRIDES = previous.flags
+    clearFlagCache()
+  }
+})
