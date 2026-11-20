@@ -9029,5 +9029,55 @@
     "merge": "Merge",
     "mergeAnyway": "Merge anyway, {count} failing",
     "mergeFailed": "Could not merge."
+  },
+  "SettingsRegistry": {
+    "archiveIdleAfterDays": {
+      "label": "Archive idle threads",
+      "keywords": "archive|idle|days"
+    },
+    "threadTitleInstructions": {
+      "label": "Thread title instructions",
+      "keywords": "title|naming"
+    },
+    "threadTitleTriggers": {
+      "label": "Update thread titles",
+      "keywords": "title|pull request|PR"
+    },
+    "subagentMaxConcurrent": {
+      "label": "Concurrent subagents",
+      "keywords": "agent|concurrency|limit"
+    },
+    "prTitlePrefix": {
+      "label": "Pull request title prefix",
+      "keywords": "git|PR|title|prefix"
+    },
+    "prBranchPrefix": {
+      "label": "Branch prefix",
+      "keywords": "git|branch|prefix"
+    },
+    "prAutoMerge": {
+      "label": "Automatically merge verified pull requests",
+      "keywords": "git|PR|auto|merge"
+    },
+    "prDraft": {
+      "label": "Open pull requests as drafts",
+      "keywords": "git|PR|draft"
+    },
+    "codeReviewModel": {
+      "label": "Code review model",
+      "keywords": "review|model|agent"
+    },
+    "codeReviewSeverity": {
+      "label": "Code review severity",
+      "keywords": "review|severity|threshold"
+    },
+    "codeReviewIgnoredPaths": {
+      "label": "Code review ignored paths",
+      "keywords": "review|ignore|paths"
+    },
+    "codeReviewOutput": {
+      "label": "Code review output",
+      "keywords": "review|comment|summary"
+    }
   }
 }
