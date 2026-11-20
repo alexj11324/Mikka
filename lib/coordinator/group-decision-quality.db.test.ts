@@ -57,7 +57,7 @@ test('PG: scoped decision traces, exact event counting, human feedback, revoked 
   const billed=await handleGroupDecisionQuality(pool,directory,req)
   assert.equal((billed.body as {turns:{decisionCostUsd:number|null}[]}).turns[0].decisionCostUsd,0.00125)
   await t.test('historical and current receipts price their exact model even with the same provider generation',async()=>{
-    const historical={...receipt,executionId:randomUUID(),modelId:LEGACY_DECISION_MODEL}
+    const historical:DecisionExecution={...receipt,executionId:randomUUID(),modelId:LEGACY_DECISION_MODEL}
     await pool.query(`INSERT INTO hosted_usage VALUES ('fixture-generation',$1,'settled',750)`,[LEGACY_DECISION_MODEL])
     const steps=[receipt,historical].map((receipt,index)=>({id:`model-${index}`,phase:'legacy_primary' as const,index,status:'complete' as const,failure:null,receipt}))
     const priced=await priceGroupDecisions(pool,steps)
