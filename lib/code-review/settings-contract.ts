@@ -1,10 +1,9 @@
 import { z } from 'zod'
 import type { ResolvedSetting } from '@mikka/protocol/settings'
+import { taskBranchPrefixSchema } from '@mikka/protocol/orchestrator'
 
 /** The prefix is a Git path, never a ref, command, template or replacement task identifier. */
-export const pullRequestBranchPrefix = z.string().trim().max(80)
-  .regex(/^(?:[A-Za-z0-9][A-Za-z0-9_-]*(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)*\/?)?$/)
-  .transform(value => value.replace(/\/$/, ''))
+export const pullRequestBranchPrefix = taskBranchPrefixSchema
 const hasControl = (value: string) => [...value].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
 export const pullRequestTitlePrefix = z.string().trim().max(80).refine(value => !hasControl(value))
 export const REVIEW_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const

@@ -206,6 +206,17 @@ const hasControlCharacter = (value: string) =>
     return code < 0x20 || code === 0x7f
   })
 
+/** A task branch prefix is a Git path, never a ref or replacement identifier. */
+export const taskBranchPrefixSchema = z.string().trim().max(80)
+  .regex(/^(?:[A-Za-z0-9][A-Za-z0-9_-]*(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)*\/?)?$/)
+  .transform(value => value.replace(/\/$/, ''))
+
+/** Shared by admission, daemon assignments and signed workflow receipts. The
+ * terminal task identifier remains mandatory even with no prefix. */
+export const taskBranchSchema = z.string().max(250)
+  .regex(/^(?:[A-Za-z0-9][A-Za-z0-9_-]*\/)*[a-z0-9]+(?:-[a-z0-9]+)*-[1-9][0-9]*$/)
+  .refine(value => !hasControlCharacter(value) && value.lastIndexOf('/') <= 80 && Number.isSafeInteger(Number(value.slice(value.lastIndexOf('-') + 1))))
+
 /**
  * A branch template: text with `{team}` and `{number}`. `{number}` is
  * required, or every issue in the workspace would push to one branch.

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { CLIENT_VERSION_HEADER, RUN_CREDENTIALS_HEADER, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, emptyRunReport } from "@mikka/protocol"
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
-import { RECOVERY_WORKTREE_HEADER, MODEL_GATEWAY_LOOPBACK_HEADER } from "@mikka/protocol/device"
+import { RECOVERY_WORKTREE_HEADER, MODEL_GATEWAY_LOOPBACK_HEADER, CUSTOM_TASK_BRANCH_HEADER } from "@mikka/protocol/device"
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 
 import {
@@ -175,6 +175,17 @@ describe("HttpServerLink", () => {
       if (origin === 'http://127.0.0.1:3000') expect((await claimed).modelCredential).toEqual(modelCredential)
       else await expect(claimed).rejects.toThrow('Loopback model gateway unavailable')
     }
+  })
+
+  it('advertises and accepts the configured task branch for native GitHub delivery', async () => {
+    const branch = 'team/changes/task-7'
+    const fetcher = (async (_url, init) => {
+      expect(new Headers(init?.headers).get(CUSTOM_TASK_BRANCH_HEADER)).toBe('1')
+      return json({ ...assignment('run-1'), pushBranch: branch, github: { endpoint: 'http://server.test/api/runs/github-token', repository: 'owner/repo', branch } })
+    }) as typeof fetch
+    const result = await new HttpServerLink('http://server.test', fetcher).claimRun('dev-1', 'run-1')
+    expect(result.pushBranch).toBe(branch)
+    expect(result.github?.branch).toBe(branch)
   })
   it('a claim delivers task grants for the whole run; the report renews nothing', async () => {
     const grant = { name: 'VENDOR_KEY', capability: 'synthetic-opaque-initial', expiresAt: SOON(), origin: 'https://api.example.com' }

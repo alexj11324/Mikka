@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createHmac } from 'node:crypto'
 import { githubRepository, openRunPullRequest, PublicationError } from './run-pull-request'
+import { workflowResult, verifyWorkflowResult } from './workflow-result'
 import { bodyWithPublicationEvidence, publicationEvidenceDigest, validPublicationEvidence, type PublicationEvidence } from '../captures/publication-contract'
 
 const issueId = '10000000-0000-4000-8000-000000000001'
@@ -9,6 +11,22 @@ const token = 'synthetic-user-token'
 const input = { remoteKey: 'v2/github.com/owner/repo', githubAccountId: '456', token, issueId, identifier: 'MIK-42', title: 'Fix redirect', summary: 'Fixed and verified.', branch: 'mikka/mik-42', commit, baseBranch: null }
 const marker = `<!-- mikka-issue:${issueId} -->`
 const pr = { number: 77, node_id: 'PR_synthetic_77', html_url: 'https://github.com/owner/repo/pull/77', state: 'open', draft: false, merged_at: null, body: `Result\n\n${marker}`, head: { ref: input.branch, repo: { id: 789 } }, base: { repo: { id: 789 } } }
+
+test('a signed workflow receipt preserves the configured task branch and rejects a changed signature', () => {
+  const now = Date.parse('2026-11-20T22:00:00Z'), timestamp = String(now / 1000), secret = 'synthetic-workflow-receipt-key'
+  const base = { version: 1, deliveryId: 'delivery-1', installationId: 1, repositoryId: 2, repository: 'owner/repo', workflowId: 3, workflowRunId: 4, attempt: 1, headSha: commit, conclusion: 'success' }
+  for (const branch of ['mikka/mik-42', 'team/changes/mik-42', 'mik-42']) {
+    const body = JSON.stringify({ ...base, branch })
+    const headers = new Headers({ 'x-mikka-ci-time': timestamp,
+      'x-mikka-ci-signature': createHmac('sha256', secret).update('mikka-ci-workflow-v1\n' + timestamp + '\n' + body).digest('hex') })
+    assert.equal(workflowResult.parse(JSON.parse(body)).branch, branch)
+    assert.equal(verifyWorkflowResult(body, headers, secret, now), true)
+    assert.equal(verifyWorkflowResult(JSON.stringify({ ...base, branch: 'other/mik-42' }), headers, secret, now), false)
+  }
+  for (const branch of ['main', 'team//mik-42', '../mik-42', 'team/mik-0', 'team/mik-01', 'team/mik-42;push']) {
+    assert.equal(workflowResult.safeParse({ ...base, branch }).success, false)
+  }
+})
 
 function stub(options: { branch?: string; autoMerge?: 'enabled' | 'denied' | 'wrong-id'; installation?: 'allowed' | 'denied'; title?: string; userId?: number; repository?: 'missing' | 'renamed'; existing?: unknown[]; create?: 'timeout' | '422' | 'malformed'; head?: string; lines?: { additions: number; deletions: number }; review?: boolean; checksDenied?: boolean; detailFailure?: number | 'timeout'; detailOverride?: Record<string, unknown>; createdOverride?: Record<string, unknown> } = {}) {
   const calls: { path: string; method: string; body: Record<string, unknown> | null; authorization: string }[] = []

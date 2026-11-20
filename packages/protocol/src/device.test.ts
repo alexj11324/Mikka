@@ -153,6 +153,12 @@ describe("device link schemas", () => {
     expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, token: "fixture-access" } }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, expiresAt: null } }).success).toBe(false)
     expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, token: "fixture\nheader", expiresAt: null } }).success).toBe(false)
+    for (const branch of ['mikka/team-1', 'Team_fix/changes/team-1', 'team-1']) {
+      expect(runAssignmentSchema.parse({ ...base, pushBranch: branch, github: { ...github, branch } }).github?.branch).toBe(branch)
+    }
+    for (const branch of ['main', '/team-1', 'team//team-1', 'team.lock/team-1', 'team/../team-1', 'team-0', 'team-01', 'team-9007199254740993']) {
+      expect(runAssignmentSchema.safeParse({ ...base, github: { ...github, branch } }).success).toBe(false)
+    }
   })
 
   it('preserves protected task metadata alongside unchanged native and GitHub credentials', () => {

@@ -1,12 +1,13 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
+import { taskBranchSchema } from '@mikka/protocol/orchestrator'
 
 const id = z.number().int().positive().max(Number.MAX_SAFE_INTEGER)
 export const workflowResult = z.object({
   version: z.literal(1), deliveryId: z.string().regex(/^[A-Za-z0-9-]{1,100}$/u), installationId: id, repositoryId: id,
   repository: z.string().max(200).regex(/^[a-z0-9_.-]+\/[a-z0-9_.-]+$/u), workflowId: id, workflowRunId: id,
   attempt: id, headSha: z.string().regex(/^[a-f0-9]{40}$/u),
-  branch: z.string().max(255).regex(/^mikka\/[a-z0-9]+(?:-[a-z0-9]+)*-[1-9][0-9]*$/u),
+  branch: taskBranchSchema,
   conclusion: z.enum(['success', 'failure']),
 }).strict()
 export type WorkflowResult = z.infer<typeof workflowResult>

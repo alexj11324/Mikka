@@ -49,3 +49,15 @@ test('older receipts stay readable; configured_allow still does not match', () =
     assert.equal(matchesRepositoryAdmission({ ...legacy, approvedAt: now.toISOString(), authority }, scope), true, authority)
   }
 })
+
+test('configured prefixes retain exact branch admission and never admit an arbitrary ref', () => {
+  for (const targetBranch of ['team/changes/test-1', 'Team_fix/task/test-1', 'test-1']) {
+    const result = admitted({ targetBranch })
+    assert.ok(result, targetBranch)
+    assert.equal(matchesRepositoryAdmission(result, { ...scope, targetBranch }), true)
+    assert.equal(matchesRepositoryAdmission(result, scope), false, 'a different branch cannot reuse this receipt')
+  }
+  for (const targetBranch of ['main', '/team/test-1', 'team//test-1', '../test-1', 'team.lock/test-1', 'team/test-0', 'team/test-01', 'team/test-9007199254740993', 'team/test-1;push', 'team/test-1\n']) {
+    assert.equal(admitted({ targetBranch }), null, targetBranch)
+  }
+})

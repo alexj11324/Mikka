@@ -4,7 +4,7 @@ import {afterEach, before, beforeEach, mock, test} from 'node:test'
 import type { SQL } from 'drizzle-orm'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import {defaultRunPolicy} from '@mikka/protocol/agent-policy'
-import {REPO_ORIGIN_HEADER} from '@mikka/protocol/device'
+import {REPO_ORIGIN_HEADER, CUSTOM_TASK_BRANCH_HEADER} from '@mikka/protocol/device'
 import {freezeWorkerDefinition, retryWorkerDefinition} from './worker'
 import {runPrompt} from '../run-prompt'
 import {DEFAULT_AGENT_DEFINITION} from './builtin'
@@ -241,7 +241,7 @@ before(async()=>{
  queue=(await import('../computer/queue-run')).queueCloudRun
 })
 beforeEach(()=>{definition=frozen();subscription={...binding};missing=false;cloud=false;localCapable=false;cliReadOnly=false;cliPolicy.permissions.git_push='deny';publicationPolicy.permissions.git_push='allow';computerPermission='ask';mismatch=undefined;protocolVersion=3;selectIndex=0;stopDuringToken=false;githubAccount=null;revokeDuringToken=false;memberActive=true;memberLease=false;repositoryDenied=false;resourceReads.length=0;lockOrder.length=0;process.env.MIKKA_BYOS_ENABLED='1';process.env.MIKKA_AGENT_KIT='1';process.env.MIKKA_CLOUD_COMPUTER_TASKS='1';for(const fn of [modelAdmissionCheck,bindingById,latestBinding,scopedBinding,claimed,cloudClaimed,prepared,completed,githubConfigured,githubCredential])fn.mock.resetCalls()})
-const request=()=>{requestedRunId=randomUUID();return claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+requestedRunId+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1'}}),{params:Promise.resolve({deviceId,runId:requestedRunId})})}
+const request=(headers:Record<string,string>={})=>{requestedRunId=randomUUID();return claim(new Request('https://example.test/v1/devices/'+deviceId+'/runs/'+requestedRunId+'/claim',{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',...headers}}),{params:Promise.resolve({deviceId,runId:requestedRunId})})}
 const assertCliPolicy=(body:{policy:ReturnType<typeof defaultRunPolicy>;policyRevision:string})=>{assert.equal(body.policy.permissions.network,'deny');assert.equal(body.policy.permissions.install_dependency,'deny');assert.deepEqual(body.policy.networkAllow,['cli-policy.invalid']);assert.equal(body.policyRevision,'a'.repeat(64))}
 // A non-GitHub repository keeps these queue cases focused on frozen worker
 // selection. GitHub publication admission is covered by the claim cases below.
@@ -514,6 +514,33 @@ test('a cloud run admitted with the GitHub App grant gets its publication and al
  assert.equal(prepared.mock.callCount(),1,'the admitted cloud run reserves its publication before the lease')
  assert.equal(body.pushBranch,publicationAssignment.pushBranch)
  assert.equal(body.policy.permissions.git_push,'allow')
+})
+
+test('a configured prefix preserves old native push delivery and is advertised to capable daemons', async () => {
+ githubAccount='123';cliPolicy.permissions.git_push='allow'
+ publicationAssignment.pushBranch='team/changes/mik-42'
+ overrideDeploymentSwitch('personalMailbox', false)
+ try {
+  for(const supportsCustom of [false,true]) {
+   selectIndex=0
+   const response=await request(supportsCustom?{[CUSTOM_TASK_BRANCH_HEADER]:'1'}:{})
+   assert.equal(response.status,200)
+   const body=await response.json()
+   assert.equal(body.pushBranch,'team/changes/mik-42')
+   assert.equal(body.github?.repository,'example/repo')
+   assert.equal(body.github?.branch,supportsCustom?'team/changes/mik-42':undefined)
+   assert.equal(body.policy.permissions.git_push,'allow')
+   if(!supportsCustom) {
+    // Decode the actual claim response with the immutable released parser;
+    // do not update that fixture to make a new server assignment pass.
+    const {HttpServerLink}=await import(new URL('../../packages/daemon/test/fixtures/released-0.0.456/http-link.js',import.meta.url).href)
+    const legacy=new HttpServerLink('https://example.test',async()=>Response.json(body))
+    const decoded=await legacy.claimRun(deviceId,requestedRunId)
+    assert.equal(decoded.pushBranch,'team/changes/mik-42')
+    assert.equal(decoded.github?.branch,undefined)
+   }
+  }
+ } finally {publicationAssignment.pushBranch='mikka/mik-42';overrideDeploymentSwitch('personalMailbox',undefined)}
 })
 
 test('a read-only local run gets no push branch and a read-only policy, but the owner\'s GitHub credential like any run', async () => {
