@@ -109,6 +109,34 @@ export function pullFromAddress(value: string | null) {
     : null;
 }
 
+/** The row a PR's own address stands for until its detail read answers; the threads come from the linked list. */
+export function pullAddressRow(
+  pull: { repo: string; number: number },
+  threadsByKey: Map<string, PullDirectoryRow["threads"]>,
+): PullDirectoryRow {
+  const url = `https://github.com/${pull.repo}/pull/${pull.number}`;
+  return {
+    url,
+    title: "",
+    state: "open",
+    repo: pull.repo,
+    number: pull.number,
+    author: null,
+    authorAvatar: null,
+    updatedAt: new Date(0).toISOString(),
+    createdAt: null,
+    body: null,
+    head: null,
+    base: null,
+    headSha: null,
+    checks: null,
+    mergeState: null,
+    reviewDecision: null,
+    labels: [],
+    threads: threadsByKey.get(githubPullRequestKey(url)) ?? [],
+  };
+}
+
 /**
  * What a row is waiting on, in the words the page groups by. A pull request
  * needs a person when something is red — failing checks, a review that asked

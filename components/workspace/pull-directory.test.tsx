@@ -141,7 +141,8 @@ stub("../../app/actions/list-views.ts", {
   deleteSavedView: async () => ({ deleted: true }),
 });
 stub("../../app/actions/projects.ts", { listWorkspaceProjects: async () => [] });
-stub("../../lib/client-runtime/navigation.ts", { useSearchParams: () => new URLSearchParams() });
+let address = "";
+stub("../../lib/client-runtime/navigation.ts", { useSearchParams: () => new URLSearchParams(address) });
 stub("../ui/resizable-pane.tsx", {
   ResizablePane: ({
     children,
@@ -270,6 +271,19 @@ test("a row press opens the pull request in the app's review page, and GitHub st
     assert.equal(github.getAttribute("target"), "_blank");
     assert.equal(github.getAttribute("rel"), "noopener noreferrer");
   } finally {
+    await act(async () => root.unmount());
+  }
+});
+
+test("a PR's own address opens its preview even when no loaded row or task has it", async () => {
+  address = "section=pulls&pull=Other/Repo/42";
+  const { root } = await mount();
+  try {
+    const preview = document.querySelector('aside[role="region"]');
+    assert.ok(preview, "the address opens the preview");
+    assert.match(preview.textContent ?? "", /Other\/Repo #42/);
+  } finally {
+    address = "";
     await act(async () => root.unmount());
   }
 });

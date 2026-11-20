@@ -11,7 +11,6 @@ import { listWorkspaceProjects } from "@/app/actions/projects";
 import { deleteSavedView, listPullPins, listSavedViews, saveView as storeView, setPullPins } from "@/app/actions/list-views";
 import { useActionError } from "@/lib/use-action-error";
 import { useSearchParams } from "@/lib/client-runtime/navigation";
-import { openPullReview } from "@/hooks/code-review/use-review-page";
 import { withBasePath } from "@/lib/base-path";
 import { useViewState } from "@/lib/hooks/view-state";
 import { useLiveKey } from "@/hooks/use-live-key";
@@ -22,7 +21,7 @@ import {
   groupDirectoryPulls,
   initialPullFilters as initial,
   pullFromAddress,
-  pullReviewRef,
+  pullAddressRow,
   pullSinceInstant,
   readSavedPullView,
   linkedPullDirectory,
@@ -256,7 +255,12 @@ export function PullDirectory({
   const ordered = groups.flatMap((group) =>
     collapsed.includes(group.key) ? [] : group.rows,
   );
-  const active = visible.find((row) => row.url === selected);
+  // A PR's own address (`pull=owner/name/number`, "Open in new tab") opens its preview, which reads
+  // the PR itself (pulls/detail), so it opens whether or not the PR is in the loaded list or a task's.
+  const addressedRow = addressed ? pullAddressRow(addressed, linkedByUrl) : null;
+  const active =
+    visible.find((row) => row.url === selected) ??
+    (addressedRow && selected === addressedRow.url ? addressedRow : undefined);
   const visibleChecked = visible.filter((row) => checked.includes(row.url));
   const set = (patch: Partial<PullFilters>) => {
     setFilters((previous) => ({ ...previous, ...patch }));
@@ -355,13 +359,9 @@ export function PullDirectory({
       toast.error(actionError());
     }
   }
-  // A PR's own address (`pull=owner/name/number`, "Open in new tab") opens its review page once.
-  const addressKey = addressed ? `${addressed.repo}/${addressed.number}` : null;
+  const addressKey = addressedRow?.url ?? null;
   useEffect(() => {
-    if (!addressed) return;
-    const pull = pullReviewRef(addressed);
-    if (pull) openPullReview(pull);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the address moves; the parsed reference goes with it
+    if (addressKey) setSelected(addressKey);
   }, [addressKey]);
   return (
     <section
