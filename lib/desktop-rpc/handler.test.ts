@@ -322,3 +322,11 @@ test('cached detail and bootstrap accept identity-free selectors while preservin
   for (const args of [[], [undefined], [owner]]) assert.equal(desktopActionSchemas['desktop.bootstrap'].safeParse(args).success, true)
   for (const args of [[null], ['invalid'], [{ workspaceId: owner, role: 'admin' }], [owner, peer]]) assert.equal(desktopActionSchemas['desktop.bootstrap'].safeParse(args).success, false)
 })
+
+test('自动化 lists accept 我的 and 定时 and nothing wider', () => {
+  const list = desktopActionSchemas['automations.listAutomations']
+  const workspace = '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f'
+  assert.equal(list.safeParse([{ owner: 'me', trigger: 'schedule', deleted: false }, workspace]).success, true)
+  assert.equal(list.safeParse([{ owner: 'someone' }, workspace]).success, false)
+  assert.equal(list.safeParse([{ trigger: 'github' }, workspace]).success, false)
+})
