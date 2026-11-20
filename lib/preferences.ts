@@ -7,6 +7,7 @@ import { attentionSettings, PUSH_WHEN, userPreferences, users } from '@/lib/db/s
 import { SEND_KEYS } from '@/lib/send-key'
 import { ActionFailureError } from '@/lib/action-error'
 import { setAttentionEnabled } from '@/lib/attention/store'
+import { writePersonalArchiveSetting } from '@/lib/settings/archive-preferences'
 
 /**
  * The app's 通知, 偏好 and 记忆 settings (docs/design/mobile.md, "Settings";
@@ -112,7 +113,7 @@ export async function savePreferences(userId: string, patch: PreferencesPatch): 
     await tx.insert(userPreferences).values({ userId, ...stored, updatedAt: new Date() })
       .onConflictDoUpdate({ target: userPreferences.userId, set: { ...stored, updatedAt: new Date() } })
     if (rest.archiveIdleAfterDays !== undefined) {
-      await (await import('./settings/store')).writePersonalArchiveSetting(tx, userId, rest.archiveIdleAfterDays)
+      await writePersonalArchiveSetting(tx, userId, rest.archiveIdleAfterDays)
     }
     if (rest.archiveIdleAfterDays !== undefined && current.archiveIdleAfterDays !== rest.archiveIdleAfterDays) {
       await (await import('./live/lists')).archivePreferenceChanged(tx, userId)
