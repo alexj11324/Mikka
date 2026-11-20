@@ -1579,7 +1579,8 @@
     "apiKeyBaseUrlInvalid": "The base URL must be a public https address.",
     "apiKeyNotFound": "This API key no longer exists.",
     "scheduleEnvironmentUnavailable": "The selected environment is no longer available.",
-    "scheduleThreadUnavailable": "The thread it runs in is no longer available."
+    "scheduleThreadUnavailable": "The thread it runs in is no longer available.",
+    "scheduleRunAsUnavailable": "The person it runs as is no longer a member of this workspace."
   },
   "Overview": {
     "sections": {
@@ -8212,7 +8213,10 @@
     "succeeded": "Automation \"{title}\" ran: {task}",
     "succeededNoTask": "Automation \"{title}\" ran",
     "failed": "Automation \"{title}\" did not run: {reason}",
-    "failedUnknown": "Something went wrong; see the run history in Mikka"
+    "failedUnknown": "Something went wrong; see the run history in Mikka",
+    "footer": "{automation} · Mikka",
+    "statusSucceeded": "Succeeded",
+    "statusFailed": "Failed"
   },
   "Automations": {
     "cancelRun": "Cancel run",
@@ -8547,7 +8551,11 @@
         "linear": "Linear events",
         "slack": "Slack",
         "github": "GitHub events"
-      }
+      },
+      "runsAs": "Runs as",
+      "runsAsCreator": "Creator ({name})",
+      "postAsRunner": "Post as the person it runs as",
+      "quiet": "Quiet posts"
     },
     "run": {
       "from": "Started by {event} · {what}",

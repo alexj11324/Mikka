@@ -789,4 +789,36 @@ test('dispatch_task automations run as their creator through the existing create
     const foreign = await seedWorkspace(fixture, member, [{ userId: member, role: 'admin' }])
     await assert.rejects(duplicate(foreign.id), /scheduleWorkspaceAccessDenied/, 'only a workspace the person is an active member of')
   })
+  await t.test('Runs as: the creator or an admin names who each run acts and is billed as; a member who leaves stops it', async () => {
+    const { schedule } = await create(definition(null))
+    const runAs = (userId: string | null, version: number, who = owner, bot = chat) =>
+      page<{ schedule: Schedule & { run_as_user_id: string | null } }>(who, bot, { action: 'run_as', scheduleId: schedule.id, version, userId })
+    const named = (await runAs(member, schedule.version)).schedule
+    assert.deepEqual([named.run_as_user_id, named.version], [member, schedule.version + 1])
+    const own = (await page<{ schedule: Schedule }>(member, memberChat, { action: 'create', requestId: randomUUID(), definition: definition(null) })).schedule
+    await assert.rejects(page(member, memberChat, { action: 'run_as', scheduleId: own.id, version: own.version, userId: owner }), /scheduleAdminRequired/, 'a member names only themselves')
+    await assert.rejects(runAs(randomUUID(), named.version), /scheduleRunAsUnavailable/, 'only an active member of the workspace')
+    const { occurrence: started } = await runNow(named)
+    const swept = await tick()
+    const run = await occurrence(started.id)
+    assert.equal(run.status, 'succeeded')
+    assert.deepEqual(swept.wakeOwners, [member], 'the request waits in the run-as person’s chat')
+    const event = (await fixture.query('SELECT "userId" FROM coordinator_events WHERE id=$1', [run.result!.eventId])).rows[0]
+    const task = (await fixture.query('SELECT "userId" FROM issues WHERE id=$1', [run.result!.id])).rows[0]
+    assert.deepEqual([event.userId, task.userId], [member, member], 'the task is theirs, and so is what it spends')
+    assert.equal((await fixture.query('SELECT "userId" FROM coordinator_messages WHERE id=(SELECT operation_id FROM schedule_occurrences WHERE id=$1)', [run.id])).rows[0].userId, owner, 'the report still goes to the creator')
+
+    await fixture.query(`UPDATE mikka_workspace_members SET status='suspended' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, member])
+    try {
+      await assert.rejects(runNow(named), /scheduleRunAsUnavailable/)
+      await fixture.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,operation_id,next_retry_at,execution_decision)
+        SELECT gen_random_uuid(),id,version,now(),definition,'pending',gen_random_uuid(),now(),'execute' FROM user_schedules WHERE id=$1`, [schedule.id])
+      await tick()
+      assert.deepEqual((await fixture.query('SELECT status,disabled_reason FROM user_schedules WHERE id=$1', [schedule.id])).rows[0], { status: 'paused', disabled_reason: 'scheduleRunAsUnavailable' })
+    } finally {
+      await fixture.query(`UPDATE mikka_workspace_members SET status='active' WHERE "workspaceId"=$1 AND "userId"=$2`, [workspace.id, member])
+    }
+    const paused = (await fixture.query<{ version: number }>('SELECT version FROM user_schedules WHERE id=$1', [schedule.id])).rows[0]!
+    assert.equal((await runAs(null, paused.version)).schedule.run_as_user_id, null, 'back to the creator')
+  })
 })

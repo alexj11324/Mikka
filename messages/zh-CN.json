@@ -1579,7 +1579,8 @@
     "apiKeyBaseUrlInvalid": "Base URL 需要是公网上的 https 地址。",
     "apiKeyNotFound": "这个 API Key 已不存在。",
     "scheduleEnvironmentUnavailable": "选择的环境已不可用。",
-    "scheduleThreadUnavailable": "它运行的线程已不可用。"
+    "scheduleThreadUnavailable": "它运行的线程已不可用。",
+    "scheduleRunAsUnavailable": "它运行时使用的成员已不在这个工作区。"
   },
   "Overview": {
     "sections": {
@@ -8212,7 +8213,10 @@
     "succeeded": "自动化「{title}」运行完成：{task}",
     "succeededNoTask": "自动化「{title}」运行完成",
     "failed": "自动化「{title}」没运行成功：{reason}",
-    "failedUnknown": "出了点问题，详情在 Mikka 的运行记录里"
+    "failedUnknown": "出了点问题，详情在 Mikka 的运行记录里",
+    "footer": "{automation} · Mikka",
+    "statusSucceeded": "已完成",
+    "statusFailed": "未运行"
   },
   "Automations": {
     "cancelRun": "取消这次运行",
@@ -8547,7 +8551,11 @@
         "linear": "Linear 事件",
         "slack": "Slack",
         "github": "GitHub 事件"
-      }
+      },
+      "runsAs": "运行身份",
+      "runsAsCreator": "创建者（{name}）",
+      "postAsRunner": "以运行身份的成员发帖",
+      "quiet": "简洁发帖"
     },
     "run": {
       "from": "由「{event}」触发 · {what}",

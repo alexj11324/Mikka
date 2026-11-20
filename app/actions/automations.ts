@@ -42,12 +42,13 @@ const id = z.uuid()
 
 /** 创建者: each row's creator as the workspace's member list names them (members only read their own workspace). */
 async function withCreators(workspaceId: string, list: AutomationList): Promise<AutomationList> {
-  const owners = [...new Set(list.schedules.map(row => row.owner_id))]
+  const owners = [...new Set(list.schedules.flatMap(row => row.run_as_user_id ? [row.owner_id, row.run_as_user_id] : [row.owner_id]))]
   if (!owners.length) return list
   const { workspacePool } = await import('@/lib/workspace-db')
   const { rows } = await workspacePool.query<{ userId: string; name: string }>('SELECT "userId",name FROM mikka_workspace_members WHERE "workspaceId"=$1 AND "userId"=ANY($2::text[])', [workspaceId, owners])
   const names = new Map(rows.map(row => [row.userId, row.name]))
-  return { ...list, schedules: list.schedules.map(row => ({ ...row, owner_name: names.get(row.owner_id) ?? null })) }
+  return { ...list, schedules: list.schedules.map(row => ({ ...row, owner_name: names.get(row.owner_id) ?? null,
+    ...(row.run_as_user_id ? { run_as_name: names.get(row.run_as_user_id) ?? null } : {}) })) }
 }
 const versioned = z.object({ scheduleId: z.uuid(), version: z.number().int().positive() }).strict()
 
@@ -123,6 +124,30 @@ export async function resumeAutomation(input: { scheduleId: string; version: num
 export async function takeOverAutomation(input: { scheduleId: string; version: number }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
   const parsed = versioned.safeParse(input)
   return parsed.success ? command({ action: 'take_over', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
+}
+
+/** Runs as: who each run acts, is billed and posts as; null is the creator. A member names only themselves. */
+export async function setAutomationRunAs(input: { scheduleId: string; version: number; userId: string | null }, workspaceId?: string): Promise<ActionResult<{ schedule: AutomationView }>> {
+  const parsed = versioned.extend({ userId: z.string().min(1).max(200).nullable() }).safeParse(input)
+  return parsed.success ? command({ action: 'run_as', ...parsed.data }, workspaceId) : { error: 'validationGeneric' }
+}
+
+/** Runs as' choices: every active member for an owner or admin; a member sees only themselves. */
+export async function automationRunAsChoices(workspaceId?: string): Promise<ActionResult<{ members: { id: string; name: string }[] }>> {
+  return runAction(async () => {
+    if (actingContext.getStore()) throw new ActionFailureError('authRequired')
+    if (workspaceId !== undefined && !z.uuid().safeParse(workspaceId).success) throw new ActionFailureError('validationGeneric')
+    let actor
+    try { actor = await currentWorkspaceActor(workspaceId) } catch (error) {
+      if (error instanceof WorkspaceError) throw new ActionFailureError(isActionErrorCode(error.code) ? error.code : 'generic', undefined, undefined, { cause: error })
+      throw error
+    }
+    const { workspacePool } = await import('@/lib/workspace-db')
+    const { rows } = await workspacePool.query<{ id: string; name: string; role: string }>(`SELECT "userId" id,name,role FROM mikka_workspace_members
+      WHERE "workspaceId"=$1 AND status='active' ORDER BY lower(name),"userId"`, [actor.workspaceId])
+    const admin = rows.some(row => row.id === actor.userId && row.role !== 'member')
+    return { members: rows.filter(row => admin || row.id === actor.userId).map(({ id, name }) => ({ id, name })) }
+  })
 }
 
 /** Webhook 地址: a new secret URL key for the automation, returned once; the previous URL stops working. */
