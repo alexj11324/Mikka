@@ -1,4 +1,11 @@
 {
+  "drizzle/20261120052721_agent_profile_chromatic_colors.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Limit Agent Profile colours to blue, teal, emerald, violet and pink in the installation database. Existing ink and graphite rows become blue and violet; the check still admits the two legacy values for writers during a deploy.",
+    "test": "lib/factory/agent-profile.db.test.ts",
+    "suite": "test:factory-routing-db"
+  },
   "lib/project-resources/device-checkouts.ts": {
     "mode": "built-in",
     "environment": [],

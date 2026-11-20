@@ -32,8 +32,10 @@ const DOTS: Record<ProfileGlyph, [number, number][]> = Object.fromEntries(PROFIL
 export function ProfileMark({ icon, color, label, size = 'md' }: ProfileMarkValue & { label?: string; size?: 'md' | 'lg' }) {
   // Callers resolve the mark (resolveProfileMark); an id this build does not know still draws something neutral.
   return <svg viewBox="0 0 10 10" fill="currentColor" className={cn('shrink-0', size === 'lg' ? 'size-5' : 'size-4',
-    color === 'ink' && 'text-foreground', color === 'teal' && 'text-chart-2', color === 'pink' && 'text-avatar-2',
-    !['ink', 'teal', 'pink'].includes(color) && 'text-muted-foreground')}
+    // Each colour's design token (app/globals.css): the avatar palette, and teal from the chart palette.
+    color === 'blue' && 'text-avatar-1', color === 'teal' && 'text-chart-2', color === 'emerald' && 'text-avatar-3',
+    color === 'violet' && 'text-avatar-4', color === 'pink' && 'text-avatar-2',
+    !['blue', 'teal', 'emerald', 'violet', 'pink'].includes(color) && 'text-muted-foreground')}
     {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}>
     {(DOTS[icon] ?? DOTS.square).map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r={0.82} />)}
   </svg>
@@ -60,7 +62,7 @@ export function ProfileMarkPicker({ value, disabled, onChange }: { value: Profil
       <ToggleGroup aria-label={t('color')} spacing={2} className="flex w-full gap-2" value={[value.color]} disabled={disabled}
         onValueChange={values => { const next = values[0] as ProfileColor | undefined; if (next) onChange({ color: next }) }}>
         {PROFILE_COLORS.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`colors.${id}`)} className="size-8 min-w-0 rounded-full p-0 data-pressed:bg-transparent">
-          <span aria-hidden="true" className={cn('size-6 rounded-full', id === 'ink' && 'bg-foreground', id === 'graphite' && 'bg-muted-foreground', id === 'teal' && 'bg-chart-2', id === 'pink' && 'bg-avatar-2', id === 'ink' && 'ring-1 ring-foreground/15 ring-inset',
+          <span aria-hidden="true" className={cn('size-6 rounded-full', id === 'blue' && 'bg-avatar-1', id === 'teal' && 'bg-chart-2', id === 'emerald' && 'bg-avatar-3', id === 'violet' && 'bg-avatar-4', id === 'pink' && 'bg-avatar-2',
             value.color === id && 'outline-2 outline-offset-2 outline-muted-foreground')} />
         </ToggleGroupItem>)}
       </ToggleGroup>

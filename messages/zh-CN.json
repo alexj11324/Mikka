@@ -3537,9 +3537,10 @@
           "arrow": "箭头"
         },
         "colors": {
-          "ink": "墨黑",
-          "graphite": "石墨",
+          "blue": "蓝",
           "teal": "青绿",
+          "emerald": "翠绿",
+          "violet": "紫",
           "pink": "粉"
         }
       },
