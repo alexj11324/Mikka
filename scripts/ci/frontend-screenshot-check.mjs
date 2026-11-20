@@ -31,9 +31,9 @@ const IMAGE = /!\[[^\]]*\]\(\s*https?:\/\/[^)\s]+\)|\[[^\]]*\]\(\s*https?:\/\/[^
 
 export function isFrontendVisual(file) {
   return FRONTEND_VISUAL.test(file)
-    || /^apps\/mobile\/.*\.(?:tsx|css)$/.test(file)
-    || /^apps\/desktop\/src\/renderer\//.test(file)
-    || /^app\/.*\.(?:tsx|css)$/.test(file)
+    || (file.startsWith('apps/mobile/') && /\.(?:tsx|css)$/.test(file))
+    || file.startsWith('apps/desktop/src/renderer/')
+    || (file.startsWith('app/') && /\.(?:tsx|css)$/.test(file))
 }
 
 export function hasScreenshot(body) {

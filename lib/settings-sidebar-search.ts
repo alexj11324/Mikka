@@ -6,7 +6,7 @@ export const SETTINGS_SECTION_KEYWORDS: Partial<Record<string, readonly string[]
 }
 
 /** Whether a settings sidebar item stays visible for the current search query. */
-export function settingsItemVisible({ query, groupTitle, groupLabel, itemTitle, label, keywords: translated = '', section, routed }: {
+export function settingsItemVisible({ query, groupTitle, groupLabel, itemTitle, label, keywords: translated = '', section }: {
   /** Raw search input. */
   query: string
   /** English group name (e.g. "Administration"). */

@@ -5,7 +5,7 @@ import { archiveIdleDays } from './conversation-directory-input'
 import { db } from '@/lib/db'
 import { attentionSettings, PUSH_WHEN, userPreferences, users } from '@/lib/db/schema'
 import { SEND_KEYS } from '@/lib/send-key'
-import { DEFAULT_UI, normalizeUi, uiPreferencesSchema, type UiPreferences, type UiPreferencesPatch } from '@/lib/ui-preferences'
+import { DEFAULT_UI, normalizeUi, uiPreferencesSchema, type UiPreferences } from '@/lib/ui-preferences'
 import { ActionFailureError } from '@/lib/action-error'
 import { setAttentionEnabled } from '@/lib/attention/store'
 

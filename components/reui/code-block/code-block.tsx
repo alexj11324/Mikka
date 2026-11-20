@@ -43,7 +43,7 @@ import type {
   CodeBlockWordSpec,
 } from "@/components/reui/code-block/code-block-highlight"
 
-import { useUiPreferenceSnapshot } from "@/lib/ui-preferences"
+import { useUiPreferenceSnapshot } from "@/hooks/use-ui-preference-snapshot"
 import { cn } from "cn"
 import { Button } from "@/components/ui/button"
 
