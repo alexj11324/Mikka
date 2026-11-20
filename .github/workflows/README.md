@@ -18,8 +18,9 @@ bindings. Current workflow files define the triggers and selected coverage.
   are **different** operations; neither changes long-term public build ownership.
   See [build-source-of-truth.md](../../docs/operations/build-source-of-truth.md).
 - A pull request that changes the interface must include a screenshot or
-  recording in its description. `frontend-screenshots.yml` checks that on
-  open, push, and description edits. It does not launch a browser.
+  recording in its description. `UI policy (strict)` requires it.
+  `frontend-screenshots.yml` reruns the same check when the description is
+  edited, without rerunning the suite. Neither job launches a browser.
 - Ordinary acceptance uses API/CLI flows under decision 2026-11-01-1520.
   Targeted Desktop and Analytics jobs retain their selected browser
   checks. `browser-gate.yml` only keeps the protected check name
