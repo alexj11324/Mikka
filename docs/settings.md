@@ -1,5 +1,8 @@
 # Settings surface
 
+The [registered settings backend](settings-backend/registry.md) defines typed
+writes, workspace inheritance, reset and row-search metadata for #2956.
+
 Each section is a small heading over one card of rows, as in
 Comma's 「模型与 API」 (decision 2026-10-30). This is the open-source default
 settings surface; the hosted settings are affectUI screens used as shipped
