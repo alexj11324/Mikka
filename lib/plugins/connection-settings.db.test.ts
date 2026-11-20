@@ -7,6 +7,7 @@ import { mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { isE2eTarget, E2E_DB_RULE } from '../../tests/helpers/e2e-target.mjs'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { PersonalPluginStore } from './store'
 import { WorkspaceMcpStore } from './workspace-mcp'
 import { McpConnectionStore } from './connection-store'
@@ -19,17 +20,25 @@ if (database) assert.ok(isE2eTarget(database), E2E_DB_RULE)
 else if (process.env.REQUIRE_DB === '1') throw Error('MCP connection settings require an isolated E2E_DATABASE_URL')
 
 test('MCP settings persist real discovery, owner-only tools and environment scope, and SDK OAuth without model calls', { skip: !database }, async t => {
-  const schema = `mcp_settings_${randomUUID().replaceAll('-', '')}`
+  const isolatedDatabase = `mcp_settings_${randomUUID().replaceAll('-', '')}_e2e`
   const admin = new Pool({ connectionString: database })
-  const pool = new Pool({ connectionString: database, options: `-c search_path=${schema}`, max: 8 })
-  await admin.query(`CREATE SCHEMA ${schema}`)
+  await createTestDatabase(admin, isolatedDatabase, 'template0')
+  const target = new URL(database!); target.pathname = `/${isolatedDatabase}`
+  const pool = new Pool({ connectionString: target.toString(), max: 8 })
   const owner = 'settings-owner', member = 'settings-member', outsider = 'settings-outsider'
   const workspace = randomUUID(), elsewhere = randomUUID(), environment = randomUUID(), wrongEnvironment = randomUUID()
   const fixtureToken = `synthetic-mcp-${randomUUID()}`
   let requireAuth = false, failCheck = false, toolCalls = 0, exchanges = 0, refreshes = 0, challenge = ''
+  let mismatchedCatalogue = false
   const server = createServer(async (request, response) => {
     const path = new URL(request.url!, 'http://localhost').pathname
     const send = (body: unknown, status = 200) => { response.writeHead(status, { 'content-type': 'application/json' }); response.end(JSON.stringify(body)) }
+    if (path.startsWith('/v0.1/servers')) {
+      const entry = { server: { name: mismatchedCatalogue ? 'io.example/other' : 'io.example/docs', description: 'Directory fixture', version: '1.2.3', remotes: [
+        { type: 'streamable-http', url: 'https://catalogue.example.com/mcp' }, { type: 'sse', url: 'https://127.0.0.1/private' },
+      ] } }
+      return send(path === '/v0.1/servers' ? { servers: [entry], metadata: { nextCursor: 'page-two' } } : entry)
+    }
     if (path.startsWith('/.well-known/oauth-protected-resource')) return send({ resource: 'https://mcp.example.com/mcp', authorization_servers: ['https://oauth.example.com'] })
     if (path.startsWith('/.well-known/oauth-authorization-server') || path.startsWith('/.well-known/openid-configuration')) return send({
       issuer: 'https://oauth.example.com', authorization_endpoint: 'https://oauth.example.com/authorize', token_endpoint: 'https://oauth.example.com/token', registration_endpoint: 'https://oauth.example.com/register',
@@ -78,7 +87,7 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
     const personal = new PersonalPluginStore(pool, env, pool), shares = new WorkspaceMcpStore(pool, pool)
     const oauth = new McpOAuthStore(pool, env, transport)
     const connections = new McpConnectionStore(personal, { transport }, oauth)
-    const installed = await personal.createMcp(owner, createMcpSchema.parse({ name: 'Docs', url: 'https://mcp.example.com/mcp' }))
+    const installed = await personal.createMcp(owner, createMcpSchema.parse({ name: 'Docs', url: 'https://mcp.example.com/mcp', headers: { 'X-Account': 'fixture-account' } }))
 
     await t.test('real check persists status and tools, and repeat check preserves switches', async () => {
       assert.equal((await connections.detail(owner, installed.id)).status, 'needs_connect')
@@ -126,12 +135,16 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
       const scoped = await personal.snapshot(member, pool, workspace, environment)
       assert.equal(scoped.servers.length, 1)
       await assert.rejects(shares.validate(member, { ...scoped.mcpAuthority!, environmentId: wrongEnvironment }), /mcpUnavailable/)
+      assert.equal((await personal.nativeMcpConnections(member, scoped.mcpAuthority!, environment)).length, 1)
+      await assert.rejects(personal.nativeMcpConnections(member, scoped.mcpAuthority!, wrongEnvironment), /mcpUnavailable/)
+      await assert.rejects(personal.nativeMcpConnections(member, scoped.mcpAuthority!, null), /mcpUnavailable/)
       await connections.setEnvironments(owner, installed.id, { workspaceId: workspace, environmentIds: [] })
       assert.equal((await personal.snapshot(member, pool, workspace)).servers.length, 1)
     })
     await t.test('SDK authorization code uses PKCE/state, tokens are encrypted, callbacks are single-use and refresh rotates under a row lock', async () => {
       requireAuth = true
-      assert.equal((await connections.check(owner, installed.id)).status, 'needs_connect')
+      const needsConnect = await connections.check(owner, installed.id)
+      assert.equal(needsConnect.status, 'needs_connect'); assert.ok(needsConnect.authorizationUrl)
       const start = await oauth.start(owner, installed.id)
       assert.equal(start.status, 'needs_connect'); assert.ok(start.authorizationUrl)
       const authorization = new URL(start.authorizationUrl)
@@ -150,14 +163,28 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
       assert.ok(!stored.includes(fixtureToken) && !stored.includes('fixture-refresh') && !stored.includes(state))
       assert.deepEqual(await Promise.all([oauth.accessToken(owner, installed.id), oauth.accessToken(owner, installed.id)]), [fixtureToken, fixtureToken])
       assert.equal(refreshes, 1)
+      assert.deepEqual((await personal.mcpConnection(owner, installed.id)).headers, { 'X-Account': 'fixture-account', Authorization: `Bearer ${fixtureToken}` })
       assert.equal((await connections.detail(member, installed.id, workspace)).authorizationUrl, null)
       assert.ok(!JSON.stringify(await personal.listMcp(owner)).includes(fixtureToken))
+    })
+    await t.test('lost OAuth credentials change persisted state and explicit disconnect removes tokens', async () => {
+      const oauthConnection = await personal.createMcp(owner, createMcpSchema.parse({ name: 'Missing token', url: 'https://mcp.example.com/mcp' }))
+      await pool.query(`UPDATE personal_mcp_servers SET oauth_enabled=true,connection_status='connected' WHERE id=$1`, [oauthConnection.id])
+      await assert.rejects(oauth.accessToken(owner, oauthConnection.id), /mcpNeedsConnect/)
+      assert.equal((await connections.detail(owner, oauthConnection.id)).status, 'needs_connect')
+      await personal.updateMcp(owner, { id: installed.id, auth: null })
+      assert.equal((await pool.query('SELECT 1 FROM personal_mcp_oauth WHERE server_id=$1', [installed.id])).rowCount, 0)
+      assert.equal((await connections.detail(owner, installed.id)).status, 'needs_connect')
+      assert.equal((await personal.mcpConnection(owner, installed.id)).headers.Authorization, undefined)
+      requireAuth = false
     })
     await t.test('real API handlers reject unauthenticated, delegated, nonowner and cross-workspace calls before mutations', async () => {
       let actor: string | null = owner
       mock.module('../api-auth.ts', { namedExports: { auth: { api: { getSession: async () => actor ? { user: { id: actor } } : null } } } })
       mock.module('../request-log.ts', { namedExports: { noteLogUser() {}, noteLogRpcAction() {} } })
       mock.module('./runtime.ts', { namedExports: { personalPlugins: personal, workspaceMcp: shares, mcpConnections: connections } })
+      // The directory uses real HTTP payloads; public DNS protection is owned by plugins.test.ts.
+      mock.module('./public-fetch.ts', { namedExports: { publicMcpFetch: () => transport() } })
       const detail = await import('../../app/api/integrations/mcp/[id]/route')
       const check = await import('../../app/api/integrations/mcp/[id]/check/route')
       const tool = await import('../../app/api/integrations/mcp/[id]/tools/[name]/route')
@@ -189,10 +216,20 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
       assert.equal((await check.POST(new Request('https://app.example.com/api/integrations/mcp/id/check', { method: 'POST', headers: { origin: 'https://other.example.com', cookie: 'fixture' } }), context)).status, 403)
       assert.equal((await start.POST(new Request('https://app.example.com/api/integrations/mcp/id/oauth/start', { method: 'POST', headers: { origin: 'https://app.example.com', authorization: 'Bearer mkpat_fixture', 'content-type': 'application/json' }, body: '{}' }), context)).status, 401)
       assert.equal((await connections.detail(owner, installed.id)).tools.find(tool => tool.name === 'read_docs')?.enabled, true)
+      const directory = await catalog.GET(request('/api/integrations/mcp/catalog?q=docs'))
+      assert.equal(directory.status, 200)
+      assert.deepEqual(await directory.json(), { entries: [{ name: 'io.example/docs', description: 'Directory fixture', version: '1.2.3', remotes: [{ index: 0, url: 'https://catalogue.example.com/mcp', transport: 'http' }] }], nextCursor: 'page-two' })
+      const added = await catalog.POST(request('/api/integrations/mcp/catalog', 'POST', { name: 'io.example/docs', remoteIndex: 0 }))
+      assert.equal(added.status, 201)
+      const addedId = (await added.json()).server.id
+      assert.ok((await personal.listMcp(owner)).some(server => server.id === addedId))
+      assert.ok(!(await personal.listMcp(member)).some(server => server.id === addedId))
+      mismatchedCatalogue = true
+      assert.equal((await catalog.POST(request('/api/integrations/mcp/catalog', 'POST', { name: 'io.example/docs', remoteIndex: 0 }))).status, 502)
     })
   } finally {
     mock.restoreAll()
     await new Promise<void>(resolve => server.close(() => resolve()))
-    await pool.end(); await admin.query(`DROP SCHEMA ${schema} CASCADE`); await admin.end()
+    await pool.end(); await dropTestDatabase(admin, isolatedDatabase); await admin.end()
   }
 })

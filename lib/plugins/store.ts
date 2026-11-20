@@ -61,7 +61,9 @@ export class PersonalPluginStore {
       // Keep already-admitted credential-free references valid when disconnect is retried.
       if ((input.auth === null || input.headers === null) && row.auth_header === null
         && !row.oauth_enabled && name === row.name && enabled === row.enabled) return mcpView(row)
-      const { rows } = await client.query<McpRow>(`UPDATE personal_mcp_servers SET name=$3,enabled=$4,auth_header=$5,ciphertext=$6,iv=$7,key_version=$8,oauth_enabled=CASE WHEN $9 THEN false ELSE oauth_enabled END,revision=revision+1 WHERE id=$1 AND user_id=$2 RETURNING ${mcpColumns}`, [row.id, userId, name, enabled, header, sealed?.ciphertext ?? null, sealed?.iv ?? null, sealed?.keyVersion ?? null, input.auth !== undefined || input.headers !== undefined])
+      const credentialsChanged = input.auth !== undefined || input.headers !== undefined || input.env !== undefined
+      if (input.auth !== undefined || input.headers !== undefined) await client.query('DELETE FROM personal_mcp_oauth WHERE server_id=$1', [row.id])
+      const { rows } = await client.query<McpRow>(`UPDATE personal_mcp_servers SET name=$3,enabled=$4,auth_header=$5,ciphertext=$6,iv=$7,key_version=$8,oauth_enabled=CASE WHEN $9 THEN false ELSE oauth_enabled END,connection_status=CASE WHEN $10 THEN 'needs_connect' ELSE connection_status END,check_failure=CASE WHEN $10 THEN NULL ELSE check_failure END,revision=revision+1 WHERE id=$1 AND user_id=$2 RETURNING ${mcpColumns}`, [row.id, userId, name, enabled, header, sealed?.ciphertext ?? null, sealed?.iv ?? null, sealed?.keyVersion ?? null, input.auth !== undefined || input.headers !== undefined, credentialsChanged])
       return mcpView(rows[0])
     })
   }
@@ -75,9 +77,13 @@ export class PersonalPluginStore {
     const row = (await this.pool.query<McpRow>(`SELECT ${mcpColumns} FROM personal_mcp_servers WHERE id=$1 AND user_id=$2 AND enabled=true`, [id, ownerId])).rows[0]
     if (!row || revision !== undefined && row.revision !== revision) throw new PluginError('mcpUnavailable', 404)
     if (grant && row.revision !== grant.revision) throw new PluginError('mcpUnavailable', 404)
-    const value = row.auth_header && !row.oauth_enabled ? openSecret({ ciphertext: row.ciphertext!, iv: row.iv!, keyVersion: row.key_version! }, aad(ownerId,row.id,row.url,row.auth_header),this.env) : null
+    const value = row.auth_header ? openSecret({ ciphertext: row.ciphertext!, iv: row.iv!, keyVersion: row.key_version! }, aad(ownerId,row.id,row.url,row.auth_header),this.env) : null
     const native = row.transport === 'stdio' ? taskMcpServerSchema.parse({ name: `mcp_${row.id.replaceAll('-','')}`, transport: 'stdio', ...JSON.parse(value!) }) : undefined
-    const headers: Record<string,string> = row.oauth_enabled ? { Authorization: `Bearer ${await new (await import('./mcp-oauth')).McpOAuthStore(this.pool, this.env).accessToken(ownerId, id)}` } : row.auth_header === '__headers__' ? JSON.parse(value!) : row.auth_header && row.transport !== 'stdio' ? { [row.auth_header]:value! } : {}
+    const headers: Record<string,string> = row.auth_header === '__headers__' ? JSON.parse(value!) : row.auth_header && row.transport !== 'stdio' ? { [row.auth_header]:value! } : {}
+    if (row.oauth_enabled) {
+      for (const name of Object.keys(headers)) if (name.toLowerCase() === 'authorization') delete headers[name]
+      headers.Authorization = `Bearer ${await new (await import('./mcp-oauth')).McpOAuthStore(this.pool, this.env).accessToken(ownerId, id)}`
+    }
     const { rows: disabled } = await this.pool.query<{ name: string }>('SELECT tool_name AS name FROM mcp_server_tools WHERE server_id=$1 AND NOT enabled ORDER BY tool_name', [id])
     const disabledTools = disabled.map(tool => tool.name)
     return { ...mcpView(row), headers, disabledTools, ...(native ? { native: { ...native, ...(disabledTools.length ? { disabledTools } : {}) } } : {}) }

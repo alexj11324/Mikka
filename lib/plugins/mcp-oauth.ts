@@ -101,6 +101,7 @@ export class McpOAuthStore {
       delete data.authorizationUrl
       const transport = this.transport()
       try { await auth(this.provider(data), { serverUrl: url, fetchFn: transport.fetch }) }
+      // error-cause: OAuth SDK errors can contain token endpoint bodies and credentials.
       catch { throw new PluginError('mcpOAuthUnavailable', 503) }
       finally { await transport.close() }
       if (!data.authorizationUrl) { delete data.state; delete data.verifier }
@@ -117,6 +118,7 @@ export class McpOAuthStore {
       const data = this.read(row, userId, serverId)
       const transport = this.transport()
       try { await auth(this.provider(data), { serverUrl: url, authorizationCode: input.code, callbackState: input.state, callbackIssuer: input.issuer, fetchFn: transport.fetch }) }
+      // error-cause: OAuth SDK errors can contain authorization codes and token endpoint bodies.
       catch { throw new PluginError('mcpOAuthExchangeFailed', 400) }
       finally { await transport.close() }
       delete data.verifier; delete data.state; delete data.authorizationUrl
@@ -130,19 +132,20 @@ export class McpOAuthStore {
    * except the bearer handed to an already-authorized native MCP connection. */
   async accessToken(userId: string, serverId: string): Promise<string> {
     const result = await this.locked(userId, serverId, async (client, url, row) => {
-      if (!row) return null
-      const data = this.read(row, userId, serverId)
-      if (data.tokens?.access_token && (data.expiresAt === undefined || data.expiresAt > Date.now() + 30_000)) return data.tokens.access_token
-      if (!data.tokens?.refresh_token) return null
-      const transport = this.transport()
-      try { await auth(this.provider(data), { serverUrl: url, fetchFn: transport.fetch }) }
-      catch { return null }
-      finally { await transport.close() }
-      await this.save(client, userId, serverId, data, data.authorizationUrl ? new Date(Date.now() + 600_000) : null)
-      if (data.authorizationUrl || !data.tokens?.access_token) {
+      const reconnect = async () => {
         await client.query(`UPDATE personal_mcp_servers SET connection_status='needs_connect',check_failure='oauthReconnectRequired' WHERE id=$1`, [serverId])
         return null
       }
+      if (!row) return reconnect()
+      const data = this.read(row, userId, serverId)
+      if (data.tokens?.access_token && (data.expiresAt === undefined || data.expiresAt > Date.now() + 30_000)) return data.tokens.access_token
+      if (!data.tokens?.refresh_token) return reconnect()
+      const transport = this.transport()
+      try { await auth(this.provider(data), { serverUrl: url, fetchFn: transport.fetch }) }
+      catch { return reconnect() }
+      finally { await transport.close() }
+      await this.save(client, userId, serverId, data, data.authorizationUrl ? new Date(Date.now() + 600_000) : null)
+      if (data.authorizationUrl || !data.tokens?.access_token) return reconnect()
       return data.tokens.access_token
     })
     if (!result) throw new PluginError('mcpNeedsConnect', 409)
