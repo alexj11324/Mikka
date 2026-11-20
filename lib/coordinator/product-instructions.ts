@@ -7,18 +7,21 @@ import { snapshotMailboxTools } from '@/lib/personal-mailbox-capability'
 import type { MailboxToolName } from '@mikka/protocol/mailbox'
 import { definitionInstructions, type DefinitionSnapshot } from '@/lib/agent-kit/definition'
 import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
-import { cachedContextLines, promptWithCachedContext } from '@/lib/coordinator/context'
+import { cachedContextLines, promptWithCachedContext, instructionsWithWorkspace } from '@/lib/coordinator/context'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { withPersonalInstructionText } from '@/lib/coordinator/personal-instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { withCoordinatorPresentation } from '@/lib/coordinator/native-prompt'
 import { loadProductPromptContext } from '@/lib/coordinator/prompt-context'
+import { readWorkspaceInstructionsForBot } from '@/lib/coordinator/workspace-instructions'
 
 /** Product context only: eve supplies history and owns pruning and compaction. */
 export async function composeEveInstructions(userId: string, botId: string, snapshot?: DefinitionSnapshot, nativeTurn?: { sessionId: string; turnId: string }, nativePolicy?: Pick<DefinitionSnapshot, 'definition' | 'effectiveTools' | 'personalPlugins'>) {
   snapshot = snapshot ? { ...snapshot, personalPlugins: snapshot.personalPlugins ? { ...snapshot.personalPlugins, skills: [] } : undefined } : undefined
   const policy = nativePolicy ?? snapshot
-  const conversation = await loadProductPromptContext(userId, botId)
+  const [conversation, workspaceInstructions] = await Promise.all([
+    loadProductPromptContext(userId, botId), readWorkspaceInstructionsForBot(userId, botId),
+  ])
   const { memory } = conversation
   const mailboxTools: readonly MailboxToolName[] = []
   const githubScope = { hosted: true, readOnly: false, effectiveTools: policy?.effectiveTools }
@@ -34,7 +37,7 @@ export async function composeEveInstructions(userId: string, botId: string, snap
   const { memoryForBotPrompt } = await import('@/lib/profile/memory')
   const [execution, rules, github, approvedFacts] = await Promise.all([
     executionContextParts(userId, botId),
-    withPersonalInstructionText(userId, instructions, conversation.personalInstructions, policy ? { ...policy.personalPlugins ?? { servers: [] }, skills: [] } : undefined),
+    withPersonalInstructionText(userId, instructionsWithWorkspace(instructions, workspaceInstructions), conversation.personalInstructions, policy ? { ...policy.personalPlugins ?? { servers: [] }, skills: [] } : undefined),
     githubPromptContext(userId, githubScope, undefined, undefined, botId),
     conversation.memoryEnabled ? memoryForBotPrompt(userId, botId, conversation.memoryEnabled, nativeTurn) : Promise.resolve(''),
   ])

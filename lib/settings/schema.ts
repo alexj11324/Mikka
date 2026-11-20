@@ -24,3 +24,10 @@ export const workspaceSettingValues = pgTable('workspace_setting_values', {
   primaryKey({ columns: [table.workspaceId, table.key] }),
   check('workspace_setting_values_one_type', sql`num_nonnulls(${table.booleanValue}, ${table.integerValue}, ${table.textValue}, ${table.textArrayValue}) <= 1`),
 ])
+
+/** Runtime prompt storage is separate from personal and thread-title instructions. */
+export const workspaceInstructions = pgTable('workspace_instructions', {
+  workspaceId: uuid('workspaceId').primaryKey(),
+  instructions: text('instructions').notNull().default(''),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [check('workspace_instructions_length', sql`char_length(${table.instructions}) <= 2000`)])

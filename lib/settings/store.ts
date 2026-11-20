@@ -8,7 +8,7 @@ import { requireWorkspace } from '@/lib/workspace-access'
 import { DEFAULT_TITLE_TRIGGERS, type ThreadTitleTriggers } from '@/lib/thread-title'
 import { archivePreferenceChanged, workspaceListChanged } from '@/lib/live/lists'
 import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
-import { personalSettingValues, workspaceSettingValues } from './schema'
+import { personalSettingValues, workspaceSettingValues, workspaceInstructions } from './schema'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Reader = Pick<typeof db, 'select'>
@@ -67,6 +67,11 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
         .onConflictDoUpdate({ target: [workspaceSettingValues.workspaceId, workspaceSettingValues.key], set: changed })
     }
     // Existing runtime readers and clients retain their typed columns during incremental adoption.
+    if (field.legacy === 'workspace-instructions' && scope === 'workspace') {
+      const instructions = (value ?? '') as string
+      await tx.insert(workspaceInstructions).values({ workspaceId: context.workspaceId, instructions })
+        .onConflictDoUpdate({ target: workspaceInstructions.workspaceId, set: { instructions, updatedAt: new Date() } })
+    }
     if (field.legacy === 'archive-days' && scope === 'personal') {
       const days = value === null ? 30 : value as number
       await tx.insert(userPreferences).values({ userId: context.userId, archiveIdleAfterDays: days })
