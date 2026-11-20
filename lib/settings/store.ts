@@ -92,14 +92,6 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
   }
 }
 
-/** Used inside the existing preferences transaction; the user ID already comes from its authenticated action. */
-export async function writePersonalArchiveSetting(tx: Transaction, userId: string, value: unknown): Promise<void> {
-  const field = settingDefinition('archiveIdleAfterDays')
-  const changed = { ...pack(field, field.guard.parse(value)), updatedAt: new Date() }
-  await tx.insert(personalSettingValues).values({ userId, workspaceId: null, key: field.key, ...changed })
-    .onConflictDoUpdate({ target: [personalSettingValues.userId, personalSettingValues.workspaceId, personalSettingValues.key], set: changed })
-}
-
 /** Membership/role stays locked through the app-data commit; the caller cannot supply a different target user. */
 export async function writeSettings(context: SettingsContext, scope: SettingScope, raw: unknown): Promise<SettingsView> {
   const values = parseSettingsPatch(scope, raw)
