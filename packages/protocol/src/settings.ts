@@ -30,3 +30,6 @@ export interface SettingsView {
 export interface SettingsPatch {
   values: Record<string, SettingValue | null>
 }
+export type ShareVisibility = 'private' | 'workspace' | 'link'
+export interface ResolvedShareVisibility { value: ShareVisibility; source: SettingSource }
+export interface WorkspaceSharingDefaults { thread: ResolvedShareVisibility; artifact: ResolvedShareVisibility }

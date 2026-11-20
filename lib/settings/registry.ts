@@ -7,7 +7,7 @@ export interface SettingDefinition extends SettingSchemaEntry {
   guard: z.ZodType<SettingValue>
   /** Existing account preferences stay global; title overrides belong to one workspace. */
   personalContext: 'account' | 'workspace'
-  legacy?: 'archive-days' | 'title-instructions' | 'title-triggers'
+  legacy?: 'archive-days' | 'title-instructions' | 'title-triggers' | 'workspace-instructions'
 }
 
 const inherited = {
@@ -39,6 +39,24 @@ export const SETTINGS_REGISTRY = {
     key: 'subagentMaxConcurrent', scope: ['workspace'], group: 'threads', page: 'threads',
     label: { en: 'Concurrent subagents', 'zh-CN': '并发子 Agent 数量' }, keywords: ['agent', 'concurrency', 'limit', '子 Agent', '并发', '限制'],
     type: 'integer', guard: z.number().int().min(1).max(20), defaultValue: 6,
+    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
+  },
+  workspaceInstructions: {
+    key: 'workspaceInstructions', scope: ['workspace'], group: 'instructions', page: 'instructions',
+    label: { en: 'Workspace instructions', 'zh-CN': '工作区指令' }, keywords: ['instructions', 'agent', '指令', '工作区'],
+    type: 'string', guard: z.string().trim().max(2000), defaultValue: '',
+    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', legacy: 'workspace-instructions',
+  },
+  threadShareVisibility: {
+    key: 'threadShareVisibility', scope: ['workspace'], group: 'sharing', page: 'sharing',
+    label: { en: 'Default thread sharing', 'zh-CN': '线程默认分享范围' }, keywords: ['thread', 'share', 'visibility', '线程', '分享', '可见'],
+    type: 'string', guard: z.enum(['private', 'workspace', 'link']), defaultValue: 'private', options: ['private', 'workspace', 'link'],
+    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
+  },
+  artifactShareVisibility: {
+    key: 'artifactShareVisibility', scope: ['workspace'], group: 'sharing', page: 'sharing',
+    label: { en: 'Default artifact sharing', 'zh-CN': '产物默认分享范围' }, keywords: ['artifact', 'share', 'visibility', '产物', '分享', '可见'],
+    type: 'string', guard: z.enum(['private', 'workspace', 'link']), defaultValue: 'link', options: ['private', 'workspace', 'link'],
     personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
   },
 } satisfies Record<string, SettingDefinition>
