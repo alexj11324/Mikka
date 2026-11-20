@@ -17,6 +17,10 @@ Use this guide to prepare, verify and submit changes to Mikka.
 - Branch from `main` and keep each pull request to one change. How work moves
   from a branch to `main` (local first, hot reload, ownership and merging, numbers,
   E2B dev templates) is in [`docs/dev-workflow.md`](docs/dev-workflow.md).
+  Independently verifiable changes merge when their own checks and release
+  window permit. Batch only genuine atomic dependencies; an existing epic's
+  explicitly approved batch rules still apply. See the
+  [delivery decision](docs/design/decisions/2026-11-20-1640-sdlc-delivery.md).
 - Write commit messages in English, in the form `<type>: <description>`, where
   the type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
   or `ci`.

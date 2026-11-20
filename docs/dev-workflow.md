@@ -2,8 +2,8 @@
 
 Standing rules for how work moves from a branch to `main`. Decision:
 [`2026-11-01-1440-dev-workflow-local-first`](design/decisions/2026-11-01-1440-dev-workflow-local-first.md);
-ownership as Alex set it on 2026-11-03, with batch merging updated on
-2026-11-05 (§ 5).
+ownership as Alex set it on 2026-11-03, with dependency-based delivery under
+[#2984](https://github.com/alexj11324/Mikka/issues/2984) (§ 5).
 Use `AGENTS.md` and the accepted decision hierarchy when another document
 disagrees, then update the lower-priority document.
 
@@ -124,7 +124,9 @@ loopback `*_e2e` database) is described in
 
 Alex set the ownership rules on 2026-11-03
 ([`2026-11-03-2359`](design/decisions/2026-11-03-2359-issue-owner-merges-and-accepts-in-production.md)).
-Batch merging follows Alex's 2026-11-05 update in `AGENTS.md`.
+The [SDLC delivery decision](design/decisions/2026-11-20-1640-sdlc-delivery.md)
+defines the default for new work. Already approved epic-specific batch rules,
+including #2891 and #2956, remain in force for those owners.
 They replace the coordinator-merges rule, the push-fixes-to-main rule and the
 old module owners (backend was Codex's).
 
@@ -139,18 +141,20 @@ old module owners (backend was Codex's).
    machines and paid resources to the actual need and stop each one as soon
    as its step is done.
 2. **No direct pushes.** Nobody pushes to `main`. Every change goes through a
-   PR from a branch based on `main`. Each original PR changes one thing;
-   ready PRs are integrated as a batch under rule 3.
+   PR from a branch based on `main`. Each PR contains one independently
+   verifiable and deliverable change; true atomic dependencies follow rule 3.
 3. **The owner merges.** Each PR is merged by its owner, the agent that
    leads its issue (Alex, 2026-11-05). A Pro owner always has the right to
    merge its own PRs on its own: when CI is green on the latest head and the
    PR is mergeable, it merges, without waiting for or handing the PR to
-   anyone. When the owner has two or more of its own PRs ready, it combines
-   their branches into one `batch/<date>-<n>` branch, resolves conflicts once
-   and runs CI on the final batch head, then merges the batch PR with a merge
-   commit so the original PRs are recorded as merged. Each original issue
-   keeps its owner and production acceptance criteria. A single ready PR may
-   be squash-merged. A UI change merges only after the owner has reviewed its
+   anyone. Merge an independently valid change as soon as its own proof and
+   release window permit; the number of ready PRs is not a dependency.
+   Batch only changes that must land atomically, and state why each member
+   cannot safely ship alone. Merge those branches normally into the batch,
+   resolve conflicts once and verify the final batch head. Every merge uses
+   a normal merge commit: no squash, rebase, force push or direct main push.
+   Each issue retains its owner and acceptance criteria. Existing approved
+   epic batches keep their original rules. A UI change merges only after the owner has reviewed its
    screenshots and attached them to the PR.
    A change to auth, signup, privilege or credentials says so in the PR.
 4. **Stacked PRs** merge in order. After a base merges, retarget the next PR
@@ -189,6 +193,33 @@ old module owners (backend was Codex's).
    by its own owner. Review findings go on the PR as comments for the owner.
 8. A documentation conflict is resolved by whoever merges: they edit the
    documents directly.
+
+### Reuse exact proof and diagnose failures
+
+Keep a recovery branch and Draft PR while implementing. Mark it Ready when
+the source, focused regression and review are ready; this activates the
+existing deferred checks without an empty commit. Required checks still run
+on drafts. Update the owning issue's existing progress record with the exact
+head, original run/attempt/job, result and next action. A queue entry or an old
+head's green check is not new acceptance.
+
+For a failed run, preserve the original error and first classify product code,
+test expectation, fixture/database state or environment failure. Reproduce the
+failure with fixed source and inputs, fix its owner, and verify that same case.
+Do not rerun a test until it happens to pass. When only an infrastructure job
+failed and source, toolchain and relevant inputs are unchanged, use GitHub's
+native failed-job or single-job rerun. Preserve successful jobs' original run
+and attempt identities. A code, dependency, fixture or environment change
+invalidates affected proof and requires the applicable checks again.
+
+Use the [existing timing collector](ci/test-ownership.md#measure-before-choosing-faster-infrastructure)
+for queue, execution and attempt measurements. Report sample denominators,
+failed/cancelled samples and unavailable timestamps explicitly. Ready-to-merge
+time starts at the recorded transition for that PR, not an inferred commit;
+merge-to-acceptance ends only at a successful receipt for that exact version.
+Code merge, image build, staging acceptance and production acceptance are
+separate outcomes. An external release dependency does not hold unrelated
+safe changes out of main.
 
 Before any merge, verify the affected API/CLI flow and required CI checks.
 UI changes also need screenshots of a production build of the official UI
