@@ -22,6 +22,18 @@ function liveLease(value: Date | string | null | undefined): boolean {
   return Number.isFinite(expires) && expires > Date.now()
 }
 
+const TERMINAL = ['succeeded', 'failed', 'stopped', 'cancelled']
+/** The thread a run belongs to: its root run, owned by the same person (decision 2026-11-19-2200). */
+const ROOT_RUN = `with recursive up as (select id,"continuesRunId","retryOf","userId",0 as depth from agent_runs where id=$1
+  union all select r.id,r."continuesRunId",r."retryOf",r."userId",up.depth+1 from agent_runs r join up on r.id=coalesce(up."continuesRunId",up."retryOf") and r."userId"=up."userId" where up.depth<64)
+  select id from up where "continuesRunId" is null and "retryOf" is null limit 1`
+/** A sender's own ACL subject: its run, or its Bot. A Coordinator has none. */
+function senderSubject(box: Mailbox, actor: MailboxActor): { kind: 'run' | 'bot'; id: string } | null {
+  if (box.kind === 'run' && actor.runId) return { kind: 'run', id: actor.runId }
+  if (box.kind === 'bot') return { kind: 'bot', id: box.sessionKey }
+  return null
+}
+
 export class SessionMailbox {
   constructor(private readonly pool: Pool, private readonly workspaceId: string, private readonly fence?: MailboxFence, private readonly guard?: MailboxTransactionGuard) {}
   private async transaction<T>(fn: (client: PoolClient) => Promise<T>, recheck?: (client: PoolClient) => Promise<unknown>): Promise<T> {
@@ -188,10 +200,18 @@ export class SessionMailbox {
   }
   async recipients(actor: MailboxActor) {
     return this.transaction(async client => {
-      await this.authorize(client, actor)
+      const box = await this.authorize(client, actor)
       // No transcripts, role configuration or repository paths are disclosed.
       const { rows } = await client.query(`select id,kind,"sessionKey","latestRunId",disabled,"wakeBudget" from session_mailboxes where "userId"=$1 and "workspaceId"=$2 and kind in ('run','coordinator','bot') order by "createdAt",id limit 100`, [actor.userId, this.workspaceId])
-      return { self: actor.mailboxId, recipients: rows }
+      // A teammate's run or Bot mailbox appears only when this sender may steer it (decision 2026-11-19-2200).
+      const subject = senderSubject(box, actor)
+      const { rows: shared } = await client.query(`select m.id,m.kind,m."sessionKey","latestRunId",m.disabled,m."wakeBudget" from session_mailboxes m
+        left join lateral (${ROOT_RUN.replace('$1', 'm."sessionKey"::uuid')}) root on m.kind='run'
+        where m."workspaceId"=$2 and m."userId"<>$1 and m.kind in ('run','bot') and not m.disabled
+          and (mikka_resource_acl_allowed('account',$1,$2::uuid,case when m.kind='run' then 'thread' else 'bot' end,case when m.kind='run' then root.id else m."sessionKey"::uuid end,'canSteer')
+            or ($3::text is not null and mikka_resource_acl_allowed($3,$4,$2::uuid,case when m.kind='run' then 'thread' else 'bot' end,case when m.kind='run' then root.id else m."sessionKey"::uuid end,'canSteer')))
+        order by m."createdAt",m.id limit 50`, [actor.userId, this.workspaceId, subject?.kind ?? null, subject?.id ?? null])
+      return { self: actor.mailboxId, recipients: [...rows, ...shared] }
     }, client => this.authorize(client, actor))
   }
   async send(actor: MailboxActor, input: { to: string; key: string; text: string; replyTo?: string }) {
@@ -253,6 +273,7 @@ export class SessionMailbox {
   }
   private async sendEnvelope(actor: MailboxActor, input: { to: string; key: string; text: string; replyTo?: string }, owner: boolean): Promise<MailboxReceipt> {
     let wake: string | undefined
+    let resume: { ownerId: string; runId: string; messageId: string } | undefined
     const receipt = await this.transaction<MailboxReceipt>(async client => {
       const box = await this.authorize(client, actor, false)
       let scope = await this.sendScope(client, actor, box)
@@ -261,9 +282,11 @@ export class SessionMailbox {
       await client.query('select pg_advisory_xact_lock(hashtextextended($1,0))', [`${actor.workspaceId}:${actor.userId}:${scope.lock}:${input.key}`])
       // Serialize scheduling/policy writers without blocking FK KEY SHARE on
       // this address. Completion may hold the coordinator while referencing it.
-      await client.query('select id from session_mailboxes where id=any($1::uuid[]) and "userId"=$2 and "workspaceId"=$3 order by id for no key update', [[actor.mailboxId, input.to], actor.userId, this.workspaceId])
-      const { rows: [target] } = await client.query<Mailbox>('select * from session_mailboxes where id=$1 and "userId"=$2 and "workspaceId"=$3 for no key update' , [input.to, actor.userId, this.workspaceId])
-      if (!target || target.userId !== actor.userId || target.workspaceId !== this.workspaceId || !['run', 'coordinator', 'bot'].includes(target.kind)) throw new MailboxError('Recipient unavailable')
+      await client.query('select id from session_mailboxes where id=any($1::uuid[]) and "workspaceId"=$2 order by id for no key update', [[actor.mailboxId, input.to], this.workspaceId])
+      const { rows: [target] } = await client.query<Mailbox>('select * from session_mailboxes where id=$1 and "workspaceId"=$2 for no key update' , [input.to, this.workspaceId])
+      if (!target || target.workspaceId !== this.workspaceId || !['run', 'coordinator', 'bot'].includes(target.kind)) throw new MailboxError('Recipient unavailable')
+      // Another member's run or Bot (never a Coordinator, never as the owner's own words) needs canSteer under this Workspace's ACL.
+      if (target.userId !== actor.userId && (owner || target.kind === 'coordinator' || !await this.mayReach(client, box, actor, target))) throw new MailboxError('Recipient unavailable')
       await this.authorize(client, actor)
       const refreshed = await this.sendScope(client, actor, box)
       if (refreshed.lock !== scope.lock) throw new MailboxError('Retry identity changed', 409)
@@ -280,10 +303,15 @@ export class SessionMailbox {
       if (!input.text.trim() || input.text.length > 4000) throw new MailboxError('Message must be 1–4000 characters', 400)
       const id = randomUUID()
       const wakeDepth = owner ? 0 : outgoingMailboxDepth(actor.notificationDepth)
-      const inserted = await client.query('insert into run_messages (id,"userId",text,"mailboxId","senderMailboxId","dedupeKey","replyTo",origin,"mailboxWakeDepth") values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning "createdAt"', [id, actor.userId, input.text, target.id, actor.mailboxId, input.key, input.replyTo ?? null, owner ? 'owner' : 'peer', wakeDepth])
+      const inserted = await client.query('insert into run_messages (id,"userId",text,"mailboxId","senderMailboxId","dedupeKey","replyTo",origin,"mailboxWakeDepth") values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning "createdAt"', [id, target.userId, input.text, target.id, actor.mailboxId, input.key, input.replyTo ?? null, owner ? 'owner' : 'peer', wakeDepth])
       if (target.disabled) await client.query('update run_messages set failure=$1 where id=$2', ['recipient_disabled', id])
       // The run's daemon reads the mailbox notice on the work signal sent after COMMIT.
-      if (target.kind === 'run' && !target.disabled && target.latestRunId) wake = (await client.query<{ deviceId: string }>('select r."deviceId" from agent_runs r where r.id=$1 and r."deviceId" is not null', [target.latestRunId])).rows[0]?.deviceId
+      if (target.kind === 'run' && !target.disabled && target.latestRunId) {
+        const { rows: [latest] } = await client.query<{ deviceId: string | null; status: string }>('select r."deviceId",r.status from agent_runs r where r.id=$1', [target.latestRunId])
+        // An ended run is continued in its own thread after COMMIT; a live one reads its inbox on the work signal.
+        if (latest && TERMINAL.includes(latest.status)) resume = { ownerId: target.userId, runId: target.latestRunId, messageId: id }
+        else wake = latest?.deviceId ?? undefined
+      }
       if (target.kind === 'coordinator' && !target.disabled && wakeDepth < MAILBOX_NOTIFICATION_LIMIT) {
         // The owner's own message is delivered as theirs; a peer's report gets no preset tier, so triage (the Decisions API) classifies it.
         await client.query(`insert into coordinator_events (id,"userId",kind,"dedupeKey","runId",payload,tier) values ($1,$2,$3,$4,$5,$6,$7)`, [randomUUID(), actor.userId, owner ? 'user_message' : 'run_report', `mailbox:${id}`, actor.runId ?? null, JSON.stringify({ text: owner ? input.text : personalPeerText({ id, senderMailboxId: actor.mailboxId, text: input.text, sourceRunId: actor.runId, createdAt: inserted.rows[0]?.createdAt }), mailboxWakeDepth: wakeDepth }), owner ? 'result' : null])
@@ -297,12 +325,45 @@ export class SessionMailbox {
         await client.query(`insert into coordinator_events (id,"userId","botId",kind,"dedupeKey","runId",payload,tier)
           select $1,$2,b.id,'run_report',$3,$4,$5,'attention' from bots b
           where b.id::text=$6 and b."ownerId"=$2 and b."workspaceId"::text=$7`,
-        [randomUUID(), actor.userId, `mailbox:${id}`, actor.runId ?? null, JSON.stringify({ text: notification, mailboxWakeDepth: wakeDepth }), target.sessionKey, this.workspaceId])
+        [randomUUID(), target.userId, `mailbox:${id}`, actor.runId ?? null, JSON.stringify({ text: notification, mailboxWakeDepth: wakeDepth }), target.sessionKey, this.workspaceId])
       }
       return { id, queued: true, duplicate: false, failure: target.disabled ? 'recipient_disabled' : null }
     }, client => this.authorize(client, actor))
     if (wake && !receipt.duplicate) notifyDeviceWork(wake)
+    if (resume && !receipt.duplicate) {
+      const continuationRunId = await this.resumeEnded(resume, input.text)
+      if (continuationRunId) return { ...receipt, continuationRunId }
+    }
     return receipt
+  }
+  /** canSteer on the target's thread (its root run) or Bot, as the sender's account or its own run/Bot grant. */
+  private async mayReach(client: PoolClient, box: Mailbox, actor: MailboxActor, target: Mailbox): Promise<boolean> {
+    const { workspacePool } = await import('./workspace-db')
+    const member = await workspacePool.query(`select 1 from mikka_workspace_members where "workspaceId"::text=$1 and "userId"=$2 and status='active'`, [this.workspaceId, target.userId])
+    if (!member.rowCount) return false
+    let resource: string | undefined
+    if (target.kind === 'run') resource = (await client.query<{ id: string }>(ROOT_RUN, [target.sessionKey])).rows[0]?.id
+    else if (target.kind === 'bot') resource = target.sessionKey
+    if (!resource) return false
+    const kind = target.kind === 'run' ? 'thread' : 'bot'
+    const subject = senderSubject(box, actor)
+    const { rows: [row] } = await client.query<{ allowed: boolean }>(`select mikka_resource_acl_allowed('account',$1,$2::uuid,$3,$4::uuid,'canSteer')
+      or ($5::text is not null and mikka_resource_acl_allowed($5,$6,$2::uuid,$3,$4::uuid,'canSteer')) as allowed`,
+    [actor.userId, this.workspaceId, kind, resource, subject?.kind ?? null, subject?.id ?? null])
+    return row?.allowed === true
+  }
+  /** Continue an ended run's thread with a peer message (sendThreadMessage, source peer). A refusal is recorded on the envelope. */
+  private async resumeEnded(resume: { ownerId: string; runId: string; messageId: string }, text: string): Promise<string | undefined> {
+    const { sendThreadMessage } = await import('./thread-continue')
+    const { ActionFailureError } = await import('./action-error')
+    try {
+      const result = await sendThreadMessage(resume.ownerId, resume.runId, `[Mailbox message ${resume.messageId}]\n${text}`, 'peer')
+      return result.continued ? result.runId : undefined
+    } catch (error) {
+      if (!(error instanceof ActionFailureError)) throw error
+      await this.pool.query('update run_messages set failure=coalesce(failure,$1) where id=$2', [`resume_${error.code}`.slice(0, 100), resume.messageId])
+      return undefined
+    }
   }
   async inbox(actor: MailboxActor) {
     return this.transaction(async client => {

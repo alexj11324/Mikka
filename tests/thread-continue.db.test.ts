@@ -765,10 +765,43 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     assert.match(next.prompt, new RegExp(`\\[From bot ${peerBot}\\]`), 'the peer is named; it never reads as the owner')
     const { rows: shown } = await pool.query('SELECT origin FROM run_messages WHERE "runId"=$1', [woke.runId])
     assert.deepEqual(shown.map(row => row.origin), ['peer'])
-    const { rowCount: ownerTurns } = await pool.query(`SELECT 1 FROM coordinator_events WHERE "userId"=$1 AND kind='user_message' AND payload->>'text' LIKE '%parser API changed%'`, [owner.id])
-    assert.equal(ownerTurns, 0, 'peer text never becomes an owner request')
+    // The host's own dispatch provenance (source host_dispatch, bound to the thread's Bot) is expected;
+    // no owner turn or thread submission may carry the peer's words.
+    const { rows: ownerTurns } = await pool.query(`SELECT "dedupeKey",payload->>'source' AS source FROM coordinator_events WHERE "userId"=$1 AND kind='user_message'
+      AND payload->>'text' LIKE '%parser API changed%' AND (payload->>'source' IS DISTINCT FROM 'host_dispatch' OR "botId" IS NULL)`, [owner.id])
+    assert.deepEqual(ownerTurns, [], 'peer text never becomes an owner request')
     assert.deepEqual(await runInteropTool(asPeer, 'send_to_thread', send), woke, 'a retried tool call never starts a second continuation')
     assert.equal((await readRunChain(pool, owner.id, initial.runId))?.latestRunId, woke.runId)
+  })
+
+  await t.test('a mailbox message from a teammate\'s Bot to an ended run continues that thread (decision 2026-11-19-2200)', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    await pool.query(`UPDATE agent_runs SET status='running',"leaseExpiresAt"=now()+interval '10 minutes' WHERE id=$1`, [initial.runId])
+    const { SessionMailbox } = await import('../lib/session-mailbox')
+    const store = new SessionMailbox(pool, owner.ws.id)
+    const runBox = await store.run(owner.id, initial.runId)
+    await end(initial.runId, 'succeeded')
+    await observeFixtureAllowance(owner)
+    const teammate = await seedUser(pool, 'thread-continue-mail')
+    users.push(teammate)
+    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [owner.ws.id, teammate, `${teammate}@example.invalid`])
+    const peerBot = await seedBot(pool, owner.ws.id, teammate)
+    const sender = await store.conversation(teammate, 'bot', peerBot)
+    const message = { to: runBox.mailboxId, key: randomUUID(), text: 'Schema changed; please regenerate.' }
+    await assert.rejects(store.send(sender, message), /Recipient unavailable/, 'no canSteer, no delivery')
+    await pool.query(`INSERT INTO resource_access_grants ("resourceKind","resourceId","subjectKind","subjectId",capabilities) VALUES ('thread',$1,'bot',$2,'{canSteer}')`, [initial.runId, peerBot])
+    const receipt = await store.send(sender, message)
+    assert.ok(receipt.continuationRunId, JSON.stringify(receipt))
+    const { rows: [next] } = await pool.query('SELECT status,"continuesRunId","userId",prompt FROM agent_runs WHERE id=$1', [receipt.continuationRunId])
+    assert.deepEqual([next.status, next.continuesRunId, next.userId], ['queued', initial.runId, owner.id])
+    assert.match(next.prompt, /Schema changed; please regenerate\./)
+    const { rows: shown } = await pool.query('SELECT origin FROM run_messages WHERE "runId"=$1', [receipt.continuationRunId])
+    assert.deepEqual(shown.map(row => row.origin), ['peer'])
+    const again = await store.send(sender, message)
+    assert.equal(again.duplicate, true)
+    assert.equal(again.continuationRunId, undefined, 'a retried envelope never starts a second continuation')
+    assert.equal((await readRunChain(pool, owner.id, initial.runId))?.latestRunId, receipt.continuationRunId)
   })
 
   await t.test('ordinary text cannot cancel a blocked original-session task or queue a fresh continuation', async () => {

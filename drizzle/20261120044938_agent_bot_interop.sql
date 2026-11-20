@@ -11,13 +11,17 @@
 --    its blobs live in their own storage namespace
 --    `drive-scope:<workspace>:<scope>:<scopeId>`, never a person's.
 -- 3. Personal access tokens gain the interop scopes.
--- 4. A peer's send to a thread keeps one receipt per sender and key, so a
+-- 4. A mailbox envelope may come from another member of the same Workspace;
+--    the recipient mailbox still names the row's owner and both mailboxes
+--    must share its tenant (previously the sender had to be the same person).
+-- 5. A peer's send to a thread keeps one receipt per sender and key, so a
 --    retried tool call never starts a second continuation. It stores a digest
 --    of the request and the delivered run id, never the text.
 -- Rollback: restore the previous CHECK constraints and function body from
 --   20261110150005_resource_acl.sql, 20261116170813_workspace_shared_drive.sql
 --   and 20261111080200_api_tokens.sql after deleting rows that use the new values,
---   then DROP TABLE interop_thread_sends.
+--   then DROP TABLE interop_thread_sends and restore require_run_child_issue_scope
+--   from 20261109035000_task_workspace_ownership.sql.
 
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -110,5 +114,48 @@ CREATE TABLE IF NOT EXISTS interop_thread_sends (
   "createdAt" timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY ("rootRunId","senderKind","senderId",key)
 );
+
+CREATE OR REPLACE FUNCTION require_run_child_issue_scope() RETURNS trigger LANGUAGE plpgsql AS $function$
+DECLARE tenant uuid; run_owner text; mailbox_tenant text; mailbox_owner text; sender_tenant text; sender_owner text;
+BEGIN
+  IF NEW."runId" IS NOT NULL THEN
+    SELECT "workspaceId", "userId" INTO tenant, run_owner FROM agent_runs WHERE id=NEW."runId" FOR SHARE;
+    IF tenant IS NULL THEN RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514'; END IF;
+  ELSIF TG_TABLE_NAME <> 'run_messages' THEN
+    RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514';
+  END IF;
+  -- Conversation envelopes intentionally have no run. Their persisted mailbox
+  -- is their tenant authority; never infer it from the user's oldest workspace.
+  IF TG_TABLE_NAME = 'run_messages' THEN
+    IF run_owner IS NOT NULL AND run_owner <> NEW."userId" THEN
+      RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+    END IF;
+    IF NEW."mailboxId" IS NOT NULL THEN
+      SELECT "workspaceId", "userId" INTO mailbox_tenant, mailbox_owner
+        FROM session_mailboxes WHERE id=NEW."mailboxId" FOR SHARE;
+      IF mailbox_owner IS DISTINCT FROM NEW."userId" OR mailbox_tenant IS NULL
+        OR mailbox_tenant !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+        RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514';
+      END IF;
+      IF tenant IS NOT NULL AND tenant <> mailbox_tenant::uuid THEN
+        RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+      END IF;
+      tenant := mailbox_tenant::uuid;
+    END IF;
+    IF tenant IS NULL THEN RAISE EXCEPTION 'taskWorkspaceUnresolved' USING ERRCODE = '23514'; END IF;
+    IF NEW."senderMailboxId" IS NOT NULL THEN
+      SELECT "workspaceId", "userId" INTO sender_tenant, sender_owner
+        FROM session_mailboxes WHERE id=NEW."senderMailboxId" FOR SHARE;
+      -- A sender may be another member of the same tenant (decision 2026-11-19-2200);
+      -- the application checks membership and canSteer. The tenant stays fixed.
+      IF sender_owner IS NULL OR sender_tenant IS NULL
+        OR lower(sender_tenant) <> tenant::text THEN
+        RAISE EXCEPTION 'taskWorkspaceMismatch' USING ERRCODE = '23514';
+      END IF;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
 
 COMMIT;
