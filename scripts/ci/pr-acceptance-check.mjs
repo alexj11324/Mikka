@@ -31,16 +31,17 @@ export function acceptanceSection(body = '') {
 }
 
 function field(section, name) {
-  const match = section.match(new RegExp(`^\\s*(?:[-*]\\s+)?(?:\\*\\*)?${name}(?:\\*\\*)?\\s*:\\s*(.+)$`, 'im'))
+  const match = section.match(new RegExp(`^[ \\t]*(?:[-*][ \\t]+)?(?:\\*\\*)?${name}(?:\\*\\*)?[ \\t]*:[ \\t]*([^\\n]*)$`, 'im'))
   return match?.[1]?.trim() ?? ''
 }
 
 function hasImage(section) {
   // GitHub uploads usually have no filename extension. Only rendered Markdown
   // images, img tags, or explicit image-file links establish screenshot syntax.
-  return /!\[[^\]]*\]\(\s*https?:\/\/[^\s)]+(?:\s+["'][^"']*["'])?\s*\)/i.test(section) ||
-    /<img\b[^>]*\bsrc\s*=\s*["']https?:\/\/[^"']+["'][^>]*>/i.test(section) ||
-    /\[[^\]]+\]\(https?:\/\/[^\s)]+\.(?:png|jpe?g|webp|gif)(?:\?[^\s)]*)?\)/i.test(section)
+  const visible = section.replace(/^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?^ {0,3}\1[ \t]*$/gm, '')
+  return /!\[[^\]]*\]\(\s*https?:\/\/[^\s)]+(?:\s+["'][^"']*["'])?\s*\)/i.test(visible) ||
+    /<img\b[^>]*\bsrc\s*=\s*["']https?:\/\/[^"']+["'][^>]*>/i.test(visible) ||
+    /https?:\/\/[^\s)<>]+\.(?:png|jpe?g|webp|gif)(?=[\s)<>?]|$)/i.test(visible)
 }
 
 /** Validate declared evidence, not whether that evidence proves the change.
@@ -55,8 +56,8 @@ export function inspectAcceptance({ body, files = [], draft = false } = {}) {
   }
   const section = sections[0]
   const errors = []
-  const notNeeded = section.match(/^\s*(?:[-*]\s+)?Not needed\s*:\s*([^\n]*)/im)
-  const productionOnly = section.match(/^\s*(?:[-*]\s+)?Production only\s*:\s*([^\n]*)/im)
+  const notNeeded = section.match(/^[ \t]*(?:[-*][ \t]+)?Not needed[ \t]*:[ \t]*([^\n]*)/im)
+  const productionOnly = section.match(/^[ \t]*(?:[-*][ \t]+)?Production only[ \t]*:[ \t]*([^\n]*)/im)
   const mode = notNeeded ? 'not-needed' : productionOnly ? 'production-only' : 'evidence'
   if (notNeeded && productionOnly) errors.push('acceptance.conflicting-modes')
   if (!meaningful(section)) errors.push('acceptance.placeholder')
@@ -70,14 +71,15 @@ export function inspectAcceptance({ body, files = [], draft = false } = {}) {
     if (!meaningful(field(section, 'Owner'))) errors.push('acceptance.owner-missing')
     if (!meaningful(field(section, 'Internal account'))) errors.push('acceptance.internal-account-missing')
   } else {
-    if (!/^(?:E2B|device|both|设备|都有)(?:\b|\s|$)/i.test(field(section, 'Runtime'))) errors.push('acceptance.runtime-missing')
-    if (!/^(?:scripted|脚本化)(?:\b|\s|$)/i.test(field(section, 'Model'))) errors.push('acceptance.scripted-model-missing')
+    if (!/^(?:E2B|device|both|设备|都有)(?=$|[\s（(])/i.test(field(section, 'Runtime'))) errors.push('acceptance.runtime-missing')
+    if (!/^(?:scripted|脚本化)(?=$|[\s（(])/i.test(field(section, 'Model'))) errors.push('acceptance.scripted-model-missing')
     if (!/^`?[a-f0-9]{40}`?$/i.test(field(section, 'Commit'))) errors.push('acceptance.commit-missing')
     if (!meaningful(field(section, 'Fixtures?'))) errors.push('acceptance.fixture-missing')
     const evidence = field(section, 'Evidence')
     const items = field(section, 'Items')
     const link = /https?:\/\/[^\s)>]+/i.test(evidence) || hasImage(section)
-    const summary = meaningful(items) && /\b\d+\s*\/\s*\d+\s*(?:pass(?:ed)?|通过)/i.test(items)
+    const counts = items.match(/\b(\d+)\s*\/\s*(\d+)\s*(?:pass(?:ed)?|通过)/i)
+    const summary = meaningful(items) && counts && Number(counts[1]) > 0 && Number(counts[1]) === Number(counts[2])
     if (!link && !summary) errors.push('acceptance.evidence-missing')
   }
   if (mode !== 'not-needed' && uiFiles.length && !hasImage(section)) errors.push('acceptance.screenshot-missing')

@@ -31,6 +31,7 @@ test('UI screenshots belong to Acceptance, with a reasoned exemption available',
   assert(inspectAcceptance({ body: evidence, files }).errors.includes('acceptance.screenshot-missing'))
   assert.equal(inspectAcceptance({ body: `${evidence}\n${screenshot}`, files }).status, 'pass')
   assert(inspectAcceptance({ body: `${evidence}\n## Other\n${screenshot}`, files }).errors.includes('acceptance.screenshot-missing'))
+  assert(inspectAcceptance({ body: `${evidence}\n\`\`\`md\n${screenshot}\n\`\`\``, files }).errors.includes('acceptance.screenshot-missing'))
   assert.equal(inspectAcceptance({ body: '## Acceptance\nNot needed: pure prop type refactor covered by task-row tests.', files }).status, 'pass')
 })
 
@@ -43,6 +44,7 @@ test('Not needed requires a concrete reason', async t => {
   for (const reason of ['', 'TBD', '<reason>', '...']) await t.test(reason || 'empty', () => {
     assert(inspectAcceptance({ body: `## Acceptance\nNot needed: ${reason}` }).errors.includes('acceptance.reason-missing'))
   })
+  assert(inspectAcceptance({ body: '## Acceptance\nNot needed:\nOwner: someone' }).errors.includes('acceptance.reason-missing'))
 })
 
 test('Production only requires an external limitation, owner and internal account alias', () => {
@@ -69,6 +71,9 @@ test('evidence must identify runtime, scripted model, fixture and tested revisio
     ['Fixtures: tool-then-text.jsonl', 'acceptance.fixture-missing'],
     ['Items: 1, 2, 5 — 3/3 passed', 'acceptance.evidence-missing'],
   ]) assert(inspectAcceptance({ body: evidence.replace(line, '') }).errors.includes(error))
+  for (const count of ['0/0 passed', '2/3 passed']) {
+    assert(inspectAcceptance({ body: evidence.replace('3/3 passed', count) }).errors.includes('acceptance.evidence-missing'))
+  }
 })
 
 test('section parsing retains report fences and nested headings', () => {
