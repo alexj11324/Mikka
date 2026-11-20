@@ -1,6 +1,7 @@
 // Personal interface preferences stored on user_preferences.uiPreferences.
 // Client-safe: the settings page, the composer and the icon rail all read it.
 
+import { useSyncExternalStore } from 'react'
 import { z } from 'zod'
 
 export const RAIL_PAGE_IDS = ['chats', 'pulls', 'automations', 'suggestions', 'board', 'plugins', 'artifacts'] as const
@@ -164,6 +165,11 @@ export function currentUiPreferences() {
 export function subscribeUiPreferences(listener: () => void) {
   listeners.add(listener)
   return () => { listeners.delete(listener) }
+}
+
+/** The last published preferences. The server snapshot is the default, so the first paint is not an empty list. */
+export function useUiPreferenceSnapshot() {
+  return useSyncExternalStore(subscribeUiPreferences, currentUiPreferences, () => DEFAULT_UI)
 }
 
 function paintToken(root: HTMLElement, name: string, value: string | null) {

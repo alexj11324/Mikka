@@ -1,10 +1,10 @@
 'use client'
 
-import { useLayoutEffect, useSyncExternalStore } from 'react'
+import { useLayoutEffect } from 'react'
 import useSWR from 'swr'
 import { useTheme } from 'next-themes'
 import { updatePreferences } from '@/app/actions/preferences'
-import { DEFAULT_UI, currentUiPreferences, publishUiPreferences, subscribeUiPreferences, type UiPreferences, type UiPreferencesPatch } from '@/lib/ui-preferences'
+import { DEFAULT_UI, publishUiPreferences, type UiPreferences, type UiPreferencesPatch } from '@/lib/ui-preferences'
 import { settingsRead } from '@/lib/settings-read'
 import { ReadResponseError } from '@/lib/swr/retry'
 import { settingsKeys } from '@/lib/swr/keys'
@@ -31,9 +31,4 @@ export function useUiPreferences() {
   }
   const denied = read.error instanceof ReadResponseError && read.error.status === 403
   return { ui, loading: read.isLoading && !read.data, failed: Boolean(read.error || read.data?.error) && !denied, denied, reload: () => { void read.mutate() }, save }
-}
-
-/** The last published preferences. Changes re-render; the server snapshot is the default so the first paint is not an empty list. */
-export function useUiPreferenceSnapshot() {
-  return useSyncExternalStore(subscribeUiPreferences, currentUiPreferences, () => DEFAULT_UI)
 }

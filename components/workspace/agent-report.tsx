@@ -1,6 +1,6 @@
 'use client'
 
-import { useUiPreferenceSnapshot } from '@/hooks/settings/use-ui-preferences'
+import { useUiPreferenceSnapshot } from '@/lib/ui-preferences'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
 import { useMemo, type ReactNode } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
