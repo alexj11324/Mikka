@@ -74,6 +74,22 @@ test('the actual metadata script permits only an API-confirmed immutable main re
   const manual = executeMetadata(t, fixture => { fixture.event.workflow_run.event = 'workflow_dispatch'; fixture.run.event = 'workflow_dispatch' })
   assert.equal(manual.status, 0, manual.stderr)
 })
+test('Cloudflare-triggered runtime metadata retains all pre-checkout identity checks', t => {
+  const automatic = mutate => executeMetadata(t, fixture => {
+    fixture.event.workflow_run.event = 'workflow_run'; fixture.run.event = 'workflow_run'
+    mutate?.(fixture)
+  })
+  const result = automatic()
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.output, `source-sha=${SHA}\nupstream-run-id=123\nupstream-run-attempt=2\n`)
+  for (const mutate of [fixture => { fixture.event.workflow_run.head_repository.full_name = 'fork/Mikka' },
+    fixture => { fixture.workflow.path = '.github/workflows/other.yml' }, fixture => { fixture.run.event = 'push' },
+    fixture => { fixture.run.run_attempt++ }, fixture => { fixture.main.object.sha = OTHER }]) {
+    const refused = automatic(mutate)
+    assert.equal(refused.status, 1); assert.equal(refused.output, '')
+    assert.equal(refused.stderr.trim(), 'thread_lifecycle_source_refused')
+  }
+})
 
 const metadataRefusals = {
   'fork receiver': fixture => { fixture.environment.GITHUB_REPOSITORY = 'fork/Mikka' },
@@ -154,7 +170,7 @@ test('skipped, incomplete, stale-attempt or unsuccessful release jobs cannot aut
   }
 })
 
-function apiFixture({ rerun = false, mainMoved = false } = {}) {
+function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event, validated = true } = {}) {
   let runs = 0, refs = 0
   const calls = []
   const fetchImpl = async (input, options) => {
@@ -165,9 +181,9 @@ function apiFixture({ rerun = false, mainMoved = false } = {}) {
     const route = url.pathname.slice(('/repos/' + REPOSITORY).length) + url.search
     calls.push(route)
     if (route === '/actions/workflows/e2b-official-runtime.yml') return Response.json(workflow)
-    if (route === '/actions/runs/123') return Response.json({ ...run, run_attempt: rerun && ++runs > 1 ? 3 : 2 })
+    if (route === '/actions/runs/123') return Response.json({ ...run, event: releaseEvent, run_attempt: rerun && ++runs > 1 ? 3 : 2 })
     if (route === '/git/ref/heads/main') return Response.json({ object: { type: 'commit', sha: mainMoved && ++refs > 1 ? OTHER : SHA } })
-    if (route === '/actions/runs/123/attempts/2/jobs?per_page=100') return Response.json(jobs())
+    if (route === '/actions/runs/123/attempts/2/jobs?per_page=100') return Response.json(jobs(validated))
     assert.fail('Unexpected endpoint; upstream artifacts are never read')
   }
   return { fetchImpl, calls }
@@ -183,6 +199,24 @@ test('the credential guard rechecks main and the attempt after exact-attempt job
   assert.ok(!f.calls.some(path => path.includes('artifact')))
   for (const change of [{ rerun: true }, { mainMoved: true }])
     await assert.rejects(verifyRelease({ env: env(), event: event(), files: relevant, ...apiFixture(change) }))
+})
+
+test('the shared guard verifies an automatic release and still rejects reruns and moving main', async () => {
+  const trigger = event(); trigger.workflow_run.event = 'workflow_run'
+  const fixture = apiFixture({ releaseEvent: 'workflow_run' })
+  const proof = await verifyRelease({ env: env(), event: trigger, files: relevant, ...fixture })
+  assert.equal(proof.selected, true)
+  assert.equal(proof.runtime, 'validated_and_published')
+  assert.equal(proof.sourceCommit, SHA)
+  assert.equal(fixture.calls.filter(path => path === '/actions/runs/123').length, 2)
+  assert.equal(fixture.calls.filter(path => path === '/git/ref/heads/main').length, 2)
+  for (const change of [{ rerun: true }, { mainMoved: true }, { releaseEvent: 'push' }])
+    await assert.rejects(verifyRelease({ env: env(), event: trigger, files: relevant,
+      ...apiFixture({ releaseEvent: 'workflow_run', ...change }) }))
+  const skipped = await verifyRelease({ env: env(), event: trigger, files: ['README.md'],
+    ...apiFixture({ releaseEvent: 'workflow_run', validated: false }) })
+  assert.equal(skipped.selected, false)
+  assert.equal(skipped.runtime, 'unchanged_worker')
 })
 
 test('provider work requires this runner own same-source Web and upstream attestation', () => {

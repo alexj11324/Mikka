@@ -152,6 +152,16 @@ dispatch of **E2B additive runtime release** on current main with `reason` and
 any template builder starts. Every gate rechecks the receipt against the live
 gateway and current main.
 
+The Coding Workspace, Task VM and Task Secret consumers accept this official
+producer's `workflow_run` event alongside its retained push/manual events. The
+event is only a pointer: their pre-checkout and shared guards confirm the fixed
+workflow identity, repository, exact main source and latest attempt through the
+GitHub API. Existing source selection, publication evidence and pre-credential
+checks still apply. A successful run with skipped publication does not prove a
+validated and published runtime. The finite Factory visual-evidence window
+below keeps its separate selection rules. The source-bound counterexample and
+retained refusal cases are recorded in the [#2984 evidence](../../docs/ci/2984-runtime-consumers.json).
+
 To retry after an external service recovers, dispatch the same way; the Actions
 dispatch event records the reason. Manual dispatch always runs validation, even for a matching worker. Changed
 runtime inputs produce a new fingerprint. Missing or expired failure artifacts
