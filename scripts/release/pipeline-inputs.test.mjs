@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import test from 'node:test'
-import { artifactFor, baselineOrigin, checkedRun, readArtifactMembers, selectAutomaticCandidate } from './pipeline-inputs.mjs'
+import { artifactFor, baselineOrigin, checkedRun, priorDeployment, readArtifactMembers, selectAutomaticCandidate } from './pipeline-inputs.mjs'
 
 const source = 'a'.repeat(40)
 const repo = { id: 1427517699, full_name: 'alexj11324/Mikka', fork: false, private: false }
@@ -59,6 +59,41 @@ test('artifact selection requires the original attempt, complete provenance, imm
     assert.throws(() => artifactFor(original, [{ ...artifact, ...changes }], 'release-manifest'))
   }
   assert.throws(() => artifactFor(original, [artifact, artifact], 'release-manifest'))
+})
+
+test('a rerun that fails before its writer cannot hide an earlier partial deployment, including its own prior attempt', async () => {
+  const original = { ...run(), path: '.github/workflows/cloudflare-app-deploy.yml', event: 'workflow_run',
+    conclusion: 'failure', run_attempt: 1 }
+  const latest = { ...original, run_attempt: 2 }
+  const summary = { version: 1, target: 'staging', status: 'failed',
+    deployment: { runId: '101', runAttempt: '1' }, origin: { runId: '100', runAttempt: '1', artifactId: '299' } }
+  const bytes = execFileSync('python3', ['-c',
+    'import io,sys,zipfile\nb=io.BytesIO()\nwith zipfile.ZipFile(b,"w") as z: z.writestr("pipeline-summary.json",sys.argv[1])\nsys.stdout.buffer.write(b.getvalue())', JSON.stringify(summary)])
+  const artifact = { id: 301, name: 'deploy-pipeline-101-1', expired: false, size_in_bytes: bytes.length,
+    digest: 'sha256:' + createHash('sha256').update(bytes).digest('hex'),
+    workflow_run: { id: 101, head_sha: source, head_branch: 'main', repository_id: repo.id, head_repository_id: repo.id } }
+  for (const currentRun of ['200', '101']) {
+    const calls = []
+    const api = async path => {
+      calls.push(path)
+      if (path.includes('actions/workflows/')) return { total_count: 1,
+        workflow_runs: [{ ...latest, ...(currentRun === '101' ? { status: 'in_progress', conclusion: null } : {}) }] }
+      if (path.endsWith('/attempts/1')) return original
+      if (path.includes('/attempts/2/jobs?')) return { total_count: 1, jobs: [{ id: 402, name: 'pipeline',
+        status: 'completed', conclusion: 'failure', steps: [{ name: 'Deploy and verify staged service manifest', conclusion: 'skipped' }] }] }
+      if (path.includes('/attempts/1/jobs?')) return { total_count: 1, jobs: [{ id: 401, name: 'pipeline',
+        status: 'completed', conclusion: 'failure', steps: [{ name: 'Deploy and verify staged service manifest', conclusion: 'failure' }] }] }
+      if (path.includes('/runs/101/artifacts?')) return { total_count: 1, artifacts: [artifact] }
+      if (path.endsWith('/artifacts/301/zip')) return bytes
+      if (path.endsWith('/jobs/401/logs')) return Buffer.from('Artifact deploy-pipeline-101-1.zip successfully finalized.\nArtifact ID 301')
+      assert.fail('Unexpected metadata request: ' + path)
+    }
+    const prior = await priorDeployment(api, currentRun)
+    assert.equal(prior.run.run_attempt, 1)
+    assert.deepEqual(prior.summary, summary)
+    assert.throws(() => baselineOrigin(prior.summary), /requires_recovery/)
+    assert.equal(calls.some(path => path.includes('/attempts/2/jobs?')), currentRun !== '101')
+  }
 })
 
 test('archive bytes are authenticated and traversal, duplicate members and unexpected private files are rejected', () => {

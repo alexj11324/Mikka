@@ -48,6 +48,14 @@ still serving. `pipeline-stage` supports an emergency replay of a successful
 main producer. Existing reviewed manual phases remain available for the release
 already in progress during migration to this workflow.
 
+The manual `pipeline-stage` phase has a `staging_failure_drill=route-404`
+acceptance option, disabled by default. It sends one anonymous registration
+probe to a fixed missing path through the same staging API binding. The original
+route inventory and verification assertions remain unchanged, so the actual
+404 fails the release. This option is rejected for automatic runs, rollback and
+production. Its failed run must leave a failure record and require recovery;
+it never counts toward the three successful automatic staging releases.
+
 Public evidence uses `deploy-pipeline-<runId>-<attempt>` with
 `pipeline-summary.json`, `release-manifest.json` and, when present,
 `previous-manifest.json`. Full provider receipts stay private. The record job

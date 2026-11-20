@@ -49,4 +49,39 @@ test('public records cannot receive the private rollback receipt or runtime cred
   assert.deepEqual(record.permissions, { contents: 'read', actions: 'read', deployments: 'write', issues: 'write' })
   assert.equal(record.needs, 'pipeline')
   assert.doesNotMatch(JSON.stringify(record), /Infisical|HOSTED_UI|CLOUDFLARE_API_TOKEN|source-token|id-token|private\.json/)
+  for (const [jobName, target, path] of [['pipeline-record', 'staging', 'pipeline-report'], ['pipeline-production-record', 'production', 'production-report']]) {
+    const steps = workflow.jobs[jobName].steps
+    const download = steps.find(step => step.uses?.startsWith('actions/download-artifact@'))
+    assert.ok(download.with['artifact-ids'])
+    assert.equal(download.with['merge-multiple'], true, 'Artifact IDs must extract the summary at the record reader root')
+    assert.equal(download.with.path, path)
+    const write = steps.find(step => step.run === 'node scripts/release/pipeline-record.mjs')
+    assert.equal(write.env.PIPELINE_TARGET, target)
+    assert.match(write.env.PIPELINE_SOURCE, /\|\| github\.sha/, 'Manual selection failures need an authentic main source')
+    assert.equal(write.env.PIPELINE_REPORT_DIRECTORY ?? 'pipeline-report', path)
+  }
+})
+
+test('production waits for verified staging records and its separately reviewed policy', () => {
+  const job = workflow.jobs['pipeline-production']
+  assert.deepEqual(job.needs, ['pipeline', 'pipeline-record'])
+  for (const guard of ["github.event_name == 'workflow_run'", "needs.pipeline.result == 'success'",
+    "needs.pipeline-record.result == 'success'", "needs.pipeline.outputs.production-enabled == 'true'"]) assert.ok(job.if.includes(guard))
+  assert.equal(job.environment, 'cloudflare-runtime-release')
+  assert.equal(job.env.MIKKA_DEPLOYMENT_PHASE, 'pipeline-promote')
+  assert.equal(job.steps.find(step => step.id === 'select').run, 'node scripts/release/pipeline-inputs.mjs promote')
+  const upload = job.steps.find(step => step.name === 'Upload production receipts')
+  assert.equal(upload.with.name, 'deploy-production-${{ github.run_id }}-${{ github.run_attempt }}')
+  assert.ok(upload.with.path.trim().split('\n').every(path => path.startsWith('${{ runner.temp }}/deploy-production/')))
+  assert.doesNotMatch(JSON.stringify(workflow.jobs['pipeline-production-record']), /Infisical|HOSTED_UI|CLOUDFLARE_API_TOKEN|source-token|id-token|private\.json/)
+})
+
+test('failure exercise is an explicit manual staging input and never a production input', () => {
+  assert.deepEqual(workflow.on.workflow_dispatch.inputs.staging_failure_drill, {
+    description: 'Staging-only acceptance exercise that must fail the real route registration probe',
+    type: 'choice', options: ['none', 'route-404'], default: 'none', required: false,
+  })
+  assert.match(workflow.jobs.pipeline.env.MIKKA_STAGING_FAILURE_DRILL, /github.event_name == 'workflow_dispatch'/)
+  assert.equal(workflow.jobs['pipeline-production'].env.MIKKA_STAGING_FAILURE_DRILL, undefined)
+  assert.equal(workflow.jobs['deploy-application'].env.MIKKA_STAGING_FAILURE_DRILL, undefined)
 })

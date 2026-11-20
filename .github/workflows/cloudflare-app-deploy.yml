@@ -40,6 +40,12 @@ on:
         description: Previous deployment pipeline run to roll back in staging
         type: string
         required: false
+      staging_failure_drill:
+        description: Staging-only acceptance exercise that must fail the real route registration probe
+        type: choice
+        options: [none, route-404]
+        default: none
+        required: false
 concurrency:
   group: cloudflare-application-deployment
   queue: max
@@ -222,6 +228,7 @@ jobs:
       production-enabled: ${{ steps.policy.outputs.enabled }}
     env:
       MIKKA_DEPLOYMENT_PHASE: ${{ github.event_name == 'workflow_run' && 'pipeline-stage' || inputs.phase }}
+      MIKKA_STAGING_FAILURE_DRILL: ${{ github.event_name == 'workflow_dispatch' && inputs.staging_failure_drill == 'route-404' && 'route-404' || '' }}
       MIKKA_CF_STAGING_OPERATOR: public-github-actions
       CLOUDFLARE_ACCOUNT_ID: d8f6630c7869111a5139bc5ed4d24ace
     steps:
@@ -404,11 +411,13 @@ jobs:
         with:
           artifact-ids: ${{ needs.pipeline.outputs.artifact }}
           path: pipeline-report
+          merge-multiple: true
       - name: Record deployment outcome and failure issue
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PIPELINE_JOB_RESULT: ${{ needs.pipeline.result }}
-          PIPELINE_SOURCE: ${{ needs.pipeline.outputs.source || github.event.workflow_run.head_sha }}
+          PIPELINE_TARGET: staging
+          PIPELINE_SOURCE: ${{ needs.pipeline.outputs.source || github.event.workflow_run.head_sha || github.sha }}
         run: node scripts/release/pipeline-record.mjs
 
   pipeline-production:
@@ -597,10 +606,12 @@ jobs:
         with:
           artifact-ids: ${{ needs.pipeline-production.outputs.artifact }}
           path: production-report
+          merge-multiple: true
       - name: Record deployment outcome and failure issue
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PIPELINE_REPORT_DIRECTORY: production-report
           PIPELINE_JOB_RESULT: ${{ needs.pipeline-production.result }}
-          PIPELINE_SOURCE: ${{ needs.pipeline-production.outputs.source || github.event.workflow_run.head_sha }}
+          PIPELINE_TARGET: production
+          PIPELINE_SOURCE: ${{ needs.pipeline-production.outputs.source || github.event.workflow_run.head_sha || github.sha }}
         run: node scripts/release/pipeline-record.mjs

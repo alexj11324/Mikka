@@ -143,33 +143,43 @@ async function release(api, runId, runAttempt) {
   return { run, manifest, origin: { runId: String(run.id), runAttempt: String(run.run_attempt), artifactId: String(packet.artifact.id) } }
 }
 
-async function priorDeployment(api, currentRun, selectedRun, target = 'staging') {
+export async function priorDeployment(api, currentRun, selectedRun, target = 'staging') {
   const runs = selectedRun ? [await api(`${repository}/actions/runs/${selectedRun}`)]
     : await pages(api, 'actions/workflows/cloudflare-app-deploy.yml/runs?branch=main', 'workflow_runs')
-  for (const run of runs) {
-    if (String(run.id) === String(currentRun) || run.status !== 'completed') continue
-    checkedRun(run, deployment, { successful: false })
-    assert.ok(['workflow_run', 'workflow_dispatch'].includes(run.event))
-    const jobs = await pages(api, `actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`, 'jobs')
-    const jobName = target === 'production' ? 'pipeline-production' : 'pipeline'
-    const job = jobs.find(job => job.name === jobName)
-    if (!job || job.conclusion === 'skipped') continue
-    assert.equal(job.status, 'completed')
-    const applied = job.steps?.find(step => step.name === (target === 'production'
-      ? 'Promote and verify the staged service manifest' : 'Deploy and verify staged service manifest'))
-    // A failed checkout/selection never acquired a deployment writer. Do not
-    // confuse it with a partially applied release that requires rollback.
-    if (!applied || applied.conclusion === 'skipped') continue
-    const packet = await members(api, run, target === 'production' ? 'deploy-production' : 'deploy-pipeline')
-    const summary = packet.files['pipeline-summary.json']
-    assert.equal(summary?.deployment?.runId, String(run.id))
-    assert.equal(summary.deployment.runAttempt, String(run.run_attempt))
-    const log = (await api(`${repository}/actions/jobs/${job.id}/logs`, { bytes: true })).toString('utf8')
-    // Private deployment independently validates all manifests. This also
-    // rejects an artifact name supplied by a different job in the same run.
-    assert.ok(log.includes(`Artifact ${packet.artifact.name}.zip successfully finalized.`)
-      && log.includes(`Artifact ID ${packet.artifact.id}`), 'pipeline_summary_upload_evidence_required')
-    return { run, summary, files: packet.files }
+  for (const latest of runs) {
+    const isCurrent = String(latest.id) === String(currentRun)
+    if (!isCurrent && latest.status !== 'completed') continue
+    assert.ok(Number.isSafeInteger(latest.run_attempt) && latest.run_attempt > 0)
+    // Re-running only failed jobs does not erase an earlier writer. Search
+    // every earlier completed attempt, including this run's previous attempt.
+    // A fresh selection failure must never hide a partial deployment.
+    for (let attempt = latest.run_attempt - Number(isCurrent); attempt >= 1; attempt--) {
+      const run = attempt === latest.run_attempt ? latest
+        : await api(`${repository}/actions/runs/${latest.id}/attempts/${attempt}`)
+      checkedRun(run, deployment, { successful: false })
+      assert.equal(run.run_attempt, attempt)
+      assert.ok(['workflow_run', 'workflow_dispatch'].includes(run.event))
+      const jobs = await pages(api, `actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`, 'jobs')
+      const jobName = target === 'production' ? 'pipeline-production' : 'pipeline'
+      const job = jobs.find(job => job.name === jobName)
+      if (!job || job.conclusion === 'skipped') continue
+      assert.equal(job.status, 'completed')
+      const applied = job.steps?.find(step => step.name === (target === 'production'
+        ? 'Promote and verify the staged service manifest' : 'Deploy and verify staged service manifest'))
+      // A failed checkout/selection never acquired a deployment writer. Do not
+      // confuse it with a partially applied release that requires rollback.
+      if (!applied || applied.conclusion === 'skipped') continue
+      const packet = await members(api, run, target === 'production' ? 'deploy-production' : 'deploy-pipeline')
+      const summary = packet.files['pipeline-summary.json']
+      assert.equal(summary?.deployment?.runId, String(run.id))
+      assert.equal(summary.deployment.runAttempt, String(run.run_attempt))
+      const log = (await api(`${repository}/actions/jobs/${job.id}/logs`, { bytes: true })).toString('utf8')
+      // Private deployment independently validates all manifests. This also
+      // rejects an artifact name supplied by a different job in the same run.
+      assert.ok(log.includes(`Artifact ${packet.artifact.name}.zip successfully finalized.`)
+        && log.includes(`Artifact ID ${packet.artifact.id}`), 'pipeline_summary_upload_evidence_required')
+      return { run, summary, files: packet.files }
+    }
   }
   assert.ok(!selectedRun, 'pipeline_requested_release_missing')
   return null

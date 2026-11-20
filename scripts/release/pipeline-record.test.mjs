@@ -38,6 +38,25 @@ test('a successful job cannot turn a failed or missing verification receipt into
   assert.equal(publicSummary(restored, { result: 'success' }).status, 'passed')
 })
 
+test('early selection failures retain the requested target and receipts cannot cross sources or environments', () => {
+  const source = 'a'.repeat(40)
+  const failed = publicSummary(null, { source, result: 'failure', target: 'production' })
+  assert.equal(failed.sourceCommit, source)
+  assert.equal(failed.target, 'production')
+  assert.equal(failed.failedStep, 'selection')
+  assert.equal(failed.status, 'failed')
+  assert.throws(() => publicSummary(receipt(), { source: 'b'.repeat(40), result: 'failure' }), /source_mismatch/)
+  assert.throws(() => publicSummary(receipt(), { source, result: 'failure', target: 'production' }), /target_mismatch/)
+  assert.throws(() => publicSummary(null, { source, result: 'failure', target: 'unknown' }), /target_required/)
+  const drill = receipt()
+  drill.verification.failureDrill = { kind: 'route-404', status: 404, address: 'private.example' }
+  assert.deepEqual(publicSummary(drill, { source, result: 'failure' }).verification.failureDrill, { kind: 'route-404', status: 404 })
+  const invalid = structuredClone(drill)
+  invalid.verification.failureDrill.kind = 'private.example'
+  assert.throws(() => publicSummary(invalid, { source, result: 'failure' }))
+  assert.throws(() => publicSummary({ ...drill, target: 'production' }, { source, result: 'failure', target: 'production' }))
+})
+
 test('the completed result creates a deployment record and opens or updates one failure issue', async () => {
   for (const existing of [false, true]) {
     const calls = []
