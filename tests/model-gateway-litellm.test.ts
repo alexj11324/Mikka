@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { converterCompatibilityRequest } from '../cloudflare/litellm/request.mjs'
 import test from 'node:test'
 import { handleModelGateway, type GatewayDependencies } from '../lib/model-gateway/handler'
 import type { GatewayGrant } from '../lib/model-gateway/token'
@@ -81,3 +82,15 @@ for (const model of ['mikka-title', 'neon/gpt-5-mini']) {
     assert.ok(response.headers.get('x-litellm-call-id'))
   })
 }
+
+test('the serving API keeps BYOK working while the shared converter is upgraded', { skip }, async () => {
+  const request = new Request(url + '/v1/messages', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + masterKey, 'content-type': 'application/json', 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model: 'zai/glm-5', api_base: provider, api_key: 'sk-person-key', max_tokens: 50,
+      stream: true, messages: [{ role: 'user', content: 'hi' }] }),
+  })
+  const response = await fetch(await converterCompatibilityRequest(request))
+  assert.equal(response.status, 200)
+  assert.match(await response.text(), /message_delta/)
+})

@@ -358,3 +358,19 @@ test('the API binds the LiteLLM service only when a release names one, and the s
     assert.equal(converterRequest(new Request('https://anything.example' + path, { method, body: method === 'POST' ? '{}' : undefined })), null)
   }
 })
+
+test('the shared converter reshapes only the currently serving API’s legacy BYOK request', async () => {
+  const { converterCompatibilityRequest } = await import('../../../cloudflare/litellm/request.mjs')
+  const url = 'http://litellm/v1/responses'
+  const payload = { model: 'openai/provider/nested', api_key: 'person-fixture', api_base: 'https://provider.example/v1', input: 'hi' }
+  const request = (headers, body = payload) => new Request(url, {
+    method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body),
+  })
+  const legacy = await converterCompatibilityRequest(request({ authorization: 'Bearer master', 'content-length': '50' }))
+  assert.deepEqual(await legacy.json(), { ...payload, model: 'openai/chat_completions/openai/provider/nested' })
+  assert.equal(legacy.headers.get('content-length'), null)
+  const modern = request({ 'x-litellm-api-key': 'Bearer master' }, { ...payload, model: 'openai/provider/nested' })
+  assert.equal(await converterCompatibilityRequest(modern), modern)
+  const noCredential = request({ authorization: 'Bearer master' }, { model: 'mikka-decision' })
+  assert.equal(await converterCompatibilityRequest(noCredential), noCredential)
+})

@@ -2,7 +2,7 @@
 import { WorkerEntrypoint } from 'cloudflare:workers'
 import { Container, getContainer } from '@cloudflare/containers'
 export { ContainerProxy } from '@cloudflare/containers'
-import { converterRequest } from './request.mjs'
+import { converterCompatibilityRequest, converterRequest } from './request.mjs'
 
 export class LiteLlm extends Container {
   defaultPort = 4000
@@ -24,10 +24,10 @@ export class LiteLlm extends Container {
 }
 
 export default class LiteLlmService extends WorkerEntrypoint {
-  fetch(request) {
+  async fetch(request) {
     const forwarded = converterRequest(request)
     if (!forwarded) return new Response(null, { status: 404, headers: { 'cache-control': 'no-store' } })
     // One shared instance: every request is independent.
-    return getContainer(this.env.LITELLM_CONTAINER, 'shared').fetch(forwarded)
+    return getContainer(this.env.LITELLM_CONTAINER, 'shared').fetch(await converterCompatibilityRequest(forwarded))
   }
 }

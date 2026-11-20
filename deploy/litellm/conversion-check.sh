@@ -37,5 +37,5 @@ output=$(NODE_OPTIONS=--test-reporter=tap MIKKA_LITELLM_TEST_URL=http://127.0.0.
 }
 printf '%s\n' "$output" | grep -E '^ok |^# (pass|fail|skipped)'
 # Require all protocol and upstream cases; a skipped test is not a proof.
-printf '%s\n' "$output" | grep -qx '# pass 6' && printf '%s\n' "$output" | grep -qx '# skipped 0'
+printf '%s\n' "$output" | grep -qx '# pass 7' && printf '%s\n' "$output" | grep -qx '# skipped 0'
 echo "LiteLLM conversion proof passed"
