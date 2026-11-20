@@ -49,16 +49,22 @@ API ↔ Eve ↔ Task ↔ World 的请求和响应同样先接受新旧形态。�
 公开代码中的私有 service binding、签名和租户校验继续使用原有实现，
 兼容版本不扩大权限。
 
-Web 和 API 可以使用不同的源码 SHA。`prepareRelease` 分别固定 Web 的
-`sourceSha` / `overlaySha` 和 API 的 `apiSourceSha` / `apiOverlaySha`，旧输入
-默认两者同源。Web 的 `/api/version` 先严格核实后台实际返回的 API pins，
-再以 `build` / `overlaySha` 表示当前 Web 制品，以新增 `apiBuild` /
-`apiOverlaySha` 保留已核实的真实后台来源。现有网页刷新器比较 Web build，
-不会因只换 API 而反复要求刷新；发布探测必须分别核实两对 pins。接入期
-接受旧 API 的五个版本字段，或新增兼容代际的完整字段对；额外未知字段和
-错误的后台 pins 仍拒绝。旧 Web 对版本文档使用严格五字段校验，因此本次
-含新字段的 API 只能和支持新文档的 Web release 绑定，保留的旧 Web/API
-release pair 继续原样服务其已固定的请求。
+Web 和 API 可以使用不同的源码 SHA。`prepareRelease` 只固定 Web 制品的
+`sourceSha` / `overlaySha`，API 的服务身份继续由受控 Service Binding
+限定。该 API 可以原地更新，因此 Web 的 `/api/version` 每次从该 binding
+读取后台版本，不缓存 API 源码或把它固定在 Web 环境变量中。它严格校验
+公开字段、40 位源码 SHA 和协议代际，以 `build` / `overlaySha` 表示 Web
+制品，以新增 `apiBuild` / `apiOverlaySha` 报告后台实际来源。现有网页
+刷新器比较 Web build，不会因只换 API 而反复要求刷新。私有发布器用已
+认证的 manifest 和部署后读回，分别核对真实 Web/API 的精确 SHA、digest
+及绑定身份；不能仅凭版本端点返回合法 SHA 就宣称发布了正确代码。
+
+已发布的旧 Web 严格要求版本文档只有五个字段。原始 API 只在请求携带
+`x-mikka-api-version` 且 reader 版本至少为 1 时增加 `apiVersion` /
+`minApiVersion`，无 header 仍返回原五字段。新 Web 发送自己的编译协议
+header，不转发来访者的 Cookie、Authorization 或版本声明；接入期同时
+接受旧五字段和新的完整字段对，未知字段、非法 SHA 和不完整代际仍拒绝。
+这使旧 Web → 新 API、新 Web → 旧 API 和 API 独立更新/回退都保留可读性。
 
 首个固定契约是 Node 调用方 → World Worker 的运行事件和读取 RPC。
 `packages/eve-cloudflare-world/test/node-world.test.mjs` 使用上一成功 serving

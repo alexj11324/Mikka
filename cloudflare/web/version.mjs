@@ -1,11 +1,11 @@
-// A service binding belongs to one immutable API release, which can differ
-// from the Web assets' source. Validate both pins and retain only public
-// values; never retain a Response or request-scoped I/O.
+// The reviewed service binding owns the API identity. Its code can update in
+// place independently of these Web assets, so read its public version afresh.
 import { versionPath } from './route-path.mjs'
+import { HOSTED_API_HEADERS } from '../../packages/protocol/src/version.ts'
 
-const versions = new WeakMap()
 const fields = ['build', 'overlaySha', 'minMobileBuild', 'mobileUpdateUrl', 'minDesktopVersion']
 const compatibilityFields = ['apiVersion', 'minApiVersion']
+const sha = /^[a-f0-9]{40}$/
 const headers = { 'cache-control': 'no-store, max-age=0', 'content-type': 'application/json' }
 
 export async function publicVersion(request, env, ctx) {
@@ -13,14 +13,6 @@ export async function publicVersion(request, env, ctx) {
   const failure = (error, status = 503) => new Response(head ? null : JSON.stringify({ error }), {
     status, headers: { ...headers, 'cache-control': 'no-store' },
   })
-  const saved = versions.get(env.API)
-  // Older release inputs used the same immutable pair for Web and API.
-  const apiBuild = env.API_RELEASE_SHA ?? env.RELEASE_SHA
-  const apiOverlaySha = env.API_OVERLAY_SHA ?? env.OVERLAY_SHA
-  if (saved && saved.build === env.RELEASE_SHA && saved.overlaySha === env.OVERLAY_SHA
-    && saved.apiBuild === apiBuild && saved.apiOverlaySha === apiOverlaySha) {
-    return new Response(head ? null : saved.json, { headers })
-  }
   // This pre-login route never needs client authority. Read the exact private
   // backend even for HEAD, so no client cookies or request headers enter state.
   const url = new URL(versionPath, request.url)
@@ -28,7 +20,7 @@ export async function publicVersion(request, env, ctx) {
   try {
     // Bound cold discovery to the existing web client's version-read budget.
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(5_000)])
-    const upstream = await env.API.fetch(new Request(url, { redirect: 'manual', signal }))
+    const upstream = await env.API.fetch(new Request(url, { redirect: 'manual', signal, headers: HOSTED_API_HEADERS }))
     if (upstream.status !== 200 || !upstream.headers.get('content-type')?.includes('application/json')) {
       if (upstream.body) {
         const cleanup = upstream.body.cancel().catch(() => {})
@@ -41,8 +33,8 @@ export async function publicVersion(request, env, ctx) {
     if (request.signal.aborted) throw cause
     return failure('deploymentVersionUnavailable')
   }
-  if (!value || value.build !== apiBuild || value.overlaySha !== apiOverlaySha) {
-    return failure('deploymentVersionMismatch')
+  if (!value || ![value.build, value.overlaySha, env.RELEASE_SHA, env.OVERLAY_SHA].every(value => typeof value === 'string' && sha.test(value))) {
+    return failure('deploymentVersionInvalid')
   }
   const hasCompatibility = compatibilityFields.some(key => Object.hasOwn(value, key))
   const allowedFields = hasCompatibility ? [...fields, ...compatibilityFields] : fields
@@ -54,9 +46,9 @@ export async function publicVersion(request, env, ctx) {
     return failure('deploymentVersionInvalid')
   }
   // Existing tabs compare `build` with their compiled Web source. Keep that
-  // contract while exposing the verified backend's distinct source explicitly.
+  // contract and report the binding's current API source separately. The private
+  // publisher checks these actual pins against the authenticated manifest.
   const published = { ...value, build: env.RELEASE_SHA, overlaySha: env.OVERLAY_SHA, apiBuild: value.build, apiOverlaySha: value.overlaySha }
   const json = JSON.stringify(published)
-  versions.set(env.API, { build: published.build, overlaySha: published.overlaySha, apiBuild, apiOverlaySha, json })
   return new Response(head ? null : json, { headers })
 }
