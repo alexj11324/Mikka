@@ -4315,5 +4315,12 @@
     "behavior": "Pure Agent Profile mark glyphs, colours and thread-status-to-ProfileMarkState mapping; no network or credentials.",
     "test": "components/labels/profile-mark.test.tsx",
     "suite": "test:lib-units"
+  },
+  "lib/api-key-models-view.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure projection partitioning an API key’s discovered models into recognized and unrecognized entries with select-all state; no network or credentials.",
+    "test": "lib/api-key-models-view.test.ts",
+    "suite": "test:lib-units"
   }
 }

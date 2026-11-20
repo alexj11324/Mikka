@@ -3312,7 +3312,19 @@
         "fallbacks": "Fallbacks",
         "thinking": "Thinking"
       },
-      "baseUrl": "Base URL"
+      "baseUrl": "Base URL",
+      "modelsDialog": {
+        "title": "Models available for \"{name}\"",
+        "description": "Automatically detects models this key can call when connecting, replacing, or testing it. Checked models appear in the model picker with a key badge.",
+        "allProvider": "All {provider} models",
+        "recognized": "Recognized",
+        "unrecognized": "Not in Mikka catalog · add by id",
+        "addById": "Add model by id for this key",
+        "addByIdBlocked": "Adding arbitrary model IDs directly to a preset key is not yet supported; unlisted models can be added via a custom provider.",
+        "manageButton": "Models",
+        "manageLabel": "Choose models for {name}",
+        "empty": "No models returned by this provider"
+      }
     },
     "modelOrder": {
       "fallbackNeedsKey": "Add an API key and connect a subscription to use this.",
