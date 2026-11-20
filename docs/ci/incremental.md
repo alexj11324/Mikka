@@ -50,6 +50,15 @@ imports in those scanners. The source job still runs the existing whole-reposito
 frontend source tests; this is deliberate retained coverage, not a performance
 claim.
 
+Site search runs the full root typecheck once through its existing `pnpm build`,
+before compiled HTTP acceptance. Its earlier preparation step retains generated
+route verification and lint. The same build/typecheck remains required on a
+standalone dispatch. Both PostgreSQL 17 services, Better Auth, authorization and
+HTTP assertions retain their independent runtime coverage. The separate Source
+checks job still owns unconditional repository-wide static validation; results
+from a different runner image or Node patch are not treated as identical-input
+cache hits. See the [recorded before sample](2984-site-search-checks.json).
+
 ## Trust and database boundaries
 
 CI calls `ci-selection.yml` once, then passes `selected: true` to each selected

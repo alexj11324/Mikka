@@ -1,6 +1,8 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync, existsSync } from 'node:fs'
+import { readFileSync, existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, join, resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { spawnSync } from 'node:child_process'
 import yaml from 'js-yaml'
@@ -180,4 +182,50 @@ test('Eve migration and maintenance check out the Eve publication source and oth
         : phase.startsWith('service-') ? service : application) + '\n')
     }
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+
+test('Site search checks types once through its build and a type failure prevents HTTP acceptance', t => {
+  const job = workflow('site-search').jobs['site-search']
+  const precheck = job.steps.find(step => step.run?.includes('generate-routes.mjs --check'))
+  const build = job.steps.find(step => step.run === 'pnpm build')
+  const http = job.steps.find(step => step.run?.includes('playwright test tests/e2e/site-search.spec.ts'))
+  assert.ok(precheck && build && http, 'route checks, the real build and HTTP acceptance remain selected')
+  assert.notEqual(build['continue-on-error'], true)
+  const directory = mkdtempSync(join(tmpdir(), 'site-search-typechecks-'))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const trace = join(directory, 'calls.jsonl')
+  // Exercise the actual workflow shell and root build command. Only external
+  // package/build tools are recorded here; this is a wiring/failure-boundary
+  // regression, not evidence that a compiler, PostgreSQL or HTTP suite passed.
+  writeFileSync(join(directory, 'pnpm'), `#!${process.execPath}
+const { appendFileSync, readFileSync } = require('node:fs')
+const { spawnSync } = require('node:child_process')
+const args = process.argv.slice(2)
+appendFileSync(process.env.SDLC_TRACE_FILE, JSON.stringify({ tool: 'pnpm', args }) + '\\n')
+if (args[0] === 'build') {
+  const command = JSON.parse(readFileSync(process.env.SDLC_PACKAGE_FILE, 'utf8')).scripts.build
+  const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', command], { stdio: 'inherit', env: process.env })
+  process.exit(result.status ?? 1)
+}
+if (args[0] === 'typecheck' && process.env.SDLC_FAIL_TYPECHECK === '1') process.exit(17)
+`, { mode: 0o755 })
+  writeFileSync(join(directory, 'node'), `#!${process.execPath}
+require('node:fs').appendFileSync(process.env.SDLC_TRACE_FILE,
+  JSON.stringify({ tool: 'node', args: process.argv.slice(2) }) + '\\n')
+`, { mode: 0o755 })
+  for (const failed of [false, true]) {
+    writeFileSync(trace, '')
+    const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', [precheck.run, build.run, http.run].join('\n')], {
+      encoding: 'utf8', env: { PATH: directory + delimiter + process.env.PATH,
+        SDLC_TRACE_FILE: trace, SDLC_PACKAGE_FILE: resolve('package.json'), SDLC_FAIL_TYPECHECK: failed ? '1' : '0' },
+    })
+    const calls = readFileSync(trace, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+    assert.equal(result.status, failed ? 17 : 0, result.stderr)
+    assert.equal(calls.filter(call => call.tool === 'pnpm' && call.args[0] === 'typecheck').length, 1,
+      'the existing build owns the complete typecheck')
+    assert.equal(calls.filter(call => call.tool === 'pnpm' && call.args[0] === 'lint').length, 1)
+    assert.equal(calls.filter(call => call.tool === 'node' && call.args.join(' ') === 'apps/api/scripts/generate-routes.mjs --check').length, 1)
+    assert.equal(calls.some(call => call.tool === 'pnpm' && call.args.join(' ') === 'exec playwright test tests/e2e/site-search.spec.ts'), !failed)
+  }
 })

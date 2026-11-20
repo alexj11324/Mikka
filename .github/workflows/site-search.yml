@@ -72,7 +72,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:integrations
-      - run: node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint
+      # The unchanged pnpm build below owns the full typecheck before HTTP acceptance.
+      - run: node apps/api/scripts/generate-routes.mjs --check && pnpm lint
       - name: Provision only the isolated application test database from existing schema
         run: pnpm test:e2e:setup
       - name: Provision only the separate workspace test database from existing schema
