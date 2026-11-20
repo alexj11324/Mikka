@@ -28,7 +28,7 @@ Describe a task to a bot. Mikka dispatches coding work to agents on your Mac, Li
 
 **Mikka Cloud.** [Open the app](https://app.aspectlylabs.com/mikka), create an account and start using Mikka. Follow the [Quickstart](https://aspectlylabs.com/mikka/docs/quickstart) to get set up.
 
-**Self-hosted server.** Mikka runs on your own Linux host with Docker and PostgreSQL. Use the bundled PostgreSQL server, or choose managed PostgreSQL (**[Neon recommended](docs/self-hosting.md#managed-postgresql-neon-recommended)**; other compatible providers also work). Follow the [self-hosting guide](docs/self-hosting.md) and download the matching Compose file.
+**Self-hosted server.** Mikka runs on your own Linux host with Docker, PostgreSQL and LiteLLM. Use the bundled PostgreSQL server, or choose managed PostgreSQL (**[Neon recommended](docs/self-hosting.md#managed-postgresql-neon-recommended)**; other compatible providers also work). Follow the [self-hosting guide](docs/self-hosting.md) and download the matching Compose file and LiteLLM files. Configure its model aliases, upstream credentials and `MIKKA_LITELLM_MASTER_KEY` before starting.
 
 With bundled PostgreSQL:
 

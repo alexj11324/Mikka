@@ -50,7 +50,7 @@ export async function claimLocalRun(pool: Pool, runId: string, deviceId: string,
 /** The scoped cloud device may claim only a run bound to its owner's Bot
  * and to that run's own thread machine. Binding and claim use the same run row lock.
  * A run frozen on an API key has no subscription binding (null): its key
- * was checked and recorded for it by `apiKeyForRun` before the claim. */
+ * was checked and recorded for it by `validateRunApiKey` before the claim. */
 export async function claimCloudRun(pool: Pool, actor: { userId: string; workspaceId: string }, runId: string, deviceId: string, leaseExpiresAt: Date, subscriptionBindingId: string | null, beforeClaim?: (tx: PoolClient) => Promise<boolean | void>, afterClaim?: (tx: PoolClient) => Promise<void>, desktop = true): Promise<{ botId: string; ownerId: string; display: string; policyVersion: number; permission: ComputerPermission } | null> {
   const { rows: [stored] } = await pool.query<{ workspaceId: string | null }>(
     'SELECT "workspaceId" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "deviceId"=$3',

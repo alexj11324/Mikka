@@ -1,17 +1,76 @@
-# The Mikka model gateway's protocol converter (decision 2026-11-15-2000).
-# It stores no provider key: every request from the Mikka API carries the
-# person's key and the provider's Chat Completions base URL (`api_key`,
-# `api_base`), and LiteLLM converts Anthropic messages or the Responses API
-# into Chat Completions for that one request. Reachable only from the Mikka API.
+# Model aliases and upstream credentials live in LiteLLM, outside Mikka.
 model_list:
-  - model_name: "*"
+  - model_name: mikka-default
     litellm_params:
-      model: "openai/chat_completions/*"
+      model: vercel_ai_gateway/deepseek/deepseek-v4.1-flash
+      api_key: os.environ/AI_GATEWAY_API_KEY
+    model_info:
+      input_cost_per_token: 0.00000030
+      output_cost_per_token: 0.00000120
+      cache_read_input_token_cost: 0.000000006
+  - model_name: mikka-title
+    litellm_params:
+      model: vercel_ai_gateway/openai/gpt-6-luna
+      reasoning_effort: none
+      api_key: os.environ/AI_GATEWAY_API_KEY
+    model_info:
+      input_cost_per_token: 0.00000010
+      output_cost_per_token: 0.00000050
+      cache_read_input_token_cost: 0.000000010
+  - model_name: mikka-planning
+    litellm_params:
+      model: vercel_ai_gateway/openai/gpt-6-luna
+      api_key: os.environ/AI_GATEWAY_API_KEY
+    model_info:
+      input_cost_per_token: 0.00000010
+      output_cost_per_token: 0.00000050
+      cache_read_input_token_cost: 0.000000010
+  - model_name: mikka-decision
+    litellm_params:
+      model: openai/openai/gpt-6-luna-decisions
+      api_base: https://ai-gateway.vercel.sh/v1
+      api_key: os.environ/AI_GATEWAY_API_KEY
+    model_info:
+      mode: decisions
+      base_model: gpt-6-luna
+      input_cost_per_token: 0.00000010
+      output_cost_per_token: 0
+      cache_read_input_token_cost: 0.000000010
+      cache_creation_input_token_cost: 0.000000125
+      input_cost_per_token_above_272k_tokens: 0.00000020
+      cache_read_input_token_cost_above_272k_tokens: 0.000000020
+      cache_creation_input_token_cost_above_272k_tokens: 0.000000250
+  - model_name: mikka-credits/*
+    litellm_params:
+      model: vercel_ai_gateway/*
+      api_key: os.environ/AI_GATEWAY_API_KEY
+  - model_name: neon/gpt-5-mini
+    litellm_params:
+      model: openai/gpt-5-mini
+      api_base: os.environ/NEON_AI_GATEWAY_CHAT_URL
+      api_key: os.environ/NEON_AI_GATEWAY_TOKEN
+  # Request credentials are set by Mikka for these BYOK routes only.
+  - model_name: openai/chat_completions/*
+    litellm_params:
+      model: openai/chat_completions/*
+      configurable_clientside_auth_params: ["api_base"]
+  - model_name: openai/*
+    litellm_params:
+      model: openai/*
+      configurable_clientside_auth_params: ["api_base"]
+  - model_name: anthropic/*
+    litellm_params:
+      model: anthropic/*
       configurable_clientside_auth_params: ["api_base"]
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY
+  pass_through_endpoints:
+    - path: /v1/mikka/catalog
+      target: https://ai-gateway.vercel.sh/v1/models
+      methods: ["GET"]
+      forward_headers: false
+      auth: true
 litellm_settings:
-  # A provider that rejects an optional parameter still answers the rest.
+  include_cost_in_streaming_usage: true
   drop_params: true
-  # No prompts, completions or keys in LiteLLM's own logs.
   turn_off_message_logging: true

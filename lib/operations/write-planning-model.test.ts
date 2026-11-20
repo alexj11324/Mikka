@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { runtimeForWritePlanning, supportsWritePlanning } from './write-planning-model'
 
-test('write planning uses only the documented image and tool capable Gateway route',()=>{
- assert.equal(supportsWritePlanning({harness:'ai_sdk',model:'openai/gpt-6-luna'}),true)
- for (const runtime of [{harness:'ai_sdk',model:'nvidia/nemotron-3.5-lightning-free'},{harness:'codex',model:'openai/gpt-6-luna'},{harness:'ai_sdk',model:'openai/gpt-6-luna-decisions'},{harness:'ai_sdk',model:null}]) assert.equal(supportsWritePlanning(runtime),false)
+test('write planning uses only the managed image and tool capable planner',()=>{
+ assert.equal(supportsWritePlanning({harness:'ai_sdk',model:'mikka-planning'}),true)
+ assert.equal(supportsWritePlanning({harness:'ai_sdk',model:'openai/gpt-6-luna'}),true, 'existing signed snapshots remain eligible')
+ for (const runtime of [{harness:'ai_sdk',model:'nvidia/nemotron-3.5-lightning-free'},{harness:'codex',model:'mikka-planning'},{harness:'ai_sdk',model:'openai/gpt-6-luna-decisions'},{harness:'ai_sdk',model:null}]) assert.equal(supportsWritePlanning(runtime),false)
 })
 
 test('a synthetic prebuilt image message retains its image part in prompt projection',async()=>{
@@ -14,9 +15,9 @@ test('a synthetic prebuilt image message retains its image part in prompt projec
  assert.deepEqual(prompt[0].content,message.content)
 })
 
-test('new write-enabled gateway runs select the documented planner without replacing subscriptions or unrelated runs',()=>{
+test('new write-enabled hosted runs select the documented planner without replacing subscriptions or unrelated runs',()=>{
  const base={harness:'ai_sdk',model:'nvidia/nemotron-3.5-lightning-free'}
- assert.equal(runtimeForWritePlanning(base,['append_notion_paragraph'],true,false).model,'openai/gpt-6-luna')
+ assert.equal(runtimeForWritePlanning(base,['append_notion_paragraph'],true,false).model,'mikka-planning')
  assert.equal(runtimeForWritePlanning(base,['append_notion_paragraph'],false,false),base)
  assert.equal(runtimeForWritePlanning(base,['append_notion_paragraph'],true,true),base)
  assert.equal(runtimeForWritePlanning(base,['web_search'],true,false),base)

@@ -44,20 +44,6 @@ export function abuseLimits(
     firstUseHourly: positive(env.MIKKA_FREE_MODEL_FIRST_USE_HOURLY, 50),
   }
 }
-/** Gateway returns billed cost as USD in providerMetadata.gateway.cost. */
-export function gatewayCost(metadata: unknown): number | null {
-  const value = (metadata as { gateway?: { cost?: unknown } } | undefined)
-    ?.gateway?.cost
-  if ((typeof value !== 'number' && typeof value !== 'string') || value === '')
-    return null
-  const cost = Number(value)
-  return Number.isFinite(cost) &&
-    cost >= 0 &&
-    Number.isSafeInteger(Math.ceil(cost * 1e6))
-    ? Math.ceil(cost * 1e6)
-    : null
-}
-
 export function abuseAlertKinds(
   spent: number,
   firstUses: number,
@@ -68,10 +54,4 @@ export function abuseAlertKinds(
     ...(spent >= limits.dailyMicroUsd ? ['full'] : []),
     ...(firstUses > limits.firstUseHourly ? ['signup_spike'] : []),
   ]
-}
-
-export function gatewayGenerationId(metadata: unknown): string | undefined {
-  const id = (metadata as { gateway?: { generationId?: unknown } } | undefined)
-    ?.gateway?.generationId
-  return typeof id === 'string' && id.length <= 200 ? id : undefined
 }

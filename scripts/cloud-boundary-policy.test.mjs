@@ -117,7 +117,6 @@ test('the CI command fails on an added untracked violation and passes again afte
   const f = fixture(t)
   // Reproduce only the retained primitives, never copy any private service code.
   f.write('lib/mobile-push-delivery.ts', `const endpoint='${expoURL}'`)
-  f.write('scripts/dev-local/services.mjs', "if (path === '/v1/decisions') return localDecision()")
   f.write('docs/contract.md', 'MIKKA_CLOUD_SIGNING_KEY is not a public setting')
   f.write('tests/private.fixture.ts', 'const secret=env.MIKKA_CLOUD_SIGNING_KEY')
   const run = () => spawnSync(process.execPath, [policy], { cwd: f.root, encoding: 'utf8' })

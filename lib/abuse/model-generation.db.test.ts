@@ -1,10 +1,9 @@
-// Actual installed Gateway streaming parser + loopback HTTP + isolated PG.
+// Actual installed LiteLLM streaming parser + loopback HTTP + isolated PG.
 // The provider receipts are synthetic; no external inference or cost is claimed.
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer, type ServerResponse } from 'node:http'
 import { mock, test } from 'node:test'
-import { createGateway } from 'ai'
 import { Pool } from 'pg'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
 import { HostedUsageStore } from './store'
@@ -25,11 +24,11 @@ mock.module(new URL('./runtime.ts', import.meta.url).href, { namedExports: {
   },
 } })
 mock.module(new URL('../model-admission/runtime.ts', import.meta.url).href, { namedExports: {
-  modelAdmission: { gateway: async () => null }, // Unmanaged transport fixture; policy has its own PG suite.
+  modelAdmission: { litellm: async () => null }, // Unmanaged transport fixture; policy has its own PG suite.
 } })
 mock.module(new URL('./alerts.ts', import.meta.url).href, { namedExports: { checkAbuseAlerts: async () => {} } })
 
-test('early Gateway lookup identity is durable after interrupted/cancelled HTTP streams', { skip: !target }, async t => {
+test('early LiteLLM lookup identity is durable after interrupted/cancelled HTTP streams', { skip: !target }, async t => {
   const pool = new Pool({ connectionString: target })
   store = new HostedUsageStore(pool)
   let response!: ServerResponse
@@ -37,10 +36,9 @@ test('early Gateway lookup identity is durable after interrupted/cancelled HTTP 
   const frame = (value: unknown) => `data: ${JSON.stringify(value)}\n\n`
   const server = createServer((_request, next) => {
     response = next
-    next.writeHead(200, { 'content-type': 'text/event-stream' })
-    next.write(frame({ type: 'stream-start', warnings: [] }))
-    next.write(frame({ type: 'text-start', id: 'text' }))
-    next.write(frame({ type: 'text-delta', id: 'text', delta: 'Synthetic partial content', providerMetadata: { gateway: { generationId: generation } } }))
+    next.writeHead(200, { 'content-type': 'text/event-stream', 'x-litellm-call-id': generation, 'x-litellm-response-cost': '0.000003' })
+    next.write(frame({ id: generation, object: 'chat.completion.chunk', created: 1, model: 'mikka-default',
+      choices: [{ index: 0, delta: { role: 'assistant', content: 'Synthetic partial content' }, finish_reason: null }] }))
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   t.after(async () => {
@@ -49,7 +47,13 @@ test('early Gateway lookup identity is durable after interrupted/cancelled HTTP 
     await pool.end()
   })
   const address = server.address() as { port: number }
-  const gateway = createGateway({ baseURL: `http://127.0.0.1:${address.port}`, apiKey: 'synthetic-loopback-only' })
+  const previous = { url: process.env.MIKKA_LITELLM_URL, key: process.env.MIKKA_LITELLM_MASTER_KEY }
+  process.env.MIKKA_LITELLM_URL = `http://127.0.0.1:${address.port}`
+  process.env.MIKKA_LITELLM_MASTER_KEY = 'synthetic-loopback-only'
+  t.after(() => {
+    for (const [key, value] of [['MIKKA_LITELLM_URL', previous.url], ['MIKKA_LITELLM_MASTER_KEY', previous.key]] as const)
+      if (value === undefined) delete process.env[key]; else process.env[key] = value
+  })
   const { hostedModel } = await import('./model')
   for (const ending of ['error', 'cancel', 'finish'] as const) await t.test(ending, async () => {
     const workspace = randomUUID()
@@ -57,7 +61,7 @@ test('early Gateway lookup identity is durable after interrupted/cancelled HTTP 
     await store.verify(workspace, 'synthetic-generation-customer', `synthetic-${workspace}`)
     // An allowance granted before 2026-11-15; new verifications grant none.
     await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000) ON CONFLICT DO NOTHING', [workspace])
-    const model = await hostedModel(workspace, 'synthetic/gateway-stream', gateway('synthetic/gateway-stream'))
+    const model = await hostedModel(workspace, 'mikka-default')
     const reader = (await model.doStream({ prompt: [] })).stream.getReader()
     for (;;) {
       const part = await reader.read()
@@ -77,7 +81,8 @@ test('early Gateway lookup identity is durable after interrupted/cancelled HTTP 
     } else if (ending === 'cancel') await reader.cancel()
     else {
       // The final receipt omits its ID: the early, persisted identity must survive.
-      response.end(frame({ type: 'finish', usage: { inputTokens: { total: 2 }, outputTokens: { total: 1 } }, finishReason: { unified: 'stop', raw: 'stop' }, providerMetadata: { gateway: { cost: '0.000003' } } }))
+      response.end(frame({ id: generation, object: 'chat.completion.chunk', created: 1, model: 'mikka-default',
+        choices: [{ index: 0, delta: {}, finish_reason: 'stop' }], usage: { prompt_tokens: 2, completion_tokens: 1, total_tokens: 3 } }) + 'data: [DONE]\n\n')
       while (!(await reader.read()).done) {}
     }
     assert.equal((await row()).generationId, generation)

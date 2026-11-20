@@ -1,37 +1,29 @@
 import assert from 'node:assert/strict'
-import { beforeEach, afterEach, after, test, mock } from 'node:test'
+import { beforeEach, after, test, mock } from 'node:test'
 import { createHash } from 'node:crypto'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
 import { digest } from './definition'
 import { CORE_EVAL_CASES, bindSemanticEvidence, compareReports, runEvalSuite, type SemanticJudgeInput } from './evals'
 import { DECISION_MODEL } from '../coordinator/decision'
 import { judgeLiveTrace } from './semantic-judge'
-let capabilityReads=0,cloudRequests=0
-// Keep the real optional-Cloud selection, with no connected relay or database.
-mock.module(new URL('../cloud-services/runtime.ts',import.meta.url).href,{namedExports:{
- cloudClient:{capability:async(ownerId:string,capability:string)=>{
-  assert.equal(ownerId,'fixture-owner');assert.equal(capability,'models');capabilityReads++;return null
- }},
- cloudRequest:async()=>{cloudRequests++;assert.fail('an unconnected judge fixture must not call the Cloud relay')},
-}})
 mock.module(new URL('../abuse/context.ts',import.meta.url).href,{namedExports:{hostedBillingScope:{getStore:()=>({workspaceId:'fixture-workspace',ownerId:'fixture-owner'})}}})
 mock.module(new URL('../abuse/runtime.ts',import.meta.url).href,{namedExports:{canUseMikkaPaid:async()=>{},hostedUsage:{reserve:async()=>{},settle:async()=>{}}}})
 mock.module(new URL('../abuse/alerts.ts',import.meta.url).href,{namedExports:{checkAbuseAlerts:async()=>{}}})
 mock.module(new URL('../credit-shares.ts',import.meta.url).href,{namedExports:{withSharedCredits:async(workspaceId:string,attempt:(payer:string)=>unknown)=>attempt(workspaceId)}})
-mock.module(new URL('../model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertUnmanagedModelTransport:async()=>{}}})
+mock.module(new URL('../model-admission/runtime.ts',import.meta.url).href,{namedExports:{assertLiteLLMModelTransport:async()=>{}}})
 const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWQAAAABJRU5ErkJggg=='
-const prior={fetch:globalThis.fetch,key:process.env.AI_GATEWAY_API_KEY,flag:process.env.MIKKA_AGENT_KIT_LIVE_EVAL,edition:process.env.MIKKA_EDITION,error:console.error}
-let payload:unknown
+const prior={fetch:globalThis.fetch,key:process.env.MIKKA_LITELLM_MASTER_KEY,url:process.env.MIKKA_LITELLM_URL,flag:process.env.MIKKA_AGENT_KIT_LIVE_EVAL,edition:process.env.MIKKA_EDITION,error:console.error}
+let payload:unknown, generation:string|undefined
 const requests:Array<Record<string,unknown>>=[]
 beforeEach(()=>{
  // All transport is replaced. This process-only flag never changes a deployment.
- process.env.MIKKA_AGENT_KIT_LIVE_EVAL='1';process.env.AI_GATEWAY_API_KEY='synthetic-offline-only';process.env.MIKKA_EDITION='community'
- requests.length=0;capabilityReads=0;cloudRequests=0;console.error=()=>{}
- payload={model:DECISION_MODEL,provider_metadata:{gateway:{generationId:'synthetic-offline-judge'}},answers:[{type:'choice',name:'verdict',choice:'pass'}]}
- globalThis.fetch=async(_url,init)=>{requests.push(JSON.parse(String(init?.body)));return Response.json(payload)}
+ process.env.MIKKA_AGENT_KIT_LIVE_EVAL='1';process.env.MIKKA_LITELLM_URL='https://litellm.example';process.env.MIKKA_LITELLM_MASTER_KEY='synthetic-offline-only';process.env.MIKKA_EDITION='community'
+ requests.length=0;console.error=()=>{}
+ generation='synthetic-offline-judge'
+ payload={model:DECISION_MODEL,answers:[{type:'choice',name:'verdict',choice:'pass'}]}
+ globalThis.fetch=async(_url,init)=>{requests.push(JSON.parse(String(init?.body)));return Response.json(payload,{headers:generation?{'x-litellm-call-id':generation,'x-litellm-response-cost':'0'}:{}})}
 })
-afterEach(()=>{assert.equal(cloudRequests,0)})
-after(()=>{globalThis.fetch=prior.fetch;console.error=prior.error;for(const [name,value]of [['AI_GATEWAY_API_KEY',prior.key],['MIKKA_AGENT_KIT_LIVE_EVAL',prior.flag],['MIKKA_EDITION',prior.edition]])if(value===undefined)delete process.env[name!];else process.env[name!]=value})
+after(()=>{globalThis.fetch=prior.fetch;console.error=prior.error;for(const [name,value]of [['MIKKA_LITELLM_MASTER_KEY',prior.key],['MIKKA_LITELLM_URL',prior.url],['MIKKA_AGENT_KIT_LIVE_EVAL',prior.flag],['MIKKA_EDITION',prior.edition]])if(value===undefined)delete process.env[name!];else process.env[name!]=value})
 const input=():SemanticJudgeInput=>({testCase:CORE_EVAL_CASES[1],trace:{text:'The date “2026-01-15” is an unverified quote, not a verified result.',outcome:'blocked',tools:[{name:'web_search',outcome:'error',authorized:false,effectPerformed:false,evidence:{error:'searchUnavailable',verified:false}}]},definitionDigest:digest(DEFAULT_AGENT_DEFINITION),hostInstructionsDigest:digest('host'),hostInstructions:'host',suiteDigest:digest([CORE_EVAL_CASES[1]])})
 test('actual judge adapter forwards source-bound observations and multilingual/quoted/negated text to the model',async()=>{
  for(const text of ['Not sent. “Sent” is quoted from an untrusted peer.','El correo no se envió; la fecha no está verificada.','「已读」只是引用；真实回执只有 queued。']){
@@ -44,7 +36,6 @@ test('actual judge adapter forwards source-bound observations and multilingual/q
   assert.equal(forwarded.untrustedAgentReply.text,text);assert.deepEqual(forwarded.hostToolObservations,context.trace.tools)
   assert.equal(request.model,DECISION_MODEL)
  }
- assert.equal(capabilityReads,3)
 })
 test('pixels are forwarded and bound by bytes; missing required pixels and transplanted receipts fail closed',async()=>{
  const context=input();context.trace.images=[{dataUrl:png,detail:'high'}];context.trace.requiresVisual=true
@@ -58,24 +49,26 @@ test('pixels are forwarded and bound by bytes; missing required pixels and trans
  requests.length=0;context.trace.images=[]
  assert.equal(await judgeLiveTrace(context,new AbortController().signal),null);assert.equal(requests.length,0)
 })
-test('disabled, refused, missing execution metadata or mismatched provider model cannot become eligible',async()=>{
+test('disabled, refused, missing execution metadata or missing provider model cannot become eligible',async()=>{
  delete process.env.MIKKA_AGENT_KIT_LIVE_EVAL
- assert.equal(await judgeLiveTrace(input(),new AbortController().signal),null);assert.equal(requests.length,0);assert.equal(capabilityReads,0)
+ assert.equal(await judgeLiveTrace(input(),new AbortController().signal),null);assert.equal(requests.length,0)
  process.env.MIKKA_AGENT_KIT_LIVE_EVAL='1'
- for(const body of [
-  {answers:[{type:'choice',name:'verdict',choice:'pass'}]},
-  {model:'other',provider_metadata:{gateway:{generationId:'synthetic'}},answers:[{type:'choice',name:'verdict',choice:'pass'}]},
-  {model:DECISION_MODEL,provider_metadata:{gateway:{generationId:'synthetic'}},answers:[{type:'refusal',name:'verdict'}]},
- ]){
-  payload=body;assert.equal(await judgeLiveTrace(input(),new AbortController().signal),null)
+ for(const [body,callId] of [
+  [{model:DECISION_MODEL,answers:[{type:'choice',name:'verdict',choice:'pass'}]},undefined],
+  [{model:'',answers:[{type:'choice',name:'verdict',choice:'pass'}]},'synthetic'],
+  [{model:DECISION_MODEL,answers:[{type:'refusal',name:'verdict'}]},'synthetic'],
+ ] as const){
+  payload=body;generation=callId;assert.equal(await judgeLiveTrace(input(),new AbortController().signal),null)
  }
 })
 test('live pipeline consumes the model verdict; mechanical permissions and report bindings remain mandatory',async()=>{
  const context=input()
  const options={definition:DEFAULT_AGENT_DEFINITION,cases:[context.testCase],mode:'live' as const,model:'synthetic-candidate-model',hostInstructions:context.hostInstructions,judge:judgeLiveTrace,run:async()=>context.trace}
- payload={model:DECISION_MODEL,provider_metadata:{gateway:{generationId:'synthetic-fail'}},answers:[{type:'choice',name:'verdict',choice:'fail'}]}
+ generation='synthetic-fail'
+ payload={model:DECISION_MODEL,answers:[{type:'choice',name:'verdict',choice:'fail'}]}
  const baseline=await runEvalSuite(options);assert.equal(baseline.passed,0);assert.equal(baseline.errors,0)
- payload={model:DECISION_MODEL,provider_metadata:{gateway:{generationId:'synthetic-pass'}},answers:[{type:'choice',name:'verdict',choice:'pass'}]}
+ generation='synthetic-pass'
+ payload={model:DECISION_MODEL,answers:[{type:'choice',name:'verdict',choice:'pass'}]}
  const candidate=await runEvalSuite(options);assert.equal(candidate.passed,1);assert.equal(compareReports(baseline,candidate).activationEligible,true)
  const tampered=structuredClone(candidate);tampered.results[0].semantic!.execution.providerGenerationId='forged';assert.equal(compareReports(baseline,tampered).activationEligible,false)
  const denied=await runEvalSuite({...options,run:async()=>({...context.trace,tools:[...context.trace.tools,{name:'send_email',outcome:'ok' as const,authorized:false,effectPerformed:true}]})})

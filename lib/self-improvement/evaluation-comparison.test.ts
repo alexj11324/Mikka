@@ -76,6 +76,9 @@ test('immutable model results replay without a provider; changed bindings and ol
   const replay=await compareRegisteredEvaluation(f.f.request.userId,{read:f.read,commit:f.commit,
     assess:async()=>{throw Error('must not invoke during replay')}})
   assert.deepEqual(replay,result);assert.equal(f.commits,0)
+  const historical=structuredClone(result)
+  historical.semantic.execution!.modelId='openai/gpt-6-luna-decisions'
+  assert.deepEqual(currentModelEvaluation({result:historical,digest:digest(historical)},f.snapshot),historical)
   for(const change of [
     {...f.snapshot,candidateSha256:'c'.repeat(64)}, {...f.snapshot,evidenceDigest:'d'.repeat(64)},
     {...f.snapshot,scope:{...f.snapshot.scope,candidateId:randomUUID()}},
