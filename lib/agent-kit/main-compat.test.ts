@@ -327,7 +327,8 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    assert.equal(compactSql(raw),compactSql(`SELECT repo."repoPath",repo."remoteUrl",a.harness,
         CASE WHEN source.id IS NULL THEN repo."baseBranch"
           WHEN source."agentDefinition"->'projectExecution' IS NOT NULL THEN source."agentDefinition"->'projectExecution'->>'baseBranch'
-          ELSE source."baseBranch" END AS "baseBranch"
+          ELSE source."baseBranch" END AS "baseBranch",
+        CASE WHEN source."agentDefinition"#>>'{projectExecution,environment,chosen}'='true' THEN source."agentDefinition"#>>'{projectExecution,environment,id}' END AS "chosenEnvironmentId"
       FROM device_repos repo JOIN agents a ON a.id=$2 AND a."userId"=$3
       JOIN issues i ON i.id=$4 AND i."workspaceId"=$5 AND i."ownershipState"='bound'
       LEFT JOIN agent_runs source ON source.id=$6 AND source."userId"=$3 AND source."issueId"=i.id AND source."workspaceId"=i."workspaceId"

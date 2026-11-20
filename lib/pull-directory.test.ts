@@ -6,7 +6,11 @@ import {
   linkedPullDirectory,
   pullDirectoryState,
   pullFilesQuery,
+  pullFromAddress,
+  pullPageHref,
   pullPageInput,
+  pullSinceInstant,
+  readSavedPullView,
   pullReviewRef,
   pullStates,
   pullViewStates,
@@ -42,6 +46,8 @@ const filter = {
   author: "",
   label: "",
   linked: false,
+  since: "" as const,
+  project: "",
 };
 test("passing checks are not enough to claim merge readiness", () => {
   assert.equal(pullDirectoryState(row({ checks: "SUCCESS" })), "open");
@@ -222,6 +228,11 @@ test("case-insensitive canonical identity deduplicates linked PRs and keeps auth
   assert.equal(result[0].threads.length, 2);
   assert.equal(result[0].checks, null);
   assert.equal(pullDirectoryState(result[0]), "draft");
+  assert.deepEqual([result[0].author, result[0].head, result[0].createdAt, result[0].headSha], [null, null, null, null]);
+  const recorded = linkedPullDirectory([{ ...first, pulls: [{ ...first.pulls[0], author: "dana", head: "fix/sidebar",
+    headSha: "A".repeat(40), createdAt: "2026-11-17T00:00:00Z" }] }]);
+  assert.deepEqual([recorded[0].author, recorded[0].head, recorded[0].createdAt, recorded[0].headSha],
+    ["dana", "fix/sidebar", "2026-11-17T00:00:00Z", "a".repeat(40)], "a linked PR carries what Copy branch and the author filter need");
 });
 test("pinned and grouped PRs retain stable updated order without duplication", () => {
   const rows = [
@@ -253,6 +264,7 @@ test("input bounds reject URLs, arbitrary states, huge cursors and path traversa
     repo: "Owner/Repo",
     cursor: null,
     view: "open",
+    since: null,
   });
 });
 
@@ -282,4 +294,40 @@ test("a row's pull request opens by its reference, never by its URL", () => {
     repo: "Owner/Repo",
     number: "7",
   });
+});
+
+test("Created keeps PRs opened inside the range and drops ones whose opening is unknown", () => {
+  const now = Date.parse("2026-11-20T00:00:00Z");
+  assert.equal(pullSinceInstant("week", now), "2026-11-13T00:00:00.000Z");
+  assert.equal(pullSinceInstant("", now), null);
+  const rows = [
+    row({ number: 1, createdAt: "2026-11-19T00:00:00Z" }),
+    row({ number: 2, createdAt: "2026-11-01T00:00:00+00:00" }),
+    row({ number: 3, createdAt: null }),
+  ];
+  assert.deepEqual(filterDirectoryPulls(rows, { ...filter, since: "week" }, now).map((item) => item.number), [1]);
+  assert.equal(filterDirectoryPulls(rows, filter, now).length, 3);
+});
+test("a PR's own address round-trips and refuses anything that is not one repository's PR", () => {
+  const href = pullPageHref({ repo: "Owner/Repo.js", number: 12 }, "00000000-0000-4000-8000-000000000001");
+  assert.ok(href);
+  const query = new URL(href, "https://mikka.invalid").searchParams;
+  assert.equal(query.get("section"), "pulls");
+  assert.equal(query.get("workspace"), "00000000-0000-4000-8000-000000000001");
+  assert.deepEqual(pullFromAddress(query.get("pull")), { repo: "Owner/Repo.js", number: 12 });
+  for (const bad of [null, "", "Owner/Repo", "Owner/Repo/0", "Owner/../7", "../Repo/7", "a/b/c/7", "Owner/Repo/7?x=1"])
+    assert.equal(pullFromAddress(bad), null, String(bad));
+  assert.equal(pullPageHref({ repo: "not-a-repo", number: 1 }, null), null);
+});
+test("a saved pulls view reads back with defaults for fields it predates and never applies another list's shape", () => {
+  const view = readSavedPullView({ id: "v", name: "Mine", filters: { filters: { view: "merged", author: "dana" }, repo: "Owner/Repo", grouping: "author" } });
+  assert.deepEqual(view, {
+    id: "v",
+    name: "Mine",
+    filters: { view: "merged", search: "", state: "", author: "dana", linked: false, label: "", since: "", project: "" },
+    repo: "Owner/Repo",
+    grouping: "author",
+  });
+  assert.equal(readSavedPullView({ id: "v", name: "x", filters: { automation: "a" } }), null);
+  assert.equal(readSavedPullView({ id: "v", name: "x", filters: { filters: {}, repo: "../x", grouping: "nope" } })?.repo, "");
 });

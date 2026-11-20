@@ -8,23 +8,26 @@ import { withTaskWorkspace } from '@/lib/task-workspace'
 import { effectiveRequestWorkspace } from '@/lib/request-workspace'
 import { withTaskCreationReceipt } from './task-creation-receipt'
 import { createOnlyCommand, type CreateOnlyCommand } from './task-create-command'
+import { applyCreateProperties } from './task-create-properties'
 
 /** Create a backlog Task without submitting a chat message, scheduling a Run or
  * starting a machine. Task identity and the durable receipt commit together. */
 export async function createUnstartedTask(input: CreateOnlyCommand) {
   const parsed = createOnlyCommand.safeParse(input)
   if (!parsed.success) throw new ActionFailureError('validationGeneric')
-  const { requestId, workspaceId, version, intent, teamId, projectId, confirmAccess = false, ...fields } = parsed.data
+  const { requestId, workspaceId, version, intent, teamId, projectId, confirmAccess = false, assignee, dueDate, labels, access, ...fields } = parsed.data
+  const properties = { assignee, dueDate, labels, access }
   if ((teamId || projectId) && actingContext.getStore()) throw new ActionFailureError('teamIssueAccessDenied')
   const user = await requireUser()
   if (await effectiveRequestWorkspace(user) !== workspaceId) throw new ActionFailureError('workspaceAccessDenied')
-  return withTaskWorkspace(user, workspaceId, () => db.transaction(async tx => {
+  return withTaskWorkspace(user, workspaceId, (_workspace, membership) => db.transaction(async tx => {
     const actor = activityActor(user.id)
     const insert = () => insertExplicitTask(tx, user.id, workspaceId, requestId, fields, actor, teamId)
     const receipt = await withTaskCreationReceipt(tx, user, workspaceId, requestId,
-      { version, intent, ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}), ...fields }, async () => {
+      { version, intent, ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}), ...fields, ...properties }, async () => {
         const created = await insert()
         if (projectId) await attachInitialProject(tx, user.id, workspaceId, created.taskId, projectId, actor, confirmAccess)
+        await applyCreateProperties(tx, membership, { user, workspaceId, taskId: created.taskId, identifier: created.identifier, properties, actor })
         return created
       }, teamId || projectId ? async expected => {
         if (teamId && (await insert()).taskId !== expected) throw new ActionFailureError('submissionConflict')

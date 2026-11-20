@@ -6,6 +6,8 @@ import type { AutomationDraft } from './automation-draft'
  */
 export const AUTOMATION_TEMPLATES = ['standup', 'prReview', 'ciFix', 'linearTriage', 'slackQuestion', 'weeklyDeps'] as const
 export type AutomationTemplate = typeof AUTOMATION_TEMPLATES[number]
+/** The trigger each template starts with, for its card's icon. */
+export const TEMPLATE_TRIGGERS = { standup: 'schedule', prReview: 'github', ciFix: 'github', linearTriage: 'linear', slackQuestion: 'slack', weeklyDeps: 'schedule' } as const satisfies Record<AutomationTemplate, 'schedule' | 'github' | 'linear' | 'slack'>
 export const isAutomationTemplate = (value: string): value is AutomationTemplate => (AUTOMATION_TEMPLATES as readonly string[]).includes(value)
 
 export function templateDraft(template: AutomationTemplate, base: AutomationDraft, text: { title: string; prompt: string }): AutomationDraft {

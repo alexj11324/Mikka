@@ -34,7 +34,7 @@ export type RailProps = {
   signingOut: boolean
   onBeforeChange?: (action: () => Promise<void>) => void
   /** The bot list's rows as data, for a frame that lists them itself (the hosted App Shell); the open-source rail ignores it. */
-  chats?: { workspaceId: string | null; entries: ChatNavEntry[]; /** The person's archived bots (已归档): they open nothing; their menu restores or deletes them. */ archived?: ChatNavEntry[]; /** Chats the person hid (已隐藏): they open as usual; their menu shows them again. */ hidden?: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void; onNewConversation?: () => void; /** 全部标为已读 for every thread and chat the list shows (Capy's section menu). */ onMarkAllRead?: () => Promise<void> }
+  chats?: { workspaceId: string | null; entries: ChatNavEntry[]; /** The person's archived bots (已归档): they open nothing; their menu restores or deletes them. */ archived?: ChatNavEntry[]; /** Chats the person hid (已隐藏): they open as usual; their menu shows them again. */ hidden?: ChatNavEntry[]; /** Teammates' Bots the person follows (订阅的 Bot): a row opens its menu (View all threads, Unfollow). */ followed?: ChatNavEntry[]; onOpen: (target: ChatTarget) => void; onNewBot: () => void; onNewGroup: () => void; onNewConversation?: () => void; /** 全部标为已读 for every thread and chat the list shows (Capy's section menu). */ onMarkAllRead?: () => Promise<void> }
   /** Opens the ⌘K search, for a frame with its own search field. */
   onSearch?: () => void
   /** How many items 收件箱 lists (hooks/use-inbox-count.ts), for a frame that shows the count on it. */

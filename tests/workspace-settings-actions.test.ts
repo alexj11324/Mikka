@@ -43,6 +43,8 @@ before(async () => {
   mock.module('@/lib/audit/record', { namedExports: { auditRequestContext: () => ({ ip: null, geoCity: null, geoCountry: null, geoRegion: null }) } })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => ({ id: actor.userId, email: actor.email, name: actor.name, [tokenWorkspace]: tokenWorkspaceId }) } })
   mock.module('@/lib/workspace-db', { namedExports: { workspaceDb: {
+    // The workspace's Environments a new Bot binds (lib/bot-environment.ts): the default first, then the one listing acme/app.
+    execute: async () => ({ rows: [{ id: 'env-default', name: 'Default', repositoryKeys: ['v2/github.com/acme/other'] }, { id: 'env-app', name: 'App', repositoryKeys: ['v2/github.com/acme/app'] }] }),
     select: (fields: Record<string, unknown>) => {
       assert.deepEqual(Object.keys(fields), ['workspaceId'])
       assert.equal(fields.workspaceId, teams.workspaceId)
@@ -80,7 +82,10 @@ before(async () => {
     teamLifecycleImpact: () => assert.fail('unexpected lifecycle impact read'),
   } })
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: actor.userId, email: actor.email, name: actor.name }, session: { id: 'workspace-fixture-session' } }) } } } })
-  mock.module('@/lib/db', { namedExports: { pool: { query: () => { throw Error('unexpected query') } }, db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }) } } })
+  // createBot writes the Bot, its access and followers in one transaction; this fixture's writes need no real one.
+  mock.module('@/lib/db', { namedExports: { pool: { query: () => { throw Error('unexpected query') } },
+    db: { insert: () => ({ values: async (row: Record<string, unknown>) => { inserted.push(row) } }), transaction: async (work: (tx: object) => Promise<unknown>) => work({}) },
+    withDatabaseTransaction: (_tx: object, work: () => unknown) => work() } })
   mock.module('@/lib/run-policy-stop', { namedExports: { stopRunsForPolicyChange: respond('stopRunsForPolicyChange', 0) } })
   mock.module('@/lib/workspace-admin/bots', { namedExports: {
     workspaceBotDefaults: async (workspaceId: string) => { calls.push(['workspaceBotDefaults', workspaceId]); return defaults },
@@ -193,11 +198,13 @@ test('createBot uses the workspace defaults only for omitted fields', async () =
   reset(); inserted.length = 0
   await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle' })
   assert.equal(inserted[0].model, 'codex')
-  assert.equal(inserted[0].repository, 'acme/app')
+  // The retired repository is never written: the Bot binds the Environment that lists the default repository.
+  assert.equal(inserted[0].repository, undefined)
+  assert.equal(inserted[0].environmentId, 'env-app')
   assert.equal(inserted[0].workspaceId, actor.workspaceId)
   await botActions.createBot({ name: 'Scout 2', color: 'encre', shape: 'cercle', model: 'mikka', repository: null })
   assert.equal(inserted[1].model, 'mikka')
-  assert.equal(inserted[1].repository, null)
+  assert.equal(inserted[1].environmentId, 'env-default', 'no repository: the workspace default Environment')
   assert.equal(calls.filter(call => call[0] === 'workspaceBotDefaults').length, 1, 'explicit values skip the defaults read')
   defaults = { defaultModel: null, defaultRepository: null }
   await botActions.createBot({ name: 'Scout 3', color: 'encre', shape: 'cercle' })
@@ -208,7 +215,7 @@ test('createBot uses the workspace defaults only for omitted fields', async () =
 test('createBot refuses a repository the workspace has not installed', async () => {
   reset(); inserted.length = 0
   await botActions.createBot({ name: 'Scout', color: 'encre', shape: 'cercle', repository: 'acme/app' })
-  assert.equal(inserted[0].repository, 'acme/app')
+  assert.equal(inserted[0].environmentId, 'env-app', 'an older client\'s repository binds the Environment that lists it')
   await assert.rejects(botActions.createBot({ name: 'Elsewhere', color: 'encre', shape: 'cercle', repository: 'other/secret' }), /botDefaultRepositoryUnavailable/)
   assert.equal(inserted.length, 1)
   assert.deepEqual(calls.filter(call => call[0] === 'repositoryAvailable').map(call => call[2]), ['acme/app', 'other/secret'])

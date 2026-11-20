@@ -600,6 +600,13 @@
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
   },
+  "app/api/tasks/dictation/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Transcribe a spoken new-task description with the person's own authorized OpenAI transcription key; nothing is stored.",
+    "test": "app/api/tasks/dictation/route.test.ts",
+    "suite": "test:issues"
+  },
   "app/api/tasks/[taskId]/review/machine-sessions/route.ts": {
     "mode": "built-in",
     "environment": [],
@@ -3833,6 +3840,48 @@
     "test": "lib/saved-views-store.db.test.ts",
     "suite": "test:settings-prefs-db"
   },
+  "app/actions/issue-metadata.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Task property reads and writes use PostgreSQL; the new-task options read lists active workspace members and visible labels, and assigning a Bot records its wake in the same transaction.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/coordinator-events.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Coordinator event inputs, including the task assignment and task activity wakes, are pure values stored in the installation's own PostgreSQL.",
+    "test": "lib/coordinator-events.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/task-activity-wake-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A task document save records Bot wakes for new comments and Bot mentions in the installation's own PostgreSQL, in the same transaction.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-activity-wake.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure rules for which Bots a task comment or mention wakes; no external service.",
+    "test": "lib/task-activity-wake.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/task-create-properties.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create-only task properties (assignee, due date, labels, access) are applied in the create transaction in the installation's own PostgreSQL.",
+    "test": "tests/task-create-only.db.test.ts",
+    "suite": "test:coordinator-issue-create-db"
+  },
+  "lib/task-due-presets.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure local-date shortcuts for a new task's due date; no external service.",
+    "test": "lib/task-due-presets.test.ts",
+    "suite": "test:issues"
+  },
   "lib/model-gateway/litellm-client.ts": {
     "mode": "operator-configured",
     "environment": [
@@ -3870,5 +3919,394 @@
     "behavior": "Provides trusted preset endpoint metadata for LiteLLM request routing and read-only credential/model discovery; it does not make model requests or hold provider keys.",
     "test": "lib/model-api-key-providers.test.ts",
     "suite": "test:execution-rules"
+  },
+  "app/api/integrations/github/repositories/pulls/detail/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in person reads one pull request of a repository their GitHub connection admits: summary, checks on its current head and reviews. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-detail.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/github/pull-detail.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one pull request through the person's admitted repository credential and refuse another repository's identity. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-detail.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "app/api/integrations/github/repositories/pulls/merge/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in person merges one pull request as themselves with their own GitHub token, bound to the head they saw; failing checks need their confirmation. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-merge.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/github/pull-merge.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Merge one pull request with the person's own GitHub token through the existing merge port, bound to the expected head. Uses the installation's own GitHub connection; without one it returns a GitHub authorization error and changes nothing.",
+    "test": "lib/github/pull-merge.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "lib/factory/merge.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Map GitHub's merge refusal to the existing stable codes for both task merges and merging one pull request; no new service.",
+    "test": "lib/github/pull-merge.test.ts",
+    "suite": "test:github-pulls"
+  },
+  "drizzle/20261120044638_workspace_issue_states.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create each workspace's task states in the installation database, seed the seven built-in states and keep every task's status equal to its state's category.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/issue-states-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read and change a workspace's task states in the installation database; deleting a state first moves its tasks to another state.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/issue-states.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate task state input and order states for the picker; no external service.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "app/actions/issue-states.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Members read the workspace's task states and admins change them through the installation's own session and workspace checks.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261120054548_task_list_filter_indexes.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Add expression indexes on the installation database's tasks for the task list's metadata and due-date filters; no rows change.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/task-list-filters.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Narrow the task list in the installation database by view, assignee, creator, labels, due date, PRs, relations and subscription before the page limit.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261120063603_task_reads.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store each person's own unread flag on a task in the installation database; it goes with the person, the task or the workspace.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "app/actions/task-list.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Count the task list's views and read or set the person's unread flags through the installation's own session and workspace checks.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261120044919_issues_source_schedule.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds issues.source_schedule_id: a task an automation's run made remembers that automation, so the thread directory can list one automation's runs (View runs). Backfilled from schedule_occurrences in the installation database; nothing outside it.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261120044753_environment_default_machine_size.sql": {
+    "mode": "built-in",
+    "environment": [
+      "DATABASE_URL"
+    ],
+    "behavior": "Keep each Environment's default machine size in the installation workspace database; NULL keeps Mikka's default.",
+    "test": "tests/environment-settings.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "lib/task-run-settings.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "An automation's run settings (Environment, model and effort, machine size, pin) are stored on its request event in the installation PostgreSQL database and read back only from that event when the run is created.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "lib/task-run-settings-schema.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The shape of an automation's run settings (Environment, model and effort, machine size, pin) carried on a task command; no environment input and no server dependency.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261120052101_schedule_run_as.sql": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL"
+    ],
+    "behavior": "Keep the workspace member an automation runs as in the installation PostgreSQL database; NULL runs as its creator.",
+    "test": "lib/schedules/dispatch.db.test.ts",
+    "suite": "test:schedules-db"
+  },
+  "drizzle/20261120044916_bot_settings.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Adds the Bot's Environment, alias, task defaults, run location, followers, model effort and Slack thread routes to the installation PostgreSQL database; scripts/bot-environment-backfill.mjs moves each old repository into a workspace Environment during the normal migration."
+  },
+  "lib/bot-settings.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Parses a Bot's alias, Environment, task place, default Agent and profile and run location, and applies task > Bot > personal precedence; pure code with no installation dependency."
+  },
+  "lib/bot-settings-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Checks every Bot setting against its owner's own Environment, devices, Agents and profiles, and stores the chat model's effort, in the installation PostgreSQL database."
+  },
+  "lib/bot-environment.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Reads the workspace's Environments from the installation's workspace database to bind a Bot and find the repository its work starts in."
+  },
+  "lib/bot-access.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Shares a Bot with the workspace or keeps it private through the installation's resource access policies, keeps its followers and hands it to another member, all in the installation PostgreSQL database."
+  },
+  "lib/bot-route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Authenticates a Bot HTTP request with the installation's own session and workspace checks; no external service."
+  },
+  "app/api/bots/[botId]/follow/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Follows or unfollows a Bot the person can find, in the installation database."
+  },
+  "app/api/bots/[botId]/transfer/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Hands a Bot to another active member of the workspace, in the installation database."
+  },
+  "lib/slack/thread-bots.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "test": "tests/bot-settings.db.test.ts",
+    "suite": "test:bot-threads-db",
+    "behavior": "Remembers which of the person's Bots a Slack thread started with bot=<alias> goes to, in the installation PostgreSQL database; only used where the operator configured Slack."
+  },
+  "lib/model-effort.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds the Bot's saved reasoning effort to the chat model's provider options; pure code, the provider is whatever the installation already uses.",
+    "test": "lib/model-effort.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/bot-model-effort.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Reads the Bot's saved reasoning effort beside its model choice in the installation PostgreSQL database; absent, the model's default applies.",
+    "test": "lib/bot-model-selection.test.ts",
+    "suite": "test:agent-kit-model"
+  },
+  "app/api/v1/artifacts/[artifactId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one artifact version for a scoped PAT or an mksvc_ service key, under the resource ACL of the credential's own Workspace, from the installation database and configured artifact storage.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/artifacts/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List artifacts a scoped PAT or service key may read in its own Workspace, from the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/bots/[botId]/messages/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read a shared Bot chat (masked) or hand a Bot a peer message and wake it through the existing coordinator outbox, under the Bot ACL of the credential's Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/bots/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List Bots a scoped PAT or service key may discover in its own Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/drive/volumes/[volumeId]/files/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read or compare-and-swap write one file of a bot, thread, environment or team Workspace Drive folder, using the installation database and configured Drive storage.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/drive/volumes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List a bot, thread, environment or team Workspace Drive scope and its default folder's files, or write one file into that default folder (creating it), for a scoped PAT or service key.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/threads/[runId]/messages/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read a thread (masked) or send a peer message that queues, steers or continues it on its owner's own admission, under the thread ACL of the credential's Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/threads/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List threads a scoped PAT or service key may read in its own Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "drizzle/20261120044938_agent_bot_interop.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds bot/run ACL subjects (explicit grants only), the bot, thread and environment Drive scopes, the interop PAT scopes and the peer thread-send receipt table to the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/drive/contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure Drive contract, including the agent Drive scopes and their storage namespace; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/interop/artifacts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked, tenant-pinned artifact reads from the installation database and configured artifact storage.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/bots.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked Bot discovery, masked chat reads and peer sends through the existing coordinator outbox.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/drive.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked Drive folders for bot, thread, environment and team Workspace scopes on the existing Drive store and its compare-and-swap.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/errors.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure interop refusal codes registered for user copy; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/interop/http.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authenticates /api/v1 interop requests by scoped PAT or mksvc_ service key and maps refusals to their codes.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/principal.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The interop principal pinned to one Workspace and the owner-or-own-grant ACL decision in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/threads.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked thread reads, masked checkpoint diffs and idempotent peer sends that continue a thread on its owner's admission.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/tool-schemas.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure tool input schemas shared by the Bot and the worker MCP; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/interop/tools.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Runs one interop tool for a principal and returns its registered refusal code.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/resource-access/contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure resource ACL contract, including the bot and run subject kinds; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/thread-continue.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Sends a message to a thread or continues an ended thread on the owner's admission; a peer send is recorded as peer, never as the owner.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "workflows/coordinator/interop-steps.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A Bot's interop tool step: the Bot acts in its own Workspace with its owner's identity and its own grants.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/grants/[kind]/[resourceId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List (owner or Workspace admin) or create (owner only) Bot, run and service grants on one resource for a scoped PAT, in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/grants/[kind]/[resourceId]/[subjectKind]/[subjectId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Revoke one Bot, run or service grant (owner or Workspace admin) for a scoped PAT, in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/grants.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Owner-created, owner- or admin-revoked explicit grants to Bot, run and service subjects in the same Workspace, audited through the existing ACL events.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/continuation-grant.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Checks the owner's explicit canSteer grant before a peer continues an ended thread, in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
   }
 }

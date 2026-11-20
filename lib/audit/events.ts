@@ -20,6 +20,7 @@ export const AUDIT_ACTIONS = {
   'member.reactivated': 'member',
   'member.role_changed': 'member',
   'bot.taken_over': 'member',
+  'bot.transferred': 'member',
   // 权限
   'team.access_changed': 'permission',
   'bot.permissions_changed': 'permission',
@@ -93,6 +94,7 @@ export const AUDIT_METADATA = {
   'member.reactivated': none,
   'member.role_changed': z.object({ oldRole: role, newRole: role }).strict(),
   'bot.taken_over': none,
+  'bot.transferred': none,
   'team.access_changed': z.object({ team: label, from: access, to: access }).partial().strict(),
   'bot.permissions_changed': z.object({ capability: label, from: access, to: access }).partial().strict(),
   'integration.permission_changed': z.object({ integration: label, capability: label, from: access, to: access }).strict(),
@@ -123,7 +125,9 @@ export const AUDIT_METADATA = {
   'token.created': z.object({
     tokenName: label,
     expiresAt: z.string().datetime({ offset: true }).nullable(),
-    scopes: z.array(z.enum(['tasks:read', 'tasks:write', 'runs:read', 'runs:write', 'legacy:full'])).min(1).max(5),
+    // lib/tokens/format.ts TOKEN_SCOPES; inlined because this file is shared with UI code.
+    scopes: z.array(z.enum(['tasks:read', 'tasks:write', 'runs:read', 'runs:write', 'threads:read', 'threads:write', 'artifacts:read',
+      'drive:read', 'drive:write', 'bots:read', 'bots:write', 'grants:read', 'grants:write', 'legacy:full'])).min(1).max(14),
   }).partial().strict(),
   'token.revoked': none,
   'token.rotated': none,

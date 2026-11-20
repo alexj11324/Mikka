@@ -7,6 +7,7 @@ import type { ComponentType, ReactNode } from 'react'
 import type { AgentState, BoardColumn } from '@/components/blocks/kanban-board-1/components/data'
 import type { BlockReason } from '@/lib/task-blocked'
 import type { RunIndicator } from '@/lib/task-state'
+import type { IssuePriority } from '@/lib/issue-meta'
 
 export type BoardColumnFrameProps = {
   status: BoardColumn
@@ -64,8 +65,11 @@ export type BoardCardProps = {
 /** One row of the board's Filter or Sort menu; `submenu` opens to the side. */
 export type BoardMenuItem = { label: string; checked?: boolean; divider?: boolean; submenu?: BoardMenuItem[]; onSelect?: () => void }
 
-/** A column of a UI layer's whole board: a status, 受阻, or `hidden` (已隐藏), which holds the hidden statuses' cards and takes no drop. */
-export type BoardScreenColumn = { id: BoardColumn | 'hidden'; label: string; locked: boolean }
+/**
+ * A column of a UI layer's whole board: a status, 受阻, or `hidden` (已隐藏), which holds the hidden statuses' cards and takes no drop.
+ * With 显示 › Grouping on Priority the columns are the four priorities instead, and a drop changes the task's priority.
+ */
+export type BoardScreenColumn = { id: BoardColumn | IssuePriority | 'hidden'; label: string; locked: boolean }
 
 export type BoardScreenCard = {
   id: string
@@ -81,6 +85,8 @@ export type BoardScreenCard = {
   priority: string | null
   /** What the task's Agent is doing (working, waiting for the person, error) when Agent 活动 is on, or why the task sits in 受阻; with its words. Never the task's status: its column is. */
   state: { kind: AgentState; label: string; /** Set when the line is the Agent's mark, so a layer can draw Mikka's shared mark for it; absent for a 受阻 reason. */ indicator?: RunIndicator } | null
+  /** The person marked the task unread (Mark as unread). A layer with no place for it leaves it out. */
+  unread?: boolean
 }
 
 /**
