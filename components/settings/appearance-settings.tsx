@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { Image, Pencil, Plus } from '@/components/icons'
+import { ChevronRight, Image, Pencil, Plus } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import { UI_THEMES, type UiPreferences } from '@/lib/ui-preferences'
 import { useTheme } from 'next-themes'
 
 const MODES = ['light', 'dark', 'system'] as const
+const selectedFrame = 'border-2 border-sidebar-primary'
 
 /** 外观, frame 1508:710. Display mode, themes, colors and background save and paint the document. */
 export function AppearanceSettings() {
@@ -36,12 +37,12 @@ export function AppearanceSettings() {
   }
   return <>
     <SettingsSection title={t('displayMode')}>
-      <div className="flex gap-3 px-5 py-4" role="radiogroup" aria-label={t('themeLabel')}>
+      <div className="grid grid-cols-3 gap-2 px-5 py-4" role="radiogroup" aria-label={t('themeLabel')}>
         {MODES.map(mode => {
           const selected = ui.colorScheme === mode
           const label = mode === 'system' ? t('system') : t(mode)
-          return <Button key={mode} type="button" role="radio" aria-checked={selected} variant={selected ? 'secondary' : 'outline'} onClick={() => { setTheme(mode); paint({ colorScheme: mode }) }}
-            className="h-auto w-28 flex-col gap-2 p-2 text-xs">
+          return <Button key={mode} type="button" role="radio" aria-checked={selected} variant="outline" onClick={() => { setTheme(mode); paint({ colorScheme: mode }) }}
+            className={cn('h-auto min-w-0 flex-col gap-2 p-2 text-xs', selected && selectedFrame)}>
             <ModeThumb mode={mode} />
             {label}
           </Button>
@@ -56,8 +57,8 @@ export function AppearanceSettings() {
       <div className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4">
         {UI_THEMES.map(theme => {
           const selected = ui.themeId === theme.id
-          return <Button key={theme.id} type="button" aria-pressed={selected} variant={selected ? 'secondary' : 'outline'} onClick={() => paint({ themeId: theme.id, accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}
-            className="h-auto flex-col items-start gap-2 p-2 text-xs">
+          return <Button key={theme.id} type="button" aria-pressed={selected} variant="outline" onClick={() => paint({ themeId: theme.id, accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}
+            className={cn('h-auto min-w-0 flex-col items-start gap-2 p-2 text-xs', selected && selectedFrame)}>
             <ThemeThumb fill={theme.fill} accent={theme.accent} foreground={theme.foreground} />
             {t(`theme_${theme.id}` as 'theme_mikka')}
           </Button>
@@ -79,11 +80,9 @@ export function AppearanceSettings() {
       <ColorRow label={t('accent')} value={accent} onChange={next => paint(side === 'dark' ? { accentDark: next } : { themeId: 'mikka', accent: next })} />
       <ColorRow label={t('surface')} value={fill} onChange={next => paint(side === 'dark' ? { fillDark: next } : { themeId: 'mikka', fill: next })} />
       <ColorRow label={t('foreground')} value={foreground} onChange={next => paint(side === 'dark' ? { foregroundDark: next } : { themeId: 'mikka', foreground: next })} />
-      <div className="px-5 pb-2">
-        <Button type="button" variant="ghost" size="sm" aria-expanded={advanced} onClick={() => setAdvanced(open => !open)}>{t('advanced')}</Button>
-      </div>
-      {advanced ? <ColorRow label={t('border')} value={ui.border ?? '#e5e5e5'} onChange={border => paint({ border })} /> : null}
     </SettingsSection>
+    <Button type="button" variant="ghost" size="sm" className="self-start" aria-expanded={advanced} onClick={() => setAdvanced(open => !open)}>{t('advanced')}<ChevronRight data-icon /></Button>
+    {advanced ? <SettingsSection><ColorRow label={t('border')} value={ui.border ?? '#e5e5e5'} onChange={border => paint({ border })} /></SettingsSection> : null}
     <SettingsSection title={t('explore')}>
       {ui.customThemes.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">{t('myThemesEmpty')}</p> : ui.customThemes.map(theme => <SettingRow key={theme.id} title={theme.name}>
         <Button type="button" size="sm" variant="outline" onClick={() => paint({ themeId: 'mikka', accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}>{t('useTheme')}</Button>
@@ -92,20 +91,21 @@ export function AppearanceSettings() {
     <SettingsSection title={t('background')}>
       <SettingRow title={t('dashboardBackground')} description={t('dashboardHint')}>
         <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center overflow-hidden rounded-md border" style={{ background: ui.background === 'color' ? ui.accent : ui.fill }} aria-hidden>
-            <Image data-icon className="text-foreground" />
+          <span className={cn('flex size-8 items-center justify-center overflow-hidden rounded-md border', ui.background === 'color' ? 'text-primary-foreground' : 'bg-muted text-foreground')} style={ui.background === 'color' ? { background: ui.accent } : undefined} aria-hidden>
+            <Image data-icon />
           </span>
           <Button type="button" variant="ghost" size="icon" aria-label={t('editBackground')} onClick={() => paint({ background: ui.background === 'color' ? 'none' : 'color' })}>
             <Pencil data-icon />
           </Button>
         </div>
       </SettingRow>
-      <SettingRow title={t('backgroundEffect')} description={t('effectHint')}>
+      <SettingRow title={t('backgroundEffect')}>
         <SettingSelect label={t('backgroundEffect')} value={ui.backgroundEffect} options={[{ value: 'colorful', label: t('effectColorful') }, { value: 'none', label: t('backgroundNone') }]} onValueChange={value => { if (value === 'none' || value === 'colorful') paint({ backgroundEffect: value }) }} />
       </SettingRow>
       <SettingRow title={t('wallpaper')} description={ui.wallpaper === 'none' ? t('wallpaperEmpty') : t('wallpaperSaved')}>
         <Button type="button" size="sm" variant="outline" onClick={() => paint({ wallpaper: 'color' })}>{t('saveCurrent')}</Button>
       </SettingRow>
+      <p className="px-5 py-3 text-sm text-muted-foreground">{t('effectHint')}</p>
     </SettingsSection>
     <SettingsSection title={t('code')}>
       <SettingRow title={t('codeSize')} description={t('codeSizeHint')}>
@@ -130,9 +130,9 @@ export function AppearanceSettings() {
 function ModeThumb({ mode }: { mode: 'light' | 'dark' | 'system' }) {
   const light = mode !== 'dark'
   const dark = mode !== 'light'
-  return <span className="flex h-14 w-full overflow-hidden bg-muted">
-    {light ? <span className="flex flex-1 bg-card"><span className="m-1 w-3 bg-muted" /><span className="m-1 h-2 flex-1 bg-foreground/20" /></span> : null}
-    {dark ? <span className="flex flex-1 bg-foreground"><span className="m-1 w-3 bg-background/30" /><span className="m-1 h-2 flex-1 bg-background/50" /></span> : null}
+  return <span className="flex h-14 w-full overflow-hidden rounded-md">
+    {light ? <span className="flex flex-1" style={{ background: '#ffffff' }}><span className="m-1 w-3" style={{ background: '#e7e5e4' }} /><span className="m-1 h-2 flex-1" style={{ background: '#d6d3d1' }} /></span> : null}
+    {dark ? <span className="flex flex-1" style={{ background: '#171717' }}><span className="m-1 w-3" style={{ background: '#404040' }} /><span className="m-1 h-2 flex-1" style={{ background: '#525252' }} /></span> : null}
   </span>
 }
 
@@ -158,9 +158,9 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
 }
 
 function DiffPreview({ color }: { color: 'redGreen' | 'blue' }) {
-  const removed = color === 'blue' ? 'bg-sidebar-primary/15' : 'bg-destructive/15'
-  const added = color === 'blue' ? 'bg-sidebar-primary/10' : 'bg-success/15'
-  return <pre className="mx-5 mb-4 overflow-hidden rounded-md border font-mono text-xs leading-6">
+  const removed = color === 'blue' ? 'bg-sidebar-primary/20' : 'bg-destructive/15'
+  const added = color === 'blue' ? 'bg-attention/25' : 'bg-success/15'
+  return <pre className="mx-5 mb-4 rounded-md border font-mono text-xs leading-6 break-all whitespace-pre-wrap">
     <div className="px-3">1 export function add(a: number, b: number) {'{'}</div>
     <div className={cn('px-3', removed)}>- return a - b</div>
     <div className={cn('px-3', added)}>+ return a + b</div>
