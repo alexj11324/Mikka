@@ -17,11 +17,12 @@ import { ActionFailureError } from '@/lib/action-error'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { GovernanceError } from '@/lib/governance/errors'
 import { accessibleProjects } from '@/lib/project-access'
+import { isMachineSize } from '@/lib/cloud-computer/machine-pricing'
 import { environmentConfiguration, projectEnvironmentVariableInput, listProjectSetupVersionsInput, rollbackProjectSetupInput, projectSetupScope, type ProjectSetupHistory, type ProjectSetupRecipe, projectDefaultEnvironmentInput, maxProjectRepositories, projectResourceMutation, repositoryBindingInput, saveEnvironmentInput, workspaceRepositoryPolicyInput, type EnvironmentConfiguration, type ProjectExecutionSnapshot } from './contracts'
 
 type Reader = Parameters<typeof withTaskWorkspace>[0]
 const actorId = (reader: Reader) => typeof reader === 'string' ? reader : reader.id
-export type EnvironmentRow = { id: string; workspaceId: string; name: string; revision: number; configuration: EnvironmentConfiguration; archivedAt: Date | null }
+export type EnvironmentRow = { id: string; workspaceId: string; name: string; revision: number; configuration: EnvironmentConfiguration; archivedAt: Date | null; defaultMachineSize: string | null }
 type ResourceLease = { userId: string; workspaceId: string; tx: WorkspaceTransaction; active: boolean; boundary: object | undefined }
 const resourceLease = new AsyncLocalStorage<ResourceLease>()
 const currentResourceLease = () => {
@@ -140,7 +141,7 @@ async function projectRepositoryBindings(tx: WorkspaceTransaction, workspaceId: 
 export async function listProjectResources(reader: Reader, workspaceId: string, projectId?: string) {
   const read = async (tx: WorkspaceTransaction) => {
     const policy = await tx.execute(sql`select mode,"repositoryKeys",revision from workspace_repository_policies where "workspaceId"=${workspaceId}`)
-    const environments = await tx.execute<EnvironmentRow>(sql`select id,"workspaceId",name,configuration,revision,"archivedAt" from workspace_environments where "workspaceId"=${workspaceId} order by name,id`)
+    const environments = await tx.execute<EnvironmentRow>(sql`select id,"workspaceId",name,configuration,revision,"archivedAt","defaultMachineSize" from workspace_environments where "workspaceId"=${workspaceId} order by name,id`)
     const repositories = projectId ? await projectRepositoryBindings(tx, workspaceId, projectId) : []
     const bindings = projectId ? await tx.execute(sql`select "environmentId","isDefault" from workspace_project_environments where "projectId"=${projectId} and "workspaceId"=${workspaceId} order by "environmentId"`) : { rows: [] }
     return { policy: policy.rows[0] ?? { mode: 'inherit', repositoryKeys: [], revision: 0 }, environments: environments.rows, repositories, environmentBindings: bindings.rows }
@@ -215,10 +216,13 @@ async function recordSetupVersion(tx: WorkspaceTransaction, workspaceId: string,
       where latest.recipe is not distinct from nullif(${JSON.stringify(recipe)}::jsonb,'null'::jsonb))`)
 }
 
-async function persistEnvironment(tx: WorkspaceTransaction, reader: Reader, workspaceId: string, id: string, name: string, configuration: EnvironmentConfiguration, revision: number, archivedAt: Date | null) {
-  await tx.execute(sql`insert into workspace_environments(id,"workspaceId",name,configuration,revision,"archivedAt","createdBy","updatedBy")
-    values(${id},${workspaceId},${name},${JSON.stringify(configuration)}::jsonb,${revision},${archivedAt},${actorId(reader)},${actorId(reader)})
-    on conflict(id) do update set name=excluded.name,configuration=excluded.configuration,revision=excluded.revision,"archivedAt"=excluded."archivedAt","updatedBy"=excluded."updatedBy","updatedAt"=now()`)
+async function persistEnvironment(tx: WorkspaceTransaction, reader: Reader, workspaceId: string, id: string, name: string, configuration: EnvironmentConfiguration, revision: number, archivedAt: Date | null, defaultMachineSize?: string | null) {
+  // An absent size keeps the saved one (archive and restore resend the rest without it).
+  const keepSize = defaultMachineSize === undefined
+  await tx.execute(sql`insert into workspace_environments(id,"workspaceId",name,configuration,revision,"archivedAt","createdBy","updatedBy","defaultMachineSize")
+    values(${id},${workspaceId},${name},${JSON.stringify(configuration)}::jsonb,${revision},${archivedAt},${actorId(reader)},${actorId(reader)},${defaultMachineSize ?? null})
+    on conflict(id) do update set name=excluded.name,configuration=excluded.configuration,revision=excluded.revision,"archivedAt"=excluded."archivedAt","updatedBy"=excluded."updatedBy","updatedAt"=now(),
+      "defaultMachineSize"=CASE WHEN ${keepSize} THEN workspace_environments."defaultMachineSize" ELSE excluded."defaultMachineSize" END`)
   await recordSetupVersion(tx, workspaceId, id, revision, configuration)
 }
 
@@ -233,7 +237,7 @@ export async function saveEnvironment(reader: Reader, raw: z.input<typeof saveEn
     if (input.id && (!current.rowCount || Number(current.rows[0].revision) !== input.revision)) throw new ActionFailureError('projectResourceConflict')
     const revision = Number(current.rows[0]?.revision ?? 0) + 1
     const configuration = { ...input.configuration, secretIds: [...new Set(input.configuration.secretIds)], repositoryKeys: [...new Set(input.configuration.repositoryKeys)] }
-    await persistEnvironment(tx, reader, input.workspaceId, id, input.name, configuration, revision, input.archived ? new Date() : null)
+    await persistEnvironment(tx, reader, input.workspaceId, id, input.name, configuration, revision, input.archived ? new Date() : null, input.defaultMachineSize)
     await audit(tx, reader, input.workspaceId, input.archived ? 'environment.archived' : 'environment.saved', id, { revision })
     await workspaceListChanged(tx, input.workspaceId, ['workspace_settings'])
     return { id, revision }
@@ -418,7 +422,8 @@ export async function setProjectDefaultEnvironment(reader: Reader, raw: z.input<
   })
 }
 
-export type ProjectExecutionInput = { userId: string; workspaceId: string; issueId: string; repositoryKey: string | null; baseBranch: string | null; runtime: 'local' | 'cloud'; harness: string }
+/** `environmentId`: an Environment the run's request chose, used instead of the Project's default (it must still fit). */
+export type ProjectExecutionInput = { userId: string; workspaceId: string; issueId: string; repositoryKey: string | null; baseBranch: string | null; runtime: 'local' | 'cloud'; harness: string; environmentId?: string }
 
 /** Hold current membership and policy through the caller's Run transaction. Existing
  * GitHub/device authorization remains mandatory at that caller; a binding grants none. */
@@ -438,9 +443,10 @@ export async function withProjectExecution<T>(input: ProjectExecutionInput, oper
       baseBranch = binding?.baseBranch ?? input.baseBranch
       environmentId = binding?.selectedEnvironmentId ?? defaultEnvironmentId
     }
+    if (input.environmentId) environmentId = input.environmentId
     let environment: ProjectExecutionSnapshot['environment'] = null
     if (environmentId) {
-      const rows = await tx.execute<EnvironmentRow>(sql`select id,"workspaceId",name,configuration,revision,"archivedAt" from workspace_environments where id=${environmentId} and "workspaceId"=${input.workspaceId} and "archivedAt" is null`)
+      const rows = await tx.execute<EnvironmentRow>(sql`select id,"workspaceId",name,configuration,revision,"archivedAt","defaultMachineSize" from workspace_environments where id=${environmentId} and "workspaceId"=${input.workspaceId} and "archivedAt" is null`)
       const row = rows.rows[0]
       if (!row) throw new ActionFailureError('projectEnvironmentUnavailable')
       const parsed = environmentConfiguration.safeParse(row.configuration)
@@ -448,7 +454,8 @@ export async function withProjectExecution<T>(input: ProjectExecutionInput, oper
       const config = parsed.data
       if ((config.runtime !== 'any' && config.runtime !== input.runtime) || (config.harness !== 'any' && config.harness !== input.harness) || (config.repositoryKeys.length && (!input.repositoryKey || !config.repositoryKeys.includes(input.repositoryKey)))) throw new ActionFailureError('projectEnvironmentUnavailable')
       await secretsFit(input.workspaceId, config, input.repositoryKey)
-      environment = { id: row.id, revision: row.revision, name: row.name, ...config }
+      environment = { id: row.id, revision: row.revision, name: row.name, ...config, ...(input.environmentId ? { chosen: true as const } : {}),
+        ...(isMachineSize(row.defaultMachineSize) ? { defaultMachineSize: row.defaultMachineSize } : {}) }
     }
     return operation({ version: 1, workspaceId: input.workspaceId, projectId: selected?.id ?? null, projectRevision: selected?.revision ?? null, policyRevision: policy.rows[0]?.revision ?? 0, repositoryKey: input.repositoryKey, baseBranch, environment })
   }, requireExisting)

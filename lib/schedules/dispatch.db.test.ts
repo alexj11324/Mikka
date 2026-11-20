@@ -711,4 +711,82 @@ test('dispatch_task automations run as their creator through the existing create
     assert.deepEqual(await occurrence(third.occurrence.id).then(row => [row.status, row.error]), ['failed', 'scheduleStandingTaskUnavailable'])
     assert.deepEqual((await fixture.query('SELECT status,disabled_reason FROM user_schedules WHERE id=$1', [standing.id])).rows[0], { status: 'paused', disabled_reason: 'scheduleStandingTaskUnavailable' })
   })
+  const environment = async (workspaceId: string, name = 'Staging') => {
+    const id = randomUUID()
+    await fixture.query(`INSERT INTO workspace_environments(id,"workspaceId",name,configuration,"createdBy","updatedBy") VALUES($1,$2,$3,$4,$5,$5)`,
+      [id, workspaceId, name, { runtime: 'any', harness: 'any', variables: {}, secretIds: [], repositoryKeys: [] }, owner])
+    return id
+  }
+  await t.test('run settings: the Environment, model and effort, machine size and pin travel on the request; a gone Environment pauses', async () => {
+    const staging = await environment(workspace.id)
+    const settings = { environmentId: staging, model: { id: 'claude-haiku-5-5', effort: 'low' as const }, machineSize: 'standard-4-16' as const, runs: { pin: true as const } }
+    const base = definition(builder)
+    const withSettings: Definition = { ...base, ...settings, description: 'Keeps main green', task: { ...base.task as Extract<Definition['task'], { kind: 'dispatch_task' }>, agent: 'claude_code' } }
+    await assert.rejects(create({ ...withSettings, environmentId: randomUUID() }), /scheduleEnvironmentUnavailable/)
+    const { schedule } = await create(withSettings)
+    const { occurrence: started } = await runNow(schedule)
+    await tick()
+    const run = await occurrence(started.id)
+    assert.equal(run.status, 'succeeded')
+    const event = (await fixture.query('SELECT payload FROM coordinator_events WHERE id=$1', [run.result!.eventId])).rows[0]
+    assert.deepEqual(event.payload.taskCommand.run, { environmentId: staging, model: { id: 'claude-haiku-5-5', effort: 'low' }, machineSize: 'standard-4-16', pin: true })
+    const { occurrence: later } = await runNow(schedule)
+    // Archived after the run was queued: the run's own check fails it and pauses the automation.
+    await fixture.query(`UPDATE workspace_environments SET "archivedAt"=now() WHERE id=$1`, [staging])
+    await assert.rejects(runNow({ ...schedule }), /scheduleEnvironmentUnavailable|scheduleConcurrencyLimit/)
+    await tick()
+    assert.deepEqual(await occurrence(later.id).then(row => [row.status, row.error]), ['failed', 'scheduleEnvironmentUnavailable'])
+    assert.deepEqual((await fixture.query('SELECT status,disabled_reason FROM user_schedules WHERE id=$1', [schedule.id])).rows[0], { status: 'paused', disabled_reason: 'scheduleEnvironmentUnavailable' })
+  })
+
+  await t.test('Runs in an existing thread: every run is a follow-up there; another person’s thread is refused', async () => {
+    const issue = (await create()).schedule
+    const { occurrence: first } = await runNow(issue)
+    await tick()
+    const taskId = (await occurrence(first.id)).result!.id
+    const agent = randomUUID(), thread = randomUUID()
+    await fixture.query(`INSERT INTO agents(id,"userId",name,harness) VALUES ($1,$2,'Thread agent','codex')`, [agent, owner])
+    await fixture.query(`INSERT INTO agent_runs(id,"userId","workspaceId","issueId","agentId",status,prompt,"promptTaskStart","promptTaskLength",title,"titleSource")
+      VALUES ($1,$2,$3,$4,$5,'running','Fix main CI',0,11,'Fix main CI','manual')`, [thread, owner, workspace.id, taskId, agent])
+    const existing: Definition = { ...definition(builder), eachRun: 'existing_thread', singleThreadId: thread }
+    await assert.rejects(page(member, memberChat, { action: 'create', requestId: randomUUID(), definition: { ...existing, task: { ...existing.task, botId: null } as Definition['task'] } }), /scheduleThreadUnavailable/)
+    const { schedule } = await create(existing)
+    const { occurrence: started } = await runNow(schedule)
+    await tick()
+    const run = await occurrence(started.id)
+    assert.equal(run.status, 'succeeded')
+    assert.deepEqual([run.result!.id, (run.result as { continued?: boolean }).continued], [taskId, true])
+    assert.equal(Number((await fixture.query('SELECT count(*) FROM run_messages WHERE "runId"=$1', [thread])).rows[0].count), 1)
+  })
+
+  await t.test('Duplicate to: a copy as the person in this or another workspace, checked there; what it cannot use is cleared', async () => {
+    const staging = await environment(workspace.id)
+    const original = (await create({ ...definition(builder), environmentId: staging, webhook: { batchMinutes: 0 } })).schedule
+    await page(owner, chat, { action: 'webhook_key', scheduleId: original.id, version: original.version })
+    await page(owner, chat, { action: 'organize', scheduleId: original.id, folder: 'CI', tags: ['nightly'] })
+    const duplicate = (target: string, requestId = randomUUID(), who = owner, bot = chat) =>
+      page<{ schedule: Schedule & { folder: string | null; tags: string[]; webhook_key_set: boolean }; cleared: string[]; replayed: boolean }>(who, bot, { action: 'duplicate', scheduleId: original.id, targetWorkspaceId: target, requestId })
+    const requestId = randomUUID()
+    const here = await duplicate(workspace.id, requestId)
+    const coordinatorOf = async (workspaceId: string) => (await fixture.query('SELECT "botId" FROM coordinator_bots WHERE "ownerId"=$1 AND "workspaceId"=$2', [owner, workspaceId])).rows[0]?.botId ?? null
+    assert.deepEqual([here.replayed, here.cleared, here.schedule.status, here.schedule.owner_id], [false, [], 'active', owner])
+    assert.equal(here.schedule.bot_id, await coordinatorOf(workspace.id), 'reports go to the person’s Coordinator chat there')
+    assert.deepEqual([here.schedule.folder, here.schedule.tags, here.schedule.webhook_key_set], ['CI', ['nightly'], false], 'organize is kept; the webhook key is not')
+    assert.notEqual(here.schedule.id, original.id)
+    const again = await duplicate(workspace.id, requestId)
+    assert.deepEqual([again.replayed, again.schedule.id], [true, here.schedule.id], 'a retried request returns the first copy')
+
+    const other = await seedWorkspace(fixture, owner, [{ userId: owner, role: 'admin' }])
+    const away = await duplicate(other.id)
+    assert.deepEqual([...away.cleared].sort(), ['bot', 'environment'], 'the Bot and Environment of the source workspace are not usable there')
+    assert.equal(away.schedule.status, 'paused')
+    const copied = (await fixture.query<{ workspace_id: string; definition: Definition }>('SELECT workspace_id,definition FROM user_schedules WHERE id=$1', [away.schedule.id])).rows[0]!
+    assert.equal(copied.workspace_id, other.id)
+    assert.equal(copied.definition.environmentId, undefined)
+    assert.equal((copied.definition.task as { botId: string | null }).botId, null)
+    assert.equal(away.schedule.bot_id, await coordinatorOf(other.id), 'reports go to the person’s chat in the target workspace')
+
+    const foreign = await seedWorkspace(fixture, member, [{ userId: member, role: 'admin' }])
+    await assert.rejects(duplicate(foreign.id), /scheduleWorkspaceAccessDenied/, 'only a workspace the person is an active member of')
+  })
 })

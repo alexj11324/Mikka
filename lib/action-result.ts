@@ -33,6 +33,8 @@ export const ACTION_ERROR_CODES = [
   'scheduleRepositoryUnavailable',
   'scheduleDeviceUnavailable',
   'scheduleProfileUnavailable',
+  'scheduleEnvironmentUnavailable',
+  'scheduleThreadUnavailable',
   'scheduleDispatchUnavailable',
   'scheduleWorkspaceAccessDenied',
   'scheduleOwnerUnavailable',

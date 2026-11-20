@@ -56,3 +56,16 @@ test('the signed webhook batch list accepts the same status and bounded page siz
   assert.equal(webhookBatchListInput.safeParse({ scheduleId, limit: 0 }).success, false)
   assert.equal(webhookBatchListInput.safeParse({ scheduleId, limit: 101 }).success, false)
 })
+
+test('run settings belong to a dispatched task; an existing thread and its ID come together', () => {
+  const dispatch = { ...base, task: { kind: 'dispatch_task', botId: null, prompt: 'Fix CI' } } as const
+  const thread = '0f8a4a62-8f3f-4c2f-a1f8-5d6b2a0c9e11'
+  assert.equal(definitionSchema.safeParse({ ...base, environmentId: thread }).success, false, 'a reminder has no Environment')
+  assert.equal(definitionSchema.safeParse({ ...base, description: 'Says hello' }).success, true, 'any automation has a description')
+  assert.equal(definitionSchema.safeParse({ ...dispatch, environmentId: thread, model: { id: 'claude-haiku-5-5', effort: 'low' }, machineSize: 'standard-4-16', runs: { pin: true } }).success, true)
+  assert.equal(definitionSchema.safeParse({ ...dispatch, machineSize: 'huge' }).success, false)
+  assert.equal(definitionSchema.safeParse({ ...dispatch, model: { id: 'x', effort: 'extreme' } }).success, false)
+  assert.equal(definitionSchema.safeParse({ ...dispatch, eachRun: 'existing_thread' }).success, false)
+  assert.equal(definitionSchema.safeParse({ ...dispatch, singleThreadId: thread }).success, false)
+  assert.equal(definitionSchema.safeParse({ ...dispatch, eachRun: 'existing_thread', singleThreadId: thread }).success, true)
+})

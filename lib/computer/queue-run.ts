@@ -21,6 +21,7 @@ import { runListChanged } from '@/lib/live/lists'
 import { runChanged } from '@/lib/live/panels'
 import { resolveRunOrigin, type RunOrigin, type RunOriginRef } from '@/lib/run-origin'
 import type { ProjectExecutionSnapshot } from '@/lib/project-resources/contracts'
+import { requestedRunSettings, taskRunSettingsSchema, withRequestedEffort } from '@/lib/task-run-settings'
 import { assertFrozenProjectExecution, assertProjectExecutionTarget, requireProjectResourceLease } from '@/lib/project-resources/store'
 
 /** Issue access is checked by the caller. Queue and Bot binding are committed
@@ -82,14 +83,18 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     const { rows: [target] } = await (existing ?? pool).query(`SELECT repo."repoPath",repo."remoteUrl",a.harness,
         CASE WHEN source.id IS NULL THEN repo."baseBranch"
           WHEN source."agentDefinition"->'projectExecution' IS NOT NULL THEN source."agentDefinition"->'projectExecution'->>'baseBranch'
-          ELSE source."baseBranch" END AS "baseBranch"
+          ELSE source."baseBranch" END AS "baseBranch",
+        CASE WHEN source."agentDefinition"#>>'{projectExecution,environment,chosen}'='true' THEN source."agentDefinition"#>>'{projectExecution,environment,id}' END AS "chosenEnvironmentId"
       FROM device_repos repo JOIN agents a ON a.id=$2 AND a."userId"=$3
       JOIN issues i ON i.id=$4 AND i."workspaceId"=$5 AND i."ownershipState"='bound'
       LEFT JOIN agent_runs source ON source.id=$6 AND source."userId"=$3 AND source."issueId"=i.id AND source."workspaceId"=i."workspaceId"
       WHERE repo.id=$1 AND repo."userId"=$3`, [input.deviceRepoId, input.agentId, actor.userId, input.issueId, actor.workspaceId, input.frozenSourceRunId ?? input.threadRunId ?? null])
     if (!target) throw new ComputerError(409, 'Bot computer task is unavailable')
     const { withProjectExecution } = await import('@/lib/project-resources/store')
-    return withProjectExecution({ userId: actor.userId, workspaceId: actor.workspaceId, issueId: input.issueId, repositoryKey: target.remoteUrl ? target.repoPath : null, baseBranch: target.baseBranch, runtime: 'cloud', harness: target.harness },
+    // An Environment the request chose for a new thread; a continuation keeps the one its thread was admitted with.
+    const environmentId = input.frozenSourceRunId ?? input.threadRunId ? target.chosenEnvironmentId ?? undefined
+      : (await requestedRunSettings(existing ?? pool, actor.userId, input.sourceEventId)).environmentId
+    return withProjectExecution({ userId: actor.userId, workspaceId: actor.workspaceId, issueId: input.issueId, repositoryKey: target.remoteUrl ? target.repoPath : null, baseBranch: target.baseBranch, runtime: 'cloud', harness: target.harness, ...(environmentId ? { environmentId } : {}) },
       snapshot => queueCloudRun(pool, actor, input, existing, factoryContext, snapshot), Boolean(existing))
   }
   requireProjectResourceLease(actor.userId, actor.workspaceId)
@@ -100,9 +105,12 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
     if (!existing) await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
     if (digest) await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-task:${digest}`])
-    const request = input.sourceEventId ? (await client.query(`SELECT payload->'taskDestination' AS destination FROM coordinator_events
+    const request = input.sourceEventId ? (await client.query(`SELECT payload->'taskDestination' AS destination,payload->'taskCommand'->'run' AS run FROM coordinator_events
       WHERE id=$1 AND "userId"=$2 AND kind='user_message' AND ("issueId"=$3 OR "issueId" IS NULL) FOR SHARE`, [input.sourceEventId, actor.userId, input.issueId])).rows[0] : undefined
     const sponsored = request?.destination?.kind === 'cloud' && request.destination.provider === 'cloudflare'
+    // The request's run settings apply to the thread it starts, not to a continuation.
+    const settings = !input.threadRunId && request ? taskRunSettingsSchema.safeParse(request.run ?? undefined).data ?? {} : {}
+    if (input.modelDispatch) input = { ...input, modelDispatch: withRequestedEffort(input.modelDispatch, settings, model) }
     const allowLocalRecovery = input.allowLocalRecovery === true && request && request.destination == null ? true as const : undefined
     // Absent stays byte-compatible with historical fingerprints; a replay
     // cannot upgrade an old cloud-only run to a newly inferred permission.
@@ -159,7 +167,8 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
              earlierPlacement.taskId!==input.issueId || earlierPlacement.botId!==input.botId || earlierPlacement.repositoryKey!==effectiveExecution.repositoryKey)))
         throw new ComputerError(409,'Cloudflare coding task unavailable')
       frozen.taskMachine=earlierPlacement ?? {provider:'cloudflare',payer:'mikka',ownerId:actor.userId,workspaceId:actor.workspaceId,
-        taskId:input.issueId,botId:input.botId,repositoryKey:effectiveExecution.repositoryKey,requestEventId:input.sourceEventId!}
+        taskId:input.issueId,botId:input.botId,repositoryKey:effectiveExecution.repositoryKey,requestEventId:input.sourceEventId!,
+        ...(settings.machineSize ?? effectiveExecution.environment?.defaultMachineSize ? { size: settings.machineSize ?? effectiveExecution.environment!.defaultMachineSize! } : {})}
     }
     frozen.definitionDigest = workerDefinitionDigest(frozen)
     frozen.executionIdentity = await freezeExecutionIdentity(client, { userId: actor.userId, botId: runBotId, deviceId: target.deviceId, agentDefinition: frozen }, undefined, actor.workspaceId)
@@ -178,6 +187,7 @@ export async function queueCloudRun(pool: Pool, actor: { userId: string; workspa
       VALUES ($1,$2,$3,$4,$5,$6,'queued','implement',$7,$8,$9,$10,$11,0,$12,$13,$14,$15)`, [runId, actor.userId, input.issueId, input.agentId, target.deviceId, input.deviceRepoId, effectiveBaseBranch, prompt, runBotId,JSON.stringify(agentDefinition), digest ? selectionFingerprint : null, promptTaskLength, actor.workspaceId, entry.origin, entry.originRef ? JSON.stringify(entry.originRef) : null])
     if (push) await client.query(`INSERT INTO run_publications ("runId","userId","issueId","scopeVersion","issueTitle","remoteUrl","remoteKey",identifier,branch,"baseBranch","pushApproved")
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true)`, [runId, push.publication.userId, push.publication.issueId, push.publication.scopeVersion, push.publication.issueTitle, push.publication.remoteUrl, push.publication.remoteKey, push.publication.identifier, push.publication.branch, push.publication.baseBranch])
+    if (settings.pin) await client.query('UPDATE agent_runs SET "conversationPinnedAt"=clock_timestamp() WHERE id=$1', [runId])
     await client.query('INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)', [runId, input.botId, actor.workspaceId, actor.userId])
     await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state,"issueId") VALUES ($1,$2,$3,$4,$5,$6,'starting',$7) ON CONFLICT DO NOTHING`, [runId, actor.workspaceId, actor.userId, input.botId, frozen.taskMachine ? 'cloudflare-task-v1' : 'pending', randomUUID(), frozen.taskMachine ? input.issueId : null])
     await runListChanged(client, runId)

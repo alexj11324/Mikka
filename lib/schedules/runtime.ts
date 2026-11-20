@@ -5,7 +5,8 @@ import { workspacePool } from '@/lib/workspace-db'
 import { issueForUser } from '@/lib/issue-access'
 import { assertCredentialSafeChat } from '@/lib/credentials/chat-guard'
 import { armDueTimerSoon } from '@/lib/due-timer'
-import { nextScheduleDue, ScheduleStore, type AutomationSeams, type WorkspaceGuard } from './store'
+import { nextScheduleDue, ScheduleStore, type AutomationSeams, type DispatchRun, type WorkspaceGuard } from './store'
+import type { TaskRunSettings } from '@/lib/task-run-settings'
 import { ScheduleError, type Actor, type Command, type DispatchTask, type ScheduledRead } from './contract'
 
 const guard: WorkspaceGuard = async(owner,workspace,work)=>{
@@ -53,11 +54,13 @@ export const automationSeams:AutomationSeams={
     }
   },
   /** The creator's 创建并派发, keyed by the occurrence: a retried run finds the same request and the same task. */
-  async dispatch({ownerId,workspaceId,scheduleId,occurrenceId,task,event,source,single}){
+  async dispatch({ownerId,workspaceId,scheduleId,occurrenceId,task,event,source,single,thread,run}){
     const botId=await dispatchBot(ownerId,workspaceId,task)
     const [{db},{recordPersonalSubmission},{createIssueFromRequest}]=await Promise.all([import('@/lib/db'),import('@/lib/coordinator-submission'),import('@/lib/coordinator/issue-create')])
     // An event-started run carries the event after the creator's request, marked as GitHub's data or the webhook's.
     const text=event?`${task.prompt}\n\n${event}`:task.prompt
+    // An existing thread: every run is a follow-up there, as the creator would type it. The occurrence is the request ID.
+    if(thread)return continueThread(ownerId,workspaceId,thread,text,occurrenceId)
     // 追加到同一个任务: after the first run made the task, a run is a follow-up in that task's thread, as the creator
     // would type it there. The occurrence ID is the request ID, so a retried run sends it once. The task is the one the
     // current creator's first run made: after 接手 the new creator's next run makes theirs.
@@ -69,7 +72,7 @@ export const automationSeams:AutomationSeams={
       }
     }
     const {eventId}=await recordPersonalSubmission(db,ownerId,text,{botId,submissionId:occurrenceId,
-      taskCommand:{version:1,intent:'create_and_dispatch',description:text,...(task.agent?{agent:task.agent}:{})},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event&&source==='slack'?{slack:true as const}:event?{event:true as const}:{})},
+      taskCommand:{version:1,intent:'create_and_dispatch',description:text,...(task.agent?{agent:task.agent}:{}),...(runSettings(run)?{run:runSettings(run)}:{})},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event&&source==='slack'?{slack:true as const}:event?{event:true as const}:{})},
       ...(task.title?{taskTitle:task.title}:{}),...(task.destination?{taskDestination:task.destination}:{}),...(task.profileId?{profileId:task.profileId}:{})})
     const created=await createIssueFromRequest(ownerId,{sourceEventId:eventId,title:task.title??task.prompt.split(/\r?\n/,1)[0]!.slice(0,200)})
     const row=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i
@@ -85,6 +88,19 @@ export const automationSeams:AutomationSeams={
     if(!connected)return null
     try{return new Set((await linearTeams(await linearAccessToken(ownerId))).map(team=>team.id))}
     catch(error){throw new ScheduleError('scheduleLinearUnreachable',503,{cause:error})}
+  },
+  async environment(workspaceId,environmentId){
+    const {rowCount}=await workspacePool.query(`SELECT 1 FROM workspace_environments WHERE id=$1 AND "workspaceId"=$2 AND "archivedAt" IS NULL`,[environmentId,workspaceId])
+    return Boolean(rowCount)
+  },
+  /** The thread is the creator's own root run in this workspace, on a task they can still see. */
+  async thread(ownerId,workspaceId,threadId){
+    const {rows:[run]}=await pool.query<{issueId:string|null}>(`SELECT "issueId" FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3`,[threadId,ownerId,workspaceId])
+    return Boolean(run?.issueId&&await issueForUser(ownerId,run.issueId,false,undefined,{withoutBody:true}))
+  },
+  async chat(ownerId,workspaceId){
+    const {chatBotId}=await import('@/lib/coordinator/coordinator-bot')
+    return chatBotId(ownerId,null,workspaceId,{backfill:false})
   },
   async notify(notice){await (await import('@/lib/slack/automation-notice')).postRunNotice(notice)},
   /** Channels the workspace's Slack installation can see, for a creator who is a member of it; null otherwise. */
@@ -108,6 +124,27 @@ export const automationSeams:AutomationSeams={
     const answer=answers?.get('holds')
     return answer?.type==='predicate'?answer.probability>=0.5:null
   },
+}
+/** The definition's run settings as the request event stores them; undefined when there are none. */
+function runSettings(run:DispatchRun|undefined):TaskRunSettings|undefined{
+  if(!run)return undefined
+  const value:TaskRunSettings={...(run.environmentId?{environmentId:run.environmentId}:{}),...(run.model?{model:run.model}:{}),...(run.machineSize?{machineSize:run.machineSize}:{}),...(run.runs?.pin?{pin:true as const}:{})}
+  return Object.keys(value).length?value:undefined
+}
+/** One run sent to an existing thread: its latest run continues it. A thread that is gone stops the automation. */
+async function continueThread(ownerId:string,workspaceId:string,threadId:string,text:string,occurrenceId:string){
+  const [{sendThreadMessage},{ActionFailureError}]=await Promise.all([import('@/lib/thread-continue'),import('@/lib/action-error')])
+  const {rows:[row]}=await pool.query<{issueId:string;title:string;status:string;identifier:string|null}>(`SELECT i.id "issueId",i.title,i.status,r.identifier FROM agent_runs a
+    JOIN issues i ON i.id=a."issueId" LEFT JOIN task_creation_receipts r ON r."taskId"=i.id AND r."userId"=$2
+    WHERE a.id=$1 AND a."userId"=$2 AND a."workspaceId"=$3`,[threadId,ownerId,workspaceId])
+  if(!row)throw new ScheduleError('scheduleThreadUnavailable',403)
+  try{
+    const sent=await sendThreadMessage(ownerId,threadId,text,'user',occurrenceId)
+    return {id:row.issueId,title:row.title,status:row.status,identifier:row.identifier,runId:sent.runId,continued:true as const}
+  }catch(error){
+    if(error instanceof ActionFailureError&&['workspaceAccessDenied','issueNotFound','runNotFound'].includes(error.code))throw new ScheduleError('scheduleThreadUnavailable',403,{cause:error})
+    throw error
+  }
 }
 export function schedules(){return new ScheduleStore(pool,guard,async(tx,owner,id)=>{
   await tx.query('SELECT id FROM issues WHERE id=$1 FOR SHARE',[id])

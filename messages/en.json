@@ -1577,7 +1577,9 @@
     "apiKeyInvalid": "The key is invalid or has been revoked.",
     "apiKeyUnverifiable": "Couldn't verify the key right now. Try again later.",
     "apiKeyBaseUrlInvalid": "The base URL must be a public https address.",
-    "apiKeyNotFound": "This API key no longer exists."
+    "apiKeyNotFound": "This API key no longer exists.",
+    "scheduleEnvironmentUnavailable": "The selected environment is no longer available.",
+    "scheduleThreadUnavailable": "The thread it runs in is no longer available."
   },
   "Overview": {
     "sections": {
@@ -3659,7 +3661,10 @@
       },
       "restore": "Restore",
       "copyFiles": "Files to copy into the worktree, one per line",
-      "approveSetup": "Run this setup when a new worktree starts"
+      "approveSetup": "Run this setup when a new worktree starts",
+      "machineSize": "Default machine size",
+      "machineSizeDefault": "Mikka default",
+      "machineSizeOption": "{vcpu} vCPU · {gib} GiB"
     },
     "threadTitles": {
       "title": "Thread titles",
@@ -8329,9 +8334,6 @@
       "dispatch_task": "Hand to a Bot"
     },
     "editor": {
-      "eachRun": "Each run",
-      "eachRunNew": "Makes a new task",
-      "eachRunSame": "Adds to the same task",
       "notify": "Post runs to Slack",
       "notifyOff": "Don't post",
       "notifyChoose": "Choose a channel",
@@ -8449,7 +8451,8 @@
         "interval": "The interval must be between 1 minute and 1 year",
         "cron": "A cron expression has 5 fields",
         "team": "Choose a Linear team",
-        "channel": "Choose a Slack channel"
+        "channel": "Choose a Slack channel",
+        "thread": "Choose a thread to save"
       },
       "webhook": {
         "title": "Webhook",
@@ -8503,7 +8506,48 @@
         "channelsError": "Could not load Slack channels"
       },
       "viewOnly": "Only its creator can change it. Take it over to edit.",
-      "devicesError": "Devices could not load"
+      "devicesError": "Devices could not load",
+      "description": "Description",
+      "descriptionPlaceholder": "What it’s for (optional)",
+      "runsIn": "Runs in",
+      "runsInNew": "A new thread each run",
+      "runsInSame": "One standing thread",
+      "runsInExisting": "An existing thread",
+      "threadSearch": "Search threads",
+      "threadNone": "No matching threads",
+      "threadChosen": "Chosen thread",
+      "threadChange": "Change",
+      "environment": "Environment",
+      "environmentDefault": "Project default",
+      "model": "Model",
+      "modelDefault": "Agent default",
+      "effort": "Effort",
+      "effortDefault": "Model default",
+      "efforts": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "xhigh": "Extra high",
+        "max": "Max"
+      },
+      "machineSize": "Machine size",
+      "machineSizeDefault": "Environment default",
+      "machineSizeOption": "{vcpu} vCPU · {gib} GiB",
+      "pin": "Pin each run’s thread",
+      "more": "More",
+      "duplicateTo": "Duplicate to",
+      "duplicated": "Duplicated",
+      "duplicatedPaused": "Duplicated and paused. Cleared: {fields}",
+      "cleared": {
+        "bot": "Bot",
+        "machine": "Machine",
+        "profile": "Agent profile",
+        "environment": "Environment",
+        "thread": "Thread",
+        "linear": "Linear events",
+        "slack": "Slack",
+        "github": "GitHub events"
+      }
     },
     "run": {
       "from": "Started by {event} · {what}",

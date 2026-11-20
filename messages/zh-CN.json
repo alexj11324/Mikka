@@ -1577,7 +1577,9 @@
     "apiKeyInvalid": "Key 无效或已被撤销。",
     "apiKeyUnverifiable": "暂时无法验证这个 Key，请稍后重试。",
     "apiKeyBaseUrlInvalid": "Base URL 需要是公网上的 https 地址。",
-    "apiKeyNotFound": "这个 API Key 已不存在。"
+    "apiKeyNotFound": "这个 API Key 已不存在。",
+    "scheduleEnvironmentUnavailable": "选择的环境已不可用。",
+    "scheduleThreadUnavailable": "它运行的线程已不可用。"
   },
   "Overview": {
     "sections": {
@@ -3659,7 +3661,10 @@
       },
       "restore": "恢复",
       "copyFiles": "复制到工作树的文件，每行一个",
-      "approveSetup": "新工作树启动时运行这些准备步骤"
+      "approveSetup": "新工作树启动时运行这些准备步骤",
+      "machineSize": "默认机器规格",
+      "machineSizeDefault": "Mikka 默认",
+      "machineSizeOption": "{vcpu} vCPU · {gib} GiB"
     },
     "threadTitles": {
       "title": "线程标题",
@@ -8329,9 +8334,6 @@
       "dispatch_task": "交给 Bot"
     },
     "editor": {
-      "eachRun": "每次运行",
-      "eachRunNew": "新建任务",
-      "eachRunSame": "追加到同一个任务",
       "notify": "运行后发到 Slack",
       "notifyOff": "不发送",
       "notifyChoose": "选择频道",
@@ -8449,7 +8451,8 @@
         "interval": "间隔要在 1 分钟到 1 年之间",
         "cron": "cron 表达式要有 5 段",
         "team": "选一个 Linear 团队",
-        "channel": "选一个 Slack 频道"
+        "channel": "选一个 Slack 频道",
+        "thread": "选一个线程才能保存"
       },
       "webhook": {
         "title": "Webhook",
@@ -8503,7 +8506,48 @@
         "channelsError": "Slack 频道没加载出来"
       },
       "viewOnly": "只有创建者能修改。需要的话接手它。",
-      "devicesError": "设备加载失败"
+      "devicesError": "设备加载失败",
+      "description": "描述",
+      "descriptionPlaceholder": "用途（可选）",
+      "runsIn": "运行在",
+      "runsInNew": "每次新建线程",
+      "runsInSame": "同一个线程",
+      "runsInExisting": "已有线程",
+      "threadSearch": "搜索线程",
+      "threadNone": "没有匹配的线程",
+      "threadChosen": "已选线程",
+      "threadChange": "更换",
+      "environment": "环境",
+      "environmentDefault": "按项目默认",
+      "model": "模型",
+      "modelDefault": "按 Agent 默认",
+      "effort": "推理强度",
+      "effortDefault": "按模型默认",
+      "efforts": {
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "xhigh": "超高",
+        "max": "最高"
+      },
+      "machineSize": "机器规格",
+      "machineSizeDefault": "按环境默认",
+      "machineSizeOption": "{vcpu} vCPU · {gib} GiB",
+      "pin": "置顶每次运行的线程",
+      "more": "更多",
+      "duplicateTo": "复制到",
+      "duplicated": "已复制",
+      "duplicatedPaused": "已复制并暂停。已清除：{fields}",
+      "cleared": {
+        "bot": "Bot",
+        "machine": "机器",
+        "profile": "Agent 配置",
+        "environment": "环境",
+        "thread": "线程",
+        "linear": "Linear 事件",
+        "slack": "Slack",
+        "github": "GitHub 事件"
+      }
     },
     "run": {
       "from": "由「{event}」触发 · {what}",
