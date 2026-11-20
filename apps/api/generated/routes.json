@@ -200,7 +200,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "7e407e460b88f95a3545b03dcb8192990772f88015ad5a24ce832e8ac07d4509"
+      "sourceHash": "b4bc950f909db1f5af00601bc3e50eaacd885c7013625461a99affceebc80c33"
     },
     {
       "path": "/mikka/api/bots/[botId]/app-tools",
