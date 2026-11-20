@@ -5,7 +5,7 @@ import { readFileSync, existsSync, globSync } from 'node:fs'
 import { posix, resolve } from 'node:path'
 import ts from 'typescript'
 import { inventory, readTree, REQUIRED_SUITES } from '../run-db-tests.mjs'
-import tasks from './tasks.json' with { type: 'json' }
+import defaultTasks from './tasks.json' with { type: 'json' }
 
 export const sourceId = file => `source:${file}`
 export const taskId = key => `ci-${key}`
@@ -14,7 +14,7 @@ export const strictCommand = command => `bash -e -o pipefail -c '${command.repla
 export const dbId = script => `db-${script.replaceAll(':', '-')}`
 const code = /\.(?:[cm]?[jt]sx?)$/
 const testFile = /(?:\.test\.|\.spec\.|\/test[s]?\/)/
-export function buildGraph(root = process.cwd()) {
+export function buildGraph(root = process.cwd(), tasks = defaultTasks) {
   const files = execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean)
   const present = new Set(files.filter(file => existsSync(resolve(root, file))))
   const tree = readTree(root)
@@ -101,5 +101,5 @@ export function buildGraph(root = process.cwd()) {
     for (const file of files) if (file.startsWith(`${pkg.root}/`)) edge(pkg.name, sourceId(file))
   }
   add('ci-tasks', { root: 'scripts/ci', tags: ['scheduler'], targets: Object.fromEntries(Object.entries(tasks).map(([key, task]) => [key, { executor: 'nx:run-commands', cache: false, inputs: [], outputs: [], options: { command: strictCommand(task.command), cwd: '.', env: task.env } }])) })
-  return { graph: { nodes, dependencies, externalNodes: {} }, db, unresolved, files }
+  return { graph: { nodes, dependencies, externalNodes: {} }, db, unresolved, files, tasks }
 }

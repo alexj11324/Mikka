@@ -4,6 +4,7 @@ set -euo pipefail
 candidate="$PWD"
 trusted="$(mktemp -d)"
 trap 'rm -rf "$trusted"' EXIT
+unset CI_POLICY_FALLBACK
 # Use the base of a PR (including forks); main push uses its previous version.
 # Read event fields as data, never shell interpolation from a PR title/ref.
 trusted_sha="$(node --input-type=module -e '
@@ -14,7 +15,9 @@ if ! git cat-file -e "$trusted_sha^{commit}" || ! git merge-base --is-ancestor "
   echo 'Policy base is not in trusted main history; use main policy and full coverage.'
   trusted_sha=origin/main
   export CI_FORCE_FULL=true
+  export CI_POLICY_FALLBACK=true
 fi
+export CI_POLICY_SHA="$(git rev-parse "$trusted_sha^{commit}")"
 git archive "$trusted_sha" | tar -x -C "$trusted"
 if test -f "$trusted/scripts/ci/select.mjs"; then
   # Install only trusted manifests; lifecycle scripts and Nx plugins never run
@@ -30,7 +33,7 @@ import { pathToFileURL } from 'node:url'
 const { inventory, readTree } = await import(pathToFileURL(`${process.env.TRUSTED_ROOT}/scripts/run-db-tests.mjs`))
 const root = process.env.CI_CANDIDATE_ROOT
 const db = inventory(readTree(root), JSON.parse(fs.readFileSync(`${root}/package.json`)).scripts)
-const result = { docs_only: false, full: true, core: true, integration: true, source: true, daemon: true, mobile: true, desktop: true, image: true, analytics: true, db: true, units: ['*'], db_suites: db.scripts, db_matrix: { shard: ['1/4','2/4','3/4','4/4'] } }
+const result = { docs_only: false, full: true, core: true, integration: true, source: true, daemon: true, mobile: true, desktop: true, analytics: true, db: true, units: ['*'], db_suites: db.scripts, db_matrix: { shard: ['1/4','2/4','3/4','4/4'] } }
 for (const [key,value] of Object.entries(result)) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${typeof value === 'object' ? JSON.stringify(value) : value}\n`)
 fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## CI bootstrap\n\nTrusted selector not present at base: full coverage; complete candidate DB inventory validated.\n')
 JS

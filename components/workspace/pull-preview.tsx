@@ -4,15 +4,26 @@
 // action it has, then two views of the same pull request: 概览 is the facts as
 // a label/value table plus what points at it, 改动 is its size and where its
 // diff is reviewed. Nothing here repeats the row (decision 2026-11-18-1400).
+// Any PR the person can read, linked to a task or not, reads its own checks and
+// reviews (pulls/detail) and merges by itself (pulls/merge, as the person).
 import { useState } from "react";
-import { Copy, ExternalLink, X } from "lucide-react";
+import useSWR from "swr";
+import { toast } from "sonner";
+import { Copy, ExternalLink, GitMerge, X } from "lucide-react";
+import { withBasePath } from "@/lib/base-path";
 import { useTranslations } from "@/lib/intl/i18n-client";
 import { cn } from "cn";
 import { compactAge } from "@/components/nav/compact-age";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PULL_STATE_TONES } from "@/lib/pull-request-appearance";
-import { pullDirectoryState, type PullDirectoryRow, type PullState } from "@/lib/pull-directory";
+import {
+  pullDirectoryState,
+  type PullDetail,
+  type PullDirectoryRow,
+  type PullMergeResult,
+  type PullState,
+} from "@/lib/pull-directory";
 import { openGroupConversation, openTask, openThread } from "./workspace-navigation";
 import { PullRequestIcon } from "./pull-request-icon";
 
@@ -42,16 +53,84 @@ const reviewKeys: Record<ReviewState, `reviewState.${ReviewState}`> = {
   unknown: "reviewState.unknown",
 };
 
+async function readDetail(repo: string, number: number): Promise<PullDetail> {
+  const response = await fetch(
+    withBasePath("/api/integrations/github/repositories/pulls/detail?" + new URLSearchParams({ repo, number: String(number) })),
+    { cache: "no-store" },
+  );
+  if (!response.ok) {
+    await response.body?.cancel();
+    throw new Error("pullDetailReadFailed");
+  }
+  return (await response.json()) as PullDetail;
+}
+
 export function PullPreview({
-  row,
-  source,
+  row: listed,
+  source: listedSource,
   onClose,
+  onMerged,
 }: {
   row: PullDirectoryRow;
   source: boolean;
   onClose: () => void;
+  onMerged?: () => void;
 }) {
   const t = useTranslations("PullDirectory");
+  const refusal = useTranslations("FactoryAcceptance.mergeRefusal");
+  // The PR's own read: what GitHub says now, for a linked PR too. The list's row stands until it answers.
+  const detail = useSWR(
+    ["pull-detail", listed.repo, listed.number, listed.updatedAt],
+    ([, repo, number]) => readDetail(repo, number),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+  const row: PullDirectoryRow = detail.data ? { ...detail.data, threads: listed.threads } : listed;
+  const source = listedSource || Boolean(detail.data);
+  const [merging, setMerging] = useState<"idle" | "busy" | { failing: number }>("idle");
+  async function merge(confirmFailedChecks: boolean) {
+    if (!detail.data) return;
+    setMerging("busy");
+    try {
+      const response = await fetch(withBasePath("/api/integrations/github/repositories/pulls/merge"), {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          repo: detail.data.repo,
+          number: detail.data.number,
+          expectedHeadSha: detail.data.headSha,
+          confirmFailedChecks,
+        }),
+      });
+      const result = (await response.json().catch(() => ({}))) as Partial<PullMergeResult> & { error?: string };
+      if (result.kind === "needs_confirm") {
+        setMerging({ failing: result.failing ?? 0 });
+        return;
+      }
+      setMerging("idle");
+      if (result.kind === "merged") {
+        toast.success(t("states.merged"));
+        await detail.mutate();
+        onMerged?.();
+        return;
+      }
+      const code = result.kind === "refused" ? result.code : result.error;
+      toast.error(code && refusal.has(code as never) ? refusal(code as never) : t("mergeFailed"));
+      if (code === "githubMergeHeadMoved") await detail.mutate();
+    } catch {
+      setMerging("idle");
+      toast.error(t("mergeFailed"));
+    }
+  }
+  const failing = detail.data?.checkRuns.filter((check) => check.state === "failure").length ?? 0;
+  const passed = detail.data?.checkRuns.filter((check) => check.state === "success").length ?? 0;
+  const pendingChecks = detail.data?.checkRuns.filter((check) => check.state === "pending").length ?? 0;
+  const reviewers = [
+    ...new Map(
+      (detail.data?.reviews ?? [])
+        .filter((item) => item.author && item.state !== "PENDING" && item.state !== "COMMENTED")
+        .map((item) => [item.author, item.state] as const),
+    ).entries(),
+  ];
   const age = useTranslations("Nav.age");
   const [view, setView] = useState("overview");
   const [copied, setCopied] = useState<"copied" | "copyError" | null>(null);
@@ -132,10 +211,14 @@ export function PullPreview({
               <span className="text-muted-foreground">@{row.author}</span>
             </>
           )}
-          <span aria-hidden="true" className="text-muted-foreground opacity-60">·</span>
-          <span className="text-muted-foreground tabular-nums">
-            {compactAge(row.updatedAt, Date.now(), (key, values) => age(key, values))}
-          </span>
+          {row.updatedAt && (
+            <>
+              <span aria-hidden="true" className="text-muted-foreground opacity-60">·</span>
+              <span className="text-muted-foreground tabular-nums">
+                {compactAge(row.updatedAt, Date.now(), (key, values) => age(key, values))}
+              </span>
+            </>
+          )}
         </p>
       </header>
       <Tabs value={view} onValueChange={(key) => setView(String(key))} className="min-h-0 flex-1 gap-0">
@@ -147,7 +230,15 @@ export function PullPreview({
           <dl className="grid grid-cols-[5rem_minmax(0,1fr)] items-baseline gap-y-1.5 text-xs">
             {source && (
               <>
-                <Fact label={t("checks")}>{t(checkKeys[row.checks ?? "unknown"])}</Fact>
+                <Fact label={t("checks")}>
+                  {detail.data?.checkRuns.length ? (
+                    <span className="tabular-nums">
+                      {t("checkCounts", { passed, failing, pending: pendingChecks })}
+                    </span>
+                  ) : (
+                    t(checkKeys[row.checks ?? "unknown"])
+                  )}
+                </Fact>
                 <Fact label={t("review")}>
                   {t(
                     reviewKeys[
@@ -157,6 +248,17 @@ export function PullPreview({
                     ],
                   )}
                 </Fact>
+                {reviewers.length > 0 && (
+                  <Fact label={t("reviewers")}>
+                    <span className="flex flex-col items-start gap-0.5">
+                      {reviewers.map(([author, state]) => (
+                        <span key={author}>
+                          @{author} · {t(reviewKeys[state === "APPROVED" || state === "CHANGES_REQUESTED" ? state : "unknown"])}
+                        </span>
+                      ))}
+                    </span>
+                  </Fact>
+                )}
                 <Fact label={t("branch")}>
                   {row.base && row.head ? (
                     <bdi dir="ltr" className="block break-all font-mono text-xs">
@@ -272,13 +374,25 @@ export function PullPreview({
               )}
             </Fact>
           </dl>
-          {tasks[0] ? (
-            <Button size="sm" variant="secondary" className="self-start" onClick={() => openTask(tasks[0][0])}>
-              {t("openReview")}
-            </Button>
-          ) : (
-            <p className="text-xs text-muted-foreground">{t("noLinkedTask")}</p>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* The review page mounts for a task only (ReviewPageProps.taskId). */}
+            {tasks[0] && (
+              <Button size="sm" variant="secondary" onClick={() => openTask(tasks[0][0])}>
+                {t("openReview")}
+              </Button>
+            )}
+            {detail.data && (row.state === "open" || row.state === "draft") && (
+              <Button
+                size="sm"
+                variant={typeof merging === "object" ? "destructive" : "secondary"}
+                disabled={merging === "busy" || row.state === "draft" || detail.data.mergeable === "CONFLICTING"}
+                onClick={() => void merge(typeof merging === "object")}
+              >
+                <GitMerge data-icon />
+                {typeof merging === "object" ? t("mergeAnyway", { count: merging.failing }) : t("merge")}
+              </Button>
+            )}
+          </div>
           <Button
             size="sm"
             variant="ghost"

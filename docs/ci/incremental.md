@@ -27,8 +27,8 @@ imports, so deleting a test cannot remove its enrollment requirement.
 
 | Change | Selection / reason |
 | --- | --- |
-| Mobile-only | Mobile consumers, source policies/typechecks; no unrelated DB, daemon, image or native desktop |
-| Web components/hooks | Import and source-contract consumers plus source policies; no unrelated DB/image |
+| Mobile-only | Mobile consumers, source policies/typechecks; no unrelated DB, daemon or native desktop |
+| Web components/hooks | Import and source-contract consumers plus source policies; no unrelated DB |
 | Daemon | Package and imported consumers, daemon tests, required downstream contracts |
 | API/Factory/Coordinator | Reverse source closure and mapped DB suites; server path without DB proof runs all DB |
 | Protocol/shared, migrations, DB core, permissions, auth | Full validation |
@@ -64,6 +64,24 @@ The trusted selector parses candidate files as data. It never imports a candidat
 plugin or executes candidate configuration. Forks use the same path without
 secrets. The tested checkout remains GitHub's synthetic merge candidate; the
 classification diff uses the PR base/head SHAs. Unsupported events/ranges run all.
+
+A frozen dependency branch can retain an older command inventory after main's
+registry changes. In the unmerged-base fallback, a candidate with main's complete
+registry keeps the normal main-policy path. For a different registry, the current
+trusted selector proves a unique common ancestor in the fetched main history and
+reads that ancestor's registry as JSON. The base and tested checkout must retain
+its complete CI configuration, manifests, runner and plugin bytes. Test paths and
+Git modes must match, including TypeScript type tests and Go tests; working files
+must match the committed checkout. Existing self-hosted dependency declarations
+cannot be changed or removed; appended declarations still pass the normal
+self-hosted acceptance checks. Same-name test bodies can change as part of the
+reviewed backport. The proof preserves task names, commands, kinds and environments,
+and selects every task in that registry with full validation of all other lanes
+and the entire candidate DB inventory. It never executes the ancestor's selector,
+trusts a branch-name allowlist, drops unknown tasks or converts a failed proof to
+a partial selection. The selection report records the policy, ancestor and registry
+blob identities. The original runner still rejects unknown tasks.
+
 When introducing the selector on a base that predates it, inventory is validated
 with the old trusted runner and every lane runs in full. Candidate shadow reports
 have no job outputs and cannot authorize skips.
@@ -82,7 +100,7 @@ Required status names remain `UI policy (strict)`, `Production build and browser
 interactions`, `Browser tests (before merge)` and external GitGuardian. Gates
 check each selected lane must succeed and each unselected lane must be skipped;
 failure, timeout, cancellation, missing output or unexpected skip cannot pass.
-Selected Docker, Desktop and Analytics PR workflows are reusable jobs of CI and their actual conclusions feed `UI policy (strict)`. They no longer also start a duplicate standalone PR run. Main keeps the existing independent image publication and release entrypoints. No workflow-level path filter is added to required workflows. Main concurrency,
+Selected Analytics runs as a reusable CI job, and its conclusion feeds `UI policy (strict)`. Desktop keeps its separate acceptance workflow. No workflow-level path filter is added to required workflows. Main concurrency,
 OIDC, daemon/Desktop exact-source CI gates, E2B release pairs and publication
 checks are unchanged. Existing browser-gate remains a compatibility status only;
 this change adds no browser tests.

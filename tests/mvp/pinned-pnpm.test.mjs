@@ -106,7 +106,6 @@ const scopeRoot = fileURLToPath(new URL('../..', import.meta.url))
 const sharedInstallPath = '.github/actions/pnpm-install/action.yml'
 const githubTokenExpression = '$' + '{{ github.token }}'
 const inputTokenExpression = '$' + '{{ inputs.ffmpeg-github-token }}'
-const publicWorldExpression = "env.PUBLISH_IMAGE != 'true' && '@workflow/world-postgres' || ''"
 const syntheticToken = 'fixture-only-not-a-real-token'
 const readYaml = path => yaml.load(readFileSync(join(scopeRoot, path), 'utf8'))
 const sharedAction = () => readYaml(sharedInstallPath)
@@ -128,31 +127,6 @@ function assertCredentialScopes(workflow) {
       assert.equal(grant, githubTokenExpression, 'ONLY_EXISTING_JOB_TOKEN')
       assert.ok(apiReadOnly(permissions), 'READ_ONLY_API_TOKEN_REQUIRED: ' + name)
     }
-  }
-}
-function assertPublicImageBuild(build) {
-  assert.ok(build, 'PUBLIC_IMAGE_BUILD_REQUIRED')
-  assert.equal(build.env?.FFMPEG_GITHUB_TOKEN, undefined)
-  if (typeof build.run === 'string') {
-    assert.doesNotMatch(build.run, /--secret\s+[^\n]*ffmpeg_github_token/)
-    return
-  }
-  assert.match(build.uses ?? '', /^docker\/build-push-action@[0-9a-f]{40}$/, 'PINNED_PUBLIC_IMAGE_ACTION_REQUIRED')
-  const inputs = build.with ?? {}
-  // Using the checked-out source avoids Buildx supplying Git auth to a remote context.
-  assert.equal(inputs.context, '.', 'PUBLIC_IMAGE_LOCAL_CONTEXT_REQUIRED')
-  for (const key of ['secrets', 'secret-envs', 'secret-files', 'github-token'])
-    assert.ok(!inputs[key], `PUBLIC_IMAGE_SECRET_INPUT: ${key}`)
-  for (const line of (inputs['build-args'] ?? '').split('\n').map(value => value.trim()).filter(Boolean)) {
-    assert.match(line, /^[A-Za-z_][A-Za-z0-9_]*=/, 'PUBLIC_IMAGE_EXPLICIT_BUILD_ARG_REQUIRED')
-    assert.doesNotMatch(line, /(?:ffmpeg[_-])?github[_-]token/i, 'PUBLIC_IMAGE_CREDENTIAL_BUILD_ARG')
-    for (const match of line.matchAll(/\$\{\{(.*?)\}\}/g))
-      assert.ok(
-        ['github.sha', 'steps.image-inputs.outputs.worker-sha'].includes(match[1].trim()) ||
-          (line.startsWith('WORKFLOW_TARGET_WORLD=') &&
-            match[1].trim() === publicWorldExpression),
-        'PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG'
-      )
   }
 }
 function resolveInstallValue(value, inputs) {
@@ -202,7 +176,7 @@ function installLifecyclePresence(t, install, inputs = {}, inherited = '') {
 }
 
 test('shared install defaults to no credential and overrides ambient legacy tokens in real lifecycle scripts', async t => {
-  const caller = sharedStep(readYaml('.github/workflows/self-hosted-image.yml').jobs.image)
+  const caller = sharedStep(readYaml('.github/workflows/ci-dependencies.yml').jobs['desktop-dependencies'])
   assert.ok(caller)
   assert.equal(caller.with?.['ffmpeg-github-token'], undefined)
   for (const inherited of ['', syntheticToken]) {
@@ -229,27 +203,10 @@ test('the actual composite input and all workflow opt-ins preserve the process c
   for (const name of readdirSync(join(scopeRoot, '.github/workflows')).filter(name => /\.ya?ml$/.test(name))) {
     assertCredentialScopes(readYaml('.github/workflows/' + name))
   }
-  const image = readYaml('.github/workflows/self-hosted-image.yml').jobs.image
-  const build = image.steps.find(step => step.name === 'Build the public standalone application')
-  assertPublicImageBuild(build)
+
 })
 
-test('the public image action refuses secret channels and credential-bearing build arguments', () => {
-  const build = { uses: 'docker/build-push-action@' + 'a'.repeat(40), with: { context: '.' } }
-  const withInput = inputs => ({ ...build, with: { ...build.with, ...inputs } })
-  for (const key of ['secrets', 'secret-envs', 'secret-files', 'github-token'])
-    assert.throws(() => assertPublicImageBuild(withInput({ [key]: 'fixture' })), /PUBLIC_IMAGE_SECRET_INPUT/)
-  assert.throws(() => assertPublicImageBuild(withInput({ context: undefined })), /PUBLIC_IMAGE_LOCAL_CONTEXT_REQUIRED/)
-  assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'IMPLICIT' })), /PUBLIC_IMAGE_EXPLICIT_BUILD_ARG_REQUIRED/)
-  assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'FFMPEG_GITHUB_TOKEN=fixture' })), /PUBLIC_IMAGE_CREDENTIAL_BUILD_ARG/)
-  assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'ALIAS=' + githubTokenExpression })), /PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG/)
-  assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': "OTHER=${{ env.PUBLISH_IMAGE != 'true' && '@workflow/world-postgres' || '' }}" })), /PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG/)
-  assert.doesNotThrow(() => assertPublicImageBuild(withInput({ 'build-args': 'WORKFLOW_TARGET_WORLD=${{ ' + publicWorldExpression + ' }}' })))
-  for (const expression of ['secrets.WORKFLOW_TARGET_WORLD', 'env.WORKFLOW_TARGET_WORLD', 'env.PUBLISH_IMAGE'])
-    assert.throws(() => assertPublicImageBuild(withInput({ 'build-args': 'WORKFLOW_TARGET_WORLD=${{ ' + expression + ' }}' })), /PUBLIC_IMAGE_NONPUBLIC_BUILD_ARG/)
-  assert.throws(() => assertPublicImageBuild({ uses: 'docker/build-push-action@main' }), /PINNED_PUBLIC_IMAGE_ACTION_REQUIRED/)
-  assert.throws(() => assertPublicImageBuild({ run: 'docker build --secret id=ffmpeg_github_token .' }))
-})
+
 
 test('credential opt-ins honor job overrides and reject unknown or API-write permissions', async t => {
   for (const [name, workflowPermissions, jobPermissions, allowed] of [

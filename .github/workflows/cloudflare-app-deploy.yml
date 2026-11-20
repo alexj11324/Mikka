@@ -343,6 +343,13 @@ jobs:
         if: steps.select.outputs.status == 'selected'
         working-directory: operations
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify migration admission before preparing the product
+        if: steps.select.outputs.status == 'selected'
+        working-directory: operations
+        env:
+          GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ steps.source-token.outputs.token }}
+        run: node operations/business-api/pipeline-preflight.mjs
       - name: Install pinned product client and verification dependencies
         if: steps.select.outputs.status == 'selected'
         working-directory: operations/product
@@ -538,6 +545,13 @@ jobs:
         if: steps.select.outputs.status == 'selected'
         working-directory: operations
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify migration admission before preparing the product
+        if: steps.select.outputs.status == 'selected'
+        working-directory: operations
+        env:
+          GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ steps.source-token.outputs.token }}
+        run: node operations/business-api/pipeline-preflight.mjs
       - name: Install pinned product client and verification dependencies
         if: steps.select.outputs.status == 'selected'
         working-directory: operations/product

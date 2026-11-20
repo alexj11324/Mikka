@@ -5,6 +5,8 @@ import { taskAgentSchema } from '@/lib/task-create-command'
 import { slackUserId } from '@/lib/slack/user-id'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
+import { MACHINE_SIZES, type MachineSize } from '@/lib/cloud-computer/machine-pricing'
+import { MODEL_ROUTING_EFFORTS } from '@/lib/model-routing'
 
 export class ScheduleError extends Error {
   constructor(public code: string, public status = 409, options?: ErrorOptions) { super(code, options); this.name = 'ScheduleError' }
@@ -83,21 +85,48 @@ export type EventTrigger = z.infer<typeof eventTriggerSchema>
 export type GitHubEventTrigger = Extract<EventTrigger, { source: 'github' }>
 export type LinearEventTrigger = Extract<EventTrigger, { source: 'linear' }>
 export type SlackEventTrigger = Extract<EventTrigger, { source: 'slack' }>
+/** Reasoning effort a run asks its model for; the model's own default when absent. */
+export const AUTOMATION_EFFORTS = MODEL_ROUTING_EFFORTS
+export type AutomationEffort = typeof AUTOMATION_EFFORTS[number]
+const machineSizeSchema = z.enum(Object.keys(MACHINE_SIZES) as [MachineSize, ...MachineSize[]])
+/** Organize: applied to the thread each run starts, for the automation's creator. Threads have no folders or tags yet. */
+const runsOrganizeSchema = z.object({ pin: z.literal(true).optional() }).strict()
+const DISPATCH_ONLY = ['environmentId', 'singleThreadId', 'model', 'machineSize', 'runs'] as const
 export const definitionSchema = z.object({
   title: z.string().trim().min(1).max(200), timezone: z.string().min(1).max(100), timing: timingSchema, task: taskSchema,
+  /** What the automation is for, shown under its name. */
+  description: z.string().trim().min(1).max(2000).optional(),
+  /** The workspace Environment (repositories, setup, variables) each run uses. */
+  environmentId: z.uuid().optional(),
+  /** eachRun 'existing_thread': the thread (its root run) every run is sent to as a follow-up. */
+  singleThreadId: z.uuid().optional(),
+  /** The model each run's task asks for, and its reasoning effort; the Agent's default when absent. */
+  model: z.object({ id: z.string().trim().min(1).max(200), effort: z.enum(AUTOMATION_EFFORTS).optional() }).strict().optional(),
+  /** The size of the Cloudflare machine each run gets; the Environment's default, else Mikka's, when absent. */
+  machineSize: machineSizeSchema.optional(),
+  runs: runsOrganizeSchema.optional(),
   misfire: z.enum(['skip', 'catch_up_once']), maxLatenessMinutes: z.number().int().min(1).max(10080),
   maxConcurrent: z.number().int().min(1).max(5).optional(),
   /** Runs started on one day in the automation's time zone; past it, timed and event runs are skipped and 立即运行 refused. */
   maxRunsPerDay: z.number().int().min(1).max(500).optional(),
-  /** dispatch_task: 'new' makes a task at every run; 'single' makes one and sends each later run to it as a follow-up. */
-  eachRun: z.enum(['new_task', 'same_task']).optional(),
+  /** dispatch_task: 'new_task' makes a task at every run; 'same_task' makes one and sends each later run to it as a
+   * follow-up; 'existing_thread' sends every run to `singleThreadId`. */
+  eachRun: z.enum(['new_task', 'same_task', 'existing_thread']).optional(),
   /** 满足任一条件就运行: event triggers beside the timing. Only an automation that hands a Bot a task has them. */
   events: z.array(eventTriggerSchema).min(1).max(20).optional(),
   /** Webhook: the automation's own URL starts a run; requests within `batchMinutes` of the first go to one run. */
   webhook: z.object({ batchMinutes: z.number().int().min(0).max(60) }).strict().optional(),
   /** 运行后发到 Slack: each finished run is posted to this channel of the workspace's Slack, in the locale saved here. */
-  notify: z.object({ slack: z.object({ channel: z.string().regex(/^[CG][A-Z0-9]{2,30}$/), locale: z.enum(['zh-CN', 'en']) }).strict() }).strict().optional(),
+  notify: z.object({ slack: z.object({
+    channel: z.string().regex(/^[CG][A-Z0-9]{2,30}$/), locale: z.enum(['zh-CN', 'en']),
+    /** Post with the run-as person's name and picture (chat:write.customize) instead of the app's. */
+    postAsRunner: z.boolean().optional(),
+    /** One plain line: no footer, no status card. */
+    quiet: z.boolean().optional(),
+  }).strict() }).strict().optional(),
 }).strict()
+  .refine(value => value.task.kind === 'dispatch_task' || DISPATCH_ONLY.every(key => value[key] === undefined), { message: 'eventTriggersNeedDispatchTask', path: ['task'] })
+  .refine(value => (value.eachRun === 'existing_thread') === (value.singleThreadId !== undefined), { message: 'singleThreadRequired', path: ['singleThreadId'] })
   .refine(value => !value.events || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['events'] })
   .refine(value => !value.webhook || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['webhook'] })
   .refine(value => !value.notify || value.task.kind === 'dispatch_task', { message: 'eventTriggersNeedDispatchTask', path: ['notify'] })
@@ -106,6 +135,10 @@ const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/',
 export const scheduleListInput = z.object({
   scheduleId: z.uuid().optional(),
   deleted: z.boolean().optional(),
+  /** 我的自动化: only those the reader created. */
+  owner: z.literal('me').optional(),
+  /** 定时: only those that run on a schedule (one-shot, interval, daily or cron), whatever else triggers them. */
+  trigger: z.literal('schedule').optional(),
   limit: z.number().int().min(1).max(SCHEDULE_PAGE_MAX).optional(),
   cursor: scheduleCursor.optional(),
 }).strict()
@@ -141,6 +174,12 @@ export const commandSchema = z.discriminatedUnion('action', [
   // 立即运行: one occurrence due now. The same requestId never adds a second one.
   z.object({ action: z.literal('run_now'), scheduleId: z.uuid(), version: z.number().int().positive(), requestId: z.uuid() }).strict(),
   z.object({ action: z.literal('cancel_run'), scheduleId: z.uuid(), runId: z.uuid(), version: z.number().int().positive() }).strict(),
+  // Duplicate to: a copy in this or another workspace the person can write to, checked again there. Fields the target
+  // cannot use are cleared and reported; the copy starts paused when any were. The webhook key and pins are not copied.
+  z.object({ action: z.literal('duplicate'), scheduleId: z.uuid(), targetWorkspaceId: z.uuid(), requestId: z.uuid() }).strict(),
+  // Runs as: who each dispatched run acts, is billed and posts as; null is the creator. A person can name only themselves
+  // (consent). The creator, an owner/admin or that person can return it to the creator.
+  z.object({ action: z.literal('run_as'), scheduleId: z.uuid(), version: z.number().int().positive(), userId: z.string().min(1).max(200).nullable() }).strict(),
   // 用量: runs and cost per day in the automation's time zone, newest first.
   z.object({ action: z.literal('usage'), scheduleId: z.uuid(), days: z.number().int().min(1).max(90).optional() }).strict(),
 ])

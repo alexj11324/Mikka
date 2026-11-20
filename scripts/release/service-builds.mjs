@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { lstat, readFile, readlink, writeFile } from 'node:fs/promises'
 import { dirname, join, posix, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildMigrationContext, validateHistoricalMigrations, validateMigrationManifest } from './migration-inputs.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const sha = /^[a-f0-9]{40}$/
@@ -82,7 +83,7 @@ export async function buildContexts({ directory = root, inputs, overlayCommit = 
   const migrationPatterns = inputs.migrations.map(pattern)
   const migrations = files.filter(file => migrationPatterns.some(match => match.test(file))).sort()
   return { version: 1, sourceCommit, overlayCommit, services,
-    migrations: { contextDigest: await hashFiles(directory, migrations, { version: 1, kind: 'migrations' }), files: migrations } }
+    migrations: await buildMigrationContext({ directory, files, sqlFiles: migrations }) }
 }
 
 function imports(source) {
@@ -187,20 +188,30 @@ export function validateServiceManifest(name, service) {
   return service
 }
 
-export function validateReleaseManifest(manifest) {
+function validateReleaseServices(manifest) {
   assert.equal(manifest?.version, 1)
   assert.match(manifest.sourceCommit ?? '', sha)
   assert.ok(manifest.overlayCommit === null || sha.test(manifest.overlayCommit ?? ''))
   assert.deepEqual(Object.keys(manifest.services ?? {}).sort(), [...serviceNames].sort())
   for (const [name, service] of Object.entries(manifest.services)) validateServiceManifest(name, service)
-  assert.match(manifest.migrations?.contextDigest ?? '', digest)
-  assert.ok(Array.isArray(manifest.migrations.files) && manifest.migrations.files.every(file => /^drizzle\/[^/]+\.sql$/.test(file)))
+}
+
+export function validateReleaseManifest(manifest) {
+  validateReleaseServices(manifest)
+  validateMigrationManifest(manifest.migrations)
+  return manifest
+}
+
+/** Historical receipts stay unchanged; they cannot authorize a new candidate. */
+export function validateHistoricalReleaseManifest(manifest) {
+  validateReleaseServices(manifest)
+  validateHistoricalMigrations(manifest.migrations)
   return manifest
 }
 
 /** Reuse preserves the original source and immutable artifacts, not the new release's commit. */
 export function releaseManifest(plan, published, previous = null) {
-  if (previous) validateReleaseManifest(previous)
+  if (previous) validateHistoricalReleaseManifest(previous)
   const services = {}
   for (const name of serviceNames) {
     const context = plan.services[name]

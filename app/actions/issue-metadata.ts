@@ -14,11 +14,13 @@ import { workspaceDb } from '@/lib/workspace-db'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 import { projectViewsForTasks } from '@/lib/project-access'
 import { issuePropertyChoices } from '@/lib/issue-property-choices'
-import { requireIssueAccess } from '@/lib/issue-access'
+import { requireIssueAccess, requireUser } from '@/lib/issue-access'
 import { listWorkspaceProjects } from '@/app/actions/projects'
 import { issueView } from '@/lib/task-identifier-server'
 import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema, readIssueMetadata } from '@/lib/issue-metadata'
 import { scheduleIssueEffect } from '@/lib/issue-effects'
+import { issueAssignedEvent } from '@/lib/coordinator-events'
+import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { activityActor } from '@/lib/activity-actor'
 import { requireCurrentIssueWorkspace, requireLockedIssueScope, withIssueWorkspace } from '@/lib/issue-scope-authorization'
 
@@ -56,6 +58,20 @@ export async function getIssuePropertyOptions(id: string) {
     labels: choices.labels,
     isOwner: user.id === issue.userId,
   }
+  })
+}
+
+/** 新建任务's Assignee, Labels and Access choices for one workspace, before any task exists: its active members and
+ * the labels already on tasks the person can see. Bots come from the person's own Bot list (listBots). */
+export async function getNewTaskOptions(workspaceId: string) {
+  const user = await requireUser()
+  return withTaskWorkspace(user, workspaceId, async (workspace, membership) => {
+    const active = await membership.select({ id: workspaceMembers.userId }).from(workspaceMembers)
+      .where(and(eq(workspaceMembers.workspaceId, workspace.id), eq(workspaceMembers.status, 'active')))
+    const members = active.length ? await db.select({ id: users.id, name: users.name, image: users.image }).from(users)
+      .where(inArray(users.id, active.map(member => member.id))) : []
+    const { labels } = await issuePropertyChoices(user, workspace.id, db)
+    return { viewerId: user.id, members: members.sort((a, b) => (a.id === user.id ? -1 : b.id === user.id ? 1 : a.name.localeCompare(b.name))), labels }
   })
 }
 
@@ -137,7 +153,13 @@ export async function updateIssueMetadata(input: { id: string; revision: number;
           const added = await tx.insert(issueMembers).values({ issueId: issue.id, userId: issue.userId, memberId: assignee.id }).onConflictDoNothing().returning({ memberId: issueMembers.memberId })
           if (added.length) await issueMembersChanged(tx, issue.id)
         }
-        return { issue: await issueView(saved, tx) }
+        const view = await issueView(saved, tx)
+        // Assigning a Bot wakes it in its own chat (Capy's issue_activity); it decides whether to start work.
+        if (delegate?.kind === 'bot' && (metadata.delegate?.kind !== 'bot' || metadata.delegate.id !== delegate.id)) {
+          await recordCoordinatorEvent(tx, issueAssignedEvent({ id: saved.id, ownerId: user.id, identifier: view.identifier ?? null, title: saved.title, revision: saved.revision },
+            delegate, { name: user.name || delegate.name }))
+        }
+        return { issue: view }
       })))
       if ('issue' in result && result.issue?.linearSyncPolicy === 'explicit' && !result.issue.linearSyncBlocked && result.issue.linearTargetVerified) scheduleIssueEffect({ kind: 'sync', issueId: result.issue.id })
       return result

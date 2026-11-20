@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { chmod, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -6,8 +7,86 @@ import { join } from 'node:path'
 import test from 'node:test'
 import { checkedServiceCache, selectServicePublications, stageContext, trustedBuildSource } from './service-build-ci.mjs'
 import { registryImage, serviceDigest, serviceNames } from './service-builds.mjs'
+import { UI_SLOTS, uiOverlay } from '../../lib/ui-overlay.mjs'
 
 const revision = 'a'.repeat(40), merge = 'b'.repeat(40)
+
+async function selectionFixture(t) {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-build-selection-'))
+  t.after(() => rm(directory, { recursive: true, force: true }))
+  const operations = join(directory, '.operations-input')
+  const releases = join(operations, 'docs/operations/releases')
+  await mkdir(releases, { recursive: true })
+  const staging = join(releases, 'hosted-api-staging.json')
+  const input = join(releases, 'deploy-build-inputs.json')
+  const stagingBytes = JSON.stringify({ source: revision, overlaySource: revision }) + '\n'
+  await writeFile(staging, stagingBytes)
+  await writeFile(input, JSON.stringify({ version: 1, overlaySource: merge }) + '\n')
+  const git = args => execFileSync('git', args, { cwd: operations, encoding: 'utf8', stdio: 'pipe' })
+  git(['init', '--quiet']); git(['add', '.'])
+  git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'approved build input'])
+  // Execute the production step itself; this source-only workflow has no package install.
+  const workflow = await readFile(new URL('../../.github/workflows/cloudflare-api-image.yml', import.meta.url), 'utf8')
+  const selections = workflow.split('\n        id: selection\n')
+  assert.equal(selections.length, 2)
+  const step = selections[1].split('\n      - ')[0]
+  const run = step.split('        run: |\n')[1]?.replace(/^ {10}/gm, '')
+  assert.ok(run)
+  const output = join(directory, 'output')
+  const select = async () => {
+    await writeFile(output, '')
+    const result = spawnSync('bash', ['-e', '-c', run], {
+      cwd: directory, encoding: 'utf8', env: { PATH: process.env.PATH, GITHUB_OUTPUT: output },
+    })
+    assert.ifError(result.error)
+    return { ...result, output: await readFile(output, 'utf8') }
+  }
+  return { directory, input, staging, stagingBytes, select }
+}
+
+test('automatic builds select an independent compatible UI pin while preserving the serving staging request', async t => {
+  const { directory, staging, stagingBytes, select } = await selectionFixture(t)
+  const requiredAdditions = new Set(['automation-editor', 'automations', 'pull-directory'])
+  for (const pin of [revision, merge]) {
+    const slots = join(directory, pin, 'slots')
+    await mkdir(slots, { recursive: true })
+    for (const name of UI_SLOTS) {
+      if (pin === revision && requiredAdditions.has(name)) continue
+      await writeFile(join(slots, name + '.tsx'), '')
+    }
+  }
+  // A pinned official build must still reject the old provider inventory.
+  assert.throws(() => uiOverlay(directory, { MIKKA_UI_OVERLAY_DIR: revision, MIKKA_UI_OVERLAY_SHA: revision }),
+    /UI_OVERLAY_SLOT_REQUIRED: automation-editor/)
+  const result = await select()
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.stdout, '')
+  const selected = /^overlay=([a-f0-9]{40})\n$/.exec(result.output)?.[1]
+  assert.ok(selected)
+  assert.doesNotThrow(() => uiOverlay(directory, { MIKKA_UI_OVERLAY_DIR: selected, MIKKA_UI_OVERLAY_SHA: selected }))
+  assert.equal(selected, merge)
+  assert.equal(await readFile(staging, 'utf8'), stagingBytes)
+})
+
+test('an unavailable or invalid independent build input fails closed without falling back to staging or disclosing input', async t => {
+  const { input, staging, stagingBytes, select } = await selectionFixture(t)
+  const invalid = [null, [], {}, { version: 1 }, { overlaySource: merge },
+    { version: '1', overlaySource: merge }, { version: 2, overlaySource: merge },
+    { version: 1, overlaySource: merge.toUpperCase() }, { version: 1, overlaySource: merge.slice(1) },
+    { version: 1, overlaySource: merge + '\n' }, { version: 1, overlaySource: 17 },
+    { version: 1, overlaySource: merge, source: revision }]
+  for (const bytes of [...invalid.map(value => JSON.stringify(value)), 'invalid-json', null]) {
+    if (bytes === null) await rm(input)
+    else await writeFile(input, bytes)
+    const result = await select()
+    assert.equal(result.status, 1)
+    assert.equal(result.stdout, '')
+    assert.equal(result.stderr, 'APPROVED_BUILD_SELECTION_UNAVAILABLE\n')
+    assert.equal(result.output, '')
+    assert.equal(await readFile(staging, 'utf8'), stagingBytes)
+  }
+})
+
 function event(kind) {
   const ref = kind === 'push' ? 'refs/heads/main' : 'refs/pull/23/merge'
   const sha = kind === 'push' ? revision : merge

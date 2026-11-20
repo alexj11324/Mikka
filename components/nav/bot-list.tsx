@@ -4,7 +4,7 @@ import type { ReactNode } from 'react'
 import { useCallback, useMemo, useRef } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { useLiveBotChatList, useLiveGroupList } from '@/hooks/use-live-lists'
-import type { BotView } from '@/app/actions/bots'
+import { followBot, listBotEnvironments, setBotAccess, updateBot, type BotView, type FollowedBotView } from '@/app/actions/bots'
 import useSWR, { unstable_serialize } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { pullRequestsState } from '@/lib/directory-pulls'
@@ -76,7 +76,7 @@ export type BotLifecycle = { archive: (bot: BotView, archived: boolean) => void;
 /** What a row's menu asks the page for: a Bot's profile (its chat's 概览), and a thread's new title. */
 export type ChatNavPage = { openProfile: (target: ChatTarget) => void; renameThread: (thread: { target: { kind: 'run' | 'chat'; id: string }; title: string }) => void }
 
-export function useChatNav({ bots, archivedBots = [], workspaceId, active, userId, presentations, onLeaveGroup, lifecycle, page }: { bots: BotView[]; archivedBots?: BotView[]; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[]; presentations: Readonly<Record<string, TaskPresentation>>; onLeaveGroup?: (group: GroupSummary) => void; lifecycle?: BotLifecycle; page?: ChatNavPage }): { entries: ChatNavEntry[]; archived: ChatNavEntry[]; hidden: ChatNavEntry[]; reloadGroups: () => Promise<unknown>; referenceGroups: GroupSummary[]; /** 全部标为已读: every thread and chat this list shows (Capy's menu item). */ markAllRead: () => Promise<void> } {
+export function useChatNav({ bots, archivedBots = [], followedBots = [], shareable = false, workspaceId, active, userId, presentations, onLeaveGroup, lifecycle, page }: { bots: BotView[]; archivedBots?: BotView[]; followedBots?: FollowedBotView[]; /** A team workspace: the row menu offers Share. */ shareable?: boolean; workspaceId: string | null; active: ChatTarget | null; userId: string; threads?: Thread[]; issues?: Issue[]; presentations: Readonly<Record<string, TaskPresentation>>; onLeaveGroup?: (group: GroupSummary) => void; lifecycle?: BotLifecycle; page?: ChatNavPage }): { entries: ChatNavEntry[]; archived: ChatNavEntry[]; hidden: ChatNavEntry[]; followed: ChatNavEntry[]; reloadGroups: () => Promise<unknown>; referenceGroups: GroupSummary[]; /** 全部标为已读: every thread and chat this list shows (Capy's menu item). */ markAllRead: () => Promise<void> } {
   const i18nText = useTranslations()
   const chatRows = useChatRows({ bots, workspaceId, active, userId })
   const { rows, hiddenRows, unreadCount, latestMessage, groupMessageId, summary, muted, reloadGroups, referenceGroups } = chatRows
@@ -85,6 +85,12 @@ export function useChatNav({ bots, archivedBots = [], workspaceId, active, userI
   const {data: sidebar} = useSWR(sidebarKey, () => listConversationSidebar(), {revalidateOnFocus:false})
   useLiveKey('thread_list', workspaceId, sidebarKey ? [unstable_serialize(sidebarKey)] : [], workspaceId)
   useLiveKey('group_list', workspaceId, sidebarKey ? [unstable_serialize(sidebarKey)] : [], workspaceId)
+  // Move to ›: the workspace's Environments, read once with the list (decision 2026-11-19-2100). Only a page that offers the Bot's lifecycle offers it.
+  const { data: environments } = useSWR(workspaceId && lifecycle ? ['bot-environments', workspaceId] : null, async () => {
+    const result = await listBotEnvironments(workspaceId ?? undefined)
+    if (result.error) throw new Error(result.error)
+    return result.environments
+  }, { revalidateOnFocus: false, shouldRetryOnError: false })
   // A row's highlight reads exactly two facts about `active`, and the page builds that object afresh on
   // every render: depend on the two values, not on the object, or these rows could never be reused.
   const activeKind = active?.kind ?? null
@@ -166,6 +172,15 @@ export function useChatNav({ bots, archivedBots = [], workspaceId, active, userI
         ...chatUnreadActions({ kind: 'bot', botId, latestMessageId: latestMessage(botId) }, unread),
         ...(bot && state ? hideActions({ kind: 'bot', botId }, state.hidden) : []),
       ] : []),
+      // Share › and Move to › (Capy's Captain row): who can find the Bot, and the Environment it works in.
+      ...(bot && menu.current.lifecycle && shareable ? [
+        { id: 'share' as const, label: i18nText('Nav.botMenu.share'), run: () => {}, children: (['private', 'shared'] as const).map(visibility => ({
+          id: 'choice' as const, label: i18nText(visibility === 'shared' ? 'Shell.newBot.accessShared' : 'Shell.newBot.accessPrivate'), checked: (bot.visibility ?? 'private') === visibility,
+          run: () => runChange(setBotAccess(bot.id, { visibility }, workspaceId ?? undefined).then(result => { if (result.error) throw new ChatRowActionError(400) })) })) },
+      ] : []),
+      ...(bot && menu.current.lifecycle && environments?.length ? [{ id: 'moveTo' as const, label: i18nText('Nav.botMenu.moveTo'), run: () => {}, children: environments.map(environment => ({
+          id: 'choice' as const, label: environment.name, checked: bot.environmentId === environment.id,
+          run: () => runChange(updateBot({ botId: bot.id, environmentId: environment.id }, workspaceId ?? undefined).then(result => { if (result.error) throw new ChatRowActionError(400) })) })) }] : []),
       ...(bot && menu.current.lifecycle ? [
         { id: 'archive' as const, label: i18nText('Nav.botMenu.archive'), run: () => menu.current.lifecycle?.archive(bot, true) },
         { id: 'delete' as const, label: i18nText('Nav.botMenu.delete'), danger: true, run: () => menu.current.lifecycle?.askDelete(bot) },
@@ -201,10 +216,18 @@ export function useChatNav({ bots, archivedBots = [], workspaceId, active, userI
         { id: 'unarchive', label: i18nText('Nav.botMenu.unarchive'), run: () => menu.current.lifecycle?.archive(bot, false) },
         { id: 'delete', label: i18nText('Nav.botMenu.delete'), danger: true, run: () => menu.current.lifecycle?.askDelete(bot) },
       ] })) : []
-    return { entries, archived, hidden }
+    // 订阅的 Bot: teammates' Bots the person follows. Their chat is their owner's, so a row opens its menu: its threads, or unfollow.
+    const followed = followedBots.map((bot): ChatNavEntry => ({ id: bot.id, kind: 'bot', name: bot.name, unread: false, current: false, target: { kind: 'bot', botId: bot.id },
+      avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" still />,
+      face: density => <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size={density === 'detailed' ? 'list' : 'pill'} still />,
+      actions: [
+        { id: 'viewAll', label: i18nText('ConversationDirectory.viewAll'), run: () => navigate({ section: 'conversations', directoryBot: bot.id, issue: null, task: null, thread: null, threads: null }) },
+        { id: 'unfollow', label: i18nText('Nav.botMenu.unfollow'), run: () => runChange(followBot(bot.id, false, workspaceId ?? undefined).then(result => { if (result.error) throw new ChatRowActionError(400) })) },
+      ] }))
+    return { entries, archived, hidden, followed }
   // Every value the rows read. The menu callbacks are read through `menu`, so their identity (always new)
   // never rebuilds a row — only whether the page offers them at all, which is what the three flags carry.
-  }, [bots, archivedBots, workspaceId, userId, presentations, i18nText, sidebar, chatRows, activeKind, activeId, Boolean(onLeaveGroup), Boolean(lifecycle), Boolean(page)]) // eslint-disable-line react-hooks/exhaustive-deps -- `menu` holds the callbacks themselves
+  }, [bots, archivedBots, followedBots, shareable, environments, workspaceId, userId, presentations, i18nText, sidebar, chatRows, activeKind, activeId, Boolean(onLeaveGroup), Boolean(lifecycle), Boolean(page)]) // eslint-disable-line react-hooks/exhaustive-deps -- `menu` holds the callbacks themselves
   // 全部标为已读 (Capy's Threads section): the threads and the person's own group chats go in one bulk write
   // (lib/thread-reads.ts `readAll`); a chat keeps its own read position (conversation_reads 'bot:<id>' and the
   // group's receipts), which that write leaves alone, so each unread chat is read through the same writer its

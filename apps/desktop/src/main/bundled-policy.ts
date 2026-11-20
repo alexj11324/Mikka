@@ -97,6 +97,11 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   // A chat attachment is read, and removed from the composer, by the same person.
   [new RegExp(`^/api/chat/attachments/${ID}$`), ['GET', 'DELETE']],
   [new RegExp(`^/api/tasks/${ID}/attachments$`), ['GET', 'POST', 'DELETE']],
+  // New-task dictation (S2) transcribes one recording for the signed-in member.
+  [/^\/api\/tasks\/dictation$/, ['POST']],
+  // PR directory (S3): one PR's preview reads its detail and merges it; both re-check the reader's repository access.
+  [/^\/api\/integrations\/github\/repositories\/pulls\/detail$/, ['GET']],
+  [/^\/api\/integrations\/github\/repositories\/pulls\/merge$/, ['POST']],
   [new RegExp(`^/api/artifacts/shared/${ID}$`), ['GET']],
   [new RegExp(`^/api/(?:mobile/(?:bots|artifacts)/${ID}|runs/${ID}/evidence)$`), ['GET']],
   [new RegExp(`^/api/factory/(?:agent-profiles/${ID}|tasks/${ID}(?:/(?:approval|dispatch(?:/cloud)?|evidence/${ID}))?|questions/${ID}(?:/recover)?|monitor-incidents/${ID}/links)$`), ['GET', 'POST', 'PATCH', 'DELETE']],

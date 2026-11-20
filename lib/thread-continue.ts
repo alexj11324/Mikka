@@ -82,6 +82,21 @@ export async function sendThreadMessage(userId: string, runId: string, text: str
   return continueThread(userId, parsed.data.text, source, chain, undefined, delivery, parsed.data.modelChoice)
 }
 
+/**
+ * A peer's message to a thread it was allowed to steer (decision 2026-11-19-2200),
+ * delivered on the owner's chain and admission but recorded as `peer`: no owner
+ * receipt, no Factory request epoch, never an editable owner row. A working
+ * thread gets it as a peer message (or a native steer); an ended thread
+ * continues in the same thread. Peers cannot attach the owner's chat files.
+ */
+export async function sendPeerThreadMessage(userId: string, runId: string, text: string, delivery?: 'steer'): Promise<{ runId: string; continued: boolean }> {
+  const parsed = z.object({ runId: z.uuid(), text: z.string().trim().min(1).max(10_000) }).safeParse({ runId, text })
+  if (!parsed.success || splitChatFiles(parsed.data.text).files.length) throw new ActionFailureError('messageRequired')
+  const chain = await readRunChain(pool, userId, parsed.data.runId)
+  if (!chain) throw new ActionFailureError('runNotFound')
+  return continueThread(userId, parsed.data.text, 'peer', chain, undefined, delivery)
+}
+
 /** Only the question that already existed when this owner submitted may be
  * retried. Never re-enter ordinary dispatch, target the chain's newer run or
  * forward an old answer as a mailbox message. */
@@ -236,7 +251,9 @@ async function continueThread(userId: string, text: string, source: Source,
   if ('error' in result) throw new ActionFailureError(isActionErrorCode(result.error) ? result.error : 'runInvalid')
   if (result.thread === 'message') return { runId: result.runId, continued: false }
   // The words are already in the new run's note; this row shows them in the thread and is never delivered again.
-  const display = db.insert(runMessages).values({ id: sourceEventId ?? crypto.randomUUID(), runId: result.runId, userId, text, origin: 'owner', mailboxWakeDepth: -1, deliveredAt: new Date() })
+  // A peer's or orchestrator's words stay theirs, as addRunMessage records them: never the owner's, never editable.
+  const origin = source === 'user' || (typeof source === 'object' && source.source === 'human') ? 'owner' : 'peer'
+  const display = db.insert(runMessages).values({ id: sourceEventId ?? crypto.randomUUID(), runId: result.runId, userId, text, origin, mailboxWakeDepth: -1, deliveredAt: new Date() })
   if (sourceEventId) await display.onConflictDoNothing()
   else await display
   await runChanged(db, result.runId)

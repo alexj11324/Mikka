@@ -18,7 +18,7 @@ bindings. Current workflow files define the triggers and selected coverage.
   are **different** operations; neither changes long-term public build ownership.
   See [build-source-of-truth.md](../../docs/operations/build-source-of-truth.md).
 - Ordinary acceptance uses API/CLI flows under decision 2026-11-01-1520.
-  Targeted Desktop, Analytics and self-hosted jobs retain their selected browser
+  Targeted Desktop and Analytics jobs retain their selected browser
   checks. `browser-gate.yml` only keeps the protected check name
   `Browser tests (before merge)` and passes at once; delete it once that name
   is removed from the required checks in the repository settings.
@@ -278,7 +278,7 @@ for identities, rollout, source exposure boundaries and recovery.
 ## Dependency-aware selection
 
 `ci-selection.yml` supplies the same trusted decision to CI, Analytics SSR,
-Desktop and Self-hosted image. Nx Core follows explicit root-file, workspace,
+and Desktop. Nx Core follows explicit root-file, workspace,
 source-contract and DB feature-marker edges; candidate code is parsed, not
 executed during classification. Source/security policies stay enabled, and
 unmapped/unsafe/global inputs expand coverage. Core/integration commands are
@@ -289,12 +289,9 @@ and Monday 03:23 UTC run complete CI. No Nx Cloud, remote test cache, browser E2
 or release credentials are added. See [policy and commands](../../docs/ci/incremental.md)
 and [measured results](../../docs/ci/1699-results.md).
 
-Selected Desktop, Analytics and Docker PR checks now run as reusable jobs of CI;
-their conclusions are included in `UI policy (strict)`. Main image publication
-remains independent, and source-SHA release gates are unchanged.
-
-Selected reusable calls consume CI's trusted decision without running another
-selector. Independent dispatches and Image pushes still classify their changes.
+Selected reusable jobs consume CI's trusted decision without running another
+selector. The Analytics conclusion contributes to `UI policy (strict)`.
+Independent dispatches still classify their changes.
 Desktop checks and Electron acceptance run on Linux. Mac packaged acceptance,
 local-driver permission probes and installer acceptance are removed from CI;
 the standalone acceptance drivers remain available for explicit local runs.

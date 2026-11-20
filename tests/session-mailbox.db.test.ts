@@ -110,4 +110,37 @@ test('session mailbox schema and store', { skip: !dbUrl }, async t => {
     const fresh = await store.send({ ...actors[0], notificationDepth: -1 }, { to: actors[1].mailboxId, key: randomUUID(), text: 'Unrelated authenticated owner request' })
     assert.equal((await pool.query('select id from coordinator_events where "dedupeKey"=$1', [`mailbox:${fresh.id}`])).rowCount, 1)
   })
+
+  await t.test('another member\'s Bot or run is reachable only with canSteer; a Coordinator and another tenant never are (decision 2026-11-19-2200)', async () => {
+    const owner = await seedUser(pool, 'mailbox-acl-owner'), teammate = await seedUser(pool, 'mailbox-acl-peer'), outsider = await seedUser(pool, 'mailbox-acl-out')
+    const ws = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: teammate, role: 'member' }])
+    const other = await seedWorkspace(pool, outsider, [{ userId: outsider, role: 'admin' }])
+    const ownerBot = await seedBot(pool, ws.id, owner), peerBot = await seedBot(pool, ws.id, teammate), outsiderBot = await seedBot(pool, other.id, outsider)
+    const store = new SessionMailbox(pool, ws.id)
+    const target = await store.conversation(owner, 'bot', ownerBot)
+    const coordinator = await store.conversation(owner, 'coordinator')
+    const sender = await store.conversation(teammate, 'bot', peerBot)
+    const send = (to: string, text = 'Peer note') => store.send(sender, { to, key: randomUUID(), text })
+    await assert.rejects(send(target.mailboxId), /Recipient unavailable/, 'no grant, no delivery')
+    assert.ok(!(await store.recipients(sender)).recipients.some((row: { id: string }) => row.id === target.mailboxId), 'not even listed')
+    // The sender Bot's own grant on the target Bot.
+    await pool.query(`insert into resource_access_grants ("resourceKind","resourceId","subjectKind","subjectId",capabilities) values ('bot',$1,'bot',$2,'{canSteer}')`, [ownerBot, peerBot])
+    assert.ok((await store.recipients(sender)).recipients.some((row: { id: string }) => row.id === target.mailboxId))
+    const sent = await send(target.mailboxId, 'Cross-user peer note')
+    const { rows: [row] } = await pool.query('select "userId",origin,"mailboxId" from run_messages where id=$1', [sent.id])
+    assert.deepEqual(row, { userId: owner, origin: 'peer', mailboxId: target.mailboxId }, 'it lands in the recipient owner\'s inbox as peer data')
+    const event = await pool.query('select "userId","botId",kind from coordinator_events where "dedupeKey"=$1', [`mailbox:${sent.id}`])
+    assert.deepEqual(event.rows, [{ userId: owner, botId: ownerBot, kind: 'run_report' }], 'the recipient Bot\'s owner is woken')
+    const inbox = await store.inbox(target)
+    assert.ok(inbox.messages.some((message: { id: string }) => message.id === sent.id))
+    // A Coordinator stays private, even with a grant on something else.
+    await assert.rejects(send(coordinator.mailboxId), /Recipient unavailable/)
+    // A grant to a Bot of another tenant never reaches across.
+    await pool.query(`insert into resource_access_grants ("resourceKind","resourceId","subjectKind","subjectId",capabilities) values ('bot',$1,'bot',$2,'{canSteer}')`, [ownerBot, outsiderBot])
+    const foreign = await new SessionMailbox(pool, other.id).conversation(outsider, 'bot', outsiderBot)
+    await assert.rejects(new SessionMailbox(pool, other.id).send(foreign, { to: target.mailboxId, key: randomUUID(), text: 'from elsewhere' }), /Recipient unavailable/)
+    // A suspended recipient is unreachable whatever was granted.
+    await pool.query(`update mikka_workspace_members set status='suspended' where "workspaceId"=$1 and "userId"=$2`, [ws.id, owner])
+    await assert.rejects(send(target.mailboxId), /Recipient unavailable/)
+  })
 })

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { setupRecipeSchema } from '@mikka/protocol/device'
 import { isReservedEnvName, SECRET_NAME } from '@/lib/secrets/format'
+import { MACHINE_SIZES, type MachineSize } from '@/lib/cloud-computer/machine-pricing'
 
 /** The normalized key already used by device_repos, never a credential or a URL. */
 export const projectRepositoryKey = z.string().trim().toLowerCase()
@@ -27,6 +28,8 @@ export const saveEnvironmentInput = z.object({
   workspaceId: z.uuid(), id: z.uuid().optional(), revision: z.number().int().positive().optional(),
   name: z.string().trim().min(1).max(120), configuration: environmentConfiguration,
   archived: z.boolean().default(false),
+  /** The machine size runs in this Environment get by default; null is Mikka's default, absent keeps the saved one. */
+  defaultMachineSize: z.enum(Object.keys(MACHINE_SIZES) as [MachineSize, ...MachineSize[]]).nullable().optional(),
 }).strict()
 export const repositoryBindingInput = z.object({
   repositoryKey: projectRepositoryKey, baseBranch: projectBranch.nullable().default(null),
@@ -95,5 +98,7 @@ export interface ProjectExecutionSnapshot {
   policyRevision: number
   repositoryKey: string | null
   baseBranch: string | null
-  environment: ({ id: string; revision: number; name: string } & EnvironmentConfiguration) | null
+  /** `chosen`: the run's request named it instead of the Project's default, so the thread's next runs keep it.
+   * `defaultMachineSize`: the Environment's machine size when the run was admitted. */
+  environment: ({ id: string; revision: number; name: string; chosen?: true; defaultMachineSize?: MachineSize } & EnvironmentConfiguration) | null
 }

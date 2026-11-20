@@ -278,6 +278,8 @@ const AUTOMATION = 'b0000000-0000-4000-8000-000000000001'
 const automation = { id: AUTOMATION, owner_id: OWNER, owner_name: 'Ada', workspace_id: WORKSPACE, bot_id: null, visibility: 'workspace' as const, status: 'active' as const, version: 2, next_at: '2026-11-06T14:00:00.000Z',
   definition: { title: 'Morning triage', timezone: 'America/New_York', timing: { kind: 'cron' as const, expression: '0 9 * * 1-5' }, task: { kind: 'dispatch_task' as const, botId: BOT, prompt: 'Triage new issues' }, misfire: 'skip' as const, maxLatenessMinutes: 30, maxConcurrent: 1 } }
 Object.assign(fixtures, {
+  'task-list.listUnreadTaskIds': () => [],
+  'task-list.countTaskListViews': () => ({ forYou: 0, assigned: 0, created: 0, mentioned: 0, all: 0 }),
   'automations.listAutomations': () => ({ schedules: [automation], nextCursor: null }),
   'automations.getAutomation': () => ({ automation }),
   'automations.automationHistory': () => ({ occurrences: [{ id: 'c0000000-0000-4000-8000-000000000001', due_at: AT, started_at: AT, finished_at: AT, status: 'succeeded', attempts: 1, error: null, result: { id: ISSUE, title: 'Fix sign-in redirect', identifier: 'MIK-7' } }] }),
@@ -286,6 +288,10 @@ Object.assign(fixtures, {
   'bots.listBotsForWorkspace': (workspaceId: unknown) => workspaceId === WORKSPACE ? bots : [],
   'automations.automationUsage': () => ({ timezone: 'America/New_York', maxRunsPerDay: 5, days: [{ day: '2026-11-05', runs: 2, skipped: 0, tasks: 2, costMicroUsd: 420000 }] }),
   'bots.getWorkspaceBotDefaults': () => ({ defaultModel: null, defaultRepository: null, models: [], repositories: ['v2/github.com/acme/web'] }),
+  // The editor's Environment choice (one read when it opens).
+  // Runs as' choices (one read when the editor opens).
+  'automations.automationRunAsChoices': () => ({ members: [{ id: OWNER, name: 'Ada' }] }),
+  'project-resources.listProjectResources': () => ({ policy: { mode: 'inherit', repositoryKeys: [], revision: 0 }, environments: [], repositories: [], environmentBindings: [] }),
 })
 // A bodyless native create prewarms the mapped session without starting a turn.
 // The public v27 protocol reports tail -1 until its first delivery; resume catches up and closes while idle.
@@ -305,6 +311,7 @@ routes['/api/factory/questions'] = () => ({ questions: [] })
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })
+routes['/api/settings/issue-states'] = () => ({ states: [], canEdit: false })
 const GROUP = '90000000-0000-4000-8000-000000000001'
 const groupMessage = (position: number, authorType: 'user' | 'bot', body: string) => ({ id: `90000000-0000-4000-8000-00000000000${position + 1}`, conversationId: GROUP, position: String(position), authorType, authorId: authorType === 'user' ? OWNER : BOT, body, mentions: [], replyToId: null, createdAt: AT })
 // A bot is answering: the case that used to re-read the chat every 2.5 s.

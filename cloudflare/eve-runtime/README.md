@@ -8,7 +8,22 @@ and reclamation belong to the Sandbox Provider.
 
 ## Build and initialize
 
-Use the public GitHub Actions Eve image workflow with frozen dependencies. Its
+In cloud Linux with Docker, Node 24 and frozen dependencies installed, run:
+
+```sh
+pnpm check:eve-image
+```
+
+The same command runs in the existing Eve pull request image job. It checks the
+model, Stop and packaging contracts before compilation, builds Eve and its shared
+resources once with network access disabled, then builds a local Docker image.
+It verifies that exact image ID against the resource manifest, source and
+Postgres World metadata, its non-root startup configuration and entry syntax.
+It sends no provider request and does not publish an image. Starting the real
+server and its health route requires an isolated PostgreSQL World; this command
+does not establish live model or Stop acceptance.
+
+Use the protected public GitHub Actions Eve image workflow for publication. Its
 Node build selects `NITRO_PRESET=node-server` and
 `WORKFLOW_TARGET_WORLD=@workflow/world-postgres`, then packages the compiled output with
 `node scripts/package-cf-eve-host.mjs`. The image starts that output with

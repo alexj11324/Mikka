@@ -19,10 +19,12 @@ import { cn } from "cn";
 import { withBasePath } from "@/lib/base-path";
 import {
   pullGroups,
+  pullSinceRanges,
   pullStates,
   pullViewStates,
   type PullFilters,
   type PullGroup,
+  type PullSince,
   type PullState,
   type SavedPullView,
 } from "@/lib/pull-directory";
@@ -61,6 +63,11 @@ const stateKeys: Record<PullState, `states.${PullState}`> = {
   merged: "states.merged",
   closed: "states.closed",
 };
+const sinceKeys: Record<PullSince, `since.${PullSince}`> = {
+  day: "since.day",
+  week: "since.week",
+  month: "since.month",
+};
 const groupKeys: Record<PullGroup, `groups.${PullGroup}`> = {
   state: "groups.state",
   repo: "groups.repo",
@@ -88,6 +95,8 @@ export function activeFilterCount(filters: PullFilters, repo: string) {
     repo ? filters.author : "",
     repo ? filters.label : "",
     filters.linked ? "linked" : "",
+    filters.since,
+    filters.project,
   ].filter(Boolean).length;
 }
 
@@ -108,6 +117,7 @@ export function PullFilterBar({
   onApplyView,
   onDeleteView,
   onSaveView,
+  projects,
 }: {
   filters: PullFilters;
   grouping: PullGroup;
@@ -123,8 +133,10 @@ export function PullFilterBar({
   onGrouping: (grouping: PullGroup) => void;
   onRefresh: () => void;
   onApplyView: (view: SavedPullView) => void;
-  onDeleteView: (name: string) => void;
+  onDeleteView: (id: string) => void;
   onSaveView: () => void;
+  /** The workspace projects the person can read, for the Project condition. */
+  projects: { id: string; name: string }[];
 }) {
   const t = useTranslations("PullDirectory");
   const [conditionsOpen, setConditionsOpen] = useState(false);
@@ -164,6 +176,20 @@ export function PullFilterBar({
       property: t("label"),
       value: filters.label,
       clear: { label: "" },
+    });
+  if (filters.since)
+    chips.push({
+      key: "since",
+      property: t("created"),
+      value: t(sinceKeys[filters.since]),
+      clear: { since: "" },
+    });
+  if (filters.project)
+    chips.push({
+      key: "project",
+      property: t("project"),
+      value: projects.find((project) => project.id === filters.project)?.name ?? t("unknownProject"),
+      clear: { project: "" },
     });
   if (filters.linked)
     chips.push({
@@ -231,6 +257,42 @@ export function PullFilterBar({
                   ))}
                 </NativeSelect>
               </ConditionRow>
+              <ConditionRow label={t("created")}>
+                <NativeSelect
+                  size="sm"
+                  aria-label={t("created")}
+                  value={filters.since}
+                  onChange={(event) => onChange({ since: event.target.value as PullFilters["since"] })}
+                  className="w-full"
+                >
+                  <NativeSelectOption value="">{t("anyTime")}</NativeSelectOption>
+                  {pullSinceRanges.map((range) => (
+                    <NativeSelectOption key={range} value={range}>
+                      {t(sinceKeys[range])}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </ConditionRow>
+              <ConditionRow label={t("project")}>
+                <NativeSelect
+                  size="sm"
+                  aria-label={t("project")}
+                  value={filters.project}
+                  onChange={(event) => onChange({ project: event.target.value })}
+                  className="w-full"
+                  disabled={!projects.length && !filters.project}
+                >
+                  <NativeSelectOption value="">{t("anyProject")}</NativeSelectOption>
+                  {filters.project && !projects.some((project) => project.id === filters.project) && (
+                    <NativeSelectOption value={filters.project}>{t("unknownProject")}</NativeSelectOption>
+                  )}
+                  {projects.map((project) => (
+                    <NativeSelectOption key={project.id} value={project.id}>
+                      {project.name}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </ConditionRow>
               {repo && (
                 <>
                   <ConditionRow label={t("author")}>
@@ -276,7 +338,7 @@ export function PullFilterBar({
                 size="sm"
                 disabled={!active}
                 onClick={() => {
-                  onChange({ state: "", author: "", label: "", linked: false });
+                  onChange({ state: "", author: "", label: "", linked: false, since: "", project: "" });
                   setConditionsOpen(false);
                 }}
               >
@@ -341,7 +403,7 @@ export function PullFilterBar({
             <DropdownMenuGroup>
               <DropdownMenuLabel>{t("savedViews")}</DropdownMenuLabel>
               {views.map((view) => (
-                <DropdownMenuItem key={view.name} onClick={() => onApplyView(view)}>
+                <DropdownMenuItem key={view.id} onClick={() => onApplyView(view)}>
                   <span className="flex-1 truncate">{view.name}</span>
                   <Button
                     variant="ghost"
@@ -349,7 +411,7 @@ export function PullFilterBar({
                     aria-label={t("deleteView", { name: view.name })}
                     onClick={(event) => {
                       event.stopPropagation();
-                      onDeleteView(view.name);
+                      onDeleteView(view.id);
                     }}
                   >
                     <X data-icon />

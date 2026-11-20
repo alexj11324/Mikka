@@ -34,7 +34,8 @@ test('remote Web Workspace selection survives bearer-only HTTP and never broaden
   const runtime = serve({ manual: true, gracefulShutdown: false, silent: true, trustProxy: false,
     fetch: request => { assert.ok(application); return application.fetch(request) },
   })
-  const server: Server = createServer(runtime.node!.handler)
+  // Fixture imports can outlive idle sockets; this suite closes every connection in finally.
+  const server: Server = createServer({ keepAliveTimeout: 0 }, runtime.node!.handler)
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
   const address = server.address(); assert.ok(address && typeof address !== 'string')
   const origin = `http://127.0.0.1:${address.port}`
