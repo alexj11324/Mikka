@@ -274,13 +274,22 @@ claims before source credential access, then verifies the selected private
 checkout belongs to canonical operations main before installing or importing it.
 The private driver independently checks source and original Cloud Services
 qualification before selecting provider credentials and the fixed operation.
+The three marketing emergency recovery actions instead require authenticated
+original resource or permit evidence before any resource write.
 
-The entry uses `cloudflare-runtime-release`, a read-only repository-scoped source
-App token and a separate public Actions token. Provider locators, operation
-requests, raw reports and recovery records stay private. Public output contains
+The entry uses `cloudflare-runtime-release`, read-only repository-scoped source
+App tokens and a separate public Actions token. Marketing uses its own website
+token, selected independently of operations ownership. Provider locators, fixed
+request documents, raw reports and recovery records stay private. Public output contains
 the operation status and a checksum for evidence retained and read back from the
 existing private storage. The original private workflows and prior receipts stay
 intact during the transition; source checks do not establish runtime acceptance.
+
+Public operator drivers are checked out at immutable approved source revisions
+before installing their locked dependencies. Canary and daemon revisions come
+from fixed reviewed private request files; an absent canary request refuses the
+operation. Manual observation is separate from the original scheduled observer
+and private JIT runner; admitting one does not prove the others work.
 
 ## Official UI overlay
 
