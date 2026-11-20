@@ -73,6 +73,12 @@ fixture proves its own behavior and compilation; it does not prove that the
 official paid slot still matches the public props. Review the official capture
 before accepting a visual change.
 
+Some public default slots deliberately reject unsupported rendering. A scene
+that reaches such a guard is blocked for that build variant; preserve the real
+error. A blank/error page or two identical error captures are not screenshot
+acceptance. Record the official overlay result separately, and leave an
+unsupported default scene unverified until its actual renderer is implemented.
+
 Fixture auth stays in the dedicated loopback proxy and uses real BetterAuth
 sessions. Do not turn fixture headers into a production auth shortcut. Freeze
 only fixture-owned data/time/IDs; keep the changed renderer and route owners real.
@@ -109,8 +115,11 @@ and readbacks below before declaring a runtime accepted.
 leases, cleanup manifests, and quarantine. `session.mjs` supplies authenticated
 owner/peer transports; `bootstrap.mjs` verifies environment identity. Prefer
 `withTestAccounts` for a new scoped check so release runs in `finally`.
-The local-loop and fixture runners already use the supported owners; do not
-register unrelated accounts or craft cookies beside them.
+The local-loop runner already uses these supported owners; do not register
+unrelated accounts or craft cookies beside it. The UI fixture is a separate
+disposable-data case: it owns fixed, namespaced identities in its guarded
+loopback database and signs in through real BetterAuth. That identity proves
+fixture rendering, not an account-pool lease or ordinary runtime acceptance.
 
 Use the CLI for metadata inspection after the environment is initialized:
 

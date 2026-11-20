@@ -18,6 +18,10 @@ build of the official public/private pair. Public-only builds prove compilation,
 not the official appearance. CI, packaged clients, serving production, and
 external provider installation remain distinct evidence scopes.
 
+Run typecheck, lint, unit tests, and isolated database tests for the changed
+scope while implementing it. Acceptance adds the behavior and evidence check;
+it does not remove applicable source, security, or database CI gates.
+
 ## 1. Review the scope plan
 
 The runner sends the checker the immutable source revision, issue requirements,

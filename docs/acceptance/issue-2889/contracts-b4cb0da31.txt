@@ -1,0 +1,42 @@
+✔ accepts a version-bound scripted local-loop declaration and item summary (5.082938ms)
+▶ requires a visible non-placeholder section
+  ✔ missing (0.650177ms)
+  ✔ empty template comment (1.383129ms)
+  ✔ placeholder (0.389336ms)
+  ✔ commented section (0.242791ms)
+  ✔ example in a fence (0.295607ms)
+  ✔ fenced declaration (0.362292ms)
+  ✔ unclosed fenced declaration (0.34276ms)
+  ✔ indented declaration (0.513834ms)
+  ✔ duplicate (0.428586ms)
+✔ requires a visible non-placeholder section (7.470656ms)
+✔ UI screenshots belong to Acceptance, with a reasoned exemption available (1.897911ms)
+✔ detects renamed UI files and does not require screenshots for API handlers or tests (0.363887ms)
+▶ Not needed requires a concrete reason
+  ✔ empty (0.263955ms)
+  ✔ TBD (0.145035ms)
+  ✔ <reason> (0.327027ms)
+  ✔ ... (0.166913ms)
+✔ Not needed requires a concrete reason (1.607728ms)
+✔ Production only requires an external limitation, owner and internal account alias (1.229172ms)
+✔ draft declarations are not acceptance passes and are evaluated when ready (0.228711ms)
+✔ evidence must identify runtime, scripted model, fixture and tested revision (0.778649ms)
+✔ section parsing retains report fences and nested headings (1.208438ms)
+✔ missing evidence posts failure and label; a PR edit posts success and removes it (93.899828ms)
+✔ all changed-file pages participate in screenshot admission (29.530096ms)
+✔ editing the body during the check cannot publish a stale success (8.872528ms)
+✔ a previous-head success never supplies acceptance for a changed head (36.712796ms)
+✔ a head change during the check leaves the old head pending instead of passing (9.319823ms)
+✔ draft stays pending without evaluating files or adding a missing-evidence label (12.489039ms)
+✔ read-only inspection does not mutate the PR (10.848251ms)
+✔ publishing fails closed for an incomplete GitHub file inventory (4.451938ms)
+✔ an edited webhook invalidates the same-head success before a failed PR read (4.283296ms)
+✔ a delayed webhook checks and publishes the current head instead of reusing its event head (13.407256ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 422.555081
