@@ -385,3 +385,90 @@ test('maintenance patch is captured from the genuine driver and changes only ins
     assert.ok(!repeated.stdout.includes('MIKKA_EVE_WORKFLOW_POSTGRES_PATCH='))
   } finally { await rm(work, { recursive: true, force: true }) }
 })
+
+test('hosted model budget backport admits only the reviewed constant and restores frozen source on compiler failure', async () => {
+  const workflow = await readFile(new URL('../.github/workflows/cloudflare-eve-image.yml', import.meta.url), 'utf8')
+  const steps = workflow.split('\n  publish:\n')[1]
+  const step = name => {
+    const value = steps.split('      - name: ' + name + '\n')[1]
+    assert.ok(value, 'missing protected budget step: ' + name)
+    return value.split('\n      - ')[0]
+  }
+  const script = name => step(name).split('        run: |\n')[1].replace(/^ {10}/gm, '')
+  const captureName = 'Preserve the reviewed hosted model call budget from the main driver'
+  const checkName = 'Check the reviewed hosted model call budget against the accepted API source'
+  const compileName = 'Compile the official Eve runtime and shared product resources offline'
+  const verifyName = 'Verify the reviewed hosted model call budget'
+  const captureScript = script(captureName)
+  assert.ok(steps.indexOf(captureName) < steps.indexOf('Check out the original API product source'))
+  assert.ok(steps.indexOf(checkName) > steps.indexOf('uses: ./.github/actions/pnpm-install'))
+  assert.ok(steps.indexOf(verifyName) > steps.indexOf(compileName))
+  assert.ok(steps.indexOf(verifyName) < steps.indexOf('Publish the verified runtime image'))
+  assert.ok(step(verifyName).includes("if: inputs.maintenance_hosted_call_budget_sha != ''"))
+  const work = await mkdtemp(join(tmpdir(), 'mikka-hosted-budget-backport-'))
+  try {
+    const run = (command, args, env = {}) => spawnSync(command, args, { cwd: work, env: { ...process.env, ...env }, encoding: 'utf8' })
+    const git = (...args) => {
+      const child = run('git', args)
+      assert.equal(child.status, 0, child.stderr)
+      return child.stdout.trim()
+    }
+    const commit = message => git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', message)
+    const policy = join(work, 'lib/abuse/policy.ts')
+    const original = 'export const HOSTED_CALL_TIMEOUT_MS = 60_000\nexport const OTHER_LIMIT = 1\n'
+    const reviewed = 'export const HOSTED_CALL_TIMEOUT_MS = 120_000\nexport const OTHER_LIMIT = 1\n'
+    const sha = value => createHash('sha256').update(value).digest('hex')
+    git('init', '-q')
+    await mkdir(join(work, 'lib/abuse'), { recursive: true })
+    await mkdir(join(work, 'scripts'))
+    await writeFile(policy, original)
+    await writeFile(join(work, '.gitignore'), 'node_modules/\n')
+    await writeFile(join(work, 'scripts/build-cloudflare-eve-image.sh'), '#!/usr/bin/env bash\nset -euo pipefail\n[[ "$1" == --prebuilt-api ]]\nsha256sum lib/abuse/policy.ts > "$COMPILED_POLICY_OBSERVATION"\nexit "${TEST_COMPILE_STATUS:-0}"\n')
+    git('add', '.')
+    commit('accepted frozen API source')
+    const accepted = git('rev-parse', 'HEAD')
+    const runnerTemp = join(work, 'node_modules/runner-temp')
+    await mkdir(runnerTemp, { recursive: true })
+    const environment = { RUNNER_TEMP: runnerTemp, MAINTENANCE_OWNER_RELEASE: ownerRelease,
+      COMPILED_POLICY_OBSERVATION: join(runnerTemp, 'compiled-policy') }
+    const invoke = (name, extra = {}) => run('bash', ['--noprofile', '--norc', '-c', name === captureName ? captureScript : script(name)], { ...environment, ...extra })
+    const selectDriver = async value => {
+      git('checkout', '--detach', '-q', accepted)
+      await writeFile(policy, value)
+      git('add', 'lib/abuse/policy.ts')
+      commit('reviewed main policy')
+      return { GITHUB_SHA: git('rev-parse', 'HEAD'), HOSTED_CALL_BUDGET_SHA256: sha(value) }
+    }
+    const forbidden = await selectDriver(reviewed.replace('OTHER_LIMIT = 1', 'OTHER_LIMIT = 2'))
+    assert.equal(invoke(captureName, forbidden).status, 0)
+    git('checkout', '--detach', '-q', accepted)
+    assert.notEqual(invoke(checkName, forbidden).status, 0, 'an unrelated reviewed policy edit cannot ride the maintenance override')
+    assert.equal(await readFile(policy, 'utf8'), original)
+    const selected = await selectDriver(reviewed)
+    for (const invalid of [{ MAINTENANCE_OWNER_RELEASE: '' }, { HOSTED_CALL_BUDGET_SHA256: selected.HOSTED_CALL_BUDGET_SHA256.toUpperCase() },
+      { HOSTED_CALL_BUDGET_SHA256: 'a'.repeat(64) }, { HOSTED_CALL_BUDGET_SHA256: selected.HOSTED_CALL_BUDGET_SHA256.slice(1) }, { GITHUB_SHA: accepted }]) {
+      assert.notEqual(invoke(captureName, { ...selected, ...invalid }).status, 0)
+    }
+    assert.equal(invoke(captureName, selected).status, 0)
+    git('checkout', '--detach', '-q', accepted)
+    const checked = invoke(checkName, selected)
+    assert.equal(checked.status, 0, checked.stderr)
+    const failed = invoke(compileName, { ...selected, TEST_COMPILE_STATUS: '23' })
+    assert.equal(failed.status, 23, failed.stderr)
+    assert.equal(await readFile(policy, 'utf8'), original, 'compiler failure restores the accepted source before a later publication step')
+    assert.equal(git('status', '--porcelain', '--untracked-files=no'), '')
+    assert.notEqual(invoke(verifyName, selected).status, 0, 'failed compilation cannot emit an authenticated budget marker')
+    const completed = invoke(compileName, selected)
+    assert.equal(completed.status, 0, completed.stderr)
+    assert.equal((await readFile(environment.COMPILED_POLICY_OBSERVATION, 'utf8')).split(' ')[0], selected.HOSTED_CALL_BUDGET_SHA256)
+    assert.equal(await readFile(policy, 'utf8'), original)
+    const verified = invoke(verifyName, selected)
+    assert.equal(verified.status, 0, verified.stderr)
+    assert.equal(verified.stdout.trim(), 'MIKKA_EVE_HOSTED_CALL_BUDGET_SHA256=' + selected.HOSTED_CALL_BUDGET_SHA256)
+    assert.equal(git('rev-parse', 'HEAD'), accepted)
+    assert.equal(git('status', '--porcelain', '--untracked-files=no'), '')
+    const normal = invoke(compileName, { HOSTED_CALL_BUDGET_SHA256: '' })
+    assert.equal(normal.status, 0, normal.stderr)
+    assert.equal((await readFile(environment.COMPILED_POLICY_OBSERVATION, 'utf8')).split(' ')[0], sha(original), 'absent input keeps the original compiler path')
+  } finally { await rm(work, { recursive: true, force: true }) }
+})
