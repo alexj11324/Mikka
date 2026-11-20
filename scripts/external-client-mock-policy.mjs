@@ -60,12 +60,9 @@ export function runExternalClientMockPolicy(root = process.cwd()) {
   const baseline = JSON.parse(readFileSync(resolve(root, baselinePath), 'utf8'))
   // Compare against the merge base so the same PR cannot enlarge its allowance.
   // On the introducing PR there is no older allowance; later PRs can only remove.
-  let previous = baseline
-  try {
-    const base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-    const prior = execFileSync('git', ['show', `${base}:${baselinePath}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-    previous = JSON.parse(prior)
-  } catch { /* The initial baseline has no predecessor. */ }
+  const base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const exists = execFileSync('git', ['ls-tree', '--name-only', base, '--', baselinePath], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  const previous = exists ? JSON.parse(execFileSync('git', ['show', `${base}:${baselinePath}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })) : baseline
   return auditExternalClientMocks(repositoryExternalClientMocks(root), baseline, previous)
 }
 
