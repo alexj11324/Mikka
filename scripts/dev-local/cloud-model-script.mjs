@@ -1,9 +1,8 @@
 // #2886 cloud-loop model choices. Only the LiteLLM fixture calls these rules;
 // the native CLI and server still execute every tool, write and verification.
-import { reply, scriptContext } from './model-scripts.mjs'
+const reply = text => ({ content: [{ type: 'text', text }], finishReason: 'stop' })
 
-export function cloudLocalModelAnswer(request) {
-  const c = scriptContext(request)
+export function cloudLocalModelAnswer(c) {
   const marker = /cloud-acceptance-[a-f0-9-]{36}/.exec(c.all)?.[0]
   if (!marker || !c.has('create_issue')) return null
   const created = c.results('create_issue', true).at(-1)
@@ -13,8 +12,7 @@ export function cloudLocalModelAnswer(request) {
   return reply(`Created ${created.id}; no run dispatched.`)
 }
 
-export function cloudNativeModelAnswer(request) {
-  const c = scriptContext(request)
+export function cloudNativeModelAnswer(c) {
   const marker = /cloud-acceptance-[a-f0-9-]{36}/.exec(c.all)?.[0]
   if (!marker || !c.has('submit')) return null
   if (c.results('submit', true).length) return reply('The real submit tool recorded the cloud fixture report.')
