@@ -4709,7 +4709,10 @@
     "untitled": "Untitled conversation",
     "more": "Load more",
     "emptyTitle": "No threads yet.",
-    "clearFilters": "Clear filters"
+    "clearFilters": "Clear filters",
+    "automationFilter": "Automation is {name}",
+    "automationUnknown": "this automation",
+    "clearAutomation": "Remove automation filter"
   },
   "ThreadReferences": {
     "sourceUnavailable": "Source file and folder references are unavailable for this thread.",

@@ -59,7 +59,7 @@ function render(metadata: Record<string, unknown>, threads: IssueThread[] = [], 
     workspaceId: '20000000-0000-4000-8000-000000000001', ownershipState: 'bound', scopeVersion: 1, scopeConfidence: null,
     linearSyncPolicy: 'disabled', linearSyncBlocked: false, linearTargetVerified: false,
     shortTitle: null, shortTitleFrom: null, issuedIdentifier: 'TEAM-1', projectId: null,
-    revision: 1, identifier: 'TEAM-1', createdAt: new Date('2026-11-10T08:00:00Z'), updatedAt: new Date('2026-11-10T08:00:00Z') }
+    revision: 1, sourceScheduleId: null, identifier: 'TEAM-1', createdAt: new Date('2026-11-10T08:00:00Z'), updatedAt: new Date('2026-11-10T08:00:00Z') }
   const props: FramedTaskProps = {
     Frame, rootRef: { current: null }, onKeyDown: noop, label: 'Task', preview: false, locked, origin: 'Tasks',
     navigation: { index: 0, total: 1, onOpen: noop }, onClose: noop, onOpen: noop, onDeleted: noop,

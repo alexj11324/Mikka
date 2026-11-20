@@ -155,6 +155,7 @@ test('dispatch_task automations run as their creator through the existing create
     assert.deepEqual([receipt.taskId, receipt.identifier], [run.result!.id, run.result!.identifier])
     const task = (await fixture.query('SELECT "userId","workspaceId",title FROM issues WHERE id=$1', [run.result!.id])).rows[0]
     assert.deepEqual([task.userId, task.workspaceId, task.title], [owner, workspace.id, 'Fix main CI'], 'an ordinary task of its creator, in its workspace')
+    assert.equal((await fixture.query('SELECT source_schedule_id FROM issues WHERE id=$1', [run.result!.id])).rows[0].source_schedule_id, schedule.id, '查看运行: the task remembers the automation that made it')
     const report = (await fixture.query('SELECT message FROM coordinator_messages WHERE id=(SELECT operation_id FROM schedule_occurrences WHERE id=$1)', [run.id])).rows[0]
     assert.equal(report.message.mikkaDisplay.line.issueId, run.result!.id, 'the reports chat shows the task line')
 

@@ -4709,7 +4709,10 @@
     "untitled": "未命名线程",
     "more": "加载更多",
     "emptyTitle": "还没有线程。",
-    "clearFilters": "清除筛选"
+    "clearFilters": "清除筛选",
+    "automationFilter": "自动化是 {name}",
+    "automationUnknown": "这个自动化",
+    "clearAutomation": "移除自动化筛选"
   },
   "ThreadReferences": {
     "sourceUnavailable": "此线程暂时无法引用源码文件或目录。",

@@ -13,6 +13,8 @@ export const directoryInput = z.strictObject({
   archived: z.union([z.boolean(), z.literal('any')]).default(false),
   pullState: z.enum(['all', 'linked', 'open', 'draft', 'merged', 'closed']).default('all'),
   botId: z.uuid().optional(),
+  /** 查看运行: only the threads of tasks this automation's runs made. */
+  automationId: z.uuid().optional(),
   cursor: z.object({ pinned: z.boolean(), at: z.iso.datetime({ precision: 6 }), id: z.uuid(), kind: z.enum(['run', 'chat']).optional() }).optional(),
 })
 export type DirectoryInput = z.input<typeof directoryInput>

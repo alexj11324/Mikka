@@ -19,6 +19,8 @@ import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
 import { scheduleChatMessage } from './chat-result'
 import { ACTION_ERROR_CODES } from '../action-result'
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
 export type WorkspaceAccess = { role: 'owner' | 'admin' | 'member'; requireActiveMember?: (userId: string) => Promise<void> }
 export type WorkspaceGuard = <T>(ownerId: string, workspaceId: string | null, work: (access: WorkspaceAccess) => Promise<T>) => Promise<T>
 export type MessageGuard = (tx: PoolClient, ownerId: string, value: unknown) => Promise<void>
@@ -546,6 +548,8 @@ export class ScheduleStore {
       // A lost lease means another worker owns this occurrence; it repeats the same idempotent dispatch.
       const done=(await tx.query<Occurrence>(`UPDATE schedule_occurrences SET status='succeeded',result=$3,error=NULL,finished_at=$4,lease_token=NULL,lease_until=NULL WHERE id=$1 AND status='running' AND lease_token=$2 RETURNING *`,[o.id,o.lease_token,result,this.clock()])).rows[0]
       if(!done)return false
+      // 查看运行: the task the run made remembers the automation, for the thread directory's automation filter.
+      if(UUID.test(String((result as {id?:unknown}).id)))await tx.query('UPDATE issues SET source_schedule_id=$2 WHERE id=$1::uuid AND source_schedule_id IS NULL',[(result as {id:string}).id,row.id])
       await this.lockChat(tx,row)
       await this.report(tx,row,done,'succeeded',result,null)
       return true

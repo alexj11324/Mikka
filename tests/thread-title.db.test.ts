@@ -179,6 +179,17 @@ test('a thread\'s stored title: bounded by the schema, generated per trigger, sh
       ON CONFLICT ("userId") DO UPDATE SET "archiveIdleAfterDays"=0`)
     assert.equal((await filtered()).length,49,'off keeps all 49 manually unarchived rows')
     assert.equal((await conversationDirectory(pool,'owner',workspaceId,{botId:directoryOtherBot})).items.length,0)
+    // 查看运行: the directory narrows to the threads of tasks one automation's runs made.
+    const automation=randomUUID(), otherAutomation=randomUUID()
+    for (const id of [automation,otherAutomation]) await pool.query(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,visibility,source_event_id,request_id,request_origin,definition,request_definition,status)
+      VALUES($1,'owner',$2,$3::uuid,'workspace',gen_random_uuid(),gen_random_uuid()::text,'bot:'||$3::uuid::text,'{}'::jsonb,'{}'::jsonb,'paused')`,[id,workspaceId,botId])
+    await pool.query('UPDATE issues SET source_schedule_id=$2 WHERE id=$1',[issueId,automation])
+    const ofAutomation=async(id:string)=>(await conversationDirectory(pool,'owner',workspaceId,{automationId:id,archived:'any'})).items
+    const made=await ofAutomation(automation)
+    assert.ok(made.length>0 && made.every(row=>row.kind==='run' && row.issueId===issueId),'only the runs of the task the automation made')
+    assert.deepEqual(await ofAutomation(otherAutomation),[])
+    await pool.query('DELETE FROM user_schedules WHERE id=$1',[automation])
+    assert.equal((await pool.query('SELECT source_schedule_id FROM issues WHERE id=$1',[issueId])).rows[0].source_schedule_id,null,'a deleted automation leaves its task unlinked')
     assert.deepEqual(await conversationSidebar(pool,'other',workspaceId),{})
     const check = await run({ finished: true })
     await pool.query(`UPDATE agent_runs SET "botId"=$2, kind='acceptance' WHERE id=$1`, [check, directoryOtherBot])
