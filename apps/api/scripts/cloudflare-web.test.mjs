@@ -248,6 +248,10 @@ test('release config requires the official compiled shell, matching pins and pri
   await writeFile(join(assets, '.vite', 'manifest.json'), '{}')
   await writeFile(join(assets, '_redirects'), '/old /new')
   const ready = await prepareRelease(input, parent)
+  assert.deepEqual(ready.vars, { RELEASE_SHA: input.sourceSha, OVERLAY_SHA: input.overlaySha, API_RELEASE_SHA: input.sourceSha, API_OVERLAY_SHA: input.overlaySha })
+  const split = await prepareRelease({ ...input, apiSourceSha: 'c'.repeat(40), apiOverlaySha: 'd'.repeat(40) }, parent)
+  assert.deepEqual(split.vars, { RELEASE_SHA: input.sourceSha, OVERLAY_SHA: input.overlaySha, API_RELEASE_SHA: 'c'.repeat(40), API_OVERLAY_SHA: 'd'.repeat(40) })
+  for (const patch of [{ apiSourceSha: 'branch' }, { apiOverlaySha: '' }]) await assert.rejects(prepareRelease({ ...input, ...patch }, parent), /REVISION_INVALID/)
   assert.equal(ready.workers_dev, false)
   assert.equal(ready.preview_urls, false)
   assert.equal(ready.assets.run_worker_first, true)
@@ -280,7 +284,7 @@ test('version reads only public fields from the release backend, once per warm b
     return Response.json(value)
   } } }
   const first = await release.fetch(request('/mikka/api/version?dpl=old', { headers: { cookie: 'fixture', authorization: 'fixture' } }), env)
-  assert.deepEqual(await first.json(), value)
+  assert.deepEqual(await first.json(), { ...value, apiBuild: source, apiOverlaySha: overlay })
   const head = await release.fetch(request('/mikka/api/version', { method: 'HEAD' }), env)
   assert.equal(await head.text(), '')
   assert.equal(head.headers.get('cache-control'), 'no-store, max-age=0')
@@ -296,7 +300,42 @@ test('version recovers from a stale overlay, unavailable backend and invalid doc
     new Response('broken', { headers: { 'content-type': 'application/json' } }), Response.json({ ...value, unrecognized: true }), Response.json(value)]
   const env = { RELEASE_SHA: source, OVERLAY_SHA: overlay, API: { fetch: async () => replies.shift() } }
   for (let i = 0; i < 4; i++) assert.equal((await release.fetch(request('/mikka/api/version'), env)).status, 503)
-  assert.deepEqual(await (await release.fetch(request('/mikka/api/version'), env)).json(), value)
+  assert.deepEqual(await (await release.fetch(request('/mikka/api/version'), env)).json(), { ...value, apiBuild: source, apiOverlaySha: overlay })
+})
+
+test('separately deployed Web and API keep truthful source pins and compatibility fields', async () => {
+  const web = 'a'.repeat(40), webOverlay = 'b'.repeat(40), api = 'c'.repeat(40), apiOverlay = 'd'.repeat(40)
+  let value = { build: api, overlaySha: apiOverlay, minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null, apiVersion: 1, minApiVersion: 0 }
+  let calls = 0
+  const env = { RELEASE_SHA: web, OVERLAY_SHA: webOverlay, API_RELEASE_SHA: api, API_OVERLAY_SHA: apiOverlay,
+    API: { fetch: () => { calls++; return Response.json(value) } } }
+  const get = current => release.fetch(request('/mikka/api/version'), current)
+  assert.deepEqual(await (await get(env)).json(), { ...value, build: web, overlaySha: webOverlay, apiBuild: api, apiOverlaySha: apiOverlay })
+  assert.equal((await get(env)).status, 200)
+  assert.equal(calls, 1)
+  // A Web-only release keeps its own refresh identity and the unchanged API.
+  const nextWeb = { ...env, RELEASE_SHA: 'e'.repeat(40) }
+  assert.deepEqual(await (await get(nextWeb)).json(), { ...value, build: nextWeb.RELEASE_SHA, overlaySha: webOverlay, apiBuild: api, apiOverlaySha: apiOverlay })
+  assert.equal(calls, 2, 'a cached document cannot borrow another Web source')
+  // An API-only release changes the verified API pins without refreshing Web.
+  value = { ...value, build: 'f'.repeat(40) }
+  const nextApi = { ...nextWeb, API_RELEASE_SHA: value.build }
+  assert.deepEqual(await (await get(nextApi)).json(), { ...value, build: nextWeb.RELEASE_SHA, overlaySha: webOverlay, apiBuild: value.build, apiOverlaySha: apiOverlay })
+  assert.equal(calls, 3)
+  assert.equal((await get(nextWeb)).status, 503, 'the old expected API source still rejects a replacement')
+  assert.equal((await get({ ...nextApi, API_OVERLAY_SHA: webOverlay })).status, 503, 'the actual API overlay is independently pinned')
+})
+
+test('version compatibility metadata must be a complete valid pair and cannot expose unrecognized fields', async () => {
+  const value = { build: 'a'.repeat(40), overlaySha: 'b'.repeat(40), minMobileBuild: 0, mobileUpdateUrl: '', minDesktopVersion: null }
+  for (const patch of [{ apiVersion: 1 }, { minApiVersion: 0 }, { apiVersion: 1, minApiVersion: 2 },
+    { apiVersion: 1, minApiVersion: -1 }, { apiVersion: 1.5, minApiVersion: 0 },
+    { apiVersion: '1', minApiVersion: 0 }, { apiVersion: 1, minApiVersion: 0, internal: 'must-not-publish' }]) {
+    const env = { RELEASE_SHA: value.build, OVERLAY_SHA: value.overlaySha, API: { fetch: () => Response.json({ ...value, ...patch }) } }
+    const response = await release.fetch(request('/mikka/api/version'), env)
+    assert.equal(response.status, 503)
+    assert.deepEqual(await response.json(), { error: 'deploymentVersionInvalid' })
+  }
 })
 
 test('rejected or stalled cold version reads free the upstream and an independent request can recover', async t => {
@@ -345,7 +384,7 @@ test('rejected or stalled cold version reads free the upstream and an independen
   caller.abort()
   await assert.rejects(disconnected, { name: 'AbortError' })
   env.API.fetch = async () => Response.json(value)
-  assert.deepEqual(await (await get(env)).json(), value)
+  assert.deepEqual(await (await get(env)).json(), { ...value, apiBuild: source, apiOverlaySha: overlay })
   env.API.fetch = () => assert.fail('unexpected upstream read')
   assert.equal((await get(env, { method: 'HEAD' })).status, 200)
 })

@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { BundledSession, BundledSignIn } from '@mikka/protocol/bridge'
+import { HOSTED_API_HEADERS } from '@mikka/protocol/version'
 import { remoteBase, safeAppNext } from './bundled-policy'
 import { startBundledLoopback } from './bundled-loopback'
 import type { LoopbackAuthServer } from './loopback'
@@ -154,6 +155,7 @@ export class BundledAuth {
     headers.set('origin', base.origin)
     headers.set('x-mikka-client', 'desktop')
     headers.set('x-mikka-client-version', this.options.version)
+    for (const [key, value] of Object.entries(HOSTED_API_HEADERS)) headers.set(key, value)
     headers.set('x-mikka-desktop-protocol', '1')
     const token = account?.token
     if (token) headers.set('authorization', `Bearer ${token}`)
@@ -363,7 +365,7 @@ export class BundledAuth {
     if (typeof body.token !== 'string' || generation !== this.generation) return { code: 'INVALID_EMAIL_OR_PASSWORD', status: 401 }
     const initialCache = responseSessionCache(response.headers)
     const base = remoteBase(this.target)
-    const identityHeaders = new Headers({ authorization: `Bearer ${body.token}`, origin: base.origin, 'x-mikka-client': 'desktop', 'x-mikka-client-version': this.options.version, 'x-mikka-desktop-protocol': '1' })
+    const identityHeaders = new Headers({ authorization: `Bearer ${body.token}`, origin: base.origin, 'x-mikka-client': 'desktop', 'x-mikka-client-version': this.options.version, 'x-mikka-desktop-protocol': '1', ...HOSTED_API_HEADERS })
     if (initialCache) identityHeaders.set(SESSION_CACHE_HEADER, initialCache)
     // Use the newly returned token only in main, before exposing public identity.
     const identityResponse = await this.options.fetch(new URL(`${base.pathname.replace(/\/$/, '')}/api/auth/get-session`, base.origin).href, {

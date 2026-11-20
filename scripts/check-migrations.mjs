@@ -6,7 +6,7 @@
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { headerLines, stripComments } from './migration-steps.mjs'
+import { headerLines } from './migration-steps.mjs'
 
 // 冻结的旧迁移：文件名 -> 内容 sha256 前 12 位。改动这些文件会让生产状态和仓库不一致。
 export const LEGACY_FROZEN = {
@@ -49,12 +49,15 @@ export const hash = (text) => createHash('sha256').update(text).digest('hex').sl
 /** Contract migrations are a later release, after every old reader has retired.
  * The issue and reason make that exception reviewable; the marker never changes
  * the SQL that migrate.mjs executes or permits editing an executed migration. */
-function contractMigration(sql) {
+export function contractMigration(sql) {
   return headerLines(sql).some(line => /^--\s*migrate:\s*contract\s+#[1-9]\d*\s+\S.+$/.test(line))
 }
 
-function removesColumn(sql) {
-  const statements = stripComments(sql).replace(/'(?:''|[^'])*'/g, "''")
+export function removesColumn(sql) {
+  // Match literals before comment markers: a string containing `--` must not
+  // hide a later ALTER on the same line. Quoted names cannot add SQL keywords.
+  const statements = sql.replace(/\bE'(?:\\[\s\S]|''|[^'\\])*'|'(?:''|[^'])*'|"(?:""|[^"])*"|--[^\r\n]*|\/\*[\s\S]*?\*\//gi,
+    token => token.startsWith('"') ? '"identifier"' : ' ')
   for (const match of statements.matchAll(/\bALTER\s+TABLE\b[^;]*/gi)) {
     // COLUMN is optional in PostgreSQL. Other DROP actions do not remove a
     // column; retain the ordinary migration checks for those operations.

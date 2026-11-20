@@ -1,6 +1,6 @@
-import { generateKeyPairSync, randomBytes } from 'node:crypto'
+import { createHash, generateKeyPairSync, randomBytes } from 'node:crypto'
 import { realpathSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -10,6 +10,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest'
 import { createBoundFetch } from '../src/bound-fetch.mjs'
 import { authenticateDelivery, bodyDigest, deliveryHeaders } from '../src/queue-auth.mjs'
 import { createNodeWorld } from '../src/node-world.mjs'
+import { createNodeWorld as releasedNodeWorld } from './fixtures/released-64a3a8df/packages/eve-cloudflare-world/src/node-world.mjs'
 import { decodeRecord, encodeRecord } from '../src/records.mjs'
 
 const require = createRequire(import.meta.url)
@@ -64,6 +65,31 @@ async function start(workflowName, input = Uint8Array.of(7)) {
   await world.events.create(run.runId, { ...spec, eventType: 'run_started' })
   return run.runId
 }
+
+test('the last serving Eve caller creates and reads a run through the new World service', async () => {
+  // Byte-for-byte caller from the successful serving release 44473639414,
+  // public source 64a3a8df. This exercises the old HTTP/CBOR producer and old
+  // response reader against today's Worker and Durable Object implementation.
+  const fixture = new URL('./fixtures/released-64a3a8df/', import.meta.url)
+  const receipt = JSON.parse(await readFile(new URL('release.json', fixture), 'utf8'))
+  for (const [path, blob] of Object.entries(receipt.files)) {
+    const bytes = await readFile(new URL(path, fixture))
+    expect(createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex'), path).toBe(blob)
+  }
+  const released = releasedNodeWorld({ deploymentId, signingKey, fetchBound: (url, options) => outbound.fetch(url, options) })
+  const runId = 'wrun_01KAG1MMXVFBQB4JWDN0BYNSKB'
+  const { run: created } = await released.events.create(runId, {
+    specVersion: 8, eventType: 'run_created',
+    eventData: { workflowName: 'released-caller', deploymentId, input: Uint8Array.of(4, 2) },
+  })
+  expect(created.runId).toBe(runId)
+  await released.events.create(runId, { specVersion: 8, eventType: 'run_started' })
+  const read = await released.runs.get(runId)
+  expect(read).toMatchObject({ runId, status: 'running', workflowName: 'released-caller', deploymentId })
+  expect(new Uint8Array(read.input)).toEqual(Uint8Array.of(4, 2))
+  const metadataOnly = await released.runs.get(runId, { resolveData: 'none' })
+  expect(metadataOnly.input).toBeUndefined()
+})
 
 test('the Node World crosses only its bound private service for catalogues, attributed events, and independent hook deliveries', async () => {
   const a = await start('private-a')

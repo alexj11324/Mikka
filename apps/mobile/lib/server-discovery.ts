@@ -1,4 +1,4 @@
-import { meetsMinimumVersion } from '@mikka/protocol/version'
+import { HOSTED_API_HEADERS, meetsMinimumVersion } from '@mikka/protocol/version'
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '[::1]'])
 const PATH = /^(?:\/[A-Za-z0-9._~-]{1,100}){0,5}$/
@@ -73,7 +73,7 @@ export async function probeMobileServer(input: unknown, options: {
   if (options.signal?.aborted) abort()
   const timer = setTimeout(abort, options.timeoutMs ?? 10_000)
   const get = (url: string) => options.fetch(url, { headers: { accept: 'application/json', 'x-mikka-client': 'mobile',
-    'x-mikka-client-version': options.appVersion, 'x-mikka-desktop-protocol': String(MOBILE_SERVER_PROTOCOL) },
+    'x-mikka-client-version': options.appVersion, 'x-mikka-desktop-protocol': String(MOBILE_SERVER_PROTOCOL), ...HOSTED_API_HEADERS },
   redirect: 'error', credentials: 'omit', cache: 'no-store', signal: controller.signal })
   let reachable = false
   const legacyBases: string[] = []

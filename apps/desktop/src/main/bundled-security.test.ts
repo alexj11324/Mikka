@@ -369,6 +369,7 @@ test('main bearer never appears in public session and only validated workspace s
     const headers = new Headers(init?.headers)
     assert.equal(headers.get('authorization'), `Bearer ${secret}`)
     assert.equal(headers.get('cookie'), calls === 0 ? null : `mikka-workspace=${workspace}`)
+    assert.equal(headers.get('x-mikka-api-version'), '1')
     assert.equal(init?.redirect, 'error')
     calls++
     return calls === 3 ? new Response(null, { status: 401 }) : new Response('{}', { headers: { 'set-cookie': `session_token=never-retain; Path=/, mikka-workspace=${workspace}; Path=/` } })

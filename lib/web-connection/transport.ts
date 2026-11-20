@@ -5,7 +5,7 @@ import { selectedWorkspaceId, WORKSPACE_SELECTION_HEADER, workspaceSelection } f
 
 const allowedHeaders = [
   'accept', 'authorization', 'content-type', 'range', 'if-none-match', 'last-event-id',
-  'x-mikka-client', 'x-mikka-client-version', 'x-mikka-web-protocol', 'x-mikka-desktop-protocol',
+  'x-mikka-client', 'x-mikka-client-version', 'x-mikka-api-version', 'x-mikka-web-protocol', 'x-mikka-desktop-protocol',
   'x-mikka-locale', 'x-mikka-credential', 'x-mikka-stream-key', 'x-mikka-deletion-receipt',
   WORKSPACE_SELECTION_HEADER,
 ]

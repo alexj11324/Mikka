@@ -20,7 +20,7 @@ import { NotificationCenter } from './notification-center'
 import { appExternalUrl, desktopAuthState, externalUrl, isTrustedFrame, navigationDecision } from './security'
 import { UPDATE_CHECK_INTERVAL_MS, Updates, updateCopy } from './updates'
 import { UpdateGate, gateCopy, gateView, type GateState } from './launch-update'
-import { meetsMinimumVersion } from '@mikka/protocol/version'
+import { HOSTED_API_HEADERS, meetsMinimumVersion } from '@mikka/protocol/version'
 import { windowAppearance } from './window-appearance'
 import { RENDERER_ORIGIN, RENDERER_URL } from './bundled-policy'
 import { bundledProtocol } from './bundled-protocol'
@@ -201,6 +201,7 @@ function registerSession(): void {
       if (!BUNDLED && new URL(details.url).origin === APP_ORIGIN) {
         details.requestHeaders['x-mikka-client'] = 'desktop'
         details.requestHeaders['x-mikka-client-version'] = APP_VERSION
+        Object.assign(details.requestHeaders, HOSTED_API_HEADERS)
       }
     } catch {
       // A malformed request URL is left untouched; the request still goes out.

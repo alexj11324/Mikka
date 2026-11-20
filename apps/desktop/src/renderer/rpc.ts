@@ -5,6 +5,7 @@ import { isBatchReadAction } from '@/lib/desktop-rpc/read-batch-contract'
 import { localeOf, type Locale } from './location'
 import { setTransportState } from './transport-state'
 import { DesktopTransportError, enqueueRead, isSnapshotReadAction } from './read-batch'
+import { hostedApiUpgrade } from '@mikka/protocol/version'
 
 export { DesktopTransportError, resetReadBatchScope } from './read-batch'
 
@@ -57,7 +58,8 @@ export async function callRemoteAction<T = unknown>(action: string, args: unknow
   }
   if (response.status === 426) {
     setTransportState('update-required')
-    throw new DesktopTransportError('desktop_client_update_required', { status: response.status })
+    const upgrade = hostedApiUpgrade(await response.json().catch(() => null))
+    throw new DesktopTransportError('desktop_client_update_required', { status: response.status, cause: upgrade?.cause })
   }
   if (response.status >= 502 && response.status <= 504) {
     setTransportState('offline')

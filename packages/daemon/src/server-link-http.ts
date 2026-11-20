@@ -36,6 +36,8 @@ import { captureCompleteResponse, capturePaths, captureUploadResponse, screenCap
 
 import {
   CLIENT_VERSION_HEADER,
+  HOSTED_API_HEADERS,
+  hostedApiUpgrade,
   REPO_ORIGIN_HEADER,
   PROJECT_ENVIRONMENT_HEADER,
   RECOVERY_WORKTREE_HEADER,
@@ -101,7 +103,7 @@ const refusalCode = (body: unknown) => {
   return typeof code === "string" ? code : typeof error === "string" ? error : undefined
 }
 /** The header every daemon request sends; without it the server answers 426. */
-export const deviceSessionHeaders = { [DEVICE_SESSION_HEADER]: String(DEVICE_SESSION_VERSION) } as const
+export const deviceSessionHeaders = { [DEVICE_SESSION_HEADER]: String(DEVICE_SESSION_VERSION), ...HOSTED_API_HEADERS } as const
 
 /**
  * Ids go into the path as one escaped segment each. `.` and `..` survive
@@ -278,8 +280,18 @@ export class HttpServerLink implements ServerLink {
     try {
       const response = await this.fetchImpl(input, init)
       status = response.status
+      if (response.status === 426 && endpoint !== 'storage_transfer') await this.refuseUpgrade(response)
       return response
     } finally { measured(status) }
+  }
+
+  /** Only the Mikka server's refusal can retire this daemon's active link. */
+  private async refuseUpgrade(response: Response): Promise<never> {
+    const refused: unknown = await response.json().catch(() => null)
+    const versions = typeof refused === 'object' && refused !== null ? (refused as { daemonVersions?: unknown }).daemonVersions : undefined
+    const latest = daemonVersionsSchema.safeParse(versions).data?.latest
+    for (const listener of [...this.upgradeListeners]) listener(latest)
+    throw new DaemonUpgradeRequiredError(latest, hostedApiUpgrade(refused)?.cause)
   }
 
   private async send(
@@ -351,13 +363,7 @@ export class HttpServerLink implements ServerLink {
       if (response.redirected || (response.status >= 300 && response.status < 400))
         throw new Error(`Unexpected server redirect (${response.status})`)
       // Any route, including the ones this daemon reads directly: too old to be served.
-      if (response.status === 426) {
-        const refused: unknown = await response.json().catch(() => null)
-        const versions = typeof refused === "object" && refused !== null ? (refused as { daemonVersions?: unknown }).daemonVersions : undefined
-        const latest = daemonVersionsSchema.safeParse(versions).data?.latest
-        for (const listener of [...this.upgradeListeners]) listener(latest)
-        throw new DaemonUpgradeRequiredError(latest)
-      }
+      if (response.status === 426) await this.refuseUpgrade(response)
       if (response.status === 401) {
         // Only the device API's exact rejection contracts can revoke a saved credential.
         const body: unknown = await response.clone().json().catch(() => null)
@@ -530,11 +536,8 @@ export class HttpServerLink implements ServerLink {
         signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(300_000)]) : AbortSignal.timeout(300_000),
       })
     } catch (error) {
+      if (error instanceof DaemonUpgradeRequiredError) throw error
       throw new ServerUnreachableError(error)
-    }
-    if (response.status === 426 && server) {
-      for (const listener of [...this.upgradeListeners]) listener()
-      throw new DaemonUpgradeRequiredError()
     }
     if (response.status >= 500 || response.status === 429) throw new ServerUnreachableError(response.status)
     if (response.status === 401 && server) throw new SessionRejectedError()

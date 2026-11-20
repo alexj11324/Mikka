@@ -338,6 +338,20 @@ describe("HttpServerLink", () => {
     expect((error as DaemonUpgradeRequiredError).latest).toBe("0.0.401")
   })
 
+  it('sends its hosted reader version and preserves upgrade causes on JSON and binary requests', async () => {
+    const cause = { code: 'api_version_below_floor', version: 1, minimum: 2 }
+    const fetcher: typeof fetch = async (_url, init) => {
+      expect(new Headers(init?.headers).get('x-mikka-api-version')).toBe('1')
+      return json({ error: 'update_required', minVersion: '2', minApiVersion: 2, message: 'Update Mikka before continuing.', cause }, 426)
+    }
+    const link = new HttpServerLink('http://server.test', fetcher)
+    for (const operation of [() => link.claimRun('d', 'r'), () => link.sendCapture('r', 'capture', { target: 'server' }, Uint8Array.of(1), 'image/png')]) {
+      const error = await operation().catch((e: unknown) => e)
+      expect(error).toBeInstanceOf(DaemonUpgradeRequiredError)
+      expect(error).toMatchObject({ cause, message: 'This daemon is too old for the server; update it.' })
+    }
+  })
+
   it("409 on a claim: no open session means redial; anything else is another device's run", async () => {
     for (const [body, kind] of [[{ error: "deviceSessionRequired" }, DeviceSessionRequiredError], [{ error: "Run is not queued for this device." }, RunNotPinnedHereError]] as const) {
       const { fetch } = scripted(() => json(body, 409))
@@ -546,6 +560,20 @@ describe("mikka daemon login (device authorization)", () => {
       ? json(grant) : json({ access_token: 'browser-session-token' }))
     await expect(deviceLogin({ serverUrl: 'https://server.test/mikka', fetchImpl: fetch, prompt: () => undefined, sleep: async () => undefined }))
       .rejects.toThrow('Device login failed')
+  })
+
+  it('CLI login sends its reader version and shows the update command with the server cause', async () => {
+    const cause = { code: 'api_version_below_floor', version: 1, minimum: 2 }
+    const prompt = vi.fn()
+    const sleep = vi.fn()
+    const fetchImpl: typeof fetch = async (_url, init) => {
+      expect(new Headers(init?.headers).get('x-mikka-api-version')).toBe('1')
+      return json({ error: 'update_required', minVersion: '2', minApiVersion: 2, message: 'Update Mikka before continuing.', cause }, 426)
+    }
+    await expect(deviceLogin({ serverUrl: 'https://server.test', fetchImpl, prompt, sleep }))
+      .rejects.toMatchObject({ cause, message: 'This daemon is too old for the server. Update it first: npm install -g @aspectlylabs/mikka@latest' })
+    expect(prompt).not.toHaveBeenCalled()
+    expect(sleep).not.toHaveBeenCalled()
   })
 })
 

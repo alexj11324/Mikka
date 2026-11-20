@@ -36,6 +36,7 @@ test('扩展迁移通过，新的删列必须独立说明已退役旧读写方',
     'ALTER TABLE items DROP old_title;',
     'ALTER TABLE "items" ADD COLUMN "title" text, DROP COLUMN IF EXISTS "oldTitle";',
     'DO $$ BEGIN ALTER TABLE items DROP COLUMN old_title; END $$;',
+    "INSERT INTO notes(body) VALUES ('-- not a comment'); ALTER TABLE items DROP COLUMN old_title;",
   ]) {
     assert.match(run([{ name, content: sql }]).join(), /新增迁移删除列/)
     assert.deepEqual(run([{ name, content: `-- migrate: contract #2896 all released readers use title; see issue receipts\n${sql}` }]), [])
@@ -44,6 +45,7 @@ test('扩展迁移通过，新的删列必须独立说明已退役旧读写方',
   assert.match(run([{ name, content: "SELECT '-- migrate: contract #2896 not a header';\nALTER TABLE items DROP COLUMN old_title;" }]).join(), /新增迁移删除列/)
   assert.deepEqual(run([{ name, content: '-- DROP COLUMN is documentation\nALTER TABLE items DROP CONSTRAINT old_constraint;' }]), [])
   assert.deepEqual(run([{ name, content: "INSERT INTO notes(body) VALUES ('ALTER TABLE items DROP COLUMN old_title');" }]), [])
+  assert.deepEqual(run([{ name, content: 'ALTER TABLE "DROP COLUMN old_title" ADD COLUMN "new--title" text;' }]), [])
   const old = { name, content: 'ALTER TABLE items DROP COLUMN old_title;' }
   assert.deepEqual(run([old], [...main, old]), [], 'already merged SQL remains immutable history')
 })

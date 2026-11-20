@@ -21,6 +21,19 @@ import { createWebTransport } from '../../../lib/web-connection/transport'
 const fixture = (path: string, module: Record<string, unknown>, methods = Object.keys(module)): ApiRoute => ({ path: `/mikka/api/${path}`, template: `/api/${path}`, source: 'fixture', methods, load: async () => module })
 const request = (path = 'one', init?: RequestInit) => new Request(`https://example.test/mikka/api/${path}`, init)
 
+test('installed-client compatibility refusals reach the caller before a business handler runs', async () => {
+  let writes = 0
+  const app = createApiHandler([fixture('write', { POST: () => { writes++; return Response.json({ written: true }) } })])
+  const refused = await app.fetch(request('write', { method: 'POST', headers: { 'x-mikka-client': 'mobile', 'x-mikka-api-version': 'invalid' } }))
+  assert.equal(refused.status, 426)
+  assert.equal((await refused.json()).cause.code, 'api_version_invalid')
+  assert.equal(writes, 0)
+  for (const headers of [{ 'x-mikka-api-version': '1' }, { 'x-mikka-client': 'mobile' }]) {
+    assert.equal((await app.fetch(request('write', { method: 'POST', headers }))).status, 200)
+  }
+  assert.equal(writes, 2, 'phase one keeps previously released clients compatible')
+})
+
 test('official web bearer adaptation is installed before the API scope and strips handler cookies afterward', async () => {
   let calls = 0, revoked = false
   const origin = 'https://app.aspectlylabs.com', authorization = `Bearer ${'s'.repeat(40)}`

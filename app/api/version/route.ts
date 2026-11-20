@@ -3,6 +3,7 @@ import { withRequestLog } from '@/lib/request-log'
 
 import { APP_BUILD, minDesktopVersion } from '@/lib/app-build'
 import { MIN_MOBILE_BUILD, MOBILE_UPDATE_URL } from '@/lib/mobile-min-build'
+import { HOSTED_API_FLOOR, HOSTED_API_VERSION } from '@mikka/protocol/version'
 
 
 /**
@@ -13,7 +14,8 @@ import { MIN_MOBILE_BUILD, MOBILE_UPDATE_URL } from '@/lib/mobile-min-build'
  */
 export const GET = withRequestLog('/api/version', () => {
   return NextResponse.json(
-    { build: APP_BUILD, overlaySha: process.env.MIKKA_UI_OVERLAY_SHA || null, minMobileBuild: MIN_MOBILE_BUILD, mobileUpdateUrl: MOBILE_UPDATE_URL, minDesktopVersion: minDesktopVersion(process.env.MIN_CLIENT_VERSION) },
+    { build: APP_BUILD, overlaySha: process.env.MIKKA_UI_OVERLAY_SHA || null, minMobileBuild: MIN_MOBILE_BUILD, mobileUpdateUrl: MOBILE_UPDATE_URL, minDesktopVersion: minDesktopVersion(process.env.MIN_CLIENT_VERSION),
+      apiVersion: HOSTED_API_VERSION, minApiVersion: HOSTED_API_FLOOR },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   )
 })

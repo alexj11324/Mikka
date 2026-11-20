@@ -23,6 +23,7 @@ const { api, apiConnection } = await import('../lib/api.ts')
 const { apiCache } = await import('../lib/api-cache.ts')
 const { presenceScope } = await import('../lib/presence-scope.ts')
 const { readPresentedTasks, readPresentedTask } = await import('../features/tasks/model/task-presentation-read.ts')
+const { onMobileUpdateRequired } = await import('../lib/startup.ts')
 
 test('a server switch while keychain reads cannot send the old cookie to the new server or sign it out', async t => {
   const requests: { url: string; cookie: string | null; redirect?: string }[] = []
@@ -59,6 +60,21 @@ test('a native Inbox write sends the origin of the same saved server connection 
     return Response.json({ changed: true })
   })
   assert.deepEqual(await api('/api/inbox', { method: 'POST', body: { action: 'dismiss' } }, target), { changed: true })
+})
+
+test('an API upgrade refusal keeps its cause and only the current server opens the update screen', async t => {
+  const cause = { code: 'api_version_below_floor', version: 1, minimum: 2 }
+  const notices: string[] = []
+  const unsubscribe = onMobileUpdateRequired(server => notices.push(server))
+  t.after(unsubscribe)
+  current = second
+  t.mock.method(globalThis, 'fetch', async () => Response.json({
+    error: 'update_required', minVersion: '2', minApiVersion: 2, message: 'Update Mikka before continuing.', cause,
+  }, { status: 426 }))
+  await assert.rejects(api('/api/mobile/settings', {}, { account: first, client }), { status: 426, code: 'update_required', cause })
+  assert.deepEqual(notices, [])
+  await assert.rejects(api('/api/mobile/settings'), { status: 426, code: 'update_required', cause })
+  assert.deepEqual(notices, [second.server.url])
 })
 
 test('an old explicit server connection cannot acquire the current server home proof', async t => {
