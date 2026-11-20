@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "issue": 2984,
+  "capturedAt": "2026-11-20T21:56:32.391Z",
+  "scope": "Site search same-job typecheck duplication",
+  "source": {
+    "pullRequest": 2993,
+    "head": "b1b03bb1ad2d915e8a9e384e5118e1eef6f8010e",
+    "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+    "testedMerge": "e285b5229ca10e5b4849ad69d9b0b2dbf30897e6",
+    "node": "v24.22.2",
+    "runnerImage": "ubuntu-26.04"
+  },
+  "sourceUrls": {
+    "job": "https://github.com/alexj11324/Mikka/actions/runs/44823370556/job/136589646398",
+    "attemptJobs": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44823370556/attempts/1/jobs?per_page=100",
+    "logs": "https://api.github.com/repos/alexj11324/Mikka/actions/jobs/136589646398/logs"
+  },
+  "after": {
+    "denominator": 1,
+    "runId": 44823370556,
+    "attempt": 1,
+    "jobId": 136589646398,
+    "conclusion": "success",
+    "createdAt": "2026-11-20T21:47:11Z",
+    "startedAt": "2026-11-20T21:49:39Z",
+    "completedAt": "2026-11-20T21:55:53Z",
+    "queueSeconds": 148,
+    "executionSeconds": 374,
+    "typecheckInvocations": 1,
+    "steps": [
+      {
+        "number": 8,
+        "name": "Run node apps/api/scripts/generate-routes.mjs --check && pnpm lint",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T21:51:35Z",
+        "completedAt": "2026-11-20T21:51:52Z",
+        "durationSeconds": 17
+      },
+      {
+        "number": 9,
+        "name": "Provision only the isolated application test database from existing schema",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T21:51:52Z",
+        "completedAt": "2026-11-20T21:51:54Z",
+        "durationSeconds": 2
+      },
+      {
+        "number": 10,
+        "name": "Provision only the separate workspace test database from existing schema",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T21:51:54Z",
+        "completedAt": "2026-11-20T21:51:56Z",
+        "durationSeconds": 2
+      },
+      {
+        "number": 11,
+        "name": "Run pnpm build",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T21:51:56Z",
+        "completedAt": "2026-11-20T21:55:29Z",
+        "durationSeconds": 213
+      },
+      {
+        "number": 12,
+        "name": "Real compiled HTTP, Better Auth and PG title read regression (HTTP API only, no browser, no providers)",
+        "conclusion": "success",
+        "startedAt": "2026-11-20T21:55:29Z",
+        "completedAt": "2026-11-20T21:55:49Z",
+        "durationSeconds": 20
+      }
+    ],
+    "checkoutLogLines": [
+      "2026-11-20T21:50:00.9815294Z HEAD is now at e285b52 Merge b1b03bb1ad2d915e8a9e384e5118e1eef6f8010e into c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "2026-11-20T21:50:00.9897077Z e285b5229ca10e5b4849ad69d9b0b2dbf30897e6"
+    ],
+    "typecheckLogLines": [
+      "2026-11-20T21:54:50.5754538Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+    ],
+    "httpLogLines": [
+      "2026-11-20T21:55:40.2097271Z   \u2713  1 [chromium] \u203a tests/e2e/site-search.spec.ts:218:1 \u203a owner titles and authorized group titles page beyond 100 with exact projections (5.3s)",
+      "2026-11-20T21:55:41.2607810Z   \u2713  2 [chromium] \u203a tests/e2e/site-search.spec.ts:245:1 \u203a auth, unsupported sources, invalid input and workspace existence share private responses (1.0s)",
+      "2026-11-20T21:55:42.3405319Z   \u2713  3 [chromium] \u203a tests/e2e/site-search.spec.ts:257:1 \u203a retired archive title hit locates owner history beyond the latest 100 without generation (1.1s)",
+      "2026-11-20T21:55:45.9855703Z   \u2713  4 [chromium] \u203a tests/e2e/site-search.spec.ts:295:1 \u203a searchable task grants no colleague thread content, old history or private DM authority (3.6s)",
+      "2026-11-20T21:55:47.0010608Z   \u2713  5 [chromium] \u203a tests/e2e/site-search.spec.ts:360:1 \u203a real query result rechecks group exit including the hidden lookahead before response (1.0s)",
+      "2026-11-20T21:55:48.3352472Z   \u2713  6 [chromium] \u203a tests/e2e/site-search.spec.ts:382:1 \u203a task source isolates the selected workspace and rechecks creator membership and PAT scope (1.3s)",
+      "2026-11-20T21:55:48.6059126Z   \u2713  7 [chromium] \u203a tests/e2e/site-search.spec.ts:408:1 \u203a archived session preview reads a single deterministic latest turn while retaining owner-only access (267ms)",
+      "2026-11-20T21:55:49.8313180Z   \u2713  8 [chromium] \u203a tests/e2e/site-search.spec.ts:432:1 \u203a continuations recheck group leave, workspace suspension and real auth revocation (1.2s)",
+      "2026-11-20T21:55:49.8972573Z   8 passed (20.2s)"
+    ],
+    "httpPassCount": 8,
+    "artifact": {
+      "id": 14673666212,
+      "name": "site-search-evidence",
+      "digest": "sha256:f37c91bc1a85581683de537a9036522649df0e5bc5f2762376a124d6ee07c366",
+      "sizeInBytes": 240213,
+      "createdAt": "2026-11-20T21:55:50Z",
+      "expiresAt": "2026-11-27T21:55:50Z",
+      "downloaded": true,
+      "verifiedSha256": "f37c91bc1a85581683de537a9036522649df0e5bc5f2762376a124d6ee07c366",
+      "members": [
+        "playwright-report/index.html",
+        "test-results/site-search-fixtures.json"
+      ]
+    },
+    "fixtureEvidence": {
+      "sha": "e285b5229ca10e5b4849ad69d9b0b2dbf30897e6",
+      "databaseIdentity": {
+        "application": {
+          "name": "mikka_e2e",
+          "started": "2026-11-20T21:49:50.446Z"
+        },
+        "workspace": {
+          "name": "mikka_workspace_e2e",
+          "started": "2026-11-20T21:49:51.354Z"
+        },
+        "distinctServices": true
+      }
+    }
+  },
+  "limitations": [
+    "One before sample and one after sample; source PRs differ and Node patch versions differ (before24.22.3, after24.22.2).",
+    "Observed preparation62\u219217s and full job485\u2192374s are descriptive, not controlled causal speedup estimates.",
+    "The directly verified change is full root typecheck invocation count2\u21921 with retained build, dual PostgreSQL and real HTTP acceptance.",
+    "Playwright output uses the existing project label chromium, but this suite only uses its request client: no browser is installed or launched.",
+    "This PR run does not replace protected CI, normal merge, or exact postmerge verification."
+  ]
+}

@@ -1,0 +1,232 @@
+{
+  "version": 1,
+  "issue": 2984,
+  "ownerIssue": 2887,
+  "ownerPullRequest": 2969,
+  "ownerReview": "https://github.com/alexj11324/Mikka/pull/2969#pullrequestreview-5999855363",
+  "publicSource": "bf60570112aa7ac4ac86e6dd78b35ac3bd9b82da",
+  "originalIntegrationSourceChecked": "64b088d930744457ae2b18e4d45e91d9d9f290bc",
+  "scope": "Dependency-source measurement, not acceptance of main, PR #2987, or #2912. Existing #2969 implementation remains owned by #2887/#2891.",
+  "environment": {
+    "node": "24.22.3",
+    "pnpm": "10.34.3",
+    "postgresql": "17.11",
+    "chromium": "156.0.8078.79",
+    "databaseKind": "owned loopback *_e2e",
+    "realModelCalls": 0,
+    "paidResourcesCreated": 0
+  },
+  "officialBuild": {
+    "sourceIdentity": "Exact authorized overlay checkout recorded in the original build receipts; no private source is included in this evidence.",
+    "rendererRevision": "bc21c4899012c275fc5eee61f035310a9cb32471fb1d96d872795e6c85829363",
+    "preparationFailures": [
+      {
+        "stage": "frontend dependency resolution",
+        "wallSeconds": 171.415553,
+        "exitCode": 1,
+        "reason": "Investigator omitted the existing producer OVERLAY_INSTALL preparation. Fixed with its frozen cached dependency install.",
+        "logSha256": "acedffe1cdefe05c74226c9e85f3d96fcb565ee279f6c6c4903dc68be4de8e00"
+      },
+      {
+        "stage": "API finalization after successful Eve, frontend, and Nitro compilation",
+        "wallSeconds": 353.153784,
+        "exitCode": 1,
+        "reason": "Public offline dependency preparation had omitted the pinned ffmpeg postinstall binary. Restored the existing same-version pinned bundle and ran the original validating installer.",
+        "logSha256": "f21b9a416b65f5f2d62cfa3d803589e3e9d750af016fcd99eba77c90142c20d4"
+      }
+    ],
+    "continuedExistingPhases": [
+      {
+        "name": "verify-existing-ffmpeg",
+        "exitCode": 0,
+        "wallSeconds": 0.377459,
+        "logSha256": "92fd969ecba6d0a8a65ba122fc76bd7da76ea61a990745338e90514bfb2af873"
+      },
+      {
+        "name": "api-finalize",
+        "exitCode": 0,
+        "wallSeconds": 4.551294,
+        "logSha256": "4d2fb004651e67b53cae7bf5cfe12c83b58ade8fd10d701ffb25add3361bfbc6"
+      },
+      {
+        "name": "package-eve",
+        "exitCode": 0,
+        "wallSeconds": 0.875557,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "name": "fixture-bundle-guard",
+        "exitCode": 0,
+        "wallSeconds": 0.765878,
+        "logSha256": "a2b0a43fe4f264187d412229df5d04be69402579f8195f563699c016d1f9491b"
+      },
+      {
+        "name": "private-source-map-guard",
+        "exitCode": 0,
+        "wallSeconds": 0.428208,
+        "logSha256": "eeca980ab2339cd698665e0ffce11a07895dacb9acce1c68eb9d5335b38ba2e3"
+      }
+    ],
+    "fullWrapperSuccessClaimed": false,
+    "sourceEdits": false
+  },
+  "runtimeAttempt": {
+    "startedUtc": "2026-11-20T21:42:14.192115+00:00",
+    "finishedUtc": "2026-11-20T21:43:22.432124+00:00",
+    "samples": [
+      {
+        "phase": "initdb",
+        "exitCode": 0,
+        "wallSeconds": 1.115641,
+        "logSha256": "05ade5d6c4b498f9ac66ff14142d58319979dc9737ac79937aa1313c8413e4c5"
+      },
+      {
+        "phase": "pg-start",
+        "exitCode": 0,
+        "wallSeconds": 0.11266,
+        "logSha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad"
+      },
+      {
+        "phase": "create-database",
+        "exitCode": 0,
+        "wallSeconds": 0.108782,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "setup",
+        "exitCode": 0,
+        "wallSeconds": 4.089036,
+        "logSha256": "abbbc9a4be1ff4d20c8a498e1a4702e5c2a717447923f34b9be7b720be4c6172"
+      },
+      {
+        "phase": "browser-readback",
+        "exitCode": 1,
+        "wallSeconds": 62.502216,
+        "logSha256": "957ab0aef36c893ec9c08c15a611af2257e90cc3b38ee6efe28fe328ac886cdd"
+      },
+      {
+        "phase": "pg-stop",
+        "exitCode": 0,
+        "wallSeconds": 0.305028,
+        "logSha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d"
+      }
+    ],
+    "fixtureStartupBudgetMs": 60000,
+    "stage": "fixture-start",
+    "browserStarted": false,
+    "uiWriteReadbackRoundsCompleted": 0,
+    "pass": false,
+    "pgPidFileAbsent": true
+  },
+  "causalObservation": {
+    "startedUtc": "2026-11-20T21:45:18.561Z",
+    "finishedUtc": "2026-11-20T21:46:20.335Z",
+    "mode": "Observe original child stderr and original readiness HTTP without response substitution or budget changes",
+    "actualPath": "/mikka/api/version",
+    "httpStatus": 500,
+    "httpBodySha256": "39aaf076d37bdcf0bd0206deeb90af13ae7a26e4c52f2b71145f08bb02591b9c",
+    "firstApplicationError": "EVE_SERVICE_EXITED",
+    "cause": "ENOENT opening <root>/.output/eve/.output/mikka-build.json",
+    "sourceChain": [
+      "scripts/fixtures/start.mjs supplies NODE_OPTIONS=--import <root>/scripts/fixtures/preload.mjs",
+      "scripts/eve-service.mjs inherits env and starts packaged Eve at cwd <root>/.output/eve",
+      "scripts/fixtures/preload.mjs calls fixtureManifest(process.cwd())"
+    ],
+    "stderrSha256": "cda5b8091e54dec20766ec1cc309ee42ba5a7b815b882dd8db95ab0bbd1982e7",
+    "timeoutsOrAssertionsChanged": false,
+    "pgStoppedNormally": true
+  },
+  "minimalReproduction": {
+    "source": "bf60570112aa7ac4ac86e6dd78b35ac3bd9b82da",
+    "cwdSuffix": ".output/eve",
+    "preload": "scripts/fixtures/preload.mjs",
+    "exitCode": 1,
+    "outputSha256": "a58a3d93cdd3f68d9e5e5a0e2639baf2fad6493bab331438f3465ea3314048f2",
+    "hasExpectedMissingManifest": true,
+    "hasENOENT": true
+  },
+  "repeatedSeedOnly": {
+    "command": "node scripts/fixtures/seed-smoke.mjs",
+    "startedUtc": "2026-11-20T21:50:10.203882+00:00",
+    "finishedUtc": "2026-11-20T21:50:12.453798+00:00",
+    "samples": [
+      {
+        "phase": "seed-repeat-pg-start",
+        "exitCode": 0,
+        "wallSeconds": 0.125856,
+        "logSha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad"
+      },
+      {
+        "phase": "seed-repeat-1",
+        "exitCode": 0,
+        "wallSeconds": 1.123749,
+        "logSha256": "31dd686d067aa43ae91848418f9c233ecbac9868a4d606c2efd568f2cc7f0537"
+      },
+      {
+        "phase": "seed-repeat-2",
+        "exitCode": 0,
+        "wallSeconds": 0.867766,
+        "logSha256": "31dd686d067aa43ae91848418f9c233ecbac9868a4d606c2efd568f2cc7f0537"
+      },
+      {
+        "phase": "seed-repeat-pg-stop",
+        "exitCode": 0,
+        "wallSeconds": 0.102376,
+        "logSha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d"
+      }
+    ],
+    "iterations": 2,
+    "scenariosPerIteration": 6,
+    "originalAssertionsUnchanged": true,
+    "snapshotsEqual": true,
+    "snapshot": [
+      {
+        "bots": 2,
+        "slug": "fixture-automations",
+        "tasks": 8,
+        "states": 8,
+        "automations": 2
+      },
+      {
+        "bots": 2,
+        "slug": "fixture-board",
+        "tasks": 8,
+        "states": 8,
+        "automations": 2
+      },
+      {
+        "bots": 2,
+        "slug": "fixture-bot-settings",
+        "tasks": 8,
+        "states": 8,
+        "automations": 2
+      },
+      {
+        "bots": 1,
+        "slug": "fixture-empty",
+        "tasks": 0,
+        "states": 8,
+        "automations": 0
+      },
+      {
+        "bots": 2,
+        "slug": "fixture-pulls",
+        "tasks": 8,
+        "states": 8,
+        "automations": 2
+      },
+      {
+        "bots": 2,
+        "slug": "fixture-task",
+        "tasks": 8,
+        "states": 8,
+        "automations": 2
+      }
+    ],
+    "pgStopExit": 0,
+    "pgPidFileAbsent": true,
+    "pass": true,
+    "uiAcceptanceClaimed": false
+  },
+  "necessaryNextStep": "Original #2969 owner fixes manifest-root selection while preserving fixture target, database and loopback checks in all subprocesses; then repeat original startup and genuine UI/API/DB/fresh-browser readback. #2984 does not add a competing fixture runner or alter that branch."
+}

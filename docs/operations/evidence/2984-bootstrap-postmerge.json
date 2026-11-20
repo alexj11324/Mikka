@@ -1,0 +1,213 @@
+{
+  "version": 1,
+  "issue": 2984,
+  "pullRequest": 2987,
+  "scope": "Exact merge-source local bootstrap and existing PostgreSQL regression; not deployment or browser acceptance",
+  "source": {
+    "mergeSha": "8cddaa7c48c97ce0092c3ea028519fc9d0ff6069",
+    "mergeParents": [
+      "603d1d95f0266827549f858624a872920344034a",
+      "33e81abd766aedea1507d66055adfada785a62ff"
+    ],
+    "mergeTree": "73bd2ed29ff148836ac2ea1a7ccf2d37652ce3bf",
+    "fetchedMainContainsMerge": true,
+    "firstParentChangedFiles": [
+      "docs/local-bootstrap.md",
+      "docs/operations/evidence/2984-local-bootstrap-migrations.json",
+      "scripts/dev/bootstrap-local.sh",
+      "scripts/dev/bootstrap-local.test.mjs"
+    ],
+    "expectedFilesOnly": true,
+    "otherOwnerFilesUnchangedFromFirstParent": true,
+    "reviewedBlobsRetained": {
+      "docs/local-bootstrap.md": {
+        "merged": "3165e4aaa8ce878e5aa776a01faeb6236ed04a31",
+        "reviewed": "3165e4aaa8ce878e5aa776a01faeb6236ed04a31"
+      },
+      "docs/operations/evidence/2984-local-bootstrap-migrations.json": {
+        "merged": "1eb40db32fbf732877af7b395712259fac3ed388",
+        "reviewed": "1eb40db32fbf732877af7b395712259fac3ed388"
+      },
+      "scripts/dev/bootstrap-local.sh": {
+        "merged": "046da669f395ae668fc30426c0f72ec3643ecddf",
+        "reviewed": "046da669f395ae668fc30426c0f72ec3643ecddf"
+      },
+      "scripts/dev/bootstrap-local.test.mjs": {
+        "merged": "8e9c9a3544a929bfcb94f9ea33bbf810d7194b76",
+        "reviewed": "8e9c9a3544a929bfcb94f9ea33bbf810d7194b76"
+      }
+    },
+    "dependencyInputsUnchangedFromReviewedHead": true,
+    "sharedInstalledDependenciesReused": true,
+    "worktreeClean": true,
+    "setupScriptBlob": "aaf8571eae3dcdb2f88b0dba5feb5a0878e8af41",
+    "unchangedSetupBlobFromFirstParent": true
+  },
+  "environment": {
+    "node": "v24.22.3",
+    "pnpm": "10.34.3",
+    "postgres": "postgres (PostgreSQL) 17.11 (Debian 17.11-0+deb13u1)",
+    "database": "owned loopback sdlc_bootstrap_e2e; TCP only",
+    "installedDependencyReuse": "Same lock/manifests and unchanged linked workspace production packages. Only a non-executed Desktop test differs between the shared installation source and this merge."
+  },
+  "localChecks": [
+    {
+      "phase": "bootstrap-tests",
+      "command": [
+        "node",
+        "--test",
+        "scripts/dev/bootstrap-local.test.mjs"
+      ],
+      "exitCode": 0,
+      "wallSeconds": 0.70959,
+      "logSha256": "ed22e1be99ebe40d7d4b07892c62587c19c0df80f8141fd2994abd83fc3dd6eb",
+      "summary": {
+        "tests": 2,
+        "pass": 2,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "phase": "shell-syntax",
+      "command": [
+        "bash",
+        "-n",
+        "scripts/dev/bootstrap-local.sh"
+      ],
+      "exitCode": 0,
+      "wallSeconds": 0.002965,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "phase": "merge-diff-check",
+      "command": [
+        "git",
+        "diff",
+        "--check",
+        "HEAD^1",
+        "HEAD"
+      ],
+      "exitCode": 0,
+      "wallSeconds": 0.007007,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "postgresMeasurement": {
+    "startedUtc": "2026-11-20T22:00:43.210121+00:00",
+    "finishedUtc": "2026-11-20T22:01:15.405191+00:00",
+    "runner": "Existing research/e2e/measure-bootstrap-pg17.py; isolated output directory and exact-source assertion",
+    "setupCommand": [
+      "corepack",
+      "pnpm",
+      "-s",
+      "test:e2e:setup"
+    ],
+    "coldSamples": 1,
+    "warmSamples": 2,
+    "samples": [
+      {
+        "phase": "initdb",
+        "exitCode": 0,
+        "wallSeconds": 1.204202,
+        "logSha256": "def7a11687b04307c800c47b09f0141f2bbd4e0823061af00d797d7559dcc7d7"
+      },
+      {
+        "phase": "pg-start",
+        "exitCode": 0,
+        "wallSeconds": 0.124457,
+        "logSha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad"
+      },
+      {
+        "phase": "create-database",
+        "exitCode": 0,
+        "wallSeconds": 0.069866,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "setup-cold",
+        "exitCode": 0,
+        "wallSeconds": 4.162715,
+        "logSha256": "abbbc9a4be1ff4d20c8a498e1a4702e5c2a717447923f34b9be7b720be4c6172"
+      },
+      {
+        "phase": "setup-warm-1",
+        "exitCode": 0,
+        "wallSeconds": 1.627864,
+        "logSha256": "28be6429dfae56504a0b35bf409b67c1ab337ef077756a3696123c9395d0ab22"
+      },
+      {
+        "phase": "setup-warm-2",
+        "exitCode": 0,
+        "wallSeconds": 1.851708,
+        "logSha256": "28be6429dfae56504a0b35bf409b67c1ab337ef077756a3696123c9395d0ab22"
+      },
+      {
+        "phase": "existing-bot-settings",
+        "exitCode": 0,
+        "wallSeconds": 22.350661,
+        "logSha256": "b2a70ed2467556017e8a732baf3d5e9cac9817c6c4aa150110469dbeecbced2f"
+      },
+      {
+        "phase": "pg-stop",
+        "exitCode": 0,
+        "wallSeconds": 0.604172,
+        "logSha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d"
+      }
+    ],
+    "snapshots": {
+      "cold": {
+        "ledger": "396:34392b12fc0e3d7f466952882d1acc47",
+        "tables": "368",
+        "database": "sdlc_bootstrap_e2e",
+        "serverVersion": "17.11 (Debian 17.11-0+deb13u1)",
+        "rows": "0"
+      },
+      "warm1": {
+        "ledger": "396:34392b12fc0e3d7f466952882d1acc47",
+        "tables": "368",
+        "database": "sdlc_bootstrap_e2e",
+        "serverVersion": "17.11 (Debian 17.11-0+deb13u1)",
+        "rows": "0"
+      },
+      "warm2": {
+        "ledger": "396:34392b12fc0e3d7f466952882d1acc47",
+        "tables": "368",
+        "database": "sdlc_bootstrap_e2e",
+        "serverVersion": "17.11 (Debian 17.11-0+deb13u1)",
+        "rows": "0"
+      }
+    },
+    "snapshotsEqual": true,
+    "existingDbCommand": [
+      "node",
+      "--import",
+      "./scripts/server-test.mjs",
+      "--import",
+      "tsx",
+      "--test",
+      "tests/bot-settings.db.test.ts"
+    ],
+    "existingDbSummary": {
+      "tests": 11,
+      "pass": 11,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "normalExit": true,
+    "pgStoppedNormally": true,
+    "pgPidFileAbsent": true
+  },
+  "claims": {
+    "postmergeLocalPass": true,
+    "productionAccepted": false,
+    "stagingAccepted": false,
+    "browserE2EAccepted": false,
+    "mainCiCollectedBy": "#2984 root and shared metrics evidence"
+  },
+  "completedUtc": "2026-11-20T22:02:30.617683+00:00"
+}

@@ -159,10 +159,12 @@ old module owners (backend was Codex's).
    A change to auth, signup, privilege or credentials says so in the PR.
 4. **Stacked PRs** merge in order. After a base merges, retarget the next PR
    to `main`.
-   Do not merge `main` into a PR only to keep it current: branch protection
-   does not require an up-to-date branch, and each merge reruns the full CI.
-   Merge `main` in when there is a conflict, or when a change that just landed
-   touches the same code and the PR must be checked against it.
+   Do not merge `main` into a PR mechanically: each new candidate reruns its
+   applicable CI. Read the effective branch protection; its settings cannot
+   be inferred from workflow YAML or a permission-denied administration API.
+   Merge `main` normally when protection requires it, there is a conflict,
+   or a relevant landed change requires integration verification. Do not
+   weaken protection to avoid that work.
 5. **After the merge** the PR owner verifies the merge SHA, records the
    post-merge regression and links its CI. For an official hosted change,
    link the merged public source and the pinned UI Overlay when applicable to
@@ -208,7 +210,11 @@ test expectation, fixture/database state or environment failure. Reproduce the
 failure with fixed source and inputs, fix its owner, and verify that same case.
 Do not rerun a test until it happens to pass. When only an infrastructure job
 failed and source, toolchain and relevant inputs are unchanged, use GitHub's
-native failed-job or single-job rerun. Preserve successful jobs' original run
+native failed-job or single-job rerun only when the workflow's runbook permits
+it and its prerequisite artifacts and external state still exist. For example,
+E2B's finalizer removes failed private candidates, so its
+[existing recovery procedure](../.github/workflows/README.md#cloud-worker-template-release)
+requires a complete replacement candidate run. Preserve successful jobs' original run
 and attempt identities. A code, dependency, fixture or environment change
 invalidates affected proof and requires the applicable checks again.
 
@@ -227,9 +233,10 @@ UI changes also need screenshots of a production build of the official UI
 own isolated PostgreSQL database (`mikka_e2e`). Isolated screenshot harnesses
 use their leased owner/peer fixtures ([`test-accounts.md`](test-accounts.md)).
 Shared-team and external-service acceptance follows the shared SMOKE account
-contract in [`acceptance.md`](acceptance.md). Pull requests and branches have no Vercel Preview: every build
-runs on GitHub Actions, and only `main` deploys, to production
-([decision 2026-11-05-1632](design/decisions/2026-11-05-1632-no-vercel-preview.md)).
+contract in [`acceptance.md`](acceptance.md). Pull requests and branches have no
+automatic Vercel Preview. Local acceptance builds are separate from official
+GitHub Actions artifacts, automatic staging and protected production promotion;
+follow the [current build and release contract](operations/build-source-of-truth.md).
 
 ## 6. Rule IDs and migrations
 
@@ -290,13 +297,15 @@ manifest and resolver. A retained VM receives that manifest with its staged
 worker release; activating or rolling back the worker selects the matching
 manifest without rebuilding its repository or session.
 
-The publication uses Web deploy's production queue and exact-source checks.
+Publication uses the existing `e2b-official-runtime-release` concurrency group,
+the Cloudflare serving-release observation and exact-main source checks in the
+[release workflow](../.github/workflows/README.md#cloud-worker-template-release).
 Each build gets a unique name; retain old templates and save the previous
 paired configuration in `MIKKA_CLOUD_RUNTIME_PREVIOUS`. For rollback, use the
 normal rollback PR and release gates to restore matching application and worker
 code, using that retained configuration as the previous known-good target;
 the old source receipt cannot bypass the exact-main check. Do not change
-template aliases or Vercel production variables by hand. A failed candidate
+template aliases or the release's production configuration by hand. A failed candidate
 gate leaves production on its existing templates. The single configuration
 upsert is checked by per-variable readback; a partial write requires repair
 and revalidation and never replaces a valid previous configuration. See the

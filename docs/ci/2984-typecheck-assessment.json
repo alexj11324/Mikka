@@ -1,0 +1,221 @@
+{
+  "observedAt": "2026-11-20T21:42:29.348Z",
+  "source": "original GitHub job logs; API step durations supplied by independent CI sample collection",
+  "sampleDenominators": {
+    "cloudAndSourcePairs": 3,
+    "siteSearchInJobRepeat": 1
+  },
+  "publicMain": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+  "samples": [
+    {
+      "key": "cloud2958",
+      "pr": 2958,
+      "runId": 44806487834,
+      "attempt": 1,
+      "jobId": 136531733334,
+      "durationSeconds": 42,
+      "head": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+      "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "testedMerge": "f1626b50383731a0947bc72e36d0dd06888bae14",
+      "node": "v24.22.3",
+      "runnerImage": "ubuntu-26.04",
+      "typecheckHeaders": [
+        "2026-11-20T20:06:55.6676215Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+      ],
+      "relevantLines": [
+        "2026-11-20T20:06:55.4438925Z ##[group]Run pnpm typecheck",
+        "2026-11-20T20:06:55.6676215Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:06:55.6677155Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
+        "2026-11-20T20:07:02.2145105Z > tsc --noEmit -p tsconfig.json"
+      ]
+    },
+    {
+      "key": "source2958",
+      "pr": 2958,
+      "runId": 44806487898,
+      "attempt": 1,
+      "jobId": 136536941618,
+      "durationSeconds": 48,
+      "head": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+      "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "testedMerge": "f1626b50383731a0947bc72e36d0dd06888bae14",
+      "node": "v24.22.3",
+      "runnerImage": "ubuntu-22.04",
+      "typecheckHeaders": [
+        "2026-11-20T20:14:33.5896292Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+      ],
+      "relevantLines": [
+        "2026-11-20T20:13:22.1504426Z ##[group]Run node apps/api/scripts/generate-routes.mjs --check",
+        "2026-11-20T20:14:33.3499620Z ##[group]Run pnpm typecheck",
+        "2026-11-20T20:14:33.5896292Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:14:33.5897042Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
+        "2026-11-20T20:14:40.4466721Z > tsc --noEmit -p tsconfig.json",
+        "2026-11-20T20:15:22.1445724Z > tsrs --noEmit -p tsconfig.json"
+      ]
+    },
+    {
+      "key": "site2958",
+      "pr": 2958,
+      "runId": 44806487915,
+      "attempt": 1,
+      "jobId": 136531732826,
+      "combinedPrecheckSeconds": 62,
+      "head": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+      "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "testedMerge": "f1626b50383731a0947bc72e36d0dd06888bae14",
+      "node": "v24.22.3",
+      "runnerImage": "ubuntu-26.04",
+      "typecheckHeaders": [
+        "2026-11-20T20:07:11.4789225Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:11:46.4290528Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+      ],
+      "relevantLines": [
+        "2026-11-20T20:07:10.7864246Z ##[group]Run node apps/api/scripts/generate-routes.mjs --check && pnpm typecheck && pnpm lint",
+        "2026-11-20T20:07:11.4789225Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:07:11.4790070Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
+        "2026-11-20T20:07:17.6172468Z > tsc --noEmit -p tsconfig.json",
+        "2026-11-20T20:07:53.9435681Z > mikka@0.0.1 lint /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:08:16.6641899Z ##[group]Run pnpm build",
+        "2026-11-20T20:08:16.8943350Z > mikka@0.0.1 build /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:11:46.4290528Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:11:46.4291077Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
+        "2026-11-20T20:11:49.0347479Z > tsc --noEmit -p tsconfig.json"
+      ]
+    },
+    {
+      "key": "cloud2963",
+      "pr": 2963,
+      "runId": 44808625968,
+      "attempt": 1,
+      "jobId": 136539084251,
+      "durationSeconds": 47,
+      "head": "16bee4e27102642db36e9916c0e453f5145824ab",
+      "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "testedMerge": "dc5c2e8d695610bae17d0f773f0c1a8aaf532c7f",
+      "node": "v24.22.3",
+      "runnerImage": "ubuntu-26.04",
+      "typecheckHeaders": [
+        "2026-11-20T20:23:18.4658729Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+      ],
+      "relevantLines": [
+        "2026-11-20T20:23:18.1202651Z ##[group]Run pnpm typecheck",
+        "2026-11-20T20:23:18.4658729Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:23:18.4659505Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
+        "2026-11-20T20:23:25.7955533Z > tsc --noEmit -p tsconfig.json"
+      ]
+    },
+    {
+      "key": "source2963",
+      "pr": 2963,
+      "runId": 44808626178,
+      "attempt": 1,
+      "jobId": 136546816628,
+      "durationSeconds": 47,
+      "head": "16bee4e27102642db36e9916c0e453f5145824ab",
+      "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "testedMerge": "dc5c2e8d695610bae17d0f773f0c1a8aaf532c7f",
+      "node": "v24.22.3",
+      "runnerImage": "ubuntu-22.04",
+      "typecheckHeaders": [
+        "2026-11-20T20:43:00.8395264Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+      ],
+      "relevantLines": [
+        "2026-11-20T20:41:43.9635648Z ##[group]Run node apps/api/scripts/generate-routes.mjs --check",
+        "2026-11-20T20:43:00.5778443Z ##[group]Run pnpm typecheck",
+        "2026-11-20T20:43:00.8395264Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:43:00.8396141Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
+        "2026-11-20T20:43:07.8889754Z > tsc --noEmit -p tsconfig.json",
+        "2026-11-20T20:43:48.2737671Z > tsrs --noEmit -p tsconfig.json"
+      ]
+    },
+    {
+      "key": "cloud2898",
+      "pr": 2898,
+      "runId": 44807427101,
+      "attempt": 1,
+      "jobId": 136534979849,
+      "durationSeconds": 60,
+      "head": "08a3f37bc0624b927326e4ac13b432f3ca9a10af",
+      "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "testedMerge": "1b7cf802de112d79efb4d93296d39462cb1b375c",
+      "node": "v24.22.2",
+      "runnerImage": "ubuntu-26.04",
+      "typecheckHeaders": [
+        "2026-11-20T20:18:46.0551449Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+      ],
+      "relevantLines": [
+        "2026-11-20T20:18:45.7161097Z ##[group]Run pnpm typecheck",
+        "2026-11-20T20:18:46.0551449Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:18:46.0552298Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
+        "2026-11-20T20:18:55.4264513Z > tsc --noEmit -p tsconfig.json"
+      ]
+    },
+    {
+      "key": "source2898",
+      "pr": 2898,
+      "runId": 44807428185,
+      "attempt": 1,
+      "jobId": 136541133347,
+      "durationSeconds": 59,
+      "head": "08a3f37bc0624b927326e4ac13b432f3ca9a10af",
+      "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+      "testedMerge": "1b7cf802de112d79efb4d93296d39462cb1b375c",
+      "node": "v24.22.3",
+      "runnerImage": "ubuntu-22.04",
+      "typecheckHeaders": [
+        "2026-11-20T20:33:18.6282339Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka"
+      ],
+      "relevantLines": [
+        "2026-11-20T20:31:44.5634881Z ##[group]Run node apps/api/scripts/generate-routes.mjs --check",
+        "2026-11-20T20:33:18.3062189Z ##[group]Run pnpm typecheck",
+        "2026-11-20T20:33:18.6282339Z > mikka@0.0.1 typecheck /home/runner/work/Mikka/Mikka",
+        "2026-11-20T20:33:18.6283163Z > tsrs --noEmit && tsrs --noEmit -p apps/api/tsconfig.json && pnpm --filter @mikka/frontend typecheck",
+        "2026-11-20T20:33:28.0630465Z > tsc --noEmit -p tsconfig.json",
+        "2026-11-20T20:34:19.3181768Z > tsrs --noEmit -p tsconfig.json"
+      ]
+    }
+  ],
+  "ownership": {
+    "admissionPR": 2964,
+    "admissionHead": "316fce4a8ed210f4db179dac3a92daa543c0d4dd",
+    "scope": "PR metadata declarations only; no cloud-computer/site-search changes",
+    "relatedPR2839": "site-search removes NEXT_TELEMETRY_DISABLED only; no typecheck repair"
+  },
+  "decisions": [
+    {
+      "item": "site-search pre-build global typecheck",
+      "verdict": "independent repair implemented; real CI pending",
+      "reason": "The unchanged pnpm build invokes a mandatory full typecheck again in the same job before HTTP acceptance. Remove only the explicit earlier typecheck; retain route check, lint, exact build, dual PG and all HTTP assertions.",
+      "pullRequest": 2993,
+      "head": "b1b03bb1ad2d915e8a9e384e5118e1eef6f8010e"
+    },
+    {
+      "item": "domain runtime and dual-PostgreSQL acceptance",
+      "verdict": "retain",
+      "reason": "Distinct actual platform, authentication, authorization and persistence contracts. No compilation/static check replaces them."
+    },
+    {
+      "item": "cloud-computer global PR typecheck vs Source",
+      "verdict": "retain existing independently executed proof",
+      "reason": "Same synthetic source in all three samples, but different Ubuntu images and one Node patch difference. The original workflow owns self-contained PR and manual-dispatch acceptance. No ADR documenting an intentional extra static compilation matrix was found; preserving this proof is a safety decision based on different actual inputs and lack of an established equivalent replacement, not a claim of documented matrix intent. No removal or cross-runner result reuse is made."
+    }
+  ],
+  "history": [
+    {
+      "commit": "96e16eb373cabc9ba2a7f1d1c89a5610206e4fec",
+      "date": "2026-10-26",
+      "scope": "Cloud computer backend/runtime workflow initially self-contained, with typecheck, isolated PG, and manual dispatch"
+    },
+    {
+      "commit": "7130665f73668adbf8f7192b933c2cc7a6487953",
+      "date": "2026-10-27",
+      "scope": "Site search independent title/owner ACL, dual-PG and HTTP acceptance; build also invokes root typecheck"
+    },
+    {
+      "commit": "9064891529ebf46d9bae083b072960c8aff92f2b",
+      "date": "2026-11-03",
+      "pullRequest": 1180,
+      "scope": "Removed redundant main push triggers from specialty workflows while retaining PR and manual dispatch"
+    }
+  ]
+}

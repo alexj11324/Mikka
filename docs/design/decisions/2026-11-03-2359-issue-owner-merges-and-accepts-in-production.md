@@ -5,6 +5,7 @@
   through a GitHub issue to one agent, which owns it end to end and never
   pushes directly to main.
 - Rule: — (process, not product)
+- Superseded in part by: [2026-11-20-1640](2026-11-20-1640-sdlc-delivery.md) (normal merge commits, dependency-based delivery for new work, exact post-merge proof and the existing release owner's separate promotion authority; approved in-flight epic batches remain unchanged).
 - Superseded in part by: [2026-11-07-1400](2026-11-07-1400-production-acceptance-scope.md) (rule 5 requires production acceptance only for external services that a local production build cannot exercise; every owner still watches deployment).
 - Superseded in part by: [2026-11-05-1632](2026-11-05-1632-no-vercel-preview.md) (no Vercel Preview; verify before merge in CI or a local/Docker production build with an isolated database)
 - Replaces:
