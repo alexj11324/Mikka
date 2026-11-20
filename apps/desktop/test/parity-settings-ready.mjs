@@ -75,7 +75,7 @@ export async function settingsReady(page, id, fixture, messages) {
       break
     }
     case 'preferences':
-      await enabled(body.getByRole('textbox', { name: /^Prefix / }))
+      await visible(text('Settings.appearance.language'))
       break
     case 'appearance':
       await selected(role('radiogroup', 'Settings.appearance.themeLabel'))

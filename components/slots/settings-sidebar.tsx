@@ -5,8 +5,11 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from '@/components/settings/settings-link'
 import { useSearchParams } from '@/lib/client-runtime/navigation'
 import useSWR from 'swr'
-import { Bell, Blocks, Brain, Building2, ChartColumn, CircleCheck, CircleDashed, Cloud, Container, CreditCard, FileText, Folder, Gauge, GitPullRequest, HardDrive, History, Keyboard, KeyRound, Landmark, Lightbulb, MessageSquareText, Monitor, Plus, Shield, ShieldCheck, SlidersHorizontal, SquareTerminal, SquareUserRound, Star, Sun, UserRound, Users, type IconGlyph } from '@/components/icons'
+import { Bell, Blocks, Brain, Building2, ChartColumn, ChevronLeft, CircleCheck, CircleDashed, Cloud, Container, CreditCard, FileText, Folder, Gauge, GitPullRequest, HardDrive, History, Keyboard, KeyRound, Landmark, Lightbulb, MessageSquareText, Monitor, Plus, Settings, Shield, ShieldCheck, SlidersHorizontal, SquareTerminal, SquareUserRound, Star, UserRound, Users, type IconGlyph } from '@/components/icons'
 import { listTeams } from '@/app/actions/teams'
+import { switchWorkspace } from '@/app/actions/workspace'
+import { fetchSettingsData } from '@/lib/settings-data'
+import type { WorkspaceSwitcher } from '@/lib/workspace-switcher'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { SearchInput } from '@/components/ui/search-input'
 import { RAIL_ITEMS } from '@/components/nav/icon-rail'
@@ -16,8 +19,8 @@ import { ResizablePane } from '@/components/ui/resizable-pane'
 import type { SettingsSidebarProps } from '@/components/slots/settings-sidebar-contract'
 
 const icons = {
-  preferences: SlidersHorizontal, appearance: Sun, account: UserRound, security: Shield, notifications: Bell,
-  models: Gauge, environments: Container, connections: Blocks, logins: KeyRound, developer: SquareTerminal, computers: Monitor,
+  preferences: Settings, appearance: SlidersHorizontal, account: UserRound, security: Shield, notifications: Bell,
+  models: Gauge, environments: Folder, connections: Blocks, logins: KeyRound, developer: SquareTerminal, computers: Monitor,
   instructions: Brain, threads: MessageSquareText, shortcuts: Keyboard, git: GitPullRequest, 'review-repositories': Folder, 'review-config': CircleCheck, activity: History,
   general: Building2, 'issue-states': CircleDashed, members: Users, teams: SquareUserRound, permissions: ShieldCheck, secrets: HardDrive,
   audit: FileText, organization: Landmark, usage: ChartColumn, billing: CreditCard, cloud: Cloud,
@@ -46,7 +49,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
     const groupLabel = group === 'workspace' && workspaceName ? workspaceName : i18nText(`Settings.groups.${group}`)
     const items = visibleSettingsSections({ admin, personal, billing, cloudAdmin, organization }).filter(item => item.group === group && settingsItemVisible({
       query, groupTitle: GROUP_TITLES[group], groupLabel, itemTitle: item.title,
-      label: i18nText(`Settings.sections.${item.id}.title` as never),
+      label: i18nText.has(`Settings.sections.${item.id}.nav` as never) ? i18nText(`Settings.sections.${item.id}.nav` as never) : i18nText(`Settings.sections.${item.id}.title` as never),
       keywords: i18nText.has(`Settings.sections.${item.id}.keywords` as never) ? i18nText(`Settings.sections.${item.id}.keywords` as never) : '',
       section: item.id, routed: Boolean(activeSection),
     }))
@@ -58,7 +61,7 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   const noMatch = Boolean(normalizedQuery) && !showTeams && groups.every(({ items }) => items.length === 0)
   const body = <>
     <SidebarHeader className="px-3 pt-3 pb-2">
-      <h2 className="flex h-8 items-center px-2 text-sm font-semibold">{i18nText("Settings.title")}</h2>
+      <button type="button" className="flex h-8 items-center gap-1 px-2 text-sm font-semibold" onClick={() => onRail('chats')}><ChevronLeft />{i18nText("Settings.title")}</button>
       <SearchInput className="mt-1" aria-label={i18nText("Settings.searchLabel")} placeholder={i18nText("Settings.searchPlaceholder")} value={query} onChange={event => setQuery(event.target.value)} />
     </SidebarHeader>
     <SidebarContent ref={contentRef} className="px-2 pb-6">
@@ -66,9 +69,9 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
       {groups.map(({ group, groupLabel, items }) => {
         return items.length > 0 && <SidebarGroup key={group} className="py-2"><SidebarGroupLabel>{groupLabel}</SidebarGroupLabel><SidebarMenu>{items.map(item => {
           const Icon = icons[item.id]
-          const label = i18nText(`Settings.sections.${item.id}.title` as never)
+          const label = i18nText.has(`Settings.sections.${item.id}.nav` as never) ? i18nText(`Settings.sections.${item.id}.nav` as never) : i18nText(`Settings.sections.${item.id}.title` as never)
           const selected = item.id === section && !selectedTeamId && !creating
-          return <SidebarMenuItem key={item.id}><SidebarMenuButton aria-label={label} render={activeSection ? <Link href={href(item.id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onPointerEnter={() => onIntent?.(item.id)} onFocus={() => onIntent?.(item.id)} onClick={() => { if (!activeSection) onSectionChange(item.id); setOpenMobile(false) }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
+          return <SidebarMenuItem key={item.id}><SidebarMenuButton className="data-active:bg-[#e9f1ff] data-active:text-[#2365db]" aria-label={label} render={activeSection ? <Link href={href(item.id)} /> : undefined} isActive={selected} aria-current={selected ? 'page' : undefined} onPointerEnter={() => onIntent?.(item.id)} onFocus={() => onIntent?.(item.id)} onClick={() => { if (!activeSection) onSectionChange(item.id); setOpenMobile(false) }}><Icon /><span>{label}</span></SidebarMenuButton></SidebarMenuItem>
         })}</SidebarMenu></SidebarGroup>
       })}
       {showTeams && <SidebarGroup className="py-2"><SidebarGroupLabel>{i18nText("Settings.groups.yourTeams")}</SidebarGroupLabel><SidebarMenu>{joinedTeams.map(team => {
@@ -78,11 +81,24 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
       })}<SidebarMenuItem><SidebarMenuButton render={<Link href={`${href('teams')}&create=1`} />} aria-label={i18nText("FeatureCopy.c_cb11190c")} isActive={creating} aria-current={creating ? 'page' : undefined} onClick={() => setOpenMobile(false)}><Plus /><span>{i18nText("Settings.nav.createTeam")}</span></SidebarMenuButton></SidebarMenuItem>{error && <SidebarMenuItem><SidebarMenuButton onClick={() => void mutate()}>{i18nText("FeatureCopy.c_c401eee8")}</SidebarMenuButton></SidebarMenuItem>}</SidebarMenu></SidebarGroup>}
     </SidebarContent>
     {/* Phones have no rail; its destinations move here, as in the bot list. */}
+    {workspaceId ? <WorkspaceSwitch currentId={workspaceId} currentName={workspaceName} /> : null}
     {isMobile && <SidebarFooter>
       <SidebarMenu>{RAIL_ITEMS.map(item => <SidebarMenuItem key={item.id}><SidebarMenuButton onClick={() => { setOpenMobile(false); onRail(item.id) }}><item.icon /><span>{i18nText(item.label)}</span></SidebarMenuButton></SidebarMenuItem>)}</SidebarMenu>
     </SidebarFooter>}
   </>
   if (isMobile) return <Sidebar collapsible="offcanvas" mobileTitle={i18nText("Settings.title")} mobileCloseLabel={i18nText('Common.close')}>{body}</Sidebar>
+
+function WorkspaceSwitch({ currentId, currentName }: { currentId: string; currentName?: string }) {
+  const { data } = useSWR('/api/workspace/switcher', fetchSettingsData<WorkspaceSwitcher>, { shouldRetryOnError: false })
+  const choices = data?.accounts[0]?.choices ?? []
+  if (choices.length < 2) return <p className="mt-auto border-t px-4 py-3 text-sm">{currentName}</p>
+  return <label className="mt-auto flex items-center gap-2 border-t px-3 py-2 text-sm">
+    <Users />
+    <select aria-label={currentName} className="min-w-0 flex-1 bg-transparent" value={currentId} onChange={event => { void switchWorkspace({ workspaceId: event.target.value }) }}>
+      {choices.map(choice => <option key={choice.id} value={choice.id}>{choice.name}</option>)}
+    </select>
+  </label>
+}
   // On desktop the section list is the card's first column, where the bot list sits elsewhere in the app.
   return <ResizablePane data-slot="settings-list" storageKey="mikka:settings-list-width" defaultWidth={256} min={208} max={400} edge="end" from="md" label={i18nText('Common.resize.settingsList')} className="hidden shrink-0 border-r md:block">
     <Sidebar collapsible="none" aria-label={i18nText("FeatureCopy.c_a8c7ae4f")} className="w-full bg-transparent">{body}</Sidebar>

@@ -11,6 +11,7 @@ import { SecurityAndSignIn } from '@ui-slot/settings-security'
 import { RestoreSetupChecklist } from '@/components/coordinator/setup-checklist'
 import { PreferencesSettings } from '@ui-slot/settings-preferences'
 import { AppearanceSettings } from '@/components/settings/appearance-settings'
+import { GeneralInterface } from '@/components/settings/general-interface'
 import { WorkspaceGeneral } from '@ui-slot/settings-general'
 import { MembersScreen } from '@ui-slot/settings-members'
 import { SettingsContent } from '@/components/ui/settings-layout'
@@ -163,7 +164,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'issue-states': return workspaceId && !preview ? <IssueStatesSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'environments')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
-    case 'preferences': return <><PreferencesSettings />{workspaceId && !preview && !workspaceError && <RestoreSetupChecklist key={workspaceId} workspaceId={workspaceId} />}</>
+    case 'preferences': return <><GeneralInterface /><PreferencesSettings />{workspaceId && !preview && !workspaceError && <RestoreSetupChecklist key={workspaceId} workspaceId={workspaceId} />}</>
     case 'appearance': return <AppearanceSettings />
     case 'instructions': return <MemorySettings />
     case 'threads': return <ThreadSettings workspaceId={workspaceId} personal={personal} />

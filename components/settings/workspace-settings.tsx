@@ -15,6 +15,7 @@ import { useReplayOnboarding } from '@/hooks/settings/use-preferences-page'
 import { usePresence, type PresenceProps } from '@/lib/use-presence'
 import { FieldError } from '@/components/ui/field'
 import { WORKSPACE_ICON_TYPES, useDeleteWorkspace, useTransferWorkspace, useWorkspaceGeneral } from '@/hooks/settings/use-workspace-general'
+import { IssuePrefixSettings } from '@/components/settings/issue-prefix-settings'
 
 /**
  * V10 常规: icon, name and address; admins edit them and can delete the workspace (S-I).
@@ -51,14 +52,15 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
 
   // S-P: members read the same rows as plain values, with no controls.
   if (!current.canEdit) return <><SettingsSection id="workspace-general">
-    <SettingRow title={t('icon')}>{icon}</SettingRow>
-    <SettingRow title={t('name')}><span>{current.name}</span></SettingRow>
+    <SettingRow title={t('icon')} description={t('iconHint')}>{icon}</SettingRow>
+    <SettingRow title={t('name')} description={t('nameHint')}><span>{current.name}</span></SettingRow>
+    <WorkspaceId id={current.id} />
     {current.slug && <SettingRow title={t('address')}><span className="break-all">{host}{current.slug}</span></SettingRow>}
   </SettingsSection></>
 
   return <>
     <SettingsSection id="workspace-general">
-      <SettingRow title={t('icon')}>
+      <SettingRow title={t('icon')} description={t('iconHint')}>
         {/* control-size-exempt: the only Input here is the sr-only file picker; no visible field shares the row. */}
         <div className="flex items-center gap-2">
           {icon}
@@ -67,11 +69,12 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
           <Button type="button" variant="secondary" size="sm" disabled={saving !== null} onClick={() => fileRef.current?.click()}>{saving === 'icon' ? commonT('saving') : t('changeIcon')}</Button>
         </div>
       </SettingRow>
-      <SettingRow title={t('name')}>
+      <SettingRow title={t('name')} description={t('nameHint')}>
         <Input aria-label={t('name')} className="w-full sm:w-50" maxLength={120} value={name ?? current.name} disabled={saving === 'name'}
           onChange={event => setName(event.target.value)} onBlur={() => commit('name')}
           onKeyDown={event => { if (event.key === 'Enter') commit('name'); if (event.key === 'Escape') setName(null) }} />
       </SettingRow>
+      <WorkspaceId id={current.id} />
       <SettingRow title={t('address')}>
         <InputGroup className="w-full sm:w-72">
           <InputGroupAddon><InputGroupText>{host}</InputGroupText></InputGroupAddon>
@@ -81,7 +84,13 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
         </InputGroup>
       </SettingRow>
     </SettingsSection>
+    <IssuePrefixSettings />
     {failed && <SettingsSaveError message={failed.message} retryLabel={commonT('retry')} onRetry={() => { if (general.failedPick) { fileRef.current?.click(); return } general.retry() }} />}
+    <SettingsSection id="workspace-share" title={t('share')}>
+      <SettingRow title={t('newWorkVisibility')} description={t('newWorkHint')}><span className="text-sm text-muted-foreground">{t('unavailable')}</span></SettingRow>
+      <SettingRow title={t('workspaceWorkVisibility')} description={t('workspaceWorkHint')}><span className="text-sm text-muted-foreground">{t('unavailable')}</span></SettingRow>
+      <SettingRow title={t('allowPrivate')} description={t('allowPrivateHint')}><span className="text-sm text-muted-foreground">{t('unavailable')}</span></SettingRow>
+    </SettingsSection>
 
     <SettingsSection id="workspace-danger" title={t('danger')}>
       {current.canTransfer && <SettingRow title={t('transferWorkspace')}>
@@ -106,6 +115,17 @@ export function WorkspaceSettings({ workspaceId }: { userKey?: string; workspace
  * and reloads the app, which shows the first-run guide again. The person's own, so it sits in
  * 偏好设置 and shows in every workspace, a personal one too (decision 2026-11-02-0203).
  */
+function WorkspaceId({ id }: { id: string }) {
+  const t = useTranslations('Settings.workspaceForm')
+  const [copied, setCopied] = useState(false)
+  return <SettingRow title={t('id')} description={t('idHint')}>
+    <span className="flex items-center gap-2 font-mono text-xs">
+      {id.slice(0, 4)}…{id.slice(-4)}
+      <Button type="button" size="sm" variant="ghost" aria-label={t('copyId')} onClick={() => { void navigator.clipboard.writeText(id).then(() => { setCopied(true) }) }}>{copied ? t('copied') : t('copyId')}</Button>
+    </span>
+  </SettingRow>
+}
+
 export function ReplayOnboarding() {
   const t = useTranslations('Settings.workspaceForm')
   const commonT = useTranslations('Common')

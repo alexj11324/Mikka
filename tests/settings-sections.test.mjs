@@ -6,7 +6,7 @@ test('every nav item has exactly one section, in the Figma 1508:2 group order', 
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'personal' && !s.withheld && !s.unbuilt && s.sidebar !== false).map(s => s.id), ['preferences', 'appearance', 'account', 'security', 'notifications', 'models', 'environments', 'connections', 'developer', 'computers'])
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'agent' && !s.unbuilt).map(s => s.id), ['instructions', 'threads'])
   assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'review' && !s.unbuilt).map(s => s.id), [])
-  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace' && !s.unbuilt && s.sidebar !== false).map(s => s.id), ['general', 'issue-states', 'members', 'teams', 'permissions', 'audit', 'organization', 'usage', 'billing', 'cloud'])
+  assert.deepEqual(SETTINGS_SECTIONS.filter(s => s.group === 'workspace' && !s.unbuilt && s.sidebar !== false).map(s => s.id), ['general', 'organization', 'issue-states', 'members', 'teams', 'billing', 'usage', 'permissions', 'audit', 'cloud'])
 })
 
 test('old links keep landing on the page that now holds their content', () => {
@@ -99,7 +99,7 @@ test('a personal workspace has every setting of the workspace itself; only what 
   // Decision 2026-11-02-0203: the two kinds differ only in 成员, 团队, 团队权限 and 审计日志.
   const personal = visibleSettingsSections({ admin: true, personal: true }).map(s => s.id)
   const account = SETTINGS_SECTIONS.filter(s => (s.group === 'personal' || s.group === 'agent') && !UNBUILT.includes(s.id) && !WITHHELD.includes(s.id) && s.sidebar !== false).map(s => s.id)
-  assert.deepEqual(personal, [...account, 'general', 'issue-states', 'usage', 'billing'])
+  assert.deepEqual(personal, [...account, 'general', 'issue-states', 'billing', 'usage'])
   const team = visibleSettingsSections({ admin: true }).map(s => s.id)
   for (const id of ['general', 'members', 'teams', 'permissions', 'environments', 'audit', 'usage', 'billing']) assert.ok(team.includes(id), id)
   assert.equal(team.includes('secrets'), false)

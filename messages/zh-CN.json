@@ -2206,7 +2206,7 @@
     "searchPlaceholder": "搜索设置…",
     "noResults": "没有匹配的设置",
     "groups": {
-      "personal": "个人",
+      "personal": "个人设置",
       "agent": "Agent",
       "review": "审阅",
       "workspace": "工作区",
@@ -2259,6 +2259,7 @@
       },
       "models": {
         "title": "模型与订阅",
+        "nav": "模型",
         "keywords": "模型订阅 订阅 额度 API Key 服务商 模型 优先使用的模型 顺序 派发 运行位置 云端 本地 Bot Agent"
       },
       "logins": {
@@ -2271,7 +2272,8 @@
         "title": "设备"
       },
       "developer": {
-        "title": "个人访问令牌"
+        "title": "个人访问令牌",
+        "nav": "API"
       },
       "general": {
         "title": "工作区常规"
@@ -2287,6 +2289,7 @@
       },
       "organization": {
         "title": "组织",
+        "nav": "身份与访问",
         "keywords": "Organization SSO SAML OIDC SCIM 单点登录 企业 身份 目录 策略 审批 法律保留"
       },
       "usage": {
@@ -2303,7 +2306,8 @@
         "title": "运行环境"
       },
       "issue-states": {
-        "title": "任务状态"
+        "title": "任务状态",
+        "nav": "任务状态与标签"
       }
     },
     "appearance": {
@@ -2317,7 +2321,44 @@
       "language": "界面语言",
       "languageName": "简体中文",
       "languageZh": "简体中文",
-      "languageEn": "English"
+      "languageEn": "English",
+      "displayMode": "显示模式",
+      "sync": "外观同步",
+      "syncHint": "在你的设备之间应用更改",
+      "themes": "主题",
+      "colors": "颜色",
+      "accent": "强调色",
+      "fill": "填充",
+      "foreground": "前景",
+      "advanced": "高级颜色",
+      "background": "背景",
+      "code": "代码",
+      "codeSize": "代码字号",
+      "diffView": "差异视图",
+      "diffColor": "差异颜色",
+      "hidden": "隐藏文件",
+      "interface": "界面",
+      "input": "输入",
+      "sidebarPages": "侧栏显示页面",
+      "sidebarPagesHint": "选择侧栏显示哪些页面。",
+      "sidebarLayout": "侧栏布局",
+      "sidebarLayoutHint": "混合布局把 Bot 放在线程上方。分栏一次显示一组。",
+      "pinPages": "页面置顶",
+      "pinPagesHint": "将任务和拉取请求放在 Bot 和线程前面。",
+      "openInApp": "在桌面应用打开链接",
+      "openInAppHint": "用已安装的 Mikka 桌面应用打开 Mikka 链接。",
+      "scrollTop": "将新消息滚到顶部",
+      "scrollTopHint": "回复生成时，将最新消息留在视窗顶部。",
+      "enter": "Enter",
+      "enterHint": "运行过程中按 Enter 时的行为。",
+      "modEnter": "⌘ / Ctrl + Enter",
+      "modEnterHint": "运行过程中按 ⌘ / Ctrl + Enter 时的行为。",
+      "altEnter": "⌥ / Alt + Enter",
+      "altEnterHint": "运行过程中按 ⌥ / Alt + Enter 时的行为。",
+      "microphone": "麦克风",
+      "microphoneHint": "这台设备上的语音输入设备。",
+      "systemDefault": "系统默认",
+      "unavailable": "这项还没有接口"
     },
     "profile": {
       "heading": "账户信息",
@@ -2373,6 +2414,20 @@
       "changeIcon": "更换",
       "removeIcon": "移除",
       "address": "地址",
+      "iconHint": "显示在工作区切换器中。",
+      "nameHint": "显示在线程和邀请中。",
+      "id": "工作区 ID",
+      "idHint": "用于支持和 API 请求。",
+      "copied": "已复制",
+      "copyId": "复制工作区 ID",
+      "unavailable": "这项还没有接口",
+      "share": "共享",
+      "newWorkVisibility": "我的新工作默认可见性",
+      "newWorkHint": "新建线程或 Bot 时预选。",
+      "workspaceWorkVisibility": "工作区新工作默认可见性",
+      "workspaceWorkHint": "成员未选择个人默认时使用。",
+      "allowPrivate": "允许私有工作",
+      "allowPrivateHint": "允许团队成员将新工作设为私有。",
       "danger": "危险操作",
       "deleteWorkspace": "删除工作区",
       "personalUndeletable": "个人工作区不能删除",
@@ -3730,6 +3785,26 @@
       "instructionsMine": "Mikka 给你发起的线程起名时，在工作区说明之外再遵循这些",
       "instructionsWorkspace": "Mikka 给这个工作区里每个线程起名时遵循这些",
       "placeholder": "提到客户时，在标题前加上客户名",
+      "lead": "设置线程的命名、运行和归档行为。",
+      "scopeMine": "个人",
+      "scopeWorkspace": "工作区",
+      "command": "标题指令",
+      "none": "无指令",
+      "edit": "编辑",
+      "regenerate": "何时重新生成标题",
+      "inheritNever": "从不 · 继承工作区",
+      "archive": "归档",
+      "archiveIdle": "自动归档闲置线程",
+      "archiveHint": "置顶线程和有开放拉取请求的线程会保留。",
+      "archiveOff": "关闭",
+      "archiveDays": "{days} 天",
+      "subagents": "子代理",
+      "subagentsHint": "线程启动时使用的并发与嵌套限制。",
+      "parallel": "并行子代理",
+      "parallelHint": "这个线程树中可同时运行的子代理数量。",
+      "depth": "嵌套深度",
+      "depthHint": "设为 1 时，子代理不能再启动子代理。",
+      "unavailable": "这项还没有接口",
       "saved": "标题说明已保存",
       "cleared": "标题说明已清除",
       "saveError": "标题说明保存失败",
