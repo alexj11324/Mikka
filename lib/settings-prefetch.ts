@@ -1,5 +1,6 @@
 import type { Cache, Key, useSWRConfig } from 'swr'
 import type { listEnvironments } from '@/app/actions/environments'
+import type { getIssueStates } from '@/app/actions/issue-states'
 import type { getPasswordStatus, listSessions } from '@/app/actions/account'
 import type { getPreferences } from '@/app/actions/preferences'
 import type { getIssuePrefixState } from '@/app/actions/issue-prefix'
@@ -58,6 +59,7 @@ const READS: Partial<Record<SettingsSectionId, (workspaceId: string) => [key: Ke
   permissions: id => [[computerPolicyKey(id), () => readComputerPolicy(id)], [settingsKeys.sharePolicy(id), () => settingsRead<Result<typeof getSharePolicy>>('share-policy', { workspace: id })], [settingsKeys.appPolicy(id), () => settingsRead<Result<typeof getAppPolicy>>('app-policy', { workspace: id })]],
   secrets: id => [[settingsKeys.secrets(id), () => settingsRead<Result<typeof listSecrets>>('secrets', { workspace: id })], [settingsKeys.e2bKey(id), () => settingsRead<Result<typeof getE2BKeyCapability>>('e2b-key', { workspace: id })]],
   environments: id => [[settingsKeys.environments(id), () => settingsRead<Result<typeof listEnvironments>>('environments', { workspace: id })]],
+  'issue-states': id => [[settingsKeys.issueStates(id), () => settingsRead<Result<typeof getIssueStates>>('issue-states', { workspace: id })]],
   usage: id => { const month = currentMonth(); return [[settingsKeys.usage(id, month), () => settingsRead<Result<typeof getUsage>>('usage', { month, workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)]] },
   billing: id => [[settingsKeys.billing(id), () => settingsRead<Result<typeof getBilling>>('billing', { workspace: id })], [creditBillingKey(id), () => getCreditBilling(id)], [cardVerificationKey(id), () => readCardVerification(id)]],
   // 模型与订阅: its GET reads.

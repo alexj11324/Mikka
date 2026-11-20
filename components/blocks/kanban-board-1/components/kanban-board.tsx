@@ -21,6 +21,10 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuRadioGroup
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { LabelDot, IssueMetadataControls, type MetadataRequest, type OnMetadataChange } from '@/components/workspace/issue-metadata-controls'
 import { IssuePropertyMenu } from '@/components/workspace/issue-property-menu'
+import { IssueStatePicker } from '@/components/workspace/issue-state-picker'
+import { Mark } from '@/components/workspace/state-mark'
+import { useIssueStates } from '@/hooks/use-issue-states'
+import { groupIssueStates, issueStateLabel, taskIssueState } from '@/lib/issue-states'
 import { IssuePullRequestLink } from '@/components/workspace/issue-pull-request-link'
 import { CardControlBoundary, CardCreatedAt } from '@/components/workspace/issue-card-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
@@ -69,7 +73,8 @@ const AGENT_STATE_DOTS = { running: 'bg-muted-foreground motion-safe:animate-pul
 
 export type CardHandlers = {
   onOpen: (id: string) => void
-  onStatusChange: (task: BoardTask, status: IssueStatus) => void
+  /** `stateId` is the workspace state picked (lib/issue-states.ts); null keeps or takes the category's default. */
+  onStatusChange: (task: BoardTask, status: IssueStatus, stateId?: string | null) => void
   onPriorityChange: (task: BoardTask, priority: string) => void
   onMetadataSaved: OnMetadataChange
   onMetadataBusy: (busy: boolean) => void
@@ -103,9 +108,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   const t = useTranslations('Board')
   const tCard = useTranslations('Shell.board.card')
   const tIssue = useTranslations('Issue')
-  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
-  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
   const controlsDisabled = disabled || isOverlay
   const [request, setRequest] = useState<MetadataRequest | null>(null)
@@ -144,7 +147,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     personal={null}
     hasAssignee={Boolean(assigneeGroup)}
     assignee={show('assignee') ? <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary> : null}
-    status={<CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>}
+    status={<CardControlBoundary><div className="-ml-[3px] flex"><IssueStatePicker workspaceId={task.workspaceId} status={task.status} stateId={task.stateId} label={tIssue('statusLabel')} disabled={controlsDisabled} onChange={(status, stateId) => onStatusChange(task, status, stateId)} /></div></CardControlBoundary>}
     chips={chips} runState={show('agentState') && agentState ? agentState : null} block={block ? { reason: block.reason, label: blockLabel(tCard, block) } : null} createdAt={show('createdAt') ? <CardCreatedAt createdAt={task.createdAt} /> : null}
     // Opened from the context menu: labels, project and PR editors, rendered off-card.
     editors={isOverlay ? null : <div hidden><IssueMetadataControls task={task} section="all" compact disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>} />
@@ -184,13 +187,20 @@ function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityC
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
-  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
+  // The workspace's states in the picker's order (Open, then Closed); the seven categories until they load.
+  const { states } = useIssueStates(task.workspaceId)
+  const current = states ? taskIssueState(states, task) : undefined
+  const stateOptions = states ? (({ open, closed }) => [...open, ...closed])(groupIssueStates(states)).map(state => ({ value: state.id, status: state.category, stateId: state.id as string | null, label: issueStateLabel(state, statusLabel), mark: <Mark shape={state.icon} tone={state.color} /> }))
+    : ISSUE_STATUSES.map(item => ({ value: item.value as string, status: item.value, stateId: null as string | null, label: statusLabel(item.value), mark: <item.icon className={item.indicatorClassName} /> }))
   return <>
     <ContextMenuSub>
       <ContextMenuSubTrigger disabled={disabled}><Circle />{tCard('status')}<ContextMenuShortcut>S</ContextMenuShortcut></ContextMenuSubTrigger>
-      <ContextMenuSubContent><ContextMenuRadioGroup value={task.status} onValueChange={value => onStatusChange(task, value as IssueStatus)}>
-        {statusOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon className={option.indicatorClassName} />{option.label}</ContextMenuRadioItem>)}
+      <ContextMenuSubContent><ContextMenuRadioGroup value={current?.id ?? task.status} onValueChange={value => {
+        const option = stateOptions.find(item => item.value === value)
+        if (option) onStatusChange(task, option.status, option.stateId)
+      }}>
+        {stateOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}>{option.mark}{option.label}</ContextMenuRadioItem>)}
       </ContextMenuRadioGroup></ContextMenuSubContent>
     </ContextMenuSub>
     <ContextMenuSub>

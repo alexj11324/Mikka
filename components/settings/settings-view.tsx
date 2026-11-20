@@ -21,6 +21,7 @@ import { WebServerControl } from '@/components/settings/web-server-control'
 import { DesktopServerSettings } from '@/components/settings/desktop-server-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
 import { EnvironmentsSettings } from './environments-settings'
+import { IssueStatesSettings } from './issue-states-settings'
 import { CloudSettings } from '@/components/settings/cloud-settings'
 
 import { PrivacySettings } from '@/components/settings/privacy-settings'
@@ -152,6 +153,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
 
     case 'environments': return workspaceId && !preview ? <EnvironmentsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'issue-states': return workspaceId && !preview ? <IssueStatesSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'privacy': return <PrivacySettings />
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />

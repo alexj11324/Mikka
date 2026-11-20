@@ -23,6 +23,7 @@ import { agents, issues, issueDocuments, issueVersions, issueMembers, users } fr
 import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES, type IssueStatus } from '@/lib/issue-meta'
+import { readIssueState } from '@/lib/issue-states-store'
 import type { JSONContent } from '@tiptap/react'
 import { blockFlagSchema, readIssueMetadata, withIssueMetadata } from '@/lib/issue-metadata'
 import type { BlockFlag } from '@/lib/task-blocked'
@@ -160,6 +161,12 @@ export async function listWorkspaceTaskPage(input: TaskListPageInput) {
   }
 }
 
+/**
+ * A list row's state: null while the task is in its category's default, which the client resolves itself
+ * (lib/issue-states.ts taskIssueState). Keeps the list's egress budget (tests/issue-list-egress.db.test.ts).
+ */
+const listStateId = sql<string | null>`case when exists (select 1 from workspace_issue_states s where s.id = ${issues.stateId} and s.is_default) then null else ${issues.stateId} end`
+
 async function readIssueSnapshot(workspaceId?: string, known?: string, previous?: ListPosition[], after?: TaskListPageInput['after'], filters: Omit<TaskListPageInput, 'workspaceId' | 'after'> = {}) {
   const { dispatchedBy, projectId, teamId, parentId } = filters
   const userId = await getUserId()
@@ -226,7 +233,7 @@ async function readIssueSnapshot(workspaceId?: string, known?: string, previous?
     if (!anchor || new Date(anchor.time).getTime() !== Date.parse(after.updatedAt)) throw new ActionFailureError('issueStale')
     continuation = sql`(${issues.updatedAt}, ${issues.id}) < (${anchor.time}::timestamptz, ${after.id}::uuid)`
   }
-  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, dispatched, inProject, inTeam, inParent, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
+  const candidates = db.select({ id: issues.id, ownerId: issues.userId, issuedIdentifier: issues.issuedIdentifier, ownerName: users.name, ownerImage: users.image, title: issues.title, content: issueAttrsContent.as('content'), checklistTotal: issueChecklistTotal.as('checklistTotal'), checklistChecked: issueChecklistChecked.as('checklistChecked'), status: issues.status, stateId: listStateId.as('stateId'), priority: issues.priority, scope: issues.scope, revision: issues.revision, createdAt: issues.createdAt, updatedAt: issues.updatedAt }).from(issues).leftJoin(users, eq(users.id, issues.userId)).leftJoin(issueMembers, and(eq(issueMembers.issueId, issues.id), eq(issueMembers.memberId, userId))).where(and(visibility.predicate, dispatched, inProject, inTeam, inParent, continuation, sql`coalesce(${issues.content}->'attrs'->'mikka', ${issues.content}->'attrs'->'orvilo')->>'deletedAt' is null`)).orderBy(desc(issues.updatedAt), desc(issues.id)).limit(TASK_LIST_PAGE_SIZE).as('task_list')
   // Issued identifiers are part of the Task row and do not follow Team,
   // personal-prefix or provider renames. Current human profile changes still
   // invalidate responsibility without rewriting historical Task metadata.
@@ -338,18 +345,22 @@ async function readIssue(id: string) {
   })
 }
 
-type SaveIssueInput = { id?: string; revision?: number; workspaceId?: string; title: string; content: JSONContent; status: string; priority: string }
+/** `stateId` picks one of the workspace's states (lib/issue-states.ts) whose category is `status`; without it a status change takes the category's default. */
+type SaveIssueInput = { id?: string; revision?: number; workspaceId?: string; title: string; content: JSONContent; status: string; stateId?: string | null; priority: string }
+/** A workspace state chosen by the person (moveIssue); its category is the status. */
+type ChosenState = { id: string; category: IssueStatus }
 
 export async function saveIssue(input: SaveIssueInput) {
   return persistIssue(input)
 }
 
-async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<ActionResult<{ issue: IssueView }>> {
+async function persistIssue(input: SaveIssueInput, block?: BlockFlag, state?: ChosenState): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
     const user = await requireUser()
     const userId = user.id
     const parsed = inputSchema.safeParse(input)
     if (!parsed.success) return { error: validationCode(parsed.error) }
+    if (input.stateId != null && !z.uuid().safeParse(input.stateId).success) return { error: 'issueStateNotFound' }
     let id: string | undefined
     if (input.id) {
       const parsedId = z.uuid().safeParse(input.id)
@@ -378,7 +389,11 @@ async function persistIssue(input: SaveIssueInput, block?: BlockFlag): Promise<A
         if (!latest) return { error: 'issueNotFound' }
         requireLockedIssueScope(latest, userId, observedScopeVersion!, context.workspace.id)
         const content = block ? withIssueMetadata(latest.content, { ...readIssueMetadata(latest.content), block }) : latest.content
-        ;[issue] = await tx.update(issues).set({ ...parsed.data, content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
+        const picked = state ?? (input.stateId ? await readIssueState(tx, context.workspace.id, input.stateId) : null)
+        if (input.stateId && (!picked || picked.category !== parsed.data.status)) return { error: 'issueStateNotFound' }
+        // A chosen state writes both columns, so triggers keyed on `status` (review sessions) still fire.
+        const chosen = picked ? { stateId: picked.id, status: picked.category } : {}
+        ;[issue] = await tx.update(issues).set({ ...parsed.data, ...chosen, content, revision: input.revision! + 1, updatedAt: new Date() }).where(and(eq(issues.id, id), eq(issues.userId, ownerId), eq(issues.revision, input.revision!))).returning()
         const changed = issue && coordinator && issueStatusEvent(latest, issue, coordinator)
         if (changed) await recordCoordinatorEvent(tx, changed)
         if (!issue) return { error: 'issueStale' }
@@ -428,14 +443,20 @@ export async function promoteIssueToTeam(input: { requestId: string; issueId: st
   })
 }
 
-export async function moveIssue(input: { id: string; status: string; revision: number; block?: BlockFlag }): Promise<ActionResult<{ issue: IssueView }>> {
+/**
+ * Moves a task to a status. `stateId` picks one of the workspace's states (lib/issue-states.ts); its category must
+ * equal `status`. Without it the task takes the category's default state, unless it is already in that category.
+ */
+export async function moveIssue(input: { id: string; status: string; stateId?: string; revision: number; block?: BlockFlag }): Promise<ActionResult<{ issue: IssueView }>> {
   return runAction(async () => {
-    const parsed = z.object({ id: z.uuid(), status: inputSchema.shape.status, revision: z.number().int().positive(), block: blockFlagSchema.optional() }).safeParse(input)
+    const parsed = z.object({ id: z.uuid(), status: inputSchema.shape.status, stateId: z.uuid().optional(), revision: z.number().int().positive(), block: blockFlagSchema.optional() }).safeParse(input)
     if (!parsed.success) return { error: 'issueMoveInvalid' }
     const issue = await readIssue(parsed.data.id)
     if (issue.revision !== parsed.data.revision) return { error: 'issueStale' }
-    if (issue.status === parsed.data.status && !parsed.data.block) return { issue }
-    return persistIssue({ ...issue, workspaceId: issue.workspaceId ?? undefined, status: parsed.data.status }, parsed.data.block)
+    const state = parsed.data.stateId && issue.workspaceId ? await readIssueState(db, issue.workspaceId, parsed.data.stateId) : null
+    if (parsed.data.stateId && (!state || state.category !== parsed.data.status)) return { error: 'issueStateNotFound' }
+    if (issue.status === parsed.data.status && (!state || state.id === issue.stateId) && !parsed.data.block) return { issue }
+    return persistIssue({ ...issue, workspaceId: issue.workspaceId ?? undefined, status: parsed.data.status, stateId: undefined }, parsed.data.block, state ?? undefined)
   })
 }
 
@@ -446,7 +467,7 @@ export async function changeIssuePriority(input: { id: string; priority: string;
     const issue = await readIssue(parsed.data.id)
     if (issue.revision !== parsed.data.revision) return { error: 'issueStale' }
     if (issue.priority === parsed.data.priority) return { issue }
-    return saveIssue({ ...issue, workspaceId: issue.workspaceId ?? undefined, priority: parsed.data.priority })
+    return saveIssue({ ...issue, workspaceId: issue.workspaceId ?? undefined, priority: parsed.data.priority, stateId: undefined })
   })
 }
 

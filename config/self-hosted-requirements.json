@@ -3905,5 +3905,33 @@
     "behavior": "Map GitHub's merge refusal to the existing stable codes for both task merges and merging one pull request; no new service.",
     "test": "lib/github/pull-merge.test.ts",
     "suite": "test:github-pulls"
+  },
+  "drizzle/20261120044638_workspace_issue_states.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Create each workspace's task states in the installation database, seed the seven built-in states and keep every task's status equal to its state's category.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/issue-states-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read and change a workspace's task states in the installation database; deleting a state first moves its tasks to another state.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "lib/issue-states.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate task state input and order states for the picker; no external service.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "app/actions/issue-states.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Members read the workspace's task states and admins change them through the installation's own session and workspace checks.",
+    "test": "tests/workspace-issue-states.db.test.ts",
+    "suite": "test:task-presentation-db"
   }
 }

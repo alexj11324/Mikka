@@ -148,6 +148,14 @@
       "working": "Agent working",
       "waiting": "Needs you",
       "error": "Agent error"
+    },
+    "stateMenu": {
+      "search": "Change status…",
+      "searchAria": "Search {label}",
+      "open": "Open",
+      "closed": "Closed",
+      "noMatch": "No matching status",
+      "readFailed": "Could not load statuses"
     }
   },
   "Nav": {
@@ -1388,6 +1396,10 @@
     "issueNotFound": "This task does not exist or you do not have access.",
     "issueRevisionInvalid": "This task version is out of date. Please reopen it.",
     "issueStale": "Another member updated this task. The latest state has been restored; please try again.",
+    "issueStateNotFound": "This status no longer exists. Reload the list.",
+    "issueStateNameTaken": "A status with this name already exists.",
+    "issueStateDefaultLocked": "Make another status the default before deleting this one.",
+    "issueStateMoveTargetInvalid": "Choose another status to move its tasks to.",
     "issueSaveFailed": "The save did not go through. Keep this page open and try again.",
     "issueMoveInvalid": "The task move information is invalid.",
     "issuePriorityInvalid": "The task priority is invalid.",
@@ -2260,6 +2272,9 @@
       },
       "environments": {
         "title": "Run environments"
+      },
+      "issue-states": {
+        "title": "Issue states"
       }
     },
     "appearance": {
@@ -3681,6 +3696,40 @@
       "workspaceDefault": "Workspace default",
       "triggersError": "Could not update the title triggers",
       "loadError": "Could not load thread title settings"
+    },
+    "issueStates": {
+      "open": "Open",
+      "closed": "Closed",
+      "new": "New state",
+      "newIn": "New {type} state",
+      "default": "Default",
+      "tasks": "{count, plural, one {# task} other {# tasks}}",
+      "rename": "Rename",
+      "look": "Icon and color",
+      "makeDefault": "Make default",
+      "delete": "Delete",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "actions": "Actions for {name}",
+      "name": "Name",
+      "category": "Category",
+      "icon": "Icon",
+      "color": "Color",
+      "create": "Create",
+      "save": "Save",
+      "cancel": "Cancel",
+      "resetName": "Use default name",
+      "deleteTitle": "Delete {name}",
+      "moveTo": "Move its tasks to",
+      "moveAndDelete": "Move and delete",
+      "colors": {
+        "gray": "Gray",
+        "yellow": "Yellow",
+        "green": "Green",
+        "blue": "Blue",
+        "purple": "Purple",
+        "red": "Red"
+      }
     }
   },
   "TelegramBot": {

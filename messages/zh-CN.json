@@ -148,6 +148,14 @@
       "working": "Agent 运行中",
       "waiting": "等你处理",
       "error": "Agent 出错"
+    },
+    "stateMenu": {
+      "search": "更改状态…",
+      "searchAria": "搜索{label}",
+      "open": "未关闭",
+      "closed": "已关闭",
+      "noMatch": "没有匹配的状态",
+      "readFailed": "状态读取失败"
     }
   },
   "Nav": {
@@ -1388,6 +1396,10 @@
     "issueNotFound": "任务不存在或没有访问权限。",
     "issueRevisionInvalid": "任务版本已过期，请重新打开。",
     "issueStale": "任务已被其他成员更新，已恢复最新状态，请重试。",
+    "issueStateNotFound": "这个状态已不存在，请刷新列表。",
+    "issueStateNameTaken": "已有同名状态。",
+    "issueStateDefaultLocked": "先把另一个状态设为默认，再删除这个。",
+    "issueStateMoveTargetInvalid": "请选择另一个状态来接收它的任务。",
     "issueSaveFailed": "保存未成功，请保留当前页面后重试。",
     "issueMoveInvalid": "任务移动信息不正确。",
     "issuePriorityInvalid": "任务优先级信息不正确。",
@@ -2260,6 +2272,9 @@
       },
       "environments": {
         "title": "运行环境"
+      },
+      "issue-states": {
+        "title": "任务状态"
       }
     },
     "appearance": {
@@ -3681,6 +3696,40 @@
       "workspaceDefault": "工作区默认",
       "triggersError": "重新生成时机更新失败",
       "loadError": "线程标题设置读取失败"
+    },
+    "issueStates": {
+      "open": "未关闭",
+      "closed": "已关闭",
+      "new": "新建状态",
+      "newIn": "新建{type}状态",
+      "default": "默认",
+      "tasks": "{count} 个任务",
+      "rename": "重命名",
+      "look": "图标和颜色",
+      "makeDefault": "设为默认",
+      "delete": "删除",
+      "moveUp": "上移",
+      "moveDown": "下移",
+      "actions": "{name} 的操作",
+      "name": "名称",
+      "category": "类别",
+      "icon": "图标",
+      "color": "颜色",
+      "create": "创建",
+      "save": "保存",
+      "cancel": "取消",
+      "resetName": "恢复默认名称",
+      "deleteTitle": "删除{name}",
+      "moveTo": "任务移到",
+      "moveAndDelete": "移动并删除",
+      "colors": {
+        "gray": "灰色",
+        "yellow": "黄色",
+        "green": "绿色",
+        "blue": "蓝色",
+        "purple": "紫色",
+        "red": "红色"
+      }
     }
   },
   "TelegramBot": {

@@ -68,6 +68,8 @@ export const issues = pgTable('issues', {
   shortTitle: varchar('shortTitle', { length: 60 }), shortTitleFrom: varchar('shortTitleFrom', { length: 200 }),
   content: jsonb('content').$type<JSONContent>().notNull(),
   status: text('status').notNull(), priority: text('priority').notNull(),
+  /** The workspace state (workspace_issue_states). A trigger keeps `status` equal to its category, both ways. */
+  stateId: uuid('state_id'),
   // Compatibility label only. workspaceId is the tenant; provider bindings control sync.
   scope: text('scope').$type<'workspace' | 'personal'>().notNull().default('personal'),
   scopeVersion: integer('scopeVersion').notNull().default(1),
@@ -80,6 +82,23 @@ export const issues = pgTable('issues', {
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [index('issues_owner_updated_idx').on(table.userId, table.updatedAt.desc()), index('issues_workspace_updated_idx').on(table.workspaceId, table.updatedAt.desc()),
   check('issues_short_title_compact', sql`mikka_issue_short_title_valid(${table.shortTitle})`)])
+/**
+ * A workspace's task states (Capy's Issue states). `category` is one of ISSUE_STATUS_CODES and fixes `type`; each
+ * category has one default. `name` NULL shows the category's translated name. Seeded by mikka_ensure_issue_states.
+ */
+export const workspaceIssueStates = pgTable('workspace_issue_states', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  workspaceId: uuid('workspace_id').notNull(),
+  name: varchar('name', { length: 60 }),
+  icon: text('icon').notNull(),
+  color: text('color').notNull(),
+  category: text('category').notNull(),
+  type: text('type').$type<'open' | 'closed'>().notNull(),
+  isDefault: boolean('is_default').notNull().default(false),
+  position: integer('position').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, table => [index('workspace_issue_states_position_idx').on(table.workspaceId, table.position)])
 export const teamIssueCreateRequests = pgTable('team_issue_create_requests', {
   requestId: uuid('requestId').primaryKey(), ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').notNull().unique(), teamId: uuid('teamId').notNull(),

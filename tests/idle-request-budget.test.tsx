@@ -305,6 +305,7 @@ routes['/api/factory/questions'] = () => ({ questions: [] })
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })
+routes['/api/settings/issue-states'] = () => ({ states: [], canEdit: false })
 const GROUP = '90000000-0000-4000-8000-000000000001'
 const groupMessage = (position: number, authorType: 'user' | 'bot', body: string) => ({ id: `90000000-0000-4000-8000-00000000000${position + 1}`, conversationId: GROUP, position: String(position), authorType, authorId: authorType === 'user' ? OWNER : BOT, body, mentions: [], replyToId: null, createdAt: AT })
 // A bot is answering: the case that used to re-read the chat every 2.5 s.

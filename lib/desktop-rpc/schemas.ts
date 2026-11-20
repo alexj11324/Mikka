@@ -10,6 +10,7 @@ import { threadHistoryInput, threadHistoryPosition } from '@/lib/thread-history'
 import { projectInput, projectPatch } from '@/lib/project-input'
 import { assigneeSchema, delegateSchema, blockFlagSchema, labelSchema, pullRequestSchema } from '@/lib/issue-metadata'
 import { ISSUE_STATUS_CODES, ISSUE_PRIORITY_CODES } from '@/lib/issue-meta'
+import { createIssueStateInput, deleteIssueStateInput, reorderIssueStatesInput, setDefaultIssueStateInput, updateIssueStateInput } from '@/lib/issue-states'
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
@@ -253,6 +254,12 @@ export const desktopActionSchemas = {
   'issue-operations.setIssueDeleted': tuple(object({ id: uuid, revision: positive.optional(), restore: bool.optional() })),
   'issue-prefix.getIssuePrefixState': none,
   'issue-prefix.saveIssuePrefix': tuple(object({ prefix: text(20).min(1) })),
+  'issue-states.getIssueStates': oneId,
+  'issue-states.createWorkspaceIssueState': tuple(createIssueStateInput),
+  'issue-states.updateWorkspaceIssueState': tuple(updateIssueStateInput),
+  'issue-states.reorderWorkspaceIssueStates': tuple(reorderIssueStatesInput),
+  'issue-states.setDefaultWorkspaceIssueState': tuple(setDefaultIssueStateInput),
+  'issue-states.deleteWorkspaceIssueState': tuple(deleteIssueStateInput),
   'thread-title-settings.getThreadTitleSettings': inWorkspace,
   'thread-title-settings.saveThreadTitleSettings': tuple(object({ workspaceId: workspace, scope: z.enum(['workspace', 'mine']), instructions: text(1000).optional(), triggers: z.enum(['first_run_ended', 'pull_opened', 'either']).nullable().optional() })),
   'issues.listIssues': none,
@@ -266,9 +273,9 @@ export const desktopActionSchemas = {
   'issues.pollIssue': tuple(uuid, version.optional()),
   'issues.createTaskOnly': tuple(createOnlyCommand),
   'issues.getDispatchedTaskReceipt': tuple(dispatchReceiptInput),
-  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), workspaceId: uuid.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), priority: z.enum(ISSUE_PRIORITY_CODES) })),
+  'issues.saveIssue': tuple(object({ id: uuid.optional(), revision: positive.optional(), workspaceId: uuid.optional(), title: text(200).trim().min(1), content: document, status: z.enum(ISSUE_STATUS_CODES), stateId: uuid.nullable().optional(), priority: z.enum(ISSUE_PRIORITY_CODES) })),
   'issues.promoteIssueToTeam': tuple(object({ requestId: uuid, issueId: uuid, revision: positive, teamId: uuid, expectedTeamId: uuid.nullable() })),
-  'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), revision: positive, block: blockFlagSchema.strict().optional() })),
+  'issues.moveIssue': tuple(object({ id: uuid, status: z.enum(ISSUE_STATUS_CODES), stateId: uuid.optional(), revision: positive, block: blockFlagSchema.strict().optional() })),
   'issues.changeIssuePriority': tuple(object({ id: uuid, priority: z.enum(ISSUE_PRIORITY_CODES), revision: positive })),
   'issues.listIssueVersions': oneId,
   'issues.pollIssueVersionSummaries': tuple(uuid, version.optional(), listPositions(5000).optional()),
