@@ -1,11 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import useSWR from "swr";
 import useSWRInfinite, { unstable_serialize } from "swr/infinite";
 import { useTranslations } from "@/lib/intl/i18n-client";
 import { Copy, Pin, X } from "lucide-react";
 import { listConversations } from "@/app/actions/task-runs";
+import { listWorkspaceProjects } from "@/app/actions/projects";
+import { deleteSavedView, listPullPins, listSavedViews, saveView as storeView, setPullPins } from "@/app/actions/list-views";
+import { useActionError } from "@/lib/use-action-error";
+import { useSearchParams } from "@/lib/client-runtime/navigation";
+import { openPullReview } from "@/hooks/code-review/use-review-page";
 import { withBasePath } from "@/lib/base-path";
 import { useViewState } from "@/lib/hooks/view-state";
 import { useLiveKey } from "@/hooks/use-live-key";
@@ -14,6 +20,11 @@ import type { ConversationDirectoryPage } from "@/lib/conversation-directory-inp
 import {
   filterDirectoryPulls,
   groupDirectoryPulls,
+  initialPullFilters as initial,
+  pullFromAddress,
+  pullReviewRef,
+  pullSinceInstant,
+  readSavedPullView,
   linkedPullDirectory,
   pullViews,
   type PullDirectoryPage,
@@ -41,14 +52,6 @@ const viewKeys: Record<PullFilters["view"], `views.${PullFilters["view"]}`> = {
   ready: "views.ready",
   merged: "views.merged",
   all: "views.all",
-};
-const initial: PullFilters = {
-  view: "open",
-  search: "",
-  state: "",
-  author: "",
-  linked: false,
-  label: "",
 };
 type RepoStatus = {
   viewerId: string;
@@ -86,17 +89,44 @@ export function PullDirectory({
 }) {
   const t = useTranslations("PullDirectory");
   const scope = `pull-directory:${ownerId}:${workspaceId}:${botId ?? "all"}`;
-  const [filters, setFilters] = useViewState<PullFilters>(
+  const [stored, setFilters] = useViewState<PullFilters>(
     scope + ":filters",
     initial,
   );
+  // Filters kept on this device before Created and Project existed read with their defaults.
+  const filters: PullFilters = { ...initial, ...stored };
+  const actionError = useActionError();
   const [repo, setRepo] = useViewState(scope + ":repo", "");
   const [grouping, setGrouping] = useViewState<PullGroup>(
     scope + ":group",
     "state",
   );
-  const [pinned, setPinned] = useViewState<string[]>(scope + ":pinned", []);
-  const [views, setViews] = useViewState<SavedPullView[]>(scope + ":views", []);
+  // Pins and saved views follow the person across devices (pull_pins, saved_views).
+  const pins = useSWR(
+    workspaceId ? ["pull-pins", ownerId, workspaceId] : null,
+    ([, , workspace]) => listPullPins(workspace),
+    { revalidateOnFocus: false },
+  );
+  const pinned = pins.data ?? [];
+  const savedViews = useSWR(
+    workspaceId ? ["saved-views", "pulls", ownerId, workspaceId] : null,
+    ([, , , workspace]) => listSavedViews(workspace, "pulls"),
+    { revalidateOnFocus: false },
+  );
+  const views = (savedViews.data ?? []).flatMap((view): SavedPullView[] => {
+    const read = readSavedPullView(view);
+    return read ? [read] : [];
+  });
+  const projects = useSWR(
+    workspaceId ? ["pull-projects", ownerId, workspaceId] : null,
+    ([, , workspace]) => listWorkspaceProjects(workspace),
+    { revalidateOnFocus: false, shouldRetryOnError: false },
+  );
+  const projectOptions = (Array.isArray(projects.data) ? projects.data : []).map(
+    (project: { id: string; name: string }) => ({ id: project.id, name: project.name }),
+  );
+  const params = useSearchParams();
+  const addressed = pullFromAddress(params.get("pull"));
   const [checked, setChecked] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"copied" | "copyError" | null>(
@@ -129,6 +159,8 @@ export function PullDirectory({
           botId,
           previous?.cursor ?? null,
           revision,
+          filters.project || null,
+          filters.since || null,
         ] as const);
   const linked = useSWRInfinite<
     ConversationDirectoryPage,
@@ -136,12 +168,14 @@ export function PullDirectory({
     typeof linkedKey
   >(
     linkedKey,
-    ([, , , bot, cursor]) =>
+    ([, , , bot, cursor, , project, since]) =>
       listConversations({
         botId: bot ?? undefined,
         archived: "any",
         pullState: "linked",
         cursor: cursor ?? undefined,
+        projectId: project ?? undefined,
+        since: pullSinceInstant(since ?? "") ?? undefined,
       }),
     { revalidateOnFocus: false, shouldRetryOnError: false },
   );
@@ -155,16 +189,18 @@ export function PullDirectory({
           repo,
           filters.view,
           previous?.cursor ?? null,
+          filters.since || null,
         ] as const);
   const github = useSWRInfinite<PullDirectoryPage, Error, typeof githubKey>(
     githubKey,
-    ([, , , repository, view, cursor]) =>
+    ([, , , repository, view, cursor, since]) =>
       read(
         "/api/integrations/github/repositories/pulls?" +
           new URLSearchParams({
             repo: repository,
             view,
             ...(cursor ? { cursor } : {}),
+            ...(since ? { since: pullSinceInstant(since)! } : {}),
           }),
         ownerId,
       ),
@@ -213,7 +249,9 @@ export function PullDirectory({
     (repositories ? !repositories.connected : false);
   const busy = repo ? github.isValidating : linked.isValidating;
   const more = Boolean(data?.at(-1)?.cursor);
-  const visible = filterDirectoryPulls(rows, filters);
+  // A project names tasks; in a repository's list only PRs those tasks' threads delivered belong to it.
+  const scoped = repo && filters.project ? rows.filter((row) => row.threads.length > 0) : rows;
+  const visible = filterDirectoryPulls(scoped, filters);
   const groups = groupDirectoryPulls(visible, grouping, pinned);
   const ordered = groups.flatMap((group) =>
     collapsed.includes(group.key) ? [] : group.rows,
@@ -253,13 +291,33 @@ export function PullDirectory({
     setSelected(row.url);
     setCopyState(null);
   }
-  function pin(urls: string[]) {
+  async function copyText(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t("copied"));
+    } catch {
+      toast.error(t("copyError"));
+    }
+  }
+  async function pin(urls: string[]) {
+    if (!workspaceId) return;
     const keys = urls.map(githubPullRequestKey);
-    setPinned((previous) =>
-      keys.every((key) => previous.includes(key))
-        ? previous.filter((key) => !keys.includes(key))
-        : [...new Set([...previous, ...keys])],
-    );
+    const next = !keys.every((key) => pinned.includes(key));
+    const optimistic = next
+      ? [...new Set([...pinned, ...keys])]
+      : pinned.filter((key) => !keys.includes(key));
+    try {
+      await pins.mutate(
+        async () => {
+          const result = await setPullPins(workspaceId, urls.slice(0, 100), next);
+          if (result.error) throw new Error(result.error);
+          return result.pins;
+        },
+        { optimisticData: optimistic, rollbackOnError: true, revalidate: false },
+      );
+    } catch (error) {
+      toast.error(actionError(error instanceof Error ? error.message : null));
+    }
   }
   const heading = (key: string) =>
     key === "pinned" || key === "results" || key === "unknownAuthor"
@@ -273,16 +331,38 @@ export function PullDirectory({
     filters.author ||
     filters.label ||
     filters.linked ||
+    filters.since ||
+    filters.project ||
     filters.view !== "all";
-  const saveView = () => {
-    const name = t("viewDefaultName", { view: t(`views.${filters.view}`) });
-    setViews((previous) =>
-      [
-        ...previous.filter((view) => view.name !== name),
-        { name, filters, repo, grouping },
-      ].slice(-12),
-    );
-  };
+  async function saveView() {
+    if (!workspaceId) return;
+    const name = t("viewDefaultName", { view: t(viewKeys[filters.view]) });
+    try {
+      const result = await storeView({ workspaceId, scope: "pulls", name, filters: { filters, repo, grouping } });
+      if (result.error) toast.error(actionError(result.error));
+      else await savedViews.mutate();
+    } catch {
+      toast.error(actionError());
+    }
+  }
+  async function removeView(id: string) {
+    if (!workspaceId) return;
+    try {
+      const result = await deleteSavedView(workspaceId, id);
+      if (result.error && result.error !== "savedViewNotFound") toast.error(actionError(result.error));
+      await savedViews.mutate();
+    } catch {
+      toast.error(actionError());
+    }
+  }
+  // A PR's own address (`pull=owner/name/number`, "Open in new tab") opens its review page once.
+  const addressKey = addressed ? `${addressed.repo}/${addressed.number}` : null;
+  useEffect(() => {
+    if (!addressed) return;
+    const pull = pullReviewRef(addressed);
+    if (pull) openPullReview(pull);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only the address moves; the parsed reference goes with it
+  }, [addressKey]);
   return (
     <section
       aria-label={t("title")}
@@ -381,8 +461,9 @@ export function PullDirectory({
           setSelected(null);
           setChecked([]);
         }}
-        onDeleteView={(name) => setViews((previous) => previous.filter((view) => view.name !== name))}
-        onSaveView={saveView}
+        onDeleteView={(id) => void removeView(id)}
+        onSaveView={() => void saveView()}
+        projects={projectOptions}
       />
       <div className="relative flex min-h-0 min-w-0 flex-1">
         <div
@@ -478,7 +559,9 @@ export function PullDirectory({
                             );
                             setCopyState(null);
                           }}
-                          onPin={(url) => pin([url])}
+                          onPin={(url) => void pin([url])}
+                          onCopy={(text) => void copyText(text)}
+                          workspaceId={workspaceId}
                         />
                       ))}
                     </ul>
@@ -516,7 +599,7 @@ export function PullDirectory({
             from="md"
             className="flex min-h-0 w-full flex-col border-s border-rule bg-background md:w-96"
           >
-            <PullPreview row={active} source={Boolean(repo)} onClose={() => setSelected(null)} />
+            <PullPreview row={active} source={Boolean(repo)} onClose={() => setSelected(null)} onMerged={() => void refresh()} />
           </ResizablePane>
         )}
       </div>
@@ -536,7 +619,7 @@ export function PullDirectory({
             <Copy data-icon />
             {t("copyLinks")}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => pin(visibleChecked.map((row) => row.url))}>
+          <Button size="sm" variant="ghost" onClick={() => void pin(visibleChecked.map((row) => row.url))}>
             <Pin data-icon />
             {t(
               visibleChecked.every((row) => pinned.includes(githubPullRequestKey(row.url)))

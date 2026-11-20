@@ -36,8 +36,8 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
 const URL_SECTIONS = ['pulls', 'conversations', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'automations', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
 const READ_SECTIONS: readonly string[] = [...URL_SECTIONS, 'coordinator']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-/** Query keys that belong to a page inside a section (the plugins page's app and category, an open automation); a new place drops them. */
-const PAGE_KEYS = ['app', 'category', 'automation'] as const
+/** Query keys that belong to a page inside a section (the plugins page's app and category, an open automation, a PR's own page); a new place drops them. */
+const PAGE_KEYS = ['app', 'category', 'automation', 'pull'] as const
 
 /** The retired 任务 page's address. Tasks have one entry, the board (2026-11-13-1405): an old link opens it in its list view. */
 export const LEGACY_TASKS_SECTION = 'tasks'

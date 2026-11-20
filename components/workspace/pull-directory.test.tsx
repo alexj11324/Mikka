@@ -72,16 +72,37 @@ mock.module("@/lib/intl/i18n-client", {
     useFormatter: () => ({ dateTime: () => "Today" }),
   },
 });
+const repositoryStatus = {
+  viewerId: "owner",
+  connected: true,
+  repositories: [{ fullName: "Owner/Repo" }],
+};
+const { useState } = await import("react");
+// Each read by its key, with a mutate that settles like SWR's: pins and saved views are server state now.
 mock.module("swr", {
-  defaultExport: () => ({
-    data: {
-      viewerId: "owner",
-      connected: true,
-      repositories: [{ fullName: "Owner/Repo" }],
-    },
-    isValidating: false,
-    mutate: async () => {},
-  }),
+  defaultExport: (key: readonly unknown[] | null) => {
+    const kind = key?.[0];
+    const [data, setData] = useState<unknown>(() =>
+      !key
+        ? undefined
+        : kind === "pull-pins" || kind === "saved-views" || kind === "pull-projects"
+          ? []
+          : kind === "pull-detail"
+            ? undefined
+            : repositoryStatus,
+    );
+    return {
+      data,
+      error: undefined,
+      isValidating: false,
+      mutate: async (next?: unknown) => {
+        if (typeof next !== "function") return data;
+        const value = await (next as () => Promise<unknown>)();
+        setData(value);
+        return value;
+      },
+    };
+  },
 });
 mock.module("swr/infinite", {
   defaultExport: (
@@ -108,6 +129,19 @@ const stub = (file: string, namedExports: Record<string, unknown>) =>
   mock.module(new URL(file, import.meta.url).href, { namedExports });
 stub("../../hooks/use-live-key.tsx", { useLiveKey: () => {} });
 stub("../../app/actions/task-runs.ts", { listConversations: () => linkedPage });
+const pinWrites: unknown[] = [];
+stub("../../app/actions/list-views.ts", {
+  listPullPins: async () => [],
+  setPullPins: async (workspaceId: string, urls: string[], pinned: boolean) => {
+    pinWrites.push([workspaceId, urls, pinned]);
+    return { pins: pinned ? urls.map((item) => item.toLowerCase()) : [] };
+  },
+  listSavedViews: async () => [],
+  saveView: async () => ({ error: "validationGeneric" }),
+  deleteSavedView: async () => ({ deleted: true }),
+});
+stub("../../app/actions/projects.ts", { listWorkspaceProjects: async () => [] });
+stub("../../lib/client-runtime/navigation.ts", { useSearchParams: () => new URLSearchParams() });
 stub("../ui/resizable-pane.tsx", {
   ResizablePane: ({
     children,
@@ -208,6 +242,7 @@ test("the PR tab switches from linked task snapshots to real repository PRs and 
       )?.getAttribute("aria-pressed"),
       "true",
     );
+    assert.deepEqual(pinWrites.at(-1), ["workspace", [url], true], "a pin is written for the person, not kept on this device");
   } finally {
     await act(async () => root.unmount());
   }
