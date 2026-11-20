@@ -76,10 +76,18 @@ existing. Reads ask `canReadContent`; sends ask `canSteer`.
   `result`, then calls `wakeCoordinator`. Peer text is never a human request:
   it is the same event kind the OAuth agent path uses, and Factory intake still
   refuses it. `result` (not `attention`) starts a turn without paging anyone.
-- The personal mailbox is unchanged in this slice: it stays same-owner, and
-  cross-user sends and waking an ended thread go through `send_to_thread` /
-  `send_to_bot`, which carry the ACL. Widening the mailbox's leases and fences
-  is left to its owner.
+- Mailbox: a run or Bot mailbox may now send to **another member's** run or
+  Bot mailbox in the same Workspace when the sender's account, or its own run
+  or Bot grant, holds `canSteer` on the target thread (root run) or Bot, and
+  the recipient is an active member. A Coordinator mailbox stays private and an
+  owner message stays same-person. The envelope lands in the recipient owner's
+  inbox as peer data. A message to a run whose latest attempt has ended
+  continues that thread once through `sendThreadMessage` (source `peer`); a
+  refusal is recorded on the envelope (`resume_<code>`). The `run_messages`
+  tenant trigger pins the tenant instead of requiring the same sender.
+- A send through `/api/v1` is always peer data, even from the thread's owner:
+  an API client is not the person typing, so its rows are never editable owner
+  words.
 
 ## 4. Drive
 
@@ -101,8 +109,19 @@ alias and store `team-workspace`.
 A scope's first write creates its default folder (`Shared`). Writes keep Drive's CAS: `expectedDigest` must be the head the writer read, and
 a mismatch returns `interop_drive_conflict` with the head digest and the
 conflicting paths. A writer re-reads and merges; nothing is overwritten
-silently. Machine sync (`~/.mikka/drive/<scope>/` at run start, write-back at
-run end) is not in this slice; when added it uses the same version contract.
+silently.
+
+Machine mirror: the run's daemon (on E2B the worker is the same daemon)
+mirrors the folders the server names in `drive_sync_scopes` (the run's thread,
+its Bot, the team Workspace; environment folders stay tool-only because a run
+records no Environment) to `~/.mikka/drive/<scope>/<scopeId>/`. It uses the
+run's existing MCP endpoint and bearer, like the run mailbox. It pulls before
+the agent starts and pushes after each checkpoint and at the terminal
+checkpoint. Every push is the same CAS; when the remote path changed too, the
+newer remote version wins the path and the local one is kept as
+`<name>.conflict-<run><ext>`. Files over 1 MB are not mirrored, and links are
+never uploaded. The scope id level keeps concurrent threads on one local
+machine apart.
 
 ## 5. External API
 
@@ -111,9 +130,19 @@ run end) is not in this slice; when added it uses the same version contract.
 `/api/v1/drive/volumes/{id}/files` (GET, PUT), `/api/v1/bots`,
 `/api/v1/bots/{botId}/messages` (GET, POST).
 
+`PUT /api/v1/drive/volumes` writes into a scope's default folder, creating it.
+`/api/v1/grants/{kind}/{resourceId}` (GET, PUT) and
+`/api/v1/grants/{kind}/{resourceId}/{subjectKind}/{subjectId}` (DELETE) manage
+bot, run and service grants on a thread, artifact, Bot, task or Bot chat. Only
+the resource's owner (`canManageAccess`) creates or replaces one; the owner or
+a Workspace admin lists and revokes, so admin status still never shares
+content. Grants are PAT-only.
+
 New PAT scopes: `threads:read`, `threads:write`, `artifacts:read`,
-`drive:read`, `drive:write`, `bots:read`, `bots:write`. An `mksvc_` key is
-admitted on exactly these routes; it authenticates the service principal and is
+`drive:read`, `drive:write`, `bots:read`, `bots:write`, `grants:read`,
+`grants:write`. An `mksvc_` key is
+admitted on exactly the threads, artifacts, Drive and Bots routes (never the
+grants routes); it authenticates the service principal and is
 authorized only by its explicit grants. It never becomes a human session and
 cannot reach any other route.
 

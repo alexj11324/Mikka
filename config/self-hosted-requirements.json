@@ -3865,7 +3865,7 @@
   "app/api/v1/drive/volumes/route.ts": {
     "mode": "built-in",
     "environment": [],
-    "behavior": "List a bot, thread, environment or team Workspace Drive scope and its default folder's files for a scoped PAT or service key.",
+    "behavior": "List a bot, thread, environment or team Workspace Drive scope and its default folder's files, or write one file into that default folder (creating it), for a scoped PAT or service key.",
     "test": "lib/interop/interop.db.test.ts",
     "suite": "test:interop-db"
   },

@@ -2945,9 +2945,10 @@
       "template": "/api/v1/drive/volumes",
       "source": "app/api/v1/drive/volumes/route.ts",
       "methods": [
-        "GET"
+        "GET",
+        "PUT"
       ],
-      "sourceHash": "92bce881df61db9ac56587dc676f51be3031055cda961122a20e2b2077e23fcf"
+      "sourceHash": "c2f8bec1ac3f6ffd8355e90108e8014f27dbff1854ba8084413da20be67bd3d4"
     },
     {
       "path": "/mikka/api/v1/drive/volumes/[volumeId]/files",

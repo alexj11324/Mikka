@@ -193,6 +193,22 @@ test('interop reads, sends and Drive follow the ACL of the caller\'s own Workspa
     assert.deepEqual((await rootsOf(await call(scoped.token))).sort(), [thread, teammateRun].sort())
     assert.equal((await threads.GET(new Request('http://localhost/mikka/api/v1/threads'))).status, 401)
 
+    // The first write into an empty scope creates its default folder; the folder's files route then serves it.
+    const volumes = await import('../../app/api/v1/drive/volumes/route')
+    const files = await import('../../app/api/v1/drive/volumes/[volumeId]/files/route')
+    const driveToken = (await createPersonalAccessToken(teammate, team.id, { name: 'interop drive', scopes: ['drive:read', 'drive:write'] })).token
+    const auth = { authorization: `Bearer ${driveToken}`, 'content-type': 'application/json' }
+    const first = await volumes.PUT(new Request('http://localhost/mikka/api/v1/drive/volumes', { method: 'PUT', headers: auth,
+      body: JSON.stringify({ scope: 'thread', scopeId: teammateRun, path: 'hello.md', content: 'hi', expectedDigest: '0'.repeat(64), mutationId: 'api-first-0001' }) }))
+    assert.equal(first.status, 409, 'the empty folder exists now; its head is returned to retry against')
+    const { headDigest } = await first.json() as { headDigest: string }
+    const written = await volumes.PUT(new Request('http://localhost/mikka/api/v1/drive/volumes', { method: 'PUT', headers: auth,
+      body: JSON.stringify({ scope: 'thread', scopeId: teammateRun, path: 'hello.md', content: 'hi', expectedDigest: headDigest, mutationId: 'api-first-0002' }) }))
+    assert.equal(written.status, 200)
+    const { volumeId } = await written.json() as { volumeId: string }
+    const file = await files.GET(new Request(`http://localhost/mikka/api/v1/drive/volumes/${volumeId}/files?path=hello.md`, { headers: auth }), { params: Promise.resolve({ volumeId }) })
+    assert.equal(((await file.json()) as { content: string }).content, 'hi')
+
     const token = `mksvc_${randomBytes(32).toString('base64url')}`
     const serviceId = randomUUID()
     await pool.query(`INSERT INTO mikka_workspace_service_identities(id,"workspaceId",name,"createdBy","requestId","initialName","credentialHash")
