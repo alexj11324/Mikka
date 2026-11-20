@@ -58,3 +58,10 @@ test("an Agent's report outside a thread stays a report, with no run to name", (
   const inRun = eventPrompt({ kind: 'run_report', issueId, runId, payload: { text: 'Half way' } })
   assert.deepEqual(eventLine('run_report', inRun), { kind: 'runReport', runId, issueId, status: null, title: null })
 })
+
+test('a task assigned to a Bot wakes it with the task and who assigned it, and reads back as that line (Capy issue_activity)', () => {
+  const assigned = eventPrompt({ kind: 'issue_assigned', issueId, runId: null, payload: { title: '登录页在 Safari 17 上白屏', identifier: 'MIKKA-12', actorName: 'Alex' } })
+  assert.match(assigned, /^\[Event\] Alex assigned you task MIKKA-12 "登录页在 Safari 17 上白屏"\. Issue: /)
+  assert.match(assigned, /get_issue/)
+  assert.deepEqual(eventLine('issue_assigned', assigned), { kind: 'issueAssigned', runId: null, issueId, status: 'Alex', title: '登录页在 Safari 17 上白屏' })
+})

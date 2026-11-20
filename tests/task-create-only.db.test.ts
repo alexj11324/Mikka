@@ -191,3 +191,66 @@ test('Project UUID is checked before commit and survives duplicate names, rename
     await pool.query('delete from "user" where id=any($1::text[])', [[user, other]])
   }
 })
+
+test('the create window properties land in one create: assignee, due date, labels, specific-people access and the assigned Bot wake', { skip: !enabled }, async () => {
+  const { pool } = await import('../lib/db')
+  const { createTaskOnly } = await import('../app/actions/issues')
+  const { updateIssueMetadata } = await import('../app/actions/issue-metadata')
+  const { seedUser, seedWorkspace, seedBot } = await import('./support/workspace-admin-db')
+  const owner = await seedUser(pool, 'Create-props owner'), teammate = await seedUser(pool, 'Create-props teammate'), outsider = await seedUser(pool, 'Create-props outsider')
+  try {
+    const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: teammate, role: 'member' }])
+    const bot = await seedBot(pool, workspace.id, owner, 'Captain'), otherBot = await seedBot(pool, workspace.id, owner, 'Second')
+    const teammateBot = await seedBot(pool, workspace.id, teammate, 'Not yours')
+    const base: CreateOnlyCommand = { version: 1, intent: 'create_only', workspaceId: workspace.id, requestId: randomUUID(), title: 'Ship the new dialog',
+      content: { type: 'doc' }, status: 'todo', priority: 'high' }
+    const send = (command: CreateOnlyCommand) => withActivitySession(owner, () => createTaskOnly(command), workspace.id)
+    const wakes = async (issueId: string) => (await pool.query(`select "userId","botId",payload from coordinator_events where kind='issue_assigned' and "issueId"=$1 order by "createdAt"`, [issueId])).rows
+
+    // Refusals roll the whole create back: another person's Bot, a non-member assignee, a non-member in Access.
+    for (const refused of [{ assignee: { kind: 'bot' as const, id: teammateBot } }, { assignee: { kind: 'user' as const, id: outsider } },
+      { access: { kind: 'members' as const, memberIds: [outsider] } }]) {
+      const result = await send({ ...base, requestId: randomUUID(), ...refused })
+      assert.ok(result.error, JSON.stringify(result))
+    }
+    assert.equal((await pool.query('select 1 from issues where "userId"=$1', [owner])).rowCount, 0)
+
+    const toBot = { ...base, assignee: { kind: 'bot' as const, id: bot }, dueDate: '2026-11-21', labels: [{ name: 'Bug', color: 'red' as const }, { name: 'bug', color: 'red' as const }],
+      access: { kind: 'members' as const, memberIds: [teammate] } }
+    const [first, replay] = await Promise.all([send(toBot), send(toBot)])
+    assert.ok('taskId' in first && first.taskId, JSON.stringify(first))
+    assert.deepEqual(replay, first)
+    const [row] = (await pool.query('select status,priority,content from issues where id=$1', [first.taskId])).rows
+    const meta = row.content.attrs.mikka
+    assert.equal(row.priority, 'high')
+    assert.deepEqual(meta.delegate, { id: bot, name: 'Captain', kind: 'bot', image: null })
+    assert.equal(meta.delegateSelection, 'manual')
+    assert.equal(meta.assignee, null)
+    assert.equal(meta.dueDate, '2026-11-21')
+    assert.deepEqual(meta.labels, [{ name: 'bug', color: 'red' }])
+    assert.equal((await pool.query(`select visibility from resource_access_policies where kind='task' and id=$1`, [first.taskId])).rows[0].visibility, 'private')
+    assert.deepEqual((await pool.query(`select "subjectId",capabilities from resource_access_grants where "resourceKind"='task' and "resourceId"=$1`, [first.taskId])).rows,
+      [{ subjectId: teammate, capabilities: ['canReadContent', 'canComment', 'canSteer'] }])
+    // The assigned Bot is woken once in its own chat, with who assigned which task; no thread starts by itself.
+    assert.deepEqual(await wakes(first.taskId), [{ userId: owner, botId: bot, payload: { title: 'Ship the new dialog', identifier: first.identifier, actorName: 'Create-props owner' } }])
+    assert.equal((await pool.query('select 1 from agent_runs where "issueId"=$1', [first.taskId])).rowCount, 0)
+
+    // A person assignee needs no wake; the workspace audience stays shared.
+    const toPerson = await send({ ...base, requestId: randomUUID(), assignee: { kind: 'user', id: teammate }, access: { kind: 'workspace' } })
+    assert.ok('taskId' in toPerson && toPerson.taskId)
+    const personMeta = (await pool.query('select content from issues where id=$1', [toPerson.taskId])).rows[0].content.attrs.mikka
+    assert.equal(personMeta.assignee.id, teammate)
+    assert.equal((await pool.query(`select visibility from resource_access_policies where kind='task' and id=$1`, [toPerson.taskId])).rows[0].visibility, 'shared')
+    assert.deepEqual(await wakes(toPerson.taskId), [])
+
+    // Reassigning later through the property writer wakes the new Bot; saving the same Bot again does not.
+    const revision = async () => (await pool.query('select revision from issues where id=$1', [first.taskId])).rows[0].revision as number
+    const reassign = (id: string) => revision().then(current => withActivitySession(owner, () => updateIssueMetadata({ id: first.taskId, revision: current, patch: { delegate: { kind: 'bot', id } } }), workspace.id))
+    assert.ok('issue' in await reassign(otherBot))
+    assert.ok('issue' in await reassign(otherBot))
+    assert.deepEqual((await wakes(first.taskId)).map(event => event.botId), [bot, otherBot])
+  } finally {
+    await pool.query('delete from issues where "userId"=any($1::text[])', [[owner, teammate, outsider]])
+    await pool.query('delete from "user" where id=any($1::text[])', [[owner, teammate, outsider]])
+  }
+})

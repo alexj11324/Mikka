@@ -4214,6 +4214,8 @@
       "runWaitingDevice": "等设备上线后开始",
       "runDeviceBack": "设备已上线，即将开始",
       "issueMoved": "改为{status}",
+      "issueAssigned": "由 {name} 指派到这里",
+      "issueAssignedYou": "已指派到这里",
       "issueSnapshot": "状态为{status}",
       "issueChanged": "状态有变化",
       "runReport": "汇报了进展",

@@ -162,6 +162,19 @@ export function issueStatusEvent(before: { status: string }, after: { id: string
   }
 }
 
+/**
+ * A task was assigned to one of the person's Bots (Capy's `issue_activity`, "X assigned you CAP-12"). It goes into
+ * that Bot's own chat and wakes it; the Bot reads the task and decides whether to start work. One event per Bot and
+ * task revision, so a replayed save does not wake it twice.
+ */
+export function issueAssignedEvent(task: { id: string; ownerId: string; identifier: string | null; title: string; revision: number }, bot: { id: string }, actor: { name: string }): CoordinatorEventInput {
+  return {
+    userId: task.ownerId, botId: bot.id, kind: 'issue_assigned', dedupeKey: `issue_assigned:${task.id}:${bot.id}:${task.revision}`,
+    issueId: task.id, runId: null,
+    payload: { title: task.title, identifier: task.identifier, actorName: actor.name },
+  }
+}
+
 /** The run an agent's worker tool call came from. */
 interface WorkerRun { id: string; userId: string; botId?: string | null; issueId: string | null }
 

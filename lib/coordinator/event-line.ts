@@ -6,7 +6,7 @@
  */
 export type EventLineKind =
   | 'runFinished' | 'runRetried' | 'runSwitched' | 'runPaused' | 'runWaitingDevice' | 'runDeviceBack'
-  | 'issueStatus' | 'issueSnapshot' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'scheduleRan' | 'scheduleDue' | 'other'
+  | 'issueStatus' | 'issueSnapshot' | 'issueAssigned' | 'runReport' | 'runQuestion' | 'runBlocked' | 'artifact' | 'action' | 'scheduleRan' | 'scheduleDue' | 'other'
 
 export interface EventLine {
   kind: EventLineKind
@@ -30,7 +30,7 @@ const LEGACY_SCHEDULE_RESULT = '[Event] An Agent reports coordination data: unde
 
 const KINDS: Record<string, EventLineKind> = {
   run_finished: 'runFinished', run_retried: 'runRetried', run_credential_switched: 'runSwitched', run_quota_paused: 'runPaused',
-  run_dispatch_failed: 'runWaitingDevice', run_redispatched: 'runDeviceBack', issue_done: 'issueStatus', issue_status_changed: 'issueStatus',
+  run_dispatch_failed: 'runWaitingDevice', run_redispatched: 'runDeviceBack', issue_done: 'issueStatus', issue_status_changed: 'issueStatus', issue_assigned: 'issueAssigned',
   run_report: 'runReport', run_question: 'runQuestion', run_blocked: 'runBlocked', artifact_submitted: 'artifact', action_decided: 'action',
 }
 
@@ -45,6 +45,11 @@ export function eventLine(eventKind: string | null | undefined, text: string, ob
     const moved = /"(.*)" moved from \S+ to (\S+?)\.$/.exec(first)
     title = moved?.[1] ?? null
     status = eventKind === 'issue_done' ? 'done' : moved?.[2] ?? null
+  }
+  if (kind === 'issueAssigned') {
+    // `status` carries who assigned it; `title` is the task's own title (eventPrompt's issue_assigned line).
+    const assigned = /^\[Event\] (.*) assigned you task \S+ "(.*)"\. Issue: /.exec(first)
+    return { kind, runId: null, issueId, status: assigned?.[1] ?? null, title: assigned?.[2] ?? null }
   }
   if (kind === 'runFinished' && !status) status = /ended with status (\w+)/.exec(first)?.[1] ?? null
   if (kind === 'artifact') title = /"(.*)", version \d+/.exec(first)?.[1] ?? null

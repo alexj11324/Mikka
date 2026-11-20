@@ -600,6 +600,13 @@
     "test": "tests/team-issue-create.db.test.ts",
     "suite": "test:scope-detachment-db"
   },
+  "app/api/tasks/dictation/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Transcribe a spoken new-task description with the person's own authorized OpenAI transcription key; nothing is stored.",
+    "test": "app/api/tasks/dictation/route.test.ts",
+    "suite": "test:issues"
+  },
   "app/api/tasks/[taskId]/review/machine-sessions/route.ts": {
     "mode": "built-in",
     "environment": [],

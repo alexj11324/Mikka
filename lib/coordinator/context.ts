@@ -148,6 +148,12 @@ export function eventPrompt(event: { kind: CoordinatorEventKind; issueId: string
       ].filter(Boolean).join('\n')
     case 'run_redispatched':
       return [`[Event] Device ${payload.deviceId} is back online; queued Factory run ${event.runId} for task ${payload.taskId} will start there.`, note].filter(Boolean).join('\n')
+    case 'issue_assigned':
+      return [
+        `[Event] ${payload.actorName} assigned you task ${payload.identifier ?? event.issueId} "${payload.title}". Issue: ${event.issueId}.`,
+        'Read it with get_issue and decide whether to start work: dispatch its thread when the work is clear and you may do it, ask the person when something material is missing, or leave it in the backlog. Do not create a second task for it.',
+        note,
+      ].filter(Boolean).join('\n')
     case 'issue_done':
       return [`[Event] Issue ${event.issueId} "${payload.title}" moved from ${payload.previousStatus} to done.`, note].filter(Boolean).join('\n')
     case 'issue_status_changed':
