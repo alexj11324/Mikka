@@ -8,6 +8,37 @@ export type BotOverviewItem = { id: string; label: string }
 
 export type BotOverviewPullRequest = { url: string; title: string; number: number; identifier?: string; state: 'open' | 'draft' | 'merged' | 'closed' }
 
+/** Bot Profile's settings as the owner endpoint returns them (app/api/bots/[botId]). */
+export type BotSettingsValue = {
+  id: string
+  alias: string | null
+  environmentId: string | null
+  /** Tasks run on: Mikka Cloud, the Cloudflare coding machine, or one of the owner's devices; null leaves the person's 运行位置. */
+  crewTarget: { kind: 'cloud'; provider?: 'cloudflare' } | { kind: 'device'; deviceId: string; agentId?: string } | null
+  defaultAgent: 'claude_code' | 'codex' | null
+  defaultProfileId: string | null
+  /** Where the Bot itself runs. */
+  runsOn: { kind: 'cloud'; provider?: 'cloudflare' } | { kind: 'device'; deviceId: string; checkout: 'worktree' | 'linked' } | null
+  effort: 'low' | 'medium' | 'high' | 'xhigh' | 'max' | null
+  visibility: 'shared' | 'private'
+  ownerId: string | null
+  subscribers: string[]
+}
+export type BotSettingsPatch = Partial<Omit<BotSettingsValue, 'id' | 'ownerId'>>
+
+/** Bot Profile (Capy's Captain settings, decision 2026-11-19-2105; no Promote / Demote). Each command resolves to an error to show, or null once saved. */
+export type BotOverviewSettings = {
+  loaded: boolean
+  loadError: boolean
+  retry: () => void
+  value: BotSettingsValue | null
+  /** The workspace's Environments, the default first. */
+  environments: { value: string; label: string }[]
+  save: (patch: BotSettingsPatch) => Promise<string | null>
+  /** Transfer ownership to another active member. */
+  transfer: (ownerId: string) => Promise<string | null>
+}
+
 export type BotOverviewProps = {
   /** Who the chat is with; `kind` 'agent' is an older chat without a bot. */
   conversation: { id?: string | null; name: string; color?: string; shape?: string; kind: 'coordinator' | 'bot' | 'agent' }
@@ -63,6 +94,8 @@ export type BotOverviewProps = {
     onOpen: () => void
     onAddKey: () => void
   }
+  /** Bot Profile settings: an ordinary bot's owner only. */
+  settings?: BotOverviewSettings | null
   /** Mikka's dialogs this body opens (the computer viewer, 添加 E2B API Key). */
   dialogs?: ReactNode
 }
