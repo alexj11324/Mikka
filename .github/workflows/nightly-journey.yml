@@ -17,8 +17,12 @@ concurrency:
 jobs:
   journey:
     name: Offline MVP journeys
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    permissions:
+      contents: read
+      actions: read
     services:
       postgres:
         image: postgres:17
@@ -61,6 +65,10 @@ jobs:
           FFMPEG_GITHUB_TOKEN: ${{ github.token }}
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
+      - name: Restore the verified official renderer for this main source
+        run: node scripts/ci/nightly-ui.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
       - name: Generate disposable authentication material
         run: |
           node --input-type=module <<'JS'
@@ -74,8 +82,12 @@ jobs:
         run: pnpm test:e2e:setup
       - name: Register the exact isolated test environment
         run: node scripts/test-accounts/bootstrap.mjs --output "$MIKKA_TEST_ENVIRONMENT_FILE"
-      - name: Build the local production runtime
-        run: pnpm generate:agent-ui && pnpm build:app --public-test-fixture
+      - name: Compile the local API and Eve around the verified official renderer
+        run: |
+          pnpm generate:agent-ui
+          node scripts/build-eve.mjs
+          node apps/api/scripts/build.mjs
+          node scripts/package-eve.mjs
         env:
           NODE_OPTIONS: --max-old-space-size=6144
       - name: Run the full scripted journey suite
@@ -83,13 +95,16 @@ jobs:
           node --input-type=module <<'JS'
           import { assertMvpEnvironment } from './tests/mvp/isolated-env.mjs'
           assertMvpEnvironment()
-          console.log('Runtime: loopback PostgreSQL 17/mikka_e2e; scripted model through fake LiteLLM at 127.0.0.1:3191; no external model credentials.')
+          console.log('Runtime: official compiled renderer, local API/Eve; loopback PostgreSQL 17/mikka_e2e; scripted model through fake LiteLLM at 127.0.0.1:3191; no external model credentials.')
           JS
           pnpm test:e2e:mvp --grep @journey
       - name: Audit evidence before upload
         if: always()
         id: audit
-        run: node scripts/test-accounts/cli.mjs audit-evidence --evidence playwright-mvp-report
+        run: |
+          mkdir -p playwright-mvp-report
+          if test -f .cache/nightly/ui-origin.json; then cp .cache/nightly/ui-origin.json playwright-mvp-report/ui-origin.json; fi
+          node scripts/test-accounts/cli.mjs audit-evidence --evidence playwright-mvp-report
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always() && steps.audit.outcome == 'success'
         with:

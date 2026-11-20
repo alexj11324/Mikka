@@ -39,6 +39,20 @@ isolated local PostgreSQL 17 database and the shared fake services. The API/CLI
 PR policy from decisions 1520 and 2225 stays in force; adding browser journeys
 to pull-request CI requires Alex's separate decision.
 
+The default public UI slots do not provide the official workspace. Nightly
+restores the official compiled renderer from the successful public service
+producer for its exact main SHA, using the standard GitHub Actions artifact
+token only during that read. It verifies the producer and manifest job, the
+original web build job, archive/member digests, safe extraction, and the
+renderer action contract. A reused web build retains its actual source,
+overlay and context digest in the report; the same-source producer owns the
+context equivalence decision. Nightly then compiles its local API and Eve
+without rebuilding the renderer. Missing exact-source publication fails the
+job; it never substitutes an older arbitrary renderer or a public empty slot.
+No private UI checkout, model key, production database or deployment is part
+of this workflow. A successful run proves this local composition, not a
+production deployment or a real provider integration.
+
 Deployment smoke reuses the route-registration probe from #2901. It checks
 the inventory belonging to the serving API source, anonymously and without
 loading business handlers. Its success proves route registration; provider
