@@ -1,6 +1,4 @@
 import type { Cache, Key, useSWRConfig } from 'swr'
-import { listAgents } from '@/app/actions/agents'
-import { listBotsForWorkspace } from '@/app/actions/bots'
 import { prefetchScopedRead } from '@/lib/swr/prefetch'
 import { botPermissionsKeys } from '@/lib/swr/keys'
 
@@ -21,11 +19,15 @@ export type WorkspacePageReads = { cache: Cache; mutate: ScopedMutate; workspace
  * Only reads that can start without something the page itself has to read first belong here: 设置 ›
  * 应用与运行权限 reads the workspace's Bots, then that Bot's workspace policy, then the run policy,
  * and only the first of those three can be asked for before the section is mounted.
+ *
+ * The actions are imported here rather than at the top of the module: a preload is speculative and may
+ * never run, and a top-level server-action import makes every host of this module carry it — including
+ * the tests that mount the workspace with their own action mocks.
  */
 const reads: Partial<Record<WorkspacePage, (scope: WorkspacePageReads) => [Key, () => Promise<unknown>][]>> = {
   settings: ({ workspaceId }) => [
-    [botPermissionsKeys.bots(workspaceId), () => listBotsForWorkspace(workspaceId)],
-    [botPermissionsKeys.agents(), () => listAgents()],
+    [botPermissionsKeys.bots(workspaceId), () => import('@/app/actions/bots').then(module => module.listBotsForWorkspace(workspaceId))],
+    [botPermissionsKeys.agents(), () => import('@/app/actions/agents').then(module => module.listAgents())],
   ],
 }
 
