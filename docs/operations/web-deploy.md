@@ -51,24 +51,25 @@ streaming and rollback on the same source pair.
 
 ## Official runtime configuration
 
-Changed template inputs require Cloudflare to serve the exact current main
-commit before the E2B release takes its lock or allocates builders. A push only
-reports changed inputs in its run summary and builds nothing; the paused Vercel
-publisher is never awaited. The release rechecks the live version after
-building and publishes template IDs that passed the build-time checks (the template
-builds, both CLIs start, the execution fence opens). E2B runs on the user's own
-key, so there is no subscription run before publication.
+Initial automatic E2B runtime selection requires the observed Cloudflare
+product to equal current main and the consumer run's recorded source. A push
+only reports changed inputs and builds no candidate. Publication rechecks the
+fixed serving receipt and publishes template IDs that passed the build-time
+checks: the template builds, both CLIs start and the execution fence opens.
+E2B uses the user's own key, so there is no subscription run before publication
+([#2789](https://github.com/alexj11324/Mikka/pull/2789)).
 
 The release starts by itself. When a run of the Cloudflare application
 deployment workflow finishes with a serving-release observation
 (`gateway-observe` after a cutover, or a per-service Web `service-production`),
-the runtime workflow and Desktop release run on that
-`workflow_run` event. Each one goes ahead only when the observed product is
-current main. Otherwise it records why in its run summary and ends green.
-E2B also compares the worker inputs with the last release that made templates
-public and skips an unchanged worker. Desktop skips a commit whose installer is
-already the latest release. Both use `actions:RUN_ID:ATTEMPT` of that observation
-as their receipt, and every gate rechecks it as below.
+the runtime workflow and Desktop release receive that `workflow_run` event.
+Runtime applies the initial current-main selection above and its existing
+input checks. Desktop accepts a served product in main's history and skips a
+commit whose installer is already the latest release. Both use
+`actions:RUN_ID:ATTEMPT` of that observation as their receipt, and every gate
+rechecks it as below. The
+[workflow reference](../../.github/workflows/README.md#cloud-worker-template-release)
+owns runtime candidate checks and recovery.
 
 To retry by hand, dispatch the official runtime workflow on current main with
 its retry reason and `cloudflare_receipt`. A dispatch without a receipt fails
@@ -79,7 +80,13 @@ checklist. The observer only reads the provider and canonical application.
 Use `actions:RUN_ID:ATTEMPT` from that successful observation in the consumer
 dispatch. Its original job identifies the 100% gateway version, product, overlay
 and Web client pin. Each signing or publication gate rechecks the live gateway
-fingerprint, product, overlay, pinned client and current product main.
+fingerprint, product, overlay, pinned client and the served commit's membership
+in main's history through the existing
+[serving-source verifier](../../scripts/release/cloudflare-promoted-web.mjs).
+Later merges do not replace the fixed source or invalidate publication. A manual
+dispatch on a later main therefore builds the still-served commit rather than
+the newer dispatch commit. Explicit release windows declared by the
+#1752/#1954 owner remain binding; an offline push does not itself open one.
 The first Vercel-to-Cloudflare transition keeps its historical issue #1954
 comment/body hash, approval window and DNS TXT verification.
 The same release produces the immutable template report for the private

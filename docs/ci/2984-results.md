@@ -85,10 +85,12 @@ Ready. Commit age and `updated_at` do not replace the missing event.
 
 Four original staging artifacts were downloaded and their digests verified.
 All four rejected admission; none proves accepted staging or production.
-Two can be linked to a merged source and its rejection interval. The denominator
-for successful merge-to-staging and merge-to-production measurements is **zero**,
-so those durations remain unavailable, not zero seconds. The original release
-owner's already-serving version is not relabelled as acceptance of these heads.
+Two can be linked to a merged source and its rejection interval. In this baseline,
+the successful merge-to-staging and merge-to-production denominators are **zero**;
+those durations are unavailable, not zero seconds. Later observations below
+separately record real service staging/HTTP smoke completion, a failed session
+phase and automatic pipeline rejections. A partial phase or the release owner's
+already-serving version is not relabelled as full acceptance of a new head.
 
 ## B. Necessary work versus removable duplication
 
@@ -108,6 +110,8 @@ declare every command in the repository globally optimal.
 | Final protected aggregation across multiple selected jobs | Retain the parent gate: it rejects failed/missing selected dependencies. Unlike the removed Analytics summary, it owns a multi-job protection contract |
 | Local migration-ready cache beside the migration ledger | Remove the incomplete cache in #2987; use the existing setup runner and ledger |
 | Repeated CI timing logic on retries | Correct the existing collector/summary in #2988; no new poller or validator |
+| Automatic runtime producer emits `workflow_run`, but three consumers admit only older event types | Repair eight existing event checks in #2995; preserve fixed workflow identity, repository/source/attempt/receipt checks and pre-credential revalidation |
+| Runtime publication history recognizes the retired `subscriptions` job and equates workflow head with published source | Independent #2984 follow-up: inspect original publication artifacts and add source-specific counterexamples before correcting the existing history reader; no paid rebuild is triggered for measurement |
 
 Seven original job logs underlying the typecheck comparison are in
 [2984-typecheck-assessment.json](2984-typecheck-assessment.json). Identical command
@@ -119,12 +123,20 @@ validation. Existing image reuse remains the single supported build reuse path.
 | Repair | Before | After and limits |
 | --- | --- | --- |
 | Analytics, #2986 | Two extra summary jobs delayed their result by 489 s and 587 s, including 485/584 s queue and 4/3 s execution | Exact PR run `44821499188/1`, real job `136586911631`, completed build/SSR/Chromium checks; no second summary job exists. Its extra allocation and serial wait are zero. Other CI jobs can still determine total completion time |
-| Site search, #2993 | Run `44806487915/1`, job `136531732826`, contains two typecheck calls. First typecheck-to-lint markers span 42.465 s | Run `44823370556/1`, job `136589646398`, has one full typecheck inside build and 8/8 real HTTP checks. Queue 148 s/execution 374 s versus 617/485 s before. n=1 each; Node patch differs, so the total-job difference is not attributed to this change |
+| Site search, #2993 | Run `44806487915/1`, job `136531732826`, contains two typecheck calls. First typecheck-to-lint markers span 42.465 s | Initial run `44823370556/1` has one full typecheck and8/8 HTTP cases. Final integrated run `44826359781/1`, job `136599858303`, independently passes one full typecheck and8/8 HTTP cases with two PG17 services: queue81 s, execution506 s, build330 s, HTTP25 s. Initial after execution374 s versus before485 s; changed sources/Node versions prevent causal whole-job speedup claims |
 | Bootstrap, #2987 | Real helper-only change alters canonical migration execution identity while the second cache stamp remains identical; original regression fails | Original setup is called every time. Exact merged PG17 cold 4.162715 s (n=1), warm 1.627864/1.851708 s (n=2); same 396 ledger rows and timestamps, 368 tables, zero users; 11/11 original DB tests |
 | Attempt timing, #2988 | `44798376633/2` mixed original creation and retry, reporting 4,737 s wall and 2,640 s initial queue | Correct current-attempt values are 2,611/514 s. In `44791185503/2`, retained 28 s work remains evidence but is excluded from current 165 s runner time. Two real counterexamples establish accounting correctness, not faster execution |
 
+Runtime consumers #2995 added four counterexamples to the existing inline/shared
+guard suites: original64 pass/4 fail, corrected68/68, and exact merged68/68 with
+zero skips. Original enrolled suites pass200/200 and164/164; their overlapping
+coverage is not summed. Negative identity, event-mismatch, stale-source and
+attempt cases remain enforced. No model/VM acceptance or wall-time saving is
+inferred from those offline contracts.
+
 The original Site logs, source identity and downloaded artifact digest are in
-[2984-site-search-after.json](2984-site-search-after.json). Original bootstrap
+[2984-site-search-after.json](2984-site-search-after.json). The exact integrated
+Site observation is retained in the [after evidence](2984-after.json). Original bootstrap
 red/green evidence lives in the
 [pre-merge receipt](../operations/evidence/2984-local-bootstrap-migrations.json);
 the [post-merge receipt](../operations/evidence/2984-bootstrap-postmerge.json)
@@ -148,8 +160,10 @@ publisher, baseline store or credential path is introduced.
 
 The original five facts remain separate: SQL snapshot, execution closure,
 backfill behavior, actual historical ledger and actual pending set. Source-only
-comparison can establish the first three identities but cannot infer the last
-two. See the [single build/release contract](../operations/build-source-of-truth.md).
+comparison establishes SQL, executor and backfill **code identity**. It cannot
+prove backfill business safety or results, inspect the historical database
+ledger, or infer a database's actual pending set. See the
+[single build/release contract](../operations/build-source-of-truth.md).
 
 The fixed-source 514b-to-c5 counterexample rejects
 `migration_execution_changed` locally in 6.503 seconds (n=1), with 387→396 SQL
@@ -164,7 +178,12 @@ contracts. At this checkpoint its exact protected Cloud qualification is still
 required. An old successful qualification, including one that legitimately
 authorizes an ancestor for existing release operations, is not current-head CI.
 The original reader rejects that substitution. Local tests and GitGuardian
-success do not complete Cloud #418.
+success do not complete Cloud #418. The available connector has no workflow
+dispatch operation and the CLI has no authenticated session. The secure browser
+login request was aborted by the user. No new login request, borrowed token,
+new trigger, source substitution or permission change bypasses that boundary.
+The original protected qualification, normal merge and exact merged validation
+remain required.
 
 ## D. Reproducible environment and real failures
 
@@ -193,8 +212,13 @@ endpoint returns HTTP 500 until the original 60-second readiness budget expires.
 A minimal child invocation reproduces the same missing-file failure without
 PostgreSQL or a browser. Original
 [#2969 review 5999855363](https://github.com/alexj11324/Mikka/pull/2969#pullrequestreview-5999855363)
-contains the fixed source, root cause and reproduction. Its owner retains the fix;
-this remediation did not copy a manifest, remove preload or change the budget.
+contains the original fixed source, root cause and reproduction. Fresh readback
+of the Owner's later head `d30f6ec4a4a1b66278587442e7fd91676ab2f709` finds the
+preload now resolves its root from `import.meta.url`, independent of child cwd.
+That is an original-owner code correction, still on the unmerged Draft at this
+observation. It has not been relabelled as a new runtime or browser pass; the
+old failure remains attached to its old source. This remediation did not copy a
+manifest, remove preload, change the readiness budget or take over that branch.
 
 Completed UI→API→DB→new-browser-readback rounds are **0** at this checkpoint.
 Two runs of the original seed smoke each passed six scenarios with identical
@@ -209,6 +233,27 @@ unit-test double that omitted the new transcript slot; real #2913 cold E2E is
 title contract conflict. The other three original chat scopes remain 0/3.
 Their product assertions and private UI changes stay with #2912. Browser gate
 success, compilation and screenshots are never counted as those E2E passes.
+
+The separate Site search post-merge run at `128cf2776e1d00c664ac7c3e5b3dc0b78a0aea87`
+passed the original optimization suite9/9 and both PG17 setup commands. Its
+subsequent full build/HTTP execution was blocked by automatic approval review
+after an HTTPS request to `ai-gateway.vercel.sh`. That run was not retried or
+resumed and is not recorded as successful build or HTTP acceptance. Read-only
+inspection of pinned Eve1.0.0-rc.9 identifies a build-time public catalog
+`GET /v1/models/catalog`, with no explicit body, authorization or cookie; static
+code does not prove the exact rejected request. The observed execution namespace
+contains no matching live wrapper or PG process, but retained PID files and a
+missing finally/stop receipt prevent a claim of orderly shutdown. The
+[partial post-merge receipt](2984-site-search-postmerge.json) preserves these
+limits alongside the independently successful real GitHub Site job.
+
+The shared execution environment subsequently became unavailable. Uncommitted
+documentation patches were recovered against their original remote files using
+the authorized GitHub interface; existing branches, PRs and the single ledger
+were retained. The supplied Docker fallback was searched in available tools and
+the plugin directory; no callable Docker entry was returned. No paid substitute,
+new CI workflow or test-result simulation was introduced. Original repository
+CI continues to provide actual execution where local execution is unavailable.
 
 ## E. Independent delivery and exact post-merge evidence
 
@@ -229,31 +274,91 @@ production promotion remain separate outcomes.
 | [#2988](https://github.com/alexj11324/Mikka/pull/2988) | `603d1d95f0266827549f858624a872920344034a` | 5/5 original focused timing tests; six reviewed file blobs retained; all 69 files from the intervening original #2991 merge preserved |
 | [#2987](https://github.com/alexj11324/Mikka/pull/2987) | `8cddaa7c48c97ce0092c3ea028519fc9d0ff6069` | 2/2 original bootstrap tests, real PG17 cold/warm runs, 11/11 DB tests; four reviewed blobs retained; setup runner unchanged |
 | [#2986](https://github.com/alexj11324/Mikka/pull/2986) | `040362591abbcb95d825311e5577bd27caa92b10` | 8/8 original optimization tests, zero skipped; four reviewed file blobs retained; all unrelated first-parent files preserved |
-| [#2993](https://github.com/alexj11324/Mikka/pull/2993) | Pending at checkpoint | Real original-head Site acceptance and independent review complete; final applicable CI and exact integration still required |
+| [#2993](https://github.com/alexj11324/Mikka/pull/2993) | `128cf2776e1d00c664ac7c3e5b3dc0b78a0aea87` | Exact merged9/9 optimization; actual tree `7d191de777d02d601b71b18b42f46050f6093312` equals successfully tested synthetic integration `67131743edad025e929babca836d35e4d20c270a`; full local post-merge build/HTTP blocked as recorded above, not passed |
+| [#2995](https://github.com/alexj11324/Mikka/pull/2995) | `ee36d52f3ee391ddd529f1135ff86fa8f55bd99d` | Exact merged68/68 focused guard contracts,0skip,6.674282523 s; all nine changed blobs equal reviewed `9731a9bc279b40be0b1ddfd2e83a7bb74fed2d90`; parents128cf277+9731a9bc |
 
 Detailed current-head runs, Ready events, merge parents and post-merge runs are
 in [2984-after.json](2984-after.json), with the root's independent
-[Analytics merged-version receipt](2984-analytics-postmerge.json).
-#2988's observed Ready-to-Merge duration is 947 seconds (n=1): 751 seconds to
-the last applicable CI completion and 196 seconds from there to merge. The API
-does not explain the latter interval, so it is not attributed to human approval.
-The different pre/post PRs do not establish a project-wide speedup.
+[Analytics merged-version receipt](2984-analytics-postmerge.json) and
+[runtime-consumer merged-version receipt](2984-runtime-consumers-postmerge.json).
+
+| Delivered PR | Ready to merge | Ready to last applicable CI completion | Remaining interval |
+| --- | ---: | ---: | ---: |
+| #2988 |947 s|751 s|196 s|
+| #2987 |1371 s|1179 s|192 s|
+| #2986 |1519 s|1319 s|200 s|
+| #2993 |3329 s|2974 s|355 s|
+| #2995 |540 s|89 s|451 s|
+
+Each row is n=1, with original Ready/merge/check timestamps retained. The API
+does not explain the final interval, so it is not attributed to human approval.
+The different pre/post PRs do not establish a project-wide speedup. Exact merged
+main CI completed for603d (`44824191022/1`),8cdd (`44825168243/1`) and040
+(`44825529454/1`),1952/2091/2277 seconds after their respective merges.
+The exact128 main CI `44831162195/1` completed its last job at22:56:23Z,
+827 seconds after merge; ee36 main CI `44832752510/1` completed its last
+job at23:05:26Z,648 seconds after merge. These five observed post-merge CI
+intervals are not staging/production acceptance measurements.
+
+Actual release observations preserve phase boundaries:
+
+- Original Owner manual `44829080930/1`, job136609101593, ran the later workflow
+  head040 but deployed source603d. Its stage-all completed at
+  `2026-11-20T22:34:07.762734Z`,2474.762734 seconds after that source merged (n=1).
+  Actual API and Web smoke each passed20 HTTP200 samples with zero failures.
+  There is no uploaded artifact for this phase; the original job/log is the
+  evidence. Later stage-sessions44830107947 failed `EVE_STAGE_FIXTURES`.
+- Original automatic pipeline44829416787 for8cdd was superseded. Automatic
+  44829567603/1 for040 passed migration admission, then failed the original
+  `existing-resources` stage. Its digest-verified artifact records no staging
+  acceptance or production promotion.
+- Exact128 producer44831162043/1 successfully reused all six existing service
+  contexts and published release-manifest artifact14677660031. This is six reused
+  inputs, not six new builds or a deployment. Its automatic consumer44831644045
+  failed during read-only candidate/baseline selection
+  (`pipeline_selection_failed`), before a writer; no unique predicate is
+  inferred from the safe error code.
+
+The ee36 service producer `44832752350/1` also succeeded, while its automatic
+deployment `44833144472/1` rejected read-only selection before a writer.
+Task VM consumer `44832859206/1`, job136621977781, passed initial metadata
+authorization but failed its pre-credential live-Web revalidation with
+`guard_failed`; E2B key, VM and subscription steps did not execute. No unique
+underlying predicate is inferred from that safe error code.
+
+Complete staging/session qualification and production acceptance therefore
+still have a successful denominator of zero in these observations. The manual
+stage-all measurement is retained as its narrower real result.
 
 Before merging, the current #1752/#1954 windows and actual E2B release state
 were read. In the current implementation an E2B `push` run only reports/tests
 inputs; its `web-ready` and `release` jobs prohibit `push`. That read-only run
-does not itself hold an exact-main release window. A real active publication
-or owner-declared window still does. Guard rejections from stale-source
-downstream consumers remain failures with their original cause, not release
-success or authorization to loosen source guards.
+does not itself hold an exact-main release window. Accepted
+[#2699](https://github.com/alexj11324/Mikka/pull/2699) and the current
+`cloudflare-promoted-web.mjs` distinguish initial automatic runtime selection
+(served source equals current main and the triggering source) from subsequent
+publication checks (the fixed live-serving receipt/source remains valid and
+the source remains in main's history). Later unrelated merges do not themselves
+void that publication. Explicit #1752/#1954 Owner windows still apply; they are
+not replaced by a blanket main freeze inferred from a running E2B workflow.
+Individual downstream stale-source refusals retain their original cause and
+are not authorization to loosen a guard.
 
 ## F. One procedure and remaining acceptance
 
 AGENTS and CONTRIBUTING point to the existing development workflow. The new
 decision updates future batching and normal-merge policy; supersession notices
-preserve the historical decisions as history. The active instructions remove
+preserve the historical decisions as history. The separately owned #2997/#2998 change merged during execution. Its local-first
+and explicitly failing Draft aggregate policy is preserved during normal
+integration; neither its implementation nor its performance is attributed to
+#2984. The active instructions remove
 retired Web/Vercel queue assumptions, false automatic-production-migration
-claims and the contradictory squash permission. The existing operations page
+claims, loose-protection advice, the pre-merge production acceptance cycle and
+the contradictory squash permission. The current E2B procedure follows accepted
+[#2789](https://github.com/alexj11324/Mikka/pull/2789): build-time checks and
+conservation/publication receipts remain; the removed live dual-subscription
+gate is not reintroduced through documentation. User-owned subscription business
+acceptance is a separate fact. The existing operations page
 owns build provenance and migration facts. No scheduler, poller, custom status
 writer, parallel release process or second account mechanism was added.
 
@@ -265,8 +370,9 @@ E2B's original cleanup/replacement procedure remains authoritative.
 This checkpoint is not closure of #2984. Remaining original-owner dependencies
 are the fixture child-start fix and chat acceptance, real staging admission and
 production acceptance. This remediation still owns the private #418 exact-head
-qualification/merge, the final Site integration, completed protected post-merge
-observations and this documentation PR's own review/CI/merge. A newly identified
-automatic-E2B consumer event incompatibility is under ownership and security
-review; it is not dismissed because earlier repairs have merged. The live
-progress comment tracks these without creating a second issue ledger.
+qualification/merge, completed protected post-merge observations and this
+documentation PR's own review/CI/merge. The automatic-E2B event contract repair
+is merged and independently verified at its merge source; live publication is
+not claimed. The newly identified publication-history job/source mismatch is
+being repaired independently. The live progress comment tracks these without
+creating a second issue ledger.

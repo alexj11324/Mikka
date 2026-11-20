@@ -15,8 +15,17 @@ any time, and opening one never waits for, or stops, local building and
 verification.
 
 CI is the final gate, not the place to find out whether something works.
+**Development loop:** reproduce the failure on the actual local API, CLI,
+daemon or UI, run focused checks red→green, then build and verify the affected
+application locally against isolated inputs. Make small commits and push early
+Draft PR checkpoints for crash recovery, **but keep debugging locally rather
+than treating every Draft push/Actions run as another experiment**. A Draft
+runs lightweight required aggregators that fail closed; switch to Ready only
+after local proof, which triggers the complete protected CI on that same SHA.
+A remote failure that can be reproduced locally returns to the local loop;
+commit the fix, verify it locally, and request the final protected result again.
 Nobody sits waiting on CI, a merge or a deploy to check what can be checked
-locally. Push, open the PR and keep working; read CI when it reports.
+locally. External-only release and OAuth checks keep their original ownership.
 
 Ordinary acceptance follows [`acceptance.md`](acceptance.md): a local
 application, a real isolated database and, when the flow uses one, a real
@@ -200,8 +209,10 @@ old module owners (backend was Codex's).
 
 Keep a recovery branch and Draft PR while implementing. Mark it Ready when
 the source, focused regression and review are ready; this activates the
-existing deferred checks without an empty commit. Required checks still run
-on drafts. Update the owning issue's existing progress record with the exact
+existing deferred checks without an empty commit. Drafts run the required
+aggregators, which fail closed while expensive selected jobs wait for Ready;
+external GitGuardian remains active. Update the owning issue's existing
+progress record with the exact
 head, original run/attempt/job, result and next action. A queue entry or an old
 head's green check is not new acceptance.
 
@@ -281,13 +292,14 @@ intact: adding files is allowed; deleting or overwriting originals is not
 
 A worker change on `main` is reported by `e2b-official-runtime.yml`. When the
 Cloudflare deployment workflow's serving-release observation shows that commit
-as current main, the same workflow runs the release by itself through the
-reusable `e2b-template.yml` candidate builder. The build checks every protected original
-file's hash, type, mode, owner and link before and after installation. Both
-Claude Code and Codex must complete real subscription executions on those
-candidates before public publication and production selection. Credentials
-arrive through normal device enrollment and owner/run-bound subscription
-leases; templates contain no identity or credential.
+as current main, the workflow applies its input checks before entering the
+release through the reusable `e2b-template.yml` candidate builder. A push alone
+builds no candidate. The build checks every protected original file's hash,
+type, mode, owner and link before and after installation. Publication requires
+the template to build, both official CLIs to start and the execution fence to
+open. E2B uses the user's own key, so no live subscription run precedes template
+publication ([#2789](https://github.com/alexj11324/Mikka/pull/2789)). Templates
+contain no identity or credential.
 The final E2B boot has a separate, recorded check for only the provider-owned
 runtime fields established by the official-only control experiment; see the
 decision's exact-path policy. A fresh verification VM is destroyed before
@@ -298,22 +310,30 @@ worker release; activating or rolling back the worker selects the matching
 manifest without rebuilding its repository or session.
 
 Publication uses the existing `e2b-official-runtime-release` concurrency group,
-the Cloudflare serving-release observation and exact-main source checks in the
+with the source bound to the Cloudflare serving receipt. Initial automatic
+runtime selection requires the observed source to be current main and the
+workflow's recorded source. Subsequent gates recheck that same served commit
+and its membership in main's history; later merges do not replace its bytes or
+invalidate publication ([#2699](https://github.com/alexj11324/Mikka/pull/2699)).
+An authorized manual dispatch on main can publish an earlier still-served
+commit after the same receipt and history checks. Respect any release window
+explicitly declared by the #1752/#1954 owner; an offline push run does not
+itself open a publication window. See the source and recovery contract in the
 [release workflow](../.github/workflows/README.md#cloud-worker-template-release).
-Each build gets a unique name; retain old templates and save the previous
-paired configuration in `MIKKA_CLOUD_RUNTIME_PREVIOUS`. For rollback, use the
-normal rollback PR and release gates to restore matching application and worker
-code, using that retained configuration as the previous known-good target;
-the old source receipt cannot bypass the exact-main check. Do not change
-template aliases or the release's production configuration by hand. A failed candidate
-gate leaves production on its existing templates. The single configuration
-upsert is checked by per-variable readback; a partial write requires repair
-and revalidation and never replaces a valid previous configuration. See the
-[release workflow](../.github/workflows/README.md#cloud-worker-template-release).
-An always-run finalizer kills this attempt's labelled test instances and deletes
-its exact private candidates after any failure, with readback and cleanup
-receipts. Public and previous images remain. Rerun the full workflow after a
-failed release so the removed candidates are rebuilt.
+
+Each build gets unique candidates. Publication verifies their original source,
+run, attempt and report digests, then retains the complete immutable release
+report for the existing private Cloudflare API deployment. Publishing template
+IDs does not select them in production. The #1954 release owner promotes the
+matched application and worker artifacts and retains previous templates and
+release receipts for rollback. Use that existing rollback procedure and a
+normal rollback PR when code changes; preserve its source and admission gates.
+Do not change template aliases or production configuration by hand.
+
+The release finalizer closes this attempt's labelled instances and removes its
+exact private candidates, verifying cleanup and recording a receipt. Public
+and previous images remain. Rerun the full workflow after a failed candidate
+release so the removed candidates are rebuilt.
 
 ## 8. Reaching a local service from outside
 

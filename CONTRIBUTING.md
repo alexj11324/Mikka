@@ -24,26 +24,28 @@ Use this guide to prepare, verify and submit changes to Mikka.
 - Write commit messages in English, in the form `<type>: <description>`, where
   the type is one of `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`
   or `ci`.
-- For code changes, run the source checks in cloud Linux before you push.
+- **Debug before requesting final CI.** Work in isolated cloud Linux, not on the developer's Mac. While editing, run the affected lint, type, unit, database and real API/CLI entry-point checks red→green; do not wait on GitHub Actions to discover ordinary HTTP, schema, generated-code or daemon failures. Push small commits to a Draft PR for recovery, and continue local debugging while its fast fail-closed checks execute. Before marking Ready, run `pnpm check`, an affected local build when needed, and the real changed-flow acceptance against isolated dependencies; record exact commands, exits and source. The final protected CI then independently verifies the candidate.
 
   ```sh
   pnpm install
-  pnpm check
+  # During development: affected checks and local runtime/API/CLI red→green
+  # Before Ready: complete the relevant local acceptance and pnpm check
   ```
 
 - Work is assigned through a GitHub issue to one agent, who owns it end to
   end. Nobody pushes to `main` directly. The assigned agent opens a pull
   request from a branch and merges it itself with a merge commit (no squash,
   no rebase) once CI is green on the latest head and the PR is mergeable.
-  After the merge the same agent watches the production deployment and, only
-  when the change needs it, accepts it in production
-  ([`docs/dev-workflow.md`](docs/dev-workflow.md) § 5). CI evaluates GitHub's
+  After the merge the same agent verifies the exact merge SHA and records its
+  regression and CI evidence. The release owner under #1954 stages and promotes
+  verified artifacts; serving-version acceptance follows
+  [`docs/dev-workflow.md`](docs/dev-workflow.md) § 5. CI evaluates GitHub's
   synthetic PR merge commit (the PR combined with its target branch) rather
   than just the standalone PR head. An unrelated merge to `main` does not
-  require rebasing a still-mergeable PR; a real conflict must be resolved and
-  the updated candidate reverified. The GitHub branch protection setting
-  "Require branches to be up to date before merging" must be disabled for
-  this loose-check policy; the workflow alone cannot change that setting.
+  require rebasing a still-mergeable PR. Read the effective branch protection
+  and merge `main` normally into the PR when protection requires it, a conflict
+  needs resolving or a relevant landed change needs integration verification.
+  Reverify the updated candidate and preserve the existing protection settings.
   See "How changes are tested" below for which checks run when.
 - Never commit credentials. Project secrets live in Infisical Cloud.
 - Focus is stale-while-revalidate: only data past its freshness threshold
@@ -99,13 +101,17 @@ cannot.
    traffic. Exercise the changed flow through the API and CLI with the local
    database and daemon when relevant. See the
    [development workflow](docs/dev-workflow.md).
-2. **Every pull request and push to main** (CI, `ui-policy.yml`): trusted
+2. **Ready pull requests, merge groups and main pushes** (CI, `ui-policy.yml`): trusted
    Nx Core selection runs affected unit, daemon and PostgreSQL suites plus the
-   existing source/security policies. PR checks use GitHub's synthetic merge
-   candidate; the full DB inventory is validated even when execution is skipped.
-   Selected DB suites keep PG17 isolation, clone databases and strict no-skip
-   summaries across 1–4 dynamic shards. Required gate names stay stable; every
-   selected lane must succeed. Weekly and manual runs cover the full inventory.
+   existing source/security policies. A Draft PR still runs its lightweight selector
+   and named aggregate checks, which **fail explicitly** until Ready; it does not
+   allocate the expensive Core, Integration, Source, Daemon or database runners.
+   `ready_for_review` runs the full selected verification at the same source SHA.
+   Ready PR checks use GitHub's synthetic merge candidate; the complete DB
+   inventory is validated even when DB execution is not selected. Selected DB
+   suites keep PG17 isolation, clone databases and strict no-skip summaries
+   across 1–4 dynamic shards. Required gate names stay stable; every selected
+   lane must succeed. Weekly and manual runs cover the full inventory.
    See the [selection, trust and fallback rules](docs/ci/incremental.md).
 3. **Ordinary acceptance uses API and CLI.** Acceptance runs locally through
    the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
@@ -142,15 +148,20 @@ preserved evidence before deleting any test. See
 
 ### Draft PR checks
 
-Keep work-in-progress pull requests as drafts. Mandatory CI and security
-checks still run on draft heads because GitHub counts conditionally skipped
-required checks as successful; we do not replace merger proof with that
-status. Standalone non-required HTTP, runtime, E2B, search and SSH checks may
-defer runner allocation while drafting. Mark a PR **Ready for review** when
-its source and focused proof are ready: the `ready_for_review` event triggers
-all applicable deferred checks on the current head without requiring a
-meaningless new commit. Every real selected acceptance still has to pass
-before the PR can merge, including exact-source production release gates.
+Keep work-in-progress pull requests as drafts to preserve independent pushed
+checkpoints. On Draft source changes the required `CI` check **does run but
+fails closed by design**, with expensive selected runner work deferred; GitHub
+can treat an ordinary skipped required job as successful, so the required
+aggregate check must never be skipped or shown green for a Draft. External
+GitGuardian remains active. Standalone non-required HTTP, runtime, E2B,
+search and SSH checks may also defer while drafting. Mark a PR **Ready for
+review** only after local red→green, affected build and actual flow acceptance
+are recorded: the `ready_for_review` event runs all applicable selected
+protected checks on the same code SHA without a meaningless new commit.
+Every applicable PR check must pass on the current head before merge.
+Exact-version post-merge verification and protected staging and production
+admission follow § 5 of the development workflow, with the existing release
+owner and source-bound receipts.
 
 ### Before asking Alex: look at how leading products do it
 
@@ -203,12 +214,15 @@ Cloud machines use versioned Mikka templates derived from E2B's official
 are preinstalled under `/opt/mikka`. Add files, never delete or overwrite an
 original official CLI, Node/npm or system file
 ([decision 2026-11-03-1430, clarified in #1505](docs/design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
-A worker change on `main` runs `.github/workflows/e2b-official-runtime.yml`.
-The release requires unchanged original-file checksums and real Claude Code
-and Codex subscription executions on the exact candidates before making them
-public or selecting them in production. Keep the previous templates and the
-paired configuration for rollback. The historical `e2b-template.yml` is now the
-reusable candidate builder; it cannot publish production configuration.
+A worker change on `main` runs the offline input checks in
+`.github/workflows/e2b-official-runtime.yml`; publication starts from an eligible
+Cloudflare serving observation or an authorized dispatch. The release requires
+original-file conservation and build-time readiness on the exact candidates.
+E2B uses the user's own key, so publication has no live subscription gate
+([#2789](https://github.com/alexj11324/Mikka/pull/2789)). Retain published templates
+and their immutable release reports for the release owner's rollback.
+`e2b-template.yml` is the reusable candidate builder; production selection
+belongs to the existing private Cloudflare deployment.
 See [the release workflow](.github/workflows/README.md#cloud-worker-template-release)
 and [`docs/dev-workflow.md`](docs/dev-workflow.md) § 7.
 

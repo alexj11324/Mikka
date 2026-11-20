@@ -2400,7 +2400,7 @@
       ],
       "job_templates": 1,
       "decision": "remove_duplicate_same_job_typecheck",
-      "reason": "Within the same existing site-search job, an explicit typecheck is followed by the original pnpm build, whose unchanged build entry performs a second full typecheck. #2993 removes the first redundant invocation while retaining the build's complete typecheck, both PostgreSQL databases and real HTTP/browser acceptance. Separate cross-workflow environments still retain their own checks.",
+      "reason": "Within the same existing site-search job, an explicit typecheck is followed by the original pnpm build, whose unchanged build entry performs a second full typecheck. #2993 removes the first redundant invocation while retaining the build's complete typecheck, both PostgreSQL databases and real HTTP acceptance. Separate cross-workflow environments still retain their own checks.",
       "owner": "#2984 / #2993",
       "source_url": "https://github.com/alexj11324/Mikka/blob/c5a5871d3e4c471005c3f4f02eaadae6db27b052/.github/workflows/site-search.yml",
       "repair_pr": "https://github.com/alexj11324/Mikka/pull/2993",

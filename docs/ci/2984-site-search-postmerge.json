@@ -1,0 +1,155 @@
+{
+  "kind": "exact-merged-source-partial-validation",
+  "provenance": "Recovered from original observed execution output and independent fixed-source inspection after the shared execution environment became unavailable; no retry.",
+  "source": "128cf2776e1d00c664ac7c3e5b3dc0b78a0aea87",
+  "tree": "7d191de777d02d601b71b18b42f46050f6093312",
+  "parents": [
+    "040362591abbcb95d825311e5577bd27caa92b10",
+    "372215cdde89ad27ad4e29af233ce117e5eef170"
+  ],
+  "started_at": "2026-11-20T22:44:12.643475+00:00",
+  "runtime": {
+    "node": "24.22.3",
+    "pnpm": "10.34.3",
+    "postgres": "17.11"
+  },
+  "optimization": {
+    "command": [
+      "node",
+      "--test",
+      "scripts/ci/optimization.test.mjs"
+    ],
+    "started_at": "2026-11-20T22:44:13.580870+00:00",
+    "completed_at": "2026-11-20T22:44:15.113699+00:00",
+    "wall_seconds": 1.532852,
+    "exit_code": 0,
+    "total": 9,
+    "passed": 9,
+    "failed": 0,
+    "skipped": 0,
+    "log_sha256": "2dc3a5b2da25b0c8b31247343af017f06bed25ad28cde3d463bcbfae2242bc75"
+  },
+  "isolated_database_setup": [
+    {
+      "service": "application",
+      "port": 55472,
+      "database": "mikka_e2e",
+      "command": [
+        "corepack",
+        "pnpm",
+        "-s",
+        "test:e2e:setup"
+      ],
+      "started_at": "2026-11-20T22:44:16.985092+00:00",
+      "completed_at": "2026-11-20T22:44:22.966020+00:00",
+      "exit_code": 0,
+      "wall_seconds": 5.980968,
+      "log_sha256": "abbbc9a4be1ff4d20c8a498e1a4702e5c2a717447923f34b9be7b720be4c6172",
+      "observed_ledger_rows": 396
+    },
+    {
+      "service": "workspace",
+      "port": 55473,
+      "database": "mikka_workspace_e2e",
+      "command": [
+        "corepack",
+        "pnpm",
+        "-s",
+        "test:e2e:setup"
+      ],
+      "started_at": "2026-11-20T22:44:24.303993+00:00",
+      "completed_at": "2026-11-20T22:44:28.733814+00:00",
+      "exit_code": 0,
+      "wall_seconds": 4.42992,
+      "log_sha256": "abbbc9a4be1ff4d20c8a498e1a4702e5c2a717447923f34b9be7b720be4c6172"
+    }
+  ],
+  "full_build": {
+    "status": "blocked",
+    "completed": false,
+    "final_exit_code": null,
+    "log_observed_bytes": 643
+  },
+  "original_http_acceptance": {
+    "completed": false,
+    "passed": null
+  },
+  "automatic_approval_review": {
+    "decision": "rejected",
+    "operation": "Continue exact-merge build and original HTTP tests",
+    "stated_reason": "An observed HTTPS request to ai-gateway.vercel.sh had no proven payload classification; the user prohibits new real model calls.",
+    "response": "No retry or resumption. Only fixed-source inspection and read-only cleanup observation followed."
+  },
+  "static_request_diagnosis": {
+    "source": "128cf2776e1d00c664ac7c3e5b3dc0b78a0aea87",
+    "eve_version": "1.0.0-rc.9",
+    "patch_sha256": "e6bd3708a13a48a38eda1fddc0da6a6b20989bbb15461c3205d0b4a96bbcf3b2",
+    "chain": [
+      "scripts/build-application.mjs",
+      "scripts/build-eve.mjs",
+      "eve/bin/eve.js build",
+      "cli/commands/build.js",
+      "internal/nitro/host/build-application.js",
+      "prepareProductionApplicationHost",
+      "compileAgentInWorkspace",
+      "writeCompilerArtifacts",
+      "createCompiledRuntimeModelCatalogLoader.loadModelMetadata",
+      "fetchAndPersistModelCatalog"
+    ],
+    "endpoint": "https://ai-gateway.vercel.sh/v1/models/catalog",
+    "explicit_request_init": {
+      "method": "unset; normal fetch default GET",
+      "body": "unset",
+      "headers": {
+        "user-agent": "eve/1.0.0-rc.9"
+      },
+      "authorization": "unset",
+      "cookie": "unset",
+      "signal_timeout_ms": 15000
+    },
+    "use": "Public model catalog metadata for compilation, not an inference payload in this statically inspected call.",
+    "source_sha256": {
+      "compiler/model-catalog.js": "5186850f22e82e45af2caa3be4a6157ca7a9c328bbf9c824dfee4da0841344b6",
+      "internal/gateway.js": "b8e45dece2db522671ad1f2f9a3380dcf6e6daf67cd628d7eb7264094bf80bdf",
+      "internal/user-agent.js": "8ddf7a0d58aafb1682fda4b4cc7effdc6dddd3e34c1ef648d0dcd360d3e39f6b",
+      "compiler/artifacts.js": "150d4f5c6793f1d04dcd1a821e13b625e37bb106871c869cc5cd88476834fcb3"
+    },
+    "limits": [
+      "Static call construction does not identify the actual rejected network request.",
+      "A separate optional Eve CLI telemetry path also exists; the build is not described as entirely offline.",
+      "No environment or credential values were read and no network/build execution was resumed."
+    ]
+  },
+  "cleanup_observation": {
+    "observed_at": "2026-11-20T22:53:26Z",
+    "scope": "Current execution namespace only",
+    "matching_live_wrapper_found": false,
+    "application_postmaster_pid_file_present": true,
+    "workspace_postmaster_pid_file_present": true,
+    "recorded_postmaster_proc_entries_present": false,
+    "normal_pg_ctl_stop_receipt": false,
+    "wrapper_finally_receipt": false,
+    "orderly_cleanup_proven": false,
+    "action": "No unknown process was killed and retained PID files were not removed."
+  },
+  "original_scratch_evidence": {
+    "assembled_receipt_sha256": "2f8eae665c51075523a329e0c1ee86612b5793e06b81b7a218a808c1f5612151",
+    "static_diagnosis_sha256": "906dd5ac7456146d564ab4c8b5ea5bf3b1cd211aa0d5b5b66f8fd6f15d48df36",
+    "cleanup_observation_sha256": "860a76379bb1ff69b9ef7994c83933dde72254c00d87f2670a1b3e9fb096188f",
+    "note": "Hashes identify original recorded scratch files, not this recovered summary."
+  },
+  "separate_real_github_acceptance": {
+    "run_id": 44826359781,
+    "attempt": 1,
+    "job_id": 136599858303,
+    "reviewed_head": "372215cdde89ad27ad4e29af233ce117e5eef170",
+    "tested_synthetic_merge": "67131743edad025e929babca836d35e4d20c270a",
+    "tree": "7d191de777d02d601b71b18b42f46050f6093312",
+    "http_tests_passed": 8,
+    "http_tests_total": 8,
+    "root_typecheck_invocations": 1,
+    "artifact_id": 14674752631,
+    "verified_zip_sha256": "7fc0cfc0907f129a36b96977a3d16c16f856b683bfd0fa0861180686df4adeee",
+    "limit": "Source-bound PR run with the identical tree; not represented as a new post-merge execution."
+  }
+}

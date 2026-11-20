@@ -191,8 +191,10 @@ changed digest nor an already-applied database ledger grants migration permissio
 For development diagnosis, keep five different facts separate: the committed
 SQL snapshot, the migration executor and its import/toolchain inputs, backfills,
 the database's historical migration ledger, and that database's actual pending
-set. A source-only comparison can detect executor incompatibility; it cannot
-infer the pending set without reading the intended isolated database. Never
+set. A source-only comparison can detect executor incompatibility and pin SQL,
+executor and backfill code identities. It does not prove backfill business safety
+or results, historical ledger state, or the pending set without inspecting the
+intended isolated database. Never
 replace an authenticated deployed baseline with the PR base, latest main or an
 unrelated Desktop release. Use the existing private
 [deployment runbook](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/deploy-pipeline.md)
