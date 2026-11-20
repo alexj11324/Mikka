@@ -3800,5 +3800,33 @@
     "behavior": "The sole SDK client sends managed models and authorized BYOK requests to LiteLLM, preserving cost and request receipts without following redirects or exposing the master key to Agents.",
     "test": "lib/model-gateway/litellm-client.test.ts",
     "suite": "test:agent-kit-model"
+  },
+  "lib/coordinator/model.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Uses administrator-managed LiteLLM aliases for default and title purposes, and preserves the Coordinator round cap and closed finish warnings without provider credentials in application constants.",
+    "test": "lib/coordinator/model.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "lib/model-admission/runtime.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Checks every affected workspace through the installation model admission store before LiteLLM or owner-bound subscription transport; a revoked policy cannot spend or issue a provider request.",
+    "test": "lib/model-admission/revocation-postpay.db.test.ts",
+    "suite": "test:model-admission-db"
+  },
+  "lib/model-gateway/protocol-fields.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Projects only supported public protocol fields before server-owned LiteLLM routing and credentials are attached, excluding task-supplied proxy control fields and mock responses.",
+    "test": "lib/model-gateway/gateway.test.ts",
+    "suite": "test:subscription-usability"
+  },
+  "lib/model-gateway/provider-config.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Provides trusted preset endpoint metadata for LiteLLM request routing and read-only credential/model discovery; it does not make model requests or hold provider keys.",
+    "test": "lib/model-api-key-providers.test.ts",
+    "suite": "test:execution-rules"
   }
 }
