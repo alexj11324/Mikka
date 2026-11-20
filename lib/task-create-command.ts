@@ -1,4 +1,4 @@
-import { taskRunSettingsSchema } from './task-run-settings'
+import { taskRunSettingsSchema } from './task-run-settings-schema'
 import { z } from 'zod'
 import type { JSONContent } from '@tiptap/core'
 import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from './issue-meta'
