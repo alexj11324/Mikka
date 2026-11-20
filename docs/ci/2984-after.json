@@ -1,7 +1,7 @@
 {
   "issue": "https://github.com/alexj11324/Mikka/issues/2984",
   "kind": "Exact-version after evidence; native pending and partial execution remain explicitly unaccepted",
-  "observed_at": "2026-11-20T23:09:40.579Z",
+  "observed_at": "2026-11-20T23:19:50.270Z",
   "methods": {
     "timing_formatter": "scripts/ci/timings.mjs timingReceipt from exact merged 603d1d95f0266827549f858624a872920344034a, using native Actions matching attempt and jobs API captures",
     "ready_to_merge": "Recorded ready_for_review event to recorded merged event. Missing events remain null.",
@@ -965,7 +965,7 @@
               "completed_at": "2026-11-20T21:55:39Z"
             }
           ],
-          "observed_at": "2026-11-20T22:07:58.099Z",
+          "observed_at": "2026-11-20T23:19:49.892Z",
           "job_conclusions": {
             "success": 2,
             "in_progress": 3,
@@ -1191,7 +1191,7 @@
               "completed_at": null
             }
           ],
-          "observed_at": "2026-11-20T22:07:58.099Z"
+          "observed_at": "2026-11-20T23:19:49.851Z"
         },
         {
           "id": 44824190911,
@@ -1244,7 +1244,8 @@
               "started_at": "2026-11-20T21:58:52Z",
               "completed_at": "2026-11-20T21:58:52Z"
             }
-          ]
+          ],
+          "observed_at": "2026-11-20T23:19:49.581Z"
         },
         {
           "id": 44824274619,
@@ -1256,7 +1257,7 @@
           "status": "completed",
           "conclusion": "success",
           "created_at": "2026-11-20T21:53:30Z",
-          "updated_at": "2026-11-20T21:59:31Z",
+          "updated_at": "2026-11-20T21:59:32Z",
           "kind": "official build producer",
           "accepted_as_deployment": false,
           "timing": null,
@@ -1315,7 +1316,8 @@
               "started_at": "2026-11-20T21:53:41Z",
               "completed_at": "2026-11-20T21:53:32Z"
             }
-          ]
+          ],
+          "observed_at": "2026-11-20T23:19:49.815Z"
         },
         {
           "id": 44825145743,
@@ -1327,7 +1329,7 @@
           "status": "completed",
           "conclusion": "success",
           "created_at": "2026-11-20T21:59:49Z",
-          "updated_at": "2026-11-20T22:03:08Z",
+          "updated_at": "2026-11-20T22:03:09Z",
           "kind": "native post-merge check",
           "accepted_as_deployment": false,
           "timing": null,
@@ -1368,7 +1370,8 @@
               "started_at": "2026-11-20T22:03:08Z",
               "completed_at": "2026-11-20T22:03:08Z"
             }
-          ]
+          ],
+          "observed_at": "2026-11-20T23:19:49.684Z"
         }
       ],
       "release_boundary": {
@@ -1806,7 +1809,7 @@
           "url": "https://github.com/alexj11324/Mikka/actions/runs/44824190911"
         }
       ],
-      "post_merge_observed_at": "2026-11-20T23:06:06.723Z",
+      "post_merge_observed_at": "2026-11-20T23:19:49.892Z",
       "post_merge_CI_completion_seconds": 1952
     },
     {
@@ -2697,7 +2700,7 @@
               }
             ]
           },
-          "observed_at": "2026-11-20T22:07:58.048Z",
+          "observed_at": "2026-11-20T23:19:49.665Z",
           "jobs": [
             {
               "id": 136595832465,
@@ -3021,7 +3024,7 @@
               }
             ]
           },
-          "observed_at": "2026-11-20T22:07:58.048Z"
+          "observed_at": "2026-11-20T23:19:49.651Z"
         },
         {
           "id": 44825167633,
@@ -3036,7 +3039,8 @@
           "updated_at": "2026-11-20T22:03:04Z",
           "kind": "native post-merge check",
           "accepted_as_deployment": false,
-          "timing": null
+          "timing": null,
+          "observed_at": "2026-11-20T23:19:49.611Z"
         },
         {
           "id": 44825167803,
@@ -3051,7 +3055,8 @@
           "updated_at": "2026-11-20T22:06:04Z",
           "kind": "native post-merge check",
           "accepted_as_deployment": false,
-          "timing": null
+          "timing": null,
+          "observed_at": "2026-11-20T23:19:49.624Z"
         }
       ],
       "release_boundary": {
@@ -3283,7 +3288,7 @@
         },
         "completedUtc": "2026-11-20T22:02:30.617683+00:00"
       },
-      "post_merge_observed_at": "2026-11-20T23:06:06.723Z",
+      "post_merge_observed_at": "2026-11-20T23:19:49.665Z",
       "post_merge_CI_completion_seconds": 2091
     },
     {
@@ -3828,13 +3833,195 @@
           "event": "push",
           "url": "https://github.com/alexj11324/Mikka/actions/runs/44825529496",
           "sha": "040362591abbcb95d825311e5577bd27caa92b10",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "created_at": "2026-11-20T22:02:25Z",
-          "updated_at": "2026-11-20T22:02:25Z",
+          "updated_at": "2026-11-20T22:06:24Z",
           "kind": "source verification",
           "accepted_as_deployment": false,
-          "timing": null
+          "timing": {
+            "id": 44825529496,
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/44825529496",
+            "sha": "040362591abbcb95d825311e5577bd27caa92b10",
+            "event": "push",
+            "attempt": 1,
+            "conclusion": "success",
+            "created_at": "2026-11-20T22:02:25Z",
+            "first_started_at": "2026-11-20T22:04:24Z",
+            "last_completed_at": "2026-11-20T22:06:23Z",
+            "run_created_at": "2026-11-20T22:02:25Z",
+            "run_lifetime_seconds": 238,
+            "first_queue_seconds": 119,
+            "wall_seconds": 238,
+            "execution_span_seconds": 119,
+            "runner_minutes": 1.9833333333333334,
+            "retained_job_count": 0,
+            "jobs": [
+              {
+                "id": 136597036946,
+                "name": "Workspace governance HTTP (Item 11)",
+                "status": "completed",
+                "conclusion": "success",
+                "created_at": "2026-11-20T22:02:26Z",
+                "started_at": "2026-11-20T22:04:24Z",
+                "completed_at": "2026-11-20T22:06:23Z",
+                "retained": false,
+                "retained_seconds": null,
+                "queue_seconds": 118,
+                "seconds": 119,
+                "steps": [
+                  {
+                    "name": "Set up job",
+                    "conclusion": "success",
+                    "seconds": 1
+                  },
+                  {
+                    "name": "Initialize containers",
+                    "conclusion": "success",
+                    "seconds": 12
+                  },
+                  {
+                    "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                    "conclusion": "success",
+                    "seconds": 6
+                  },
+                  {
+                    "name": "Run ./.github/actions/pnpm-install",
+                    "conclusion": "success",
+                    "seconds": 33
+                  },
+                  {
+                    "name": "Verify the exact hosted checkout and create a test-only auth secret",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Apply every tracked migration to the isolated PostgreSQL service",
+                    "conclusion": "success",
+                    "seconds": 4
+                  },
+                  {
+                    "name": "Bind the disposable database to this exact checkout",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Run real HTTP Item 11 with its ordinary owner and peer sessions",
+                    "conclusion": "success",
+                    "seconds": 59
+                  },
+                  {
+                    "name": "Preserve only audited acceptance metadata",
+                    "conclusion": "success",
+                    "seconds": 1
+                  },
+                  {
+                    "name": "Post Run ./.github/actions/pnpm-install",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                    "conclusion": "success",
+                    "seconds": 1
+                  },
+                  {
+                    "name": "Stop containers",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Complete job",
+                    "conclusion": "success",
+                    "seconds": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "observed_at": "2026-11-20T23:19:49.586Z",
+          "jobs": [
+            {
+              "id": 136597036946,
+              "name": "Workspace governance HTTP (Item 11)",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:02:26Z",
+              "started_at": "2026-11-20T22:04:24Z",
+              "completed_at": "2026-11-20T22:06:23Z",
+              "retained": false,
+              "retained_seconds": null,
+              "queue_seconds": 118,
+              "seconds": 119,
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "conclusion": "success",
+                  "seconds": 1
+                },
+                {
+                  "name": "Initialize containers",
+                  "conclusion": "success",
+                  "seconds": 12
+                },
+                {
+                  "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "conclusion": "success",
+                  "seconds": 6
+                },
+                {
+                  "name": "Run ./.github/actions/pnpm-install",
+                  "conclusion": "success",
+                  "seconds": 33
+                },
+                {
+                  "name": "Verify the exact hosted checkout and create a test-only auth secret",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Apply every tracked migration to the isolated PostgreSQL service",
+                  "conclusion": "success",
+                  "seconds": 4
+                },
+                {
+                  "name": "Bind the disposable database to this exact checkout",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Run real HTTP Item 11 with its ordinary owner and peer sessions",
+                  "conclusion": "success",
+                  "seconds": 59
+                },
+                {
+                  "name": "Preserve only audited acceptance metadata",
+                  "conclusion": "success",
+                  "seconds": 1
+                },
+                {
+                  "name": "Post Run ./.github/actions/pnpm-install",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "conclusion": "success",
+                  "seconds": 1
+                },
+                {
+                  "name": "Stop containers",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Complete job",
+                  "conclusion": "success",
+                  "seconds": 0
+                }
+              ]
+            }
+          ]
         },
         {
           "id": 44825529439,
@@ -3843,13 +4030,381 @@
           "event": "push",
           "url": "https://github.com/alexj11324/Mikka/actions/runs/44825529439",
           "sha": "040362591abbcb95d825311e5577bd27caa92b10",
-          "status": "queued",
-          "conclusion": null,
+          "status": "completed",
+          "conclusion": "success",
           "created_at": "2026-11-20T22:02:25Z",
-          "updated_at": "2026-11-20T22:02:25Z",
+          "updated_at": "2026-11-20T22:07:16Z",
           "kind": "offline push observation; release jobs require a non-push event",
           "accepted_as_deployment": false,
-          "timing": null
+          "timing": {
+            "id": 44825529439,
+            "url": "https://github.com/alexj11324/Mikka/actions/runs/44825529439",
+            "sha": "040362591abbcb95d825311e5577bd27caa92b10",
+            "event": "push",
+            "attempt": 1,
+            "conclusion": "success",
+            "created_at": "2026-11-20T22:02:25Z",
+            "first_started_at": "2026-11-20T22:06:24Z",
+            "last_completed_at": "2026-11-20T22:07:15Z",
+            "run_created_at": "2026-11-20T22:02:25Z",
+            "run_lifetime_seconds": 290,
+            "first_queue_seconds": 239,
+            "wall_seconds": 290,
+            "execution_span_seconds": 51,
+            "runner_minutes": 0.7833333333333333,
+            "retained_job_count": 0,
+            "jobs": [
+              {
+                "id": 136597035433,
+                "name": "test",
+                "status": "completed",
+                "conclusion": "success",
+                "created_at": "2026-11-20T22:02:26Z",
+                "started_at": "2026-11-20T22:06:24Z",
+                "completed_at": "2026-11-20T22:06:52Z",
+                "retained": false,
+                "retained_seconds": null,
+                "queue_seconds": 238,
+                "seconds": 28,
+                "steps": [
+                  {
+                    "name": "Set up job",
+                    "conclusion": "success",
+                    "seconds": 2
+                  },
+                  {
+                    "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                    "conclusion": "success",
+                    "seconds": 9
+                  },
+                  {
+                    "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                    "conclusion": "success",
+                    "seconds": 5
+                  },
+                  {
+                    "name": "Install only the offline gate test dependencies",
+                    "conclusion": "success",
+                    "seconds": 3
+                  },
+                  {
+                    "name": "Run node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/release/cloudflare-promoted-web.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+                    "conclusion": "success",
+                    "seconds": 4
+                  },
+                  {
+                    "name": "Run python3 scripts/e2b/build-template.test.py",
+                    "conclusion": "success",
+                    "seconds": 1
+                  },
+                  {
+                    "name": "Run python3 packages/daemon/scripts/prepare-worker-install.test.py",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Run python3 scripts/e2b/official-files.test.py",
+                    "conclusion": "success",
+                    "seconds": 1
+                  },
+                  {
+                    "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Complete job",
+                    "conclusion": "success",
+                    "seconds": 0
+                  }
+                ]
+              },
+              {
+                "id": 136599225020,
+                "name": "check",
+                "status": "completed",
+                "conclusion": "success",
+                "created_at": "2026-11-20T22:06:52Z",
+                "started_at": "2026-11-20T22:06:56Z",
+                "completed_at": "2026-11-20T22:07:15Z",
+                "retained": false,
+                "retained_seconds": null,
+                "queue_seconds": 4,
+                "seconds": 19,
+                "steps": [
+                  {
+                    "name": "Set up job",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                    "conclusion": "success",
+                    "seconds": 13
+                  },
+                  {
+                    "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                    "conclusion": "success",
+                    "seconds": 2
+                  },
+                  {
+                    "name": "Use a Cloudflare gateway observation that serves current main",
+                    "conclusion": "skipped",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Compare canonical worker inputs across this push and check failed attempts",
+                    "conclusion": "success",
+                    "seconds": 1
+                  },
+                  {
+                    "name": "Leave publication to the Cloudflare promotion",
+                    "conclusion": "skipped",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                    "conclusion": "success",
+                    "seconds": 0
+                  },
+                  {
+                    "name": "Complete job",
+                    "conclusion": "success",
+                    "seconds": 0
+                  }
+                ]
+              },
+              {
+                "id": 136599418822,
+                "name": "web-ready",
+                "status": "completed",
+                "conclusion": "skipped",
+                "created_at": "2026-11-20T22:07:16Z",
+                "started_at": "2026-11-20T22:07:16Z",
+                "completed_at": "2026-11-20T22:07:15Z",
+                "retained": false,
+                "retained_seconds": null,
+                "queue_seconds": null,
+                "seconds": 0,
+                "steps": []
+              },
+              {
+                "id": 136599419722,
+                "name": "release",
+                "status": "completed",
+                "conclusion": "skipped",
+                "created_at": "2026-11-20T22:07:16Z",
+                "started_at": "2026-11-20T22:07:16Z",
+                "completed_at": "2026-11-20T22:07:16Z",
+                "retained": false,
+                "retained_seconds": null,
+                "queue_seconds": null,
+                "seconds": 0,
+                "steps": []
+              }
+            ]
+          },
+          "observed_at": "2026-11-20T23:19:49.932Z",
+          "jobs": [
+            {
+              "id": 136597035433,
+              "name": "test",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:02:26Z",
+              "started_at": "2026-11-20T22:06:24Z",
+              "completed_at": "2026-11-20T22:06:52Z",
+              "retained": false,
+              "retained_seconds": null,
+              "queue_seconds": 238,
+              "seconds": 28,
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "conclusion": "success",
+                  "seconds": 2
+                },
+                {
+                  "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "conclusion": "success",
+                  "seconds": 9
+                },
+                {
+                  "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                  "conclusion": "success",
+                  "seconds": 5
+                },
+                {
+                  "name": "Install only the offline gate test dependencies",
+                  "conclusion": "success",
+                  "seconds": 3
+                },
+                {
+                  "name": "Run node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/release/cloudflare-promoted-web.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs",
+                  "conclusion": "success",
+                  "seconds": 4
+                },
+                {
+                  "name": "Run python3 scripts/e2b/build-template.test.py",
+                  "conclusion": "success",
+                  "seconds": 1
+                },
+                {
+                  "name": "Run python3 packages/daemon/scripts/prepare-worker-install.test.py",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Run python3 scripts/e2b/official-files.test.py",
+                  "conclusion": "success",
+                  "seconds": 1
+                },
+                {
+                  "name": "Run python3 scripts/e2b/cleanup-template-candidates.test.py",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Run python3 -m py_compile scripts/e2b/validate-official-instances.py",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Run bash -n packages/daemon/scripts/official-e2b-instance-bootstrap.sh scripts/e2b/start-prebuilt.sh",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Complete job",
+                  "conclusion": "success",
+                  "seconds": 0
+                }
+              ]
+            },
+            {
+              "id": 136599225020,
+              "name": "check",
+              "status": "completed",
+              "conclusion": "success",
+              "created_at": "2026-11-20T22:06:52Z",
+              "started_at": "2026-11-20T22:06:56Z",
+              "completed_at": "2026-11-20T22:07:15Z",
+              "retained": false,
+              "retained_seconds": null,
+              "queue_seconds": 4,
+              "seconds": 19,
+              "steps": [
+                {
+                  "name": "Set up job",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "conclusion": "success",
+                  "seconds": 13
+                },
+                {
+                  "name": "Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                  "conclusion": "success",
+                  "seconds": 2
+                },
+                {
+                  "name": "Use a Cloudflare gateway observation that serves current main",
+                  "conclusion": "skipped",
+                  "seconds": 0
+                },
+                {
+                  "name": "Compare canonical worker inputs across this push and check failed attempts",
+                  "conclusion": "success",
+                  "seconds": 1
+                },
+                {
+                  "name": "Leave publication to the Cloudflare promotion",
+                  "conclusion": "skipped",
+                  "seconds": 0
+                },
+                {
+                  "name": "Post Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
+                  "conclusion": "success",
+                  "seconds": 0
+                },
+                {
+                  "name": "Complete job",
+                  "conclusion": "success",
+                  "seconds": 0
+                }
+              ]
+            },
+            {
+              "id": 136599418822,
+              "name": "web-ready",
+              "status": "completed",
+              "conclusion": "skipped",
+              "created_at": "2026-11-20T22:07:16Z",
+              "started_at": "2026-11-20T22:07:16Z",
+              "completed_at": "2026-11-20T22:07:15Z",
+              "retained": false,
+              "retained_seconds": null,
+              "queue_seconds": null,
+              "seconds": 0,
+              "steps": []
+            },
+            {
+              "id": 136599419722,
+              "name": "release",
+              "status": "completed",
+              "conclusion": "skipped",
+              "created_at": "2026-11-20T22:07:16Z",
+              "started_at": "2026-11-20T22:07:16Z",
+              "completed_at": "2026-11-20T22:07:16Z",
+              "retained": false,
+              "retained_seconds": null,
+              "queue_seconds": null,
+              "seconds": 0,
+              "steps": []
+            }
+          ]
         },
         {
           "id": 44825529465,
@@ -3989,7 +4544,7 @@
               }
             ]
           },
-          "observed_at": "2026-11-20T22:07:57.924Z"
+          "observed_at": "2026-11-20T23:19:49.678Z"
         },
         {
           "id": 44825529454,
@@ -4324,7 +4879,7 @@
               }
             ]
           },
-          "observed_at": "2026-11-20T22:07:57.924Z",
+          "observed_at": "2026-11-20T23:19:49.791Z",
           "jobs": [
             {
               "id": 136597037569,
@@ -4667,7 +5222,7 @@
         },
         "acceptance_scope": "Merged workflow behavior and actual original regression; not staging or production acceptance."
       },
-      "post_merge_observed_at": "2026-11-20T23:06:06.723Z",
+      "post_merge_observed_at": "2026-11-20T23:19:49.932Z",
       "post_merge_CI_completion_seconds": 2277
     },
     {
@@ -5620,7 +6175,8 @@
                 "failed_steps": []
               }
             ]
-          }
+          },
+          "observed_at": "2026-11-20T23:19:50.106Z"
         },
         {
           "id": 44831162158,
@@ -5631,11 +6187,12 @@
           "sha": "128cf2776e1d00c664ac7c3e5b3dc0b78a0aea87",
           "status": "completed",
           "conclusion": "success",
-          "created_at": "2026-11-20T22:42:39Z",
-          "updated_at": "2026-11-20T22:43:19Z",
+          "created_at": "2026-11-20T22:42:40Z",
+          "updated_at": "2026-11-20T22:43:20Z",
           "kind": "native post-merge check",
           "accepted_as_deployment": false,
-          "timing": null
+          "timing": null,
+          "observed_at": "2026-11-20T23:19:49.717Z"
         },
         {
           "id": 44831162043,
@@ -5780,7 +6337,8 @@
               "digest": "sha256:0d1c6327cf2e2ac0acde3921a1a25bb0c5082d3cbd23dfca75394af4157225d1"
             },
             "claim_scope": "The original producer reused all six exact service contexts and emitted the exact-source release manifest. This is native input-based reuse, not staging/production acceptance or a new build of six services."
-          }
+          },
+          "observed_at": "2026-11-20T23:19:49.666Z"
         },
         {
           "id": 44831162001,
@@ -5795,7 +6353,8 @@
           "updated_at": "2026-11-20T22:44:44Z",
           "kind": "native post-merge check",
           "accepted_as_deployment": false,
-          "timing": null
+          "timing": null,
+          "observed_at": "2026-11-20T23:19:50.270Z"
         }
       ],
       "post_merge_CI_completion_seconds": 827,
@@ -5886,7 +6445,7 @@
           "claim_scope": "Read-only selection failed before any staging writer. The safe error code does not establish the unique failed predicate. No staging/production acceptance is proven."
         }
       },
-      "post_merge_observed_at": "2026-11-20T23:06:06.723Z",
+      "post_merge_observed_at": "2026-11-20T23:19:50.270Z",
       "original_PR_acceptance_samples": [
         {
           "kind": "Same-job duplicated typecheck before sample",
@@ -6846,7 +7405,8 @@
           "updated_at": "2026-11-20T22:56:40Z",
           "kind": "native post-merge check",
           "accepted_as_deployment": false,
-          "timing": null
+          "timing": null,
+          "observed_at": "2026-11-20T23:19:49.599Z"
         },
         {
           "id": 44832752510,
@@ -7180,7 +7740,8 @@
                 "failed_steps": []
               }
             ]
-          }
+          },
+          "observed_at": "2026-11-20T23:19:49.810Z"
         },
         {
           "id": 44832752350,
@@ -7332,7 +7893,8 @@
                 "digest": "sha256:5467e05b4be3b418a46be07987a819e3031efead3d049c4d1cbe1ec9217d5b66"
               }
             ]
-          }
+          },
+          "observed_at": "2026-11-20T23:19:49.634Z"
         },
         {
           "id": 44832752591,
@@ -7347,7 +7909,8 @@
           "updated_at": "2026-11-20T22:55:28Z",
           "kind": "native post-merge check",
           "accepted_as_deployment": false,
-          "timing": null
+          "timing": null,
+          "observed_at": "2026-11-20T23:19:49.892Z"
         }
       ],
       "release_boundary": {
@@ -7669,7 +8232,7 @@
           "claim_limit": "The safe generic code does not identify the unique failed predicate. No staging/production writer ran."
         }
       },
-      "post_merge_observed_at": "2026-11-20T23:09:40.579Z",
+      "post_merge_observed_at": "2026-11-20T23:19:49.892Z",
       "original_PR_acceptance_samples": [
         {
           "kind": "Original source-controlled red/green counterexamples, historical before-merge capture",
@@ -8631,7 +9194,18 @@
           "negative_job_queues": []
         }
       }
-    ]
+    ],
+    "reviewed_snapshot_refresh": {
+      "reason": "Two old queued workflow snapshots and initial capture timestamps survived into the recovered completed-state evidence.",
+      "source": "603d1d95f0266827549f858624a872920344034a:scripts/ci/timings.mjs",
+      "refreshed_workflow_count": 21,
+      "completed_timings_added": [
+        44825529496,
+        44825529439
+      ],
+      "observation_time": "2026-11-20T23:19:50.270Z",
+      "boundary": "E2B push succeeds only its offline test/check; skipped web-ready/release remains no publication acceptance."
+    }
   },
   "completion_limits": [
     "All five exact merged-source main CI runs and all five official producers have terminal success. This is code/CI evidence, not deployment or workload acceptance.",
@@ -9087,7 +9661,11 @@
     "method": "Reconstructed from the committed baseline file, retained original tool/API captures, newly refreshed native GitHub metadata, and root receipts previously read and hash-verified before environment loss. It is not a claimed byte-for-byte reread of the unavailable latest local file.",
     "timing_code_source": "603d1d95f0266827549f858624a872920344034a:scripts/ci/timings.mjs",
     "timing_execution": "Executed only the unchanged pure timingReceipt/jobTimings definitions retrieved from that committed source in the current JS tool runtime.",
-    "compression": "Routine setup step detail is summarized in timing jobs; exact run/attempt/job identifiers, queue/execution timestamps, conclusions and failed steps remain."
+    "compression": "Routine setup step detail is summarized in timing jobs; exact run/attempt/job identifiers, queue/execution timestamps, conclusions and failed steps remain.",
+    "secondary_review_correction": {
+      "observed_at": "2026-11-20T23:19:50.270Z",
+      "scope": "All 21 retained post-merge workflow metadata records refreshed against their exact original attempts after review found two queued snapshots and obsolete capture timestamps. Source/run/attempt identity was checked. This is metadata recovery, not a rerun or release acceptance."
+    }
   },
   "descriptive_after_metrics": {
     "scope": "Five explicitly listed remediation PRs; no fleet-wide or causal latency claim.",
