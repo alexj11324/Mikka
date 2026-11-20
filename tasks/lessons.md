@@ -590,3 +590,9 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   1. 画任何对标 Capy 的控件前，先在 /Applications/Capy.app/Contents/Resources/renderer/assets 里找到对应组件（按 data-track-owner 路径搜），读清类型、样式 class、交互，再画。
   2. 例句里只出现 Mikka 真实存在的对象：文件 / 任务 / PR / thread / Bot。Agent 不可提及。
   3. 新增的状态不要放在会被相邻 section 盖住的位置；画完截整节确认可见。
+
+## 2026-11-20 模型调用只许走 LiteLLM；对用户的选项也要用中文
+
+- 规则（Alex）：LiteLLM 建好之后，所有模型调用都必须经后台的 LiteLLM，任何绕开它的方式都不允许。换模型时不要在代码里写死模型 ID，也不要直连 Vercel AI Gateway 或厂商，哪怕仓库里已经有同样写死的先例（`WRITE_PLANNING_MODEL`）。先例不等于合规，要先查规则。迁移由 alexj11324/Mikka#2869 跟进。
+- 用户说"走 Vercel 网关"时，先确认这条路是不是经过 LiteLLM，再动手；不确定就先问，不要按字面直连。
+- AskUserQuestion 的问题和选项也算"对话"，必须用简体中文。
