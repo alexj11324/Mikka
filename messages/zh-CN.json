@@ -9031,6 +9031,14 @@
     "mergeFailed": "合并没有完成。"
   },
   "SettingsRegistry": {
+    "newWorkVisibility": {
+      "label": "新线程与 Bot 的默认可见性",
+      "keywords": "新工作|创建|可见性|私有|共享|线程|Bot"
+    },
+    "allowPrivateNewWork": {
+      "label": "允许私有线程与 Bot",
+      "keywords": "新工作|创建|私有|权限|工作区|线程|Bot"
+    },
     "archiveIdleAfterDays": {
       "label": "归档闲置线程",
       "keywords": "归档|闲置"

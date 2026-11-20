@@ -9031,6 +9031,14 @@
     "mergeFailed": "Could not merge."
   },
   "SettingsRegistry": {
+    "newWorkVisibility": {
+      "label": "Default visibility for new threads and Bots",
+      "keywords": "new work|creation|visibility|private|shared|thread|bot"
+    },
+    "allowPrivateNewWork": {
+      "label": "Allow private threads and Bots",
+      "keywords": "new work|creation|private|permission|workspace|thread|bot"
+    },
     "archiveIdleAfterDays": {
       "label": "Archive idle threads",
       "keywords": "archive|idle|days"

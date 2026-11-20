@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ResolvedSetting, SettingSchemaEntry, SettingScope, SettingValue } from '@mikka/protocol/settings'
+import { workVisibilitySchema } from '@mikka/protocol/work-visibility'
 import { archiveIdleDays } from '@/lib/conversation-directory-input'
 import { DEFAULT_TITLE_TRIGGERS, THREAD_TITLE_TRIGGERS, TITLE_INSTRUCTIONS_MAX } from '@/lib/thread-title'
 import { settingMetadata } from './metadata'
@@ -47,6 +48,18 @@ export const SETTINGS_REGISTRY = {
     ...settingMetadata('workspaceInstructions'),
     type: 'string', guard: z.string().trim().max(2000), defaultValue: '',
     personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', legacy: 'workspace-instructions',
+  },
+  newWorkVisibility: {
+    ...inherited, key: 'newWorkVisibility', group: 'work-creation', page: 'general',
+    ...settingMetadata('newWorkVisibility'),
+    type: 'string', guard: workVisibilitySchema, defaultValue: 'private', options: ['private', 'shared'],
+    personalContext: 'workspace',
+  },
+  allowPrivateNewWork: {
+    key: 'allowPrivateNewWork', scope: ['workspace'], group: 'work-creation', page: 'general',
+    ...settingMetadata('allowPrivateNewWork'),
+    type: 'boolean', guard: z.boolean(), defaultValue: true,
+    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
   },
   threadShareVisibility: {
     key: 'threadShareVisibility', scope: ['workspace'], group: 'sharing', page: 'general',

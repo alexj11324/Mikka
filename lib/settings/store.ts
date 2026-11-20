@@ -1,6 +1,7 @@
 import 'server-only'
 import { and, eq, isNull, or } from 'drizzle-orm'
 import type { ResolvedSetting, SettingScope, SettingValue, SettingsView } from '@mikka/protocol/settings'
+import { workVisibilitySchema } from '@mikka/protocol/work-visibility'
 import { db } from '@/lib/db'
 import { threadTitleSettings, userPreferences, users } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
@@ -9,6 +10,7 @@ import { DEFAULT_TITLE_TRIGGERS, type ThreadTitleTriggers } from '@/lib/thread-t
 import { archivePreferenceChanged, workspaceListChanged } from '@/lib/live/lists'
 import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
 import { personalSettingValues, workspaceSettingValues, workspaceInstructions } from './schema'
+import { workCreationView } from './work-creation-policy'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Reader = Pick<typeof db, 'select'>
@@ -30,7 +32,7 @@ function pack(field: SettingDefinition, raw: SettingValue | null): StoredValue {
   return row
 }
 
-async function readValues(context: SettingsContext, database: Reader = db, scope: SettingScope = 'personal'): Promise<SettingsView> {
+async function readValues(context: SettingsContext, kind: 'personal' | 'team', database: Reader = db, scope: SettingScope = 'personal'): Promise<SettingsView> {
   const personal = await database.select().from(personalSettingValues).where(and(eq(personalSettingValues.userId, context.userId),
     or(isNull(personalSettingValues.workspaceId), eq(personalSettingValues.workspaceId, context.workspaceId))))
   const workspace = await database.select().from(workspaceSettingValues).where(eq(workspaceSettingValues.workspaceId, context.workspaceId))
@@ -38,14 +40,15 @@ async function readValues(context: SettingsContext, database: Reader = db, scope
     const own = personal.find(row => row.key === field.key && row.workspaceId === (field.personalContext === 'workspace' ? context.workspaceId : null))
     return [field.key, resolveSettingValue(field.key, scope === 'personal' ? unpack(own) : null, unpack(workspace.find(row => row.key === field.key)))]
   }))
-  return { workspaceId: context.workspaceId, values }
+  const configured = { ...values.newWorkVisibility, value: workVisibilitySchema.parse(values.newWorkVisibility.value) }
+  return { workspaceId: context.workspaceId, values, workCreation: workCreationView(kind, configured, values.allowPrivateNewWork.value === true) }
 }
 
 /** Both API reads and background consumers re-admit the explicit workspace. */
 export async function readSettings(context: SettingsContext, scope: SettingScope = 'personal'): Promise<SettingsView> {
   return workspaceDb.transaction(async tx => {
-    await requireWorkspace(tx, context.workspaceId, context.userId)
-    return readValues(context, db, scope)
+    const { workspace } = await requireWorkspace(tx, context.workspaceId, context.userId)
+    return readValues(context, workspace.kind, db, scope)
   })
 }
 
@@ -91,11 +94,11 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
 export async function writeSettings(context: SettingsContext, scope: SettingScope, raw: unknown): Promise<SettingsView> {
   const values = parseSettingsPatch(scope, raw)
   return workspaceDb.transaction(async workspaceTx => {
-    await requireWorkspace(workspaceTx, context.workspaceId, context.userId, scope === 'workspace')
+    const { workspace } = await requireWorkspace(workspaceTx, context.workspaceId, context.userId, scope === 'workspace')
     const result = await db.transaction(async tx => {
       if (scope === 'personal') await tx.select({ id: users.id }).from(users).where(eq(users.id, context.userId)).for('no key update')
       await writeRows(tx, scope, context, values)
-      return readValues(context, tx, scope)
+      return readValues(context, workspace.kind, tx, scope)
     })
     await workspaceListChanged(workspaceTx, context.workspaceId, ['workspace_settings'])
     return result
