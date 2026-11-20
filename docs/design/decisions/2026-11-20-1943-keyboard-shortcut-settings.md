@@ -6,6 +6,11 @@ Their declarations derive personal P1 registry fields, schema/search metadata,
 defaults and conflict detection. Adding an action does not add a migration or a
 server action. No new `project` terminology is introduced.
 
+Display labels and search terms live in the canonical English and Chinese
+`SettingsRegistry` message catalogues. Shared declarations carry a stable
+`metadataKey`; the registry resolves it through `settingMetadata` so the API
+and settings rows use the same translations.
+
 | Action ID | Default physical binding | Active surface |
 | --- | --- | --- |
 | `search.open` | `Mod+KeyK` | Global; Settings uses its own search |

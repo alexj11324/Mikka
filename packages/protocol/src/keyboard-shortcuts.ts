@@ -3,20 +3,20 @@
 export type KeyboardShortcutScope = 'global' | 'workspace' | 'board' | 'details' | 'devices'
 export type KeyboardShortcutContext = { scope: KeyboardShortcutScope; editable: boolean; modal: boolean; target?: 'task' }
 type ActionDefinition = {
-  action: string; defaultBinding: string; label: { en: string; 'zh-CN': string };
-  keywords: readonly string[]; context: KeyboardShortcutContext;
+  action: string; defaultBinding: string; metadataKey: string;
+  context: KeyboardShortcutContext;
 }
 
 export const KEYBOARD_SHORTCUT_ACTIONS = [
-  { action: 'search.open', defaultBinding: 'Mod+KeyK', label: { en: 'Open search', 'zh-CN': '打开搜索' }, keywords: ['search', 'find', 'command', '搜索', '查找'], context: { scope: 'global', editable: true, modal: false } },
-  { action: 'settings.open', defaultBinding: 'Mod+Comma', label: { en: 'Open settings', 'zh-CN': '打开设置' }, keywords: ['settings', 'preferences', '设置', '偏好'], context: { scope: 'global', editable: false, modal: false } },
-  { action: 'task.create', defaultBinding: 'KeyC', label: { en: 'Create task', 'zh-CN': '新建任务' }, keywords: ['task', 'create', 'issue', '新建', '任务', '问题'], context: { scope: 'workspace', editable: false, modal: false } },
-  { action: 'sidebar.toggle', defaultBinding: 'Mod+KeyB', label: { en: 'Toggle sidebar', 'zh-CN': '切换侧栏' }, keywords: ['sidebar', 'navigation', '侧栏', '导航'], context: { scope: 'global', editable: true, modal: true } },
-  { action: 'review.open', defaultBinding: 'Mod+Shift+KeyB', label: { en: 'Open review', 'zh-CN': '打开审阅' }, keywords: ['review', 'task', '审阅', '任务'], context: { scope: 'workspace', editable: true, modal: false, target: 'task' } },
-  { action: 'board.assistant.toggle', defaultBinding: 'Mod+KeyJ', label: { en: 'Toggle board assistant', 'zh-CN': '切换看板助手' }, keywords: ['board', 'assistant', 'panel', '看板', '助手', '面板'], context: { scope: 'board', editable: true, modal: true } },
-  { action: 'details.toggle', defaultBinding: 'Mod+KeyI', label: { en: 'Toggle details', 'zh-CN': '切换详情' }, keywords: ['details', 'panel', '详情', '面板'], context: { scope: 'details', editable: false, modal: false } },
-  { action: 'devices.add', defaultBinding: 'Mod+KeyN', label: { en: 'Add device', 'zh-CN': '添加设备' }, keywords: ['device', 'computer', 'connect', '设备', '电脑', '连接'], context: { scope: 'devices', editable: true, modal: true } },
-  { action: 'theme.toggle', defaultBinding: 'KeyD', label: { en: 'Toggle appearance', 'zh-CN': '切换外观' }, keywords: ['theme', 'appearance', 'dark', 'light', '主题', '外观', '深色', '浅色'], context: { scope: 'global', editable: false, modal: false } },
+  { action: 'search.open', defaultBinding: 'Mod+KeyK', metadataKey: 'keyboardShortcutSearchOpen', context: { scope: 'global', editable: true, modal: false } },
+  { action: 'settings.open', defaultBinding: 'Mod+Comma', metadataKey: 'keyboardShortcutSettingsOpen', context: { scope: 'global', editable: false, modal: false } },
+  { action: 'task.create', defaultBinding: 'KeyC', metadataKey: 'keyboardShortcutTaskCreate', context: { scope: 'workspace', editable: false, modal: false } },
+  { action: 'sidebar.toggle', defaultBinding: 'Mod+KeyB', metadataKey: 'keyboardShortcutSidebarToggle', context: { scope: 'global', editable: true, modal: true } },
+  { action: 'review.open', defaultBinding: 'Mod+Shift+KeyB', metadataKey: 'keyboardShortcutReviewOpen', context: { scope: 'workspace', editable: true, modal: false, target: 'task' } },
+  { action: 'board.assistant.toggle', defaultBinding: 'Mod+KeyJ', metadataKey: 'keyboardShortcutBoardAssistantToggle', context: { scope: 'board', editable: true, modal: true } },
+  { action: 'details.toggle', defaultBinding: 'Mod+KeyI', metadataKey: 'keyboardShortcutDetailsToggle', context: { scope: 'details', editable: false, modal: false } },
+  { action: 'devices.add', defaultBinding: 'Mod+KeyN', metadataKey: 'keyboardShortcutDevicesAdd', context: { scope: 'devices', editable: true, modal: true } },
+  { action: 'theme.toggle', defaultBinding: 'KeyD', metadataKey: 'keyboardShortcutThemeToggle', context: { scope: 'global', editable: false, modal: false } },
 ] as const satisfies readonly ActionDefinition[]
 
 export type KeyboardShortcutAction = typeof KEYBOARD_SHORTCUT_ACTIONS[number]['action']

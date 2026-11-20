@@ -80,6 +80,10 @@ editing eligibility, dialog eligibility, and optional task target. Use the
 schema's bilingual `label` and `keywords` for row-level search. The existing
 sidebar search remains a separate navigation surface.
 
+The `SettingsRegistry` namespace in the English and Chinese message catalogues
+owns display labels and search terms. Shared actions reference their stable
+`metadataKey`; the backend registry resolves it through `settingMetadata`.
+
 After a shortcut write commits, the existing live stream publishes
 `workspace_settings` to the owner in every active workspace. Its payload
 contains only the workspace ID. Other members and suspended memberships

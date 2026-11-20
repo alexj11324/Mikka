@@ -9029,5 +9029,59 @@
     "merge": "Merge",
     "mergeAnyway": "Merge anyway, {count} failing",
     "mergeFailed": "Could not merge."
+  },
+  "SettingsRegistry": {
+    "archiveIdleAfterDays": {
+      "label": "Archive idle threads",
+      "keywords": "archive|idle|days"
+    },
+    "threadTitleInstructions": {
+      "label": "Thread title instructions",
+      "keywords": "title|naming"
+    },
+    "threadTitleTriggers": {
+      "label": "Update thread titles",
+      "keywords": "title|pull request|PR"
+    },
+    "subagentMaxConcurrent": {
+      "label": "Concurrent subagents",
+      "keywords": "agent|concurrency|limit"
+    },
+    "keyboardShortcutSearchOpen": {
+      "label": "Open search",
+      "keywords": "keyboard|shortcut|search|find|command"
+    },
+    "keyboardShortcutSettingsOpen": {
+      "label": "Open settings",
+      "keywords": "keyboard|shortcut|settings|preferences"
+    },
+    "keyboardShortcutTaskCreate": {
+      "label": "Create task",
+      "keywords": "keyboard|shortcut|task|create|issue"
+    },
+    "keyboardShortcutSidebarToggle": {
+      "label": "Toggle sidebar",
+      "keywords": "keyboard|shortcut|sidebar|navigation"
+    },
+    "keyboardShortcutReviewOpen": {
+      "label": "Open review",
+      "keywords": "keyboard|shortcut|review|task"
+    },
+    "keyboardShortcutBoardAssistantToggle": {
+      "label": "Toggle board assistant",
+      "keywords": "keyboard|shortcut|board|assistant|panel"
+    },
+    "keyboardShortcutDetailsToggle": {
+      "label": "Toggle details",
+      "keywords": "keyboard|shortcut|details|panel"
+    },
+    "keyboardShortcutDevicesAdd": {
+      "label": "Add device",
+      "keywords": "keyboard|shortcut|device|computer|connect"
+    },
+    "keyboardShortcutThemeToggle": {
+      "label": "Toggle appearance",
+      "keywords": "keyboard|shortcut|theme|appearance|dark|light"
+    }
   }
 }
