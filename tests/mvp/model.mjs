@@ -29,7 +29,7 @@ function output(messages, toolName, expectedRunId) {
 export function answerModel(request, scenario, observe = () => {}) {
   const prompt = request.prompt ?? []
   const start = scenario ? prompt.findLastIndex(message => message.role === 'user' && body(message).includes(scenario.marker)) : -1
-  if (start < 0) return text('你想先做哪件事？')
+  if (start < 0) return null
   const messages = prompt.slice(start)
   const selected = body(prompt[start]).match(/The person selected device ([a-f0-9-]{36}) in the task dialog\./)?.[1]
   if (!scenario.deviceId || selected !== scenario.deviceId) throw fixtureModelError('MODEL_DESTINATION_MISMATCH')

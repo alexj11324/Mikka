@@ -475,5 +475,10 @@
     "command": "pnpm test:http-fakes",
     "kind": "integration",
     "env": {}
+  },
+  "integration-ui-fixture-guards": {
+    "command": "pnpm test:ui-fixture-guards",
+    "kind": "integration",
+    "env": {}
   }
 }

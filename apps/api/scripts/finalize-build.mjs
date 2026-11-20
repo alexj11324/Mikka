@@ -7,6 +7,7 @@ import { configuredDeploymentId } from '../../../lib/deployment-id.mjs'
 import { nodeRuntimePackages } from '../build-contract.mjs'
 import { cloudServiceRewrite } from '../cloud-service-rewrite.mjs'
 import { deduplicateVercelFunctions } from './dedupe-functions.mjs'
+import { assertNoFixtureAuthInDirectories } from '../../../scripts/fixtures/bundle-check.mjs'
 
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const within = (root, path) => path === root || path.startsWith(`${root}${sep}`)
@@ -64,6 +65,7 @@ export async function finalizeBuild({ root, output, preset, revision }) {
   const tracing = await compileTracing(root)
   const { resources, posterBinary, copyResources } = await runtimeResources(root)
   const evidence = { version: 1, revision, preset, node: process.version,
+    target: process.env.MIKKA_BUILD_TARGET === 'local-fixture' ? 'local-fixture' : 'production',
     basePath: '/mikka',
     appBuild: process.env.NEXT_PUBLIC_MIKKA_BUILD || process.env.VERCEL_DEPLOYMENT_ID || revision,
     testDeploymentSha: process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? '',
@@ -71,6 +73,7 @@ export async function finalizeBuild({ root, output, preset, revision }) {
     routesSha256: hash(await readFile(join(root, 'apps/api/generated/routes.json'))),
     tracingSha256: hash(tracing), posterBinary, resources, functions: [] }
   if (evidence.testDeploymentSha && evidence.testDeploymentSha !== revision) throw new Error('API_TEST_BUILD_SHA_MISMATCH')
+  if (evidence.target === 'local-fixture' && (preset !== 'node-server' || process.env.VERCEL || process.env.VERCEL_ENV)) throw new Error('FIXTURE_DEPLOYMENT_FORBIDDEN')
   if (preset === 'vercel') {
     const path = join(output, 'config.json')
     const config = JSON.parse(await readFile(path, 'utf8'))
@@ -112,6 +115,9 @@ export async function finalizeBuild({ root, output, preset, revision }) {
     // paths are retained when starting from this output directory.
     await copyResources(output)
   } else throw new Error('API_BUILD_PRESET_UNSUPPORTED')
+  evidence.fixtureAuthExclusion = { checkedFiles: await assertNoFixtureAuthInDirectories([
+    join(output, preset === 'vercel' ? 'functions' : 'server'),
+  ]) }
   await writeFile(join(output, 'mikka-build.json'), `${JSON.stringify(evidence, null, 2)}\n`)
   return evidence
 }

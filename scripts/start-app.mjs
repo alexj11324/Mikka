@@ -52,7 +52,7 @@ export async function readCompiledDockerBuild(root, options = {}) {
 }
 
 export function serverOptions(args, env = process.env) {
-  const options = { hostname: env.NITRO_HOST || env.HOST || '0.0.0.0', port: env.NITRO_PORT || env.PORT || '3000' }
+  const options = { hostname: env.NITRO_HOST || env.HOST || (env.MIKKA_FIXTURE ? '127.0.0.1' : '0.0.0.0'), port: env.NITRO_PORT || env.PORT || '3000' }
   const seen = new Set()
   for (let index = 0; index < args.length; index += 2) {
     const option = args[index]
@@ -71,6 +71,13 @@ export async function startApp({ root = process.cwd(), args = process.argv.slice
   root = await realpath(root)
   const options = serverOptions(args, env)
   const built = await readCompiledBuild(root, { env })
+  if (env.MIKKA_FIXTURE) {
+    const { assertFixtureRuntime } = await import('./fixtures/guard.mjs')
+    const origin = `http://${options.hostname}:${options.port}`
+    assertFixtureRuntime({ env, built, origin })
+    const { startFixture } = await import('./fixtures/start.mjs')
+    return startFixture({ root, env, origin, scenario: env.MIKKA_FIXTURE })
+  }
   // Keep the launch cwd: relative environment descriptors and runtime resources
   // already share this root. In particular, do not move lease files into output.
   if (root !== await realpath(process.cwd())) fail('APP_START_ROOT_MISMATCH')

@@ -37,8 +37,8 @@ export function installMvpTransport(env = process.env, upstreamFetch = globalThi
     }
     if (url.origin === 'https://api.github.com')
       return upstreamFetch(new Request(`${MVP_SERVICES}/github${url.pathname}${url.search}`, request), { redirect: 'error' })
-    if (url.href === `${MVP_SERVICES}/litellm/v1/decisions`)
-      return upstreamFetch(new Request(`${MVP_SERVICES}/decisions`, request), { redirect: 'error' })
+    if (url.origin === MVP_SERVICES && /^\/litellm\/v1\/(?:chat\/completions|messages(?:\/count_tokens)?|responses|decisions|models)$/.test(url.pathname) && !url.search)
+      return upstreamFetch(request, { redirect: 'error' })
     if (url.href.startsWith(`${MVP_SERVICES}/litellm/`) || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)) throw new Error('MVP fixture refused an unstubbed external request')
     return upstreamFetch(request, { redirect: 'error' })
   }
