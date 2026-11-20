@@ -2,8 +2,12 @@
 
 These ten source files are unmodified Git blobs from public commit
 `64a3a8df554f7efdd00784a3790a544109ade658`. They retain their original relative
-paths so `node-world.test.mjs` can execute the released Node client against the
-new World Worker and Durable Object through the existing local Miniflare setup.
+paths. `packages/eve-cloudflare-world/test/node-world.test.mjs` verifies every
+blob before copying these bytes into its own temporary directory and executing
+the released Node client against the new World Worker and Durable Object through
+the existing local Miniflare setup. It uses the contract suite's installed SDK
+dependencies. The archive is historical evidence, not a current application
+build input; retired framework names in its original comments remain untouched.
 The fixture runs no model and contacts no external service.
 
 The successful [serving release job](https://github.com/alexj11324/Mikka/actions/runs/44473639414/job/135389683331)
