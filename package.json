@@ -37,7 +37,7 @@
     "test:local-loop": "node --import ./tests/support/server-only.mjs --import tsx scripts/dev-local/acceptance.mjs",
     "test:preview": "node --test tests/preview-ready.test.mjs",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "lint": "pnpm lint:code && pnpm lint:ui && node scripts/litellm-policy.mjs && node --test scripts/litellm-policy.test.mjs",
+    "lint": "pnpm lint:code && pnpm lint:ui && node scripts/litellm-policy.mjs && node --test scripts/litellm-policy.test.mjs && pnpm lint:external-clients",
     "lint:code": "oxlint --deny-warnings && pnpm check:migrations && pnpm test:migrations && pnpm check:factory",
     "lint:ui": "node scripts/lint-ui.mjs",
     "test:ui-policy": "node --test scripts/badge-size-policy.test.mjs scripts/next-free.test.mjs scripts/coordinator-chat-readers.test.mjs scripts/ui-policy.test.mjs scripts/entity-ui-policy.test.mjs scripts/icon-button-policy.test.mjs scripts/interaction-policy.test.mjs scripts/ci-docs-only.test.mjs scripts/copy-policy.test.mjs scripts/focus-refetch-policy.test.mjs scripts/polling-policy.test.mjs scripts/error-cause-policy.test.mjs scripts/split-pane-policy.test.mjs scripts/control-size-policy.test.mjs scripts/motion-policy.test.mjs scripts/contrast.test.mjs scripts/navigation-policy.test.mjs scripts/base-path-policy.test.mjs scripts/issue-detail-layout-policy.test.mjs lib/ui-overlay.test.mjs && pnpm test:focus",
@@ -258,7 +258,9 @@
     "test:eve-db": "node --test-force-exit --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/eve/auth-bot.db.test.ts lib/eve/scheduled-read.db.test.ts lib/eve/scope.db.test.ts lib/eve/approval-bridge.db.test.ts lib/eve/settlement.db.test.ts lib/eve/sandbox.db.test.ts lib/eve/outcome-delivery.db.test.ts lib/eve/evaluation-store.db.test.ts",
     "test:github-pulls": "node --experimental-test-module-mocks --import ./tests/support/server-only.mjs --import tsx --test app/api/integrations/github/repositories/pulls/route.test.ts app/api/integrations/github/repositories/pulls/files/route.test.ts lib/github/pull-directory.test.ts lib/github/pull-merge.test.ts lib/github/pull-detail.test.ts lib/pull-directory.test.ts lib/pull-request-diff.test.ts components/workspace/pull-directory.test.tsx",
     "test:runtime-config": "node --import ./tests/support/server-only.mjs --import tsx --test lib/edition.test.ts scripts/release/verify-cloud-edition.test.ts lib/server-info.test.ts && node --test tests/self-hosted-decisions-http.test.mjs scripts/self-hosted-source.test.mjs scripts/build-installation.test.mjs",
-    "test:service-config": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/default-model-config.test.ts lib/mail-delivery.test.ts lib/account/mail.test.ts lib/artifacts/storage.test.ts lib/credentials/local-kms.test.ts lib/coordinator/model-ready.test.ts lib/coordinator/wake-after-commit.test.ts app/api/skills/search/route.test.ts lib/posthog-server.test.ts lib/deployment-switches.test.ts"
+    "test:service-config": "node --experimental-test-module-mocks --import ./scripts/server-test.mjs --import tsx --test lib/default-model-config.test.ts lib/mail-delivery.test.ts lib/account/mail.test.ts lib/artifacts/storage.test.ts lib/credentials/local-kms.test.ts lib/coordinator/model-ready.test.ts lib/coordinator/wake-after-commit.test.ts app/api/skills/search/route.test.ts lib/posthog-server.test.ts lib/deployment-switches.test.ts",
+    "lint:external-clients": "node scripts/external-client-mock-policy.mjs",
+    "test:http-fakes": "node --test tests/fakes/e2b.test.mjs scripts/external-client-mock-policy.test.mjs && node --import ./scripts/server-test.mjs --import tsx --test lib/github/pull-merge.http.test.ts"
   },
   "dependencies": {
     "@ai-sdk/gateway": "4.0.121",
