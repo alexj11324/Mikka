@@ -3,7 +3,7 @@ import test from 'node:test'
 import { gatedFeatures, killSwitches, upcomingFeatures } from '@/lib/feature-flags'
 import { desktopFeatures } from './features'
 
-test('desktop flags use only the seven public hook keys and the verified user identity', async () => {
+test('desktop flags use only the public hook keys and the verified user identity', async () => {
   const calls: [string, string][] = []
   const evaluate = async (key: string, userId: string) => {
     calls.push([key, userId])
@@ -24,7 +24,7 @@ test('desktop flags use only the seven public hook keys and the verified user id
 test('signed-out config uses public defaults without evaluating an anonymous identity', async () => {
   const features = await desktopFeatures(undefined, { evaluate: async () => { throw new Error('anonymous flag evaluation') }, env: {} })
   assert.equal(features.cloudComputer, false)
-  assert.equal(Object.keys(features.flags).length, 7)
+  assert.equal(Object.keys(features.flags).length, 8)
   assert.ok(Object.values(features.flags).every(value => value === false))
 })
 

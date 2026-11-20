@@ -39,7 +39,7 @@ test('members do not see admin-only sections; admins see every built one', () =>
   // 密钥与环境: members see every entry and write repository ones (decision 2026-11-02-2120).
   for (const id of ['general', 'members', 'teams', 'computers', 'usage', 'billing', 'secrets']) assert.equal(member.includes(id), true, id)
   for (const id of ['audit']) assert.equal(member.includes(id), false, id)
-  assert.deepEqual(visibleSettingsSections({ admin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !LAYER_ONLY.includes(s.id) && s.id !== 'cloud').map(s => s.id))
+  assert.deepEqual(visibleSettingsSections({ admin: true, memory: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !LAYER_ONLY.includes(s.id) && s.id !== 'cloud').map(s => s.id))
 })
 
 test('cloud server settings require the explicit server administrator capability', () => {
@@ -48,7 +48,7 @@ test('cloud server settings require the explicit server administrator capability
     assert.equal(visibleSettingsSections({ admin, cloudAdmin: false }).some(s => s.id === 'cloud'), false)
     assert.equal(visibleSettingsSections({ admin, cloudAdmin: true }).some(s => s.id === 'cloud'), true)
   }
-  assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !LAYER_ONLY.includes(s.id)).map(s => s.id))
+  assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true, memory: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id) && !LAYER_ONLY.includes(s.id)).map(s => s.id))
 })
 
 test('组织 requires the official UI layer, including Organization-only personal members without team permissions', () => {
@@ -60,7 +60,7 @@ test('组织 requires the official UI layer, including Organization-only persona
   assert.equal(visibleSettingsSections({ admin: true, organization: true }).some(s => s.id === 'organization'), true)
   const personalMember = visibleSettingsSections({ admin: false, organization: true, personal: true }).map(s => s.id)
   for (const teamOnly of ['members', 'teams', 'permissions', 'audit']) assert.equal(personalMember.includes(teamOnly), false, teamOnly)
-  assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true, organization: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id)).map(s => s.id))
+  assert.deepEqual(visibleSettingsSections({ admin: true, cloudAdmin: true, organization: true, memory: true }).map(s => s.id), SETTINGS_SECTIONS.filter(s => !UNBUILT.includes(s.id)).map(s => s.id))
 })
 
 test('sections without a page body are hidden until their UI lands, and their links open preferences', () => {
@@ -84,9 +84,17 @@ test('a current id wins over a legacy alias with the same name', () => {
 
 test('a personal workspace has every setting of the workspace itself; only what is between people is a team\'s', () => {
   // Decision 2026-11-02-0203: the two kinds differ only in 成员, 团队, 团队权限 and 审计日志.
-  const personal = visibleSettingsSections({ admin: true, personal: true }).map(s => s.id)
+  const personal = visibleSettingsSections({ admin: true, personal: true, memory: true }).map(s => s.id)
   const account = SETTINGS_SECTIONS.filter(s => s.group === 'personal' && !UNBUILT.includes(s.id)).map(s => s.id)
   assert.deepEqual(personal, [...account, 'general', 'bot-permissions', 'secrets', 'environments', 'usage', 'billing'])
   const team = visibleSettingsSections({ admin: true }).map(s => s.id)
   for (const id of ['general', 'members', 'teams', 'permissions', 'secrets', 'environments', 'audit', 'usage', 'billing']) assert.ok(team.includes(id), id)
+})
+
+test('记忆 shows only while the memory PostHog flag is on', () => {
+  for (const admin of [false, true]) for (const personal of [false, true]) {
+    assert.equal(visibleSettingsSections({ admin, personal }).some(s => s.id === 'memory'), false, `admin=${admin} personal=${personal}`)
+    assert.equal(visibleSettingsSections({ admin, personal, memory: false }).some(s => s.id === 'memory'), false)
+    assert.equal(visibleSettingsSections({ admin, personal, memory: true }).some(s => s.id === 'memory'), true)
+  }
 })

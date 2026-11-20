@@ -14,6 +14,7 @@ import { settingsItemVisible } from '@/lib/settings-sidebar-search'
 import { settingsHref, visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 import type { SettingsSidebarProps } from '@/components/slots/settings-sidebar-contract'
+import { useGatedFeature } from '@/hooks/use-feature-availability'
 
 const icons: Record<SettingsSectionId, IconGlyph> = {
   account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks, 'bot-permissions': ShieldCheck,
@@ -24,6 +25,7 @@ const icons: Record<SettingsSectionId, IconGlyph> = {
 
 export function SettingsSidebar({ section, activeSection, admin, personal = false, billing = true, cloudAdmin = false, workspaceName, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: SettingsSidebarProps) {
   const i18nText = useTranslations();
+  const memory = useGatedFeature('memory')
   const [query, setQuery] = useState('')
   const params = useSearchParams()
   const creating = params.get('create') === '1'
@@ -34,13 +36,13 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   // Recheck visibility changes before paint as well as route/team changes.
   useLayoutEffect(() => {
     contentRef.current?.querySelector('[aria-current="page"]')?.closest('[data-slot="sidebar-group"]')?.scrollIntoView({ block: 'nearest' })
-  }, [creating, section, selectedTeamId, teams.length, personal, admin, billing, cloudAdmin])
+  }, [creating, section, selectedTeamId, teams.length, personal, admin, billing, cloudAdmin, memory])
   const normalizedQuery = query.trim().toLowerCase()
   const joinedTeams = teams.filter(team => team.role && (!workspaceId || team.workspaceId === workspaceId) && `${team.name} ${team.identifier}`.toLowerCase().includes(normalizedQuery))
   const href = (id: SettingsSectionId) => settingsHref(id, workspaceId)
   const groups = (['personal', 'workspace'] as const).map(group => {
     const groupLabel = group === 'workspace' && workspaceName ? workspaceName : i18nText(`Settings.groups.${group}`)
-    const items = visibleSettingsSections({ admin, personal, billing, cloudAdmin }).filter(item => item.group === group && settingsItemVisible({
+    const items = visibleSettingsSections({ admin, personal, billing, cloudAdmin, memory }).filter(item => item.group === group && settingsItemVisible({
       query, groupTitle: group === 'personal' ? 'Account' : 'Workspace', groupLabel, itemTitle: item.title,
       label: i18nText(`Settings.sections.${item.id}.title` as never),
       keywords: i18nText.has(`Settings.sections.${item.id}.keywords` as never) ? i18nText(`Settings.sections.${item.id}.keywords` as never) : '',
