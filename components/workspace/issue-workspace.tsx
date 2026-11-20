@@ -127,6 +127,8 @@ const TaskDetail = dynamic(() => import('./task-detail').then(module => module.T
 const ArtifactWindow = dynamic(() => import('@/components/artifacts/artifact-window').then(module => module.ArtifactWindow), { ssr: false })
 const ProjectWorkspace = dynamic(() => import('./project-workspace').then(module => module.ProjectWorkspace), { loading: ProjectsPageLoading })
 const AutomationsSection = dynamic(loadAutomations, { loading: AutomationsPageLoading })
+/** Stable when the roster has no followed Bots, so the chat list is not rebuilt each render. */
+const NO_FOLLOWED_BOTS: import('@/app/actions/bots').FollowedBotView[] = []
 // Settings chunks load inside the persistent frame, leaving its navigation and providers mounted.
 // OWN_SETTINGS_FRAME is optional (lib/ui-overlay.mjs UI_SLOT_EXPORTS): a layer without it keeps the workspace frame.
 const ownSettingsFrame = (settingsFrameSlot as { OWN_SETTINGS_FRAME?: boolean }).OWN_SETTINGS_FRAME === true
@@ -254,6 +256,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   const { data: projectTeams = [], error: projectTeamsError, isLoading: projectTeamsLoading, mutate: refreshProjectTeams } = useSWR('project-teams', snapshotReadFetcher(listProjectTeams), whileSettings)
   const { data: botList, error: botListError, mutate: refreshBotList } = useLiveBotRoster(user.id, listWorkspaceId, settingsShown)
   const bots = botList?.items ?? []
+  const followedBots = botList?.followed ?? NO_FOLLOWED_BOTS
   const [onboardingOpen, setOnboardingOpen] = useState(Boolean(onboarding))
   const { data: threadList, error: threadsError, mutate: refreshThreads } = useLiveThreadList(user.id, listsPaused)
   const threads = useMemo(() => threadList?.items ?? [], [threadList])
@@ -687,7 +690,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
     if (FRAME_OWNS_PANEL) setPanelReveal(value => ({ reveal: value.reveal + 1, revealId: 'overview' }))
     else setPanelSheet(true)
   }
-  const { entries: chatNav, archived: archivedNav, hidden: hiddenNav, reloadGroups, referenceGroups, markAllRead } = useChatNav({ bots, archivedBots, workspaceId: listWorkspaceId, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items, onLeaveGroup: setLeavingGroup,
+  const { entries: chatNav, archived: archivedNav, hidden: hiddenNav, followed: followedNav, reloadGroups, referenceGroups, markAllRead } = useChatNav({ bots, archivedBots, followedBots, shareable: botList?.shareable === true, workspaceId: listWorkspaceId, active: activeChat, userId: user.id, threads, issues: tasks, presentations: presentation.items, onLeaveGroup: setLeavingGroup,
     lifecycle: { archive: (bot, archived) => { void setBotArchived(bot, archived) }, askDelete: setDeletingBot }, page: { openProfile, renameThread: setRenamingThread } })
   const referenceTitles = useMemo(() => conversationReferenceTitles(user.id, listWorkspaceId, threadsError ? undefined : threadList, referenceGroups), [user.id, listWorkspaceId, threadList, threadsError, referenceGroups])
   const beforeChange = (action: () => Promise<void>) => { if (!boardBusy && !leaving.current) void leave(action) }
@@ -885,8 +888,8 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   // The handlers themselves are new on every render; naming them instead would make both memos miss every time.
   const windowBar = useMemo(() => FRAME_OWNS_HEADER ? <WindowBar center={null} /> : <WindowBar center={<SearchPill onSearch={searchFromBar} />} trailing={<>{!settingsShown && (isConversation || groupPanel) && !rightTaken && <Tooltip><TooltipTrigger render={<Button variant="ghost" size="icon-sm" className={cn('text-muted-foreground', panelOpen && 'xl:hidden')} aria-label={i18nText('Shell.panel.open')} onClick={openPanel} />}><PanelRight data-icon="inline-start" /></TooltipTrigger><TooltipContent side="bottom">{i18nText('Shell.panel.open')}</TooltipContent></Tooltip>}{!settingsShown && <AllThreadsToggle open={!!threadsView} waiting={threadsWaiting} pending={tasksPending} onToggle={() => toggleAllThreads(!threadsView)} />}<BrowserToggle open={!settingsShown && browserShown && !threadsView} onToggle={settingsShown ? browserFromSettings : () => { if (threadsView) { toggleAllThreads(false); showBrowser('column') } else showBrowser(rightTaken ? 'closed' : 'column') }} /></>} />,
     [boardBusy, settingsShown, pathname, isConversation, Boolean(groupPanel), rightTaken, panelOpen, threadsView, threadsWaiting, tasksPending, browserShown, i18nText]) // eslint-disable-line react-hooks/exhaustive-deps -- openPanel, searchFromBar, showBrowser and browserFromSettings read exactly these, plus setters and module helpers
-  const railNav = useMemo(() => <IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} onPageIntent={preloadPage} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: listWorkspaceId, entries: chatNav, archived: archivedNav, hidden: hiddenNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreation('group'), onNewConversation: () => setCreation('conversation'), onMarkAllRead: markAllRead }} onSearch={searchFromBar} inboxCount={inboxCounts?.count ?? 0} />,
-    [settingsShown, rail, pathname, boardBusy, teamId, listWorkspaceId, chatNav, archivedNav, hiddenNav, user, signingOut, bots, inboxCounts?.count]) // eslint-disable-line react-hooks/exhaustive-deps -- onNavigate, onSettings, onSignOut, onBeforeChange, onSearch and onOpen read exactly these, plus refs, setters and module helpers
+  const railNav = useMemo(() => <IconRail active={settingsShown ? null : rail} onNavigate={settingsShown ? leaveSettings : openRail} onPageIntent={preloadPage} user={user} onSettings={openSettings} onSignOut={signOut} signingOut={signingOut} onBeforeChange={settingsShown ? undefined : beforeChange} chats={{ workspaceId: listWorkspaceId, entries: chatNav, archived: archivedNav, hidden: hiddenNav, followed: followedNav, onOpen: openChat, onNewBot: () => setCreatingBot(true), onNewGroup: () => setCreation('group'), onNewConversation: () => setCreation('conversation'), onMarkAllRead: markAllRead }} onSearch={searchFromBar} inboxCount={inboxCounts?.count ?? 0} />,
+    [settingsShown, rail, pathname, boardBusy, teamId, listWorkspaceId, chatNav, archivedNav, hiddenNav, followedNav, user, signingOut, bots, inboxCounts?.count]) // eslint-disable-line react-hooks/exhaustive-deps -- onNavigate, onSettings, onSignOut, onBeforeChange, onSearch and onOpen read exactly these, plus refs, setters and module helpers
 
   // A UI layer with its own settings frame (docs/ui-overlay.md) draws settings in it;
   // the default keeps the workspace frame mounted around settings (#1603).

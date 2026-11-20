@@ -227,6 +227,10 @@
     "artifacts": "Artifact",
     "cardPreview": "[卡片]",
     "botMenu": {
+      "share": "共享",
+      "moveTo": "移到",
+      "unfollow": "取消订阅",
+      "following": "订阅的 Bot",
       "archive": "归档",
       "unarchive": "取消归档",
       "delete": "删除",
@@ -1540,6 +1544,12 @@
     "teamNotFound": "团队不存在。",
     "teamDeleteNameMismatch": "输入的名称与团队名称不一致。",
     "botDefaultRepositoryUnavailable": "这个仓库不在工作区成员已安装的 GitHub App 仓库中。",
+    "botEnvironmentUnavailable": "这个环境不可用，请换一个。",
+    "botAliasInvalid": "别名为 1–32 个小写字母、数字、- 或 _。",
+    "botAliasTaken": "工作区里已有 Bot 使用这个别名。",
+    "botTargetUnavailable": "这台机器、Agent 或配置不可用。",
+    "botShareUnavailable": "个人工作区没有可以共享的成员。",
+    "botSubscriberNoAccess": "这位成员看不到这个 Bot。",
     "usageLimitReached": "已达到用量上限，新任务已暂停，运行中的任务会继续完成。",
     "usageCreditsExhausted": "点数已用完，新任务已暂停，运行中的任务会继续完成。",
     "billingNotConfigured": "计费尚未开通。",
@@ -3003,7 +3013,8 @@
         },
         "bot": {
           "permissions_changed": "修改了 {target} 的权限",
-          "taken_over": "接管了 {target}"
+          "taken_over": "接管了 {target}",
+          "transferred": "把 {target} 转让给了其他成员"
         },
         "integration": {
           "permission_changed": "把 {integration} 改为{to}"
@@ -5173,6 +5184,26 @@
       "model": "模型",
       "repository": "仓库",
       "noRepository": "不用仓库",
+      "environment": "环境",
+      "machine": "机器",
+      "machineDefault": "跟随个人设置",
+      "machineCloud": "Mikka Cloud",
+      "machineCloudflare": "Cloudflare 编程机器",
+      "otherDevices": "其他设备",
+      "effort": "推理强度",
+      "effortDefault": "默认",
+      "efforts": {
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "xhigh": "超高",
+        "max": "最高"
+      },
+      "access": "访问权限",
+      "accessPrivate": "仅自己",
+      "accessShared": "工作区",
+      "subscribers": "订阅者",
+      "noEnvironment": "不用环境",
       "loading": "正在加载…"
     },
     "createConversation": {
@@ -5263,6 +5294,16 @@
       "allThreadsWaiting": "全部线程，{count} 条等你",
       "tabs": "右栏内容",
       "details": "详情",
+      "profile": {
+        "label": "资料",
+        "alias": "别名",
+        "aliasHint": "Slack：@Mikka bot=<别名>",
+        "aliasPlaceholder": "release",
+        "tasksRunOn": "任务运行位置",
+        "defaultAgent": "默认 Agent",
+        "unset": "跟随个人设置",
+        "loadError": "无法加载资料。"
+      },
       "publicRole": {
         "label": "公开职责",
         "hint": "群聊按此公开职责选择 Bot；工具仍需授权。",

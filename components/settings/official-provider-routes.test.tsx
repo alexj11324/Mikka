@@ -101,7 +101,8 @@ test('only the visible Bot tab activates library, role or computer reads', () =>
     computerScopes.length = 0
     render(<BotOverviewBody {...props} tab={tab} />)
     const reads = cacheKeys.filter(Array.isArray).map(key => key[0])
-    assert.deepEqual(reads.sort(), tab === 'details' ? ['bot-library', 'bot-public-role'] : [])
+    // 详情 also reads the Bot Profile's settings and the workspace's Environments (components/nav/use-bot-settings.ts), once.
+    assert.deepEqual(reads.sort(), tab === 'details' ? ['bot-environments', 'bot-library', 'bot-public-role', 'bot-settings'] : [])
     assert.deepEqual(computerScopes, tab === 'computer' ? [team.workspace.id] : [])
   }
 })
