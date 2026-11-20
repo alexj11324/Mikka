@@ -122,7 +122,8 @@ export function publicSummary(raw, { source, result, target = 'staging' }) {
       || (raw?.status === 'passed' && raw?.verification?.status === 'pass')) ? 'passed' : 'failed',
     target,
     changedServices: [], retainedServices: [], services: {}, productionPromoted: raw?.productionPromoted === true }
-  if (!raw) { summary.failedStep = 'unknown'; summary.summaryAvailable = false; return summary }
+  if (!raw) return { ...summary, failedStep: 'unknown', summaryAvailable: false,
+    changedServices: null, retainedServices: null, services: null, productionPromoted: null }
   assert.equal(raw.version, 1)
   if (raw.admission !== undefined || raw.failedStep === 'migration-identity') return rejectedAdmission(raw, summary)
   for (const key of ['changedServices', 'retainedServices']) {
@@ -190,7 +191,7 @@ export function recordBody(summary, runId, attempt) {
   const url = `https://github.com/${repository}/actions/runs/${runId}/attempts/${attempt}`
   const rejected = summary.admission === 'rejected'
   const missing = summary.summaryAvailable === false
-  const rows = Object.entries(summary.services).map(([name, service]) =>
+  const rows = missing ? [] : Object.entries(summary.services).map(([name, service]) =>
     `| ${name} | ${summary.changedServices.includes(name) ? 'changed' : 'retained'} | \`${service.digest}\` | \`${service.sourceCommit}\` |`)
   return [rejected ? '## Deployment admission rejected' : `## Deployment ${summary.status}`, '', `Workflow: [${runId} / attempt ${attempt}](${url})`,
     `Source: \`${summary.sourceCommit}\`; target: **${summary.target}**.`,
@@ -238,7 +239,7 @@ export async function recordPipeline({ summary, runId, attempt, driverSource, ap
     auto_inactive: summary.status === 'passed',
   } })
   await api(`${repository}/issues/2895/comments`, { method: 'POST', body: { body } })
-  if (summary.changedServices.length === 1) await api(`${repository}/issues/2894/comments`, { method: 'POST', body: { body } })
+  if (!missing && summary.changedServices.length === 1) await api(`${repository}/issues/2894/comments`, { method: 'POST', body: { body } })
   if (summary.status === 'failed') {
     const open = await api(`${repository}/issues?state=open&per_page=100`)
     const existing = open.find(issue => !issue.pull_request && issue.body?.startsWith(marker))
