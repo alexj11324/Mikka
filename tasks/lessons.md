@@ -538,3 +538,47 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
   2. 只想消掉 `ERR_PNPM_IGNORED_BUILDS` 而不改变构建行为，就全部显式写 `false`。
   3. 验证要复现 CI 条件：删掉已编译的 `.node` 再跑 `node scripts/build-eve.mjs`，
      而不是只看 `pnpm install` 绿了。
+
+## 2026-11-20 审计出清单后不要问「先做哪个」，用户要的是全部做完
+
+- 现象：SEO 审计给出 6 条 Critical、10 条 High，我按批次排好优先级，然后问用户
+  「三个可选下一步你挑一个」。用户回：「你直接把题做完就行了，你不用问我哪个先做，
+  哪个后做，都要做」。
+- 根因：把「优先级排序」当成了交付物，实际上排序只是内部执行顺序。用户要的是结果，
+  不是选择题。而且我把本该自己判断的事（哪些能自动做、哪些只能人手做）抛回给了用户。
+- 规则：
+  1. 列出清单后直接按依赖顺序执行，不要用「你挑一个」收尾。
+  2. 只有两种情况值得停下来问：需要用户做业务决策（定价、是否开源、是否接受不可逆操作），
+     或者需要用户提供我拿不到的东西（仓库位置、后台权限）。
+  3. 停下来时要把「我已经做到哪、剩下这一步为什么只能你做」写清楚，而不是给选项。
+
+## 2026-11-20 用响应头推断「页面没被缓存、每请求重渲染」是错的
+
+- 现象：SEO 性能审计看到 `x-nextjs-cache: MISS`、`cache-control: max-age=0, must-revalidate`，
+  判定「HTML 不走 CDN 缓存」，据此建议加 Cache Rule / 加 `revalidate`。
+  实际跑 `pnpm build` 后路由表显示 `/mikka` 等页面全是 ○ Static（构建时预渲染），
+  docs 是 ● SSG。那些头是 OpenNext 外层的响应策略，不是重新渲染的证据。
+- 根因：把外网可见的响应头当成渲染方式的证据。响应头能证明「浏览器/边缘怎么缓存」，
+  不能证明「服务端有没有重新渲染」。而如果真按这个判断加了 Cache Rule 覆盖
+  `must-revalidate`，发布瞬间会拿旧 HTML 拼新 chunk，直接白屏。
+- 规则：
+  1. 判断「是不是静态化」要看构建路由表（`○`/`●`/`ƒ`），不要从响应头反推。
+  2. 建议改缓存策略之前，先确认页面本来是不是预渲染的；已经静态的页面「加 revalidate」
+     是无效动作。
+  3. 覆盖 `must-revalidate` 属于危险改动，会破坏部署原子性，默认不做。
+
+## 2026-11-20 robots.txt 里的「放行」和边缘的「放行」是两件事
+
+- 现象：技术审计读 robots.txt 得出「PerplexityBot 放行」（文件里确实没有它），
+  而实测同一 UA 拿到 403 `Your request was blocked.`。反过来，`Google-Extended`
+  在 robots 里是 `Disallow: /`，但边缘返回 200 —— 两者都不矛盾，因为是两层。
+- 根因：Cloudflare 的 AI 爬虫控制同时改 robots.txt 托管块**和**边缘执行，
+  但 PerplexityBot 只被边缘拦（它不在托管列表里），Google-Extended 只被 robots 拦
+  （它本来就不自抓页）。
+- 规则：
+  1. 判断 AI 爬虫能否访问，必须**实跑 UA**：`curl -A "<完整官方 UA>" -o /dev/null -w "%{http_code}"`。
+     读 robots.txt 只能得出「声明层」结论。
+  2. 报结论时分开写「robots 层」和「边缘层」，不要合并成一句「已拦/已放行」。
+  3. 拦 AI 爬虫要区分训练 UA 和检索 UA：OpenAI（GPTBot / OAI-SearchBot）、
+     Anthropic（ClaudeBot / Claude-SearchBot / Claude-User）都有两套，拦前者无损；
+     **Perplexity 只有一个索引爬虫 PerplexityBot**，拦掉等于退出它的检索面。

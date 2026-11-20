@@ -3,19 +3,18 @@
 import { Fragment, useState, type MouseEvent } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { ChevronDown, Ellipsis, Pin, Plus, SlidersHorizontal } from '@/components/icons'
+import { CalendarClock, ChevronDown, Ellipsis, Pin, Plus, X } from '@/components/icons'
 import { toast } from 'sonner'
 import { organizeAutomation, pinAutomation, restoreAutomation } from '@/app/actions/automations'
 import { listWorkspaceBots } from '@/app/actions/bots'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { FilterChip } from '@/components/ui/filter-chip'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useActionError } from '@/lib/use-action-error'
-import { Empty, EmptyContent, EmptyHeader, EmptyTitle } from '@/components/ui/empty'
+import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@/components/ui/item'
 import { SearchInput } from '@/components/ui/search-input'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -26,14 +25,9 @@ import { useLiveKey } from '@/hooks/use-live-key'
 import { invalidateAutomationList, useAutomations } from '@/hooks/use-automations'
 import type { AutomationView } from '@/lib/schedules/automation-view'
 import { useNextRunLabel, useTimingSummary } from './automation-summary'
-import { AutomationTemplateGrid } from './automation-template-grid'
 import { AUTOMATION_TEMPLATES } from './automation-templates'
 
-/** Capy's My automations / All automations / Scheduled, then 已删除 so a deleted one stays reachable. */
-type Segment = 'mine' | 'all' | 'scheduled' | 'deleted'
-type StatusFilter = 'any' | 'active' | 'paused'
-type RowPile = { key: string; label: string | null; rows: AutomationView[] }
-type RowGroup = { key: string; label: string | null; count: number; piles: RowPile[] }
+type Filter = 'all' | 'active' | 'paused' | 'deleted'
 export type WorkspaceBotRow = { id: string; name: string; color: string; shape: string }
 
 /** The workspace's Bots by ID, for 交给 (any member may read them; the list follows `bot_list`). */
@@ -64,59 +58,33 @@ export function AutomationBot({ automation, bots }: { automation: AutomationView
 const statusVariant = { active: 'secondary', paused: 'outline', completed: 'outline', cancelled: 'outline' } as const
 
 /**
- * 自动化 (Capy's Automations list, layout and interaction only): the segments split My / All / Scheduled / 已删除, the
- * chips say which filters are on and can be taken off, the groups are by status (进行中 first) and every row names the
- * automation, when it runs and next runs, who it hands work to and whether it is on. 模板 draws the cards below.
+ * 自动化 (Capy's Automations list, layout and interaction only): each row names the automation, says when it runs and
+ * next runs, who it hands work to and whether it is on. Search and the 全部 / 运行中 / 已暂停 filter work on the rows read.
  */
 export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }: { workspaceId: string | null; userId: string; href: (id: string) => string; onOpen: (id: string) => void; onAskBot: (text: string) => void }) {
   const t = useTranslations('Automations')
   const tCommon = useTranslations('Common')
   const summary = useTimingSummary()
   const nextRun = useNextRunLabel()
-  const [segment, setSegment] = useState<Segment>('mine')
-  const [status, setStatus] = useState<StatusFilter>('any')
+  const [filter, setFilter] = useState<Filter>('all')
   const [restoring, setRestoring] = useState<string | null>(null)
-  const { automations, error, data, mutate, setSize, size, more, isValidating } = useAutomations(workspaceId, segment === 'deleted')
+  const { automations, error, data, mutate, setSize, size, more, isValidating } = useAutomations(workspaceId, filter === 'deleted')
   const { mutate: mutateCache } = useSWRConfig()
   const bots = useWorkspaceBotNames(workspaceId)
   const [query, setQuery] = useState('')
   const [tag, setTag] = useState<string | null>(null)
   const [organizing, setOrganizing] = useState<AutomationView | null>(null)
   const actionError = useActionError()
-  const visible = automations
-    .filter(row => segment === 'deleted' ? row.deleted : !row.deleted && row.status !== 'cancelled')
-    .filter(row => segment !== 'mine' || row.owner_id === userId)
-    // 定时: it runs on its own clock (Capy's Scheduled), whatever else may also start it.
-    .filter(row => segment !== 'scheduled' || row.definition.timing.kind !== 'manual')
-    .filter(row => segment === 'deleted' || status === 'any' || row.status === status)
+  const visible = automations.filter(row => filter === 'deleted' ? row.deleted : row.status !== 'cancelled' && (filter === 'all' || row.status === filter))
     .filter(row => !query.trim() || row.definition.title.toLowerCase().includes(query.trim().toLowerCase()))
     .filter(row => !tag || (row.tags ?? []).includes(tag))
   // 已置顶 first, then each 文件夹 by name, then those in none; within each, the list's own order (newest first).
-  // Labels appear only when the rows really fall into more than one pile (Capy's status group is the only heading otherwise).
-  const pilesOf = (rows: AutomationView[]): RowPile[] => {
-    const folders = [...new Set(rows.filter(row => !row.pinned && row.folder).map(row => row.folder!))].sort((a, b) => a.localeCompare(b))
-    const piles: RowPile[] = [
-      { key: 'pinned', label: t('pinned'), rows: rows.filter(row => row.pinned) },
-      ...folders.map(folder => ({ key: `folder:${folder}`, label: folder, rows: rows.filter(row => !row.pinned && row.folder === folder) })),
-      { key: 'rest', label: folders.length ? t('noFolder') : null, rows: rows.filter(row => !row.pinned && !row.folder) },
-    ].filter(pile => pile.rows.length)
-    return piles.length > 1 ? piles : piles.map(pile => ({ ...pile, label: null }))
-  }
-  // A deleted row keeps the status it had before it was deleted, so 已删除 is one group rather than three.
-  const groups: RowGroup[] = segment === 'deleted'
-    ? visible.length ? [{ key: 'deleted', label: null, count: visible.length, piles: pilesOf(visible) }] : []
-    : (['active', 'paused', 'completed'] as const).flatMap(value => {
-      const rows = visible.filter(row => row.status === value)
-      return rows.length ? [{ key: value, label: t(`group.${value}`), count: rows.length, piles: pilesOf(rows) }] : []
-    })
-  // 创建者 is 我 comes from the segment; the chip takes it off and the list widens back to 全部.
-  const chips = [
-    ...(segment === 'mine' ? [{ key: 'creator', field: t('filterField.creator'), value: t('filterValue.me'), removeLabel: t('clearCreator'), remove: () => setSegment('all') }] : []),
-    ...(segment !== 'deleted' && status !== 'any' ? [{ key: 'status', field: t('filterField.status'), value: t(`status.${status}`), removeLabel: t('clearStatus'), remove: () => setStatus('any') }] : []),
-    ...(tag ? [{ key: 'tag', field: t('filterField.tag'), value: tag, removeLabel: t('clearTag'), remove: () => setTag(null) }] : []),
-  ]
-  // 模板 answers 「这里能建什么」, so it steps aside while a search or a filter is narrowing the list.
-  const showTemplates = segment !== 'deleted' && !query.trim() && !tag && status === 'any'
+  const folders = [...new Set(visible.filter(row => !row.pinned && row.folder).map(row => row.folder!))].sort((a, b) => a.localeCompare(b))
+  const groups: { key: string; label: string | null; rows: AutomationView[] }[] = [
+    { key: 'pinned', label: t('pinned'), rows: visible.filter(row => row.pinned) },
+    ...folders.map(folder => ({ key: `folder:${folder}`, label: folder, rows: visible.filter(row => !row.pinned && row.folder === folder) })),
+    { key: 'rest', label: folders.length ? t('noFolder') : null, rows: visible.filter(row => !row.pinned && !row.folder) },
+  ].filter(group => group.rows.length)
   async function restore(row: AutomationView) {
     if (restoring || !workspaceId) return
     setRestoring(row.id)
@@ -160,69 +128,49 @@ export function AutomationsPage({ workspaceId, userId, href, onOpen, onAskBot }:
         <h1 id="automations-title" className="text-xl font-semibold text-foreground">{t('title')}</h1>
         {create}
       </header>
+      {/* control-size-exempt: the clear-tag button sits inside a badge chip, sized to the chip. */}
       <div className="flex flex-wrap items-center gap-2">
-        <ToggleGroup aria-label={t('segment.label')} size="sm" variant="segment" spacing={0.5} value={[segment]} onValueChange={values => { const next = values[0]; if (next === 'mine' || next === 'all' || next === 'scheduled' || next === 'deleted') setSegment(next) }}>
-          {(['mine', 'all', 'scheduled', 'deleted'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`segment.${value}`)}</ToggleGroupItem>)}
+        <SearchInput className="h-(--control-sm) min-w-0 flex-1 sm:max-w-64" type="search" value={query} maxLength={120} aria-label={t('search')} placeholder={t('search')} onChange={event => setQuery(event.target.value)} />
+        <ToggleGroup aria-label={t('filter.all')} size="sm" variant="segment" spacing={0.5} value={[filter]} onValueChange={values => { const next = values[0]; if (next === 'all' || next === 'active' || next === 'paused' || next === 'deleted') setFilter(next) }}>
+          {(['all', 'active', 'paused', 'deleted'] as const).map(value => <ToggleGroupItem key={value} value={value}>{t(`filter.${value}`)}</ToggleGroupItem>)}
         </ToggleGroup>
-        <SearchInput className="h-(--control-sm) min-w-0 flex-1 sm:max-w-56" type="search" value={query} maxLength={120} aria-label={t('search')} placeholder={t('search')} onChange={event => setQuery(event.target.value)} />
-        {segment !== 'deleted' && <DropdownMenu>
-          <DropdownMenuTrigger render={<Button size="sm" variant="outline" />}><SlidersHorizontal data-icon="inline-start" />{t('filters')}</DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>{t('filterField.status')}</DropdownMenuLabel>
-              <DropdownMenuRadioGroup value={status} onValueChange={value => { if (value === 'any' || value === 'active' || value === 'paused') setStatus(value) }}>
-                <DropdownMenuRadioItem value="any">{t('statusAny')}</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="active">{t('status.active')}</DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="paused">{t('status.paused')}</DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>}
+        {tag && <Badge variant="secondary" className="gap-1">{t('tagFilter', { tag })}<Button size="icon-xs" variant="ghost" aria-label={t('clearTag')} onClick={() => setTag(null)}><X /></Button></Badge>}
       </div>
-      {/* What is on, and the × that takes it off — the one FilterChip the PR list draws too. */}
-      {chips.length > 0 && <div className="flex flex-wrap items-center gap-1">{chips.map(chip => <FilterChip key={chip.key} field={chip.field} value={chip.value} is={t('filterIs')} removeLabel={chip.removeLabel} onRemove={chip.remove} />)}</div>}
       {error && !data ? <InlineLoadError message={t('loadError')} retryLabel={tCommon('retry')} onRetry={() => { void mutate() }} />
         : !data ? <div role="status" aria-label={t('loading')} className="flex flex-col gap-2">{[0, 1, 2].map(index => <Skeleton key={index} className="h-16 w-full rounded-xl" />)}</div>
-          : <>
-            {visible.length
-              ? <div className="flex flex-col gap-6">{groups.map(group => <section key={group.key} aria-label={group.label ?? undefined} className="flex flex-col gap-2">
-                {group.label && <h2 className="flex items-center gap-1.5 px-1 text-sm font-medium text-muted-foreground">{group.label}<span className="tabular-nums">{group.count}</span></h2>}
-                <div className="flex flex-col gap-3">{group.piles.map(pile => <div key={pile.key} className="flex flex-col gap-2">
-                  {pile.label && <h3 className="flex items-center gap-1.5 px-1 text-xs font-medium text-muted-foreground">{pile.key === 'pinned' && <Pin className="size-3.5" />}{pile.label}</h3>}
-                  <ItemGroup role="list" className="gap-0! overflow-hidden rounded-xl border bg-card">
-                    {pile.rows.map((row, index) => <Fragment key={row.id}>{index > 0 && <ItemSeparator className="my-0" />}<Item role="listitem" className="rounded-none hover:bg-accent/50" render={row.deleted ? undefined : <a href={href(row.id)} />} onClick={row.deleted ? undefined : (event: MouseEvent) => follow(event, row.id)}>
-                      <ItemContent className="min-w-0">
-                        <ItemTitle className="w-full truncate">{row.definition.title}</ItemTitle>
-                        <ItemDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                          <span>{summary(row.definition)}</span>
-                          {row.status === 'active' && row.next_at && <time dateTime={new Date(row.next_at).toISOString()}>{t('nextRun', { time: nextRun(row.next_at, row.definition.timezone) })}</time>}
-                          {(row.tags ?? []).map(name => <Button key={name} size="xs" variant="secondary" className="rounded-full"
-                            onClick={event => { event.preventDefault(); event.stopPropagation(); setTag(name) }}>#{name}</Button>)}
-                        </ItemDescription>
-                      </ItemContent>
-                      <ItemMedia className="hidden max-w-40 text-sm sm:flex"><AutomationBot automation={row} bots={bots} /></ItemMedia>
-                      <ItemActions>
-                        <Badge variant={statusVariant[row.status]}>{row.status === 'paused' && row.disabled_reason ? t('status.autoPaused') : t(`status.${row.status}`)}</Badge>
-                        {row.deleted ? (row.owner_id === userId || row.can_take_over) && <Button size="sm" variant="outline" disabled={restoring !== null} aria-busy={restoring === row.id} onClick={() => { void restore(row) }}>{t('restore')}</Button> : <DropdownMenu>
-                          <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" aria-label={t('rowMenu')} onClick={event => { event.preventDefault(); event.stopPropagation() }} />}><Ellipsis /></DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" onClick={event => event.stopPropagation()}>
-                            <DropdownMenuGroup>
-                              <DropdownMenuItem onClick={() => { void pin(row) }}>{row.pinned ? t('unpin') : t('pin')}</DropdownMenuItem>
-                              {(row.owner_id === userId || row.can_take_over) && <DropdownMenuItem onClick={() => setOrganizing(row)}>{t('organize')}</DropdownMenuItem>}
-                            </DropdownMenuGroup>
-                          </DropdownMenuContent>
-                        </DropdownMenu>}
-                      </ItemActions>
-                    </Item></Fragment>)}
-                  </ItemGroup>
-                </div>)}</div>
-              </section>)}</div>
-              : <Empty className="border">
-                <EmptyHeader><EmptyTitle>{segment === 'deleted' ? t('emptyDeleted') : automations.length ? t('emptyFiltered') : t('empty')}</EmptyTitle></EmptyHeader>
-                {segment !== 'deleted' && !automations.length && <EmptyContent>{create}</EmptyContent>}
-              </Empty>}
-            {showTemplates && <AutomationTemplateGrid href={template => href(`new:${template}`)} onPick={template => onOpen(`new:${template}`)} />}
-          </>}
+          : !visible.length ? <Empty className="min-h-72">
+            <EmptyHeader><EmptyMedia variant="icon"><CalendarClock aria-hidden="true" /></EmptyMedia><EmptyTitle>{filter === 'deleted' ? t('emptyDeleted') : automations.length ? t('emptyFiltered') : t('empty')}</EmptyTitle></EmptyHeader>
+            {filter !== 'deleted' && !automations.length && <EmptyContent>{create}</EmptyContent>}
+          </Empty>
+            : <div className="flex flex-col gap-4">{groups.map(group => <section key={group.key} aria-label={group.label ?? undefined} className="flex flex-col gap-2">
+              {group.label && <h2 className="flex items-center gap-1.5 px-1 text-sm font-medium text-muted-foreground">{group.key === 'pinned' && <Pin className="size-3.5" />}{group.label}</h2>}
+              <ItemGroup role="list" className="gap-0! overflow-hidden rounded-xl border bg-card">
+              {group.rows.map((row, index) => <Fragment key={row.id}>{index > 0 && <ItemSeparator className="my-0" />}<Item role="listitem" className="rounded-none hover:bg-accent/50" render={row.deleted ? undefined : <a href={href(row.id)} />} onClick={row.deleted ? undefined : (event: MouseEvent) => follow(event, row.id)}>
+                <ItemContent className="min-w-0">
+                  <ItemTitle className="w-full truncate">{row.definition.title}</ItemTitle>
+                  <ItemDescription className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span>{summary(row.definition)}</span>
+                    {row.status === 'active' && row.next_at && <time dateTime={new Date(row.next_at).toISOString()}>{t('nextRun', { time: nextRun(row.next_at, row.definition.timezone) })}</time>}
+                    {(row.tags ?? []).map(name => <Button key={name} size="xs" variant="secondary" className="rounded-full"
+                      onClick={event => { event.preventDefault(); event.stopPropagation(); setTag(name) }}>#{name}</Button>)}
+                  </ItemDescription>
+                </ItemContent>
+                <ItemMedia className="hidden max-w-40 text-sm sm:flex"><AutomationBot automation={row} bots={bots} /></ItemMedia>
+                <ItemActions>
+                  <Badge variant={statusVariant[row.status]}>{row.status === 'paused' && row.disabled_reason ? t('status.autoPaused') : t(`status.${row.status}`)}</Badge>
+                  {row.deleted ? (row.owner_id === userId || row.can_take_over) && <Button size="sm" variant="outline" disabled={restoring !== null} aria-busy={restoring === row.id} onClick={() => { void restore(row) }}>{t('restore')}</Button> : <DropdownMenu>
+                    <DropdownMenuTrigger render={<Button size="icon-sm" variant="ghost" aria-label={t('rowMenu')} onClick={event => { event.preventDefault(); event.stopPropagation() }} />}><Ellipsis /></DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" onClick={event => event.stopPropagation()}>
+                      <DropdownMenuGroup>
+                        <DropdownMenuItem onClick={() => { void pin(row) }}>{row.pinned ? t('unpin') : t('pin')}</DropdownMenuItem>
+                        {(row.owner_id === userId || row.can_take_over) && <DropdownMenuItem onClick={() => setOrganizing(row)}>{t('organize')}</DropdownMenuItem>}
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>}
+                </ItemActions>
+              </Item></Fragment>)}
+              </ItemGroup>
+            </section>)}</div>}
       {more && <Button variant="outline" disabled={isValidating} onClick={() => void setSize(size + 1)}>{t('more')}</Button>}
     </div>
     {organizing && <OrganizeDialog automation={organizing} folders={[...new Set(automations.flatMap(row => row.folder ? [row.folder] : []))]} onClose={() => setOrganizing(null)} onSaved={() => { setOrganizing(null); void mutate() }} />}

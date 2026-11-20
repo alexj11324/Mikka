@@ -15,7 +15,6 @@ import { CONFIGURABLE_ACTIONS, CONFIGURABLE_PERMISSIONS, type PermissionDecision
 import { LEGACY_APP_ACTIONS, LEGACY_WRITE_ACTIONS, appPermissionValue, withAppPermissions } from '@/lib/operations/app-permission-keys'
 import { OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import type { BotPermissionAction, BotPermissionApp, BotPermissionAppTools, PermissionChoice, PermissionValue, SettingsBotPermissionsProps } from '@/components/slots/settings-bot-permissions-contract'
-import { botPermissionsKeys } from '@/lib/swr/keys'
 
 type WritePolicy = { permissions: Record<string, PermissionChoice>; version: string }
 type PolicyLayer = { permissions?: Record<string, PermissionDecision>; networkAllow?: string[]; approvalMode?: 'ask' | 'read_only'; defaults?: unknown }
@@ -65,8 +64,8 @@ export function useBotPermissions({ admin = false, workspaceId }: { admin?: bool
   const own = useSWR(OWN_APP_STATES_KEY, () => fetchOwnAppStates())
   // The Bot list is scoped to the workspace the page shows (`?workspace=`). The Coordinator is a Bot too; its id is
   // an execution identity, not a policy key. The workspace id keys the policy.
-  const { data: bots, error: botsError } = useSWR(botPermissionsKeys.bots(workspaceId), () => workspaceId ? listBotsForWorkspace(workspaceId) : listBots())
-  const { data: agents } = useSWR(botPermissionsKeys.agents(), () => listAgents())
+  const { data: bots, error: botsError } = useSWR(workspaceId ? ['bots', 'workspace', workspaceId] : 'bots', () => workspaceId ? listBotsForWorkspace(workspaceId) : listBots())
+  const { data: agents } = useSWR('agents', () => listAgents())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Catalogue reads are lazy: GitHub plus the legacy write apps load with the page, every other app on open.

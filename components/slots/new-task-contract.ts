@@ -30,9 +30,6 @@ export type NewTaskProject = { value: string; label: string }
 /** A status the task can be created in (Mikka's own statuses), as a chip in the row of pills. */
 export type NewTaskStatus = { value: string; label: string; /** Its mark, as Mikka draws it (`TaskStatusIcon`). */ mark: ReactNode }
 
-/** A priority the task can be created in (Mikka's own priorities), as a chip beside the status. */
-export type NewTaskPriority = { value: string; label: string; /** Its mark, as Mikka draws it (`PriorityIcon`). */ mark: ReactNode }
-
 export type NewTaskProps = {
   intent?: 'create_only' | 'create_and_dispatch'
   /** 创建方式, when the person may switch between 只创建 and 创建并派发 (a page that can open the created task). */
@@ -52,11 +49,6 @@ export type NewTaskProps = {
    * created by its Bot's own command, which has no status field), so the window then draws no status chip.
    */
   status?: { choices: NewTaskStatus[]; value: string; onChange: (value: string) => void; disabled: boolean }
-  /**
-   * The priority the task is created in, drawn beside the status. Absent for the same reason a status is: a dispatched
-   * task's own command (`create_and_dispatch`) carries no priority field, so the window then draws no priority chip.
-   */
-  priority?: { choices: NewTaskPriority[]; value: string; onChange: (value: string) => void; disabled: boolean }
   /** 标题 the person wrote (optional; empty, the Bot writes one). */
   title: string
   onTitle: (title: string) => void

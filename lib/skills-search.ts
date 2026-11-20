@@ -53,30 +53,3 @@ export function skillsPage(result: z.infer<typeof skillsSearchResponseSchema>, q
   const end = (page + 1) * SKILLS_PAGE_SIZE
   return { data: result.data.slice(page * SKILLS_PAGE_SIZE, end), hasMore: result.data.length >= end && end < SKILLS_SEARCH_MAX }
 }
-
-/** A source names its owner first ("vercel-labs/skills"), and an owner is what says whose tool a skill is. */
-function skillOwner(skill: SkillsSearchResult) {
-  return (skill.source.split('/')[0] ?? '').trim().toLowerCase()
-}
-
-/**
- * 技能's two groups, as Capy's Explore draws them (2026-11-19): 推荐给你 — the skills whose owner is a tool the person
- * already connected — then 热门, skills.sh's all-time leaderboard. A skill sits in one group only, and a search of the
- * person's own replaces both with its results. skills.sh gives an owner and an install count, not a GitHub star count,
- * so a row says those.
- */
-export function groupSkills(skills: readonly SkillsSearchResult[] | undefined, connected: readonly string[]): { recommended: SkillsSearchResult[]; popular: SkillsSearchResult[] } {
-  // Two letters match too much ("ai" is inside "railway"); an id that short is no owner anyway.
-  const owners = connected.map(id => id.trim().toLowerCase()).filter(id => id.length > 2)
-  const mine = (skill: SkillsSearchResult) => {
-    const owner = skillOwner(skill)
-    return owner.length > 2 && owners.some(id => owner.includes(id) || id.includes(owner))
-  }
-  const recommended: SkillsSearchResult[] = []
-  const popular: SkillsSearchResult[] = []
-  for (const skill of skills ?? []) {
-    if (mine(skill)) recommended.push(skill)
-    else popular.push(skill)
-  }
-  return { recommended, popular }
-}

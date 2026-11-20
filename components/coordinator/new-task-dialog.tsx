@@ -16,10 +16,8 @@ import type { TaskAgent } from '@/lib/task-create-command'
 import { harnessName } from '@/components/labels/entity-labels'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
 import { AccessChangeDialog } from '@/components/workspace/issue-metadata-controls'
-import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
-import { PriorityIcon } from '@/components/workspace/priority-icon'
-import { TaskStatusIcon, useTaskPriorityLabel, useTaskStatusLabel } from '@/components/workspace/task-state-icon'
-import type { IssuePriority } from '@/lib/issue-meta'
+import { ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
+import { TaskStatusIcon, useTaskStatusLabel } from '@/components/workspace/task-state-icon'
 import { Alert, AlertTitle } from '@/components/ui/alert'
 import { DeviceIcon } from '@/components/devices/device-icon'
 import { useComputer } from '@/hooks/use-computer'
@@ -114,10 +112,6 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   // entry has it. Only a create that carries the status field draws it (a dispatched task's command has none).
   const [status, setStatus] = useState<IssueStatus>('todo')
   const statusLabel = useTaskStatusLabel()
-  // 优先级: the priority the task is created in, Normal by default, the field create_only carries (`createOnlyCommand`).
-  // A dispatched task's command has no priority field, so only a create draws it.
-  const [priority, setPriority] = useState<IssuePriority>('normal')
-  const priorityLabel = useTaskPriorityLabel()
   const [picked, setPicked] = useState<string | null>(null)
   // 交给哪个 Agent: the person picks one; nothing is preselected and the task keeps it for life (decision 2026-11-17-1800).
   const [agent, setAgent] = useState<TaskAgent | null>(null)
@@ -181,7 +175,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   async function submit(confirmedFingerprint?: string) {
     const name = title.trim()
     const text = draft.trim() || name
-    const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, status, priority, picked, botPick, profileId, agent])
+    const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, intent, status, picked, botPick, profileId, agent])
     const confirmAccess = confirmedFingerprint === fingerprint
     if (!text || pending.current || projectPicker.pending || attachments.locked || (only && !workspaceId) || (!only && (!available || !profileAllowed || !agent || botPick && !handler))) return
     // A task on Mikka 额度 (its chat's model, or a Cloudflare machine) with nothing to pay opens 选择套餐 instead (decision 2026-11-15-1900).
@@ -196,7 +190,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
         createRequests.current.set(fingerprint, requestId)
         const { createTaskOnly } = await import('@/app/actions/issues')
         const result = await createTaskOnly({ version: 1, intent: 'create_only', workspaceId, requestId, ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}), ...(confirmAccess ? { confirmAccess: true } : {}),
-          ...backlogTaskDraft(name, text, status, priority) })
+          ...backlogTaskDraft(name, text, status) })
         if (result.error && 'confirmable' in result && result.confirmable) { setAccessChange({ fingerprint, tasks: Number(result.params?.tasks ?? 1) }); return }
         if (result.error || !('taskId' in result)) { toast.error(actionError(result.error)); return }
         createRequests.current.delete(fingerprint)
@@ -257,8 +251,6 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
     : undefined
   const statuses: NewTaskProps['status'] = { choices: ISSUE_STATUSES.map(item => ({ value: item.value, label: statusLabel(item.value), mark: <TaskStatusIcon status={item.value} /> })),
     value: status, onChange: value => setStatus(ISSUE_STATUSES.find(item => item.value === value)?.value ?? 'todo'), disabled: sending }
-  const priorities: NewTaskProps['priority'] = { choices: ISSUE_PRIORITIES.map(item => ({ value: item.value, label: priorityLabel(item.value), mark: <PriorityIcon priority={item.value} /> })),
-    value: priority, onChange: value => setPriority(ISSUE_PRIORITIES.find(item => item.value === value)?.value ?? 'normal'), disabled: sending }
   const notices = <>
     {!only && <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />}
     {!only && !available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
@@ -267,7 +259,7 @@ export function NewTaskDialog({ open, onOpenChange, onSent, project: pageProject
   </>
   return <>
     {paywall.dialog}
-    {TaskWindow && <TaskWindow onClose={() => onOpenChange(false)} project={project} projects={projects} status={only ? statuses : undefined} priority={only ? priorities : undefined}
+    {TaskWindow && <TaskWindow onClose={() => onOpenChange(false)} project={project} projects={projects} status={only ? statuses : undefined}
       title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
       files={attachments.files.length || attachments.pending.length ? <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} /> : null}
       onAttach={files => { void attach(files) }} accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT}

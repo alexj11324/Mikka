@@ -117,8 +117,6 @@ export type ThreadScreenProps = {
   pending: { id: string; name: string; meta?: string; onRemove: () => void }[]
   /** Notices that wait above the composer (quota, sign in again, actions to approve). */
   notices?: ReactNode
-  /** The row under the composer that says where the conversation runs (Capy's ☁ Cloud row). */
-  environment?: ReactNode
   /** Questions waiting on the person; `onAnswer` sends the option's title or the person's own words. */
   questions: ThreadQuestion[]
   onAnswer: (id: string, text: string) => Promise<DecisionReceipt>

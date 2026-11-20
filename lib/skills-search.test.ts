@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { SKILLS_MAX_PAGE, SKILLS_PAGE_SIZE, groupSkills, skillsPage, skillsSearchResponseSchema, skillsUpstreamUrl } from './skills-search'
+import { SKILLS_MAX_PAGE, SKILLS_PAGE_SIZE, skillsPage, skillsSearchResponseSchema, skillsUpstreamUrl } from './skills-search'
 
 test('accepts skills.sh search results', () => {
   const result = skillsSearchResponseSchema.safeParse({
@@ -67,23 +67,4 @@ test('a search asks for results up to the end of the page and returns that page'
 
 test('rejects more results than skills.sh search can return', () => {
   assert.equal(skillsSearchResponseSchema.safeParse({ data: Array.from({ length: 201 }, (_, n) => skill(n)) }).success, false)
-})
-
-const from = (source: string) => ({ id: `${source}/skill`, name: source, slug: 'skill', source, installs: 1, url: `https://skills.sh/${source}/skill` })
-
-test('技能 separates the skills whose owner the person connected from the leaderboard', () => {
-  const skills = [from('vercel-labs/skills'), from('anthropics/skills'), from('sentry/skills')]
-  const { recommended, popular } = groupSkills(skills, ['vercel'])
-  assert.deepEqual(recommended.map(item => item.source), ['vercel-labs/skills'])
-  // Everything else keeps skills.sh's own order.
-  assert.deepEqual(popular.map(item => item.source), ['anthropics/skills', 'sentry/skills'])
-  assert.deepEqual(groupSkills(skills, []), { recommended: [], popular: skills })
-  assert.deepEqual(groupSkills(undefined, ['vercel']), { recommended: [], popular: [] })
-})
-
-test('a connected id shorter than three letters never claims a skill', () => {
-  const skills = [from('railway/skills'), from('ai/skills')]
-  const { recommended, popular } = groupSkills(skills, ['ai'])
-  assert.deepEqual(recommended, [])
-  assert.deepEqual(popular, skills)
 })

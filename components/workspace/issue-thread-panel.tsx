@@ -22,7 +22,6 @@ import { runFailureText, runIsActive, runIsWorking, runStopTimeoutRemaining, thr
 import { ThreadReplyVersions } from './thread-reply-versions'
 import { ThreadExecutionIdentity } from './thread-execution-identity'
 import { ThreadRunPlace } from './thread-run-place'
-import { ThreadEnvironment } from './thread-environment'
 import { acceptedProducerOutcome, isThreadRun, threadQuestionView } from '@/lib/issue-threads'
 import { threadComposerHarness } from '@/lib/run-model-fallback-view'
 import { MessageActions } from '@/components/ai-elements/message'
@@ -652,7 +651,6 @@ function ThreadPanel({ issueId, runId, onBack, onClose, bare = false, initialTab
       {sendFailed && <FieldError className="px-3 text-xs">{sendFailed}</FieldError>}
       {stopFailed && <div role="alert" className="flex items-center gap-2 px-3 text-xs"><span className="text-destructive-foreground">{t('stopFailed')}</span><Button variant="ghost" size="sm" className="min-w-22 max-sm:h-11" onClick={() => { void stop() }}>{t('retryStop')}</Button></div>}
     </>}
-    environment={<ThreadEnvironment issueId={issueId} runId={liveRunId} status={view?.status ?? data?.thread.status ?? ''} />}
     questions={[]} onAnswer={async () => ({ status: 'unavailable', error: '' })} running={0} onOpenTask={() => onOpenTask?.()} onOpenInbox={() => navigate({ section: 'suggestions' })} /></div>
     : <div className="min-h-0 flex-1 overflow-y-auto p-4">{waiting}</div>
   const views: ThreadViewAction[] = []

@@ -18,13 +18,10 @@ const Pass = ({ children }: { children?: ReactNode }) => <>{children}</>
 mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate } })
 const syncReads: (string | undefined)[] = []
 let mappedWorkspace: string | undefined
-/** The reader's own Agents and the Runs a live read names, so a task's Captain can be one of theirs. */
-let myAgentList: { id: string }[] = []
-let liveRuns: { issueId: string; bot: { id: string; name: string; color: string; shape: string } | null; harnesses: string[] }[] | undefined
 mock.module('@/hooks/use-task-collection', { namedExports: { TaskPresentationsContext: createContext({}) } })
-mock.module('@/hooks/use-live-lists', { namedExports: { useLiveTaskRunList: () => liveRuns ? { data: { items: liveRuns } } : { data: undefined } } })
+mock.module('@/hooks/use-live-lists', { namedExports: { useLiveTaskRunList: () => ({ data: undefined }) } })
 mock.module('@/hooks/use-list-expiry', { namedExports: { useListExpiry: nothing } })
-mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => myAgentList } })
+mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => [] } })
 mock.module('@/app/actions/linear-sync', { namedExports: { getLinearBoardSync: async (workspace?: string) => {
   syncReads.push(workspace)
   return { synced: !!workspace && workspace === mappedWorkspace }
@@ -36,10 +33,9 @@ mock.module('@/components/coordinator/new-task-dialog', { namedExports: { NewTas
 mock.module('@/components/ui/sheet', { namedExports: { Sheet: empty, SheetContent: Pass, SheetHeader: Pass, SheetTitle: Pass } })
 // The test adapter exposes the public slot callbacks. The official renderer
 // is exercised in the companion repository without copying its implementation.
-mock.module('./board-screen', { namedExports: { BoardScreenView: ({ issues, view, onView, scopes, scope, onScope, filterItems, tools }: Pick<BoardScreenProps, 'view' | 'onView' | 'scopes' | 'scope' | 'onScope' | 'filterItems' | 'tools'> & { issues: Issue[] }) =>
+mock.module('./board-screen', { namedExports: { BoardScreenView: ({ issues, view, onView, filterItems, tools }: Pick<BoardScreenProps, 'view' | 'onView' | 'filterItems' | 'tools'> & { issues: Issue[] }) =>
   <div data-board-view={view}>{tools}
     <Button aria-label="viewList" aria-pressed={view === 'list'} onClick={() => onView('list')}>List</Button>
-    <div role="tablist">{scopes.map(entry => <Button key={entry.id} role="tab" aria-selected={scope === entry.id} data-count={entry.count} onClick={() => onScope(entry.id)}>{entry.label}</Button>)}</div>
     {filterItems.map((group: BoardMenuItem) => <div key={group.label}>
       {group.submenu?.map(item => <Button key={item.label} role="menuitemcheckbox" aria-checked={item.checked} onClick={item.onSelect}>{item.label}</Button>)}
       {group.submenu?.some(item => item.checked) && <span role="group" aria-label={group.label}>{group.submenu.filter(item => item.checked).map(item => item.label).join(', ')}</span>}
@@ -61,7 +57,6 @@ before(async () => {
 })
 beforeEach(() => {
   browser.localStorage.clear(); browser.sessionStorage.clear()
-  myAgentList = []; liveRuns = undefined
   container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container)
 })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
@@ -204,55 +199,4 @@ test('changing browser display preferences never writes scoped filter names back
   await render({ owner: 'owner-two', workspace: 'workspace-two', remount: true })
   assert.equal(container.querySelector('[data-board-view]')?.getAttribute('data-board-view'), 'list')
   assert.equal(!!chip('project'), false)
-})
-
-test("the chips above the board are Capy's presets, and 为你 opens selected as it does there", async () => {
-  const mine = issue('owner-one', 'workspace-one', 'mine')
-  const theirs = issue('owner-two', 'workspace-one', 'theirs')
-  const own = issue('owner-one', 'workspace-one', 'handed')
-  const handed = { ...own, metadata: { ...own.metadata, assignee: { id: 'owner-two', kind: 'member', name: 'owner-two', image: null } } } as Issue
-  const handedOver = issue('owner-two', 'workspace-one', 'delegated')
-  const delegated = { ...handedOver, metadata: { ...handedOver.metadata, assignee: null, delegate: { id: 'agent-one', kind: 'agent', name: 'Agent', image: null } } } as Issue
-  myAgentList = [{ id: 'agent-one' }]
-  liveRuns = [{ issueId: 'workspace-one-held', bot: { id: 'bot-one', name: 'Coordinator', color: 'blue', shape: 'round' }, harnesses: [] }]
-  const unassigned = issue('owner-two', 'workspace-one', 'held')
-  const held = { ...unassigned, metadata: { ...unassigned.metadata, assignee: null } } as Issue
-  // A cache of its own: the Agents read is what names my Captains, and an earlier test's empty list must not stand in
-  // for it.
-  await act(async () => root.render(<SWRConfig value={{ provider: () => new Map() }}>
-    <ViewStateProvider scope="owner-one:workspace-one">
-      <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} issues={[mine, theirs, handed, delegated, held]} userId="owner-one" workspaceId="workspace-one" onOpen={nothing} onUpdated={async () => {}} onBusyChange={nothing} />
-    </ViewStateProvider>
-  </SWRConfig>))
-  const tabs = () => [...container.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
-  const counts = () => Object.fromEntries(tabs().map(tab => [tab.textContent, Number(tab.dataset.count)]))
-  const chosen = () => tabs().find(tab => tab.getAttribute('aria-selected') === 'true')?.textContent
-  assert.deepEqual(tabs().map(tab => tab.textContent), ['scope.forYou', 'scope.assigned', 'scope.created', 'scope.all'],
-    'Capy names five presets; Mikka records no mentions, so that one is not drawn')
-  // Each count is what choosing the preset shows, under the filters that are on.
-  assert.deepEqual(counts(), { 'scope.forYou': 4, 'scope.assigned': 1, 'scope.created': 2, 'scope.all': 5 })
-  // Capy opens on For you, not on everything (Alex, 2026-11-19: 「这个东西肯定要按照 capy 对齐」).
-  // For you is the union: assigned to me, created by me, delegated to an Agent I configured,
-  // or my own Bot working on it — so `theirs`, which is none of those, is the one left out.
-  assert.equal(chosen(), 'scope.forYou', 'the board opens on what concerns the reader, as Capy does')
-  assert.deepEqual(shown(), ['workspace-one task mine', 'workspace-one task handed', 'owner-two:workspace-one task delegated', 'owner-two:workspace-one task held'])
-  const choose = async (label: string) => {
-    const tab = tabs().find(node => node.textContent === label)
-    assert.ok(tab, `preset ${label} is drawn`)
-    await act(async () => tab.click())
-    assert.equal(chosen(), label)
-  }
-  // 分配给我 is the human assignee alone: a delegated task is not mine to answer for (#1687).
-  await choose('scope.assigned')
-  assert.deepEqual(shown(), ['workspace-one task mine'])
-  // 我创建的 keeps a task assigned to someone else.
-  await choose('scope.created')
-  assert.deepEqual(shown(), ['workspace-one task mine', 'workspace-one task handed'])
-  // 为你 is Capy's match=any union: mine, what I created, and what my Captains hold — an Agent I configured or a Bot
-  // of mine running on it.
-  await choose('scope.forYou')
-  assert.deepEqual(shown(), ['workspace-one task mine', 'workspace-one task handed', 'owner-two:workspace-one task delegated', 'owner-two:workspace-one task held'])
-  await choose('scope.all')
-  assert.equal(shown().length, 5)
-  assert.deepEqual(counts(), { 'scope.forYou': 4, 'scope.assigned': 1, 'scope.created': 2, 'scope.all': 5 }, 'a preset never changes what the others hold')
 })

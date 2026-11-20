@@ -270,26 +270,6 @@
       "allRead": "Everything is marked read",
       "viewAllThreads": "View all threads",
       "noMatches": "No matches",
-      "sortBy": "Sort by",
-      "sortPinned": "Pinned first",
-      "sortRecent": "Latest activity",
-      "sortName": "Name",
-      "groupBy": "Group by",
-      "groupNone": "None",
-      "groupUnread": "Unread",
-      "groupWaiting": "Threads waiting on you",
-      "groupWorking": "Working",
-      "groupOther": "Other",
-      "filters": "Filters",
-      "clearFilters": "Clear filters",
-      "sectionOptions": "List options",
-      "searchThreads": "Search threads",
-      "searchThreadsPlaceholder": "Search Bots or threads",
-      "closeSearch": "Close search",
-      "markAllRead": "Mark all as read",
-      "allRead": "Everything is marked read",
-      "viewAllThreads": "View all threads",
-      "noMatches": "No matches",
       "botOptions": "Bot options",
       "threadActions": "Thread actions",
       "showThreads": "Show threads",
@@ -319,19 +299,7 @@
     "unavailable": "Unavailable",
     "title": "Plugins",
     "appsTab": "Apps",
-    "pluginsTab": "Plugins",
     "skillsTab": "Skills",
-    "themesTab": "Themes",
-    "recommended": "Recommended for you",
-    "featured": "Featured",
-    "viewAll": "View all {count, number}",
-    "subtitle": {
-      "apps": "Extend what Mikka can do with your tools",
-      "skills": "Instructions the agent follows, from skills.sh, ranked by installs",
-      "themes": "Palettes for light and dark, some with a wallpaper"
-    },
-    "noThemes": "No themes yet",
-    "themesNote": "Themes are still being made; they will show up here.",
     "searchAria": "Search skills.sh skills",
     "searchPlaceholder": "Search skills…",
     "leaderboard": "Leaderboard",
@@ -533,7 +501,6 @@
     "property": {
       "estimate": "Estimate",
       "dueDate": "Due date",
-      "setDueDate": "Set due date",
       "addLabels": "Add labels",
       "setProject": "Set project",
       "editLabels": "Edit task labels",
@@ -583,8 +550,7 @@
       "pullRequestOne": "Pull request",
       "pullRequestMany": "Pull requests",
       "threadOne": "Thread",
-      "threadMany": "Threads",
-      "threadNone": "No thread yet"
+      "threadMany": "Threads"
     },
     "colors": {
       "violet": "Violet",
@@ -638,9 +604,6 @@
       "statusOf": "Status of {title}",
       "removeChildAria": "Remove subtask relation: {title}",
       "addChild": "Add subtask",
-      "label": "Relations",
-      "add": "Add relation",
-      "none": "None yet",
       "groupLabel": {
         "parent": "Parent task",
         "blockedBy": "Blocked by",
@@ -4718,8 +4681,7 @@
     "lastSeen": "Last seen",
     "copyId": "Copy ID",
     "copied": "ID copied",
-    "copyFailed": "Couldn't copy",
-    "fixed": "This thread's runs stay on this machine."
+    "copyFailed": "Couldn't copy"
   },
   "ConversationDirectory": {
     "unread": "Unread",
@@ -4744,9 +4706,6 @@
     "retry": "Retry",
     "loading": "Loading conversations…",
     "empty": "No matching conversations.",
-    "emptyHint": "A thread appears here once a Bot dispatches it.",
-    "emptyHintFiltered": "Pick another state or clear the search to see the rest.",
-    "groupChats": "Group chats",
     "untitled": "Untitled conversation",
     "more": "Load more",
     "emptyTitle": "No threads yet.",
@@ -5401,7 +5360,6 @@
     "newTaskDialog": {
       "project": "Project",
       "status": "Status",
-      "priority": "Priority",
       "projectPreferenceUnavailable": "Could not load or save your project.",
       "intent": "Action",
       "backlogTitlePlaceholder": "Title (optional, defaults to the first line)",
@@ -5449,12 +5407,6 @@
     "board": {
       "toolbar": "Board toolbar",
       "scopeLabel": "Task scope",
-      "scope": {
-        "forYou": "For you",
-        "assigned": "Assigned to me",
-        "created": "Created by me",
-        "all": "All"
-      },
       "filter": "Filter",
       "filterField": {
         "status": "Status",
@@ -5466,7 +5418,6 @@
         "agentState": "Agent activity"
       },
       "removeFilter": "Remove {field} filter",
-      "is": "is",
       "me": "Me",
       "noProject": "No project",
       "noRun": "No run",
@@ -7644,7 +7595,7 @@
     "inProgress": "Running"
   },
   "HostedThread": {
-    "placeholder": "What should it do? Type @ to reference a task, a thread or a PR",
+    "placeholder": "What should it do?",
     "open": "Open",
     "needsYou": "Needs you",
     "later": "Later",
@@ -8259,40 +8210,6 @@
     "failedUnknown": "Something went wrong; see the run history in Mikka"
   },
   "Automations": {
-    "segment": {
-      "label": "Which automations",
-      "mine": "Mine",
-      "all": "All",
-      "scheduled": "Scheduled",
-      "deleted": "Deleted"
-    },
-    "filters": "Filters",
-    "filterField": {
-      "status": "Status",
-      "creator": "Creator",
-      "tag": "Tag"
-    },
-    "group": {
-      "active": "Active",
-      "paused": "Paused",
-      "completed": "Completed"
-    },
-    "clearStatus": "Clear status filter",
-    "filterIs": "is",
-    "filterValue": {
-      "me": "Me"
-    },
-    "statusAny": "Any status",
-    "clearCreator": "Show all automations",
-    "templatesGroup": "Templates",
-    "comingSoon": "Coming soon",
-    "integration": {
-      "github": "GitHub",
-      "linear": "Linear",
-      "sentry": "Sentry",
-      "slack": "Slack",
-      "schedule": "Schedule"
-    },
     "cancelRun": "Cancel run",
     "fromTemplate": "Start from a template",
     "pin": "Pin",
@@ -8314,37 +8231,26 @@
     "templates": {
       "standup": {
         "title": "Weekday standup notes",
-        "description": "Turn yesterday's merged PRs and closed issues into a short standup update.",
         "prompt": "Gather the PRs merged and issues closed yesterday and write a short standup update: what was done, what is next, what is blocked."
       },
       "prReview": {
         "title": "Review new PRs",
-        "description": "Read each new PR: risks, missing tests, what could be simpler.",
         "prompt": "Review this PR: point out risks, missing tests and what could be simpler, and leave one comment on the PR."
       },
       "ciFix": {
         "title": "Fix failing CI",
-        "description": "Find the root cause of a failed check and fix it, or say what blocks it.",
         "prompt": "Look at the failed checks, find the root cause and fix it; if you cannot, say on the PR what blocks you."
       },
       "linearTriage": {
         "title": "Triage new issues",
-        "description": "Set a priority, add reproduction steps and suggest an owner.",
         "prompt": "Triage this new issue: set a priority, add reproduction steps, suggest an owner, and leave one comment on the issue."
       },
       "slackQuestion": {
         "title": "Answer questions in Slack",
-        "description": "Answer a question from Slack, checking the code and docs when needed.",
         "prompt": "Answer the question in this Slack message, checking the code and docs when needed; keep the answer short."
-      },
-      "sentryInvestigation": {
-        "title": "Investigate Sentry errors",
-        "description": "Trace a production error back to the file and the commit that introduced it.",
-        "prompt": "Investigate this Sentry error: find the code path that triggers it and the commit that introduced it, and write the cause and a suggested fix on the issue."
       },
       "weeklyDeps": {
         "title": "Weekly dependency check",
-        "description": "Check for dependency updates each week and open a PR for the important ones.",
         "prompt": "Check dependencies for security updates or important new versions, open an upgrade PR, and say what changed."
       }
     },
@@ -8671,8 +8577,9 @@
     "anyState": "Any state",
     "anyAuthor": "Anyone",
     "anyLabel": "Any label",
-    "is": "is",
-    "eitherOfStates": "either of {count} states",
+    "stateValue": "State {value}",
+    "authorValue": "@{value}",
+    "labelValue": "Label {value}",
     "linkedOnly": "Linked only",
     "removeFilter": "Remove filter {name}",
     "openTask": "Open task",

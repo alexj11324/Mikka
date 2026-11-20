@@ -64,12 +64,6 @@ export type BoardCardProps = {
 /** One row of the board's Filter or Sort menu; `submenu` opens to the side. */
 export type BoardMenuItem = { label: string; checked?: boolean; divider?: boolean; submenu?: BoardMenuItem[]; onSelect?: () => void }
 
-/**
- * One filter in effect, read where it is set as `property is value` with a ✕ that turns that one value off (Capy's
- * Match row, 2026-11-19). `value` is left out for a filter that has none to show — 我创建的 is a flag, not a choice.
- */
-export type BoardFilterChip = { key: string; property: string; value?: string; title?: string; clear: () => void }
-
 /** A column of a UI layer's whole board: a status, 受阻, or `hidden` (已隐藏), which holds the hidden statuses' cards and takes no drop. */
 export type BoardScreenColumn = { id: BoardColumn | 'hidden'; label: string; locked: boolean }
 
@@ -100,33 +94,20 @@ export type BoardScreenProps = {
   cards: BoardScreenCard[]
   view: 'board' | 'list'
   onView: (view: 'board' | 'list') => void
-  /**
-   * The presets above the board — Capy's 为你, 分配给我, 我创建的 and 全部 (2026-11-19) — each with how many tasks it holds
-   * under the filters that are on. 全部 is the default: the board holds every task of its workspace (2026-11-13-1405).
-   */
+  /** Empty: the board holds every task of its workspace, so there is nothing to switch between (2026-11-13-1405). A layer draws no tab for it. */
   scopes: { id: string; label: string; count: number }[]
-  /** The preset in effect: one of `scopes`' ids. */
   scope: string
-  /** The person chose another preset. */
   onScope: (id: string) => void
   /** Filter fields with their values, then the columns shown and 显示空列. */
   filterItems: BoardMenuItem[]
   /** How many filters are on. */
   filterCount: number
-  /** The filters in effect, each shown as a `property is value` chip that removes itself where it is read (Capy's Match row). */
-  filterChips: BoardFilterChip[]
   /** 排序, then 已完成任务 and 卡片属性. */
   sortItems: BoardMenuItem[]
   /** Refresh / Linear sync and the Coordinator toggle, as Mikka draws them. */
   tools: ReactNode
   onNew: () => void
   onOpen: (id: string) => void
-  /**
-   * ⌘/Ctrl+click on a row of the list opens the task beside it, in the right column, and the list stays standing
-   * (`openTask`, decision 2026-11-07-2045), which is how Capy opens a task. A plain click keeps `onOpen`, the centre
-   * page. Absent: a task has only one destination, as without a list.
-   */
-  onOpenInColumn?: (id: string) => void
   /** A card dropped into another column; Mikka saves the status or 受阻. */
   /** True after the server has acknowledged the move. Older bindings return no receipt. */
   onMove: (id: string, column: BoardScreenColumn['id']) => Promise<boolean> | void

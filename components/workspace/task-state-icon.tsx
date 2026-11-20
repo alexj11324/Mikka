@@ -54,12 +54,6 @@ export function useTaskStatusLabel() {
   return (status: string) => t.has(status as never) ? t(status as never) : status
 }
 
-/** A priority's name, as the property menu and the create window write it. */
-export function useTaskPriorityLabel() {
-  const t = useTranslations('Issue.priority')
-  return (priority: string) => t.has(priority as never) ? t(priority as never) : priority
-}
-
 type ThreadRun = { id: string; status: string; outcome?: string | null; createdAt: Date | string; continuation?: { status: string; outcome?: string | null } | null }
 
 /**

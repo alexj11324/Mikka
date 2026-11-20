@@ -270,26 +270,6 @@
       "allRead": "已全部标为已读",
       "viewAllThreads": "全部线程",
       "noMatches": "没有匹配的结果",
-      "sortBy": "排序",
-      "sortPinned": "置顶优先",
-      "sortRecent": "最近活动",
-      "sortName": "名称",
-      "groupBy": "分组",
-      "groupNone": "无",
-      "groupUnread": "未读",
-      "groupWaiting": "有线程在等你",
-      "groupWorking": "正在工作",
-      "groupOther": "其他",
-      "filters": "筛选",
-      "clearFilters": "清除筛选",
-      "sectionOptions": "列表选项",
-      "searchThreads": "搜索线程",
-      "searchThreadsPlaceholder": "搜索 Bot 或线程",
-      "closeSearch": "关闭搜索",
-      "markAllRead": "全部标为已读",
-      "allRead": "已全部标为已读",
-      "viewAllThreads": "全部线程",
-      "noMatches": "没有匹配的结果",
       "botOptions": "Bot 选项",
       "threadActions": "线程操作",
       "showThreads": "显示线程",
@@ -319,19 +299,7 @@
     "unavailable": "不可用",
     "title": "插件",
     "appsTab": "应用",
-    "pluginsTab": "插件",
     "skillsTab": "技能",
-    "themesTab": "主题",
-    "recommended": "推荐给你",
-    "featured": "精选",
-    "viewAll": "查看全部 {count, number} 个",
-    "subtitle": {
-      "apps": "用你的工具扩展 Mikka 能做的事",
-      "skills": "Agent 遵循的指令，来自 skills.sh，按安装量排序",
-      "themes": "明暗两套配色，部分带壁纸"
-    },
-    "noThemes": "还没有可用的主题",
-    "themesNote": "主题还在准备中，做好后会出现在这里。",
     "searchAria": "搜索 skills.sh 技能",
     "searchPlaceholder": "搜索技能…",
     "leaderboard": "排行榜",
@@ -533,7 +501,6 @@
     "property": {
       "estimate": "估算",
       "dueDate": "截止日期",
-      "setDueDate": "设置截止日期",
       "addLabels": "添加标签",
       "setProject": "设置所属项目",
       "editLabels": "编辑任务标签",
@@ -583,8 +550,7 @@
       "pullRequestOne": "PR",
       "pullRequestMany": "PR",
       "threadOne": "线程",
-      "threadMany": "线程",
-      "threadNone": "还没有线程"
+      "threadMany": "线程"
     },
     "colors": {
       "violet": "紫色",
@@ -638,9 +604,6 @@
       "statusOf": "{title} 的状态",
       "removeChildAria": "移除子任务关系：{title}",
       "addChild": "添加子任务",
-      "label": "关系",
-      "add": "添加关系",
-      "none": "暂无",
       "groupLabel": {
         "parent": "父任务",
         "blockedBy": "被阻塞于",
@@ -4718,8 +4681,7 @@
     "lastSeen": "上次在线",
     "copyId": "复制 ID",
     "copied": "ID 已复制",
-    "copyFailed": "复制失败",
-    "fixed": "这个线程每次运行都在同一台机器上。"
+    "copyFailed": "复制失败"
   },
   "ConversationDirectory": {
     "unread": "未读",
@@ -4744,9 +4706,6 @@
     "retry": "重试",
     "loading": "正在加载线程…",
     "empty": "没有匹配的线程。",
-    "emptyHint": "Bot 派出线程后，它会出现在这里。",
-    "emptyHintFiltered": "换一个状态或清空搜索，就能看到其余的线程。",
-    "groupChats": "群聊",
     "untitled": "未命名线程",
     "more": "加载更多",
     "emptyTitle": "还没有线程。",
@@ -5401,7 +5360,6 @@
     "newTaskDialog": {
       "project": "项目",
       "status": "状态",
-      "priority": "优先级",
       "projectPreferenceUnavailable": "未能读取或保存项目。",
       "intent": "创建方式",
       "backlogTitlePlaceholder": "标题（可选，默认为首行）",
@@ -5449,12 +5407,6 @@
     "board": {
       "toolbar": "看板工具栏",
       "scopeLabel": "任务范围",
-      "scope": {
-        "forYou": "为你",
-        "assigned": "分配给我",
-        "created": "我创建的",
-        "all": "全部"
-      },
       "filter": "筛选",
       "filterField": {
         "status": "状态",
@@ -5466,7 +5418,6 @@
         "agentState": "Agent 活动"
       },
       "removeFilter": "移除{field}筛选",
-      "is": "为",
       "me": "我",
       "noProject": "无项目",
       "noRun": "没有运行",
@@ -7644,7 +7595,7 @@
     "inProgress": "进行中"
   },
   "HostedThread": {
-    "placeholder": "想让它做什么？输入 @ 引用任务、线程或 PR",
+    "placeholder": "想让它做什么？",
     "open": "打开",
     "needsYou": "等你决定",
     "later": "稍后",
@@ -8259,40 +8210,6 @@
     "failedUnknown": "出了点问题，详情在 Mikka 的运行记录里"
   },
   "Automations": {
-    "segment": {
-      "label": "自动化的范围",
-      "mine": "我的",
-      "all": "全部",
-      "scheduled": "定时",
-      "deleted": "已删除"
-    },
-    "filters": "筛选",
-    "filterField": {
-      "status": "状态",
-      "creator": "创建者",
-      "tag": "标签"
-    },
-    "group": {
-      "active": "进行中",
-      "paused": "已暂停",
-      "completed": "已完成"
-    },
-    "clearStatus": "清除状态筛选",
-    "filterIs": "是",
-    "filterValue": {
-      "me": "我"
-    },
-    "statusAny": "任意状态",
-    "clearCreator": "只看全部自动化",
-    "templatesGroup": "模板",
-    "comingSoon": "即将支持",
-    "integration": {
-      "github": "GitHub",
-      "linear": "Linear",
-      "sentry": "Sentry",
-      "slack": "Slack",
-      "schedule": "定时"
-    },
     "cancelRun": "取消这次运行",
     "fromTemplate": "从模板开始",
     "pin": "置顶",
@@ -8314,37 +8231,26 @@
     "templates": {
       "standup": {
         "title": "工作日站会小结",
-        "description": "把昨天合并的 PR 和关掉的议题整理成一段站会更新。",
         "prompt": "整理昨天合并的 PR 和关闭的议题，写一段简短的站会更新：做了什么、今天做什么、有什么卡住。"
       },
       "prReview": {
         "title": "新 PR 先审一遍",
-        "description": "新 PR 进来就先过一遍：风险、遗漏的测试、能简化的地方。",
         "prompt": "审阅这个 PR：指出风险、遗漏的测试和可以简化的地方，在 PR 上留一条评论。"
       },
       "ciFix": {
         "title": "CI 失败就修",
-        "description": "检查失败就找根因并修掉，修不了就在 PR 上说明。",
         "prompt": "看看失败的检查，找到根本原因并修复；修不了就在 PR 上说明卡在哪里。"
       },
       "linearTriage": {
         "title": "新议题分诊",
-        "description": "给新议题定优先级、补复现步骤、建议负责人。",
         "prompt": "给这个新议题分诊：判断优先级，补充复现步骤，建议负责人，在议题上留一条评论。"
       },
       "slackQuestion": {
         "title": "回答 Slack 里的提问",
-        "description": "回答 Slack 里的提问，必要时查代码和文档。",
         "prompt": "回答这条 Slack 消息里的问题，必要时查代码和文档，答案要简短。"
-      },
-      "sentryInvestigation": {
-        "title": "Sentry 报错先排查",
-        "description": "线上报错进来就先查一遍，定位到文件和提交。",
-        "prompt": "排查这条 Sentry 报错：找到触发的代码路径和引入它的提交，在议题上写清楚原因和建议的修法。"
       },
       "weeklyDeps": {
         "title": "每周检查依赖更新",
-        "description": "每周看依赖更新，有重要升级就开 PR。",
         "prompt": "检查依赖有没有安全更新或重要的新版本，开一个升级 PR，说明改了什么。"
       }
     },
@@ -8671,8 +8577,9 @@
     "anyState": "全部状态",
     "anyAuthor": "全部作者",
     "anyLabel": "全部标签",
-    "is": "为",
-    "eitherOfStates": "以下 {count} 种之一",
+    "stateValue": "状态 {value}",
+    "authorValue": "@{value}",
+    "labelValue": "标签 {value}",
     "linkedOnly": "只看关联",
     "removeFilter": "移除筛选 {name}",
     "openTask": "打开任务",
