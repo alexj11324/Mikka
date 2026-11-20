@@ -5,6 +5,7 @@ import { MAILBOX_NOTICE_HEADER } from '@mikka/protocol/device'
 import { WORKSPACE_REQUEST_HEADER, type WorkspaceReadCommand } from '@mikka/protocol/coding-workspace'
 import { WORKSPACE_DIFF_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-review'
 import { WORKSPACE_GIT_REQUEST_HEADER } from '@mikka/protocol/coding-workspace-git'
+import { MCP_CHECK_HEADER, type McpDeviceCheckCommand } from '@mikka/protocol/mcp-check'
 
 // Replace database-backed route operations.
 mock.module(new URL('../../../../../lib/db/index.ts', import.meta.url).href, {
@@ -20,6 +21,8 @@ const pendingWorkspaceReads = mock.fn(async (_database: unknown, _membership: un
 })
 mock.module(new URL('../../../../../lib/coding-workspace/requests.ts', import.meta.url).href, { namedExports: { pendingWorkspaceReads } })
 const pendingDeviceCommands = mock.fn(async (_id: string, _completed: string[]) => [{ id: 'update-command', kind: 'update' }])
+const pendingMcpChecks = mock.fn(async (_userId: string, _deviceId: string): Promise<McpDeviceCheckCommand[]> => [])
+mock.module(new URL('../../../../../lib/plugins/runtime.ts', import.meta.url).href, { namedExports: { mcpDeviceChecks: { pending: pendingMcpChecks } } })
 mock.module(new URL('../../../../../lib/device-management.ts', import.meta.url).href, { namedExports: { pendingDeviceCommands } })
 const authenticateDevice = mock.fn(async () => ({ userId: 'owner', tokenId: 'token' }) as object | null)
 const ownsDevice = mock.fn(async () => ({ id: 'device-1', enabled: true }) as object | null)
@@ -66,6 +69,8 @@ beforeEach(() => {
   deviceWork.mock.resetCalls()
   deviceWork.mock.mockImplementation(async () => ({ commands: [], queuedRuns: [] }))
   pendingWorkspaceReads.mock.resetCalls()
+  pendingMcpChecks.mock.resetCalls()
+  pendingMcpChecks.mock.mockImplementation(async () => [])
   pendingWorkspaceReads.mock.mockImplementation(async () => {
     assert.fail('A daemon without the Files capability must never query source requests')
   })
@@ -98,6 +103,25 @@ test('authentication and ownership failures do not query the queue or label an e
   assert.equal((await GET(request(), params)).status, 404)
   assert.equal(deviceWork.mock.callCount(), 0)
   assert.ok(logs.every(entry => entry.outcome === undefined))
+})
+
+test('STDIO check configuration goes only to an authenticated capable owner device and never the request log', async () => {
+  const command: McpDeviceCheckCommand = { id: '6f1c2b8e-2a8e-4c39-9d1a-3b5d7c9e1f20', expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    server: { name: 'mcp_fixture', transport: 'stdio', command: 'node', args: [], env: { SERVICE_TOKEN: 'synthetic-mcp-owner-key' } } }
+  pendingMcpChecks.mock.mockImplementation(async () => [command])
+  assert.deepEqual(await (await GET(request(), params)).json(), { commands: [] })
+  assert.equal(pendingMcpChecks.mock.callCount(), 0)
+  const capable = () => { const value = request(); value.headers.set(MCP_CHECK_HEADER, '1'); return value }
+  authenticateDevice.mock.mockImplementation(async () => null)
+  assert.equal((await GET(capable(), params)).status, 401)
+  authenticateDevice.mock.mockImplementation(async () => ({ userId: 'owner', tokenId: 'token' }))
+  ownsDevice.mock.mockImplementation(async () => null)
+  assert.equal((await GET(capable(), params)).status, 404)
+  assert.equal(pendingMcpChecks.mock.callCount(), 0)
+  ownsDevice.mock.mockImplementation(async () => ({ id: 'device-1', enabled: false }))
+  assert.deepEqual(await (await GET(capable(), params)).json(), { commands: [], mcpChecks: [command] })
+  assert.deepEqual(pendingMcpChecks.mock.calls[0].arguments, ['owner', 'device-1'])
+  assert.ok(!JSON.stringify(logs).includes('synthetic-mcp-owner-key'))
 })
 
 test('a device with scheduling off is never offered queued runs', async () => {

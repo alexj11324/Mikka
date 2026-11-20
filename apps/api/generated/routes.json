@@ -1523,7 +1523,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "011ca580d14d1729082cb397c44cc40d02e85816f3b1603d31bbf77b2ba7a433"
+      "sourceHash": "7324f1dde31a603e033707ee19014eb209b854cd3e97cebdbf55194b0f730a41"
     },
     {
       "path": "/mikka/api/integrations/mcp/search",
@@ -1559,7 +1559,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "1562ce948e13430057449438585313066339397d983d0cdf4c08f2e23fc02fcf"
+      "sourceHash": "81ecda7aefe3e56fb87e4602d166f1c263fd79950a30c1b8da20d9d2d445f1a6"
     },
     {
       "path": "/mikka/api/integrations/mcp/[id]/environments",
@@ -1577,7 +1577,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "75cad1132ea2b8d8fc596a72be511059879d9c33a89e05de3a607d34e593a7ea"
+      "sourceHash": "20998d20319dff9d3ff508e029f28a2e377889d230c8226949122bc71eb4c78f"
     },
     {
       "path": "/mikka/api/integrations/mcp/[id]/oauth/start",
@@ -1586,7 +1586,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "8872c4582127288a8a9abef53c7a7c811c5ced81fee4aa7dff1aafe7bded707f"
+      "sourceHash": "4cfbbf485fcdd1fb8f53ea73d23d420f57e311f7109ba419388a613ec7f6d552"
     },
     {
       "path": "/mikka/api/integrations/mcp/[id]/tools/[name]",
@@ -3483,7 +3483,7 @@
       "methods": [
         "GET"
       ],
-      "sourceHash": "01625bca7d6374054aee08da16a5b948a4ea020efa0cc742bec692c65fd44735"
+      "sourceHash": "872c6e7f5027b70495ad735282736e6afe31586b483f82f28f02841824bd3eb4"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/commands/ack",
@@ -3555,7 +3555,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "f88da8028042c0b5b6fae602764c64d0825cb71c012344d0a27782c0bb42551a"
+      "sourceHash": "28647f0c4061d829503334afd4c8e42955841ff14593b9071dc52c132b96066b"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/repos",
@@ -3591,7 +3591,7 @@
       "methods": [
         "POST"
       ],
-      "sourceHash": "121fa3cfb05e49fef05589beea162a9dd61603a6b821f1ed187ac693a4c00354"
+      "sourceHash": "56e6e0e6d21fedd8ebf60bde481b0c5927d733ec378b6de96950ed396161c8b0"
     },
     {
       "path": "/mikka/v1/devices/[deviceId]/runs/[runId]/computer-authority",

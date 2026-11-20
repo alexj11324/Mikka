@@ -26,6 +26,11 @@ test('owner and workspace are both part of the signed channel; device tickets ar
 })
 
 test('the wire format refuses data, credentials and arbitrary entity kinds', () => {
+  const integrations = { kind: 'integration_settings', id: workspace }
+  assert.deepEqual(liveInvalidation(integrations), integrations)
+  assert.equal(liveInvalidation({ ...integrations, serverId: 'private-server' }), null)
+  assert.equal(liveInvalidation({ ...integrations, token: 'private' }), null)
+  assert.equal(liveInvalidation({ ...integrations, rev: 1 }, true), null)
   const value = { kind: 'factory_task', id: workspace }
   assert.deepEqual(liveInvalidation(value), value)
   for (const invalid of [null, [], { ...value, prompt: 'private' }, { ...value, token: 'private' }, { kind: 'user', id: workspace }, { ...value, id: 'not-an-id' }]) {

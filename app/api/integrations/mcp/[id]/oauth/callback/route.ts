@@ -15,5 +15,7 @@ export const GET = freshSessionRoute((request: Request, ctx: Context) => pluginR
     code: query.get('code'), state: query.get('state'), issuer: query.get('iss') ?? undefined,
   })
   if (!input.success) throw new PluginError('mcpOAuthStateInvalid', 400)
-  return mcpConnections.oauth.callback(userId, await serverId(ctx), input.data)
+  const id = await serverId(ctx)
+  await mcpConnections.oauth.callback(userId, id, input.data)
+  return mcpConnections.check(userId, id)
 }))

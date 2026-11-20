@@ -3,6 +3,7 @@ import { randomBytes, randomUUID, createHash } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { readFile, readdir } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import { mock, test } from 'node:test'
 import { Pool } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
@@ -14,6 +15,9 @@ import { McpConnectionStore } from './connection-store'
 import { McpOAuthStore } from './mcp-oauth'
 import { createMcpSchema } from './contracts'
 import { createPersonalMcpRuntime } from './mcp'
+import { McpDeviceChecks } from './device-checks'
+import { checkStdioMcp } from '../../packages/daemon/src/mcp-check'
+import { ownerIntegrationSettingsTargets } from '../live/lists'
 
 const database = process.env.E2E_DATABASE_URL
 if (database) assert.ok(isE2eTarget(database), E2E_DB_RULE)
@@ -77,6 +81,7 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
     const directory = new URL('../../drizzle/', import.meta.url)
     for (const migration of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(migration, directory), 'utf8'))
     await pool.query(await readFile(new URL('20261120185217_mcp_connection_details.sql', directory), 'utf8'))
+    await pool.query(await readFile(new URL('20261120191012_mcp_device_checks.sql', directory), 'utf8'))
     assert.match((await pool.query('SHOW server_version')).rows[0].server_version, /^17\./)
     for (const user of [owner, member, outsider]) await pool.query('INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$1,$2,true,now(),now())', [user, `${user}@example.invalid`])
     for (const [id, users] of [[workspace, [owner, member]], [elsewhere, [outsider]]] as const) {
@@ -87,6 +92,7 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
     const personal = new PersonalPluginStore(pool, env, pool), shares = new WorkspaceMcpStore(pool, pool)
     const oauth = new McpOAuthStore(pool, env, transport)
     const connections = new McpConnectionStore(personal, { transport }, oauth)
+    const deviceChecks = new McpDeviceChecks(personal)
     const installed = await personal.createMcp(owner, createMcpSchema.parse({ name: 'Docs', url: 'https://mcp.example.com/mcp', headers: { 'X-Account': 'fixture-account' } }))
 
     await t.test('real check persists status and tools, and repeat check preserves switches', async () => {
@@ -178,11 +184,51 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
       assert.equal((await personal.mcpConnection(owner, installed.id)).headers.Authorization, undefined)
       requireAuth = false
     })
+    await t.test('STDIO check uses the selected owner device and accepts only a current one-use SDK receipt', async () => {
+      const device = randomUUID(), otherDevice = randomUUID(), memberDevice = randomUUID()
+      for (const [id, userId] of [[device, owner], [otherDevice, owner], [memberDevice, member]]) await pool.query('INSERT INTO devices(id,"ownerId",name) VALUES($1,$2,\'MCP fixture\')', [id, userId])
+      const local = await personal.createMcp(owner, createMcpSchema.parse({ name: 'Local docs', transport: 'stdio', command: process.execPath,
+        args: [fileURLToPath(new URL('../../packages/daemon/test/fakes/mcp-settings.mjs', import.meta.url))], env: { SERVICE_TOKEN: fixtureToken } }))
+      await assert.rejects(deviceChecks.request(member, local.id, memberDevice), /mcpNotFound/)
+      await assert.rejects(deviceChecks.request(owner, local.id, memberDevice), /mcpCheckDeviceNotFound/)
+      await assert.rejects(deviceChecks.request(owner, installed.id, device), /mcpCheckNotAvailable/)
+      const queued = await deviceChecks.request(owner, local.id, device)
+      assert.equal((await connections.detail(owner, local.id)).deviceCheck?.status, 'pending')
+      assert.deepEqual(await deviceChecks.pending(member, device), [])
+      assert.deepEqual(await deviceChecks.pending(owner, otherDevice), [])
+      const [command] = await deviceChecks.pending(owner, device)
+      assert.equal(command.id, queued.id)
+      const receipt = await checkStdioMcp(command)
+      assert.deepEqual(receipt, { id: queued.id, status: 'connected', tools: [{ name: 'read_docs', description: 'Read [redacted]' }] })
+      await assert.rejects(deviceChecks.complete(member, device, receipt), /mcpCheckReceiptExpired/)
+      await assert.rejects(deviceChecks.complete(owner, otherDevice, receipt), /mcpCheckReceiptExpired/)
+      await deviceChecks.complete(owner, device, receipt)
+      await assert.rejects(deviceChecks.complete(owner, device, receipt), /mcpCheckReceiptExpired/)
+      const checked = await connections.detail(owner, local.id)
+      assert.equal(checked.status, 'connected'); assert.ok(checked.lastCheckedAt); assert.equal(checked.deviceCheck, null)
+      assert.ok(!JSON.stringify(checked).includes(fixtureToken))
+      await connections.setTool(owner, local.id, 'read_docs', false)
+      const next = await deviceChecks.request(owner, local.id, device)
+      await deviceChecks.complete(owner, device, { ...receipt, id: next.id })
+      assert.equal((await connections.detail(owner, local.id)).tools[0].enabled, false)
+      const stale = await deviceChecks.request(owner, local.id, device)
+      await personal.updateMcp(owner, { id: local.id, name: 'Renamed local' })
+      await assert.rejects(deviceChecks.complete(owner, device, { ...receipt, id: stale.id }), /mcpCheckReceiptExpired/)
+      const expired = await deviceChecks.request(owner, local.id, device)
+      await pool.query(`UPDATE mcp_device_checks SET expires_at=now()-interval '1 second' WHERE id=$1`, [expired.id])
+      await assert.rejects(deviceChecks.complete(owner, device, { ...receipt, id: expired.id }), /mcpCheckReceiptExpired/)
+      assert.deepEqual(await deviceChecks.pending(owner, device), [])
+      assert.equal((await connections.detail(owner, local.id)).status, 'check_failed')
+      assert.equal((await connections.detail(owner, local.id)).failureReason, 'deviceCheckExpired')
+      assert.deepEqual(await ownerIntegrationSettingsTargets(pool, pool, owner), [{ scope: { ownerId: owner, workspaceId: workspace }, events: [{ kind: 'integration_settings', id: workspace }] }])
+      await pool.query(`UPDATE devices SET "removedAt"=now() WHERE id=$1`, [device])
+      await assert.rejects(deviceChecks.request(owner, local.id, device), /mcpCheckDeviceNotFound/)
+    })
     await t.test('real API handlers reject unauthenticated, delegated, nonowner and cross-workspace calls before mutations', async () => {
       let actor: string | null = owner
       mock.module('../api-auth.ts', { namedExports: { auth: { api: { getSession: async () => actor ? { user: { id: actor } } : null } } } })
       mock.module('../request-log.ts', { namedExports: { noteLogUser() {}, noteLogRpcAction() {} } })
-      mock.module('./runtime.ts', { namedExports: { personalPlugins: personal, workspaceMcp: shares, mcpConnections: connections } })
+      mock.module('./runtime.ts', { namedExports: { personalPlugins: personal, workspaceMcp: shares, mcpConnections: connections, mcpDeviceChecks: deviceChecks } })
       // The directory uses real HTTP payloads; public DNS protection is owned by plugins.test.ts.
       mock.module('./public-fetch.ts', { namedExports: { publicMcpFetch: () => transport() } })
       const detail = await import('../../app/api/integrations/mcp/[id]/route')
@@ -215,6 +261,12 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
       actor = owner
       assert.equal((await check.POST(new Request('https://app.example.com/api/integrations/mcp/id/check', { method: 'POST', headers: { origin: 'https://other.example.com', cookie: 'fixture' } }), context)).status, 403)
       assert.equal((await start.POST(new Request('https://app.example.com/api/integrations/mcp/id/oauth/start', { method: 'POST', headers: { origin: 'https://app.example.com', authorization: 'Bearer mkpat_fixture', 'content-type': 'application/json' }, body: '{}' }), context)).status, 401)
+      const local = (await personal.listMcp(owner)).find(server => server.transport === 'stdio')!
+      const device = (await pool.query('SELECT id FROM devices WHERE "ownerId"=$1 AND "removedAt" IS NULL LIMIT 1', [owner])).rows[0].id
+      const localContext = { params: Promise.resolve({ id: local.id }) }
+      const requested = await check.POST(request('/api/integrations/mcp/id/check', 'POST', { deviceId: device }), localContext)
+      assert.equal(requested.status, 200); assert.equal((await requested.json()).deviceCheck.status, 'pending')
+      assert.equal((await check.POST(request('/api/integrations/mcp/id/check', 'POST', { deviceId: device, userId: outsider }), localContext)).status, 400)
       assert.equal((await connections.detail(owner, installed.id)).tools.find(tool => tool.name === 'read_docs')?.enabled, true)
       const directory = await catalog.GET(request('/api/integrations/mcp/catalog?q=docs'))
       assert.equal(directory.status, 200)
@@ -230,6 +282,9 @@ test('MCP settings persist real discovery, owner-only tools and environment scop
   } finally {
     mock.restoreAll()
     await new Promise<void>(resolve => server.close(() => resolve()))
+    await (await import('../builtin-gateway/runtime')).builtinGateway()?.stop()
+    const [{ pool: applicationPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
+    await Promise.all([applicationPool.end(), workspacePool.end()])
     await pool.end(); await dropTestDatabase(admin, isolatedDatabase); await admin.end()
   }
 })

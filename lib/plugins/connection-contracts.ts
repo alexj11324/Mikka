@@ -11,4 +11,5 @@ export type McpToolView = { name: string; enabled: boolean; description: string;
 export type McpConnectionDetails = {
   id: string; status: McpConnectionStatus; lastCheckedAt: string | null; failureReason: string | null;
   authorizationUrl: string | null; tools: McpToolView[]; environmentIds: string[];
+  deviceCheck: { id: string; deviceId: string; expiresAt: string; status: 'pending' | 'expired' } | null;
 }

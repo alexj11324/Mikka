@@ -12,5 +12,7 @@ import { mcpOAuthStart } from '@/lib/plugins/connection-contracts'
 export const POST = freshSessionRoute((request: Request, ctx: Context) => pluginResponse(async () => {
   const userId = await pluginActor(request, { humanOnly: true })
   await pluginBody(request, mcpOAuthStart)
-  return mcpConnections.oauth.start(userId, await serverId(ctx))
+  const id = await serverId(ctx)
+  const result = await mcpConnections.oauth.start(userId, id)
+  return result.authorizationUrl ? result : mcpConnections.check(userId, id)
 }))

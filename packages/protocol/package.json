@@ -5,6 +5,7 @@
   "private": true,
   "license": "AGPL-3.0-only",
   "exports": {
+    "./mcp-check": "./src/mcp-check.ts",
     "./coding-terminal": "./src/coding-terminal.ts",
     "./coding-workspace": "./src/coding-workspace.ts",
     "./coding-workspace-review": "./src/coding-workspace-review.ts",

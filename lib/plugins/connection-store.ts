@@ -31,9 +31,12 @@ export class McpConnectionStore {
       WHERE server_id=$1 AND ($2::boolean OR (enabled AND available)) ORDER BY tool_name`, [serverId, mine])
     const { rows: environments } = await this.personal.pool.query<{ environment_id: string }>(`SELECT environment_id FROM mcp_server_environments
       WHERE server_id=$1 AND ($2::boolean OR workspace_id=$3) ORDER BY environment_id`, [serverId, mine, workspaceId ?? null])
-    return { id: serverId, status: server.enabled ? state.connection_status : 'disabled', lastCheckedAt: state.last_checked_at?.toISOString() ?? null,
-      failureReason: state.check_failure, authorizationUrl: mine ? await this.oauth.authorizationUrl(userId, serverId) : null,
-      tools, environmentIds: environments.map(row => row.environment_id) }
+    const { rows: [deviceCheck] } = mine ? await this.personal.pool.query<{ id: string; device_id: string; expires_at: Date }>(`SELECT id,device_id,expires_at FROM mcp_device_checks WHERE server_id=$1 AND completed_at IS NULL ORDER BY created_at DESC LIMIT 1`, [serverId]) : { rows: [] }
+    const expired = deviceCheck && deviceCheck.expires_at.getTime() <= Date.now()
+    return { id: serverId, status: server.enabled ? expired ? 'check_failed' : state.connection_status : 'disabled', lastCheckedAt: state.last_checked_at?.toISOString() ?? null,
+      failureReason: expired ? 'deviceCheckExpired' : state.check_failure, authorizationUrl: mine ? await this.oauth.authorizationUrl(userId, serverId) : null,
+      tools, environmentIds: environments.map(row => row.environment_id), deviceCheck: deviceCheck ? { id: deviceCheck.id, deviceId: deviceCheck.device_id,
+        expiresAt: deviceCheck.expires_at.toISOString(), status: deviceCheck.expires_at.getTime() > Date.now() ? 'pending' : 'expired' } : null }
   }
 
   async search(userId: string, options: { workspaceId?: string; query?: string; environmentId?: string } = {}) {
@@ -87,7 +90,7 @@ export class McpConnectionStore {
 
   /** Enumerate all pages before changing the catalogue. A partial failed check
    * never removes the last confirmed tool list or resets a user's switches. */
-  async check(userId: string, serverId: string) {
+  async check(userId: string, serverId: string, authorize = true): Promise<McpConnectionDetails> {
     const installation = await this.owned(userId, serverId)
     if (!installation.enabled) return this.detail(userId, serverId)
     if (installation.transport === 'stdio') throw new PluginError('mcpCheckRequiresDevice', 409)
@@ -131,8 +134,9 @@ export class McpConnectionStore {
     } catch (error) { await client.query('ROLLBACK'); throw error }
     finally { client.release() }
     const checked = await this.detail(userId, serverId)
-    if (checked.status !== 'needs_connect') return checked
-    await this.oauth.start(userId, serverId).catch(error => { if (!(error instanceof PluginError)) throw error })
+    if (checked.status !== 'needs_connect' || !authorize) return checked
+    const authorized = await this.oauth.start(userId, serverId).catch(error => { if (!(error instanceof PluginError)) throw error })
+    if (authorized?.status === 'connected') return this.check(userId, serverId, false)
     return this.detail(userId, serverId)
   }
 }
