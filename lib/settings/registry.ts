@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { ResolvedSetting, SettingSchemaEntry, SettingScope, SettingValue } from '@mikka/protocol/settings'
 import { archiveIdleDays } from '@/lib/conversation-directory-input'
 import { DEFAULT_TITLE_TRIGGERS, THREAD_TITLE_TRIGGERS, TITLE_INSTRUCTIONS_MAX } from '@/lib/thread-title'
+import { settingMetadata } from './metadata'
 
 export interface SettingDefinition extends SettingSchemaEntry {
   guard: z.ZodType<SettingValue>
@@ -19,25 +20,25 @@ const inherited = {
 export const SETTINGS_REGISTRY = {
   archiveIdleAfterDays: {
     ...inherited, key: 'archiveIdleAfterDays', group: 'threads', page: 'threads',
-    label: { en: 'Archive idle threads', 'zh-CN': '归档闲置线程' }, keywords: ['archive', 'idle', 'days', '归档', '闲置'],
+    ...settingMetadata('archiveIdleAfterDays'),
     type: 'integer', guard: z.literal(archiveIdleDays), defaultValue: 30, options: [...archiveIdleDays],
     personalContext: 'account', legacy: 'archive-days',
   },
   threadTitleInstructions: {
     ...inherited, key: 'threadTitleInstructions', group: 'threads', page: 'threads',
-    label: { en: 'Thread title instructions', 'zh-CN': '线程标题指令' }, keywords: ['title', 'naming', '标题', '指令'],
+    ...settingMetadata('threadTitleInstructions'),
     type: 'string', guard: z.string().trim().max(TITLE_INSTRUCTIONS_MAX), defaultValue: '',
     personalContext: 'workspace', legacy: 'title-instructions',
   },
   threadTitleTriggers: {
     ...inherited, key: 'threadTitleTriggers', group: 'threads', page: 'threads',
-    label: { en: 'Update thread titles', 'zh-CN': '更新线程标题' }, keywords: ['title', 'pull request', 'PR', '标题', '拉取请求'],
+    ...settingMetadata('threadTitleTriggers'),
     type: 'string', guard: z.enum(THREAD_TITLE_TRIGGERS), defaultValue: DEFAULT_TITLE_TRIGGERS, options: [...THREAD_TITLE_TRIGGERS],
     personalContext: 'workspace', legacy: 'title-triggers',
   },
   subagentMaxConcurrent: {
     key: 'subagentMaxConcurrent', scope: ['workspace'], group: 'threads', page: 'threads',
-    label: { en: 'Concurrent subagents', 'zh-CN': '并发子 Agent 数量' }, keywords: ['agent', 'concurrency', 'limit', '子 Agent', '并发', '限制'],
+    ...settingMetadata('subagentMaxConcurrent'),
     type: 'integer', guard: z.number().int().min(1).max(20), defaultValue: 6,
     personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
   },
