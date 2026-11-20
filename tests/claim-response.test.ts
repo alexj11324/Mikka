@@ -327,6 +327,20 @@ test('ordinary retries retain the normal claim path after question lineage valid
   assert.equal((await response.json()).continuesRunId,'ordinary-parent')
 })
 
+test('a local HTTP gateway claim tells an older daemon to upgrade before leasing the run', async () => {
+  const probe = fixture(), savedOrigin = process.env.BETTER_AUTH_URL
+  Object.assign(probe.run, { agentDefinition: { harness: 'codex', apiKey: { keyId: '53100000-0000-4000-8000-000000000004', model: 'key-model' } } })
+  probe.modelCredentialCapability = true
+  try {
+    process.env.BETTER_AUTH_URL = 'http://127.0.0.1'
+    const response = await claim(probe, ['skill-preflight'])
+    assert.equal(response.status, 409)
+    assert.equal((await response.json()).code, 'daemonUpgradeRequired')
+    assert.equal(probe.run.status, 'queued')
+    assert.equal(probe.run.leaseExpiresAt, null)
+  } finally { if (savedOrigin === undefined) delete process.env.BETTER_AUTH_URL; else process.env.BETTER_AUTH_URL = savedOrigin }
+})
+
 test('every github.com run of a connected owner gets the owner credential endpoint, read-only and plan runs included', async () => {
   overrideDeploymentSwitch('personalMailbox', false)
   overrideDeploymentSwitch('byos', true)

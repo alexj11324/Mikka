@@ -40,6 +40,7 @@ import {
   PROJECT_ENVIRONMENT_HEADER,
   RECOVERY_WORKTREE_HEADER,
   MODEL_CREDENTIAL_HEADER,
+  MODEL_GATEWAY_LOOPBACK_HEADER,
   RUN_CREDENTIALS_HEADER,
   INITIAL_REPOSITORY_HEADER,
   MAILBOX_NOTICE_HEADER,
@@ -323,6 +324,7 @@ export class HttpServerLink implements ServerLink {
           [PROJECT_ENVIRONMENT_HEADER]: '1',
           [RECOVERY_WORKTREE_HEADER]: '1',
           [MODEL_CREDENTIAL_HEADER]: '1',
+          [MODEL_GATEWAY_LOOPBACK_HEADER]: '1',
           [TASK_SECRETS_HEADER]: TASK_SECRETS_VERSION,
           [RUN_CREDENTIALS_HEADER]: '1',
           [TASK_MCP_HEADER]: TASK_MCP_VERSION,
@@ -461,11 +463,15 @@ export class HttpServerLink implements ServerLink {
   }
 
   async claimRun(deviceId: string, runId: string, signal?: AbortSignal, options?: { initialRepository: true }): Promise<RunAssignment> {
-    return this.call(
+    const assignment = await this.call(
       "POST",
       devicePaths.claim(checkId(deviceId), checkId(runId)),
       { schema: runAssignmentSchema, claimOf: runId, signal, initialRepository: options?.initialRepository }
     )
+    const model = assignment.modelCredential
+    if (model?.kind === 'provider' && new URL(model.baseUrl).protocol === 'http:'
+      && new URL(model.baseUrl).origin !== new URL(this.baseUrl).origin) throw new Error('Loopback model gateway unavailable')
+    return assignment
   }
   async validateSkillReceipt(runId:string,receiptId:string) {
     return this.call('GET',`/v1/runs/${seg(runId)}/skill-receipt?receiptId=${encodeURIComponent(checkId(receiptId))}`,{schema:skillReceiptRevalidationSchema})

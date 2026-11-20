@@ -6,6 +6,7 @@
 // - Codex takes OpenAI-compatible endpoints as a custom model provider in
 //   its run config (`-c model_providers.mikka...`), reading the key from
 //   the env var it names.
+import { runModelCredentialSchema } from "@mikka/protocol/device"
 
 export type RunCredential =
   // Legacy assignments are recognized so they fail closed instead of using a CLI's default endpoint.
@@ -15,9 +16,7 @@ export type RunCredential =
 const KEY_ENV = "MIKKA_MODEL_API_KEY"
 function checked(credential: RunCredential) {
   if (credential.kind !== "provider") throw new Error("Run credential unavailable")
-  if (!credential.key || credential.key.length > 32768 || /[\r\n\0]/.test(credential.key)) throw new Error("Run credential unavailable")
-  const url = new URL(credential.baseUrl)
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) throw new Error("Run credential unavailable")
+  if (!runModelCredentialSchema.safeParse(credential).success) throw new Error("Run credential unavailable")
   return credential
 }
 

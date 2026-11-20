@@ -15,7 +15,7 @@ import { readRepositorySettings } from '@/lib/device-repositories'
 import { daemonTestMode, repositoryBindingMatches } from '@mikka/protocol/repository'
 import { localExecutionHarnesses } from '@/lib/device-agents'
 import { runTestFixture } from '@/lib/run-test-fixture'
-import { MIN_DAEMON_VERSION, SESSION_LEASE_MS, isDeviceOnline, REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
+import { MIN_DAEMON_VERSION, SESSION_LEASE_MS, isDeviceOnline, REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, MODEL_CREDENTIAL_HEADER, MODEL_GATEWAY_LOOPBACK_HEADER, RUN_CREDENTIALS_HEADER, INITIAL_REPOSITORY_HEADER, deviceRepoSchema, runModelCredentialSchema, type RunModelCredential } from '@mikka/protocol/device'
 import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER, type NativeLease } from '@mikka/protocol/subscription'
 import { POLICY_SNAPSHOT_HEADER, POLICY_SNAPSHOT_VERSION } from '@mikka/protocol/policy-snapshot'
 import { issuePolicySnapshot, policyDistributionContext } from '@/lib/agent-tool-approval/policy-distribution'
@@ -29,6 +29,8 @@ import { runChanged } from '@/lib/live/panels'
 import { agentRuns, agents, deviceRepos } from '@/lib/db/schema'
 import { authenticateDevice, ownedDeviceWithReport } from '@/lib/device-link'
 import { withBasePath } from '@/lib/base-path'
+import { resolveAppOrigin } from '@/lib/auth-config'
+import { isLoopbackHost } from '@/lib/loopback'
 import { mcpResourceURL } from '@/lib/mcp/resource'
 import { issueRunToken } from '@/lib/mcp/worker'
 import { RUN_DECISION_CATALOGUE } from '@/lib/project-map/mcp-tool'
@@ -217,8 +219,12 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
   const frozenKey = run.agentDefinition?.apiKey
   // Paid by Mikka 额度: the CLI reaches the model only through the Mikka model gateway (decision 2026-11-15-2000).
   const frozenCredits = run.agentDefinition?.credits
+  const requestUrl = new URL(request.url)
+  const loopbackGateway = requestUrl.protocol === 'http:' && isLoopbackHost(requestUrl.hostname)
+    && device.kind === 'local' && requestUrl.origin === resolveAppOrigin(process.env)
   if ((frozenKey || frozenCredits) && (subscription || pinned)) return NextResponse.json({ error: 'Run credential unavailable.' }, { status: 409 })
-  if ((frozenKey || frozenCredits) && request.headers.get(MODEL_CREDENTIAL_HEADER) !== '1') return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
+  if ((frozenKey || frozenCredits) && (request.headers.get(MODEL_CREDENTIAL_HEADER) !== '1'
+    || loopbackGateway && request.headers.get(MODEL_GATEWAY_LOOPBACK_HEADER) !== '1')) return NextResponse.json({ error: 'Upgrade the Mikka daemon before starting this thread.', code: 'daemonUpgradeRequired', protocolVersion: DAEMON_PROTOCOL_VERSION, daemonVersions: await daemonVersions() }, { status: 409 })
   let cliPolicy: Awaited<ReturnType<typeof readCliRunPolicy>>
   try {
     cliPolicy = await readCliRunPolicy(pool, runId, caller.userId)
@@ -278,10 +284,10 @@ async function claimRun(request: Request, { params }: { params: Promise<{ device
       return NextResponse.json({ error: 'API key unavailable.', code: 'apiKeyUnavailable' }, { status: 409 })
     }
     if (harness !== 'claude_code' && harness !== 'codex') return refuse()
-    // The Mikka model gateway under this server's own HTTPS origin: the CLI holds only a run-bound token.
+    // HTTP is only for a local runner on this server's configured loopback origin.
     const { GATEWAY_PATHS } = await import('@/lib/model-gateway/config')
     const gatewayUrl = new URL(withBasePath(harness === 'claude_code' ? GATEWAY_PATHS.anthropic : GATEWAY_PATHS.openai), request.url)
-    if (gatewayUrl.protocol !== 'https:') return refuse()
+    if (gatewayUrl.protocol !== 'https:' && !loopbackGateway) return refuse()
     if (frozenKey) {
       try { await validateRunApiKey(pool, runId, frozenKey.keyId) }
       catch (error) {

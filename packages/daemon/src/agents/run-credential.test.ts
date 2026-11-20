@@ -38,7 +38,24 @@ describe("run credentials", () => {
     expect(() => codexCredential({ kind: "api_key", key: "legacy-key" })).toThrow("Run credential unavailable")
   })
 
-  it("refuses a non-HTTPS endpoint, a URL carrying a login, or a key that could split a header", () => {
+  it("passes a scoped loopback gateway token to each CLI without admitting raw HTTP provider keys", () => {
+    const key = 'mkg_' + 'a'.repeat(43)
+    const baseUrl = 'http://127.0.0.1:3000/mikka/api/model-gateway/anthropic'
+    expect(claudeCredentialEnv({ kind: 'provider', protocol: 'anthropic', baseUrl, key }))
+      .toEqual({ ANTHROPIC_API_KEY: key, ANTHROPIC_BASE_URL: baseUrl })
+    const codex = codexCredential({ kind: 'provider', protocol: 'openai', baseUrl: 'http://localhost:3000/api/model-gateway/openai/v1', key })
+    expect(codex.args).toContain('model_providers.mikka.base_url="http://localhost:3000/api/model-gateway/openai/v1"')
+    expect(codex.env).toEqual({ MIKKA_MODEL_API_KEY: key })
+    expect(codex.args.join(' ')).not.toContain(key)
+    for (const credential of [
+      { baseUrl, key: 'provider-key' },
+      { baseUrl: 'http://remote.example/api/model-gateway/anthropic', key },
+      { baseUrl: 'http://127.0.0.1:3000/v1', key },
+      { baseUrl: 'http://127.0.0.1:3000/api/model-gateway/openai/v1', key },
+    ]) expect(() => claudeCredentialEnv({ kind: 'provider', protocol: 'anthropic', ...credential })).toThrow('Run credential unavailable')
+  })
+
+  it("refuses insecure remote endpoints, a URL carrying a login, or a key that could split a header", () => {
     for (const baseUrl of ["http://llm.example.com/v1", "https://user:pw@llm.example.com/v1", "https://llm.example.com/v1?token=key", "https://llm.example.com/v1#fragment"]) {
       expect(() => codexCredential({ kind: "provider", protocol: "openai", baseUrl, key: "k" })).toThrow()
     }

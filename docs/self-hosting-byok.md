@@ -48,6 +48,8 @@ S3 配置优先于 R2。配置其中一部分却缺少必要字段时会拒绝�
 
 两项缺一时，模型请求不可用，没有直连 fallback。模型准入、工作区权限、原有预算预留和用量记录仍由 Mikka 执行。daemon 的 API-key 运行使用本次运行绑定的 Mikka 网关令牌，经后台 LiteLLM；不把用户真实 Key 交给 CLI。
 
+同机运行的 Desktop/daemon 可通过 HTTP loopback 连接本地服务器：`BETTER_AUTH_URL` 必须与连接地址的 origin 完全一致（协议、主机、端口），设备类型必须是本地。服务器只下发 `mkg_` 运行令牌和对应的 Mikka 模型网关地址，不下发厂商 Key。其他 HTTP 地址和云端设备仍需 HTTPS。支持该协议的 daemon 会发送 `x-mikka-model-gateway-loopback: 1`；旧 daemon 收到 `daemonUpgradeRequired`，运行保留在队列中，升级后再领取。
+
 在 LiteLLM 中配置 `mikka-default`、`mikka-title`、`mikka-decision` 和 `mikka-planning` 别名。`mikka-title` 映射到 GPT-6 Luna；其他别名的实际模型和上游由部署者配置。Vercel AI Gateway、Neon AI Gateway、Workers AI 或自己的兼容模型都是 LiteLLM 上游；在 LiteLLM 的配置和 secret 环境中设置它们的凭据。参考同版本的 [`deploy/litellm/config.yaml`](../deploy/litellm/config.yaml)。个人 API Key 的模型和端点继续通过「模型与订阅」选择，后端将已授权的来源交给 LiteLLM，失败时不切换到 Mikka 的 Key。
 
 旧 `MIKKA_DEFAULT_MODEL_*`、`ZEROCAT_*`、应用内 Workers AI 配置、`DECISIONS_URL`、`DECISIONS_API_KEY`、`OPENAI_DECISIONS_API_KEY` 和 `DECISION_MODEL` 不再提供独立模型路径。把实际模型、端点和上游凭据迁到 LiteLLM 配置后，再升级应用；只设置旧变量无法启用默认模型。Decisions 使用 LiteLLM 的原生 `/v1/decisions` 协议，别名是 `mikka-decision`。
