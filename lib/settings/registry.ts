@@ -49,13 +49,13 @@ export const SETTINGS_REGISTRY = {
     personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace', legacy: 'workspace-instructions',
   },
   threadShareVisibility: {
-    key: 'threadShareVisibility', scope: ['workspace'], group: 'sharing', page: 'sharing',
+    key: 'threadShareVisibility', scope: ['workspace'], group: 'sharing', page: 'general',
     ...settingMetadata('threadShareVisibility'),
     type: 'string', guard: z.enum(['private', 'workspace', 'link']), defaultValue: 'private', options: ['private', 'workspace', 'link'],
     personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
   },
   artifactShareVisibility: {
-    key: 'artifactShareVisibility', scope: ['workspace'], group: 'sharing', page: 'sharing',
+    key: 'artifactShareVisibility', scope: ['workspace'], group: 'sharing', page: 'general',
     ...settingMetadata('artifactShareVisibility'),
     type: 'string', guard: z.enum(['private', 'workspace', 'link']), defaultValue: 'link', options: ['private', 'workspace', 'link'],
     personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
