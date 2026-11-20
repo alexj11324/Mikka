@@ -175,19 +175,29 @@ export class ScheduleStore {
       if (cmd.action === 'list') {
         const limit = cmd.limit ?? SCHEDULE_PAGE_MAX
         const [at, id] = cmd.cursor?.split('/') ?? []
+        // 我的自动化 (owner) and 定时 (trigger) narrow the same visible set; the counts below follow them too.
+        const visible = `workspace_id IS NOT DISTINCT FROM $1::uuid
+            AND ((visibility = 'workspace' AND $1::uuid IS NOT NULL)
+              OR (visibility = 'owner' AND owner_id = $2 AND bot_id IS NOT DISTINCT FROM $3::uuid))
+            AND ($4::boolean IS FALSE OR owner_id = $2)
+            AND ($5::boolean IS FALSE OR definition->'timing'->>'kind' <> 'manual')
+            AND (status_before_delete IS NOT NULL)=$6::boolean`
+        const scope = [actor.workspaceId, actor.ownerId, actor.botId, cmd.owner === 'me', cmd.trigger === 'schedule', cmd.deleted ?? false]
         const { rows } = await tx.query<Schedule & { page_cursor: string }>(`
           SELECT ${SCHEDULE_COLUMNS}, EXISTS(SELECT 1 FROM schedule_pins p WHERE p.schedule_id=user_schedules.id AND p.user_id=$2) AS pinned, to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') || '/' || id AS page_cursor
           FROM user_schedules
-          WHERE workspace_id IS NOT DISTINCT FROM $1::uuid
-            AND ((visibility = 'workspace' AND $1::uuid IS NOT NULL)
-              OR (visibility = 'owner' AND owner_id = $2 AND bot_id IS NOT DISTINCT FROM $3::uuid))
+          WHERE ${visible}
             AND ($7::uuid IS NULL OR id = $7::uuid)
-            AND (status_before_delete IS NOT NULL)=$8::boolean
-            AND ($4::timestamptz IS NULL OR (created_at, id) < ($4::timestamptz, $5::uuid))
+            AND ($8::timestamptz IS NULL OR (created_at, id) < ($8::timestamptz, $9::uuid))
           ORDER BY created_at DESC, id DESC
-          LIMIT $6`, [actor.workspaceId, actor.ownerId, actor.botId, at ?? null, id ?? null, limit + 1, cmd.scheduleId ?? null, cmd.deleted ?? false])
+          LIMIT $10`, [...scope, cmd.scheduleId ?? null, at ?? null, id ?? null, limit + 1])
         const page = rows.slice(0, limit)
+        // 运行中 N / 已暂停 N: the whole filtered list's sizes, read with its first page (the rows arrive 100 at a time).
+        const counts = cmd.cursor || cmd.scheduleId ? undefined : (await tx.query<{ active: number; paused: number }>(`
+          SELECT count(*) FILTER (WHERE status = 'active')::int AS active, count(*) FILTER (WHERE status = 'paused')::int AS paused
+          FROM user_schedules WHERE ${visible}`, scope)).rows[0]
         return {
+          ...(counts ? { counts } : {}),
           // 接手 is offered to an owner or admin on another person's workspace automation.
           schedules: page.map(({ page_cursor: _cursor, ...schedule }) => ({ ...schedule, can_take_over: schedule.visibility === 'workspace' && schedule.owner_id !== actor.ownerId && access.role !== 'member' })),
           nextCursor: rows.length > limit ? page[limit - 1]!.page_cursor : null,

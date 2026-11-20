@@ -16,6 +16,8 @@ export type AutomationView = {
   updated_at?: string | Date
   /** The creator's name in this workspace (null when they left it). */
   owner_name?: string | null
+  /** The creator's picture (null without one). */
+  owner_image?: string | null
   /** Why the host paused it (the creator lost the authority it runs on); null when a person paused it or it runs. */
   disabled_reason?: string | null
   /** 接手 is offered: the reader is an owner or admin and someone else created it. */
@@ -27,7 +29,8 @@ export type AutomationView = {
   tags?: string[]
   pinned?: boolean
 }
-export type AutomationList = { schedules: AutomationView[]; nextCursor: string | null }
+/** `counts`: the whole filtered list's 运行中 and 已暂停 sizes, with the first page only. */
+export type AutomationList = { schedules: AutomationView[]; nextCursor: string | null; counts?: { active: number; paused: number } }
 
 /** Receipt for a run cancelled before the worker claimed it. */
 export type CancelledAutomationRun = {

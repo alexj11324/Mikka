@@ -106,6 +106,10 @@ const scheduleCursor = z.templateLiteral([z.iso.datetime({ precision: 6 }), '/',
 export const scheduleListInput = z.object({
   scheduleId: z.uuid().optional(),
   deleted: z.boolean().optional(),
+  /** 我的自动化: only those the reader created. */
+  owner: z.literal('me').optional(),
+  /** 定时: only those that run on a schedule (one-shot, interval, daily or cron), whatever else triggers them. */
+  trigger: z.literal('schedule').optional(),
   limit: z.number().int().min(1).max(SCHEDULE_PAGE_MAX).optional(),
   cursor: scheduleCursor.optional(),
 }).strict()
