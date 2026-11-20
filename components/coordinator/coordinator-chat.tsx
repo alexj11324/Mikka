@@ -159,7 +159,9 @@ function FollowSentMessages({ count }: { count: number | null }) {
     if (seen.current !== null && count > seen.current) {
       if (currentUiPreferences().scrollNewToTop) {
         const items = document.querySelectorAll('[data-slot="message-scroller-item"]')
-        items[items.length - 1]?.scrollIntoView({ block: 'start' })
+        const last = items[items.length - 1]
+        if (last) last.scrollIntoView({ block: 'start' })
+        else scrollToEnd()
       } else scrollToEnd()
     }
     seen.current = count
