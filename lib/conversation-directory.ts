@@ -34,11 +34,10 @@ function conversationQuery() {
   const depth = '$' + (facts.params.length + 3)
   const scope = `r."userId"=${owner} AND r."workspaceId"=${workspace}`
   return `WITH RECURSIVE thread_settings AS (
-    SELECT coalesce(CASE WHEN p.key IS NULL THEN legacy."archiveIdleAfterDays" ELSE p."integerValue" END,w."integerValue",${SETTINGS_REGISTRY.archiveIdleAfterDays.defaultValue}) AS days,
+    SELECT coalesce(p."integerValue",w."integerValue",${SETTINGS_REGISTRY.archiveIdleAfterDays.defaultValue}) AS days,
       coalesce(pin."booleanValue",wpin."booleanValue",${SETTINGS_REGISTRY.keepPinnedThreadsActive.defaultValue}) AS "keepPins"
     FROM (SELECT 1) seed
     LEFT JOIN personal_setting_values p ON p."userId"=${owner} AND p."workspaceId" IS NULL AND p.key='archiveIdleAfterDays'
-    LEFT JOIN user_preferences legacy ON legacy."userId"=${owner}
     LEFT JOIN workspace_setting_values w ON w."workspaceId"=${workspace} AND w.key='archiveIdleAfterDays'
     LEFT JOIN personal_setting_values pin ON pin."userId"=${owner} AND pin."workspaceId"=${workspace} AND pin.key='keepPinnedThreadsActive'
     LEFT JOIN workspace_setting_values wpin ON wpin."workspaceId"=${workspace} AND wpin.key='keepPinnedThreadsActive'

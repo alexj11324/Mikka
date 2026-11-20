@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
+import { once } from 'node:events'
+import { createServer } from 'node:http'
 import { after, before, mock, test } from 'node:test'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
+import { wireKeys } from '../live/wire-keys.test-support'
+import { liveChannelId } from '../live/scope'
 
 const target = process.env.E2E_DATABASE_URL
 const available = disposableDatabase() && process.env.MIKKA_DATABASE_URL === target && process.env.DATABASE_URL === target
@@ -11,6 +15,8 @@ const dbTest = available ? test : test.skip
 const owner = `settings-admin-${randomUUID()}`, member = `settings-member-${randomUUID()}`, outsider = `settings-outsider-${randomUUID()}`
 const workspaceId = randomUUID(), otherWorkspaceId = randomUUID()
 let currentUser: { id: string; email: string; name: string } | null = null
+let sessionId = 'settings-test-session'
+const liveJobs: (() => Promise<void>)[] = []
 let pool: (typeof import('@/lib/db'))['pool']
 let workspacePool: (typeof import('@/lib/workspace-db'))['workspacePool']
 let personal: typeof import('@/app/api/settings/personal/route')
@@ -30,9 +36,12 @@ before(async () => {
   if (!available) return
   mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
   mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
-  mock.module('@/lib/session', { namedExports: { getSession: async () => currentUser ? { user: currentUser, session: { id: 'settings-test-session' } } : null } })
+  mock.module('@/lib/session', { namedExports: { getSession: async () => currentUser ? { user: currentUser, session: { id: sessionId } } : null } })
+  const server = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...server, after: (work: () => Promise<void>) => { liveJobs.push(work) } } })
   mock.module('@/lib/suggestions/sources', { namedExports: { connectedComposioApps: async () => [] } })
   ;({ pool } = await import('@/lib/db'))
+  pool.options.max = 1
   ;({ workspacePool } = await import('@/lib/workspace-db'))
   personal = await import('@/app/api/settings/personal/route')
   workspace = await import('@/app/api/settings/workspace/[workspaceId]/route')
@@ -244,5 +253,166 @@ dbTest('subagent admission reads the workspace cap and leaves a saturated queued
   } finally {
     await pool.query('DELETE FROM bot_subagents WHERE "botId"=$1', [botId])
     await pool.query('DELETE FROM bots WHERE id=$1', [botId])
+  }
+})
+
+dbTest('a new member changing an unrelated preference still inherits the same archive days in settings and the directory', async () => {
+  const { savePreferences } = await import('@/lib/preferences')
+  const { readSettings, writeSettings } = await import('./store')
+  const { conversationDirectory } = await import('@/lib/conversation-directory')
+  const { directoryInput } = await import('@/lib/conversation-directory-input')
+  const userId = `settings-new-${randomUUID()}`, agentId = randomUUID(), runId = randomUUID()
+  await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [userId, `${userId}@example.invalid`])
+  await workspacePool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [workspaceId, userId, `${userId}@example.invalid`])
+  await pool.query('INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,\'Archive default fixture\',\'codex\')', [agentId, userId])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","workspaceId","agentId",status,prompt,"createdAt","updatedAt","finishedAt")
+    VALUES ($1,$2,$3,$4,'succeeded','Archive fixture',now()-interval '10 days',now()-interval '10 days',now()-interval '10 days')`, [runId, userId, workspaceId, agentId])
+  try {
+    await writeSettings({ userId: owner, workspaceId }, 'workspace', patch({ archiveIdleAfterDays: 7 }))
+    await savePreferences(userId, { pushFinished: false })
+    assert.equal((await pool.query('SELECT "archiveIdleAfterDays" FROM user_preferences WHERE "userId"=$1', [userId])).rows[0].archiveIdleAfterDays, 30)
+    assert.equal((await pool.query('SELECT 1 FROM personal_setting_values WHERE "userId"=$1 AND key=\'archiveIdleAfterDays\'', [userId])).rowCount, 0)
+    assert.deepEqual((await readSettings({ userId, workspaceId })).values.archiveIdleAfterDays, { value: 7, source: 'workspace' })
+    const directory = await conversationDirectory(pool, userId, workspaceId, directoryInput.parse({ archived: true }))
+    assert.equal(directory.items.some(row => row.id === runId), true, 'a legacy default from an unrelated patch cannot override workspace inheritance')
+  } finally {
+    await pool.query('DELETE FROM agent_runs WHERE id=$1', [runId])
+    await pool.query('DELETE FROM agents WHERE id=$1', [agentId])
+    await workspacePool.query('DELETE FROM mikka_workspace_members WHERE "userId"=$1', [userId])
+    await pool.query('DELETE FROM "user" WHERE id=$1', [userId])
+  }
+})
+
+dbTest('a continuation copying a manual title cannot overwrite a later committed human rename', async () => {
+  const { nameThread, renameThreadTitle } = await import('@/lib/thread-title-server')
+  const { READ_CHAIN_TITLE } = await import('@/lib/thread-title')
+  const agentId = randomUUID(), first = randomUUID(), continuation = randomUUID()
+  await pool.query('INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,\'Title copy fixture\',\'codex\')', [agentId, member])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","workspaceId","agentId",status,prompt,title,"titleSource")
+    VALUES ($1,$2,$3,$4,'succeeded','Fixture','Observed title','manual')`, [first, member, workspaceId, agentId])
+  await pool.query(`INSERT INTO agent_runs (id,"userId","workspaceId","agentId",status,prompt,"continuesRunId")
+    VALUES ($1,$2,$3,$4,'succeeded','Fixture',$5)`, [continuation, member, workspaceId, agentId, first])
+  let interleaved = false
+  const atCopy = { query: async (text: string, values?: unknown[]) => {
+    const result = await pool.query(text, values)
+    if (text === READ_CHAIN_TITLE && !interleaved) {
+      interleaved = true
+      assert.equal(await renameThreadTitle(pool, continuation, member, 'Newer human title', workspaceId), 'Newer human title')
+    }
+    return result
+  } }
+  try {
+    assert.equal(await nameThread(atCopy, continuation, member, 'created', async () => { assert.fail('copying a manual title never calls a model') }), null)
+    assert.equal(interleaved, true)
+    assert.deepEqual((await pool.query('SELECT title,"titleSource" FROM agent_runs WHERE id=ANY($1::uuid[])', [[first, continuation]])).rows,
+      [{ title: 'Newer human title', titleSource: 'manual' }, { title: 'Newer human title', titleSource: 'manual' }])
+  } finally {
+    await pool.query('DELETE FROM agent_runs WHERE id=ANY($1::uuid[])', [[first, continuation]])
+    await pool.query('DELETE FROM agents WHERE id=$1', [agentId])
+  }
+})
+
+dbTest('an SSO-authenticated administrator manages a member device with one APP connection and no owner session', async () => {
+  const { PATCH } = await import('@/app/api/devices/[deviceId]/settings/route')
+  const organizationId = randomUUID(), providerId = `settings-provider-${randomUUID()}`, identityId = randomUUID()
+  const deviceId = randomUUID(), agentId = randomUUID(), runId = randomUUID(), priorSession = sessionId
+  sessionId = randomUUID()
+  await workspacePool.query('INSERT INTO mikka_organizations (id,name,"createdBy") VALUES ($1,\'Settings SSO fixture\',$2)', [organizationId, owner])
+  await workspacePool.query('INSERT INTO mikka_organization_workspaces ("organizationId","workspaceId") VALUES ($1,$2)', [organizationId, workspaceId])
+  await pool.query('INSERT INTO enterprise_sso_provider (id,"providerId","organizationScopeId","userId",issuer,domain,"domainVerified","oidcConfig","domainTokenHash") VALUES ($1,$2,$3,$4,\'https://settings-idp.example.invalid\',$5,true,\'{}\',$6)',
+    [randomUUID(), providerId, organizationId, owner, `${randomUUID()}.example.invalid`, randomUUID()])
+  await pool.query('INSERT INTO enterprise_identity (id,"providerId",issuer,subject,"userId") VALUES ($1,$2,\'https://settings-idp.example.invalid\',$3,$3)', [identityId, providerId, owner])
+  await pool.query('INSERT INTO session (id,token,"userId","expiresAt","createdAt","updatedAt","enterpriseOrganizationId","enterpriseProviderId","enterpriseIdentityId") VALUES ($1,$2,$3,now()+interval \'1 hour\',now(),now(),$4,$5,$6)',
+    [sessionId, randomUUID(), owner, organizationId, providerId, identityId])
+  await pool.query('INSERT INTO enterprise_org_policy ("organizationId","enforceSso") VALUES ($1,true)', [organizationId])
+  await pool.query('INSERT INTO devices (id,"ownerId",name) VALUES ($1,$2,\'Member device\')', [deviceId, member])
+  await pool.query('INSERT INTO agents (id,"userId",name,harness) VALUES ($1,$2,\'SSO device fixture\',\'codex\')', [agentId, member])
+  await pool.query('INSERT INTO agent_runs (id,"userId","workspaceId","agentId",status,prompt) VALUES ($1,$2,$3,$4,\'succeeded\',\'fixture\')', [runId, member, workspaceId, agentId])
+  await pool.query('INSERT INTO thread_machines ("runId","workspaceId","ownerId","snapshotId","operationId",state,"deviceId") VALUES ($1,$2,$3,\'fixture\',$4,\'paused\',$5)', [runId, workspaceId, member, randomUUID(), deviceId])
+  const send = () => PATCH(new Request(`http://127.0.0.1/api/devices/${deviceId}/settings?workspaceId=${workspaceId}`, {
+    method: 'PATCH', body: JSON.stringify({ maxConcurrentRuns: 9 }),
+  }), { params: Promise.resolve({ deviceId }) })
+  try {
+    as(owner)
+    assert.equal((await send()).status, 200)
+    assert.equal((await pool.query('SELECT "maxConcurrentRuns" FROM devices WHERE id=$1', [deviceId])).rows[0].maxConcurrentRuns, 9)
+    assert.equal(pool.totalCount, 1, 'Enterprise checks do not acquire an APP connection inside the held device transaction')
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, member])
+    assert.equal((await send()).status, 403)
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, member])
+    await pool.query('UPDATE session SET "enterpriseIdentityId"=NULL WHERE id=$1', [sessionId])
+    assert.equal((await send()).status, 403, 'the administrator must retain their own SSO assurance')
+  } finally {
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, member])
+    await pool.query('DELETE FROM agent_runs WHERE id=$1', [runId])
+    await pool.query('DELETE FROM agents WHERE id=$1', [agentId])
+    await pool.query('DELETE FROM devices WHERE id=$1', [deviceId])
+    await pool.query('DELETE FROM session WHERE id=$1', [sessionId])
+    await pool.query('DELETE FROM enterprise_identity WHERE id=$1', [identityId])
+    await pool.query('DELETE FROM enterprise_sso_provider WHERE "providerId"=$1', [providerId])
+    await pool.query('DELETE FROM enterprise_org_policy WHERE "organizationId"=$1', [organizationId])
+    await workspacePool.query('DELETE FROM mikka_organizations WHERE id=$1', [organizationId])
+    sessionId = priorSession
+  }
+})
+
+dbTest('archive and pin writers publish exact directory scopes after commit and no directory keys after rollback', async () => {
+  const { db, withDatabaseTransaction } = await import('@/lib/db')
+  const { writeSettings, resetSettings } = await import('./store')
+  const sent: { channel: string; key: string }[] = []
+  const errors: unknown[] = []
+  const receiver = createServer(async (request, response) => {
+    try {
+      let body = ''; for await (const part of request) body += part
+      const channel = request.url!.split('/')[3]
+      for (const event of wireKeys(JSON.parse(body))) {
+        if (event.kind === 'thread_list' || event.kind === 'group_list') sent.push({ channel, key: `${event.kind}:${event.id}` })
+      }
+      response.writeHead(204).end()
+    } catch (error) { errors.push(error); response.writeHead(500).end() }
+  })
+  receiver.listen(0, '127.0.0.1'); await once(receiver, 'listening')
+  const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
+  process.env.DEVICE_GATEWAY_URL = `http://127.0.0.1:${(receiver.address() as { port: number }).port}`
+  process.env.DEVICE_GATEWAY_PUSH_SECRET = 'settings-directory-live-fixture'
+  const drain = async () => { while (liveJobs.length) await liveJobs.shift()!(); assert.deepEqual(errors, []) }
+  const expected = (scopes: { ownerId: string; workspaceId: string }[]) => new Set(scopes.flatMap(scope => ['thread_list', 'group_list'].map(kind => `${liveChannelId(scope)}:${kind}:${scope.workspaceId}`)))
+  const received = () => new Set(sent.map(value => `${value.channel}:${value.key}`))
+  const revisions = async () => (await pool.query('SELECT kind,revision FROM live_revisions WHERE id=$1 AND kind IN (\'thread_list\',\'group_list\') ORDER BY kind', [workspaceId])).rows
+  try {
+    await drain(); sent.length = 0
+    await writeSettings({ userId: member, workspaceId }, 'personal', patch({ keepPinnedThreadsActive: false }))
+    await drain()
+    assert.deepEqual(received(), expected([{ ownerId: member, workspaceId }]))
+    // group_list is an unversioned key in the existing wire contract.
+    assert.deepEqual((await revisions()).map(row => [row.kind, Number(row.revision) > 0]), [['thread_list', true]])
+    sent.length = 0
+    await writeSettings({ userId: owner, workspaceId }, 'workspace', patch({ archiveIdleAfterDays: 14 }))
+    await drain()
+    assert.deepEqual(received(), expected([{ ownerId: owner, workspaceId }, { ownerId: member, workspaceId }]))
+    sent.length = 0
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, member])
+    await resetSettings({ userId: owner, workspaceId }, 'workspace', { group: 'threads' })
+    await drain()
+    assert.deepEqual(received(), expected([{ ownerId: owner, workspaceId }]), 'suspended members and unrelated tenants receive no directory key')
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, member])
+    sent.length = 0
+    await writeSettings({ userId: member, workspaceId }, 'personal', patch({ archiveIdleAfterDays: 3 }))
+    await drain()
+    assert.deepEqual(received(), expected([{ ownerId: member, workspaceId }, { ownerId: member, workspaceId: homes.get(member)! }]))
+    sent.length = 0
+    const beforeRollback = await revisions()
+    await assert.rejects(db.transaction(tx => withDatabaseTransaction(tx, async () => {
+      await writeSettings({ userId: member, workspaceId }, 'personal', patch({ keepPinnedThreadsActive: true }))
+      throw new Error('rollback directory setting fixture')
+    })), /rollback directory setting fixture/)
+    await drain()
+    assert.equal(sent.length, 0)
+    assert.deepEqual(await revisions(), beforeRollback, 'rolled-back settings do not advance persisted directory revisions')
+  } finally {
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, member])
+    if (previous.url === undefined) delete process.env.DEVICE_GATEWAY_URL; else process.env.DEVICE_GATEWAY_URL = previous.url
+    if (previous.secret === undefined) delete process.env.DEVICE_GATEWAY_PUSH_SECRET; else process.env.DEVICE_GATEWAY_PUSH_SECRET = previous.secret
+    receiver.closeAllConnections(); await new Promise<void>(resolve => receiver.close(() => resolve()))
   }
 })

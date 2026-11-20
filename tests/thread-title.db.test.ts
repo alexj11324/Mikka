@@ -37,6 +37,7 @@ test('a thread\'s stored title: bounded by the schema, generated per trigger, sh
     const { conversationDirectory, conversationSidebar } = await import('../lib/conversation-directory')
     const { conversationOrganization } = await import('../lib/conversation-organization')
     const { nameThread, renameThreadTitle } = await import('../lib/thread-title-server')
+    const { savePreferences } = await import('../lib/preferences')
     type GroupRequest = import('../lib/group-conversations-store').GroupRequest
     const dir = new URL('../drizzle/', import.meta.url)
     for (const f of orderMigrations((await readdir(dir)).filter(f => f.endsWith('.sql')))) await pool.query(await readFile(new URL(f, dir), 'utf8'))
@@ -175,8 +176,8 @@ test('a thread\'s stored title: bounded by the schema, generated per trigger, sh
     assert.equal((await conversationOrganization(pool,'owner',workspaceId,historical[49]))?.archived,true)
     await organize(historical[49],'archived',false)
     assert.ok((await filtered()).some(row=>row.id===historical[49]),'restore restarts the idle clock')
-    await pool.query(`INSERT INTO user_preferences ("userId","archiveIdleAfterDays") VALUES ('owner',0)
-      ON CONFLICT ("userId") DO UPDATE SET "archiveIdleAfterDays"=0`)
+    // The real preference writer mirrors the typed setting consumed by the directory.
+    await savePreferences('owner', { archiveIdleAfterDays: 0 })
     assert.equal((await filtered()).length,49,'off keeps all 49 manually unarchived rows')
     assert.equal((await conversationDirectory(pool,'owner',workspaceId,{botId:directoryOtherBot})).items.length,0)
     // 查看运行: the directory narrows to the threads of tasks one automation's runs made.
@@ -199,9 +200,9 @@ test('a thread\'s stored title: bounded by the schema, generated per trigger, sh
     await pool.query(`UPDATE agent_runs SET "botId"=$2 WHERE id=$1`, [main, directoryOtherBot])
     assert.deepEqual(await nested(), [main])
     assert.ok((await conversationSidebar(pool, 'owner', workspaceId, directoryOtherBot))[directoryOtherBot].items.some(row => row.id === check))
-    await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=3 WHERE "userId"='owner'`)
+    await savePreferences('owner', { archiveIdleAfterDays: 3 })
     assert.equal((await sidebar()).more,false,'three days hides old idle work but preserves pinned/live/restored rows')
-    await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=30 WHERE "userId"='owner'`)
+    await savePreferences('owner', { archiveIdleAfterDays: 30 })
     const search = { search: 'needle' }
     const runUnread = async () => {
       const item = (await conversationDirectory(pool, 'owner', workspaceId, search)).items.find(row => row.id === unlinked)
@@ -327,7 +328,7 @@ test('a thread\'s stored title: bounded by the schema, generated per trigger, sh
     assert.deepEqual((await conversationDirectory(pool, 'owner', workspaceId, { ...mixedInput, cursor: legacyCursor })).items, [],
       'a cursor sent by a previous client preserves the old exclusive UUID boundary')
     // The sidebar, header and archive filter use the same idle clock for a named chat.
-    await pool.query(`UPDATE user_preferences SET "archiveIdleAfterDays"=3 WHERE "userId"='owner'`)
+    await savePreferences('owner', { archiveIdleAfterDays: 3 })
     await pool.query(`UPDATE conversations SET "createdAt"=now()-interval '10 days',"conversationRestoredAt"=NULL WHERE id=$1`, [id])
     await pool.query(`UPDATE conversation_messages SET "createdAt"=now()-interval '10 days' WHERE "conversationId"=$1`, [id])
     await pool.query(`UPDATE group_turns SET status='complete' WHERE "conversationId"=$1`, [id])

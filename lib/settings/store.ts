@@ -6,7 +6,7 @@ import { threadTitleSettings, userPreferences, users } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace } from '@/lib/workspace-access'
 import { DEFAULT_TITLE_TRIGGERS, type ThreadTitleTriggers } from '@/lib/thread-title'
-import { archivePreferenceChanged, workspaceListChanged } from '@/lib/live/lists'
+import { archivePreferenceChanged, threadDirectorySettingsChanged, workspaceListChanged } from '@/lib/live/lists'
 import { wakeTokens, wakeWorkflowAfterCommit } from '@/lib/workflow-wake'
 import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
 import { personalSettingValues, workspaceSettingValues } from './schema'
@@ -80,6 +80,9 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
       await tx.insert(threadTitleSettings).values({ workspaceId: context.workspaceId, userId: scope === 'workspace' ? '' : context.userId, ...change })
         .onConflictDoUpdate({ target: [threadTitleSettings.workspaceId, threadTitleSettings.userId], set: { ...change, updatedAt: new Date() } })
     }
+  }
+  if (Object.hasOwn(values, 'keepPinnedThreadsActive') || scope === 'workspace' && Object.hasOwn(values, 'archiveIdleAfterDays')) {
+    await threadDirectorySettingsChanged(tx, context.workspaceId, scope === 'personal' ? context.userId : undefined)
   }
   if (scope === 'workspace' && Object.hasOwn(values, 'subagentMaxConcurrent')) {
     // Raising capacity wakes the existing waiting workflows after commit; no new polling loop.

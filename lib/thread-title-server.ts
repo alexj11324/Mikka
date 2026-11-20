@@ -53,7 +53,8 @@ export async function nameThread(database: Query, runId: string, ownerId: string
     const plan = threadTitlePlan(trigger, run, chain, runIds.length, protection.value as boolean)
     if (plan.do === 'keep') return null
     if (plan.do === 'copy') {
-      const changed = await write(database, ownerId, tenant, runIds, plan.title, plan.source, plan.source === 'manual')
+      const changed = await write(database, ownerId, tenant, runIds, plan.title, plan.source, plan.source === 'manual',
+        plan.source === 'manual' ? plan.title : undefined)
       return { kind: 'copied' as const, title: changed ? plan.title : null }
     }
     const [first = '', ...rest] = run.asked.split('\n').map(line => line.trim()).filter(Boolean)
