@@ -10,7 +10,8 @@ mock.module(new URL('./abuse/model.ts', import.meta.url).href, { namedExports: {
 } })
 mock.module('ai', { namedExports: {
   NoObjectGeneratedError, NoOutputGeneratedError, Output,
-  generateText: async ({ model, output }: { model: { modelId: string }; output: unknown }) => {
+  generateText: async ({ model, output, abortSignal }: { model: { modelId: string }; output: unknown; abortSignal: AbortSignal }) => {
+    abortSignal.throwIfAborted()
     assert.equal(model.modelId, 'mikka-title')
     assert.ok(output, 'the title is requested through structured output')
     const error = nextError
@@ -25,6 +26,15 @@ test('short titles admit and use the managed title alias', async () => {
   assert.equal(await generateShortTitle('owner', { title: 'Fix login', body: '' }, 'workspace'), 'Fix login')
   assert.deepEqual(admitted, [[{ workspaceId: 'workspace', ownerId: 'owner' }, 'mikka-title', { auditAllowed: false }]])
   assert.deepEqual(selected, [['workspace', 'mikka-title', undefined, 'owner']])
+})
+
+test('a title can arrive after a slow converter start', async t => {
+  // Evaluate the deadline at the simulated instant the warmed provider replies.
+  t.mock.method(AbortSignal, 'timeout', (deadlineMs: number) => deadlineMs <= 35_000
+    ? AbortSignal.abort(new DOMException('The title timed out', 'TimeoutError'))
+    : new AbortController().signal)
+  const { generateShortTitle } = await import('./short-title-server')
+  assert.equal(await generateShortTitle('owner', { title: 'Fix login', body: '' }, 'workspace'), 'Fix login')
 })
 
 

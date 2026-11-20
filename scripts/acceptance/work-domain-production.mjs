@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { observeEveSession } from './eve-session.mjs'
+import { observeEveSession, submitEveMessage } from './eve-session.mjs'
 /** Epic #1687. Ordinary shared-account APIs, only inside the existing OIDC job.
  * Preflight sends no model prompt. Active retains useful Tasks and reports.
  * No database/provider credentials, startup timing, settings preparation or UI.
@@ -368,8 +368,8 @@ async function dispatch(client, record, scope, item, timeoutMs) {
   const text = '执行已有 Task ' + record.issueId + '，保留其 Project 关联。只调用一次 dispatch_run，参数：'
     + JSON.stringify(input) + '。不创建新 Task、不换 Profile、模型、订阅或运行位置；派发后仅确认已派发。'
   record.submitted = true
-  await client.rpc('coordinator.sendCoordinatorMessage', [text, null, scope.botId, record.submissionId,
-    { kind: 'cloud' }, null, [], { $mikka: 'undefined' }, record.profileId])
+  await submitEveMessage(client, scope.botId, text, record.submissionId,
+    { taskDestination: { kind: 'cloud' }, profileId: record.profileId, expectedWorkspaceId: scope.workspaceId })
   let call, completed = false
   await observeEveSession(client, scope.botId, { timeoutMs, fail: () => { throw new DomainError('stream_invalid') },
     onEvent: event => {

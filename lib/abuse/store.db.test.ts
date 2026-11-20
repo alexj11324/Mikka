@@ -293,6 +293,21 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
       await store.settle(after, null)
     },
   )
+  await t.test('readiness ignores abandoned holds that a new reservation reaps', async () => {
+    const id = await verified(), abandoned = randomUUID(), reconcilable = randomUUID()
+    await pool.query('UPDATE hosted_allowances SET remaining=150000 WHERE "workspaceId"=$1', [id])
+    await store.reserve(id, 'fixture', abandoned)
+    await store.settle(abandoned, null)
+    assert.equal((await store.status(id)).state, 'points_exhausted')
+    await pool.query(`UPDATE hosted_usage SET "createdAt"=now()-interval '11 minutes' WHERE id=$1`, [abandoned])
+    assert.equal((await store.status(id)).state, 'ready')
+    assert.equal((await pool.query('SELECT state FROM hosted_usage WHERE id=$1', [abandoned])).rows[0].state, 'unknown')
+    await store.reserve(id, 'fixture', reconcilable)
+    assert.equal((await pool.query('SELECT state FROM hosted_usage WHERE id=$1', [abandoned])).rows[0].state, 'failed')
+    await store.settle(reconcilable, null, 0, 0, 'fixture-generation')
+    await pool.query(`UPDATE hosted_usage SET "createdAt"=now()-interval '11 minutes' WHERE id=$1`, [reconcilable])
+    assert.equal((await store.status(id)).state, 'points_exhausted')
+  })
   await t.test(
     'actual rolling spend pauses subsequent calls; purchased calls bypass pause; clears after window',
     async capTest => {

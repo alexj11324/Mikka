@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
+import { submitEveMessage } from '../acceptance/eve-session.mjs'
 
 const tools = ['mailbox_recipients', 'mailbox_send', 'mailbox_inbox', 'mailbox_ack', 'mailbox_sent']
 const unbox = output => output?.type === 'json' ? output.value : output?.type === 'text' ? (() => { try { return JSON.parse(output.value) } catch { return output.value } })() : output
@@ -51,7 +52,7 @@ export async function verifyMailbox({ accounts, pool, progress = async () => {},
   })
   const turn = async (account, botId, text, expected) => {
     const since = new Date()
-    await json(account, '/api/mobile/chat', { botId, text })
+    await submitEveMessage({ request: (path, init) => account.request(path, { ...init, signal }) }, botId, text, randomUUID())
     return waitTools(account, botId, since, expected)
   }
   const create = async (account, name, instructions) => {
