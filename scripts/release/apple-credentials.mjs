@@ -3,6 +3,7 @@
 import { createPrivateKey } from 'node:crypto'
 import { appendFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
 
 export function appleCredentialAliases(env, desktop = false) {
   if (!/^[A-Z0-9]{1,30}$/.test(env.ASC_API_KEY_ID ?? '') || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(env.ASC_API_ISSUER_ID ?? '')) throw Error('RELEASE_APPLE_IDENTIFIERS_INVALID')
@@ -23,7 +24,7 @@ export function appleCredentialAliases(env, desktop = false) {
 }
 
 export function prepareAppleCredentials(env = process.env, desktop = false) {
-  if (env.GITHUB_ACTIONS !== 'true' || env.GITHUB_REPOSITORY !== 'alexj11324/Mikka' || env.GITHUB_REPOSITORY_ID !== '1427517699' || env.GITHUB_REPOSITORY_OWNER_ID !== '183887963' || env.GITHUB_REF !== 'refs/heads/main' || !env.GITHUB_ENV) throw Error('RELEASE_APPLE_RUNNER_REQUIRED')
+  if (env.GITHUB_ACTIONS !== 'true' || !actionsMikkaRepository(env) || env.GITHUB_REF !== 'refs/heads/main' || !env.GITHUB_ENV) throw Error('RELEASE_APPLE_RUNNER_REQUIRED')
   const aliases = appleCredentialAliases(env, desktop)
   for (const value of Object.values(aliases)) console.log('::add-mask::' + value.replaceAll('%', '%25'))
   appendFileSync(env.GITHUB_ENV, Object.entries(aliases).map(([name, value]) => name + '=' + value + '\n').join(''))

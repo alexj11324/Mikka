@@ -46,6 +46,20 @@ def bootstrap_acceptance(run_id, harness):
             'startupTiming': {**base, 'startedAt': 1200, 'endedAt': 1600, 'ms': 400, 'phases': []}}
 
 
+class ReleaseMetadataTests(unittest.TestCase):
+    def test_both_coherent_official_actions_identities_keep_release_metadata(self):
+        for owner, owner_id in [('alexj11324', '183887963'), ('aspectly-labs', '359279274')]:
+            env = {'GITHUB_REPOSITORY': f'{owner}/Mikka', 'GITHUB_REPOSITORY_ID': '1427517699',
+                   'GITHUB_REPOSITORY_OWNER_ID': owner_id, 'GITHUB_SHA': 'a' * 40,
+                   'MIKKA_RUNTIME_SOURCE': 'b' * 40, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '2'}
+            self.assertEqual(bt.release_metadata(env), {'application': 'mikka-template-release',
+                             'sourceCommit': 'b' * 40, 'runId': '123', 'runAttempt': '2'})
+            for change in [{'GITHUB_REPOSITORY_ID': '1'}, {'GITHUB_REPOSITORY_OWNER_ID': ''},
+                           {'GITHUB_REPOSITORY_OWNER_ID': '359279274' if owner == 'alexj11324' else '183887963'},
+                           {'GITHUB_REPOSITORY': 'foreign/Mikka'}]:
+                self.assertEqual(bt.release_metadata({**env, **change}), {'application': 'mikka-template-release'})
+
+
 class FakeResponse(io.BytesIO):
     def __enter__(self): return self
     def __exit__(self, *_): return False
