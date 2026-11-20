@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { ArrowLeft, MoreHorizontal, Play } from '@/components/icons'
 import { listDevices } from '@/app/actions/agents'
 import { getWorkspaceBotDefaults, listBotsForWorkspace } from '@/app/actions/bots'
-import { listEnvironments } from '@/app/actions/environments'
+import { listProjectResources } from '@/app/actions/project-resources'
 import { getModelOrder } from '@/app/actions/model-order'
 import { findThreadReferences } from '@/app/actions/task-runs'
 import { automationLinearLabels, automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, duplicateAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
@@ -131,8 +131,8 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   }, { revalidateOnFocus: false })
   // The Environments a run may use, 优先使用的模型 for the model choice, and the person's workspaces for Duplicate to.
   const environments = useSWR(workspaceId ? ['automation-environments', workspaceId] as const : null, async ([, shown]) => {
-    const result = await listEnvironments(shown)
-    return 'error' in result && result.error ? [] : (result as { environments: { id: string; name: string; archived: boolean }[] }).environments
+    const { environments } = await listProjectResources(shown)
+    return environments.map(environment => ({ id: environment.id, name: environment.name, archived: Boolean(environment.archivedAt) }))
   }, { revalidateOnFocus: false })
   const modelOrder = useSWR(workspaceId && draft?.agent ? ['automation-models', workspaceId] as const : null, async ([, shown]) => {
     const result = await getModelOrder(shown)

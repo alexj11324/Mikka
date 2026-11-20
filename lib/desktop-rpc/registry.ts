@@ -129,6 +129,7 @@ const functions = {
   'automations.pauseAutomation': automations.pauseAutomation,
   'automations.takeOverAutomation': automations.takeOverAutomation,
   'automations.automationWebhookKey': automations.automationWebhookKey,
+  'automations.duplicateAutomation': automations.duplicateAutomation,
   'automations.automationLinearLabels': automations.automationLinearLabels,
   'automations.automationLinearTeams': automations.automationLinearTeams,
   'automations.automationSlackChannels': automations.automationSlackChannels,
