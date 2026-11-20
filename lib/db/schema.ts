@@ -1038,6 +1038,19 @@ export const chatPreferences = pgTable('chat_preferences', {
   pinOrder: integer('pinOrder'), listOrder: integer('listOrder'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.chatKey] })])
+/** A person's pinned pull requests in one workspace (drizzle/20261120045013). `pullKey` is githubPullRequestKey(url). */
+export const pullPins = pgTable('pull_pins', {
+  userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), workspaceId: uuid('workspaceId').notNull(),
+  pullKey: text('pullKey').notNull(), createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.workspaceId, t.pullKey] })])
+/** A person's saved list views (drizzle/20261120045013, lib/saved-views.ts). `filters` is the list's own shape. */
+export const savedViews = pgTable('saved_views', {
+  id: uuid('id').primaryKey(), ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: uuid('workspaceId').notNull(), scope: text('scope').$type<'pulls' | 'threads' | 'tasks'>().notNull(),
+  name: text('name').notNull(), filters: jsonb('filters').$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique('saved_views_ownerId_workspaceId_scope_name_key').on(t.ownerId, t.workspaceId, t.scope, t.name)])
 /** A person's reaction to a bot-chat or group-chat message: one emoji each (drizzle/20261101020500). No FK: the message is in either table. */
 export const messageReactions = pgTable('message_reactions', {
   userId: text('userId').notNull().references(() => users.id, { onDelete: 'cascade' }), messageId: uuid('messageId').notNull(),
