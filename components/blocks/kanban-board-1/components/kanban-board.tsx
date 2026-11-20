@@ -5,7 +5,12 @@ import { useViewScroll } from '@/lib/hooks/view-state'
 import { isValidElement, useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
 import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
-import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, MessageSquare, Tag, Trash2 } from '@/components/icons'
+import { Bell, Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, ExternalLink, EyeOff, Flag, Hash, Link2, ListChecks, Mail, MessageSquare, Tag, Trash2 } from '@/components/icons'
+import { toast } from 'sonner'
+import { useLiveScope } from '@/hooks/use-live-key'
+import { useActionError } from '@/lib/use-action-error'
+import { toggleIssuePreference } from '@/app/actions/issue-operations'
+import { workspaceSearch } from '@/components/workspace/workspace-navigation'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
@@ -177,12 +182,28 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
 }
 
 /** A card's context menu: status, priority, the metadata editors, 受阻, discuss and delete. */
-function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityChange, onDelete, onDiscuss, onBlockChange }: Pick<CardHandlers, 'onStatusChange' | 'onPriorityChange' | 'onDelete' | 'onDiscuss' | 'onBlockChange'> & {
+function TaskMenuItems({ task, disabled, block, ask, unread, onUnread, onStatusChange, onPriorityChange, onDelete, onDiscuss, onBlockChange }: Pick<CardHandlers, 'onStatusChange' | 'onPriorityChange' | 'onDelete' | 'onDiscuss' | 'onBlockChange'> & {
   task: BoardTask
   disabled: boolean
   block: boolean
   ask: (target: MetadataRequest['target']) => void
+  /** Mark as unread (S1-C); absent where the board has no unread list. */
+  unread?: boolean
+  onUnread?: (task: BoardTask, unread: boolean) => void
 }) {
+  const tMenu = useTranslations('IssueDetail.menu')
+  const tDetail = useTranslations('IssueDetail')
+  const viewer = useLiveScope()?.ownerId
+  const actionError = useActionError()
+  const subscribed = Boolean(viewer && task.metadata.subscriberUserIds.includes(viewer))
+  const taskUrl = () => { const url = new URL(window.location.href); url.search = workspaceSearch({ issue: task.id }); return url.href }
+  async function copy(text: string) {
+    try { await navigator.clipboard.writeText(text); toast.success(tDetail('copySuccess')) } catch { toast.error(tDetail('copyFailed')) }
+  }
+  async function subscribe() {
+    const result = await toggleIssuePreference({ id: task.id, kind: 'subscribe', enabled: !subscribed }).catch(() => ({ error: 'generic' }))
+    if (!result || ('error' in result && result.error)) toast.error(actionError('error' in result ? result.error : undefined))
+  }
   const tCard = useTranslations('Shell.board.card')
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
@@ -217,6 +238,12 @@ function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityC
     {onBlockChange && <ContextMenuItem disabled={disabled} onClick={() => onBlockChange(task, !block)}><CircleStop />{block ? tCard('unblock') : tCard('markBlocked')}</ContextMenuItem>}
     <ContextMenuItem onClick={() => onDiscuss(task)}><MessageSquare />{tCard('discuss')}</ContextMenuItem>
     <ContextMenuSeparator />
+    <ContextMenuItem onClick={() => { window.open(taskUrl(), '_blank', 'noopener,noreferrer') }}><ExternalLink />{tMenu('openNewTab')}</ContextMenuItem>
+    <ContextMenuItem onClick={() => { void copy(taskUrl()) }}><Link2 />{tMenu('copyLink')}</ContextMenuItem>
+    {task.identifier && <ContextMenuItem onClick={() => { void copy(task.identifier!) }}><Hash />{tMenu('copyId')}</ContextMenuItem>}
+    <ContextMenuItem disabled={disabled || !viewer} onClick={() => { void subscribe() }}><Bell />{subscribed ? tMenu('unsubscribe') : tMenu('subscribe')}</ContextMenuItem>
+    {onUnread && <ContextMenuItem onClick={() => onUnread(task, !unread)}><Mail />{unread ? tCard('markRead') : tCard('markUnread')}</ContextMenuItem>}
+    <ContextMenuSeparator />
     <ContextMenuItem variant="destructive" disabled={disabled} onClick={() => onDelete(task)}><Trash2 />{tCard('delete')}</ContextMenuItem>
   </>
 }
@@ -225,10 +252,12 @@ function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityC
  * The same context menu around a UI layer's own card (the `board` slot's BoardScreen), with the editors it opens kept
  * off the card. The card stays as the layer draws it: the trigger adds no box of its own.
  */
-export function TaskContextMenu({ task, disabled, block, children, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: Omit<CardHandlers, 'onOpen'> & {
+export function TaskContextMenu({ task, disabled, block, unread, onUnread, children, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: Omit<CardHandlers, 'onOpen'> & {
   task: BoardTask
   disabled: boolean
   block: boolean
+  unread?: boolean
+  onUnread?: (task: BoardTask, unread: boolean) => void
   children: ReactNode
 }) {
   const [request, setRequest] = useState<MetadataRequest | null>(null)
@@ -238,7 +267,7 @@ export function TaskContextMenu({ task, disabled, block, children, onStatusChang
       {isValidElement(children) && typeof children.type === 'string'
         ? <ContextMenuTrigger render={children} data-focus-id={task.id} onPointerEnter={disabled ? undefined : preloadTaskDetail} onFocus={disabled ? undefined : preloadTaskDetail} />
         : <ContextMenuTrigger render={<div className="contents" />} onPointerEnter={disabled ? undefined : preloadTaskDetail} onFocus={disabled ? undefined : preloadTaskDetail}>{children}</ContextMenuTrigger>}
-      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={block} ask={ask} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
+      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={block} ask={ask} unread={unread} onUnread={onUnread} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
     </ContextMenu>
     <div hidden><IssueMetadataControls task={task} section="all" compact disabled={disabled} request={request} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>
   </>

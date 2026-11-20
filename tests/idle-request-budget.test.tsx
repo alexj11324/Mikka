@@ -278,6 +278,8 @@ const AUTOMATION = 'b0000000-0000-4000-8000-000000000001'
 const automation = { id: AUTOMATION, owner_id: OWNER, owner_name: 'Ada', workspace_id: WORKSPACE, bot_id: null, visibility: 'workspace' as const, status: 'active' as const, version: 2, next_at: '2026-11-06T14:00:00.000Z',
   definition: { title: 'Morning triage', timezone: 'America/New_York', timing: { kind: 'cron' as const, expression: '0 9 * * 1-5' }, task: { kind: 'dispatch_task' as const, botId: BOT, prompt: 'Triage new issues' }, misfire: 'skip' as const, maxLatenessMinutes: 30, maxConcurrent: 1 } }
 Object.assign(fixtures, {
+  'task-list.listUnreadTaskIds': () => [],
+  'task-list.countTaskListViews': () => ({ forYou: 0, assigned: 0, created: 0, mentioned: 0, all: 0 }),
   'automations.listAutomations': () => ({ schedules: [automation], nextCursor: null }),
   'automations.getAutomation': () => ({ automation }),
   'automations.automationHistory': () => ({ occurrences: [{ id: 'c0000000-0000-4000-8000-000000000001', due_at: AT, started_at: AT, finished_at: AT, status: 'succeeded', attempts: 1, error: null, result: { id: ISSUE, title: 'Fix sign-in redirect', identifier: 'MIK-7' } }] }),

@@ -83,6 +83,22 @@ test('task list views and filters apply before the page limit', { skip: !enabled
   // An anchor outside the filtered list is stale, never silently continued.
   const outside = { id: assigned, updatedAt: '2025-06-01T00:00:00.000Z' }
   assert.equal((await run(() => listWorkspaceTaskPage({ workspaceId, after: outside, subscribed: true }))).reset, true)
+  // The tabs' counts span the whole collection (the fillers are followed by now, so For you counts them too).
+  const { countTaskListViews, listUnreadTaskIds, setTaskUnread } = await import('../app/actions/task-list')
+  const counts = await run(() => countTaskListViews(workspaceId))
+  assert.deepEqual(counts, { forYou: 153, assigned: 2, created: 158, mentioned: 1, all: 158 })
+  // Mark as unread is the person's own flag; reading it clears it; a task outside the workspace list is never returned.
+  assert.deepEqual(await run(() => listUnreadTaskIds(workspaceId)), [])
+  assert.deepEqual(await run(() => setTaskUnread({ id: assigned, unread: true })), { unread: true })
+  assert.deepEqual(await run(() => setTaskUnread({ id: assigned, unread: true })), { unread: true }, 'idempotent')
+  assert.deepEqual(await run(() => listUnreadTaskIds(workspaceId)), [assigned])
+  assert.deepEqual(await run(() => setTaskUnread({ id: assigned, unread: false })), { unread: false })
+  assert.deepEqual(await run(() => listUnreadTaskIds(workspaceId)), [])
+  assert.deepEqual(await run(() => setTaskUnread({ id: 'not-a-uuid', unread: true })), { error: 'issueOperationInvalid' })
+  await pool.query(`update issues set content = jsonb_set(content, '{attrs,mikka,deletedAt}', to_jsonb(now()::text)) where id = $1`, [mentioned])
+  await run(() => setTaskUnread({ id: assigned, unread: true }))
+  await pool.query('insert into task_reads (user_id, issue_id, workspace_id, unread) values ($1, $2, $3, true)', [me, mentioned, workspaceId])
+  assert.deepEqual(await run(() => listUnreadTaskIds(workspaceId)), [assigned], 'a deleted task is not listed')
   // Unknown values are refused before any read.
   await assert.rejects(run(() => listWorkspaceTaskPage({ workspaceId, after: null, view: 'everything' } as never)))
 })

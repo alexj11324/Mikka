@@ -32,6 +32,7 @@ mock.module(at('components/workspace/issue-assignee-menu.tsx'), { namedExports: 
 mock.module(at('components/workspace/issue-activity.tsx'), { namedExports: { useActivityDrafts: () => ({ body: '', setBody: noop, replyTo: null, setReplyTo: noop, reply: '', setReply: noop, submit: noop, sendReply: noop }) } })
 mock.module(at('components/workspace/issue-pull-request-link.tsx'), { namedExports: { PullRequestStatus: () => null } })
 mock.module(at('hooks/use-issue-states.ts'), { namedExports: { useIssueStates: () => ({ states: null, canEdit: false, error: null, mutate: noop }) } })
+mock.module(at('hooks/use-task-unread.ts'), { namedExports: { useTaskUnread: () => ({ unread: new Set<string>(), loaded: true, set: async () => true }) } })
 
 const { FramedTask } = await import('../components/workspace/task-detail-frame')
 const human = { kind: 'member' as const, id: 'fixture-owner', name: 'Owner', image: null }

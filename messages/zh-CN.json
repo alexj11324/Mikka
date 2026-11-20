@@ -5533,7 +5533,10 @@
           "flagged": "已标记"
         },
         "markBlocked": "标记为受阻",
-        "unblock": "移出受阻"
+        "unblock": "移出受阻",
+        "unread": "未读",
+        "markUnread": "标为未读",
+        "markRead": "标为已读"
       },
       "title": "看板",
       "synced": "已与 Linear 同步",
@@ -5542,7 +5545,29 @@
       "coordinatorPlaceholder": "告诉 Coordinator 怎么安排…",
       "collapse": "收起线程",
       "expand": "展开线程",
-      "unassigned": "未分配"
+      "unassigned": "未分配",
+      "views": {
+        "forYou": "与我相关",
+        "assigned": "分配给我",
+        "created": "我创建的",
+        "mentioned": "提到我",
+        "all": "全部"
+      },
+      "grouping": "分组",
+      "groupBy": {
+        "status": "状态",
+        "priority": "优先级"
+      },
+      "direction": "顺序",
+      "directionValue": {
+        "desc": "降序",
+        "asc": "升序"
+      },
+      "subtasks": "子任务",
+      "subtasksValue": {
+        "show": "显示",
+        "hide": "隐藏"
+      }
     },
     "search": {
       "searching": "正在搜索…",

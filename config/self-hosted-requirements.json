@@ -3868,5 +3868,19 @@
     "behavior": "Narrow the task list in the installation database by view, assignee, creator, labels, due date, PRs, relations and subscription before the page limit.",
     "test": "tests/task-list-filters.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261120063603_task_reads.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store each person's own unread flag on a task in the installation database; it goes with the person, the task or the workspace.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
+  },
+  "app/actions/task-list.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Count the task list's views and read or set the person's unread flags through the installation's own session and workspace checks.",
+    "test": "tests/task-list-filters.db.test.ts",
+    "suite": "test:task-presentation-db"
   }
 }
