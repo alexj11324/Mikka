@@ -55,7 +55,7 @@ function render(metadata: Record<string, unknown>, threads: IssueThread[] = [], 
   }
   const content = { type: 'doc', attrs: { mikka: metadata } }
   const task: IssueView = { id: '10000000-0000-4000-8000-000000000001', userId: human.id, title: 'Task', content,
-    metadata: readIssueMetadata(content), status: 'todo', priority: 'normal', scope: 'workspace', scopeSetBy: 'user',
+    metadata: readIssueMetadata(content), status: 'todo', stateId: null, priority: 'normal', scope: 'workspace', scopeSetBy: 'user',
     workspaceId: '20000000-0000-4000-8000-000000000001', ownershipState: 'bound', scopeVersion: 1, scopeConfidence: null,
     linearSyncPolicy: 'disabled', linearSyncBlocked: false, linearTargetVerified: false,
     shortTitle: null, shortTitleFrom: null, issuedIdentifier: 'TEAM-1', projectId: null,
