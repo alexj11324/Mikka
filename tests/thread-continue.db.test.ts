@@ -741,6 +741,36 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     }
   })
 
+  await t.test('a teammate\'s Bot with canSteer wakes an ended thread in the same thread, once (decision 2026-11-19-2200)', async () => {
+    const owner = await person()
+    const initial = await steps.dispatchRun(owner.id, { model: { harness: 'codex' as const }, issueId: owner.issueId, repo: 'octo/repo', requestKey: `dispatch:${randomUUID()}` }, undefined, owner.botId) as unknown as { runId: string }
+    await end(initial.runId, 'succeeded')
+    await observeFixtureAllowance(owner)
+    const teammate = await seedUser(pool, 'thread-continue-peer')
+    users.push(teammate)
+    await pool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [owner.ws.id, teammate, `${teammate}@example.invalid`])
+    const peerBot = await seedBot(pool, owner.ws.id, teammate)
+    const { botPrincipal } = await import('../lib/interop/principal')
+    const { runInteropTool } = await import('../lib/interop/tools')
+    const asPeer = await botPrincipal(teammate, peerBot)
+    const send = { runId: initial.runId, text: 'The parser API changed; rebase on it.', key: 'peer-wake-1' }
+    assert.deepEqual(await runInteropTool(asPeer, 'send_to_thread', send), { error: 'interop_not_found' }, 'no grant, no send')
+    await pool.query(`INSERT INTO resource_access_grants ("resourceKind","resourceId","subjectKind","subjectId",capabilities) VALUES ('thread',$1,'bot',$2,'{canSteer}')`, [initial.runId, peerBot])
+    const woke = await runInteropTool(asPeer, 'send_to_thread', send) as { runId: string; continued: boolean }
+    assert.equal(woke.continued, true)
+    assert.notEqual(woke.runId, initial.runId)
+    const { rows: [next] } = await pool.query('SELECT status,"continuesRunId","userId",prompt FROM agent_runs WHERE id=$1', [woke.runId])
+    // It runs as the thread owner's own continuation, on the owner's admission.
+    assert.deepEqual([next.status, next.continuesRunId, next.userId], ['queued', initial.runId, owner.id])
+    assert.match(next.prompt, new RegExp(`\\[From bot ${peerBot}\\]`), 'the peer is named; it never reads as the owner')
+    const { rows: shown } = await pool.query('SELECT origin FROM run_messages WHERE "runId"=$1', [woke.runId])
+    assert.deepEqual(shown.map(row => row.origin), ['peer'])
+    const { rowCount: ownerTurns } = await pool.query(`SELECT 1 FROM coordinator_events WHERE "userId"=$1 AND kind='user_message' AND payload->>'text' LIKE '%parser API changed%'`, [owner.id])
+    assert.equal(ownerTurns, 0, 'peer text never becomes an owner request')
+    assert.deepEqual(await runInteropTool(asPeer, 'send_to_thread', send), woke, 'a retried tool call never starts a second continuation')
+    assert.equal((await readRunChain(pool, owner.id, initial.runId))?.latestRunId, woke.runId)
+  })
+
   await t.test('ordinary text cannot cancel a blocked original-session task or queue a fresh continuation', async () => {
     const b = await person()
     const initial = await steps.dispatchRun(b.id, { model: { harness: 'codex' as const }, issueId: b.issueId, repo: 'octo/repo', requestKey: `strict:${randomUUID()}` }, undefined, b.botId) as unknown as { runId: string }
