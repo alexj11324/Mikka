@@ -170,7 +170,7 @@ test('skipped, incomplete, stale-attempt or unsuccessful release jobs cannot aut
   }
 })
 
-function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event } = {}) {
+function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event, validated = true } = {}) {
   let runs = 0, refs = 0
   const calls = []
   const fetchImpl = async (input, options) => {
@@ -183,7 +183,7 @@ function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event
     if (route === '/actions/workflows/e2b-official-runtime.yml') return Response.json(workflow)
     if (route === '/actions/runs/123') return Response.json({ ...run, event: releaseEvent, run_attempt: rerun && ++runs > 1 ? 3 : 2 })
     if (route === '/git/ref/heads/main') return Response.json({ object: { type: 'commit', sha: mainMoved && ++refs > 1 ? OTHER : SHA } })
-    if (route === '/actions/runs/123/attempts/2/jobs?per_page=100') return Response.json(jobs())
+    if (route === '/actions/runs/123/attempts/2/jobs?per_page=100') return Response.json(jobs(validated))
     assert.fail('Unexpected endpoint; upstream artifacts are never read')
   }
   return { fetchImpl, calls }
@@ -213,6 +213,10 @@ test('the shared guard verifies an automatic release and still rejects reruns an
   for (const change of [{ rerun: true }, { mainMoved: true }, { releaseEvent: 'push' }])
     await assert.rejects(verifyRelease({ env: env(), event: trigger, files: relevant,
       ...apiFixture({ releaseEvent: 'workflow_run', ...change }) }))
+  const skipped = await verifyRelease({ env: env(), event: trigger, files: ['README.md'],
+    ...apiFixture({ releaseEvent: 'workflow_run', validated: false }) })
+  assert.equal(skipped.selected, false)
+  assert.equal(skipped.runtime, 'unchanged_worker')
 })
 
 test('provider work requires this runner own same-source Web and upstream attestation', () => {
