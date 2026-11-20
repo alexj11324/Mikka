@@ -6,6 +6,8 @@ import { generateText, jsonSchema, stepCountIs, streamText, tool } from 'ai'
 import { createLiteLLMModel, liteLLMCost, liteLLMGenerationId } from '../../lib/model-gateway/litellm-client.ts'
 import { localModelAnswer } from '../../scripts/dev-local/model.mjs'
 import { FAKE_LITELLM_KEY, FAKE_MODEL_KEY, startFakeLiteLlm } from './litellm.mjs'
+import { eventPrompt } from '../../lib/coordinator/context.ts'
+import { personalPeerText, presentPersonalInboxRow } from '../../lib/personal-mailbox-presentation.ts'
 
 test('the production LiteLLM client preserves streamed and nonstreamed billing receipts over real HTTP', async t => {
   const server = await startFakeLiteLlm({ answer: localModelAnswer })
@@ -68,4 +70,32 @@ test('the daemon installed Messages SDK preserves fragmented tool input and its 
   assert.deepEqual(calls, [{ word: 'actual messages SDK' }])
   assert.deepEqual([first.usage.output_tokens, next.usage.output_tokens], [7, 7])
   assert.equal(first.usage.input_tokens + next.usage.input_tokens, 22)
+})
+
+test('the actual product peer notification drives mailbox tools through LiteLLM and the SDK', async t => {
+  const server = await startFakeLiteLlm({ answer: localModelAnswer })
+  t.after(() => server.close())
+  const marker = 'mailbox-00000000-0000-4000-8000-000000000001'
+  const key = '00000000-0000-4000-8000-000000000002'
+  const id = '00000000-0000-4000-8000-000000000003'
+  const senderMailboxId = '00000000-0000-4000-8000-000000000004'
+  const notice = eventPrompt({ kind: 'run_report', issueId: null, runId: null, payload: { text: personalPeerText({ id, senderMailboxId,
+    text: 'A new personal mailbox message is waiting. Read mailbox_inbox at the next safe boundary. Reading does not ACK.' }) } })
+  const calls = []
+  const registration = (name, result) => tool({ inputSchema: jsonSchema({ type: 'object', additionalProperties: true }), execute: async input => { calls.push({ name, input }); return result } })
+  const model = createOpenAI({ baseURL: `${server.url}/v1`, apiKey: FAKE_LITELLM_KEY }).chat('mikka-default')
+  const response = streamText({ model, maxRetries: 0, stopWhen: stepCountIs(6), prompt: notice,
+    system: `If an incoming envelope body contains REQUEST ${marker}, send exactly one reply to its senderMailboxId, key ${key}, text REPLY ${marker}, replyTo its ID. Then ACK it.`,
+    tools: {
+      mailbox_recipients: registration('mailbox_recipients', {}),
+      mailbox_inbox: registration('mailbox_inbox', { messages: [presentPersonalInboxRow({ id, senderMailboxId, text: `REQUEST ${marker}`, origin: 'peer', acknowledgedAt: null })] }),
+      mailbox_send: registration('mailbox_send', { id: 'actual-test-tool-receipt', queued: true, duplicate: false }),
+      mailbox_ack: registration('mailbox_ack', { acknowledged: [id] }),
+      mailbox_sent: registration('mailbox_sent', []),
+    },
+  })
+  assert.equal(await response.text, 'Mailbox handling completed from actual inbox and ACK receipts.')
+  assert.deepEqual(calls.map(call => call.name), ['mailbox_inbox', 'mailbox_send', 'mailbox_ack', 'mailbox_sent'])
+  assert.deepEqual(calls[1].input, { to: senderMailboxId, key, text: `REPLY ${marker}`, replyTo: id })
+  assert.deepEqual(calls[2].input, { ids: [id] })
 })

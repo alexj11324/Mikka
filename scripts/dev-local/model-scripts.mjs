@@ -95,8 +95,19 @@ function mailbox(c) {
     if (!c.results('mailbox_sent').length) return c.call('mailbox_sent', {})
     return reply(JSON.stringify(c.results('mailbox_sent').at(-1)))
   }
-  // The product inserts this notice; the fixture waits for it before inbox reads.
-  if (!/runtime_notification/.test(c.user) || !/mailbox/i.test(c.user)) return null
+  // Bot wakes use the product's peer envelope, while native worker notices use
+  // runtime_notification. Neither contains the mail: read its actual inbox next.
+  const peerNotice = c.user.split('\n').some(line => {
+    const prefix = '[Event] An Agent reports coordination data: '
+    if (!line.startsWith(prefix)) return false
+    try {
+      const packet = JSON.parse(line.slice(prefix.length))
+      return packet.version === 1 && packet.kind === 'personal_agent_message'
+        && packet.authority === 'coordination_data_only' && packet.source?.origin === 'peer_agent'
+        && packet.untrustedData?.body?.startsWith('A new personal mailbox message is waiting. Read mailbox_inbox')
+    } catch { return false }
+  })
+  if (!peerNotice && (!/runtime_notification/.test(c.user) || !/mailbox/i.test(c.user))) return null
   const inbox = c.results('mailbox_inbox').at(-1)
   if (!inbox) return c.call('mailbox_inbox', {})
   if (!Array.isArray(inbox.messages)) return { status: 422, code: 'fixture_mailbox_receipt_missing' }
