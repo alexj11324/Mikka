@@ -22,6 +22,7 @@ import { ARTIFACT_KINDS } from '@/lib/db/schema'
 import { ARTIFACT_TITLE_MAX } from '@/lib/artifacts/limits'
 import { ProjectMapError } from '@/lib/project-map/contracts'
 import { RECORD_DECISION_TOOL } from '@/lib/project-map/mcp-tool'
+import { INTEROP_TOOLS, INTEROP_TOOL_IDS, WORKER_RUN_TOOLS } from '@/lib/interop/tool-schemas'
 
 // Leaves room for read_coordinator_messages to wait for a reply.
 export const maxDuration = 120
@@ -325,6 +326,28 @@ function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return creat
   }, async (input, ctx) => message(await worker.ask(worker.workerRun(ctx.http?.authInfo), input)))
 
   server.registerTool('submit_artifact', SUBMIT_ARTIFACT, async (input, ctx) => outcome(await artifacts.submit(await artifacts.runSubmitter(worker.workerRun(ctx.http?.authInfo)), input)))
+
+  // Reads, sends and shared Drive across threads and Bots (decision 2026-11-19-2200).
+  // The run acts with its owner's identity and its own grants, pinned to the run's Workspace.
+  for (const name of INTEROP_TOOL_IDS) {
+    const { description, inputSchema } = INTEROP_TOOLS[name]
+    server.registerTool(name, { description, inputSchema: inputSchema as z.ZodObject<z.ZodRawShape> }, async (input: Record<string, unknown>, ctx) => {
+      const run = worker.workerRun(ctx.http?.authInfo)
+      const [{ runPrincipal }, { interopFailure, runInteropTool }] = await Promise.all([import('@/lib/interop/principal'), import('@/lib/interop/tools')])
+      let result
+      try { result = await runInteropTool(await runPrincipal(run.userId, run.id), name, input, ctx.mcpReq.signal) }
+      catch (error) { result = interopFailure(error) }
+      return outcome(result)
+    })
+  }
+
+  server.registerTool('list_runs', { ...WORKER_RUN_TOOLS.list_runs, annotations: { readOnlyHint: true } },
+    async (input, ctx) => json(await withMcpWorkspace(ctx.http?.authInfo, undefined, userId => tools.listRuns(userId, input))))
+
+  server.registerTool('get_run', { ...WORKER_RUN_TOOLS.get_run, annotations: { readOnlyHint: true } }, async ({ runId }, ctx) => {
+    const run = await withMcpWorkspace(ctx.http?.authInfo, undefined, userId => tools.getRun(userId, runId))
+    return run ? json(run) : notFound('Run')
+  })
 
   server.registerTool('blocked', {
     title: 'Say you are blocked',

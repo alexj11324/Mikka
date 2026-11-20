@@ -76,7 +76,19 @@
     "schedule_update",
     "schedule_pause",
     "schedule_resume",
-    "schedule_cancel"
+    "schedule_cancel",
+    "list_threads",
+    "read_thread_messages",
+    "read_run_diff",
+    "list_artifacts",
+    "read_artifact",
+    "list_bots",
+    "read_bot_chat",
+    "send_to_thread",
+    "send_to_bot",
+    "drive_list",
+    "drive_read",
+    "drive_write"
   ],
   "skills": [],
   "hooks": [
