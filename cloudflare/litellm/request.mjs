@@ -1,3 +1,5 @@
+import { modelGatewayProtocolBody } from '../../lib/model-gateway/protocol-fields.mjs'
+
 const postPaths = new Set([
   '/v1/chat/completions', '/v1/decisions', '/v1/audio/transcriptions',
   '/v1/messages', '/v1/messages/count_tokens', '/v1/responses',
@@ -24,6 +26,14 @@ export async function converterCompatibilityRequest(request) {
     || typeof payload.api_base !== 'string' || !payload.api_base) return request
   const headers = new Headers(request.headers)
   headers.delete('content-length')
-  return new Request(request.url, { method: request.method, headers, signal: request.signal,
-    body: JSON.stringify({ ...payload, model: 'openai/chat_completions/' + payload.model }) })
+  const body = {
+    ...modelGatewayProtocolBody(path === '/v1/responses' ? 'openai' : 'anthropic', payload),
+    model: 'openai/chat_completions/' + payload.model,
+    api_key: payload.api_key,
+    api_base: payload.api_base,
+    custom_llm_provider: 'openai',
+    disable_fallbacks: true,
+    num_retries: 0,
+  }
+  return new Request(request.url, { method: request.method, headers, signal: request.signal, body: JSON.stringify(body) })
 }

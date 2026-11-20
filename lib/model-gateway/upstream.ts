@@ -1,3 +1,4 @@
+import { modelGatewayProtocolBody } from './protocol-fields.mjs'
 /* The run's frozen model and server-owned credential reach only LiteLLM. */
 import { managedLiteLlmModel } from './config'
 import type { GatewayProtocol } from './usage'
@@ -16,13 +17,6 @@ export interface UpstreamRequest { url: string; headers: Record<string, string>;
 /** Client headers that carry protocol meaning. Authentication never passes through. */
 const FORWARDED = ['anthropic-version', 'anthropic-beta', 'accept', 'openai-beta']
 
-// LiteLLM accepts routing, credentials and mock responses in the JSON body.
-// Admit only the public protocol fields so a task cannot replace those controls.
-const PROTOCOL_FIELDS: Record<GatewayProtocol, readonly string[]> = {
-  anthropic: ['messages', 'max_tokens', 'system', 'metadata', 'stop_sequences', 'stream', 'temperature', 'top_k', 'top_p', 'tools', 'tool_choice', 'thinking', 'output_config', 'service_tier', 'container', 'context_management'],
-  openai: ['input', 'instructions', 'max_output_tokens', 'max_tool_calls', 'parallel_tool_calls', 'previous_response_id', 'reasoning', 'store', 'stream', 'stream_options', 'temperature', 'text', 'tool_choice', 'tools', 'top_p', 'top_logprobs', 'truncation', 'include', 'service_tier', 'prompt', 'prompt_cache_key', 'prompt_cache_retention', 'safety_identifier', 'user', 'background', 'conversation'],
-}
-
 export function upstreamRequest(input: {
   protocol: GatewayProtocol
   operation: GatewayOperation
@@ -39,12 +33,7 @@ export function upstreamRequest(input: {
     if (value) headers[name] = value
   }
   if (input.protocol === 'anthropic' && !headers['anthropic-version']) headers['anthropic-version'] = '2023-06-01'
-  const body: Record<string, unknown> = Object.fromEntries(PROTOCOL_FIELDS[input.protocol].filter(name => name in input.body).map(name => [name, input.body[name]]))
-  // Anthropic metadata is only a user identifier, not LiteLLM routing metadata.
-  if (input.protocol === 'anthropic' && body.metadata) {
-    const metadata = body.metadata as Record<string, unknown>
-    body.metadata = typeof metadata.user_id === 'string' ? { user_id: metadata.user_id } : {}
-  }
+  const body = modelGatewayProtocolBody(input.protocol, input.body)
   body.model = managedLiteLlmModel(input.model)
   const credential = input.upstream.credential
   if (credential) Object.assign(body, {

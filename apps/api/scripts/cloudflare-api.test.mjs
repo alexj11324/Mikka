@@ -366,8 +366,10 @@ test('the shared converter reshapes only the currently serving API’s legacy BY
   const request = (headers, body = payload) => new Request(url, {
     method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body),
   })
-  const legacy = await converterCompatibilityRequest(request({ authorization: 'Bearer master', 'content-length': '50' }))
-  assert.deepEqual(await legacy.json(), { ...payload, model: 'openai/chat_completions/openai/provider/nested' })
+  const legacy = await converterCompatibilityRequest(request({ authorization: 'Bearer master', 'content-length': '50' },
+    { ...payload, custom_llm_provider: 'malicious', fallbacks: ['mikka-title'], mock_response: 'untrusted' }))
+  assert.deepEqual(await legacy.json(), { ...payload, model: 'openai/chat_completions/openai/provider/nested',
+    custom_llm_provider: 'openai', disable_fallbacks: true, num_retries: 0 })
   assert.equal(legacy.headers.get('content-length'), null)
   const modern = request({ 'x-litellm-api-key': 'Bearer master' }, { ...payload, model: 'openai/provider/nested' })
   assert.equal(await converterCompatibilityRequest(modern), modern)
