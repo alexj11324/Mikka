@@ -9029,5 +9029,23 @@
     "merge": "合并",
     "mergeAnyway": "仍然合并，{count} 项失败",
     "mergeFailed": "合并没有完成。"
+  },
+  "SettingsRegistry": {
+    "archiveIdleAfterDays": {
+      "label": "归档闲置线程",
+      "keywords": "归档|闲置"
+    },
+    "threadTitleInstructions": {
+      "label": "线程标题指令",
+      "keywords": "标题|指令"
+    },
+    "threadTitleTriggers": {
+      "label": "更新线程标题",
+      "keywords": "标题|拉取请求"
+    },
+    "subagentMaxConcurrent": {
+      "label": "并发子 Agent 数量",
+      "keywords": "子 Agent|并发|限制"
+    }
   }
 }
