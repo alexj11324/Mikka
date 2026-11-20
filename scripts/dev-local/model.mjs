@@ -1,6 +1,8 @@
 // Scripts at the LiteLLM HTTP boundary. No production modules or tools are mocked.
 import { randomUUID } from 'node:crypto'
 import { answerDecision } from '../../tests/mvp/decisions.mjs'
+import { localLoopModelAnswer, localGroupDecision } from './model-scripts.mjs'
+import { nativeLocalModelAnswer } from './native-model-script.mjs'
 
 export const textOf = message => typeof message?.content === 'string' ? message.content
   : (message?.content ?? []).filter(part => part.type === 'text').map(part => part.text).join('\n')
@@ -29,7 +31,7 @@ export function localModelAnswer(request) {
     const value = JSON.parse(user)
     if (value.task && typeof value.task.title === 'string') return text(JSON.stringify({ title: '检查本地任务' }))
   }
-  return null
+  return localLoopModelAnswer(request) ?? nativeLocalModelAnswer(request)
 }
 
 export function localDecision(input) {
@@ -39,5 +41,5 @@ export function localDecision(input) {
       ? { type: 'choice', name: question.name, choice: question.choices?.[0]?.value }
       : { type: 'predicate', name: question.name, probability: 0.5 }),
   }
-  return answerDecision(input)
+  return localGroupDecision(input) ?? answerDecision(input)
 }
