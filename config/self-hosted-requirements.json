@@ -4308,5 +4308,12 @@
     "behavior": "Checks the owner's explicit canSteer grant before a peer continues an ended thread, in the installation database.",
     "test": "lib/interop/interop.db.test.ts",
     "suite": "test:interop-db"
+  },
+  "lib/api-key-models-view.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure projection partitioning an API key’s discovered models into recognized and unrecognized entries with select-all state; no network or credentials.",
+    "test": "lib/api-key-models-view.test.ts",
+    "suite": "test:lib-units"
   }
 }
