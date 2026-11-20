@@ -41,6 +41,16 @@ export const SETTINGS_REGISTRY = {
     type: 'integer', guard: z.number().int().min(1).max(20), defaultValue: 6,
     personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
   },
+  protectManualThreadTitles: {
+    ...inherited, key: 'protectManualThreadTitles', group: 'threads', page: 'threads',
+    label: { en: 'Protect manually named threads', 'zh-CN': '保护手动命名的线程' }, keywords: ['title', 'manual', 'rename', '标题', '手动'],
+    type: 'boolean', guard: z.boolean(), defaultValue: true, personalContext: 'workspace',
+  },
+  keepPinnedThreadsActive: {
+    ...inherited, key: 'keepPinnedThreadsActive', group: 'threads', page: 'threads',
+    label: { en: 'Keep pinned threads active', 'zh-CN': '保留置顶线程' }, keywords: ['pin', 'archive', '置顶', '归档'],
+    type: 'boolean', guard: z.boolean(), defaultValue: true, personalContext: 'workspace',
+  },
 } satisfies Record<string, SettingDefinition>
 
 export type SettingKey = keyof typeof SETTINGS_REGISTRY
