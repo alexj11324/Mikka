@@ -139,6 +139,9 @@ jobs:
           docker compose run --rm --no-deps --entrypoint node \
             --volume "$PWD:/source:ro" app \
             /source/apps/eve/node_modules/@workflow/world-postgres/bin/setup.js
+          docker compose run --rm --no-deps --entrypoint node \
+            --volume "$PWD:/source:ro" app \
+            --test /source/scripts/acceptance/workflow-postgres-startup-race.test.mjs
       - name: Start an independent external Compose installation against isolated PG17
         run: bash scripts/acceptance/self-hosted-external-postgres.sh
       - &build_minio
