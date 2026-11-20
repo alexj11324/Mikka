@@ -304,7 +304,7 @@ export async function sendCoordinatorMessage(text: string, quote?: ArtifactQuote
       if (error instanceof SubmissionConflictError) throw new ActionFailureError('submissionConflict')
       throw error
     }
-    afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(userId, bot.id))
     return { queued: true as const }
   })
 }

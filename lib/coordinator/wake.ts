@@ -56,8 +56,14 @@ export async function triageInbox(userId: string, botId: string): Promise<void> 
  * Claimed batches also get a durable deadline. The independent sweep still
  * repairs the commit-to-start gap and workflow infrastructure failures.
  */
-export async function wakeCoordinator(userId: string): Promise<void> {
+export async function wakeCoordinator(userId: string, directBotId?: string): Promise<void> {
   try {
+    if (directBotId) {
+      // An explicit send already names the recipient. Its outbox delivery
+      // must not wait for background judgments in this or another chat.
+      if (await coordinatorEnabled(userId, directBotId)) await deliverReadyChat({ userId, botId: directBotId }, true)
+      return
+    }
     // Resolving the Coordinator first moves any of its chat still stored the old way onto its personal Coordinator.
     // A person with no workspace to resolve has no Coordinator turn to start; their bots still wake.
     await coordinatorBot(userId, null).catch(() => undefined)
@@ -74,12 +80,16 @@ export async function wakeCoordinator(userId: string): Promise<void> {
 /** Product outbox delivery only. eve owns turn queueing, retry and recovery. */
 async function wakeChat(scope: { userId: string; botId: string }) {
   await triageInbox(scope.userId,scope.botId)
+  return deliverReadyChat(scope)
+}
+
+async function deliverReadyChat(scope: { userId: string; botId: string }, directOnly = false) {
   const { rows: events } = await pool.query<{ id: string; workspaceId: string }>(`
     SELECT e.id, b."workspaceId" FROM coordinator_events e
     JOIN bots b ON b.id = e."botId" AND b."ownerId" = e."userId"
     WHERE e."userId" = $1 AND e."botId" = $2 AND e."deliveredAt" IS NULL
-      AND (e.kind = 'user_message' OR (e.tier IS NOT NULL AND e.tier <> 'background'))
-    ORDER BY e."createdAt", e.id LIMIT 50`, [scope.userId, scope.botId])
+      AND (e.kind = 'user_message' OR (NOT $3::boolean AND e.tier IS NOT NULL AND e.tier <> 'background'))
+    ORDER BY e."createdAt", e.id LIMIT 50`, [scope.userId, scope.botId, directOnly])
   if (!events.length) return 'deferred' as const
   const { sendEveEvent } = await import('../eve/server-client')
   for (const event of events) {

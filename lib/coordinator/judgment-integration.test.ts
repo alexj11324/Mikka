@@ -7,6 +7,7 @@ const priorUrl=process.env.MIKKA_LITELLM_URL
 const priorKey=process.env.MIKKA_LITELLM_MASTER_KEY, priorFetch=globalThis.fetch, priorConsole=console.error
 let events: Array<{id:string;kind:'run_finished'|'run_question'|'run_blocked'|'issue_done'|'user_message';payload:Record<string,unknown>;tier:string|null;lastTriageAttemptAt?:Date|null}>=[]
 let starts=0
+let directBotId: string | null = null
 const requests: Array<Record<string,unknown>>=[]
 let response:unknown
 const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new URL(path,import.meta.url).href,{namedExports})
@@ -31,13 +32,13 @@ stub('../attention/store.ts',{releaseAttention:async()=>{}})
 // are synthetic. No old Workflow loop or lease engine participates.
 stub('../default-model.ts',{defaultModelAvailable:async()=>true})
 stub('./coordinator-bot.ts',{coordinatorBot:async()=>({botId:'fixture-bot',workspaceId:'fixture-workspace'})})
-stub('../db/index.ts',{pool:{query:async(sql:string)=>{
- if(sql.includes('SELECT e.id, b."workspaceId" FROM coordinator_events e'))return {rows:events.filter(e=>e.tier!==null&&e.tier!=='background').map(e=>({id:e.id,workspaceId:'fixture-workspace'}))}
+stub('../db/index.ts',{pool:{query:async(sql:string,params?:unknown[])=>{
+ if(sql.includes('SELECT e.id, b."workspaceId" FROM coordinator_events e'))return {rows:events.filter(e=>params?.[2]===true ? e.kind==='user_message' : e.tier!==null&&e.tier!=='background').map(e=>({id:e.id,workspaceId:'fixture-workspace'}))}
  throw new Error('Unexpected SQL in decision boundary fixture')
 }}})
 stub('../eve/server-client.ts',{sendEveEvent:async(scope:unknown,id:string)=>{
- assert.deepEqual(scope,{ownerId:'synthetic',botId:null,workspaceId:'fixture-workspace',surface:'web'})
- assert.ok(events.some(event=>event.id===id));starts++
+ assert.deepEqual(scope,{ownerId:'synthetic',botId:directBotId,workspaceId:'fixture-workspace',surface:'web'})
+ assert.ok(events.some(event=>event.id===id && (!directBotId || event.kind==='user_message')));starts++
 }})
 let wake:typeof import('./wake'),group:typeof import('./route-group'),transport:typeof import('./decide')
 before(async()=>{
@@ -45,7 +46,7 @@ before(async()=>{
  globalThis.fetch=async(input,init)=>{assert.equal(String(input),'https://litellm.example/v1/decisions');requests.push(JSON.parse(String(init?.body)));return Response.json({model:DECISION_MODEL,...(response as object)},{headers:{'x-litellm-call-id':'synthetic-generation','x-litellm-response-cost':'0'}})}
  wake=await import('./wake');group=await import('./route-group');transport=await import('./decide')
 })
-beforeEach(()=>{process.env.MIKKA_LITELLM_URL='https://litellm.example';process.env.MIKKA_LITELLM_MASTER_KEY='synthetic-no-provider';events=[];starts=0;requests.length=0;response={answers:[{type:'choice',name:'tier',choice:'result'}]}})
+beforeEach(()=>{process.env.MIKKA_LITELLM_URL='https://litellm.example';process.env.MIKKA_LITELLM_MASTER_KEY='synthetic-no-provider';events=[];starts=0;directBotId=null;requests.length=0;response={answers:[{type:'choice',name:'tier',choice:'result'}]}})
 after(()=>{if(priorUrl===undefined)delete process.env.MIKKA_LITELLM_URL;else process.env.MIKKA_LITELLM_URL=priorUrl;globalThis.fetch=priorFetch;console.error=priorConsole;if(priorKey===undefined)delete process.env.MIKKA_LITELLM_MASTER_KEY;else process.env.MIKKA_LITELLM_MASTER_KEY=priorKey})
 test('every runtime event reaches the actual model adapter instead of failed/blocked heuristics',async()=>{
  events=['run_finished','run_question','run_blocked','issue_done'].map((kind,i)=>({id:String(i),kind:kind as 'run_finished',payload:{status:'failed',reason:'already recoverable'},tier:null}))
@@ -63,6 +64,16 @@ test('unavailable or malformed model results leave the event pending and do not 
 test('direct user delivery does not require a semantic classification or a new confirmation layer',async()=>{
  delete process.env.MIKKA_LITELLM_MASTER_KEY;events=[{id:'user',kind:'user_message',payload:{text:'authorized task'},tier:null}]
  await wake.wakeCoordinator('synthetic');assert.equal(events[0].tier,'attention');assert.equal(starts,1);assert.equal(requests.length,0)
+})
+test('the user message addressed to a Bot reaches Eve without running unrelated inbox judgments', async () => {
+ directBotId='selected-bot'
+ events=[{id:'older',kind:'run_finished',payload:{status:'failed'},tier:null},
+   {id:'classified',kind:'run_question',payload:{},tier:'attention'},
+   {id:'user',kind:'user_message',payload:{text:'direct message'},tier:null}]
+ await wake.wakeCoordinator('synthetic',directBotId)
+ assert.equal(starts,1)
+ assert.equal(requests.length,0)
+ assert.equal(events[0].tier,null)
 })
 test('actual pixels reach input_image; a visual request without pixels remains pending',async()=>{
  events=[{id:'visual',kind:'run_finished',payload:{status:'failed',images:[{dataUrl:png,detail:'high'}],requiresVisual:true},tier:null}]

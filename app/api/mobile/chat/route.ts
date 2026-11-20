@@ -114,7 +114,7 @@ async function handlePOST(request: Request) {
       if (error instanceof SubmissionConflictError) return json({ error: 'submissionConflict' }, 409)
       throw error
     }
-    afterJob('after:coordinator-wake', () => wakeCoordinator(user.id))
+    afterJob('after:coordinator-wake', () => wakeCoordinator(user.id, botId))
     return json({ queued: true }, 202)
   }
   const result = await sendCoordinatorMessage(parsed.data.text, null, parsed.data.botId ?? null, parsed.data.submissionId, undefined, null, images)

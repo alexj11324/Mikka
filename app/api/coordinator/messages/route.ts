@@ -56,7 +56,7 @@ async function handlePOST(request: Request) {
     if (error instanceof SubmissionConflictError) return NextResponse.json({ error: 'submissionConflict' }, { status: 409 })
     throw error
   }
-  afterJob('after:coordinator-wake', () => wakeCoordinator(userId))
+  afterJob('after:coordinator-wake', () => wakeCoordinator(userId, botId))
   return NextResponse.json({ queued: true, enabled: await coordinatorEnabled(userId, botId) }, { status: 202 })
 }
 
