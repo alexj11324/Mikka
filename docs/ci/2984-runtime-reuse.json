@@ -69,10 +69,40 @@
       "archiveDigestReportedByGitHub": "sha256:eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429",
       "expiredAtRead": false,
       "expiresAt": "2026-11-24T17:56:58Z",
-      "archiveBytesIndependentlyVerified": false
+      "archiveBytesIndependentlyVerified": true,
+      "initialCheckpointArchiveBytesIndependentlyVerified": false,
+      "archiveVerificationObservedAt": "2026-11-20T23:53:41.161Z"
     },
     "sampleDenominator": 1,
-    "qualification": "Existing historical publication only. No new E2B build, deployment, sandbox or real model execution was triggered for this evidence."
+    "qualification": "Existing historical publication only. No new E2B build, deployment, sandbox or real model execution was triggered for this evidence.",
+    "laterReadOnlyArchiveVerification": {
+      "schema": "mikka-2984-independent-real-published-artifact-v1",
+      "started_at": "2026-11-20T23:53:41.114Z",
+      "completed_at": "2026-11-20T23:53:41.161Z",
+      "parser_checkout": "d86dade94a7977c14e073820dc8c98e22d27f475",
+      "archive_parser_blob": "a55edb760f77913f12595e476e55b9f47645f35c",
+      "report_parser_blob": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f",
+      "node": "v24.22.3",
+      "python": "Python 3.12.14",
+      "repository_id": 1427517699,
+      "repository_full_name": "aspectly-labs/Mikka",
+      "run_id": 44140435060,
+      "run_attempt": 1,
+      "workflow_head_sha": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "artifact_id": 14354323589,
+      "archive_bytes": 46376,
+      "archive_sha256": "eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429",
+      "native_archive_digest_match": true,
+      "report_bytes": 329438,
+      "report_sha256": "8847c9c24574ae7361b0c172d93c5728359468df2bbf22a33e4c4a3004b3b482",
+      "published_source_commit": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "published_worker_sha": "3c001413e47063cc68108c84938c697f4cf18357",
+      "report_identity": "passed",
+      "all_three_templates_public_ready": true,
+      "workflow_head_used_as_published_source": "rejected_runtime_report_source_mismatch",
+      "scope": "Existing GitHub artifact downloaded read-only through purpose-built connector, original Python-backed ZIP reader and Node report identity function executed. No publication payload or resource locators emitted; no model, provider, VM, deployment or DB action. This proves actual artifact bytes, not the new helper network path.",
+      "receiptSha256": "5f397932902b0ecb7ef209c0cdddca1c76a398ca5229346e40f8bf39a089b85f"
+    }
   },
   "sourceOnlyValidation": {
     "runtime": "Existing functions V8 isolate; no persistent runner or validation framework added",
@@ -385,7 +415,92 @@
       "logSha256": "977b0235d0d17d149726364c176597c6e09167f5dd602a45e311db7780ad2aa3",
       "qualification": "These 26 original cases completed successfully in the recorded multi-file command even though task-secrets failed to load. This is not a claim that the whole command passed."
     },
-    "scope": "Only original offline suites with closed network fixtures. No live subscription, E2B, release, database, browser session or production acceptance. Final commit review and real protected CI are separate gates."
+    "scope": "Only original offline suites with closed network fixtures. No live subscription, E2B, release, database, browser session or production acceptance. Final commit review and real protected CI are separate gates.",
+    "independentFixedTreeGreen": {
+      "schema": "mikka-2984-independent-node-green-v1",
+      "head": "e2d9ee268f5479fdbfbab629232bf362674808d8",
+      "tree": "3fb748ecb57aedacc354ca2b86a20563cfc8187e",
+      "parents": [
+        "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+        "6fe25cf9413d4078ce350a97e284c33f1efa9de7"
+      ],
+      "node": "v24.22.3",
+      "python": "Python 3.12.14",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/e2b/runtime-inputs.test.mjs",
+        "scripts/acceptance/task-secrets-ci.test.mjs",
+        "scripts/acceptance/coding-review-ci.test.mjs",
+        "scripts/acceptance/factory-visual-evidence.test.mjs"
+      ],
+      "started_at": "2026-11-20T23:55:00.691810+00:00",
+      "completed_at": "2026-11-20T23:55:05.540587+00:00",
+      "wall_seconds": 4.848754298000131,
+      "node_exit_code": 0,
+      "node_summary": {
+        "tests": 61,
+        "suites": 0,
+        "pass": 61,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "log_bytes": 7239,
+      "log_sha256": "fdf2ccbdb982fe527bf06d2503e5336d4aeb6038893f8dc087300617157bab2d",
+      "worktree_clean_after": true,
+      "scope": "Original four offline Node test files on fixed commit; actual Python ZIP/SHA/canonical Git work and offline FFmpeg tests execute; external HTTP/provider/model I/O stays mocked by original fixtures. This is not protected GitHub CI or live paid acceptance.",
+      "receiptSha256": "42bd1c892b8a766c0bd8d8db72e32e3620fed56ca2280f22976180a0a87c6453"
+    },
+    "independentNativeArtifactGreen": {
+      "schema": "mikka-2984-independent-node-real-artifact-green-v1",
+      "head": "e2d9ee268f5479fdbfbab629232bf362674808d8",
+      "tree": "3fb748ecb57aedacc354ca2b86a20563cfc8187e",
+      "helper_blob": "f5e11abae81d4409ccb7f16c875ce640e4dee0ae",
+      "runtime_blob": "fd3f919d955f547db24f175a4bfdae8057a49a95",
+      "report_parser_blob": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f",
+      "started_at": "2026-11-20T23:56:10.478Z",
+      "completed_at": "2026-11-20T23:56:10.615Z",
+      "node": "v24.22.3",
+      "repository_id": 1427517699,
+      "run_id": 44140435060,
+      "run_attempt": 1,
+      "publication_job_id": 134248391647,
+      "native_job_denominator": 9,
+      "native_artifact_denominator": 4,
+      "artifact_id": 14354323589,
+      "native_metadata_unchanged": true,
+      "archive_bytes": 46376,
+      "archive_sha256": "eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429",
+      "native_digest_match": true,
+      "report_bytes": 329438,
+      "report_sha256": "8847c9c24574ae7361b0c172d93c5728359468df2bbf22a33e4c4a3004b3b482",
+      "workflow_head_sha": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "published_source_commit": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "published_worker_sha": "3c001413e47063cc68108c84938c697f4cf18357",
+      "all_three_templates_public_ready": true,
+      "authenticated_route": "https://api.github.com/repositories/1427517699/actions/artifacts/14354323589/zip",
+      "token_forwarded_to_storage": false,
+      "actual_new_helper_identity": "passed",
+      "actual_new_helper_byte_digest_zip_report": "passed",
+      "isolated_native_publication_selection": "passed",
+      "transport_boundary": "Node requests use a closed offline response adapter over captured native run/jobs/artifact list and the actual downloaded archive. Artifact detail and latest-run responses reuse their captured metadata; no direct artifact-detail response was available through the connector. Real archive download occurred separately through the authorized GitHub connector. This does not prove live execution of the new HTTP route or protected CI.",
+      "scope": "Original production functions only; no source changes, new framework, model/provider/VM/deployment/DB calls or publication payload output.",
+      "receiptSha256": "b3a7ad499450780df4bd12cb68243d2caf3a5012cb18bedba4d23d45baa661aa"
+    },
+    "currentRemoteEquivalentSource": {
+      "head": "7c01475dbc3a0bc14b84dcd2e7236b0a8187a911",
+      "tree": "3fb748ecb57aedacc354ca2b86a20563cfc8187e",
+      "parents": [
+        "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+        "6fe25cf9413d4078ce350a97e284c33f1efa9de7"
+      ],
+      "qualification": "Native commit API readback confirms the same tree and normal two parents as tested local e2d9ee268. Different commit metadata does not create a second test execution. This documentation append preserves all tested code and test blobs."
+    },
+    "validationBoundary": "The complete 61-case result is a real independent local Node run at e2d9, byte-identical to remote 7c01475d. The separately fetched historical artifact is real and native-digest verified. The new reader was exercised with a closed adapter over those actual bytes/metadata; the artifact-detail and latest-run adapter responses reuse captured metadata. No live execution of the new HTTP route, protected CI, publication or model acceptance is inferred."
   },
   "ownership": [
     {
@@ -425,7 +540,7 @@
     "No workflow, permission, timeout, trigger, publisher or model-policy change"
   ],
   "remaining": [
-    "Independent review and applicable protected CI on the final current head",
+    "Final-head independent review COMMENT and applicable protected CI",
     "Normal merge and exact merged-source verification by the root coordinator",
     "Existing acceptance-consumer top-level identity migration remains a separately tracked owner dependency",
     "No claim of production acceptance, real subscription execution or measured paid-build savings"
