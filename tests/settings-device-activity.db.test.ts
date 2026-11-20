@@ -169,6 +169,19 @@ test('settings device and contribution HTTP reads preserve owner, tenant and rol
     assert.equal((await readActivity('?groupBy=invalid')).status, 400)
   })
 
+  await t.test('revoked task access also removes checkpoint metadata and migration admission for the original run owner', async () => {
+    principal = { id: owner }
+    await pool.query(`UPDATE resource_access_policies SET "ownerId"=$2,visibility='private' WHERE kind='task' AND id=$1`, [issue, member])
+    try {
+      const value = await (await detail.GET(deviceRequest('detail'), deviceContext())).json()
+      assert.deepEqual(value.checkpoints, [])
+      assert.deepEqual(value.cloudCheckpoints, [])
+      assert.equal((await migrate()).status, 404)
+    } finally {
+      await pool.query('UPDATE resource_access_policies SET "ownerId"=$2 WHERE kind=\'task\' AND id=$1', [issue, owner])
+    }
+  })
+
   await t.test('ordinary members, outsiders, suspended administrators and other workspace tokens cannot read the administrator calendar', async () => {
     for (const id of [null, member, outsider]) {
       principal = id ? { id } : null

@@ -53,11 +53,14 @@ export async function readDeviceSettingsDetail(reader: EnterpriseReader, input: 
       : { rows: [] }
     const { rows: checkpoints } = await tx.query<{ runId: string; baseCommit: string; files: number; takenAt: Date; unavailableReason: 'too_large' | null }>(`SELECT c."runId",c."baseCommit",c.files,c."takenAt",c."unavailableReason"
       FROM run_checkpoints c JOIN agent_runs r ON r.id=c."runId" AND r."userId"=c."userId"
-      WHERE r."deviceId"=$1 AND r."userId"=$2 AND r."workspaceId"=$3 ORDER BY c."takenAt" DESC,c."runId" LIMIT 100`, [deviceId, reader.id, workspaceId])
+      WHERE r."deviceId"=$1 AND r."userId"=$2 AND r."workspaceId"=$3
+        AND (r."issueId" IS NULL OR mikka_resource_acl_allowed('account',$2,r."workspaceId",'task',r."issueId",'canReadContent'))
+      ORDER BY c."takenAt" DESC,c."runId" LIMIT 100`, [deviceId, reader.id, workspaceId])
     const { rows: snapshots } = await tx.query<{ runId: string; snapshotState: DeviceSettingsDetail['cloudCheckpoints'][number]['state']; snapshotTakenAt: Date | null; available: boolean }>(`SELECT t."runId",t."snapshotState",t."snapshotTakenAt",
       (t."snapshotState"='ready' AND t."filesystemSnapshotId" IS NOT NULL) AS available
       FROM thread_machines t JOIN agent_runs r ON r.id=t."runId" AND r."userId"=t."ownerId" AND r."workspaceId"=t."workspaceId"
       WHERE t."deviceId"=$1 AND t."ownerId"=$2 AND t."workspaceId"=$3
+        AND (r."issueId" IS NULL OR mikka_resource_acl_allowed('account',$2,r."workspaceId",'task',r."issueId",'canReadContent'))
       ORDER BY t."snapshotTakenAt" DESC NULLS LAST,t."runId" LIMIT 100`, [deviceId, reader.id, workspaceId])
     const online = deviceIsOnline(device)
     return {
@@ -92,7 +95,8 @@ export async function inspectDeviceMigration(reader: EnterpriseReader, deviceId:
   return withTaskWorkspace(reader, value.workspaceId, () => writeTransaction(pool, async tx => {
     const { rows } = await tx.query(`SELECT id FROM devices WHERE id=ANY($1::uuid[]) AND "ownerId"=$2 AND "removedAt" IS NULL FOR SHARE`, [[deviceId, value.targetDeviceId], reader.id])
     if (rows.length !== 2) throw new GovernanceError('not_found')
-    const run = await tx.query(`SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3 AND "deviceId"=$4 FOR SHARE`,
+    const run = await tx.query(`SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3 AND "deviceId"=$4
+      AND ("issueId" IS NULL OR mikka_resource_acl_allowed('account',$2,"workspaceId",'task',"issueId",'canReadContent')) FOR SHARE`,
       [value.runId, reader.id, value.workspaceId, deviceId])
     if (!run.rowCount) throw new GovernanceError('not_found')
     return { workspaceId: value.workspaceId, sourceDeviceId: deviceId, targetDeviceId: value.targetDeviceId,
