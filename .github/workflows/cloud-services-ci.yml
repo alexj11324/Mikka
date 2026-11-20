@@ -8,9 +8,11 @@ on:
         required: true
 permissions:
   contents: read
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
 jobs:
   qualify:
-    if: github.repository == 'alexj11324/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963'
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963'
     # The qualification extracts PostgreSQL 17 from the PGDG noble (24.04)
     # packages, and its initdb only runs on that release. `ubuntu-latest`
     # moved to 26.04 on 2026-11-19 and broke the stage; pin the image the
@@ -65,7 +67,7 @@ jobs:
         with:
           app-id: ${{ env.GITHUB_APP_ID }}
           private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
-          owner: alexj11324
+          owner: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
           repositories: mikka-cloud
           permission-contents: read
       - name: Remove App credentials before loading private operations code
@@ -75,7 +77,7 @@ jobs:
       - name: Check out the pinned private operations source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          repository: alexj11324/mikka-cloud
+          repository: ${{ format('{0}/mikka-cloud', vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324') }}
           ref: ${{ inputs.cloud_source_sha }}
           token: ${{ steps.source-token.outputs.token }}
           path: .mikka-cloud

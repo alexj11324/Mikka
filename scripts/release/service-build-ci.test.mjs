@@ -91,7 +91,7 @@ function event(kind) {
   const ref = kind === 'push' ? 'refs/heads/main' : 'refs/pull/23/merge'
   const sha = kind === 'push' ? revision : merge
   return {
-    env: { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
+    env: { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
       GITHUB_ACTOR_ID: '183887963', GITHUB_ACTOR: 'alexj11324', GITHUB_TRIGGERING_ACTOR: 'alexj11324',
       GITHUB_REF: ref, GITHUB_SHA: sha, GITHUB_WORKFLOW_SHA: sha, GITHUB_EVENT_NAME: kind,
       GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/cloudflare-api-image.yml@' + ref,

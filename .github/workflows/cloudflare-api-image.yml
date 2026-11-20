@@ -12,6 +12,8 @@ on:
         required: true
 permissions:
   contents: read
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
 jobs:
   source:
     if: github.event_name == 'pull_request' || github.event_name == 'push'
@@ -30,7 +32,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    if: github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 30
@@ -89,7 +91,7 @@ jobs:
     # The existing environment rejects refs/pull/*/merge, including owner PRs.
     # Keep that protection: PRs run the credential-free legacy image gates;
     # Registry publication starts only after a real merge into main.
-    if: github.repository_id == '1427517699' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 10
@@ -144,7 +146,7 @@ jobs:
         with:
           app-id: ${{ env.GITHUB_APP_ID }}
           private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
-          owner: alexj11324
+          owner: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
           repositories: mikka-cloud
           permission-contents: read
       - name: Remove App credentials
@@ -153,7 +155,7 @@ jobs:
           echo 'GITHUB_APP_PRIVATE_KEY=' >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: alexj11324/mikka-cloud
+          repository: ${{ format('{0}/mikka-cloud', vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324') }}
           ref: main
           token: ${{ steps.source-token.outputs.token }}
           path: .operations-input
