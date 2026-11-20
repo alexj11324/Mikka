@@ -64,7 +64,9 @@ export function operationsInput(env) {
     check(sha.test(env.MIKKA_OPERATOR_PRODUCT_SHA ?? '') && post.test(env.MIKKA_PROMOTION_POST ?? '')
       && attempt.test(env.MIKKA_PREPARATION_RUN ?? ''), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
     const history = env.MIKKA_OBSERVATION_HISTORY || ''
-    check(!history || history === 'auto' || history.split(',').length === 8 && history.split(',').every(original), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
+    const windows = history.split(',')
+    check(!history || history === 'auto' || windows.length === 8 && new Set(windows).size === 8
+      && windows.every(original), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
     check(!env.MIKKA_PRESSURE_ENROLLMENT || original(env.MIKKA_PRESSURE_ENROLLMENT), 'PUBLIC_OPERATIONS_INPUT_REQUIRED')
   }
   if (operation === 'runtime-native-alert') {

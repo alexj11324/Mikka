@@ -318,10 +318,10 @@ test('runtime operations reject unrelated receipts or incomplete activation befo
   }
   const observe = {...operatorEnv(), MIKKA_OPERATION:'observe-cloudflare-runtime', MIKKA_OPERATION_ACTION:'read',
     MIKKA_OPERATOR_PRODUCT_SHA:sourceSha, MIKKA_PROMOTION_POST:base.MIKKA_PROMOTION_POST,
-    MIKKA_PREPARATION_RUN:'321-1', MIKKA_OBSERVATION_HISTORY:Array(8).fill(receipt).join(','),
+    MIKKA_PREPARATION_RUN:'321-1', MIKKA_OBSERVATION_HISTORY:Array.from({length:8}, (_, index) => `${123 + index}-1-` + 'b'.repeat(40) + '-' + 'c'.repeat(64)).join(','),
     MIKKA_PRESSURE_ENROLLMENT:'456-1'}
   assert.equal(operationsInput(observe).action, 'read')
-  for (const history of ['../123', receipt, Array(9).fill(receipt).join(',')]) {
+  for (const history of ['../123', receipt, Array(8).fill(receipt).join(','), Array(9).fill(receipt).join(',')]) {
     assert.throws(() => operationsInput({...observe, MIKKA_OBSERVATION_HISTORY:history}))
   }
   const workflow = await readFile(new URL('../../.github/workflows/cloudflare-operations.yml', import.meta.url), 'utf8')
