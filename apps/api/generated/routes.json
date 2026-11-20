@@ -3433,6 +3433,36 @@
       "sourceHash": "bf7dfb2e73c45593e0f8225e51d778f04cae81b7e66a7b5a720b0b854f8e3176"
     },
     {
+      "path": "/mikka/api/workspaces/[workspaceId]/task-labels",
+      "template": "/api/workspaces/[workspaceId]/task-labels",
+      "source": "app/api/workspaces/[workspaceId]/task-labels/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "601cd298b27b912a61e1780bdde15cceb69e731142af5c0361d0cf099043461d"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/task-labels/[labelId]",
+      "template": "/api/workspaces/[workspaceId]/task-labels/[labelId]",
+      "source": "app/api/workspaces/[workspaceId]/task-labels/[labelId]/route.ts",
+      "methods": [
+        "DELETE",
+        "GET",
+        "PATCH"
+      ],
+      "sourceHash": "06d5ed8bb4a4953424f6dccb3475a5a1573807c8fb7e2b1d90a80f65bbfb7e05"
+    },
+    {
+      "path": "/mikka/api/workspaces/[workspaceId]/task-labels/[labelId]/merge",
+      "template": "/api/workspaces/[workspaceId]/task-labels/[labelId]/merge",
+      "source": "app/api/workspaces/[workspaceId]/task-labels/[labelId]/merge/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "b6176202721bed0c2b8e05f8aa0a6255a77de3f7916577e74f4ffc24e84cb5a3"
+    },
+    {
       "path": "/mikka/v1/devices/enroll",
       "template": "/v1/devices/enroll",
       "source": "app/v1/devices/enroll/route.ts",

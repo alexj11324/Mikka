@@ -10,6 +10,7 @@ export interface WorkspaceTaskLabel {
 
 export interface WorkspaceTaskLabelsView {
   workspaceId: string
+  source: 'workspace'
   labels: WorkspaceTaskLabel[]
   canManage: boolean
 }

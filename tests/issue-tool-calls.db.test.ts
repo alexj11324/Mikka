@@ -54,6 +54,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     for (const id of [owner, stranger]) await pool.query('insert into "user"(id,name,email,"emailVerified","createdAt","updatedAt") values($1,$1,$2,false,now(),now())', [id, `${id}@example.invalid`])
     // The owner's Coordinator is an ordinary bot row; its tools write as that bot.
     const ownCoordinator = await seedCoordinator(owner)
+    await pool.query('INSERT INTO workspace_issue_labels(workspace_id,name,color) VALUES($1,\'regression\',\'gray\')', [ownCoordinator.workspaceId])
     const coordinator = ownCoordinator.botId
     personalWorkspaces.set(owner, ownCoordinator.workspaceId)
     personalWorkspaces.set(stranger, (await seedCoordinator(stranger)).workspaceId)
@@ -282,6 +283,7 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     await pool.query('DELETE FROM mikka_workspaces WHERE id=$1', [workspace])
     for (const id of [owner, stranger]) {
       for (const table of ['issue_tool_calls', 'issue_versions', 'issues']) await pool.query(`delete from ${table} where "userId"=$1`, [id])
+      await pool.query('DELETE FROM workspace_issue_labels WHERE workspace_id=$1', [personalWorkspaces.get(id)])
       await pool.query('delete from repository_settings where "userId"=$1', [id])
       await pool.query('delete from agents where "userId"=$1', [id])
       await pool.query('delete from device_repos where "userId"=$1', [id])

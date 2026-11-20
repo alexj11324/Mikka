@@ -20,7 +20,6 @@ import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { db } from '@/lib/db'
 import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, runChunks, teamIssuePromotions } from '@/lib/db/schema'
 import { deviceIsOnline } from '@/lib/device-presence'
-import type { IssueLabel } from '@/lib/issue-metadata'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { getIssue, saveIssue } from '@/app/actions/issues'
@@ -28,8 +27,9 @@ import { updateIssueMetadata, type IssueMetadataPatch } from '@/app/actions/issu
 import { updateIssueRelation } from '@/app/actions/issue-operations'
 import { createIssueInput, updateIssueInput } from '@/lib/coordinator/issue-input'
 import { listProjects as readProjects, moveIssueToProject } from '@/app/actions/projects'
-import { taskReaderScope } from '@/lib/task-workspace'
+import { taskReaderScope, withTaskWorkspace } from '@/lib/task-workspace'
 import { tokenWorkspace } from '@/lib/tokens/principal'
+import { resolveTaskLabelNames } from '@/lib/task-labels/references'
 
 // The MCP tools that change things, and the reads that need more than one
 // table. Writes go through the app's own server actions inside `actAs`, so an
@@ -88,12 +88,6 @@ function textToDoc(text: string) {
   return { type: 'doc', content: lines.map(line => line ? { type: 'paragraph', content: [{ type: 'text', text: line }] } : { type: 'paragraph' }) }
 }
 
-/** The labels the person already uses, so a label named by an agent keeps its color. */
-async function knownLabels(userId: string): Promise<Map<string, IssueLabel>> {
-  const rows = await db.select({ content: issueAttrsContent }).from(issues).where(and(eq(issues.userId, userId), (await issueVisibility(userId)).predicate))
-  return new Map(rows.flatMap(row => readIssueMetadata(row.content).labels).map(label => [label.name.toLowerCase(), label]))
-}
-
 interface IssueChanges {
   title?: string
   status?: string
@@ -109,6 +103,7 @@ interface IssueChanges {
 /** Applies the changes one action at a time, each on the revision the last one left. */
 async function applyChanges(userId: string, issueId: string, changes: IssueChanges) {
   let issue = unwrap(await getIssue(issueId)).issue
+  const labels = changes.labels === undefined ? undefined : await resolveTaskLabelNames(db, issue.workspaceId!, changes.labels)
   // Historical invitations do not grant personal-task or revoked workspace
   // access. Check the proposed person's effective access before any mutation.
   if (changes.assigneeUserId && !await issueForUser(changes.assigneeUserId, issue.id)) throw new ActionFailureError('memberNotJoined')
@@ -119,10 +114,7 @@ async function applyChanges(userId: string, issueId: string, changes: IssueChang
     })).issue
   }
   const patch: IssueMetadataPatch = {}
-  if (changes.labels) {
-    const known = await knownLabels(issue.userId)
-    patch.labels = changes.labels.map(name => known.get(name.toLowerCase()) ?? { name, color: 'gray' })
-  }
+  if (labels) patch.labelIds = labels.labelIds
   if (changes.assigneeUserId !== undefined) patch.assignee = changes.assigneeUserId ? { kind: 'member', id: changes.assigneeUserId } : null
   if (changes.assigneeAgentId !== undefined) patch.delegate = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
   if (Object.keys(patch).length) issue = unwrap(await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch })).issue
@@ -147,6 +139,11 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     if (teamId && toolCallId === undefined) return { error: 'validationGeneric' }
     const mutate = async () => {
+      if (input.labels !== undefined) {
+        const workspaceId = taskReaderScope(userId).workspaceId
+        if (!workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+        await withTaskWorkspace(userId, workspaceId, () => resolveTaskLabelNames(db, workspaceId, input.labels))
+      }
       const fields = { title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' }
       const created = unwrap(await saveIssue(fields)).issue
       return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId, assigneeAgentId: input.assigneeAgentId }))

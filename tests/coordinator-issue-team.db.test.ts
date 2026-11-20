@@ -24,6 +24,7 @@ test('Coordinator tools keep personal, grouped and teamless shared tasks in thei
     const personal = personalCoordinator.botId
     await pool.query(`INSERT INTO mikka_workspaces (id,"userId",name,slug,kind) VALUES ($1,$2,'Acme',$3,'team')`, [workspace, owner, `acme-${workspace.slice(0, 8)}`])
     await pool.query(`INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,'admin','active')`, [workspace, owner, `${owner}@example.invalid`])
+    await pool.query('INSERT INTO workspace_issue_labels(workspace_id,name,color) VALUES($1,\'bug\',\'gray\')', [workspace])
     await pool.query('INSERT INTO mikka_teams (id,"workspaceId","userId",name,identifier) VALUES ($1,$2,$3,$4,$5)', [team, workspace, owner, 'Acme', identifier])
     const acme = (await coordinatorBot(owner, workspace)).botId
     const create = (botId: string, input: Record<string, unknown>) => createCoordinatorRegistry(owner, botId, undefined, { coordinator: true }).create_issue!.execute!(input, { toolCallId: `call-${randomUUID()}`, messages: [], context: {} })
@@ -95,6 +96,7 @@ test('Coordinator tools keep personal, grouped and teamless shared tasks in thei
     await pool.query('DELETE FROM team_issue_create_requests WHERE "ownerId"=$1', [owner])
     await pool.query('DELETE FROM issue_versions WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM issues WHERE "userId"=$1', [owner])
+    await pool.query('DELETE FROM workspace_issue_labels WHERE workspace_id=$1', [workspace])
     await pool.query('DELETE FROM bots WHERE "ownerId"=$1', [owner])
     await pool.query('DELETE FROM mikka_workspace_members WHERE "userId"=$1', [owner])
     await pool.query('DELETE FROM mikka_workspaces WHERE "userId"=$1', [owner])

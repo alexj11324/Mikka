@@ -200,6 +200,7 @@ test('the create window properties land in one create: assignee, due date, label
   const owner = await seedUser(pool, 'Create-props owner'), teammate = await seedUser(pool, 'Create-props teammate'), outsider = await seedUser(pool, 'Create-props outsider')
   try {
     const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: teammate, role: 'member' }])
+    await pool.query('INSERT INTO workspace_issue_labels(workspace_id,name,color) VALUES($1,\'bug\',\'red\')', [workspace.id])
     const bot = await seedBot(pool, workspace.id, owner, 'Captain'), otherBot = await seedBot(pool, workspace.id, owner, 'Second')
     const teammateBot = await seedBot(pool, workspace.id, teammate, 'Not yours')
     const base: CreateOnlyCommand = { version: 1, intent: 'create_only', workspaceId: workspace.id, requestId: randomUUID(), title: 'Ship the new dialog',
@@ -252,6 +253,7 @@ test('the create window properties land in one create: assignee, due date, label
     assert.deepEqual((await wakes(first.taskId)).map(event => event.botId), [bot, otherBot])
   } finally {
     await pool.query('delete from issues where "userId"=any($1::text[])', [[owner, teammate, outsider]])
+    await pool.query('DELETE FROM workspace_issue_labels l USING mikka_workspaces w WHERE l.workspace_id=w.id AND w."userId"=ANY($1::text[])', [[owner, teammate, outsider]])
     await pool.query('delete from "user" where id=any($1::text[])', [[owner, teammate, outsider]])
   }
 })

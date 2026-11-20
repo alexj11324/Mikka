@@ -1,15 +1,12 @@
 import 'server-only'
 import type { db } from '@/lib/db'
-import { issues } from '@/lib/db/schema'
-import { issueAttrsContent } from '@/lib/issue-summary-columns'
-import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
-import { readIssueMetadata } from '@/lib/issue-metadata'
+import type { IssueReader } from '@/lib/issue-visibility'
+import { requireTaskWorkspace } from '@/lib/task-workspace'
+import { taskLabelsInWorkspace } from '@/lib/task-labels/store'
 
-/** Task property choices never expose the owner's hidden execution identities. Labels live in attrs; the body is not read. */
+/** The admitted workspace's reusable label entities, including labels not assigned to a visible task yet. */
 export async function issuePropertyChoices(reader: IssueReader, workspaceId: string, tx: Pick<typeof db, 'select'>) {
-  const visibility = await issueVisibility(reader, false, workspaceId, tx)
-  const rows = await tx.select({ content: issueAttrsContent }).from(issues).where(visibility.predicate)
-  return {
-    labels: [...new Map(rows.flatMap(row => readIssueMetadata(row.content).labels).map(label => [label.name, label])).values()],
-  }
+  await requireTaskWorkspace(reader, workspaceId)
+  const labelRecords = await taskLabelsInWorkspace(tx, workspaceId)
+  return { labelRecords, labels: labelRecords.map(({ name, color }) => ({ name, color })) }
 }

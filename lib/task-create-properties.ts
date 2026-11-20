@@ -11,15 +11,16 @@ import { recordCoordinatorEvent } from './coordinator-event-store'
 import type { ActivityActor } from './activity-actor'
 import type { CreateAccess, CreateAssignee, CreateOnlyCommand } from './task-create-command'
 import type { WorkspaceTransaction } from './task-workspace'
+import { resolveTaskLabelIds, resolveTaskLabelNames } from './task-labels/references'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Membership = Pick<WorkspaceTransaction, 'select'>
 
 /** The create window's properties beyond title, text, status and priority. */
-export type CreateProperties = Pick<CreateOnlyCommand, 'assignee' | 'dueDate' | 'labels' | 'access'>
+export type CreateProperties = Pick<CreateOnlyCommand, 'assignee' | 'dueDate' | 'labels' | 'labelIds' | 'access'>
 
 export function hasCreateProperties(properties: CreateProperties) {
-  return Boolean(properties.assignee || properties.dueDate || properties.labels?.length || properties.access?.kind === 'members')
+  return Boolean(properties.assignee || properties.dueDate || properties.labels?.length || properties.labelIds?.length || properties.access?.kind === 'members')
 }
 
 /**
@@ -42,9 +43,10 @@ export async function applyCreateProperties(tx: Transaction, membership: Members
     ...(assignment?.assignee ? { assignee: assignment.assignee } : {}),
     ...(assignment?.delegate ? { delegate: assignment.delegate, delegateSelection: 'manual' as const } : {}),
     ...(properties.dueDate ? { dueDate: properties.dueDate } : {}),
-    ...(properties.labels?.length ? { labels: [...new Map(properties.labels.map(label => [label.name.toLowerCase(), label])).values()] } : {}),
+    ...(properties.labels?.length ? await resolveTaskLabelNames(tx, workspaceId, properties.labels.map(label => label.name)) : {}),
+    ...(properties.labelIds ? await resolveTaskLabelIds(tx, workspaceId, properties.labelIds) : {}),
   }
-  const saved = assignment || properties.dueDate || properties.labels?.length ? await persistIssueMetadata(tx, task, next, input.actor) : task
+  const saved = assignment || properties.dueDate || properties.labels?.length || properties.labelIds?.length ? await persistIssueMetadata(tx, task, next, input.actor) : task
   if (!saved) throw new ActionFailureError('issueOutdated')
   if (properties.access?.kind === 'members') await setTaskVisibility(tx, membership, { taskId, workspaceId, ownerId: user.id, access: properties.access })
   if (assignment?.delegate) {

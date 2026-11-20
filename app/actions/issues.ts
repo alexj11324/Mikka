@@ -19,7 +19,7 @@ import { resourceAccessPredicate } from '@/lib/resource-access/predicate'
 import type { ThreadRecord } from '@/components/blocks/rich-text-editor-4/components/rich-text-comments'
 import { issueVisibilityPredicate } from '@/lib/issue-visibility-policy'
 import { issueTeamScope } from '@/lib/issue-team-access'
-import { db } from '@/lib/db'
+import { db, withDatabaseTransaction } from '@/lib/db'
 import { agents, issues, issueDocuments, issueVersions, issueMembers, users } from '@/lib/db/schema'
 import { requireIssueAccess, requireIssueAccessWithoutBody, requireUser } from '@/lib/issue-access'
 import { checklistView, issueAttrsContent, issueChecklistChecked, issueChecklistTotal } from '@/lib/issue-summary-columns'
@@ -339,13 +339,13 @@ export async function pollIssue(id: string, known?: string): Promise<ActionResul
 async function readIssue(id: string) {
   const { issue, user } = await requireIssueAccessWithoutBody(id)
   if (!issue.issuedIdentifier) await taskIdentifiers([{ id: issue.id, ownerId: issue.userId, scope: issue.scope }])
-  return db.transaction(async tx => {
+  return db.transaction(tx => withDatabaseTransaction(tx, async () => {
     const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
     requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
     await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
     if (readIssueMetadata(locked.content).deletedAt) throw new ActionFailureError('issueNotFound')
     return issueView(locked, tx)
-  })
+  }))
 }
 
 /** `stateId` picks one of the workspace's states (lib/issue-states.ts) whose category is `status`; without it a status change takes the category's default. */
