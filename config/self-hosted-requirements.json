@@ -3826,5 +3826,40 @@
     "behavior": "The one mark registry: a status, priority, thread group or run indicator in, the shape and tone every surface draws out. Pure data, no installation dependency.",
     "test": "lib/state-mark.test.ts",
     "suite": "test:lib-units"
+  },
+  "drizzle/20261120045013_pull_pins_and_saved_views.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store each person's PR pins and saved list views per workspace in the installation database; deleting the account removes them.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "app/actions/list-views.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A signed-in workspace member reads and writes only their own PR pins and saved list views in the installation PostgreSQL database.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "lib/pull-pins.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pin or unpin pull requests for one person in one workspace in the installation database, up to a fixed limit.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "lib/saved-views-store.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Save, list and delete one person's named list views per workspace and list in the installation database, up to a fixed limit.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
+  },
+  "lib/saved-views.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Validate a saved list view's scope, name and small filter object before it is stored; no external service.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
   }
 }
