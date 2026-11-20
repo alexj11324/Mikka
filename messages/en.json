@@ -5118,6 +5118,7 @@
       "noRepository": "No repository",
       "environment": "Environment",
       "machine": "Machine",
+      "machineDefault": "Your default",
       "machineCloud": "Mikka Cloud",
       "machineCloudflare": "Cloudflare coding machine",
       "otherDevices": "Other devices",

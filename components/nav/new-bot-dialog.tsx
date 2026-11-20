@@ -101,7 +101,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
   ]
   const machineDetail: NewBotDetail = {
     choices: machineChoices, value: machine ?? null,
-    label: machineChoices.find(choice => choice.value === machine)?.label ?? t('machine'),
+    label: machineChoices.find(choice => choice.value === machine)?.label ?? t('machineDefault'),
     onChange: setMachine, disabled: saving,
   }
   const effortChoices: NewBotChoice[] = [{ value: NO_EFFORT, label: t('effortDefault') }, ...MODEL_ROUTING_EFFORTS.map(value => ({ value, label: value }))]

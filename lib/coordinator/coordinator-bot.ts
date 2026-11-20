@@ -130,7 +130,7 @@ export async function listOwnerBots(ownerId: string, workspaceId: string) {
   const { botId } = await coordinatorBot(ownerId, workspaceId)
   const isCoordinator = sql<boolean>`${bots.id} = ${botId}`
   // The row menu's Share and Move to show the current access and Environment (lib/bot-access.ts).
-  const visibility = sql<'shared' | 'private'>`coalesce((select p.visibility from resource_access_policies p where p.kind='bot' and p.id=${bots.id}),'private')`
+  const visibility = sql<'shared' | 'private'>`coalesce((select p.visibility from resource_access_policies p where p.kind='bot' and p.id="bots"."id"),'private')`
   return db.select({ id: bots.id, name: bots.name, color: bots.color, shape: bots.shape, coordinator: isCoordinator, environmentId: bots.environmentId, visibility }).from(bots)
     // An archived bot leaves the person's lists (lib/bot-lifecycle.ts); its chat stays reachable by address.
     .where(and(eq(bots.ownerId, ownerId), eq(bots.workspaceId, workspaceId), isNull(bots.archivedAt)))

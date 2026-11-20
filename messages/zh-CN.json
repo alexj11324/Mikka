@@ -5118,6 +5118,7 @@
       "noRepository": "不用仓库",
       "environment": "环境",
       "machine": "机器",
+      "machineDefault": "跟随个人设置",
       "machineCloud": "Mikka Cloud",
       "machineCloudflare": "Cloudflare 编程机器",
       "otherDevices": "其他设备",

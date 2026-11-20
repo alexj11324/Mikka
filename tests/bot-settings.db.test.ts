@@ -113,12 +113,19 @@ test('bot settings', { skip: !dbUrl }, async t => {
     await rejects(createOwnedBot(me, { name: 'Early follower', color: 'encre', shape: 'cercle', subscribers: [member] }), 'botSubscriberNoAccess')
     const created = await createOwnedBot(me, { name: 'Born shared', color: 'encre', shape: 'cercle', visibility: 'shared', subscribers: [member] })
     assert.deepEqual(await access.botAccess(actor, created.id), { visibility: 'shared', ownerId: owner, subscribers: [member] })
+    // The sidebar's row menu reads each Bot's access and Environment from the owner's list (Share ›, Move to ›).
+    const { listOwnerBots } = await import('../lib/coordinator/coordinator-bot')
+    const listed = await listOwnerBots(owner, ws.id)
+    assert.equal(listed.find(item => item.id === created.id)?.visibility, 'shared')
+    assert.equal(listed.find(item => item.id === bot)?.visibility, 'private')
+    assert.equal(listed.find(item => item.id === created.id)?.environmentId, defaultEnv)
+    assert.deepEqual((await access.followedBots(memberActor)).map(item => item.id), [created.id], 'the follower\'s sidebar lists it')
     const personal = { id: randomUUID() }
     await pool.query(`insert into mikka_workspaces (id,"userId",name,slug,kind) values ($1,$2,'Solo',$3,'personal')`, [personal.id, member, `ws-${personal.id.slice(0, 8)}`])
     await pool.query(`insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,'admin','active')`, [personal.id, member, `${member}@example.invalid`])
     await rejects(createOwnedBot({ ownerId: member, workspaceId: personal.id }, { name: 'Solo', color: 'encre', shape: 'cercle', visibility: 'shared' }), 'botShareUnavailable')
-    const coordinator = await seedBot(pool, ws.id, owner, 'Coordinator')
-    await pool.query('insert into coordinator_bots ("ownerId","workspaceId","botId") values ($1,$2,$3)', [owner, ws.id, coordinator])
+    // listOwnerBots above made the owner's Coordinator here.
+    const coordinator = listed.find(item => item.coordinator)!.id
     await rejects(access.setBotVisibility(actor, coordinator, 'shared'), 'botNotFound')
   })
 
