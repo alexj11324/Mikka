@@ -22,6 +22,7 @@ import { prepareCloudAcceptance } from '../e2b/cloud-acceptance-release.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const selectedItems = process.env.LOCAL_LOOP_ITEMS?.split(',') ?? ['1', '2', '3', '4', '5', '6', '7']
+assert.notEqual(process.env.MIKKA_LOCAL_LIVE_MODELS, '1', 'Local acceptance requires scripted LiteLLM; live models are forbidden')
 assert.ok(selectedItems.length && selectedItems.every(item => /^(?:[1-9]|10|11)$/.test(item)) && new Set(selectedItems).size === selectedItems.length, 'LOCAL_LOOP_ITEMS must be unique item numbers 1–11')
 const needsDaemon = selectedItems.some(item => ['1', '2', '3', '7', '9', '10'].includes(item))
 const needsModels = selectedItems.some(item => item !== '11')
@@ -217,7 +218,7 @@ async function setup() {
     await recordAuthenticationSecrets([decodeURIComponent(new URL(process.env.E2E_DATABASE_URL).password)], { environment })
   }
   await new TestAccountPool(pool, environment).prepare({ pairs: 4 })
-  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, MIKKA_DEV_SKIP_ENV_FILES: '1', MIKKA_DEV_SKIP_MODEL_SETUP: needsModels ? '0' : '1',
+  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, MIKKA_LOCAL_LOOP: '1', MIKKA_DEV_SKIP_ENV_FILES: '1', MIKKA_DEV_SKIP_MODEL_SETUP: needsModels ? '0' : '1',
     ...(selectedItems.some(item => ['9', '10'].includes(item)) ? { MIKKA_DEV_ACCEPTANCE_HANDOFF: '1' } : {}),
     ...(selectedItems.includes('10') ? { MIKKA_DEV_ACCEPTANCE_ONLINE_WATCHDOG: '1' } : {}), ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
   await step('server-ready', 180_000, signal => until(signal, async () => {
@@ -251,11 +252,11 @@ async function setup() {
     const refreshed = await fetch('http://127.0.0.1:3191/refresh', { method: 'POST', signal: AbortSignal.timeout(90_000) })
     if (!refreshed.ok) return false
     const keys = await query(`SELECT id FROM model_api_keys WHERE "ownerId"=$1 AND provider='deepseek'`, [accounts.owner.userId])
-    assert.ok(keys.length, 'No real DeepSeek key seeded; refusing scripted/default model acceptance')
+    assert.ok(keys.length, 'The scripted model key must be seeded through normal account setup')
     return true
   }))
   if (!needsDaemon) {
-    await writeFile(join(directory, 'environment-summary.json'), JSON.stringify({ revision, driverRevision, sourceFingerprint, items: selectedItems, origin, database: environment.database.name, instanceId: environment.instanceId, leaseId: accounts.lease.id, started: new Date(started).toISOString(), externalBoundaries: [needsModels ? 'Real DeepSeek model' : 'No model calls required by selected items', 'No daemon required by selected items', 'No browser tests', 'No production DB writes'] }, null, 2), { mode: 0o600 })
+    await writeFile(join(directory, 'environment-summary.json'), JSON.stringify({ revision, driverRevision, sourceFingerprint, items: selectedItems, origin, database: environment.database.name, instanceId: environment.instanceId, leaseId: accounts.lease.id, started: new Date(started).toISOString(), externalBoundaries: [needsModels ? 'Scripted LiteLLM HTTP boundary; no real model calls' : 'No model calls required by selected items', 'No daemon required by selected items', 'No browser tests', 'No production DB writes'] }, null, 2), { mode: 0o600 })
     return null
   }
   const standaloneDaemon = (args, persistent = false) => {
@@ -285,7 +286,7 @@ async function setup() {
     return result.devices?.some(device => device.online) ? result.devices : null
   }))
   const device = devices.find(value => value.online)
-  await writeFile(join(directory, 'environment-summary.json'), JSON.stringify({ revision, driverRevision, sourceFingerprint, origin, database: environment.database.name, instanceId: environment.instanceId, leaseId: accounts.lease.id, deviceId: device.id, started: new Date(started).toISOString(), externalBoundaries: ['Real DeepSeek model', 'Synthetic GitHub API and real local bare Git push', 'No browser tests', 'No production DB writes'] }, null, 2), { mode: 0o600 })
+  await writeFile(join(directory, 'environment-summary.json'), JSON.stringify({ revision, driverRevision, sourceFingerprint, origin, database: environment.database.name, instanceId: environment.instanceId, leaseId: accounts.lease.id, deviceId: device.id, started: new Date(started).toISOString(), externalBoundaries: ['Scripted LiteLLM HTTP boundary; no real model calls', 'Synthetic GitHub API and real local bare Git push', 'No browser tests', 'No production DB writes'] }, null, 2), { mode: 0o600 })
   return device
 }
 

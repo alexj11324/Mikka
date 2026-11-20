@@ -150,6 +150,7 @@ export function createLiteLlmRoutes({ basePath = '/litellm', apiKey = FAKE_LITEL
       const id = `fake-litellm-${randomUUID()}`
       if (protocol === 'count_tokens') return json({ input_tokens: 11 })
       const normalized = normalize(body, protocol)
+      normalized.model = alias
       const result = protocol === 'decisions' ? await decision(body) : probeAnswer(normalized) ?? await answer(normalized, { body, protocol })
       if (!result) return error('fixture_unmatched_request', 422)
       observe({ kind: 'litellm-request', protocol, model: alias, callId: id, outcome: result.status ?? (result.hang ? 'timeout' : 'success') })
