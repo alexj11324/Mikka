@@ -5681,6 +5681,14 @@
       "sourceSeparator": ", ",
       "sectionsHint": "to jump between sections",
       "openHint": "to open"
+    },
+    "profileMark": {
+      "state": {
+        "working": "Working",
+        "idle": "Idle",
+        "needs-you": "Needs you",
+        "failed": "Failed"
+      }
     }
   },
   "SuggestionsPage": {
