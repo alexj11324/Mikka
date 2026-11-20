@@ -1,3 +1,4 @@
+import { DECISION_MODEL } from '../coordinator/decision'
 import assert from 'node:assert/strict'
 import { randomUUID,createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -24,7 +25,7 @@ const target={targetId:'chromium-target',origin:'https://example.com',endpoint:'
 const bytes=Buffer.from([0xff,0xd8,0xff,...Array.from({length:40},()=>0),0xff,0xd9]),imageDigest=createHash('sha256').update(bytes).digest('hex')
 const observation=():VisualObservation=>({observationId:'a'.repeat(32),loaderId:'document',origin:target.origin,observedAt:Date.now(),screenshot:'data:image/jpeg;base64,'+bytes.toString('base64'),width:1280,height:800,observation:{url:target.origin,title:'Fixture',text:'Fixture',elements:[],needsLogin:false}})
 function judgment(effect:BrowserEffect='browse'):Awaited<ReturnType<typeof judgeVisualBrowserAction>> {
- return {scope:'within_task',effect,execution:{executionId:randomUUID(),modelId:'openai/gpt-6-luna-decisions',providerGenerationId:'synthetic-provider',startedAt:new Date().toISOString(),completedAt:new Date().toISOString(),requestDigest:'b'.repeat(64),imageDigests:[imageDigest],vision:'image-input-submitted'}}
+ return {scope:'within_task',effect,execution:{executionId:randomUUID(),modelId:DECISION_MODEL,providerGenerationId:'synthetic-provider',startedAt:new Date().toISOString(),completedAt:new Date().toISOString(),requestDigest:'b'.repeat(64),imageDigests:[imageDigest],vision:'image-input-submitted'}}
 }
 const realFetch=globalThis.fetch
 before(async()=>{

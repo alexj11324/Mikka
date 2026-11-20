@@ -1,7 +1,7 @@
 // Offline image plan. Live Decisions run inside the application's authorized workspace scope.
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { DECISIONS_URL, DECISION_MODEL, decisionRequestInput } from '../lib/coordinator/decision.ts'
+import { DECISIONS_PATH, DECISION_MODEL, decisionRequestInput } from '../lib/coordinator/decision.ts'
 import { deflateSync } from 'node:zlib'
 
 if (process.argv.slice(2).includes('--execute-synthetic-vision')) {
@@ -43,7 +43,7 @@ const cases = ['red', 'blue'].map(expected => {
 })
 for (const item of cases) decisionRequestInput({ text: 'Inspect the image.', requiresVisual: true, images: [{ dataUrl: 'data:image/png;base64,' + item.pixels.toString('base64') }] })
 console.log(JSON.stringify({
-  model: DECISION_MODEL, endpoint: DECISIONS_URL,
+  model: DECISION_MODEL, endpointPath: DECISIONS_PATH,
   maximumGatewayRequests: 0, applicationRetries: 0,
   images: cases.map(item => ({ sha256: item.sha256, bytes: item.pixels.length, width: 128, height: 64 })),
   liveEval: false, externalActions: false,

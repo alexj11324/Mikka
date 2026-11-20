@@ -7206,9 +7206,7 @@
         "any": "不限制",
         "none": "至少选择一个来源，否则组织工作区将不能运行模型。",
         "names": {
-          "vercel-gateway": "Mikka 托管模型（Gateway）",
-          "zerocat": "Mikka 托管模型（ZeroCat）",
-          "cloudflare-workers-ai": "Mikka 托管模型（Cloudflare Workers AI）",
+          "litellm": "Mikka 模型（LiteLLM）",
           "openai-subscription": "OpenAI 订阅",
           "anthropic-subscription": "Anthropic 订阅",
           "api-key": "自带 API 密钥"

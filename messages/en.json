@@ -7206,9 +7206,7 @@
         "any": "Any",
         "none": "Choose at least one source, or Organization workspaces can't run models.",
         "names": {
-          "vercel-gateway": "Mikka hosted models (Gateway)",
-          "zerocat": "Mikka hosted models (ZeroCat)",
-          "cloudflare-workers-ai": "Mikka hosted models (Cloudflare Workers AI)",
+          "litellm": "Mikka models (LiteLLM)",
           "openai-subscription": "OpenAI subscription",
           "anthropic-subscription": "Anthropic subscription",
           "api-key": "Your own API key"

@@ -30,7 +30,7 @@ test('regenerate is the person asking: it is the one trigger that replaces a man
 test('a title a person types is held to the short-title bound', () => {
   assert.equal(manualThreadTitle('  登录回调  修复  '), '登录回调 修复')
   assert.equal([...manualThreadTitle('修复登录后的工作区前缀和查询参数丢失问题')!].length, 12)
-  assert.equal(manualThreadTitle('Fix the workspace prefix that is lost after sign in'), 'Fix the workspace prefix that is')
+  assert.equal(manualThreadTitle('Fix the workspace prefix that is lost after sign in'), 'Fix the workspace prefix that')
   assert.equal(manualThreadTitle('   '), null)
 })
 

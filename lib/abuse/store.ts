@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { hostedBillingScope } from './context'
 import { resourceBudgetAdmission } from '../billing/resource-budgets'
+import { connectForCommitEffects } from '../db/commit-effects'
 import {
   abuseLimits,
   HOSTED_CALL_HOLD_MICRO_USD,
@@ -28,7 +29,7 @@ export class HostedUsageStore {
     this.workspaceDatabase = options.workspaceDatabase ?? pool
   }
   private async transaction<T>(work: (tx: PoolClient) => Promise<T>) {
-    const tx = await this.pool.connect()
+    const tx = await connectForCommitEffects(this.pool)
     try {
       await tx.query('BEGIN')
       const result = await work(tx)

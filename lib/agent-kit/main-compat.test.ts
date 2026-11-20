@@ -192,7 +192,7 @@ const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),perm
 let cliReadOnly=false
 stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,sessionOpenedAt:new Date(),sessionClosedAt:null,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
 const modelAdmissionCheck=mock.fn(async(_scope:{workspaceId:string;ownerId:string},_model:string,_signal?:AbortSignal)=>undefined)
-stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck})
+stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck,assertLiteLLMModelTransport:modelAdmissionCheck})
 stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64),workspaceIds:[workspace]})})
 stub('../mcp/worker.ts',{issueRunToken:async()=>{if(stopDuringToken)currentRun.stopRequestedAt=new Date();if(revokeDuringToken)memberActive=false;return {token:'synthetic-only'}}})
 stub('../personal-mailbox-runtime.ts',{personalWorkerMailboxAdvertised:async()=>[]})
