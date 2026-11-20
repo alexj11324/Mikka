@@ -54,6 +54,7 @@ permissions:
   contents: read
 env:
   MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
 jobs:
   deploy-application:
     if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && !startsWith(inputs.phase, 'pipeline-')
@@ -100,6 +101,20 @@ jobs:
           assert.equal(claims.workflow_ref, claims.repository + '/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main')
           console.log(JSON.stringify({subject: claims.sub, repositoryId: claims.repository_id, ref: claims.ref, workflowRef: claims.workflow_ref}))
           JS
+      - name: Select the source App before credential access
+        id: source-app
+        env:
+          SOURCE_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs'
+          const owner = process.env.SOURCE_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
+          JS
       - name: Read the existing source App id
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -108,7 +123,7 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_ID
           recursive: false
           include-imports: false
@@ -120,10 +135,14 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_PRIVATE_KEY
           recursive: false
           include-imports: false
+      - name: Verify the selected source App
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.source-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("CI_SOURCE_APP_ID_MISMATCH")'
       - name: Mint a short-lived read-only operations checkout token
         id: source-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
@@ -262,6 +281,20 @@ jobs:
           assert.equal(claims.workflow_ref, claims.repository + '/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main')
           console.log(JSON.stringify({subject: claims.sub, repositoryId: claims.repository_id, ref: claims.ref, workflowRef: claims.workflow_ref}))
           JS
+      - name: Select the source App before credential access
+        id: source-app
+        env:
+          SOURCE_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs'
+          const owner = process.env.SOURCE_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
+          JS
       - name: Read the existing source App id
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -270,7 +303,7 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_ID
           recursive: false
           include-imports: false
@@ -282,10 +315,14 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_PRIVATE_KEY
           recursive: false
           include-imports: false
+      - name: Verify the selected source App
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.source-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("CI_SOURCE_APP_ID_MISMATCH")'
       - name: Mint a short-lived read-only operations checkout token
         id: source-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
@@ -479,6 +516,20 @@ jobs:
           assert.equal(claims.workflow_ref, claims.repository + '/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main')
           console.log(JSON.stringify({subject: claims.sub, repositoryId: claims.repository_id, ref: claims.ref, workflowRef: claims.workflow_ref}))
           JS
+      - name: Select the source App before credential access
+        id: source-app
+        env:
+          SOURCE_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs'
+          const owner = process.env.SOURCE_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
+          JS
       - name: Read the existing source App id
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -487,7 +538,7 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_ID
           recursive: false
           include-imports: false
@@ -499,10 +550,14 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_PRIVATE_KEY
           recursive: false
           include-imports: false
+      - name: Verify the selected source App
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.source-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("CI_SOURCE_APP_ID_MISMATCH")'
       - name: Mint a short-lived read-only operations checkout token
         id: source-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349

@@ -124,7 +124,7 @@ test('native release admission requires a coherent official identity before cred
   }
 })
 test('native private UI selection rejects unknown owners before reading credentials', async () => {
-  for (const [file, job] of [['desktop-release', 'macos'], ['mobile-update', 'update'], ['mobile-native', 'release']]) {
+  for (const [file, job] of [['desktop-release', 'macos'], ['mobile-update', 'update'], ['mobile-native', 'release'], ['mobile-screenshots', 'screenshots']]) {
     const workflow = yaml.load(await readFile(new URL(`../../.github/workflows/${file}.yml`, import.meta.url), 'utf8'))
     const steps = workflow.jobs[job].steps
     const check = steps.find(step => step.name === 'Validate the selected private UI owner before credential access')
@@ -132,12 +132,16 @@ test('native private UI selection rejects unknown owners before reading credenti
     assert.ok(steps.indexOf(check) < steps.findIndex(step => step.uses?.startsWith('Infisical/')), file)
     const checkout = steps.find(step => step.with?.path === '.hosted-ui')
     const select = new Function('vars', 'format', `return ${checkout.with.repository.slice(3, -3)}`)
+    assert.equal(workflow.env.MIKKA_HOSTED_UI_GITHUB_OWNER, '${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}')
     for (const owner of ['', 'alexj11324', 'aspectly-labs', 'foreign']) {
-      const run = () => execFileSync('bash', ['-e', '-c', check.run], { cwd: new URL('../../', import.meta.url), env: { ...process.env, MIKKA_PRIVATE_GITHUB_OWNER: owner }, stdio: 'pipe' })
-      if (owner === 'foreign') assert.throws(run, /CI_PRIVATE_REPOSITORY_OWNER_REQUIRED/)
-      else {
-        run()
-        assert.equal(select({ MIKKA_PRIVATE_GITHUB_OWNER: owner }, (_, value) => `${value}/mikka-hosted-ui`), `${owner || 'alexj11324'}/mikka-hosted-ui`)
+      for (const uiOwner of ['', 'alexj11324', 'aspectly-labs', 'foreign']) {
+        const env = { MIKKA_PRIVATE_GITHUB_OWNER: owner, MIKKA_HOSTED_UI_GITHUB_OWNER: uiOwner }
+        const run = () => execFileSync('bash', ['-e', '-c', check.run], { cwd: new URL('../../', import.meta.url), env: { ...process.env, ...env }, stdio: 'pipe' })
+        if ((uiOwner || owner) === 'foreign') assert.throws(run, /CI_PRIVATE_REPOSITORY_OWNER_REQUIRED/)
+        else {
+          run()
+          assert.equal(select(env, (_, value) => `${value}/mikka-hosted-ui`), `${uiOwner || owner || 'alexj11324'}/mikka-hosted-ui`)
+        }
       }
     }
   }
@@ -154,6 +158,61 @@ test('daemon metadata follows official Actions identities while fork builds reta
     assert.equal(url(select({ env })), `git+https://github.com/${owner}/Mikka.git`)
     for (const patch of [{ GITHUB_REPOSITORY: 'foreign/Mikka' }, { GITHUB_REPOSITORY_ID: '1' }, { GITHUB_REPOSITORY_OWNER_ID: id === '183887963' ? '359279274' : '183887963' }]) {
       assert.equal(url(select({ env: { ...env, ...patch } })), 'git+https://github.com/alexj11324/Mikka.git')
+    }
+  }
+})
+test('source App routing validates owner and secret path before reads and rejects the wrong App before minting', async t => {
+  const directoryPath = await directory(t)
+  for (const file of ['cloud-services-ci', 'cloudflare-api-image', 'cloudflare-app-deploy', 'cloudflare-world-deploy', 'marketing-build']) {
+    const workflow = yaml.load(await readFile(new URL(`../../.github/workflows/${file}.yml`, import.meta.url), 'utf8'))
+    for (const job of Object.values(workflow.jobs)) {
+      const steps = job.steps ?? []
+      const selector = steps.find(step => step.id === 'source-app')
+      if (!selector) {
+        assert.ok(!steps.some(step => step.uses?.startsWith('actions/create-github-app-token')), file)
+        continue
+      }
+      const marketing = file === 'marketing-build'
+      assert.equal(selector.env.SOURCE_OWNER, marketing ? '${{ steps.website-owner.outputs.owner }}' : "${{ vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}")
+      assert.equal(selector.env.ORG_SECRET_PATH, '${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}')
+      const reads = steps.filter(step => ['GITHUB_APP_ID', 'GITHUB_APP_PRIVATE_KEY'].includes(step.with?.['secret-name']))
+      assert.equal(reads.length, 2)
+      for (const read of reads) {
+        assert.ok(steps.indexOf(selector) < steps.indexOf(read), file)
+        assert.equal(read.with['secret-path'], '${{ steps.source-app.outputs.secret-path }}')
+      }
+      const verification = steps.find(step => step.name === 'Verify the selected source App')
+      assert.equal(verification.env.EXPECTED_SOURCE_APP_ID, '${{ steps.source-app.outputs.app-id }}')
+      assert.ok(reads.every(step => steps.indexOf(step) < steps.indexOf(verification)))
+      const tokens = steps.filter(step => step.uses?.startsWith('actions/create-github-app-token'))
+      assert.ok(tokens.every(step => steps.indexOf(verification) < steps.indexOf(step)), file)
+      for (const [owner, path, expected] of [
+        ['alexj11324', '', '4840908'], ['alexj11324', '/unused-fixture', '4840908'],
+        ['aspectly-labs', '/isolated-fixture', '5853576'],
+        ['aspectly-labs', '', null], ['aspectly-labs', '  ', null],
+        ['aspectly-labs', '/fixture\nowner=foreign', null], ['foreign', '/fixture', null],
+      ]) {
+        const output = join(directoryPath, 'outputs')
+        await writeFile(output, '')
+        const run = () => execFileSync('bash', ['-e', '-c', selector.run], { env: { PATH: process.env.PATH, SOURCE_OWNER: owner, ORG_SECRET_PATH: path, GITHUB_OUTPUT: output }, stdio: 'pipe' })
+        if (!expected) {
+          assert.throws(run, /CI_SOURCE_APP_(?:OWNER|SECRET_PATH)_REQUIRED/)
+          assert.equal(await readFile(output, 'utf8'), '')
+          continue
+        }
+        run()
+        assert.equal(await readFile(output, 'utf8'), `owner=${owner}\nsecret-path=${owner === 'alexj11324' ? '/github' : path}\napp-id=${expected}\n`)
+        for (const token of tokens) {
+          const ownerExpression = token.with.owner.slice(3, -3).replace('steps.website-owner', "steps['website-owner']")
+          const actual = new Function('vars', 'steps', `return ${ownerExpression}`)({ MIKKA_PRIVATE_GITHUB_OWNER: marketing ? 'alexj11324' : owner }, { 'website-owner': { outputs: { owner } } })
+          assert.equal(actual, owner)
+        }
+        for (const appId of ['4840908', '5853576', '']) {
+          const verify = () => execFileSync('bash', ['-e', '-c', verification.run], { env: { PATH: process.env.PATH, GITHUB_APP_ID: appId, EXPECTED_SOURCE_APP_ID: expected }, stdio: 'pipe' })
+          if (appId === expected) verify()
+          else assert.throws(verify, marketing ? /MARKETING_APP_ID_MISMATCH/ : /CI_SOURCE_APP_ID_MISMATCH/)
+        }
+      }
     }
   }
 })

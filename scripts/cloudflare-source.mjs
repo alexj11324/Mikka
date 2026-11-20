@@ -34,7 +34,7 @@ export function actionsMikkaRepository(env) {
 }
 
 export function privateMikkaRepository(name, env = process.env) {
-  const owner = env.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324'
+  const owner = (name === 'mikka-hosted-ui' && env.MIKKA_HOSTED_UI_GITHUB_OWNER) || env.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324'
   if (!owners.has(owner) || !['mikka-cloud', 'mikka-hosted-ui'].includes(name)) throw new Error('CI_PRIVATE_REPOSITORY_OWNER_REQUIRED')
   return owner + '/' + name
 }

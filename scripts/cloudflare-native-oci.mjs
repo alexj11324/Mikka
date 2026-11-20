@@ -26,7 +26,7 @@ export function releaseId(publicSha, runId, runAttempt) {
 
 export function releaseSelection(env, receipt) {
   const context = sourceContext(env, env.GITHUB_SHA, env.OVERLAY_SHA)
-  validateReceipt(receipt, context)
+  validateReceipt(receipt, context, privateMikkaRepository('mikka-hosted-ui', env))
   return { context, publicSha: context.publicSha, privateSha: context.privateSha,
     id: releaseId(context.publicSha, context.runId, context.runAttempt) }
 }
@@ -205,7 +205,7 @@ async function prepareArtifacts(work, selected, env, webRenderer) {
 export async function readSelection(env) {
   const receipt = JSON.parse(await readFile(join(root, '.cloudflare-ci/receipt.json'), 'utf8'))
   const selected = releaseSelection(env, receipt)
-  validateReceipt(receipt, selected.context)
+  validateReceipt(receipt, selected.context, privateMikkaRepository('mikka-hosted-ui', env))
   if (git(root, 'rev-parse', 'HEAD') !== selected.publicSha
       || git(join(root, '.hosted-ui'), 'rev-parse', 'HEAD') !== selected.privateSha) fail('CF_OCI_CHECKOUT_DRIFT')
   return { receipt, selected }

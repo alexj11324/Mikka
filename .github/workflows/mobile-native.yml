@@ -40,6 +40,7 @@ concurrency:
 
 env:
   MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
 
 jobs:
   release:
@@ -110,7 +111,7 @@ jobs:
         if: steps.source.outputs.build_id == ''
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: ${{ format('{0}/mikka-hosted-ui', vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324') }}
+          repository: ${{ format('{0}/mikka-hosted-ui', vars.MIKKA_HOSTED_UI_GITHUB_OWNER || vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324') }}
           ref: ${{ env.OVERLAY_SHA }}
           ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui

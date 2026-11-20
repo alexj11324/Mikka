@@ -166,7 +166,7 @@ test('pinned private helper receives original Actions context and only publish w
 test('workflow uses public manual main qualification and uploads the single receipt file', async () => {
   const workflow = await readFile(new URL('../.github/workflows/cloud-services-ci.yml', import.meta.url), 'utf8')
   assert.match(workflow, /on:\n  workflow_dispatch:\n    inputs:\n      cloud_source_sha:/)
-  assert.match(workflow, /permissions:\n  contents: read\n(?:env:\n  MIKKA_PRIVATE_GITHUB_OWNER:[^\n]+\n)?jobs:/)
+  assert.match(workflow, /permissions:\n  contents: read\n(?:env:\n(?:  MIKKA_(?:PRIVATE|HOSTED_UI)_GITHUB_OWNER:[^\n]+\n)+)?jobs:/)
   assert.match(workflow, /if: \(github.repository_id == '1427517699' && \(github.repository_owner_id == '183887963' \|\| github.repository_owner_id == '359279274'\)\) && github.event_name == 'workflow_dispatch' && github.ref == 'refs\/heads\/main'/)
   // The stage runs PostgreSQL 17's initdb from the pinned PGDG noble (24.04)
   // packages, so the image is pinned to that release: `ubuntu-latest` moved to

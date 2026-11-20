@@ -48,6 +48,15 @@ test('publication requires the public main build and exact selected overlay', ()
   assert.throws(() => releaseSelection(env, { ...receipt, target: 'renderers' }), /CI_BUILD_TARGET_INVALID/)
 })
 
+test('fresh API publication keeps the independent UI namespace bound to its receipt', () => {
+  const moved = { ...env, MIKKA_PRIVATE_GITHUB_OWNER: 'alexj11324', MIKKA_HOSTED_UI_GITHUB_OWNER: 'aspectly-labs' }
+  const movedReceipt = { ...receipt, overlayCheckout: { ...receipt.overlayCheckout, repository: 'aspectly-labs/mikka-hosted-ui' } }
+  assert.equal(releaseSelection(moved, movedReceipt).privateSha, privateSha)
+  assert.throws(() => releaseSelection(moved, receipt), /CI_OVERLAY_RECEIPT_MISMATCH/)
+  assert.throws(() => releaseSelection(env, movedReceipt), /CI_OVERLAY_RECEIPT_MISMATCH/)
+  assert.equal(receipt.overlayCheckout.repository, 'alexj11324/mikka-hosted-ui')
+})
+
 test('a selected main overlay survives later merges while an unmerged overlay is rejected without changing the checkout', async () => {
   const directory = await mkdtemp(join(tmpdir(),'mikka-overlay-main-'))
   const upstream = join(directory,'upstream'), checkout = join(directory,'checkout')

@@ -67,6 +67,7 @@ permissions:
 
 env:
   MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
   # to a normal install, which outlasts the short jobs' own timeouts.
@@ -196,7 +197,7 @@ jobs:
       - name: Check out the production Web UI revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: ${{ format('{0}/mikka-hosted-ui', vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324') }}
+          repository: ${{ format('{0}/mikka-hosted-ui', vars.MIKKA_HOSTED_UI_GITHUB_OWNER || vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324') }}
           ref: ${{ needs.preflight.outputs.overlay-sha }}
           ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui

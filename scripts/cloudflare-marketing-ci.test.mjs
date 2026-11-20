@@ -186,10 +186,10 @@ test('marketing mints separate exact-repository App tokens after public source v
     assert.match(delivery, /uses: Infisical\/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d/)
     for (const field of ['method: oidc', 'identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac',
       'oidc-audience: mikka-infisical', 'project-id: 89850d6a-f020-4936-863e-df77380dfe40',
-      'env-slug: prod', 'secret-path: /github', 'recursive: false', 'include-imports: false']) assert.ok(delivery.includes(field))
+      'env-slug: prod', 'secret-path: ${{ steps.source-app.outputs.secret-path }}', 'recursive: false', 'include-imports: false']) assert.ok(delivery.includes(field))
     assert.ok(steps.indexOf(preflight) < steps.indexOf(delivery))
   }
-  assert.ok(step('name: Verify the existing Mikka App').includes('process.env.GITHUB_APP_ID !== "4840908"'))
+  assert.ok(step('name: Verify the selected source App').includes('process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID'))
   const tokens = steps.filter(value => value.includes('uses: actions/create-github-app-token@'))
   assert.equal(tokens.length, 2)
   for (const [id, permission] of [['website-read-token', 'read'], ['website-release-token', 'write']]) {
