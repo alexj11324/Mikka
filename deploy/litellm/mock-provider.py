@@ -10,7 +10,12 @@ import json
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-KEY = 'Bearer sk-person-key'
+MODEL_KEYS = {
+    'zai/glm-5': 'sk-person-key',
+    'fixture/provider-model': 'sk-vercel-fixture',
+    'openai/gpt-6-luna': 'sk-vercel-fixture',
+    'gpt-5-mini': 'sk-neon-fixture',
+}
 
 
 def chunk(delta, finish=None, usage=None):
@@ -29,12 +34,13 @@ class Provider(BaseHTTPRequestHandler):
         if self.path.rstrip('/') not in ('/v1/chat/completions', '/chat/completions'):
             self.send_error(404)
             return
-        if self.headers.get('authorization') != KEY:
-            self.send_error(401)
-            return
         request = json.loads(self.rfile.read(int(self.headers.get('content-length', 0))) or b'{}')
-        if request.get('model') not in ('zai/glm-5', 'fixture/provider-model'):
+        model = request.get('model')
+        if model not in MODEL_KEYS:
             self.send_error(400, 'model routing changed the provider/model slug')
+            return
+        if self.headers.get('authorization') != 'Bearer ' + MODEL_KEYS[model]:
+            self.send_error(401)
             return
         tool = bool(request.get('tools'))
         usage = ({'prompt_tokens': 20, 'completion_tokens': 5, 'total_tokens': 25} if tool
@@ -51,7 +57,7 @@ class Provider(BaseHTTPRequestHandler):
             parts = [chunk({'role': 'assistant', 'content': 'Hello'}), chunk({'content': '.'}), chunk({}, 'stop')]
             message, finish = {'role': 'assistant', 'content': 'Hello.'}, 'stop'
         if not request.get('stream'):
-            body = json.dumps({'id': 'chatcmpl-mock', 'object': 'chat.completion', 'created': 0, 'model': 'mock',
+            body = json.dumps({'id': 'chatcmpl-mock', 'object': 'chat.completion', 'created': 0, 'model': model,
                                'choices': [{'index': 0, 'message': message, 'finish_reason': finish}], 'usage': usage}).encode()
             self.send_response(200)
             self.send_header('content-type', 'application/json')

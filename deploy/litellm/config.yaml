@@ -11,6 +11,7 @@ model_list:
   - model_name: mikka-title
     litellm_params:
       model: vercel_ai_gateway/openai/gpt-6-luna
+      reasoning_effort: none
       api_key: os.environ/AI_GATEWAY_API_KEY
     model_info:
       input_cost_per_token: 0.00000010

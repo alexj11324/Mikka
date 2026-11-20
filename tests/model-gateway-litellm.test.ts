@@ -66,3 +66,18 @@ for (const protocol of ['anthropic', 'openai'] as const) {
     assert.deepEqual(settled, [11 * 1 + 2 * 2])
   })
 }
+
+for (const model of ['mikka-title', 'neon/gpt-5-mini']) {
+  test(`LiteLLM requests ${model} with that upstream's credential`, { skip }, async () => {
+    const response = await fetch(url + '/v1/chat/completions', {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + masterKey, 'content-type': 'application/json' },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: 'hi' }] }),
+    })
+    assert.equal(response.status, 200)
+    const result = await response.json()
+    assert.equal(result.choices[0].message.content, 'Hello.')
+    assert.equal(result.usage.prompt_tokens, 11)
+    assert.ok(response.headers.get('x-litellm-call-id'))
+  })
+}
