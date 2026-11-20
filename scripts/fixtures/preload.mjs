@@ -1,7 +1,8 @@
+import { fileURLToPath } from 'node:url'
 import { assertFixtureRuntime, fixtureManifest, fixtureOrigin } from './guard.mjs'
 
 const env = process.env
-assertFixtureRuntime({ env, built: await fixtureManifest(process.cwd()), origin: env.MIKKA_FIXTURE_ORIGIN })
+assertFixtureRuntime({ env, built: await fixtureManifest(fileURLToPath(new URL('../../', import.meta.url))), origin: env.MIKKA_FIXTURE_ORIGIN })
 const services = fixtureOrigin(env.MIKKA_FIXTURE_SERVICES), github = fixtureOrigin(env.MIKKA_FIXTURE_GITHUB)
 fixtureOrigin(env.MIKKA_LITELLM_URL)
 const send = globalThis.fetch
