@@ -37,14 +37,13 @@ on:
       - 'packages/daemon/scripts/prepare-worker-install.py'
       - 'lib/eve/cloudflare-task-*'
       - '.github/workflows/cloudflare-task-sandbox.yml'
-  push:
-    branches: [main]
-    paths: *task_workspace_paths
 permissions:
   contents: read
 jobs:
   workspace:
-    if: github.event_name != 'workflow_dispatch'
+    # All PRs retain their existing credential-free qualification. The
+    # protected Registry producer is allowed to run only on real main pushes.
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
