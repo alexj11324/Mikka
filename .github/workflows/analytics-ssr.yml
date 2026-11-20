@@ -26,9 +26,13 @@ jobs:
     uses: ./.github/workflows/ci-selection.yml
 
   analytics-ssr-full:
-    name: Analytics SSR (full)
+    # The real job owns the historical check name. Its native failure result
+    # reaches the parent gate without allocating another summary runner.
+    name: analytics-ssr
     needs: changes
-    if: always() && !cancelled() && (inputs.selected || (needs.changes.result == 'success' && needs.changes.outputs.analytics == 'true'))
+    # Only an explicit trusted false may omit this optional lane. Missing or
+    # malformed selection reaches the first step and fails before checkout.
+    if: ${{ !cancelled() && (inputs.selected || needs.changes.outputs.analytics != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     services:
@@ -54,6 +58,13 @@ jobs:
       NEXT_PUBLIC_POSTHOG_KEY: phc_synthetic_ssr_regression
       MIGRATE: '0'
     steps:
+      - name: Require a successful trusted selection
+        env:
+          CHANGES_RESULT: ${{ inputs.selected && 'success' || needs.changes.result }}
+          RUN_ANALYTICS: ${{ inputs.selected && 'true' || needs.changes.outputs.analytics }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          test "$RUN_ANALYTICS" = true
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: ./.github/actions/pnpm-install
         with:
@@ -77,26 +88,3 @@ jobs:
           sudo apparmor_parser --replace /etc/apparmor.d/mikka-analytics-chromium
       - name: Render real compiled HTTP pages with browser analytics enabled
         run: node scripts/check-analytics-ssr.mjs
-
-  analytics-ssr:
-    # Preserve the historical status-check name even for docs-only PRs.
-    name: analytics-ssr
-    needs: [changes, analytics-ssr-full]
-    if: ${{ !cancelled() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Require classification and full regression unless docs-only
-        env:
-          CHANGES_RESULT: ${{ inputs.selected && 'success' || needs.changes.result }}
-          RUN_ANALYTICS: ${{ inputs.selected && 'true' || needs.changes.outputs.analytics }}
-          FULL_RESULT: ${{ needs.analytics-ssr-full.result }}
-        run: |
-          if [ "$CHANGES_RESULT" != 'success' ]; then exit 1; fi
-          if [ "$RUN_ANALYTICS" = 'false' ]; then
-            test "$FULL_RESULT" = 'skipped'
-          elif [ "$RUN_ANALYTICS" = 'true' ]; then
-            test "$FULL_RESULT" = 'success'
-          else
-            exit 1
-          fi

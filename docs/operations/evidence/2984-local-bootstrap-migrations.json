@@ -1,0 +1,197 @@
+{
+  "version": 1,
+  "issue": "https://github.com/alexj11324/Mikka/issues/2984",
+  "pullRequest": "https://github.com/alexj11324/Mikka/pull/2987",
+  "scope": "Local bootstrap migration readiness; this is not browser E2E, staging, or production acceptance.",
+  "source": {
+    "base": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+    "redHead": "d957507f48cb66a8eee904279ca9fefd9668f8a3",
+    "fixedHead": "3c286d7340c39e4897c28efd95a52ccae67528fb",
+    "fixedTree": "bb38a5212b9b916817c13b3f43adf164ad823cff",
+    "measuredWorkingDiffSha256": "02fcdaca8a0b1ac85d741fb974f61da576cf85ae1170e4bfbb7237153e6792fe",
+    "fixedBootstrapBlob": "046da669f395ae668fc30426c0f72ec3643ecddf",
+    "testBlob": "8e9c9a3544a929bfcb94f9ea33bbf810d7194b76",
+    "note": "PG measurements used redHead plus measuredWorkingDiffSha256. The fixedBootstrapBlob is identical to the published fix; the only later edit before fixedHead was Markdown line wrapping."
+  },
+  "counterexample": {
+    "source": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+    "realBackfillFix": "421d73b2d999564bbaabb0eef494dd7eb04e5b02",
+    "changedInput": "scripts/bot-environment-backfill.mjs",
+    "sqlFiles": 396,
+    "executionFiles": 34,
+    "oldStamp": "c5bcdeb7399fc558",
+    "newStamp": "c5bcdeb7399fc558",
+    "oldMigrationDigest": "sha256:75925fcee0657af961d6e71e23ecb9a4806daa717de84ae39f06c0e08978f42e",
+    "newMigrationDigest": "sha256:2ac01ef5e77e05c7ed87164de1bfa10228de4304d8a684e5dd7fcb5f103667fa",
+    "oldHelperSha256": "7a47b2a4cd4fa61ac432939588e7280c27b0b63e10855e82e0eb83f69bf61082",
+    "newHelperSha256": "0f3fdbda5d1060c44f3b6fb4e2cefa0347b01c49288c66bc8fc7d758fad4ce29",
+    "stampWronglyReused": true,
+    "executionIdentityChanged": true
+  },
+  "regression": {
+    "command": "node --test scripts/dev/bootstrap-local.test.mjs",
+    "red": {
+      "head": "d957507f48cb66a8eee904279ca9fefd9668f8a3",
+      "passed": 1,
+      "failed": 1,
+      "skipped": 0,
+      "failure": "helper-only change retained before instead of after"
+    },
+    "green": {
+      "head": "3c286d7340c39e4897c28efd95a52ccae67528fb",
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "durationMs": 517.807201
+    },
+    "checks": [
+      "Execute the actual bootstrap shell database-preparation section",
+      "Helper-only changes reach the existing setup command",
+      "Setup failure propagates with exit status 1",
+      "Existing secret-free URL output contract remains intact"
+    ],
+    "boundary": "pnpm/psql are fixture clients in this dispatch regression. PostgreSQL behavior is measured separately below."
+  },
+  "database": {
+    "runtime": {
+      "postgres": "postgres (PostgreSQL) 17.11 (Debian 17.11-0+deb13u1)",
+      "node": "24.22.3",
+      "pnpm": "10.34.3",
+      "host": "127.0.0.1",
+      "port": 55484,
+      "database": "sdlc_bootstrap_e2e",
+      "isolated": true
+    },
+    "startedUtc": "2026-11-20T21:25:17.499302+00:00",
+    "finishedUtc": "2026-11-20T21:25:50.310430+00:00",
+    "sampleCounts": {
+      "coldSetup": 1,
+      "warmSetup": 2,
+      "existingDatabaseSuite": 1
+    },
+    "commands": {
+      "setup": "corepack pnpm -s test:e2e:setup",
+      "existingDatabaseSuite": "node --import ./scripts/server-test.mjs --import tsx --test tests/bot-settings.db.test.ts"
+    },
+    "samples": [
+      {
+        "phase": "initdb",
+        "exitCode": 0,
+        "wallSeconds": 0.963268,
+        "logSha256": "4fb4f7c769d5deaa3bb92673c13c4f0231f13d912d428af692479cf3483f58db"
+      },
+      {
+        "phase": "pg-start",
+        "exitCode": 0,
+        "wallSeconds": 0.1194,
+        "logSha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad"
+      },
+      {
+        "phase": "create-database",
+        "exitCode": 0,
+        "wallSeconds": 0.062479,
+        "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "phase": "setup-cold",
+        "exitCode": 0,
+        "wallSeconds": 4.071119,
+        "logSha256": "abbbc9a4be1ff4d20c8a498e1a4702e5c2a717447923f34b9be7b720be4c6172"
+      },
+      {
+        "phase": "setup-warm-1",
+        "exitCode": 0,
+        "wallSeconds": 1.916943,
+        "logSha256": "28be6429dfae56504a0b35bf409b67c1ab337ef077756a3696123c9395d0ab22"
+      },
+      {
+        "phase": "setup-warm-2",
+        "exitCode": 0,
+        "wallSeconds": 1.751009,
+        "logSha256": "28be6429dfae56504a0b35bf409b67c1ab337ef077756a3696123c9395d0ab22"
+      },
+      {
+        "phase": "existing-bot-settings",
+        "exitCode": 0,
+        "wallSeconds": 22.843669,
+        "logSha256": "8cda250ebe8930021d597640fb84fd8e7ca491489e2bdc234f17aeeda4cf9ee4"
+      },
+      {
+        "phase": "pg-stop",
+        "exitCode": 0,
+        "wallSeconds": 0.91243,
+        "logSha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d"
+      }
+    ],
+    "afterCold": {
+      "ledger": "396:b6a222d71df02fdf135c1f0ae1b4e1b7",
+      "tables": "368",
+      "database": "sdlc_bootstrap_e2e",
+      "serverVersion": "17.11 (Debian 17.11-0+deb13u1)",
+      "rows": "0"
+    },
+    "afterWarm1": {
+      "ledger": "396:b6a222d71df02fdf135c1f0ae1b4e1b7",
+      "tables": "368",
+      "database": "sdlc_bootstrap_e2e",
+      "serverVersion": "17.11 (Debian 17.11-0+deb13u1)",
+      "rows": "0"
+    },
+    "afterWarm2": {
+      "ledger": "396:b6a222d71df02fdf135c1f0ae1b4e1b7",
+      "tables": "368",
+      "database": "sdlc_bootstrap_e2e",
+      "serverVersion": "17.11 (Debian 17.11-0+deb13u1)",
+      "rows": "0"
+    },
+    "existingDatabaseSuite": {
+      "passed": 11,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "coverage": [
+        "Bot creation/seed state",
+        "Environment authorization and existing bindings",
+        "Alias uniqueness",
+        "Owner-only settings and transfer",
+        "Backfill isolated environment creation",
+        "Backfill repeated application"
+      ]
+    },
+    "pass": true,
+    "pgPidFileAbsent": true
+  },
+  "environmentFailure": {
+    "startedUtc": "2026-11-20T21:22:31.527958+00:00",
+    "finishedUtc": "2026-11-20T21:22:34.614718+00:00",
+    "phase": "pg-start",
+    "exitCode": 1,
+    "reason": "Scratch filesystem rejected Unix-domain socket creation with Operation not permitted after the loopback TCP bind succeeded.",
+    "adjustment": "Start the same PostgreSQL binary with Unix sockets disabled, retaining loopback-only TCP. No test code, assertions, timeout, or migration inputs changed.",
+    "pgPidFileAbsent": true,
+    "samples": [
+      {
+        "phase": "initdb",
+        "exitCode": 0,
+        "wallSeconds": 2.810441,
+        "logSha256": "e6895259fe90cda40bff301b399a166f1bb0a804251e7e701c800694bb58c0a7"
+      },
+      {
+        "phase": "pg-start",
+        "exitCode": 1,
+        "wallSeconds": 0.247658,
+        "logSha256": "072bdd374cf4acca521b5f507cda71baccaba16e1ebc37c9bcecf8f3f5f1fd02"
+      }
+    ]
+  },
+  "interpretation": {
+    "before": "One real helper-only source change altered the canonical migration identity but reused the bootstrap cache. The shell regression falsely kept stale observed state.",
+    "after": "The bootstrap always enters the existing setup and per-file migration ledger; the helper-only regression passes and setup errors propagate.",
+    "cost": "Warm setup now intentionally executes the existing checks/backfills. Observed costs are 1.916943 and 1.751009 seconds (n=2); no broader latency distribution is claimed.",
+    "limits": [
+      "Cold/warm measurements used an empty disposable database; the existing DB suite separately exercises populated fixture/authorization/backfill paths.",
+      "This evidence does not authorize deployment or modify #2891, #2897, #2912, #2956 or #1954 ownership.",
+      "Protected CI, independent review and merged-version checks are recorded in the PR and the single #2984 progress comment."
+    ]
+  }
+}

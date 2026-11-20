@@ -21,7 +21,7 @@ Stage selection: any concrete missing information or permission → `clarify/wai
 
 ## Compatibility and rollout
 
-`POST /api/coordinator/messages` remains strictly `{text,submissionId?}`. Do not send question/approval fields, strip them into ordinary messages, or reinterpret submission IDs as question IDs. This PR has no execution-question answer endpoint. The old execution question/run/session contract remains unavailable on main until a separately coordinated integration preserves current worker and provenance boundaries.
+Personal messages use the [native Eve submission endpoint](../backend/personal-submission-contract.md). Question and approval continuations keep their own request identity and fields. This PR has no execution-question answer endpoint. The old execution question/run/session contract remains unavailable on main until a separately coordinated integration preserves current worker and provenance boundaries.
 
 Intake tools need both the Factory routing switch and the issue tools switch on (`mikka-factory-routing-off` and `mikka-issue-tools-off` in `lib/deployment-switches.ts`; both default to on). Registering capabilities does not expand a frozen execution grant. Existing stored definitions must explicitly include a capability before instrumented execution can use it. No runtime flag, definition, provider authorization or real resource is changed by this PR.
 

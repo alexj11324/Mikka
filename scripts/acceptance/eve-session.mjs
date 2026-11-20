@@ -59,3 +59,16 @@ export async function observeEveSession(client, botId, { timeoutMs = 120_000, st
     if (stopped || ended || !resumable) return { sessionId: session.sessionId, nextIndex }
   }
 }
+
+/** Native authenticated submission; the caller retains its logical operation UUID. */
+export async function submitEveMessage(client, botId, message, submissionId, clientContext = {}, headers = {}) {
+  const response = await client.request(`/api/agents/eve/v1/session${botId ? '?botId=' + encodeURIComponent(botId) : ''}`, {
+    method: 'POST', headers: { ...headers, 'content-type': 'application/json', 'x-mikka-submission-id': submissionId },
+    body: JSON.stringify({ message, clientContext }),
+  })
+  const value = await response.json()
+  if (response.status !== 202 || value?.ok !== true || !/^wrun_[A-Za-z0-9_-]+$/.test(value.sessionId ?? '') || typeof value.deliveryId !== 'string' || !value.deliveryId) {
+    const error = new Error('eve_submission_refused'); error.httpStatus = response.status; error.serverCode = typeof value?.error === 'string' ? value.error : value?.error?.code; throw error
+  }
+  return value
+}
