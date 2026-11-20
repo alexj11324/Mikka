@@ -52,7 +52,7 @@ export async function readCompiledDockerBuild(root, options = {}) {
 }
 
 export function serverOptions(args, env = process.env) {
-  const options = { hostname: env.NITRO_HOST || env.HOST || '0.0.0.0', port: env.NITRO_PORT || env.PORT || '3000' }
+  const options = { hostname: env.NITRO_HOST || env.HOST || (env.MIKKA_FIXTURE ? '127.0.0.1' : '0.0.0.0'), port: env.NITRO_PORT || env.PORT || '3000' }
   const seen = new Set()
   for (let index = 0; index < args.length; index += 2) {
     const option = args[index]
