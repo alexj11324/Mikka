@@ -15,7 +15,7 @@ const pick = (file, extra) => select(plan, [change(file, extra)])
 test('mobile does not select server DB, daemon, Docker or macOS', async () => {
   const result = await pick('apps/mobile/lib/theme.ts')
   assert.equal(result.full, false)
-  for (const key of ['daemon','image','desktop','analytics']) assert.equal(result[key], false, key)
+  for (const key of ['daemon','desktop','analytics']) assert.equal(result[key], false, key)
   assert.deepEqual(result.db_suites, [])
   assert.deepEqual(result.db_matrix.shard, [])
   assert(result.mobile)
@@ -30,7 +30,6 @@ test('non-documentation plans keep the suite that actually exercises the docs cl
 test('web component edits select their consumers without server DB or Docker', async () => {
   const result = await pick('components/settings/settings-view.tsx')
   assert.equal(result.full, false)
-  assert.equal(result.image, false)
   assert.equal(result.daemon, false)
   assert.deepEqual(result.db_suites, [])
   assert(result.source)
@@ -41,7 +40,7 @@ test('daemon is selected through its package dependency and protocol expands glo
   assert.equal(result.daemon, true)
   const shared = await pick('packages/protocol/src/run.ts')
   assert(shared.full)
-  assert(shared.daemon && shared.desktop && shared.image)
+  assert(shared.daemon && shared.desktop)
   assert.deepEqual(shared.db_suites, plan.db.scripts)
 })
 test('Factory store selects marker-backed suites and real downstream imports', async () => {
@@ -49,7 +48,6 @@ test('Factory store selects marker-backed suites and real downstream imports', a
   for (const suite of ['test:factory','test:factory-routing-db']) assert(result.db_suites.includes(suite), suite)
   assert(result.affected.includes(dbId('test:factory')))
   assert(result.db_suites.length < plan.db.scripts.length)
-  assert(result.image, 'a new backend capability must validate self-hosted dependencies and exercise the image')
 })
 test('Eve model changes select native unit tests and schedule authority selects its database gate', async () => {
   const unit = await pick('lib/eve/streaming-model.ts')
@@ -62,7 +60,7 @@ for (const file of ['pnpm-lock.yaml','pnpm-workspace.yaml','tsconfig.json','.git
   const r = await pick(file)
   assert(r.full)
   assert.equal(r.db_suites.length, plan.db.scripts.length)
-  assert(r.daemon && r.image && r.desktop)
+  assert(r.daemon && r.desktop)
 })
 // A migration changes the schema every suite runs against, so it keeps the full
 // DB inventory; it says nothing about rendering, so it must not turn on the
@@ -75,7 +73,6 @@ test('a migration keeps every DB suite without turning on the packaged desktop b
   assert(!r.full)
   assert.equal(r.db_suites.length, plan.db.scripts.length)
   assert(!r.desktop)
-  assert(r.image, 'a schema migration must validate the real self-hosted image')
 })
 test('deletes, renames, executable modes, symlinks and empty diffs run all', async () => {
   for(const extra of [{status:'D'},{status:'R100'},{mode:'100755'},{mode:'120000'},{oldMode:'100755'}]) assert((await pick('README.md', extra)).full)
@@ -114,7 +111,7 @@ test('shared aliases and glob imports become graph edges rather than missed test
   assert(Object.values(plan.graph.dependencies).some(edges=>edges.some(e=>e.target.startsWith('source:packages/protocol/'))))
 })
 test('every heavy consumer uses the same trusted triage and required names remain', () => {
-  for(const file of ['ui-policy','desktop','analytics-ssr','self-hosted-image']) assert(readFileSync(`.github/workflows/${file}.yml`,'utf8').includes('uses: ./.github/workflows/ci-selection.yml'))
+  for(const file of ['ui-policy','desktop','analytics-ssr']) assert(readFileSync(`.github/workflows/${file}.yml`,'utf8').includes('uses: ./.github/workflows/ci-selection.yml'))
   const bootstrap=readFileSync('scripts/ci/bootstrap.sh','utf8')
   assert(bootstrap.includes('git archive "$trusted_sha"'))
   assert(bootstrap.includes('--frozen-lockfile --ignore-scripts'))
@@ -128,7 +125,7 @@ test('every heavy consumer uses the same trusted triage and required names remai
 
 test('the actual required gate scripts reject unselected failures and selected skips', () => {
   const workflow = readFileSync('.github/workflows/ui-policy.yml','utf8')
-  const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'IMAGE', 'ANALYTICS', 'GOVERNANCE']
+  const uiChecks = ['CORE', 'INTEGRATION', 'SOURCE', 'DAEMON', 'ANALYTICS', 'GOVERNANCE']
   for (const job of ['ui-policy','browser-tests']) {
     const block = workflow.split(`\n  ${job}:\n`)[1].split(/\n  [a-z][a-z-]*:\n/)[0]
     const script = block.split('        run: |\n')[1].split('      - uses:')[0].split('\n').map(line => line.slice(10)).join('\n')
@@ -155,8 +152,10 @@ test('the actual required gate scripts reject unselected failures and selected s
     }
     if (job === 'ui-policy') {
       assert(!/\b(?:EXPECT_)?DESKTOP\b/.test(script), 'the automatic gate has no Desktop consumer')
-      for (const result of ['success', 'skipped', 'failure', 'cancelled', 'timed_out', '']) {
-        assert(run({ EXPECT_DESKTOP: 'true', DESKTOP: result }), 'a retired Desktop result does not affect the automatic gate')
+      for (const retired of ['DESKTOP', 'IMAGE']) {
+        assert(!new RegExp(`\\b(?:EXPECT_)?${retired}\\b`).test(script), retired)
+        for (const result of ['success', 'skipped', 'failure', 'cancelled', 'timed_out', ''])
+          assert(run({ ['EXPECT_' + retired]: 'true', [retired]: result }), `a retired ${retired} result does not affect the automatic gate`)
       }
       for (const key of uiChecks) {
         assert(run({['EXPECT_' + key]: 'false', [key]: 'skipped'}), key)

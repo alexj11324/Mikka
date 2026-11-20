@@ -28,7 +28,6 @@ concurrency:
 
 env:
   # Existing accounting/admission suites exercise the hosted deployment.
-  # The self-hosted image workflow separately runs the default community mode.
   MIKKA_EDITION: cloud
   # A cache restore that fails (e.g. the account's cache egress limit) would
   # otherwise hang for actions/cache's 10-minute default before falling back
@@ -286,16 +285,6 @@ jobs:
 
   # PR specializations are reusable jobs so the stable gate can require their
   # actual conclusions. Main retains its existing independent release workflows.
-  image-checks:
-    needs: changes
-    if: github.event_name != 'push' && needs.changes.outputs.image == 'true'
-    uses: ./.github/workflows/self-hosted-image.yml
-    with:
-      selected: true
-    permissions:
-      contents: read
-      packages: write
-
   analytics-checks:
     needs: changes
     if: github.event_name != 'push' && needs.changes.outputs.analytics == 'true'
@@ -317,7 +306,7 @@ jobs:
     # The required check name. It reports success when only documentation
     # changed; otherwise it mirrors the full suite's result.
     name: UI policy (strict)
-    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, image-checks, analytics-checks, workspace-governance-checks]
+    needs: [changes, ui-policy-full, ui-policy-integrations, source-checks, daemon-checks, analytics-checks, workspace-governance-checks]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -332,11 +321,9 @@ jobs:
           EXPECT_INTEGRATION: ${{ needs.changes.outputs.integration }}
           EXPECT_SOURCE: ${{ needs.changes.outputs.source }}
           EXPECT_DAEMON: ${{ needs.changes.outputs.daemon }}
-          EXPECT_IMAGE: ${{ github.event_name != 'push' && needs.changes.outputs.image == 'true' }}
           EXPECT_ANALYTICS: ${{ github.event_name != 'push' && needs.changes.outputs.analytics == 'true' }}
           EXPECT_GOVERNANCE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && needs.changes.outputs.db == 'true' }}
           GOVERNANCE: ${{ needs.workspace-governance-checks.result }}
-          IMAGE: ${{ needs.image-checks.result }}
           ANALYTICS: ${{ needs.analytics-checks.result }}
           CORE: ${{ needs.ui-policy-full.result }}
           INTEGRATION: ${{ needs.ui-policy-integrations.result }}
@@ -344,7 +331,7 @@ jobs:
           DAEMON: ${{ needs.daemon-checks.result }}
         run: |
           test "$CHANGES_RESULT" = success
-          for name in CORE INTEGRATION SOURCE DAEMON IMAGE ANALYTICS GOVERNANCE; do
+          for name in CORE INTEGRATION SOURCE DAEMON ANALYTICS GOVERNANCE; do
             expected="EXPECT_$name"
             case "${!expected}" in
               true) test "${!name}" = success ;;

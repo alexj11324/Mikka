@@ -1,5 +1,7 @@
 # Self-hosting Mikka
 
+Self-hosting is community-maintained. Mikka ended dedicated compatibility testing and automatic self-hosted image releases on November 20, 2026.
+
 Deploy the community server, then connect the official app to that server. It runs on your own database and does not need a Mikka account, Stripe, Vercel, Cloudflare, or a Mikka-owned API key. Your subscriptions and API keys belong to you. Hosted Mikka billing is disabled in the community edition.
 
 The image provides the server: API, realtime, daemon gateway, scheduling, migrations and BYOK. **Mikka has one official UI**, whose Web, Desktop and iOS clients connect to this server ([active One UI decision](design/decisions/2026-11-08-2133-one-ui.md)). The old built-in community workspace was retired; `MIKKA_COMMUNITY_UI=1` no longer re-enables it. The public image still serves server status, sign-in and account handoff pages, not a second workbench. Official UI screenshots are not copied into the public server image.
@@ -399,7 +401,7 @@ node scripts/self-hosted-smoke.mjs
 
 The build uses the pinned pnpm lockfile, Vite frontend, Nitro Node server, and Node 24. It does not run migrations at image build time and does not require production credentials. `.dockerignore` excludes local environment files and private hosted UI. The runtime image contains the traced server dependencies and public assets, runs as an unprivileged user, and starts from its standalone output directory.
 
-The **Self-hosted image** workflow builds the image, starts a clean PostgreSQL 17 database, checks migrations/startup health, verifies public configuration and static assets, and restarts the same persisted installation. A successful main build publishes `ghcr.io/alexj11324/mikka:<commit-sha>` and updates `latest`; release tags publish matching tags. Pin the SHA or release tag in `.env` before an upgrade, back up the two volumes, then run `docker compose pull` and `docker compose up -d --wait`. For a stable versioned release, use the [host-only upgrade controller and compatibility policy](self-hosted-updates.md); main/`latest` image publication never restarts existing self-hosted servers automatically.
+Choose a published image and its matching Compose file. Pin the image digest or published release tag in `.env`. Back up the two volumes before you run `docker compose pull` and `docker compose up -d --wait`. For existing stable releases, see the [host-side upgrade guide](self-hosted-updates.md).
 
 `/mikka/api/version` reports the compiled revision. `docker compose ps` reports health. Startup logs include migration names and bounded error codes, never generated installation keys.
 

@@ -33,7 +33,7 @@ import { pathToFileURL } from 'node:url'
 const { inventory, readTree } = await import(pathToFileURL(`${process.env.TRUSTED_ROOT}/scripts/run-db-tests.mjs`))
 const root = process.env.CI_CANDIDATE_ROOT
 const db = inventory(readTree(root), JSON.parse(fs.readFileSync(`${root}/package.json`)).scripts)
-const result = { docs_only: false, full: true, core: true, integration: true, source: true, daemon: true, mobile: true, desktop: true, image: true, analytics: true, db: true, units: ['*'], db_suites: db.scripts, db_matrix: { shard: ['1/4','2/4','3/4','4/4'] } }
+const result = { docs_only: false, full: true, core: true, integration: true, source: true, daemon: true, mobile: true, desktop: true, analytics: true, db: true, units: ['*'], db_suites: db.scripts, db_matrix: { shard: ['1/4','2/4','3/4','4/4'] } }
 for (const [key,value] of Object.entries(result)) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${typeof value === 'object' ? JSON.stringify(value) : value}\n`)
 fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '## CI bootstrap\n\nTrusted selector not present at base: full coverage; complete candidate DB inventory validated.\n')
 JS

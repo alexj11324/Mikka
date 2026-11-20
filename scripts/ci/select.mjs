@@ -4,7 +4,6 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { filterAffected } from 'nx/src/project-graph/affected/affected-project-graph.js'
 import { buildGraph, dbId, taskId } from './graph.mjs'
-import { isSelfHostedBackendInput } from './self-hosted-requirements.mjs'
 import { isDocsOnly } from '../ci-docs-only.mjs'
 import { frozenUnitInventory } from './frozen-inventory.mjs'
 
@@ -20,7 +19,6 @@ export function area(file) {
   if (/^(?:components|hooks|i18n|messages|public|apps\/frontend)\/|^app\/(?:fonts|globals)/.test(file)) return 'frontend/web'
   if (/^(?:lib|app|apps\/api)\//.test(file)) return 'api/factory/coordinator'
   if (file.startsWith('drizzle/')) return 'database/migrations'
-  if (/^(?:Dockerfile|docker-compose|tests\/self-hosted)/.test(file)) return 'self-hosted/image'
   if (file.startsWith('scripts/e2b/')) return 'e2b/runtime'
   if (globalPath(file)) return 'ci/release/security'
   if (isDocsOnly([file])) return 'docs-only'
@@ -70,7 +68,6 @@ export async function select(plan, changes, { force = false } = {}) {
     source: !docs, daemon: !docs && (full || selected.has('@mikka/daemon') || areas.includes('daemon')),
     mobile: !docs && (full || selected.has('@mikka/mobile') || areas.includes('mobile')),
     desktop: !docs && (full || selected.has('@mikka/desktop') || areas.includes('desktop')),
-    image: !docs && (full || areas.includes('self-hosted/image') || files.some(isSelfHostedBackendInput) || files.some(f => area(f) === 'api/factory/coordinator' && !/\.(?:test|spec)\.[^.]+$/.test(f))),
     analytics: !docs && (full || files.some(f => /analytics|posthog|instrumentation|^apps\/frontend\/|^app\/globals/.test(f))),
   }
   return { version: 1, full, docs_only: docs, areas, reasons, affected, units,
