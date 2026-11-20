@@ -101,9 +101,11 @@ export type ThreadScreenProps = {
   name: string
   /** The accessible name of the existing transcript viewport. */
   transcriptLabel?: string
+  /** The accessible waiting state for an initial read; omitted once it resolves or fails. */
+  loadingLabel?: string
   /** Its mark, for the author line (an entry's own author wins). */
   mark: ReactNode
-  /** null while the first read is on its way. */
+  /** null until the first read supplies entries; loadingLabel distinguishes a pending read from an error. */
   entries: ThreadEntry[] | null
   /** Shown in place of an empty conversation: the welcome being written. No starter cards (R-12). */
   empty?: ReactNode

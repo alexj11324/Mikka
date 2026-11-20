@@ -650,6 +650,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       <section ref={rootRef} aria-label={name} className={cn('mikka-agent flex min-h-0 min-w-0 flex-1 flex-col', pill && 'md:pt-14')}>
         <ThreadScreen host={compact ? 'column' : 'page'} botId={botId} name={name} mark={avatar('pill')} entries={data || localMessages.length ? entries : null} empty={empty} panels={compact ? undefined : panels} work={work.work}
           transcriptLabel={bot ? t('conversationWith', { name: bot.name }) : t('conversation')}
+          loadingLabel={!data && !loadError ? tCommon('loading') : undefined}
           older={data?.historyBefore ? { loading: loadingHistory, onLoad: () => void loadHistory() } : undefined}
           working={working && !stopping} onStop={(working || sending || activeTurn(stream.view) !== undefined) && !resuming && !stopping ? () => { void stop() } : undefined}
           composer={{ ref: inputRef, label: bot ? t('inputTo', { name: bot.name }) : t('input'), placeholder, value: draft, onChange: updateDraft, sending: resuming, editableWhileSending: resuming, onSubmit: () => { void send() },
