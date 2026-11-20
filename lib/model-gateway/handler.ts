@@ -21,7 +21,7 @@ export interface GatewayDependencies {
   upstream(grant: GatewayGrant, protocol: GatewayProtocol): Promise<{ upstream: GatewayUpstream; features?: import('./features').GatewayFeatures }>
   /** Mikka 额度 only: holds a call's worth of credit; resolves to the hold's id. Throws `PaidResourceError` when nothing can pay. */
   reserve(grant: GatewayGrant, id: string): Promise<void>
-  settle(id: string, cost: number | null, usage: ReturnType<typeof readGatewayUsage>): Promise<void>
+  settle(id: string, cost: number | null, usage: ReturnType<typeof readGatewayUsage>, generationId?: string): Promise<void>
   /** The catalogue the cost is priced from. */
   catalogue(): Promise<readonly import('@/lib/model-catalog').CatalogModel[]>
   /** Nothing can pay: the run stops with the refusal as its reason, so the thread shows 「Mikka 额度已用完」. */
@@ -118,22 +118,23 @@ export async function handleModelGateway(request: Request, protocol: GatewayProt
     console.warn(JSON.stringify({ msg: 'model_gateway_upstream_failed', runId: grant.runId, source: grant.source.kind, error: error instanceof Error ? error.name : 'unknown' }))
     return errorResponse(protocol, 502, 'model_gateway_upstream_failed')
   }
+  const generationId = response.headers.get('x-litellm-call-id') ?? undefined
   const headers = new Headers({ 'cache-control': 'no-store' })
   const type = response.headers.get('content-type')
   if (type) headers.set('content-type', type)
   if (!metered || !response.body) {
-    if (metered) await dependencies.settle(holdId, response.ok ? null : 0, null)
+    if (metered) await dependencies.settle(holdId, response.ok ? null : 0, null, generationId)
     return new Response(response.body, { status: response.status, headers })
   }
   if (!response.ok) {
     // A refused request (bad parameters, provider limits) cost nothing.
-    await dependencies.settle(holdId, 0, null)
+    await dependencies.settle(holdId, 0, null, generationId)
     return new Response(response.body, { status: response.status, headers })
   }
   const tap = usageTap(async text => {
     const usage = readGatewayUsage(protocol, text)
     const model = catalogModel(grant.model, await dependencies.catalogue())
-    await dependencies.settle(holdId, usage ? gatewayCostMicroUsd(model, usage) : null, usage)
+    await dependencies.settle(holdId, usage ? gatewayCostMicroUsd(model, usage) : null, usage, generationId)
   })
   // A client that stops reading still owes what the provider already produced.
   request.signal.addEventListener('abort', () => { void tap.finish() }, { once: true })
@@ -153,9 +154,9 @@ function defaultDependencies(): GatewayDependencies {
       await hostedBillingScope.run({ workspaceId, ownerId: grant.ownerId, runId: grant.runId, actorId: grant.ownerId },
         () => withSharedCredits(workspaceId, payer => hostedUsage.reserve(payer, grant.model, id, process.env)))
     },
-    async settle(id, cost, usage) {
+    async settle(id, cost, usage, generationId) {
       const { hostedUsage } = await import('@/lib/abuse/runtime')
-      await hostedUsage.settle(id, cost, usage?.inputTokens ?? 0, usage?.outputTokens ?? 0, undefined,
+      await hostedUsage.settle(id, cost, usage?.inputTokens ?? 0, usage?.outputTokens ?? 0, generationId,
         usage ? { read: usage.cacheReadTokens, write: usage.cacheWriteTokens } : null)
     },
     catalogue: async () => (await import('@/lib/model-catalog-server')).modelCatalog(),

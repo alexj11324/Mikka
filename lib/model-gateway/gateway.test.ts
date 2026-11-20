@@ -88,16 +88,16 @@ test('LiteLLM is configured only with a clean URL and a master key', () => {
 
 const grant = (over: Partial<GatewayGrant> = {}): GatewayGrant => ({ runId: '10000000-0000-4000-8000-000000000001', ownerId: 'alice', workspaceId: '10000000-0000-4000-8000-000000000002', harness: 'claude_code', model: 'anthropic/claude-sonnet-5.5', source: { kind: 'credits' }, ...over })
 function harness(over: Partial<GatewayDependencies> & { answer?: () => Response } = {}) {
-  const calls = { reserved: [] as string[], settled: [] as [string, number | null, unknown][], fetched: [] as { url: string; init: RequestInit }[] }
+  const calls = { reserved: [] as string[], settled: [] as [string, number | null, unknown][], generationIds: [] as (string | undefined)[], fetched: [] as { url: string; init: RequestInit }[] }
   const dependencies: GatewayDependencies = {
     fetch: (async (url: string | URL | Request, init?: RequestInit) => { calls.fetched.push({ url: String(url), init: init! }); return (over.answer ?? (() => new Response(sse([
       { type: 'message_start', message: { usage: { input_tokens: 1000, output_tokens: 0 } } },
       { type: 'message_delta', usage: { output_tokens: 100 } },
-    ]), { headers: { 'content-type': 'text/event-stream' } })))() }) as typeof fetch,
+    ]), { headers: { 'content-type': 'text/event-stream', 'x-litellm-call-id': 'call-fixture' } })))() }) as typeof fetch,
     verify: async token => token === 'mkg_valid' ? grant() : null,
     upstream: async () => ({ upstream: { url: 'http://litellm:4000', masterKey: 'internal' } }),
     reserve: async (_grant, id) => { calls.reserved.push(id) },
-    settle: async (id, cost, usage) => { calls.settled.push([id, cost, usage]) },
+    settle: async (id, cost, usage, generationId) => { calls.settled.push([id, cost, usage]); calls.generationIds.push(generationId) },
     catalogue: async () => [{ id: 'anthropic/claude-sonnet-5.5', vendor: 'anthropic', name: 'Sonnet', contextWindow: null, maxTokens: null, pricing: { input: 3, output: 15 }, tags: [], reasoning: [] }],
     ...over,
   }
@@ -116,6 +116,7 @@ test('Mikka 额度: the gateway holds credit, streams the answer through, then s
   assert.equal(JSON.parse(String(calls.fetched[0].init.body)).model, 'mikka-credits/anthropic/claude-sonnet-5.5')
   // 1000 input at $3/M + 100 output at $15/M = 3000 + 1500 micro-USD.
   assert.deepEqual(calls.settled.map(([id, cost]) => [id, cost]), [[calls.reserved[0], 4500]])
+  assert.deepEqual(calls.generationIds, ['call-fixture'])
 })
 
 test('a request is refused without a valid token, on the wrong protocol, or when nothing can pay', async () => {

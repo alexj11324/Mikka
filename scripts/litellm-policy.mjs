@@ -7,6 +7,8 @@ import ts from 'typescript'
 const client = 'lib/model-gateway/litellm-client.ts'
 const roots = ['app/', 'apps/', 'lib/', 'packages/', 'cloudflare/', 'services/', 'workflows/']
 const constructors = new Set(['createGateway', 'gateway', 'createOpenAI', 'createAnthropic', 'createOpenAICompatible'])
+const providerModule = /^(?:@ai-sdk\/(?:gateway|openai|anthropic|openai-compatible)|openai|@anthropic-ai\/sdk)$/
+const inferenceFunctions = new Set(['generateText', 'streamText', 'generateObject', 'streamObject', 'embed', 'embedMany', 'transcribe'])
 const modelDomain = /(?:api\.openai\.com|api\.anthropic\.com|ai-gateway\.vercel\.sh|api\.deepseek\.com|api\.moonshot\.(?:cn|ai)|zero\.cat|chatgpt\.com\/backend-api\/codex|api\.cloudflare\.com\/client\/v4\/accounts\/[^\s]*\/ai)/i
 
 // Official subscription OAuth remains the explicit #2869 exception. Quota
@@ -31,18 +33,17 @@ export function auditLiteLlmSource(file, source) {
       const bindings = node.importClause?.namedBindings
       const factory = bindings && ts.isNamedImports(bindings)
         && bindings.elements.some(item => constructors.has((item.propertyName ?? item.name).text))
-      const providerModule = /^@ai-sdk\/(?:gateway|openai|anthropic|openai-compatible)$/.test(module)
       const runtimeImport = !node.importClause?.isTypeOnly && (node.importClause?.name
         || (bindings && ts.isNamespaceImport(bindings))
         || (bindings && ts.isNamedImports(bindings) && bindings.elements.some(item => !item.isTypeOnly && !(item.propertyName ?? item.name).text.endsWith('Error'))))
-      if (!subscription && ((providerModule && runtimeImport) || (module === 'ai' && factory))) {
+      if (!subscription && ((providerModule.test(module) && runtimeImport) || (module === 'ai' && factory))) {
         report(node, 'provider SDK imports belong in the LiteLLM client')
       }
     }
     if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword
       || (ts.isIdentifier(node.expression) && node.expression.text === 'require'))
       && node.arguments[0] && ts.isStringLiteral(node.arguments[0])
-      && /^@ai-sdk\/(?:gateway|openai|anthropic|openai-compatible)$/.test(node.arguments[0].text)) {
+      && providerModule.test(node.arguments[0].text)) {
       report(node, 'dynamic provider imports belong in the LiteLLM client')
     }
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && constructors.has(node.expression.text)) {
@@ -51,6 +52,13 @@ export function auditLiteLlmSource(file, source) {
       const subscription = file === 'lib/subscription-service.ts' && node.expression.text === 'createOpenAICompatible'
         && node.arguments[0]?.getText(tree).includes("baseURL: 'https://mikka.invalid/v1'")
       if (!subscription) report(node, 'model SDK construction belongs in the LiteLLM client')
+    }
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && inferenceFunctions.has(node.expression.text)) {
+      const options = node.arguments[0]
+      if (options && ts.isObjectLiteralExpression(options) && options.properties.some(property =>
+        ts.isPropertyAssignment(property) && property.name.getText(tree) === 'model' && ts.isStringLiteralLike(property.initializer))) {
+        report(node, 'string model IDs select the SDK default gateway; pass a LiteLLM model')
+      }
     }
     if ((ts.isStringLiteralLike(node) || ts.isTemplateExpression(node)) && modelDomain.test(node.getText(tree)) && !metadata.has(file)) {
       report(node, 'provider model domains belong in LiteLLM configuration')

@@ -9,6 +9,8 @@ test('rejects a direct model request and renamed SDK factories outside the LiteL
     `createOpenAICompatible({ baseURL: endpoint, apiKey })`,
     `gateway('model')`,
     `import { createOpenAI as provider } from '@ai-sdk/openai'; provider({ baseURL: endpoint })`,
+    `import Direct from 'openai'; new Direct({ apiKey })`,
+    `generateText({ model: 'openai/gpt-6-luna', prompt })`,
     `import { openai } from '@ai-sdk/openai'; openai('model')`,
     `const provider = await import('@ai-sdk/openai')`,
     `import { gateway as provider } from 'ai'; provider('model')`,
