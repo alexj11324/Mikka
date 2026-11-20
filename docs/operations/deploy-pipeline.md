@@ -32,6 +32,13 @@ write. A partial or completed pipeline marker prevents a second bootstrap.
 
 ## Verification and recovery
 
+The Web version document keeps `build` and `overlaySha` tied to its own assets.
+It reads `apiBuild` and `apiOverlaySha` from the current API binding on each
+request, so a warm Web instance observes an API-only update or rollback without
+being replaced. The upstream API still has its exact five-field document; this
+identity separation does not introduce the client protocol changes from #2896
+or satisfy that issue's production promotion gate.
+
 Staging runs the existing authenticated feature smoke and the anonymous
 [API route registration probe](route-probe.md). The route inventory must come
 from the actual API artifact, even when a newer release reuses that API. A
@@ -69,8 +76,9 @@ requires a valid release owner window, the compatibility change merged into
 main, at least three successful automatic staging releases and a verified
 current staging result. Production and staging use distinct previous manifests.
 Enabling this path is a separate reviewed operations change; merging product
-code does not by itself enable production. Existing automatic Mobile OTA
-publication must respect the same window before it can read release credentials.
+code does not by itself enable production. The Mobile OTA owner-window guard
+belongs to the separate compatibility change in #2896. This staging rollout
+does not change mobile or protocol inputs or authorize an OTA publication.
 
 The current registry publication environment permits main only. Trusted PRs
 still run the original credential-free image qualification gates, but cannot
