@@ -221,6 +221,24 @@ test('the actual pre-checkout script permits current official release or exact m
   assert.equal(manual.status, 0, manual.stderr); assert.equal(manual.output, `source-sha=${SHA}\n`)
 })
 
+test('Cloudflare-triggered runtime metadata retains all pre-checkout identity checks', t => {
+  const automatic = mutate => metadataFixture(t, value => {
+    value.event.workflow_run.event = 'workflow_run'; value.run.event = 'workflow_run'
+    mutate?.(value)
+  })
+  const result = automatic()
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.output, `source-sha=${SHA}\nupstream-run-id=123\nupstream-run-attempt=2\n`)
+  for (const mutate of [value => { value.event.workflow_run.head_repository.full_name = 'fork/Mikka' },
+    value => { value.workflow.path = '.github/workflows/other.yml' }, value => { value.run.event = 'push' },
+    value => { value.run.run_attempt++ }, value => { value.main.object.sha = OTHER },
+    value => { value.environment.GITHUB_RUN_ATTEMPT = '3' }]) {
+    const refused = automatic(mutate)
+    assert.equal(refused.status, 1); assert.equal(refused.output, '')
+    assert.equal(refused.stderr.trim(), 'task_secret_source_refused')
+  }
+})
+
 test('the actual pre-checkout script refuses fork, PR, wrong workflow/attempt/source and exhausted receiver retry', t => {
   for (const mutate of [value => { value.environment.GITHUB_REPOSITORY = 'fork/Mikka' },
     value => { value.environment.GITHUB_EVENT_NAME = 'pull_request_target' }, value => { value.environment.GITHUB_REF = 'refs/heads/other' },
