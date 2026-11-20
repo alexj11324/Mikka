@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { createRequire } from 'node:module'
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText, jsonSchema, stepCountIs, streamText, tool } from 'ai'
 import { createLiteLLMModel, liteLLMCost, liteLLMGenerationId } from '../../lib/model-gateway/litellm-client.ts'
@@ -39,4 +40,32 @@ test('the real Responses SDK parses fragmented tool arguments and executes the r
   assert.deepEqual(calls, [{ word: 'actual response SDK' }])
   assert.deepEqual((await result.steps).map(step => step.usage.outputTokens), [7, 7])
   assert.equal((await result.totalUsage).outputTokens, 14)
+})
+
+test('the daemon installed Messages SDK preserves fragmented tool input and its correlated result', async t => {
+  const server = await startFakeLiteLlm({ answer: localModelAnswer })
+  t.after(() => server.close())
+  const daemonRequire = createRequire(new URL('../../packages/daemon/package.json', import.meta.url))
+  const sdkRequire = createRequire(daemonRequire.resolve('@anthropic-ai/claude-agent-sdk'))
+  const { default: Anthropic } = sdkRequire('@anthropic-ai/sdk')
+  const client = new Anthropic({ baseURL: server.url, apiKey: FAKE_MODEL_KEY, maxRetries: 0,
+    defaultHeaders: { 'x-litellm-api-key': `Bearer ${FAKE_LITELLM_KEY}` },
+  })
+  const calls = []
+  const options = { model: 'mikka-default', max_tokens: 100, messages: [{ role: 'user', content: '/tool echo {"word":"actual messages SDK"}' }],
+    tools: [{ name: 'echo', input_schema: { type: 'object', properties: { word: { type: 'string' } }, required: ['word'], additionalProperties: false } }],
+  }
+  const first = await client.messages.stream(options).finalMessage()
+  assert.equal(first.stop_reason, 'tool_use')
+  const call = first.content.find(part => part.type === 'tool_use')
+  assert.equal(call.name, 'echo')
+  calls.push(call.input)
+  const next = await client.messages.stream({ ...options, messages: [...options.messages,
+    { role: 'assistant', content: first.content },
+    { role: 'user', content: [{ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify({ echoed: call.input.word }) }] },
+  ] }).finalMessage()
+  assert.equal(next.content.find(part => part.type === 'text').text, 'echo: {"echoed":"actual messages SDK"}')
+  assert.deepEqual(calls, [{ word: 'actual messages SDK' }])
+  assert.deepEqual([first.usage.output_tokens, next.usage.output_tokens], [7, 7])
+  assert.equal(first.usage.input_tokens + next.usage.input_tokens, 22)
 })
