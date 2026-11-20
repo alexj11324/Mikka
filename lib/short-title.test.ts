@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { cleanShortTitle, compactTaskTitle, isCjk, parseShortTitle, shortTitlePrompt, SHORT_TITLE_CJK_MAX, SHORT_TITLE_CHARS_MAX, SHORT_TITLE_PROMPT_MAX_BYTES } from './short-title'
+import { cleanShortTitle, compactTaskTitle, isCjk, parseShortTitle, shortTitlePrompt, SHORT_TITLE_CJK_MAX, SHORT_TITLE_PROMPT_MAX_BYTES } from './short-title'
 
 test('the prompt holds the model to the task language and limit, and treats the task as evidence', () => {
   const zh = shortTitlePrompt({ title: 'ALEX-1408: iOS 按 Comma 的布局重做线程页', body: '把线程页改成一行一个' })
