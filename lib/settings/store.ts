@@ -96,7 +96,10 @@ export async function writeSettings(context: SettingsContext, scope: SettingScop
       await writeRows(tx, scope, context, values)
       return readValues(context, tx, scope)
     })
-    await workspaceListChanged(workspaceTx, context.workspaceId, ['workspace_settings'])
+    // Pure keyboard writes already refresh this account's active workspaces.
+    if (scope === 'workspace' || Object.keys(values).some(key => !settingDefinition(key).action)) {
+      await workspaceListChanged(workspaceTx, context.workspaceId, ['workspace_settings'])
+    }
     return result
   })
 }

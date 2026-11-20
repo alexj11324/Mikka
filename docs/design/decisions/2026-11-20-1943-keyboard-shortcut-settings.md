@@ -61,6 +61,12 @@ concurrent requests. Conflict returns HTTP 409 with
 no partial update, including unrelated settings in the patch, is committed.
 Reset applies to the whole group under the same lock.
 
+After commit, pure shortcut writes publish the existing `workspace_settings`
+key to this owner in every active workspace, including other open windows.
+Other members and suspended memberships receive no shortcut invalidation. The
+payload is the known workspace ID only; neither action IDs nor key values are
+published. Mixed patches keep the existing invalidation for their other fields.
+
 The migration is additive and idempotent. Application rollback retains both
 tables and personal choices; it does not delete user settings. Test proof uses
 the existing settings unit/PG17 suites and real HTTP handlers, including

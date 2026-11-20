@@ -1,5 +1,6 @@
 import { eq } from 'drizzle-orm'
 import type { db } from '@/lib/db'
+import { ownerKeyboardShortcutsChanged } from '@/lib/live/lists'
 import type { SettingValue } from '@mikka/protocol/settings'
 import { KEYBOARD_SHORTCUT_ACTIONS, keyboardShortcutConflicts, keyboardShortcutSettingKey, type KeyboardShortcutBindings } from '@mikka/protocol/keyboard-shortcuts'
 import { settingDefinition } from './registry'
@@ -30,4 +31,5 @@ export async function writeKeyboardShortcuts(tx: Transaction, userId: string, va
   if (conflicts.length) throw new KeyboardShortcutConflictError(conflicts)
   for (const { action, binding } of entries) await tx.insert(keyboardShortcuts).values({ userId, actionId: action, binding })
     .onConflictDoUpdate({ target: [keyboardShortcuts.userId, keyboardShortcuts.actionId], set: { binding, updatedAt: new Date() } })
+  await ownerKeyboardShortcutsChanged(tx, userId)
 }

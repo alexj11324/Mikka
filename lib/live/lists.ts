@@ -201,6 +201,14 @@ export async function ownerSettingsTargets(_database: Database, workspaceDatabas
 export const ownerSettingsChanged = (executor: object, ownerId: string) => changed(executor, `owner-settings:${ownerId}`, (database, workspace) => ownerSettingsTargets(database, workspace, ownerId))
   .catch(() => console.warn('[live] settings invalidation unavailable'))
 
+/** Account-level keyboard settings refresh only their owner in every active
+ * workspace. The existing key contains a workspace ID, never bindings. */
+export async function ownerKeyboardShortcutTargets(database: Database, workspaceDatabase: Database, ownerId: string): Promise<Target[]> {
+  return (await ownerSettingsTargets(database, workspaceDatabase, ownerId)).map(({ scope }) => target(scope, ['workspace_settings']))
+}
+export const ownerKeyboardShortcutsChanged = (executor: object, ownerId: string) => changed(executor, `owner-shortcuts:${ownerId}`, (database, workspace) => ownerKeyboardShortcutTargets(database, workspace, ownerId))
+  .catch(() => console.warn('[live] keyboard settings invalidation unavailable'))
+
 /** The account's workspace directory and personal issue identifiers are read
  * across selected workspaces. Their transport still uses the actual owned
  * home, and carries only that known list key. */

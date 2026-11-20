@@ -231,3 +231,18 @@ dbTest('keyboard schema is machine-readable and migration replay retains disable
   assert.deepEqual(view.values['keyboardShortcuts.devices.add'], { value: 'Mod+F8', source: 'personal' })
   assert.deepEqual(view.values['keyboardShortcuts.search.open'], { value: 'Mod+KeyK', source: 'default' })
 })
+
+dbTest('account shortcut invalidation reaches only the owner in active workspaces without settings payloads', async () => {
+  const { ownerKeyboardShortcutTargets } = await import('../live/lists')
+  const home = homes.get(owner)!
+  const sort = <T extends { scope: { workspaceId: string } }>(rows: T[]) => rows.sort((a, b) => a.scope.workspaceId.localeCompare(b.scope.workspaceId))
+  assert.deepEqual(sort(await ownerKeyboardShortcutTargets(pool, workspacePool, owner)), sort([workspaceId, home].map(id => ({
+    scope: { ownerId: owner, workspaceId: id }, events: [{ kind: 'workspace_settings', id }],
+  }))))
+  await workspacePool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [home, owner])
+  try {
+    assert.deepEqual(await ownerKeyboardShortcutTargets(pool, workspacePool, owner), [{ scope: { ownerId: owner, workspaceId }, events: [{ kind: 'workspace_settings', id: workspaceId }] }])
+  } finally {
+    await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [home, owner])
+  }
+})
