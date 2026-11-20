@@ -2,6 +2,10 @@ import { spawn } from 'node:child_process'
 import { mkdir, readFile, realpath, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createServer } from 'node:net'
+import { EVE_PARENT_WATCH } from './eve-parent-watch-source.mjs'
+
+/** The peer guard as `--import` takes it: a data URL, because a built chunk has no scripts/ beside it. */
+export const EVE_PARENT_WATCH_IMPORT = `data:text/javascript;base64,${Buffer.from(EVE_PARENT_WATCH).toString('base64')}`
 
 export async function availableEvePort() {
   const listener = createServer()
@@ -97,7 +101,7 @@ export async function startEveService({ root = process.cwd(), env = process.env,
   // `--import` makes the peer stop when this process does, including after a
   // `kill -9` that leaves no chance to clean up here. `detached` makes it a
   // process-group leader, so one signal reaps everything it started.
-  const child = spawnProcess(process.execPath, ['--import', new URL('./eve-parent-watch.mjs', import.meta.url).href, ...args], {
+  const child = spawnProcess(process.execPath, ['--import', EVE_PARENT_WATCH_IMPORT, ...args], {
     cwd: directory, env: { ...childEnv, MIKKA_EVE_PARENT_PID: String(process.pid) },
     stdio: ['ignore', 'pipe', 'pipe'], detached: true,
   })

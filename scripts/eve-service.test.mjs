@@ -8,9 +8,10 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PassThrough } from 'node:stream'
 import test from 'node:test'
-import { eveFailureReason, startEveService } from './eve-service.mjs'
+import { eveFailureReason, startEveService, EVE_PARENT_WATCH_IMPORT } from './eve-service.mjs'
 
-const parentWatch = new URL('./eve-parent-watch.mjs', import.meta.url).href
+/** The peer guard the service hands `--import`; a data URL, so a built chunk needs no scripts/ beside it. */
+const parentWatch = EVE_PARENT_WATCH_IMPORT
 
 /** Alive, not a zombie: `kill(pid, 0)` reports a reparented orphan as alive. */
 function isRunning(pid) {
