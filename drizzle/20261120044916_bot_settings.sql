@@ -47,3 +47,16 @@ ALTER TABLE bot_model_choices ADD COLUMN IF NOT EXISTS effort text;
 DO $$ BEGIN
   ALTER TABLE bot_model_choices ADD CONSTRAINT bot_model_choices_effort_known CHECK (effort IS NULL OR effort IN ('low','medium','high','xhigh','max'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- A Slack thread started with `@Mikka bot=<alias>` keeps going to that Bot (lib/slack/thread-bots.ts):
+-- one row per person's Slack link, channel and thread. A deleted Bot drops its routes.
+CREATE TABLE IF NOT EXISTS slack_thread_bots (
+  "linkId" uuid NOT NULL,
+  "channelId" text NOT NULL,
+  "threadTs" text NOT NULL,
+  "ownerId" text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  "botId" uuid NOT NULL REFERENCES bots(id) ON DELETE CASCADE,
+  "createdAt" timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY ("linkId", "channelId", "threadTs")
+);
+CREATE INDEX IF NOT EXISTS slack_thread_bots_bot_idx ON slack_thread_bots ("botId");

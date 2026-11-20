@@ -219,6 +219,10 @@
     "artifacts": "Artifacts",
     "cardPreview": "[Card]",
     "botMenu": {
+      "share": "Share",
+      "moveTo": "Move to",
+      "unfollow": "Unfollow",
+      "following": "Following",
       "archive": "Archive",
       "unarchive": "Unarchive",
       "delete": "Delete",

@@ -7,8 +7,9 @@ import type { ChatTarget } from './bot-list'
  * `id` lets the frame pick the item's icon; `label` is already in the person's language.
  */
 export type ChatNavActionId = 'openNewTab' | 'copyLink' | 'profile' | 'pin' | 'unpin' | 'mute' | 'unmute' | 'markRead' | 'markUnread' | 'viewAll'
-  | 'rename' | 'hide' | 'unhide' | 'leave' | 'archive' | 'unarchive' | 'delete'
-export type ChatNavAction = { id: ChatNavActionId; label: string; danger?: boolean; run: () => void }
+  | 'rename' | 'hide' | 'unhide' | 'leave' | 'archive' | 'unarchive' | 'delete' | 'share' | 'moveTo' | 'unfollow' | 'choice'
+/** `children` opens to the side (Share ›, Move to ›); `checked` marks the current choice among them. */
+export type ChatNavAction = { id: ChatNavActionId; label: string; danger?: boolean; checked?: boolean; children?: ChatNavAction[]; run: () => void }
 
 /** The place a chat opens at, as an address (the same one the row opens). */
 export function chatPlace(target: ChatTarget): Partial<WorkspaceLocation> | null {

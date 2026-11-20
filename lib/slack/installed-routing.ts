@@ -17,7 +17,7 @@ export function signedCoordinates(app: string, input: unknown) {
     p.authorizations.some((a) => record(a).is_bot === true && record(a).team_id !== team)
   )
     return null
-  let channel: unknown, sender: unknown, eventId: string | undefined, text: string | undefined
+  let channel: unknown, sender: unknown, eventId: string | undefined, text: string | undefined, threadTs: string | undefined
   if (p.type === 'event_callback') {
     if (
       !['app_mention', 'message'].includes(String(e.type)) ||
@@ -32,6 +32,8 @@ export function signedCoordinates(app: string, input: unknown) {
     sender = e.user
     eventId = p.event_id
     text = e.text
+    // The thread a reply belongs to, or the message's own ts when it starts one.
+    threadTs = typeof e.thread_ts === 'string' ? e.thread_ts : typeof e.ts === 'string' ? e.ts : undefined
   } else if (p.type === 'block_actions' || p.type === 'view_submission') {
     sender = u.id
     channel = record(p.channel).id ?? record(p.container).channel_id
@@ -52,7 +54,7 @@ export function signedCoordinates(app: string, input: unknown) {
   const authorizations = Array.isArray(p.authorizations)
     ? p.authorizations.map(record).filter((a) => a.is_bot === true)
     : []
-  return { team, sender, channel, eventId, text, botUsers: authorizations.map((a) => a.user_id) }
+  return { team, sender, channel, eventId, text, threadTs, botUsers: authorizations.map((a) => a.user_id) }
 }
 
 export function signedRevocation(app: string, input: unknown) {

@@ -134,6 +134,23 @@ test('bot settings', { skip: !dbUrl }, async t => {
     await rejects(updateOwnedBot(me, { botId: bot, alias: 'mine' }), 'botNotFound')
   })
 
+  await t.test('a Slack thread started with bot=<alias> keeps its Bot, while the Bot is still the owner\'s', async () => {
+    const threads = await import('../lib/slack/thread-bots')
+    const bot = await seedBot(pool, ws.id, owner, 'Slack routed')
+    const thread = { linkId: randomUUID(), channelId: 'C123', threadTs: '1700000000.000100' }
+    assert.equal(await threads.slackThreadBot(pool, thread, owner, ws.id), null)
+    await threads.rememberSlackThreadBot(pool, thread, owner, bot)
+    assert.equal(await threads.slackThreadBot(pool, thread, owner, ws.id), bot)
+    assert.equal(await threads.slackThreadBot(pool, { ...thread, threadTs: '1700000000.000200' }, owner, ws.id), null, 'another thread')
+    assert.equal(await threads.slackThreadBot(pool, thread, owner, other.id), null, 'another workspace')
+    assert.equal(await threads.slackThreadBot(pool, thread, member, ws.id), null, 'another person')
+    const moved = await seedBot(pool, ws.id, owner, 'Slack moved')
+    await threads.rememberSlackThreadBot(pool, thread, owner, moved)
+    assert.equal(await threads.slackThreadBot(pool, thread, owner, ws.id), moved, 'a later alias moves the thread')
+    await pool.query('update bots set "archivedAt"=now() where id=$1', [moved])
+    assert.equal(await threads.slackThreadBot(pool, thread, owner, ws.id), null, 'an archived Bot no longer answers')
+  })
+
   await t.test('the backfill moves each retired repository into an Environment, once', async () => {
     const fresh = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
     const listed = await seedBot(pool, ws.id, owner, 'Legacy listed')

@@ -187,6 +187,16 @@ export const botSubscribers = pgTable('bot_subscribers', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [primaryKey({ columns: [table.botId, table.userId] }), index('bot_subscribers_user_idx').on(table.userId)])
 
+/** A Slack thread started with `@Mikka bot=<alias>` and the Bot its later replies go to (lib/slack/thread-bots.ts). */
+export const slackThreadBots = pgTable('slack_thread_bots', {
+  linkId: uuid('linkId').notNull(),
+  channelId: text('channelId').notNull(),
+  threadTs: text('threadTs').notNull(),
+  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  botId: uuid('botId').notNull().references(() => bots.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
+}, table => [primaryKey({ columns: [table.linkId, table.channelId, table.threadTs] }), index('slack_thread_bots_bot_idx').on(table.botId)])
+
 /** The bot row that is a person's Coordinator in a workspace (drizzle/20261101140000); see lib/coordinator/coordinator-bot.ts. */
 export const coordinatorBots = pgTable('coordinator_bots', {
   ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),

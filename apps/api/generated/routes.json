@@ -200,7 +200,7 @@
         "GET",
         "PATCH"
       ],
-      "sourceHash": "b8b9ff7b2a5183a1ef878ce71e52479e4f2035bcc860854098a45282e3ed0783"
+      "sourceHash": "7e407e460b88f95a3545b03dcb8192990772f88015ad5a24ce832e8ac07d4509"
     },
     {
       "path": "/mikka/api/bots/[botId]/app-tools",
@@ -300,6 +300,16 @@
       "sourceHash": "c7373a620a479cc66f84dfbb24cdfaad121dbdbb2025fdd898f1231d66cff81c"
     },
     {
+      "path": "/mikka/api/bots/[botId]/follow",
+      "template": "/api/bots/[botId]/follow",
+      "source": "app/api/bots/[botId]/follow/route.ts",
+      "methods": [
+        "DELETE",
+        "PUT"
+      ],
+      "sourceHash": "2630c6b622ab2f3908982fd65299f6c1ea8ec0117ab92543727f3a056dc74b4b"
+    },
+    {
       "path": "/mikka/api/bots/[botId]/subagents",
       "template": "/api/bots/[botId]/subagents",
       "source": "app/api/bots/[botId]/subagents/route.ts",
@@ -363,6 +373,15 @@
         "POST"
       ],
       "sourceHash": "ddd125c8c8768471b3750b00aaf8b7108add6069ec73f400c6eb9c580c09cea5"
+    },
+    {
+      "path": "/mikka/api/bots/[botId]/transfer",
+      "template": "/api/bots/[botId]/transfer",
+      "source": "app/api/bots/[botId]/transfer/route.ts",
+      "methods": [
+        "POST"
+      ],
+      "sourceHash": "2d353865cde3e680fa6dc1a7c26d9cd9c200ff0e0ecd18e3ccb7a41dfdc5b3ed"
     },
     {
       "path": "/mikka/api/captures/shared/[token]",

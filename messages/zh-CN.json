@@ -219,6 +219,10 @@
     "artifacts": "Artifact",
     "cardPreview": "[卡片]",
     "botMenu": {
+      "share": "共享",
+      "moveTo": "移到",
+      "unfollow": "取消订阅",
+      "following": "订阅的 Bot",
       "archive": "归档",
       "unarchive": "取消归档",
       "delete": "删除",

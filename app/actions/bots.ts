@@ -23,7 +23,14 @@ export interface BotView {
   shape: string
   /** The person's Coordinator (coordinator_bots): the left column draws it as the Coordinator, pinned on top. */
   coordinator?: boolean
+  /** The Environment it works in; its row menu's Move to marks it. */
+  environmentId?: string | null
+  /** Who can find it; its row menu's Share marks it. */
+  visibility?: 'shared' | 'private'
 }
+
+/** A teammate's Bot the person follows (bot_subscribers): listed apart, it opens its threads, not a chat. */
+export interface FollowedBotView { id: string; name: string; color: string; shape: string; ownerId: string | null }
 
 
 /** The person and the workspace they are in: a bot belongs to both. */
@@ -48,7 +55,9 @@ export async function listBotsForWorkspace(workspaceId: string): Promise<BotView
 /** The list cache is bound to this actual authorized Owner/workspace read. */
 export async function pollBots(workspaceId?: string) {
   const owner = await getOwner(workspaceId)
-  return { items: await listOwnerBots(owner.ownerId, owner.workspaceId), live: owner }
+  const { followedBots } = await import('@/lib/bot-access')
+  const [items, followed] = await Promise.all([listOwnerBots(owner.ownerId, owner.workspaceId), followedBots({ userId: owner.ownerId, workspaceId: owner.workspaceId })])
+  return { items, followed: followed as FollowedBotView[], live: owner }
 }
 
 /**
