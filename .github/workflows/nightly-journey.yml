@@ -64,7 +64,9 @@ jobs:
         env:
           FFMPEG_GITHUB_TOKEN: ${{ github.token }}
       - name: Install Chromium
-        run: pnpm exec playwright install --with-deps chromium
+        run: |
+          sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
+          pnpm exec playwright install --with-deps chromium
       - name: Restore the verified official renderer for this main source
         run: node scripts/ci/nightly-ui.mjs
         env:
