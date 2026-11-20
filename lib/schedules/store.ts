@@ -29,7 +29,7 @@ export type IssueReader = (tx: PoolClient, ownerId: string, issueId: string) => 
 export type DispatchResult = { id: string; title: string; status: string; identifier: string | null; eventId?: string; requestedBy?: string; runId?: string; continued?: true }
 /** How each run is set up beyond the request: the Environment, model and effort, machine size and the thread's organize. */
 export type DispatchRun = Pick<Definition, 'environmentId' | 'model' | 'machineSize' | 'runs'>
-export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'slack' | 'webhook'; single?: true; thread?: string; run?: DispatchRun }
+export type DispatchInput = { ownerId: string; workspaceId: string; scheduleId: string; occurrenceId: string; task: DispatchTask; event?: string; source?: 'github' | 'linear' | 'slack' | 'webhook'; single?: true; thread?: string; run?: DispatchRun; /** Host-derived, never a schedule form field. */ codeReview?: true }
 /** What started a run: a GitHub event and the indexes of the triggers that took it, or the webhook requests it batched. */
 export type OccurrenceTrigger = { event: GitHubAutomationEvent | LinearAutomationEvent | SlackAutomationEvent; triggers: number[] } | { webhook: { requests: WebhookRequest[] } }
 /** One finished run to post: the automation, how it ended, and the task it made or added to. */

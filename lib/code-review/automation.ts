@@ -42,7 +42,7 @@ export async function configuredReviewDispatch<T>(input: DispatchInput, dispatch
         ? 'The workspace administrator authorized posting the concrete review findings to this pull request through the normal GitHub capability. Keep its existing permission gates. Never post credentials, private configuration or unrelated workspace content.'
         : 'Keep the review in this task report. No GitHub write is authorized by summary mode.',
     ].join('\n\n')
-    return dispatch({ ...input, task: { ...input.task, prompt }, run: { ...input.run, ...(config.model ? { model: { id: config.model } } : {}) } })
+    return dispatch({ ...input, codeReview: true, task: { ...input.task, prompt }, run: { ...input.run, ...(config.model ? { model: { id: config.model } } : {}) } })
     }))) } finally { client.release() }
   })
 }

@@ -46,7 +46,7 @@ export async function personalSubmissionRecorded(executor: Pick<typeof db, 'sele
  * included (resolved where the message enters), or a suggestion's stored one
  * (null only on a suggestion from before it stored one).
  */
-export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string; taskCommand?: DispatchTaskIntent; humanSessionId?: string; filesValidated?: true; turnPolicy?: 'queue' | 'steer';retryOf?:number;taskRequestSourceEventId?:string; schedule?: { scheduleId: string; occurrenceId: string; event?: true; webhook?: true; linear?: true; slack?: true } }) {
+export async function recordPersonalSubmission(executor: Executor, userId: string, text: string, options: { submissionId?: string; botId: string | null; images?: readonly UserImageInput[]; taskDestination?: TaskDestination; profileId?: string; taskTitle?: string; taskCommand?: DispatchTaskIntent; humanSessionId?: string; filesValidated?: true; turnPolicy?: 'queue' | 'steer';retryOf?:number;taskRequestSourceEventId?:string; schedule?: { scheduleId: string; occurrenceId: string; event?: true; webhook?: true; linear?: true; slack?: true; codeReview?: true } }) {
   const submissionId = personalSubmissionInput.shape.submissionId.parse(options.submissionId)
   const botId = options.botId
   if (!options.filesValidated && splitChatFiles(text).files.length) {
@@ -63,7 +63,7 @@ export async function recordPersonalSubmission(executor: Executor, userId: strin
   const retryOf = z.number().int().positive().optional().parse(options.retryOf)
   const taskRequestSourceEventId=z.uuid().optional().parse(options.taskRequestSourceEventId)
   // An automation's run: the person's own request, sent by their schedule.
-  const schedule=z.object({ scheduleId: z.uuid(), occurrenceId: z.uuid(), event: z.literal(true).optional(), webhook: z.literal(true).optional(), linear: z.literal(true).optional(), slack: z.literal(true).optional() }).strict().optional().parse(options.schedule)
+  const schedule=z.object({ scheduleId: z.uuid(), occurrenceId: z.uuid(), event: z.literal(true).optional(), webhook: z.literal(true).optional(), linear: z.literal(true).optional(), slack: z.literal(true).optional(), codeReview: z.literal(true).optional() }).strict().optional().parse(options.schedule)
   const dedupeKey = submissionId
     ? submissionKey(userId, botId, submissionId)
     : `user_message:${randomUUID()}`

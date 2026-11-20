@@ -65,6 +65,8 @@ before(async () => {
     await workspacePool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'admin\',\'active\')', [id, person, `${person}@example.invalid`])
   }
   await workspacePool.query('INSERT INTO mikka_workspace_members ("workspaceId","userId",name,email,role,status) VALUES ($1,$2,$2,$3,\'member\',\'active\')', [workspaceId, member, `${member}@example.invalid`])
+  const { seedTeam } = await import('../../tests/support/workspace-admin-db')
+  await seedTeam(workspacePool, workspaceId, owner, 'Review fixture team')
   for (const [person, repo] of [[owner, repository], [outsider, foreignRepository]]) {
     await pool.query('INSERT INTO github_repository_installations ("userId","remoteKey","githubAccountId","installationId","repositoryId") VALUES ($1,$2,\'1\',1,1)', [person, repo])
   }
@@ -172,6 +174,37 @@ dbTest('repository configuration uses the native durable GitHub event queue and 
   assert.match(configured.task.prompt, /severity high or higher/)
   assert.match(configured.task.prompt, /vendor\/\*\*/)
   assert.match(configured.task.prompt, /No GitHub write is authorized by summary mode/)
+  await runtime.schedules().tick()
+  const outcome = (await pool.query('SELECT status,result,error FROM schedule_occurrences WHERE id=$1', [occurrence.id])).rows[0]
+  assert.equal(outcome.status, 'succeeded', outcome.error)
+  assert.ok(outcome.result.eventId)
+  const event = (await pool.query('SELECT payload,"botId" FROM coordinator_events WHERE id=$1', [outcome.result.eventId])).rows[0]
+  assert.equal(event.payload.schedule.codeReview, true)
+  assert.equal(event.payload.taskCommand.run.model.id, 'fixture-review-model')
+  const { requestedCodeReviewReadOnly } = await import('./request-authority')
+  assert.equal(await requestedCodeReviewReadOnly(owner, outcome.result.eventId), true)
+  const { reviewGitHubCall } = await import('./github-call')
+  const [repoOwner, repoName] = name.split('/')
+  const call = { name: 'pull_request_review_write', arguments: { owner: repoOwner, repo: repoName, pullNumber: 7, method: 'create', event: 'COMMENT' } }
+  const caller = { botId: event.botId, sourceEventId: outcome.result.eventId }
+  let written = 0
+  const execute = async (guard?: import('@/lib/github/mcp').GitHubMcpGuard) => {
+    assert.ok(guard, 'managed reviews cannot lose their guard')
+    if (!await guard(call, false)) return { error: 'githubActionDenied' }
+    written++; return { accepted: true }
+  }
+  assert.deepEqual(await reviewGitHubCall(owner, caller, call, execute), { error: 'githubActionDenied' })
+  assert.equal(written, 0)
+  assert.equal((await workspace.PATCH(request(`workspace/${workspaceId}`, 'PATCH', patch({ codeReviewOutput: 'comments' })), context())).status, 200)
+  assert.deepEqual(await reviewGitHubCall(owner, caller, call, execute), { accepted: true })
+  assert.equal(written, 1)
+  await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",permission,external_write_permissions,external_write_policy_version)
+    VALUES ($1,'allow','{"github":"deny"}',1) ON CONFLICT ("workspaceId") DO UPDATE SET external_write_permissions=excluded.external_write_permissions`, [workspaceId])
+  assert.deepEqual(await reviewGitHubCall(owner, caller, call, execute), { error: 'githubActionDenied' }, 'review comments never override the existing workspace GitHub deny')
+  assert.equal(written, 1)
+  await pool.query('DELETE FROM workspace_computer_policies WHERE "workspaceId"=$1', [workspaceId])
+  assert.deepEqual(await reviewGitHubCall(member, caller, call, execute), { error: 'githubActionDenied' })
+  assert.equal(written, 1)
   assert.equal((await saveRepository({ repository })).status, 200)
   assert.equal((await readSchedule()).id, schedule.id, 'saving twice keeps one native automation')
   for (const invalid of [{ ...input, ownerId: member }, { ...input, ownerId: outsider }, { ...input, workspaceId: otherWorkspaceId }, { ...input, source: 'webhook' as const }]) {
@@ -181,6 +214,8 @@ dbTest('repository configuration uses the native durable GitHub event queue and 
   assert.equal((await saveRepository({ repository })).status, 403)
   assert.equal((await workspace.PATCH(request(`workspace/${workspaceId}`, 'PATCH', patch({ codeReviewOutput: 'comments' })), context())).status, 403)
   await assert.rejects(runtime.automationSeams.dispatch!(input), /workspaceAccessDenied/)
+  assert.deepEqual(await reviewGitHubCall(owner, caller, call, execute), { error: 'githubActionDenied' })
+  assert.equal(written, 1)
   await workspacePool.query('UPDATE mikka_workspace_members SET role=\'admin\',status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner])
   await assert.rejects(runtime.automationSeams.dispatch!(input), /workspaceMembershipSuspended|workspaceAccessDenied/)
   await workspacePool.query('UPDATE mikka_workspace_members SET status=\'active\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, owner])
@@ -190,14 +225,21 @@ dbTest('repository configuration uses the native durable GitHub event queue and 
   await pool.query('DELETE FROM github_repository_installations WHERE "userId"=$1 AND "remoteKey"=$2', [owner, repository])
   await assert.rejects(runtime.automationSeams.dispatch!(input), /scheduleRepositoryUnavailable/)
   await pool.query('INSERT INTO github_repository_installations ("userId","remoteKey","githubAccountId","installationId","repositoryId") VALUES ($1,$2,\'1\',1,1)', [owner, repository])
+  assert.equal(await runtime.fireGitHubAutomations(`review-fixture:${randomUUID()}`, 'pull_request', { ...payload, pull_request: { ...payload.pull_request, number: 8 } }), 1)
+  const pending = (await pool.query('SELECT id,status FROM schedule_occurrences WHERE schedule_id=$1 AND id<>$2', [schedule.id, occurrence.id])).rows[0]
+  assert.equal(pending.status, 'pending')
   assert.equal((await saveRepository({ repository, enabled: false })).status, 200)
   schedule = await readSchedule()
   assert.equal(schedule.status, 'paused')
-  assert.equal((await pool.query('SELECT status FROM schedule_occurrences WHERE id=$1', [occurrence.id])).rows[0].status, 'cancelled')
+  assert.equal((await pool.query('SELECT status FROM schedule_occurrences WHERE id=$1', [occurrence.id])).rows[0].status, 'succeeded', 'pausing preserves completed native history')
+  assert.equal((await pool.query('SELECT status FROM schedule_occurrences WHERE id=$1', [pending.id])).rows[0].status, 'cancelled')
+  assert.deepEqual(await reviewGitHubCall(owner, caller, call, execute), { error: 'githubActionDenied' })
   await assert.rejects(runtime.automationSeams.dispatch!(input), /scheduleDispatchUnavailable/)
   assert.equal((await repositories.DELETE(request(path, 'DELETE', { repository }), context())).status, 200)
   const deleted = (await pool.query('SELECT status,status_before_delete FROM user_schedules WHERE id=$1', [schedule.id])).rows[0]
   assert.equal(deleted.status, 'cancelled')
   assert.ok(deleted.status_before_delete, 'the native automation preserves its deletion history')
   assert.equal((await pool.query('SELECT 1 FROM workspace_code_review_repositories WHERE "workspaceId"=$1', [workspaceId])).rowCount, 0)
+  assert.deepEqual(await reviewGitHubCall(owner, caller, call, execute), { error: 'githubActionDenied' }, 'deletion does not turn an old managed request into an unrestricted GitHub call')
+  assert.equal(written, 1)
 })

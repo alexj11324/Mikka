@@ -201,13 +201,14 @@ export async function githubCallAllowedStep(userId: string, botId: string | null
 }
 
 /** GitHub's hosted MCP server as the caller, with the caller's own token only (decision 2026-11-02-1730). */
-export async function githubMcp(userId: string, input: import('@/lib/github/mcp').GitHubMcpCommand, scope?: NativeToolScope) {
+export async function githubMcp(userId: string, input: import('@/lib/github/mcp').GitHubMcpCommand, scope?: NativeToolScope, request?: { botId: string; sourceEventId: string }) {
   'use step'
   await assertNativeToolScope(userId, scope)
   if (scope?.scheduledRead) return { error: 'mcpNotAllowedForScheduledRead' }
   const { createGitHubMcpRuntime, GITHUB_MCP_MIN_VALIDITY_MS } = await import('@/lib/github/mcp')
   const { githubTokenForUser } = await import('@/lib/github/user-access')
-  return createGitHubMcpRuntime(owner => githubTokenForUser(owner, { minValidityMs: GITHUB_MCP_MIN_VALIDITY_MS }))(userId, input)
+  const execute = (guard?: import('@/lib/github/mcp').GitHubMcpGuard) => createGitHubMcpRuntime(owner => githubTokenForUser(owner, { minValidityMs: GITHUB_MCP_MIN_VALIDITY_MS }), {}, guard)(userId, input)
+  return request ? (await import('@/lib/code-review/github-call')).reviewGitHubCall(userId, request, input, execute) : execute()
 }
 // A GitHub write has no idempotency key; never replay an uncertain call.
 githubMcp.maxRetries = 0

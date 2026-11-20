@@ -57,7 +57,7 @@ export const automationSeams:AutomationSeams={
   },
   /** The creator's 创建并派发, keyed by the occurrence: a retried run finds the same request and the same task. */
   async dispatch(input){
-    return (await import('@/lib/code-review/automation')).configuredReviewDispatch(input, async ({ownerId,workspaceId,scheduleId,occurrenceId,task,event,source,single,thread,run}) => {
+    return (await import('@/lib/code-review/automation')).configuredReviewDispatch(input, async ({ownerId,workspaceId,scheduleId,occurrenceId,task,event,source,single,thread,run,codeReview}) => {
     const botId=await dispatchBot(ownerId,workspaceId,task)
     const [{db},{recordPersonalSubmission},{createIssueFromRequest}]=await Promise.all([import('@/lib/db'),import('@/lib/coordinator-submission'),import('@/lib/coordinator/issue-create')])
     // An event-started run carries the event after the creator's request, marked as GitHub's data or the webhook's.
@@ -75,7 +75,7 @@ export const automationSeams:AutomationSeams={
       }
     }
     const {eventId}=await recordPersonalSubmission(db,ownerId,text,{botId,submissionId:occurrenceId,
-      taskCommand:{version:1,intent:'create_and_dispatch',description:text,...(task.agent?{agent:task.agent}:{}),...(runSettings(run)?{run:runSettings(run)}:{})},schedule:{scheduleId,occurrenceId,...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event&&source==='slack'?{slack:true as const}:event?{event:true as const}:{})},
+      taskCommand:{version:1,intent:'create_and_dispatch',description:text,...(task.agent?{agent:task.agent}:{}),...(runSettings(run)?{run:runSettings(run)}:{})},schedule:{scheduleId,occurrenceId,...(codeReview?{codeReview:true as const}:{}),...(event&&source==='webhook'?{webhook:true as const}:event&&source==='linear'?{linear:true as const}:event&&source==='slack'?{slack:true as const}:event?{event:true as const}:{})},
       ...(task.title?{taskTitle:task.title}:{}),...(task.destination?{taskDestination:task.destination}:{}),...(task.profileId?{profileId:task.profileId}:{})})
     const created=await createIssueFromRequest(ownerId,{sourceEventId:eventId,title:task.title??task.prompt.split(/\r?\n/,1)[0]!.slice(0,200)})
     const row=(await pool.query<{title:string;status:string;identifier:string|null}>(`SELECT i.title,i.status,r.identifier FROM issues i
