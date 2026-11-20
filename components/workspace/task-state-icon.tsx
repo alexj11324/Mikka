@@ -2,7 +2,7 @@
 
 // A task has one status, its status field, drawn with the same mark on every surface (decision 2026-11-13-1405):
 // TaskStatusIcon, and a task's chip carries that one icon only. What an Agent is doing belongs to the conversation:
-// TaskRunMark is its small mark (working, waiting for the person, error; EXECUTION_VISUALS), drawn on the conversation's own surfaces and
+// TaskRunMark is its small mark (working, waiting for the person, error; RUN_MARKS), drawn on the conversation's own surfaces and
 // never beside a status icon. TaskStatusMark is a conversation card's one glyph: the mark while active, else the status.
 // Both marks come from the one registry (`lib/state-mark.ts`), so no shape or colour is chosen here.
 import { useCallback } from 'react'
@@ -23,8 +23,6 @@ export function TaskStatusIcon({ status, size = 'sm', plain = false }: { status:
   const mark = statusMarkOf(status)
   return <Mark shape={mark.shape} tone={plain ? undefined : mark.tone} size={size} data-task-status={status} />
 }
-
-const RUN_MARKS: Record<RunIndicator, ExecutionState> = { working: 'running', waiting: 'waiting', error: 'failed' }
 
 /** The words of a run mark, for its tooltip and for assistive technology. They are not status names. */
 export function useRunIndicatorLabel() {

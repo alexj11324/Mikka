@@ -341,8 +341,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       // clash. A bare EVE_SERVICE_EXITED would send the developer hunting for a
       // cause this process already has in hand.
       const words = error?.detail?.reason ?? error?.detail?.stderr?.trim()
-      if (words) for (const line of words.split('
-').slice(-12)) console.error(`[dev] eve: ${line}`)
+      if (words) for (const line of words.split('\n').slice(-12)) console.error(`[dev] eve: ${line}`)
     }
     process.exitCode = 1
   }

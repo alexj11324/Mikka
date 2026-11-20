@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from '@/lib/intl/i18n-client'
 import type { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
 import { personalProjectSelection } from '@/lib/project-input'

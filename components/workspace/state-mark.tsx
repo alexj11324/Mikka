@@ -2,7 +2,7 @@
 // Geometry is fixed — a 14 box, the shape stroked in `currentColor` at 1.25, circles r=5 around (7, 7) — and the
 // renderer takes no `className`: a mark's colour is its tone and its size is its `size`, so a call site cannot
 // paint one of its own and every class in this file stays statically readable (`style/static-layout-only`).
-import { forwardRef, type ComponentPropsWithRef, type ReactNode } from 'react'
+import { forwardRef, type ComponentProps, type ReactNode } from 'react'
 import type { LucideIcon, LucideProps } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ISSUE_PRIORITY_MARKS, ISSUE_STATUS_MARKS, markToneClass, statusMarkOf, type MarkShape, type MarkSize, type MarkSpec, type MarkTone } from '@/lib/state-mark'
@@ -62,7 +62,7 @@ const MARK_SHAPES: Record<MarkShape, ReactNode> = {
   'bars-3': bars(3, [4, 7.5, 11]),
 }
 
-export type MarkProps = Omit<ComponentPropsWithRef<'svg'>, 'viewBox' | 'children' | 'className'> & {
+export type MarkProps = Omit<ComponentProps<'svg'>, 'viewBox' | 'children' | 'className'> & {
   shape: MarkShape
   /** Absent draws the shape in the colour of where it sits. */
   tone?: MarkTone
