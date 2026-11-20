@@ -11,15 +11,21 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=4096
       MIKKA_EDITION: cloud
       MIKKA_DEPLOYMENT_ID: build-output-contract
+      NEXT_PUBLIC_MIKKA_BUILD: 6e6ee0575f64fa58a91fc392f93dddb61a63a76c
       PROBE_DIRECTORY: /tmp/frontend-determinism-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
+        with:
+          node-version: '24.22.2'
       - name: Run unchanged regression with bounded CPU contention and retain cleanup inputs
         run: |
           mkdir -p "$PROBE_DIRECTORY"
+          cd apps/frontend
+          node --version
+          pwd
           failed=0
           load_a=''
           load_b=''
@@ -31,7 +37,7 @@ jobs:
             fi
             probe_case="$PROBE_DIRECTORY/$mode"
             mkdir -p "$probe_case"
-            if PROBE_CASE_DIRECTORY="$probe_case" node --experimental-test-module-mocks --import ./apps/frontend/scripts/frontend-determinism-snapshot.mjs --test --test-concurrency=1 apps/frontend/scripts/build.test.mjs > "$probe_case/test.log" 2>&1; then
+            if PROBE_CASE_DIRECTORY="$probe_case" node --experimental-test-module-mocks --import ./scripts/frontend-determinism-snapshot.mjs --test --test-concurrency=1 scripts/*.test.mjs > "$probe_case/test.log" 2>&1; then
               echo "$mode: passed"
             else
               echo "$mode: failed"
