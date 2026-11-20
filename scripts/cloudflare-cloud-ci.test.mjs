@@ -186,6 +186,7 @@ test('workflow uses public manual main qualification and uploads the single rece
   assert.match(workflow, /name: Upload the qualification receipt/)
   assert.match(workflow, /name: cloud-services-ci-receipt-\$\{\{ github.run_id }}-\$\{\{ github.run_attempt }}/)
   assert.match(workflow, /path: \$\{\{ runner.temp }}\/cloud-services-ci-receipt\/receipt.json\n          if-no-files-found: error/)
+  assert.match(workflow, /path: \$\{\{ runner.temp }}\/cloud-services-ci-receipt\/receipt.json\n          if-no-files-found: error\n          retention-days: 90/)
   assert.equal((workflow.match(/actions\/upload-artifact@/g) ?? []).length, 1)
   assert.match(workflow, /environment: cloudflare-runtime-release/)
   assert.match(workflow, /CF_RUNTIME_REGISTRY_USERNAME: \$\{\{ steps\.registry\.outputs\.username }}/)

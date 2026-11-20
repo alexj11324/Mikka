@@ -100,4 +100,4 @@ jobs:
           name: cloud-services-ci-receipt-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/cloud-services-ci-receipt/receipt.json
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 90
