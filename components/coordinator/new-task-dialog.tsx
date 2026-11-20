@@ -74,7 +74,7 @@ export function NewTaskDialog({ open, onOpenChange, project: pageProject, projec
   const pending = useRef(false)
   const createRequests = useRef(new Map<string, string>())
   const [draft, setDraft] = useState('')
-  // 标题: written by the person, the task gets exactly it; empty, the description's first line.
+  // 标题: required (Create only stays disabled without it); the task gets exactly what the person wrote.
   const [title, setTitle] = useState('')
   const [sending, setSending] = useState(false)
   // 继续新建: after a create the window stays, cleared, for the next one.
