@@ -1,6 +1,12 @@
 /** The proxy owns the backing model and provider for this stable purpose alias. */
 export const DECISION_MODEL = 'mikka-decision'
 export const DECISIONS_PATH = '/v1/decisions'
+/** Persisted receipts retain their original model identity; new calls use the alias above. */
+export const LEGACY_DECISION_MODEL = 'openai/gpt-6-luna-decisions'
+export type DecisionReceiptModel = typeof DECISION_MODEL | typeof LEGACY_DECISION_MODEL
+export function isDecisionReceiptModel(value: unknown): value is DecisionReceiptModel {
+  return value === DECISION_MODEL || value === LEGACY_DECISION_MODEL
+}
 
 export type DecisionQuestion =
   | { type: 'predicate'; name: string; instructions: string }

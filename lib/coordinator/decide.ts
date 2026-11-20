@@ -4,7 +4,7 @@ import { gatewayLiteLlm } from '../model-gateway/config'
 import { liteLLMBaseUrl } from '../model-gateway/litellm-client'
 import { isCloudEdition } from '@/lib/edition'
 import { createHash, randomUUID } from 'node:crypto'
-import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_PATH, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
+import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_PATH, type DecisionReceiptModel, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
 import type { HostedModelBilling } from '@/lib/abuse/model'
 import { observeAiRequest, type AiMetadata } from '@/lib/tracing/ai'
 
@@ -15,7 +15,7 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
  * Submitted pixels and a provider receipt do not prove visual understanding. */
 export interface DecisionExecution {
   executionId: string
-  modelId: typeof DECISION_MODEL
+  modelId: DecisionReceiptModel
   providerGenerationId: string
   startedAt: string
   completedAt: string

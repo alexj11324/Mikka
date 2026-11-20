@@ -1,3 +1,4 @@
+import { DECISION_MODEL } from './decision'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
@@ -319,7 +320,7 @@ dbTest('durable attempts advance past one inbox batch and persist only a matchin
     assert.equal(next.length,50)
     assert.equal(next.some(item=>item.id===event.id),false,'in-flight/cooling attempt cannot monopolize the next wake')
     assert.ok(next.some(item=>!first.some(prior=>prior.id===item.id)),'selection advances beyond the original fifty rows')
-    const execution={executionId:randomUUID(),modelId:'openai/gpt-6-luna-decisions' as const,
+    const execution={executionId:randomUUID(),modelId:DECISION_MODEL,
       providerGenerationId:'synthetic-db-contract',startedAt:'2026-10-28T22:00:00Z',completedAt:'2026-10-28T22:00:00Z',
       requestDigest:'a'.repeat(64),imageDigests:[],vision:'no-image-input' as const}
     const judgment={tier:'result' as const,execution}
