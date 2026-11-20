@@ -1,12 +1,23 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { spawnSync } from 'node:child_process'
 import yaml from 'js-yaml'
 
 const workflow = name => yaml.load(readFileSync(`.github/workflows/${name}.yml`, 'utf8'))
 const evaluate = (expression, context) => runInNewContext(expression.replace(/^\$\{\{|\}\}$/g, '').replace(/\.([\w-]+)/g, '[$1]').replace(/\[([\w-]+)\]/g, '["$1"]'), { always: () => true, cancelled: () => false, ...context })
+
+test('dedicated self-hosted CI is retired while cloud compatibility and official builds remain', () => {
+  for (const name of ['self-hosted-image', 'self-hosted-stable-release', 'self-hosting-ui'])
+    assert.equal(existsSync(`.github/workflows/${name}.yml`), false, name)
+  const parent = workflow('ui-policy')
+  assert.equal(parent.jobs['image-checks'], undefined)
+  assert(!parent.jobs['ui-policy'].needs.includes('image-checks'))
+  assert.equal(workflow('self-hosted-production').name, 'Mikka cloud core compatibility')
+  for (const name of ['cloudflare-api-image', 'cloudflare-eve-image', 'cloudflare-litellm-image', 'desktop-release'])
+    assert.ok(workflow(name).jobs, name)
+})
 
 test('Desktop platform caches warm on changed main install inputs without duplicating acceptance on main', () => {
   const warmer = workflow('ci-dependencies')
@@ -17,15 +28,14 @@ test('Desktop platform caches warm on changed main install inputs without duplic
   assert.deepEqual(warmer.permissions, { contents: 'read' })
   const setup = warmer.jobs['desktop-dependencies'].steps.find(step => step.uses === './.github/actions/pnpm-install')
   assert.deepEqual(setup.with, { profile: 'desktop', 'skip-electron': 'true' })
-  // Analytics can consume the full Linux tree populated by the main Image job,
-  // which already suppresses Electron's unused runtime download.
+  // Analytics does not need Electron's runtime download.
   const analyticsSetup = workflow('analytics-ssr').jobs['analytics-ssr-full'].steps.find(step => step.uses === './.github/actions/pnpm-install')
   assert.equal(analyticsSetup.with['skip-electron'], 'true')
 })
 
 test('selected specialty calls reuse the parent decision; direct dispatch still runs trusted selection', () => {
   const parent = workflow('ui-policy')
-  const automatic = [['analytics-ssr', 'analytics'], ['self-hosted-image', 'image']]
+  const automatic = [['analytics-ssr', 'analytics']]
   for (const [, lane] of automatic) assert.equal(parent.jobs[`${lane}-checks`].with.selected, true)
   assert.equal(parent.jobs['desktop-checks'], undefined)
   assert.ok(Object.hasOwn(workflow('desktop').on, 'workflow_dispatch'), 'Desktop acceptance remains available manually')

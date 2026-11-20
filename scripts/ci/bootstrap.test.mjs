@@ -52,7 +52,7 @@ test('first-introduction workflow runs trusted legacy inventory and forces full 
   const body=workflow.split('      - id: select\n')[1].split('        run: |\n')[1].split('\n').map(l=>l.slice(10)).join('\n')
   execFileSync('bash',['-e','-c',body],{cwd:f.root,env:{...f.env,GITHUB_EVENT_PATH:event,GITHUB_OUTPUT:output,GITHUB_STEP_SUMMARY:summary},stdio:'pipe'})
   const result=readFileSync(output,'utf8')
-  for(const key of ['core','integration','source','daemon','desktop','image','analytics','db']) assert(result.includes(`${key}=true`))
+  for(const key of ['core','integration','source','daemon','desktop','analytics','db']) assert(result.includes(`${key}=true`))
   assert(result.includes('test:fixture-db'))
   assert(!existsSync(join(f.root,'bypass-marker')))
 })

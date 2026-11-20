@@ -109,7 +109,7 @@ cannot.
    with screenshots of a local production build of the official UI (`pnpm build`, `pnpm start`, with `mikka-hosted-ui`). `browser-gate.yml` only keeps the protected
    check name "Browser tests (before merge)" and passes at once. The specs
    under `tests/e2e/` stay as retained fixtures. The general browser suite is
-   retired. Targeted Desktop, Analytics and self-hosted jobs retain their
+   retired. Targeted Desktop and Analytics jobs retain their
    explicitly selected build/browser checks. `site-search.yml` runs its
    spec with Playwright's request client. See the
    [workflow reference](.github/workflows/README.md) for actual scopes. Decisions

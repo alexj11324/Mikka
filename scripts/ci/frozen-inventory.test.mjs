@@ -73,7 +73,7 @@ test('trusted main selects the complete 87-task frozen registry, including its c
   assert.ok(result.units.includes('ci-core-6'))
   assert.equal(result.unit_tasks.find(task => task.project === 'ci-core-43').command, 'pnpm test:coordinator-issue-tools')
   assert.equal(result.unit_tasks.find(task => task.project === 'ci-core-47').command, 'pnpm test:artifacts')
-  for (const key of ['source', 'daemon', 'mobile', 'desktop', 'image', 'analytics']) assert.equal(result[key], true, key)
+  for (const key of ['source', 'daemon', 'mobile', 'desktop', 'analytics']) assert.equal(result[key], true, key)
   assert.deepEqual(result.db_suites, ['test:fixture-db'])
   // Materialize the same historical runner the frozen branch executes. Main's
   // newer runner translates retired core-6 to core-7 and is a different caller.
