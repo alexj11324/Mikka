@@ -4,6 +4,7 @@ import test from 'node:test'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { seedCoordinator } from '../../tests/support/coordinator-bot'
 import { seedUser } from '../../tests/support/workspace-admin-db'
+import { createRequestScope, runRequestScope } from '../../apps/api/src/context'
 import type { WriteProvider } from '../operations/write-contract'
 
 const target = process.env.E2E_DATABASE_URL
@@ -35,6 +36,7 @@ test('welcome and approved-write decisions wake through their stored event', { s
     // The real operation ledger is immutable. Other operation DB suites also
     // retain its owner and operation in this disposable, fully migrated DB.
     t.diagnostic(JSON.stringify({ retainedOwner: owner, reason: 'immutable personal operation ledger' }))
+    await (await import('../builtin-gateway/runtime')).builtinGateway()?.stop()
     await Promise.all([pool.end(), workspacePool.end()])
   })
   let viewer: { user: { id: string; email: string; name: string }; session: { id: string } } | null = null
@@ -42,8 +44,6 @@ test('welcome and approved-write decisions wake through their stored event', { s
   let configured = true
   const realAuth = await import('../auth')
   t.mock.module('../auth', { namedExports: { ...realAuth, auth: { api: { getSession: async () => viewer } } } })
-  t.mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' ? { value: workspaceId } : undefined }) } })
-  t.mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   const existingWake = await import('./wake')
   t.mock.module('./wake', { namedExports: { ...existingWake, coordinatorEnabled: async () => configured, wakeCoordinator: async (userId: string) => { direct.push(userId) } } })
   let sends = 0
@@ -54,11 +54,24 @@ test('welcome and approved-write decisions wake through their stored event', { s
     lookup: async () => { throw Error('the settled result should be read from the ledger') },
   }
   t.mock.module('../operations/write-provider', { namedExports: { composioWriteProvider: () => provider } })
-  const { welcomeCoordinator } = await import('../../app/actions/coordinator')
+  const { welcomeCoordinator: welcome } = await import('../../app/actions/coordinator')
   const { POST } = await import('../../app/api/approved-writes/route')
-  const submit = async (body: object) => POST(new Request('https://fixture.invalid/api/approved-writes', {
-    method: 'POST', headers: { origin: 'https://fixture.invalid', cookie: 'fixture=one' }, body: JSON.stringify({ action: 'append_notion_paragraph', ...body }),
-  }))
+  // Authentication may import workspace readers before this fixture installs
+  // its session stub. Exercise the real request-bound headers and cookie jar.
+  async function scoped<T>(request: Request, work: () => Promise<T>) {
+    const scope = createRequestScope(request)
+    try { return await runRequestScope(scope, work) }
+    finally { await scope.after.finish() }
+  }
+  const welcomeCoordinator = (...args: Parameters<typeof welcome>) => scoped(new Request('https://fixture.invalid/actions/coordinator', {
+    headers: { cookie: `mikka-workspace=${workspaceId}`, 'x-mikka-locale': 'en' },
+  }), () => welcome(...args))
+  const submit = async (body: object) => {
+    const request = new Request('https://fixture.invalid/api/approved-writes', {
+      method: 'POST', headers: { origin: 'https://fixture.invalid', cookie: 'fixture=one', 'x-mikka-locale': 'en' }, body: JSON.stringify({ action: 'append_notion_paragraph', ...body }),
+    })
+    return scoped(request, () => POST(request))
+  }
   await t.test('a ready, authenticated empty Bot receives one welcome', async () => {
     assert.equal((await welcomeCoordinator(botId)).error, 'authRequired')
     viewer = authenticated
