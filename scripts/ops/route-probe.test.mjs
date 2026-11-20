@@ -13,7 +13,7 @@ test('all generated routes have a safe dispatch-only probe, including explicit O
   assert.equal(plan.length, generated.routes.length)
   for (const [index, probe] of plan.entries()) {
     assert.equal(generated.routes[index].methods.includes(probe.method), false)
-    assert.equal(/[\[\]]/.test(probe.path), false)
+    assert.equal(/[[\]]/.test(probe.path), false)
     assert.equal(probe.allowed.includes('OPTIONS'), true)
   }
   assert.ok(plan.some(probe => probe.method === 'PUT' && probe.expectedStatus === 405))

@@ -23,8 +23,8 @@ export function routeProbePlan(manifest) {
       && route.methods.every(method => methods.includes(method))
       && new Set(route.methods).size === route.methods.length, 'route_probe_methods_invalid')
     const segments = route.path.split('/').map(segment => {
-      if (/^\[(?:\.\.\.)?[^\[\]]+\]$/.test(segment) || /^\[\[\.\.\.[^\[\]]+\]\]$/.test(segment)) return placeholder
-      assert.ok(!/[\[\]]/.test(segment) && !['.', '..'].includes(segment), 'route_probe_path_invalid')
+      if (/^\[(?:\.\.\.)?[^\][\r\n]+\]$/.test(segment) || /^\[\[\.\.\.[^\][\r\n]+\]\]$/.test(segment)) return placeholder
+      assert.ok(!/[[\]]/.test(segment) && !['.', '..'].includes(segment), 'route_probe_path_invalid')
       return segment
     })
     const allowed = new Set(route.methods)
@@ -58,7 +58,7 @@ function targetOrigin(baseUrl) {
 export async function runRouteProbe({ baseUrl, manifest, fetchImpl = fetch }) {
   const origin = targetOrigin(baseUrl)
   const plan = routeProbePlan(manifest)
-  const results = new Array(plan.length)
+  const results = Array.from({ length: plan.length })
   let cursor = 0
   async function worker() {
     while (cursor < plan.length) {
