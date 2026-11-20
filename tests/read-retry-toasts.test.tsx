@@ -62,7 +62,7 @@ stub('components/workspace/thread-quota.tsx', { ThreadModelFallbackNotice: Empty
 stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
 stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', threadTopologyKey: (id: string) => ['issue-thread-topology', id], IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
-stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
+stub('components/coordinator/chat-composer.tsx', { ChatComposerAttachment: Empty, ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
 mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => Empty })
 
 const issue = { id: 'issue', userId: 'owner', title: 'Retained task', content: { type: 'doc', content: [] }, status: 'review', priority: 'normal', revision: 1, identifier: 'FIX-1', metadata: {}, createdAt: new Date(0), updatedAt: new Date(0) }
