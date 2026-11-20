@@ -9,6 +9,7 @@ mock.module(new URL('./default-model.ts', import.meta.url).href, { namedExports:
 import type { BotSubscriptionChoice } from './bot-model-choice'
 import type { UsableApiKey } from './model-api-keys'
 import { creditsOptionId } from './bot-model-menu-view'
+import { SELF_HOSTED_DEFAULT_CATALOG_ID } from './model-gateway/config'
 
 /** A Mikka 额度 pick (decision 2026-11-15-1900). */
 const CREDITS_MODEL = 'deepseek/deepseek-v4-pro'
@@ -85,8 +86,7 @@ test('hosted settings list the models offered by the configured LiteLLM source',
   const scope = { ownerId: 'fixture-owner', workspaceId: '10000000-0000-4000-8000-000000000001' }
   process.env.MIKKA_EDITION = 'community'
   try {
-    const { COORDINATOR_MODEL } = await import('./coordinator/model')
-    assert.deepEqual((await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models.map(model => model.id), [COORDINATOR_MODEL])
+    assert.deepEqual((await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models.map(model => model.id), [SELF_HOSTED_DEFAULT_CATALOG_ID])
     kind = 'none'
     assert.deepEqual((await readEnabledModels(query, scope)).sources.find(source => source.id === 'hosted')!.models, [])
   } finally { kind = 'hosted'; process.env.MIKKA_EDITION = 'cloud' }
@@ -152,8 +152,7 @@ test('no choice and nothing to fill in is no model, never a silent Mikka 额度 
   const configured = kind
   try {
     // A self-hosted server offers only its administrator's model: with nothing to choose, a chat uses it.
-    const { COORDINATOR_MODEL } = await import('./coordinator/model')
-    assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'hosted', model: COORDINATOR_MODEL, chosen: false })
+    assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'hosted', model: SELF_HOSTED_DEFAULT_CATALOG_ID, chosen: false })
     // A server with no model of its own still has no model to run.
     kind = 'none'
     assert.deepEqual(await choose(fixture('alice', [true])), { kind: 'none', chosen: false })
