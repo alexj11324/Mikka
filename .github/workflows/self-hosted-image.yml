@@ -116,7 +116,7 @@ jobs:
           node --input-type=module <<'JS'
           import { randomBytes } from 'node:crypto'
           import { appendFileSync } from 'node:fs'
-          for (const [name, value] of Object.entries({ POSTGRES_PASSWORD: randomBytes(24).toString('hex'), SELF_HOSTED_FIXTURE_KEY: randomBytes(32).toString('base64') })) {
+          for (const [name, value] of Object.entries({ POSTGRES_PASSWORD: randomBytes(24).toString('hex'), SELF_HOSTED_FIXTURE_KEY: randomBytes(32).toString('base64'), MIKKA_LITELLM_MASTER_KEY: 'synthetic-selfhost-litellm' })) {
             console.log(`::add-mask::${value}`)
             appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`)
           }

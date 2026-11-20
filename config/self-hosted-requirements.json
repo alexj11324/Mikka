@@ -1194,17 +1194,6 @@
     "test": "tests/resource-access.db.test.ts",
     "suite": "test:visibility-db"
   },
-  "lib/abuse/workers-ai.ts": {
-    "mode": "optional-cloud",
-    "environment": [
-      "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "CLOUDFLARE_WORKERS_AI_TOKEN",
-      "MIKKA_WORKERS_AI_CAPABILITY"
-    ],
-    "behavior": "Only an explicitly selected managed Workers AI model uses the Cloudflare account and token and the model route refuses missing configuration before provider I/O.",
-    "test": "lib/abuse/model.test.ts",
-    "suite": "test:abuse"
-  },
   "lib/account-deletions-due.ts": {
     "mode": "built-in",
     "environment": [],
@@ -1785,22 +1774,20 @@
   "lib/coordinator/decision-provider.ts": {
     "mode": "operator-configured",
     "environment": [
-      "AI_GATEWAY_API_KEY",
-      "DECISIONS_API_KEY",
-      "DECISIONS_BILLING_PROFILE",
-      "OPENAI_DECISIONS_API_KEY"
+      "MIKKA_LITELLM_URL",
+      "MIKKA_LITELLM_MASTER_KEY"
     ],
-    "behavior": "The native decision route requires an explicit billing profile, matching model and operator key. Unconfigured or disallowed routes cannot reserve or send a provider request.",
+    "behavior": "Decisions use only the installation LiteLLM endpoint and master key, without provider-specific keys, endpoints or fallback.",
     "test": "lib/coordinator/native-decision.test.ts",
     "suite": "test:coordinator-events"
   },
   "lib/coordinator/decision.ts": {
     "mode": "operator-configured",
     "environment": [
-      "DECISIONS_URL",
-      "DECISION_MODEL"
+      "MIKKA_LITELLM_URL",
+      "MIKKA_LITELLM_MASTER_KEY"
     ],
-    "behavior": "The Coordinator allows an operator-selected decision endpoint and model. Requests use the existing credential and budget policy for that route.",
+    "behavior": "The built-in Decision request uses the mikka-decision alias managed in LiteLLM; the application does not select a provider model.",
     "test": "lib/coordinator/native-decision.test.ts",
     "suite": "test:coordinator-events"
   },
@@ -1901,21 +1888,10 @@
   "lib/default-model-config.ts": {
     "mode": "operator-configured",
     "environment": [
-      "AI_GATEWAY_API_KEY",
-      "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "CLOUDFLARE_WORKERS_AI_TOKEN",
-      "MIKKA_DEFAULT_MODEL_API_KEY",
-      "MIKKA_DEFAULT_MODEL_BASE_URL",
-      "MIKKA_DEFAULT_MODEL_ID",
-      "MIKKA_EDITION",
-      "MIKKA_HOSTED_MODEL_FALLBACK",
-      "MIKKA_WORKERS_AI_CAPABILITY",
-      "VERCEL",
-      "VERCEL_OIDC_TOKEN",
-      "ZEROCAT_API_KEY",
-      "ZEROCAT_BASE_URL"
+      "MIKKA_LITELLM_URL",
+      "MIKKA_LITELLM_MASTER_KEY"
     ],
-    "behavior": "Community installations may configure their own complete model endpoint, key and model ID. An incomplete private route is unavailable and optional hosted provider configurations are evaluated separately.",
+    "behavior": "Model readiness requires the installation LiteLLM URL and master key; retired direct-provider settings do not enable models.",
     "test": "lib/default-model-config.test.ts",
     "suite": "test:self-hosted-byok"
   },
@@ -3062,18 +3038,6 @@
     "test": "lib/mobile-web-target.test.ts",
     "suite": "test:mobile"
   },
-  "lib/workers-ai-config.ts": {
-    "mode": "optional-cloud",
-    "environment": [
-      "CLOUDFLARE_WORKERS_AI_ACCOUNT_ID",
-      "CLOUDFLARE_WORKERS_AI_TOKEN",
-      "MIKKA_HOSTED_MODEL_FALLBACK",
-      "MIKKA_WORKERS_AI_CAPABILITY"
-    ],
-    "behavior": "A hosted Cloudflare container authorizes its fixed account with an instance-scoped service binding. Operators can also configure a model-specific REST token. Community installations can use their own configured model.",
-    "test": "lib/abuse/model.test.ts",
-    "suite": "test:abuse"
-  },
   "lib/workspace-db.ts": {
     "mode": "built-in",
     "environment": [
@@ -3452,7 +3416,7 @@
       "MIKKA_LITELLM_URL",
       "MIKKA_LITELLM_MASTER_KEY"
     ],
-    "behavior": "Protocol conversion uses the operator's own LiteLLM when both variables are set; without them a key that speaks the client's protocol still works and conversion is refused.",
+    "behavior": "LiteLLM is mandatory model egress for both hosted and community installations. Missing or invalid configuration refuses model requests with no direct-provider fallback.",
     "test": "lib/model-gateway/gateway.test.ts",
     "suite": "test:subscription-usability"
   },
@@ -3480,7 +3444,7 @@
   "lib/model-gateway/upstream.ts": {
     "mode": "operator-configured",
     "environment": [],
-    "behavior": "Chooses the provider endpoint for a person's key, the operator's LiteLLM for conversion, or the operator's Gateway for credits.",
+    "behavior": "All API-key and credits model requests go to the configured LiteLLM endpoint; authorized user-key routing metadata is passed per request and cannot fall back to a Mikka upstream key.",
     "test": "lib/model-gateway/gateway.test.ts",
     "suite": "test:subscription-usability"
   },
@@ -3826,5 +3790,15 @@
     "behavior": "The one mark registry: a status, priority, thread group or run indicator in, the shape and tone every surface draws out. Pure data, no installation dependency.",
     "test": "lib/state-mark.test.ts",
     "suite": "test:lib-units"
+  },
+  "lib/model-gateway/litellm-client.ts": {
+    "mode": "operator-configured",
+    "environment": [
+      "MIKKA_LITELLM_URL",
+      "MIKKA_LITELLM_MASTER_KEY"
+    ],
+    "behavior": "The sole SDK client sends managed models and authorized BYOK requests to LiteLLM, preserving cost and request receipts without following redirects or exposing the master key to Agents.",
+    "test": "lib/model-gateway/litellm-client.test.ts",
+    "suite": "test:subscription-usability"
   }
 }

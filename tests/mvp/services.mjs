@@ -134,12 +134,14 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
       }
       if (url.pathname === '/decisions' && request.method === 'POST') {
         handler = 'decisions'
+        response.setHeader('x-litellm-call-id', `mvp-synthetic-${randomUUID()}`)
+        response.setHeader('x-litellm-response-cost', '0.001')
         // The real triage transport still validates a model response and issues
         // its own execution receipt. This scripted response is only evidence of
         // that integration contract, never live model judgment or authorization.
         assert.equal(request.headers.authorization, 'Bearer mvp-synthetic-decisions')
         const input = await readBody(request)
-        assert.equal(input.model, 'openai/gpt-6-luna-decisions')
+        assert.equal(input.model, 'mikka-decision')
         assert.equal(input.questions?.length, 1)
         const question = input.questions[0]
         assert.equal(question.type, 'choice')
@@ -155,7 +157,6 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
           // The person is in the chat they just wrote in: no phone notification.
           return reply({
             model: input.model,
-            provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}`, cost: '0.001' } },
             answers: [{ type: 'choice', name: 'push', choice: 'none' }],
           })
         }
@@ -171,7 +172,6 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
           observe({ kind: 'outcome-request', requestId, status })
           return reply({
             model: input.model,
-            provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}`, cost: '0.001' } },
             answers: [{ type: 'choice', name: 'outcome', choice: status === 'succeeded' ? 'done' : 'idle' }],
           })
         }
@@ -207,7 +207,6 @@ export async function startMvpServices(port = 3191, { routes } = {}) {
         observe({ kind: 'decision-request', requestId, eventId: host.eventId, eventKind: host.eventKind })
         return reply({
           model: input.model,
-          provider_metadata: { gateway: { generationId: `mvp-synthetic-${randomUUID()}`, cost: '0.001' } },
           answers: [{ type: 'choice', name: 'tier', choice: 'result' }],
         })
       }

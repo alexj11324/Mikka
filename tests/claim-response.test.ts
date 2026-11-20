@@ -5,7 +5,7 @@ import { gzipSync } from 'node:zlib'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { CodedError } from '@mikka/protocol/coded-error'
 import { DAEMON_PROTOCOL_VERSION } from '@mikka/protocol/daemon'
-import { REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, RUN_CREDENTIALS_HEADER, type RunCheckpoint } from '@mikka/protocol/device'
+import { REPO_ORIGIN_HEADER, PROJECT_ENVIRONMENT_HEADER, RECOVERY_WORKTREE_HEADER, RUN_CREDENTIALS_HEADER, MODEL_CREDENTIAL_HEADER, type RunCheckpoint } from '@mikka/protocol/device'
 import { SUBSCRIPTION_MODEL_CATALOGUE_HEADER } from '@mikka/protocol/subscription'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { SKILL_ARTIFACT_HEADER } from '@mikka/protocol/skill'
@@ -51,6 +51,7 @@ function fixture() {
     appActive: 0, appCheckouts: 0, appReleases: 0,
     issueAccessError: undefined as Error | undefined,
     credentialCapability: false,
+    modelCredentialCapability: false,
     catalogueCapability: false,
     secretCapability: undefined as string | undefined,
     secretInjection: undefined as Partial<TaskSecretInjection> | undefined,
@@ -86,7 +87,7 @@ function fixture() {
 async function claim(probe: ReturnType<typeof fixture>, preparation = ['skill-preflight','policy','secrets','publication','claim','skill-claim','benchmark-claim','token','settings'], expectsProjectAdmission = true) {
   const diagnostics: unknown[][] = []
   const errors = mock.method(console, 'error', (...args: unknown[]) => { diagnostics.push(args) })
-  try { return await POST(new Request(claimRequestURL,{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {}),...(probe.environmentCapability ? {[PROJECT_ENVIRONMENT_HEADER]:probe.environmentCapability} : {}),...(probe.secretCapability ? {[TASK_SECRETS_HEADER]:probe.secretCapability} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
+  try { return await POST(new Request(claimRequestURL,{method:'POST',headers:{[REPO_ORIGIN_HEADER]:'1',[SKILL_ARTIFACT_HEADER]:'1',...(probe.strictRecovery ? {[RECOVERY_WORKTREE_HEADER]:'1'} : {}),...(probe.policyCapability?{[POLICY_SNAPSHOT_HEADER]:probe.policyCapability}:{}),...(probe.credentialCapability ? {[RUN_CREDENTIALS_HEADER]:'1'} : {}),...(probe.modelCredentialCapability ? {[MODEL_CREDENTIAL_HEADER]:'1'} : {}),...(probe.catalogueCapability ? {[SUBSCRIPTION_MODEL_CATALOGUE_HEADER]:'1'} : {}),...(probe.environmentCapability ? {[PROJECT_ENVIRONMENT_HEADER]:probe.environmentCapability} : {}),...(probe.secretCapability ? {[TASK_SECRETS_HEADER]:probe.secretCapability} : {})}}),{params:Promise.resolve({deviceId:'device',runId:'run'})}) }
   finally {
     errors.mock.restore()
     // The route logs only error names. Keep the intentional refusal distinct
@@ -291,6 +292,30 @@ test('native claims check both stored Bot and task workspace model limits before
     {workspaceId:'bot-workspace',ownerId:'member'},{workspaceId:'task-workspace',ownerId:'member'},
   ])
   assert.deepEqual(probe.modelAdmissionCalls, probe.cliPolicy.workspaceIds.map(workspaceId => ({scope:{workspaceId,ownerId:'member'},model:'native-default'})))
+})
+
+for (const source of ['apiKey', 'credits'] as const) test(`a frozen ${source} claim checks its LiteLLM route in every affected workspace before leasing`, async () => {
+  const saved = { url: process.env.MIKKA_LITELLM_URL, key: process.env.MIKKA_LITELLM_MASTER_KEY }
+  process.env.MIKKA_LITELLM_URL = 'https://models.example.test/v1'
+  process.env.MIKKA_LITELLM_MASTER_KEY = 'synthetic-claim-only'
+  try {
+    const probe = fixture()
+    probe.modelCredentialCapability = true
+    probe.cliPolicy.workspaceIds = ['bot-workspace', 'task-workspace']
+    Object.assign(probe, { modelAdmissionDeniedWorkspace: 'task-workspace' })
+    Object.assign(probe.run, { agentDefinition: { harness: 'codex', model: 'stale-model',
+      [source]: source === 'apiKey' ? { keyId: 'fixture-key', model: 'frozen-model' } : { model: 'frozen-model' } } })
+    const response = await claim(probe, ['skill-preflight', 'policy', 'model-admission', 'model-admission'])
+    assert.equal(response.status, 409)
+    assert.equal((await response.json()).error, 'modelRouteDenied')
+    assert.equal(probe.run.status, 'queued')
+    assert.equal(probe.run.leaseExpiresAt, null)
+    assert.deepEqual((probe as typeof probe & { liteLLMAdmissionCalls: unknown[] }).liteLLMAdmissionCalls,
+      probe.cliPolicy.workspaceIds.map(workspaceId => ({ scope: { workspaceId, ownerId: 'member' }, model: 'frozen-model', endpoint: 'https://models.example.test/v1' })))
+  } finally {
+    for (const [name, value] of [['MIKKA_LITELLM_URL', saved.url], ['MIKKA_LITELLM_MASTER_KEY', saved.key]] as const)
+      if (value === undefined) delete process.env[name]; else process.env[name] = value
+  }
 })
 
 test('ordinary retries retain the normal claim path after question lineage validation',async()=>{

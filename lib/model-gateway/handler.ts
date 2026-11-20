@@ -7,7 +7,8 @@ import { requestGatewayToken, verifyGatewayToken, type GatewayGrant } from './to
 import { upstreamRequest, type GatewayOperation, type GatewayUpstream } from './upstream'
 import { gatewayCostMicroUsd, readGatewayUsage, type GatewayProtocol } from './usage'
 import { withoutDisabledFeatures } from './features'
-import { gatewayLiteLlm } from './config'
+import { isCloudEdition } from '@/lib/edition'
+import { gatewayLiteLlm, SELF_HOSTED_DEFAULT_CATALOG_ID } from './config'
 
 /** The same input-size boundary the hosted model applies to one call. */
 const MAX_BODY_BYTES = 16 * 1024 * 1024
@@ -168,22 +169,21 @@ function defaultDependencies(): GatewayDependencies {
 
 /** The run's frozen source, opened for this one request. */
 export async function resolveGatewayUpstream(grant: GatewayGrant, protocol: GatewayProtocol, env: Record<string, string | undefined> = process.env): Promise<{ upstream: GatewayUpstream; features?: import('./features').GatewayFeatures }> {
+  const litellm = gatewayLiteLlm(env)
+  if (!litellm) throw new GatewayRefusal(503, 'model_gateway_unconfigured')
   if (grant.source.kind === 'credits') {
+    if (!isCloudEdition(env) && grant.model === SELF_HOSTED_DEFAULT_CATALOG_ID) return { upstream: litellm }
     const models = await (await import('@/lib/model-catalog-server')).modelCatalog()
     if (!catalogModel(grant.model, models)?.pricing) throw new GatewayRefusal(400, 'model_gateway_model_unpriced')
-    const auth = await (await import('@/lib/ai-gateway-auth')).gatewayAuth(env)
-    if (!auth) throw new GatewayRefusal(503, 'model_gateway_unconfigured')
-    return { upstream: { kind: 'vercel', token: auth.token } }
+    return { upstream: litellm }
   }
   const { openGatewayApiKey } = await import('@/lib/model-api-keys')
   const opened = await openGatewayApiKey(pool, grant.source.keyId, env).catch((error: unknown) => {
     throw new GatewayRefusal(401, 'model_gateway_key_unavailable', { cause: error })
   })
-  const { apiKeyEndpoint, apiKeyChatBaseUrl } = await import('@/lib/model-api-key-providers')
-  const native = apiKeyEndpoint(opened.key, protocol === 'anthropic' ? 'claude_code' : 'codex')
-  if (native) return { upstream: { kind: 'provider', baseUrl: native.baseUrl, key: opened.apiKey }, features: opened.features }
-  const chatBaseUrl = apiKeyChatBaseUrl(opened.key)
-  const litellm = gatewayLiteLlm(env)
-  if (!chatBaseUrl || !litellm) throw new GatewayRefusal(400, 'model_gateway_protocol_unsupported')
-  return { upstream: { kind: 'litellm', url: litellm.url, masterKey: litellm.masterKey, chatBaseUrl, key: opened.apiKey }, features: opened.features }
+  const { apiKeyChatBaseUrl, apiKeyEndpoint } = await import('@/lib/model-api-key-providers')
+  const anthropic = opened.key.provider === 'anthropic' || (opened.key.provider === 'custom' && opened.key.protocol === 'anthropic')
+  const apiBase = anthropic ? apiKeyEndpoint(opened.key, 'claude_code')?.baseUrl : apiKeyChatBaseUrl(opened.key)
+  if (!apiBase) throw new GatewayRefusal(400, 'model_gateway_protocol_unsupported')
+  return { upstream: { ...litellm, credential: { key: opened.apiKey, provider: anthropic ? 'anthropic' : 'openai', apiBase, chatCompletionsOnly: !anthropic && opened.key.provider !== 'openai' } }, features: opened.features }
 }

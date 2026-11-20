@@ -1,7 +1,6 @@
-/** Existing vision-capable decision model and existing budgeted Gateway route. */
-export const STANDARD_DECISION_MODEL = 'openai/gpt-6-luna-decisions'
-export const DECISION_MODEL = process.env.DECISION_MODEL?.trim() || STANDARD_DECISION_MODEL
-export const DECISIONS_URL = process.env.DECISIONS_URL?.trim() || 'https://ai-gateway.vercel.sh/v1/decisions'
+/** The proxy owns the backing model and provider for this stable purpose alias. */
+export const DECISION_MODEL = 'mikka-decision'
+export const DECISIONS_PATH = '/v1/decisions'
 
 export type DecisionQuestion =
   | { type: 'predicate'; name: string; instructions: string }
@@ -37,7 +36,7 @@ export function decisionRequestInput(input: DecisionInput) {
     if (!(match[1] === 'png' ? prefix.startsWith('\x89PNG\r\n\x1a\n') : match[1] === 'jpeg' ? prefix.startsWith('\xff\xd8\xff') : prefix.startsWith('RIFF') && prefix.slice(8,12) === 'WEBP')) throw Error('decisionImageInvalid')
     return { type: 'input_image' as const, image_url: image.dataUrl, detail: image.detail ?? 'auto' }
   })
-  return [{ role: 'user' as const, content: [{ type: 'input_text' as const, text: input.text }, ...parts] }]
+  return [{ type: 'message' as const, role: 'user' as const, content: [{ type: 'input_text' as const, text: input.text }, ...parts] }]
 }
 
 export function answersByName(body: DecisionResponse): Map<string, Exclude<DecisionAnswer, { type: 'refusal' }>> {

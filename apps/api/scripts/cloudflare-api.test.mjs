@@ -63,22 +63,17 @@ test('ingress maps the selected image with a private route and a bounded staging
   assert.equal(config.containers[0].image, input.image)
   assert.equal(config.vars.MIKKA_DEPLOYMENT_ID, input.release)
   assert.equal(config.ai, undefined)
-  const withAI = ingressConfig({ ...input, workersAi: true })
-  assert.deepEqual(withAI.ai, { binding: 'WORKERS_AI' })
-  assert.equal(withAI.vars.CLOUDFLARE_WORKERS_AI_ACCOUNT_ID, input.image.split('/')[1])
 })
 
 test('ingress maps custom deployment metadata and underscore service names', () => {
   const input = { release: 'custom_release_v2', image: 'registry.example.test/team/api:release_2',
     origin: 'http://localhost:4310', taskMachine: 'task_service', eveService: 'eve_service',
     businessWorld: 'business_world', credentialIdentityService: 'identity_service',
-    credentialBrokerService: 'broker_service', workersAi: 'enabled' }
+    credentialBrokerService: 'broker_service' }
   const config = ingressConfig(input)
   assert.equal(config.name, 'mikka-api-' + input.release)
   assert.equal(config.containers[0].image, input.image)
-  assert.deepEqual(config.vars, { PUBLIC_ORIGIN: input.origin, MIKKA_DEPLOYMENT_ID: input.release,
-    CLOUDFLARE_WORKERS_AI_ACCOUNT_ID: 'team' })
-  assert.deepEqual(config.ai, { binding: 'WORKERS_AI' })
+  assert.deepEqual(config.vars, { PUBLIC_ORIGIN: input.origin, MIKKA_DEPLOYMENT_ID: input.release })
   assert.deepEqual(config.services, [
     { binding: 'TASK_MACHINE', service: input.taskMachine },
     { binding: 'EVE_SERVICE', service: input.eveService, entrypoint: 'EveService' },
@@ -183,14 +178,14 @@ test('the private API receives its sign-in and product bindings without inheriti
     GITHUB_CLIENT_ID: 'github', GITHUB_CLIENT_SECRET: 'github-credential', GITHUB_WEBHOOK_SECRET: 'existing-hook',
     BETTER_AUTH_SECRET: 'auth', TURNSTILE_SECRET_KEY: 'signup-verification', MIKKA_CLOUDFLARE_TASKS_DISABLED: 'sponsor',
     MIKKA_DEPLOYMENT_ID: id, MIKKA_WORKFLOW_QUEUE_PUBLIC_KEY: 'public-verification-key',
-    DECISIONS_API_KEY: 'decision-gateway-fixture', OPENAI_DECISIONS_API_KEY: 'decisions', CLOUDFLARE_WORKERS_AI_TOKEN: 'models',
-    AI_GATEWAY_API_KEY: 'credits-gateway-fixture', MIKKA_LITELLM_URL: 'http://litellm.internal:4000', MIKKA_LITELLM_MASTER_KEY: 'converter-fixture',
+    MIKKA_LITELLM_URL: 'http://litellm.internal:4000', MIKKA_LITELLM_MASTER_KEY: 'converter-fixture',
     DEVICE_GATEWAY_URL: 'https://gateway.example', DEVICE_GATEWAY_PUSH_SECRET: 'device-signing',
     WORKSPACE_SECRETS_KEY: 'workspace-sealing',
     COMPOSIO_API_KEY: 'integrations', COMPOSIO_WEBHOOK_SECRET: 'hook-verification',
     COMPOSIO_CALLBACK_VERIFIER_URL: origin + '/mikka/api/integrations/composio/callback',
   }
   const unexpected = {
+    AI_GATEWAY_API_KEY: 'upstream', NEON_AI_GATEWAY_TOKEN: 'neon', DECISIONS_API_KEY: 'obsolete', ZEROCAT_API_KEY: 'retired',
     SLACK_SIGNING_SECRET: 'event-signing', SLACK_BOT_TOKEN: 'tenant-token', SLACK_USER_BINDINGS: 'tenant-map',
     GITHUB_APP_PRIVATE_KEY: 'app-signing', AWS_ACCESS_KEY_ID: 'aws', AWS_SECRET_ACCESS_KEY: 'aws-secret',
     CREDENTIAL_MASTER_KEY: 'self-hosted-vault', CREDENTIAL_BROKER_ROLE_ARN: 'broker', EVE_QUEUE_SIGNING_KEY: 'world-signing',
@@ -324,40 +319,42 @@ test('the hosted image verifies its bundled WDK business client and requires sco
   assert.throws(() => verifyConfiguration({ ...bindings, MIKKA_EVE_ORIGIN: 'https://other.example' }), /PRIVATE_BINDINGS_REQUIRED/)
 })
 
-test('the private LiteLLM bridge forwards only the conversion routes with their auth and content headers', async () => {
+test('the private LiteLLM bridge forwards only the model routes with their auth and content headers', async () => {
   const { liteLlmRequest } = await import('../../../cloudflare/api/ingress/services.mjs')
   const seen = []
   const binding = { fetch: async request => { seen.push(request); return new Response('ok') } }
   const body = JSON.stringify({ model: 'm', api_key: 'person-key', api_base: 'https://provider.example/v1' })
-  const headers = { authorization: 'Bearer master', 'content-type': 'application/json', cookie: 'session=1',
+  const headers = { authorization: 'Bearer master', 'x-litellm-api-key': 'Bearer master', 'content-type': 'application/json', cookie: 'session=1',
     'x-forwarded-for': '1.2.3.4', 'cf-connecting-ip': '1.2.3.4', 'anthropic-version': '2023-06-01' }
-  for (const path of ['/v1/messages', '/v1/messages/count_tokens', '/v1/responses']) {
+  for (const path of ['/v1/messages', '/v1/messages/count_tokens', '/v1/responses', '/v1/chat/completions', '/v1/decisions', '/v1/audio/transcriptions']) {
     const res = await liteLlmRequest(new Request('https://litellm.internal' + path, { method: 'POST', headers, body }), binding)
     assert.equal(res.status, 200)
   }
-  assert.equal(seen.length, 3)
+  assert.equal(seen.length, 6)
   for (const request of seen) {
     assert.equal(request.headers.get('authorization'), 'Bearer master')
+    assert.equal(request.headers.get('x-litellm-api-key'), 'Bearer master')
     assert.equal(request.headers.get('anthropic-version'), '2023-06-01')
     for (const name of ['cookie', 'x-forwarded-for', 'cf-connecting-ip']) assert.equal(request.headers.get(name), null)
   }
   assert.equal(await seen[2].text(), body)
-  for (const [url, method] of [['https://litellm.internal/v1/chat/completions', 'POST'], ['https://litellm.internal/v1/messages', 'GET'],
+  assert.equal((await liteLlmRequest(new Request('https://litellm.internal/v1/mikka/catalog', { headers }), binding)).status, 200)
+  for (const [url, method] of [['https://litellm.internal/v1/mikka/catalog', 'POST'], ['https://litellm.internal/v1/messages', 'GET'],
     ['https://litellm.internal/v1/messages?x=1', 'POST'], ['https://other.internal/v1/messages', 'POST'], ['https://litellm.internal/key/generate', 'POST']]) {
     assert.equal((await liteLlmRequest(new Request(url, { method, body: method === 'POST' ? '{}' : undefined }), binding)).status, 404)
   }
   assert.equal((await liteLlmRequest(new Request('https://litellm.internal/v1/messages', { method: 'POST', body: '{}' }), undefined)).status, 503)
-  assert.equal(seen.length, 3)
+  assert.equal(seen.length, 7)
 })
 
-test('the API binds the LiteLLM service only when a release names one, and the service exposes only conversion routes', async () => {
+test('the API binds the LiteLLM service only when a release names one, and the service exposes only model routes', async () => {
   const input = { release: id, origin: 'https://test.example', image: 'registry.cloudflare.com/' + '0'.repeat(32) + '/mikka-api@sha256:' + '2'.repeat(64) }
   assert.equal(ingressConfig(input).services, undefined)
   assert.deepEqual(ingressConfig({ ...input, liteLlmService: 'mikka-litellm-staging' }).services, [{ binding: 'LITELLM', service: 'mikka-litellm-staging' }])
   const { converterRequest } = await import('../../../cloudflare/litellm/request.mjs')
   const forwarded = converterRequest(new Request('https://anything.example/v1/responses', { method: 'POST', body: '{}' }))
   assert.equal(forwarded.url, 'http://litellm/v1/responses')
-  for (const [path, method] of [['/v1/chat/completions', 'POST'], ['/v1/responses', 'GET'], ['/v1/responses?debug=1', 'POST'], ['/health', 'GET']]) {
+  for (const [path, method] of [['/v1/mikka/catalog', 'POST'], ['/v1/responses', 'GET'], ['/v1/responses?debug=1', 'POST'], ['/health', 'GET']]) {
     assert.equal(converterRequest(new Request('https://anything.example' + path, { method, body: method === 'POST' ? '{}' : undefined })), null)
   }
 })

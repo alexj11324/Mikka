@@ -1,6 +1,6 @@
 # Connected cloud model credits
 
-- **Status:** implementation for review
+- **Status:** model egress superseded by [mandatory LiteLLM](decisions/2026-11-20-0530-litellm-only-model-egress.md); this record preserves the connected-credit design.
 - **GitHub:** #1567, design PR #1559
 - **Owner:** self-hosting implementation batch
 
@@ -64,8 +64,9 @@ credit and a positive balance. The public platform retains its existing trial.
 Neither client JSON nor provider options can choose the adapter or its workspace.
 
 The private implementation and schema stay in `mikka-cloud`. It reuses the
-public router, its ZeroCat-first path, 20-second first-token Gateway fallback,
-actual-cost settlement and unknown-cost reconciliation. The local installation
+public router, backend LiteLLM egress, actual-cost settlement and unknown-cost
+reconciliation. Self-hosted servers also require LiteLLM; the earlier direct
+cloud-model transport was retired under #2869. The local installation
 makes no hosted-usage debit for a cloud call. A private attribution row links the
 server, authorization, pseudonymous actor and actual public ledger identity; it
 stores no prompt, response or credential.

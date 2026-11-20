@@ -33,6 +33,9 @@ class Provider(BaseHTTPRequestHandler):
             self.send_error(401)
             return
         request = json.loads(self.rfile.read(int(self.headers.get('content-length', 0))) or b'{}')
+        if request.get('model') not in ('zai/glm-5', 'fixture/provider-model'):
+            self.send_error(400, 'model routing changed the provider/model slug')
+            return
         tool = bool(request.get('tools'))
         usage = ({'prompt_tokens': 20, 'completion_tokens': 5, 'total_tokens': 25} if tool
                  else {'prompt_tokens': 11, 'completion_tokens': 2, 'total_tokens': 13})

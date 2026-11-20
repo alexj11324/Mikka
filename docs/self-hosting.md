@@ -6,24 +6,25 @@ The image provides the server: API, realtime, daemon gateway, scheduling, migrat
 
 ## Start the server
 
-Use a Linux host with Docker Engine and Docker Compose 2.24 or newer. The first published image targets `linux/amd64`. Start with 2 CPU cores and 4 GB RAM for the application and PostgreSQL; running coding agents on this same host needs additional resources. The application listens on port 3000 and is served at `/mikka`. This version supports a configurable origin; the `/mikka` path is fixed in the compiled web application.
+Use a Linux host with Docker Engine and Docker Compose 2.24 or newer. The first published image targets `linux/amd64`. Start with 2 CPU cores and 4 GB RAM for the application, PostgreSQL and LiteLLM; running coding agents on this same host needs additional resources. The application listens on port 3000 and is served at `/mikka`. This version supports a configurable origin; the `/mikka` path is fixed in the compiled web application.
 
-Download `docker-compose.yml` from the release you plan to run. In the same directory, create a `.env` file:
+Download `docker-compose.yml` and `deploy/litellm/Dockerfile` plus `deploy/litellm/config.yaml` and `deploy/litellm/start.sh` from the release you plan to run, preserving those paths. Configure the model aliases and upstream credentials in LiteLLM before starting the application; see [model configuration](self-hosting-byok.md#必需的-litellm-模型出口). In the same directory, create a `.env` file:
 
 ```dotenv
 POSTGRES_PASSWORD=replace-with-a-random-hex-password
+MIKKA_LITELLM_MASTER_KEY=replace-with-a-random-hex-key
 BETTER_AUTH_URL=http://localhost:3000
 # Pin a published commit SHA or release tag for repeatable upgrades.
 MIKKA_IMAGE=ghcr.io/alexj11324/mikka:latest
 ```
 
-Generate the database password with `openssl rand -hex 32`. Do not use a sample password. Keep `.env` private (`chmod 600 .env`); it is not part of the image or source control.
+Generate separate database and LiteLLM keys with `openssl rand -hex 32`. Do not use a sample password. Keep `.env` private (`chmod 600 .env`); it is not part of the image or source control.
 
 ```sh
 docker compose up -d --wait
 ```
 
-Open `http://localhost:3000/mikka` for server information. Compose starts only the app and PostgreSQL. PostgreSQL has no exposed host port. At each application start, the existing migrations run before the HTTP listener starts. An advisory lock serializes migrations across replicas. Workflow uses its local backend and stores its durable state in the app data volume.
+Open `http://localhost:3000/mikka` for server information. Compose starts the app, PostgreSQL and the mandatory LiteLLM service. LiteLLM has no exposed host port; the app uses `http://litellm:4000` and the configured master key. PostgreSQL has no exposed host port. At each application start, the existing migrations run before the HTTP listener starts. An advisory lock serializes migrations across replicas. Workflow uses its local backend and stores its durable state in the app data volume.
 
 The app port binds to `127.0.0.1` by default. For remote access, put a TLS reverse proxy on the host and set `BETTER_AUTH_URL=https://mikka.example.com`. The value is an **origin**, without `/mikka`, credentials, a query, or a fragment. Forward `Host` unchanged, support WebSocket upgrades, and forward the original HTTPS scheme. The server rejects conflicting forwarded hosts or schemes. HTTP is accepted only for a configured loopback origin; use HTTPS for a network deployment.
 
@@ -48,8 +49,8 @@ not hosted Mikka compute, model credits, or access to any Mikka account.
 
 Use the independent [`docker-compose.neon.yml`](../docker-compose.neon.yml)
 from the **same Mikka release** as the application image. Unlike the default
-Compose file, it launches **only the Mikka app** and does not create a local
-PostgreSQL service. This is a fresh-installation procedure; changing an existing
+Compose file, it launches **the Mikka app and LiteLLM** and does not create a local
+PostgreSQL service. Keep the same `deploy/litellm` files beside it. This is a fresh-installation procedure; changing an existing
 installation's database URL does not migrate its data.
 
 1. [Create a Neon project](https://console.neon.tech/) and choose a region close
@@ -65,6 +66,7 @@ installation's database URL does not migrate its data.
 
    ```dotenv
    BETTER_AUTH_URL=http://localhost:3000
+   MIKKA_LITELLM_MASTER_KEY=REPLACE_WITH_A_RANDOM_HEX_KEY
    MIKKA_IMAGE=ghcr.io/alexj11324/mikka:latest
    MIKKA_DATABASE_URL=postgresql://YOUR_ROLE:YOUR_PASSWORD@ep-YOUR-ID-pooler.YOUR-REGION.aws.neon.tech/YOUR_DATABASE?sslmode=require
    MIKKA_DATABASE_URL_UNPOOLED=postgresql://YOUR_ROLE:YOUR_PASSWORD@ep-YOUR-ID.YOUR-REGION.aws.neon.tech/YOUR_DATABASE?sslmode=require
@@ -77,7 +79,7 @@ installation's database URL does not migrate its data.
    either connection URL to source control, support messages or screenshots;
    run `chmod 600 .env`. Be aware that `docker compose config` expands
    variables and may print the credentials.
-4. Start the app (not the bundled `postgres` service):
+4. Configure the LiteLLM aliases and upstream secrets, then start the app and LiteLLM:
 
    ```sh
    docker compose -f docker-compose.neon.yml up -d --wait
@@ -300,7 +302,7 @@ and account so a notification cannot route into a different saved account.
 
 In **Settings → Models and subscriptions**, add your own provider API key, or connect your own Claude or ChatGPT subscription after configuring the subscription backend below. The community edition does not reserve Mikka credits, require a payment card, or stop after the hosted free-message allowance. It hides the Billing settings section. The normal user/workspace permissions and model access rules still apply.
 
-To supply the server's default OpenAI-compatible model, set `MIKKA_DEFAULT_MODEL_BASE_URL`, `MIKKA_DEFAULT_MODEL_API_KEY`, and `MIKKA_DEFAULT_MODEL_ID`. Use the provider's API base, including its version path where required. Provider charges go to your account. Without a configured default model, choose one of your own available models.
+Configure `MIKKA_LITELLM_URL` and `MIKKA_LITELLM_MASTER_KEY` for all managed model calls. The bundled Compose files set the internal URL and require a master key. Set default/title/Decision/Planning aliases and upstream credentials in LiteLLM; personal API keys also go through it. There is no direct-provider fallback. See [model configuration and migration](self-hosting-byok.md#必需的-litellm-模型出口).
 
 Connect your own computer or server using the commands shown in Mikka's **Devices** settings. Copied commands always include `--server` with the current origin and `/mikka` path. The daemon's standalone CLI keeps its existing official-server default, so retain the flag for a self-hosted installation. A daemon too old to hold a device session is refused on every device route (`426 daemonUpgradeRequired`); update it and sign in again ([decision 2026-11-17-2215](design/decisions/2026-11-17-2215-device-session-no-heartbeat.md)).
 

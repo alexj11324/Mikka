@@ -100,7 +100,7 @@ describe("run homes", () => {
     const binary = recordingCli("fake-claude.mjs", record, join(runDir, "native-home", ".claude", ".credentials.json"))
     const adapter = new ClaudeAdapter({ stateDir, sandbox: new NoSandbox(), binary })
     const session = await adapter.start({ runId: "claude-isolated", cwd: await makeRepo(), prompt: "MODEL", env: buildChildEnv(),
-      log: createLogger(), toolApproval: gate("claude-isolated"), credential: { kind: "api_key", key: "run-key-claude" } })
+      log: createLogger(), toolApproval: gate("claude-isolated"), credential: { kind: "provider", protocol: "anthropic", baseUrl: "https://mikka.test/api/model-gateway/anthropic", key: "run-key-claude" } })
     expect((await runToExit(session))?.outcome).toBe("succeeded")
     const [home, configDir, , key] = readFileSync(record, "utf8").split("\n")
     expect(key).toBe("run-key-claude")
@@ -119,7 +119,7 @@ describe("run homes", () => {
     const binary = recordingCli("fake-codex.mjs", record, join(runDir, "codex-home", "auth.json"))
     const adapter = new CodexAdapter({ stateDir, sandbox: new NoSandbox(), binary })
     const session = await adapter.start({ runId: "codex-isolated", cwd: await makeRepo(), prompt: "MODEL", env: buildChildEnv(),
-      log: createLogger(), toolApproval: gate("codex-isolated"), credential: { kind: "api_key", key: "run-key-codex" } })
+      log: createLogger(), toolApproval: gate("codex-isolated"), credential: { kind: "provider", protocol: "openai", baseUrl: "https://mikka.test/api/model-gateway/openai/v1", key: "run-key-codex" } })
     expect((await runToExit(session))?.outcome).toBe("succeeded")
     const [, , codexHome, key] = readFileSync(record, "utf8").split("\n")
     expect(key).toBe("run-key-codex")

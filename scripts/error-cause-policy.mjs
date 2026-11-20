@@ -168,7 +168,6 @@ export const droppedCauseAllowlist = {
   'packages/daemon/src/adapters/codex-mailbox.ts': 2,
   'packages/daemon/src/agents/chat-files.ts': 2,
   'packages/daemon/src/agents/github-runtime.ts': 1,
-  'packages/daemon/src/api-key-broker.ts': 1,
   'packages/daemon/src/lock.ts': 1,
   'packages/daemon/src/main.ts': 1,
   'packages/daemon/src/quota/parse.ts': 1,

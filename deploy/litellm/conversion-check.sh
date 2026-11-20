@@ -18,7 +18,8 @@ docker network create "$network" > /dev/null
 docker run -d --name litellm-proof-provider --network "$network" --cap-drop ALL --security-opt=no-new-privileges \
   -v "$(cd "$(dirname "$0")" && pwd)/mock-provider.py:/mock-provider.py:ro" --entrypoint python "$image" /mock-provider.py 9911 > /dev/null
 docker run -d --name litellm-proof --network "$network" --cap-drop ALL --security-opt=no-new-privileges -p 127.0.0.1:4012:4000 \
-  -e LITELLM_LOCAL_MODEL_COST_MAP=True -e LITELLM_MASTER_KEY="$key" "$image" > /dev/null
+  -e LITELLM_LOCAL_MODEL_COST_MAP=True -e LITELLM_MASTER_KEY="$key" \
+  -e AI_GATEWAY_API_KEY=sk-person-key -e VERCEL_AI_GATEWAY_API_BASE=http://litellm-proof-provider:9911/v1 "$image" > /dev/null
 for _ in $(seq 1 90); do
   curl -fsS --noproxy '*' http://127.0.0.1:4012/health/liveliness > /dev/null 2>&1 && break
   sleep 2
@@ -34,6 +35,6 @@ output=$(NODE_OPTIONS=--test-reporter=tap MIKKA_LITELLM_TEST_URL=http://127.0.0.
   exit 1
 }
 printf '%s\n' "$output" | grep -E '^ok |^# (pass|fail|skipped)'
-# Both conversions ran: a skipped test is not a proof.
-printf '%s\n' "$output" | grep -qx '# pass 2' && printf '%s\n' "$output" | grep -qx '# skipped 0'
+# Both BYOK conversions and both quota wildcard bridges ran: no skipped proof.
+printf '%s\n' "$output" | grep -qx '# pass 4' && printf '%s\n' "$output" | grep -qx '# skipped 0'
 echo "LiteLLM conversion proof passed"

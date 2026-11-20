@@ -1,5 +1,5 @@
 name: Cloudflare LiteLLM runtime
-# The model gateway's protocol converter (decision 2026-11-15-2000), built and
+# The private model egress, built and
 # published like the task runtime: bound to an accepted API build, tested,
 # then pushed to the account registry for the private publisher to pin.
 on:
@@ -25,6 +25,8 @@ on:
     paths: &litellm_paths
       - 'deploy/litellm/**'
       - 'cloudflare/litellm/**'
+      - 'lib/model-gateway/**'
+      - 'tests/model-gateway-litellm.test.ts'
       - '.github/workflows/cloudflare-litellm-image.yml'
   push:
     branches: [main]
@@ -48,6 +50,10 @@ jobs:
         run: |
           docker build --platform linux/amd64 -t mikka-litellm deploy/litellm
           bash deploy/litellm/offline-check.sh mikka-litellm
+      - name: Prove both CLI protocols through the built proxy
+        run: |
+          corepack pnpm install --frozen-lockfile --ignore-scripts
+          bash deploy/litellm/conversion-check.sh mikka-litellm
   publish:
     permissions:
       contents: read

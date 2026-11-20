@@ -78,7 +78,7 @@ export async function botModelMenu(
   const sharedOwners = [...new Set(keys.filter((key) => !key.mine).map((key) => key.ownerId))];
   const ownerNames = sharedOwners.length ? await memberNames(scope.workspaceId, sharedOwners) : new Map<string, string>();
   // Mikka 额度: every catalogue model, listed whenever the source is on; the balance is checked when a message is sent
-  // (decision 2026-11-15-1900). A self-hosted server lists the one model its own provider serves.
+  // (decision 2026-11-15-1900). A self-hosted server lists its LiteLLM default alias.
   const { hostedPointsHere } = await import("./points-fallback");
   const { creditsModels } = await import("./credits-models");
   const local = !isCloudEdition();
@@ -86,7 +86,7 @@ export async function botModelMenu(
   const { points } = local ? { points: 0 } : await hostedPointsHere(scope.workspaceId);
   const enabled = await hostedModelEnabled(pool, scope.ownerId) && (!local || target !== null);
   const usable = enabled && (local || points > 0);
-  const hostedSource = local ? target?.kind === "cloud" ? "cloud" as const : "self-hosted" as const : undefined;
+  const hostedSource = local ? "self-hosted" as const : undefined;
   const catalogue = enabled ? await creditsModels(scope.ownerId) : [];
   const creditsOption = (model: { id: string; name?: string; pricing?: { input: number; output: number } | null }, featured?: boolean): BotModelMenuOption => ({
     id: creditsOptionId(model.id), modelId: model.id, provider: "mikka", ...(model.name ? { name: model.name } : {}),

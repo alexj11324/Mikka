@@ -2,7 +2,7 @@
 // GitHub. Starts the local fake services (tests/mvp/services.mjs, with the
 // substitutes in scripts/dev-local/services.mjs), Vite + the API (hot reload) with a
 // preload that sends GitHub's API to the fake, and the daemon from source with
-// tsx. A workspace's own model key stays real; without a real AI_GATEWAY_API_KEY
+// tsx. A workspace's own model key stays real; without a configured LiteLLM service
 // or RESEND_API_KEY, Mikka 默认, Decisions and mail use the local substitutes.
 import { spawn, execFileSync } from 'node:child_process'
 import { generateKeyPairSync, randomUUID } from 'node:crypto'
@@ -17,10 +17,9 @@ import { localSecretsKey } from './dev-local/secrets-key.mjs'
 import { refreshQueue } from './dev-local/refresh-queue.mjs'
 import { stopOwnedServices, waitForApiReady } from './dev-local/shutdown.mjs'
 import { prepareLocalHarnesses } from './dev-local/prepare-harnesses.mjs'
-import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_ZEROCAT_KEY } from './dev-local/services.mjs'
+import { grantLocalCredits, localServiceRoutes, LOCAL_CRON_SECRET, LOCAL_RESEND_KEY, LOCAL_LITELLM_KEY, LOCAL_LITELLM_URL } from './dev-local/services.mjs'
 import { startMvpServices } from '../tests/mvp/services.mjs'
 import { MVP_SERVICES, REPOSITORY } from '../tests/mvp/isolated-env.mjs'
-import { MVP_DECISION_KEY } from '../tests/mvp/transport.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 if (process.env.MIKKA_DEV_SKIP_ENV_FILES !== '1') {
@@ -116,12 +115,10 @@ const preload = pathToFileURL(join(root, 'scripts/dev-local/preload.mjs')).href
 const apiProcess = watch(spawn(process.execPath, ['apps/api/scripts/dev.mjs', '--port', String(port)], {
   cwd: root, stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
   env: { ...childEnv, NODE_ENV: 'development', NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --import ${preload}`.trim(),
-    // A real key keeps the real service; without one the preload uses the local substitute.
-    AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY || MVP_DECISION_KEY,
+    // A configured LiteLLM stays real; otherwise the guarded fixture handles model calls.
+    MIKKA_LITELLM_URL: process.env.MIKKA_LITELLM_URL || LOCAL_LITELLM_URL,
+    MIKKA_LITELLM_MASTER_KEY: process.env.MIKKA_LITELLM_URL ? process.env.MIKKA_LITELLM_MASTER_KEY : LOCAL_LITELLM_KEY,
     RESEND_API_KEY: process.env.RESEND_API_KEY || LOCAL_RESEND_KEY,
-    // Mikka 默认 calls ZeroCat directly (lib/abuse/zerocat.ts); its fixed endpoint either way.
-    ZEROCAT_API_KEY: process.env.ZEROCAT_API_KEY || LOCAL_ZEROCAT_KEY,
-    ZEROCAT_BASE_URL: process.env.ZEROCAT_BASE_URL || 'https://zero.cat/v1',
     CRON_SECRET: cronSecret,
     // Saving a workspace's own model key needs it (lib/secrets/crypto.ts).
     WORKSPACE_SECRETS_KEY: secretsKey,

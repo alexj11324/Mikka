@@ -1,11 +1,11 @@
 import 'server-only'
 import { generateText } from 'ai'
-import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
+import { TITLE_MODEL } from '@/lib/coordinator/model'
 import { isCjk, parseShortTitle, shortTitlePrompt } from './short-title'
 import { withAiMetadata } from './tracing/ai'
 
-/** The small text model that names conversations, as Capy names its threads; the Coordinator's flash model. */
-const SHORT_TITLE_MODEL = COORDINATOR_MODEL
+/** Thread names use the independently managed title model. */
+const SHORT_TITLE_MODEL = TITLE_MODEL
 const SHORT_TITLE_TIMEOUT_MS = 10_000
 
 /**

@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { gatewayCostMicroUsd, readGatewayUsage } from './usage'
-import { upstreamRequest, VERCEL_GATEWAY_ORIGIN } from './upstream'
+import { upstreamRequest } from './upstream'
 import { parseGatewayFeatures, withoutDisabledFeatures } from './features'
-import { gatewayLiteLlm } from './config'
+import { gatewayLiteLlm, SELF_HOSTED_DEFAULT_CATALOG_ID } from './config'
+import { parseCreditsOption, creditsOptionId } from '../bot-model-menu-view'
 import { GatewayRefusal, handleModelGateway, type GatewayDependencies } from './handler'
 import type { GatewayGrant } from './token'
 import { PaidResourceError } from '@/lib/abuse/policy'
@@ -33,28 +34,36 @@ test('cost is the list price with no markup, cached input at the cache price', (
   assert.equal(gatewayCostMicroUsd({ pricing: null }, { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 }), null)
 })
 
-test('each source gets its own upstream; the run\'s model always replaces the CLI\'s', () => {
-  const clientHeaders = new Headers({ 'anthropic-version': '2023-06-01', 'anthropic-beta': 'tools', cookie: 'session=secret', 'x-api-key': 'mkg_run_token' })
-  const body = { model: 'claude-sonnet-5', max_tokens: 10, messages: [] }
-  const credits = upstreamRequest({ protocol: 'anthropic', operation: 'messages', model: 'deepseek/deepseek-v4-pro', body, clientHeaders, upstream: { kind: 'vercel', token: 'vercel-token' } })
-  assert.equal(credits.url, `${VERCEL_GATEWAY_ORIGIN}/claude-code/v1/messages`)
-  assert.equal(credits.headers.authorization, 'Bearer vercel-token')
-  assert.equal(credits.body.model, 'deepseek/deepseek-v4-pro')
-  assert.equal(credits.headers.cookie, undefined, 'nothing but protocol headers leaves Mikka')
-  assert.equal(credits.headers['x-api-key'], undefined, 'the run token never reaches a provider')
-  const codex = upstreamRequest({ protocol: 'openai', operation: 'responses', model: 'openai/gpt-5.5', body: { input: 'hi' }, clientHeaders: new Headers(), upstream: { kind: 'vercel', token: 't' } })
-  assert.equal(codex.url, `${VERCEL_GATEWAY_ORIGIN}/codex/v1/responses`)
-  const native = upstreamRequest({ protocol: 'anthropic', operation: 'count_tokens', model: 'deepseek-chat', body, clientHeaders, upstream: { kind: 'provider', baseUrl: 'https://api.deepseek.com/anthropic/', key: 'sk-user' } })
-  assert.equal(native.url, 'https://api.deepseek.com/anthropic/v1/messages/count_tokens')
-  assert.equal(native.headers['x-api-key'], 'sk-user')
-  const openai = upstreamRequest({ protocol: 'openai', operation: 'responses', model: 'gpt-5.5', body: {}, clientHeaders: new Headers(), upstream: { kind: 'provider', baseUrl: 'https://api.openai.com/v1', key: 'sk-user' } })
-  assert.deepEqual([openai.url, openai.headers.authorization], ['https://api.openai.com/v1/responses', 'Bearer sk-user'])
-  const converted = upstreamRequest({ protocol: 'openai', operation: 'responses', model: 'glm-5', body: { input: 'hi' }, clientHeaders: new Headers(),
-    upstream: { kind: 'litellm', url: 'http://litellm:4000', masterKey: 'internal', chatBaseUrl: 'https://open.bigmodel.cn/api/paas/v4/', key: 'sk-user' } })
-  assert.equal(converted.url, 'http://litellm:4000/v1/responses')
-  assert.equal(converted.headers.authorization, 'Bearer internal')
-  assert.deepEqual([converted.body.api_key, converted.body.api_base, converted.body.model], ['sk-user', 'https://open.bigmodel.cn/api/paas/v4', 'glm-5'])
-  assert.throws(() => upstreamRequest({ protocol: 'openai', operation: 'messages', model: 'm', body: {}, clientHeaders: new Headers(), upstream: { kind: 'vercel', token: 't' } }))
+test('credits and BYOK reach only LiteLLM; credentials and routing come from the server', () => {
+  const clientHeaders = new Headers({ 'anthropic-version': '2023-06-01', 'anthropic-beta': 'tools', cookie: 'session=secret', 'x-api-key': 'mkg_run_token', authorization: 'Bearer malicious' })
+  const upstream = { url: 'http://litellm:4000/', masterKey: 'internal' }
+  const body = { model: 'untrusted', max_tokens: 10, messages: [], api_key: 'attacker', api_base: 'https://attacker.test', custom_llm_provider: 'evil',
+    fallbacks: ['other-paid-model'], model_list: [{}], mock_response: 'fake answer', extra_headers: { authorization: 'attacker' },
+    metadata: { user_id: 'cli-user', _disable_fallbacks: false, api_key: 'attacker' } }
+  const credits = upstreamRequest({ protocol: 'anthropic', operation: 'messages', model: 'anthropic/claude-small', body, clientHeaders, upstream })
+  assert.equal(credits.url, 'http://litellm:4000/v1/messages')
+  assert.equal(credits.headers['x-litellm-api-key'], 'Bearer internal')
+  assert.equal(credits.headers['anthropic-beta'], 'tools')
+  assert.equal(credits.headers.cookie, undefined)
+  assert.equal(credits.headers['x-api-key'], undefined, 'the run token never leaves Mikka')
+  assert.equal(credits.headers.authorization, undefined)
+  assert.deepEqual(credits.body, { max_tokens: 10, messages: [], metadata: { user_id: 'cli-user' }, model: 'mikka-credits/anthropic/claude-small' })
+  const defaultChoice = parseCreditsOption(creditsOptionId(SELF_HOSTED_DEFAULT_CATALOG_ID))
+  assert.equal(defaultChoice, SELF_HOSTED_DEFAULT_CATALOG_ID)
+  assert.equal(upstreamRequest({ protocol: 'anthropic', operation: 'messages', model: defaultChoice, body, clientHeaders, upstream }).body.model, 'mikka-default')
+  const credential = { key: 'person-key', provider: 'anthropic' as const, apiBase: 'https://provider.test/' }
+  const counted = upstreamRequest({ protocol: 'anthropic', operation: 'count_tokens', model: 'claude-small', body, clientHeaders, upstream: { ...upstream, credential } })
+  assert.equal(counted.url, 'http://litellm:4000/v1/messages/count_tokens')
+  assert.deepEqual([counted.body.api_key, counted.body.api_base, counted.body.model, counted.body.custom_llm_provider], ['person-key', 'https://provider.test', 'anthropic/claude-small', 'anthropic'])
+  assert.equal(counted.body.disable_fallbacks, true, 'a failed personal key never falls back to a Mikka-paid deployment')
+  assert.equal(counted.body.num_retries, 0)
+  const codex = upstreamRequest({ protocol: 'openai', operation: 'responses', model: 'custom-model', body: { input: 'hi', stream: true, previous_response_id: 'previous' }, clientHeaders,
+    upstream: { ...upstream, credential: { key: 'person-key', provider: 'openai', apiBase: 'https://provider.test/v1/', chatCompletionsOnly: true } } })
+  assert.equal(codex.url, 'http://litellm:4000/v1/responses')
+  assert.equal(codex.body.model, 'openai/chat_completions/custom-model')
+  assert.equal(codex.body.stream, true)
+  assert.equal(codex.body.previous_response_id, 'previous')
+  assert.throws(() => upstreamRequest({ protocol: 'openai', operation: 'messages', model: 'm', body: {}, clientHeaders, upstream }))
 })
 
 test('turned-off features are removed before the request leaves', () => {
@@ -74,6 +83,7 @@ test('LiteLLM is configured only with a clean URL and a master key', () => {
   assert.equal(gatewayLiteLlm({ MIKKA_LITELLM_URL: 'http://litellm:4000/' }), null)
   assert.deepEqual(gatewayLiteLlm({ MIKKA_LITELLM_URL: 'http://litellm:4000/', MIKKA_LITELLM_MASTER_KEY: 'k' }), { url: 'http://litellm:4000', masterKey: 'k' })
   assert.equal(gatewayLiteLlm({ MIKKA_LITELLM_URL: 'http://user:pw@litellm:4000', MIKKA_LITELLM_MASTER_KEY: 'k' }), null)
+  assert.deepEqual(gatewayLiteLlm({ MIKKA_LITELLM_URL: 'https://models.example.test/proxy/v1/', MIKKA_LITELLM_MASTER_KEY: 'k' }), { url: 'https://models.example.test/proxy', masterKey: 'k' })
 })
 
 const grant = (over: Partial<GatewayGrant> = {}): GatewayGrant => ({ runId: '10000000-0000-4000-8000-000000000001', ownerId: 'alice', workspaceId: '10000000-0000-4000-8000-000000000002', harness: 'claude_code', model: 'anthropic/claude-sonnet-5.5', source: { kind: 'credits' }, ...over })
@@ -85,7 +95,7 @@ function harness(over: Partial<GatewayDependencies> & { answer?: () => Response 
       { type: 'message_delta', usage: { output_tokens: 100 } },
     ]), { headers: { 'content-type': 'text/event-stream' } })))() }) as typeof fetch,
     verify: async token => token === 'mkg_valid' ? grant() : null,
-    upstream: async () => ({ upstream: { kind: 'vercel', token: 'vercel-token' } }),
+    upstream: async () => ({ upstream: { url: 'http://litellm:4000', masterKey: 'internal' } }),
     reserve: async (_grant, id) => { calls.reserved.push(id) },
     settle: async (id, cost, usage) => { calls.settled.push([id, cost, usage]) },
     catalogue: async () => [{ id: 'anthropic/claude-sonnet-5.5', vendor: 'anthropic', name: 'Sonnet', contextWindow: null, maxTokens: null, pricing: { input: 3, output: 15 }, tags: [], reasoning: [] }],
@@ -103,7 +113,7 @@ test('Mikka 额度: the gateway holds credit, streams the answer through, then s
   const text = await response.text()
   assert.match(text, /message_delta/, 'the provider\'s stream reaches the CLI unchanged')
   assert.equal(calls.reserved.length, 1)
-  assert.equal(JSON.parse(String(calls.fetched[0].init.body)).model, 'anthropic/claude-sonnet-5.5')
+  assert.equal(JSON.parse(String(calls.fetched[0].init.body)).model, 'mikka-credits/anthropic/claude-sonnet-5.5')
   // 1000 input at $3/M + 100 output at $15/M = 3000 + 1500 micro-USD.
   assert.deepEqual(calls.settled.map(([id, cost]) => [id, cost]), [[calls.reserved[0], 4500]])
 })
@@ -132,8 +142,22 @@ test('a refused or failed provider call costs nothing; a key run is never metere
   const keyed = harness({ verify: async () => grant({ source: { kind: 'api_key', keyId: '10000000-0000-4000-8000-000000000003' }, model: 'deepseek-chat' }) })
   const response = await handleModelGateway(post({ messages: [] }), 'anthropic', 'messages', keyed.dependencies)
   await response.text()
-  assert.deepEqual([keyed.calls.reserved.length, keyed.calls.settled.length], [0, 0], 'the person\'s own key pays its provider directly')
+  assert.deepEqual([keyed.calls.reserved.length, keyed.calls.settled.length], [0, 0], 'the person\'s own key pays through LiteLLM without Mikka credits')
   const counted = harness()
   await (await handleModelGateway(post({ messages: [] }), 'anthropic', 'count_tokens', counted.dependencies)).text()
   assert.deepEqual([counted.calls.reserved.length, counted.calls.settled.length], [0, 0], 'counting tokens is free')
+})
+
+test('Codex streaming through LiteLLM retains usage and settles the same credit hold', async () => {
+  const { calls, dependencies } = harness({
+    verify: async () => grant({ harness: 'codex' }),
+    answer: () => new Response(sse([{ type: 'response.completed', response: { usage: { input_tokens: 20, output_tokens: 4 } } }]), { headers: { 'content-type': 'text/event-stream', 'x-litellm-model-api-base': 'https://private-provider.test' } }),
+  })
+  const response = await handleModelGateway(post({ model: 'untrusted', input: 'hi', stream: true, api_key: 'attacker', api_base: 'https://attacker.test' }), 'openai', 'responses', dependencies)
+  assert.equal(response.status, 200)
+  assert.match(await response.text(), /response.completed/)
+  assert.equal(calls.fetched[0].url, 'http://litellm:4000/v1/responses')
+  assert.equal(JSON.parse(String(calls.fetched[0].init.body)).api_base, undefined)
+  assert.equal(response.headers.get('x-litellm-model-api-base'), null, 'internal provider metadata stays behind the gateway')
+  assert.deepEqual(calls.settled.map(([id, cost]) => [id, cost]), [[calls.reserved[0], 120]])
 })
