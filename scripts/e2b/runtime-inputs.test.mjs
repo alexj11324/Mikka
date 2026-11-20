@@ -9,12 +9,14 @@ import { runtimeInputsDigest, pushRuntimeInputs, releaseDecision, findFailedInpu
 
 const digest = 'a'.repeat(40)
 const sha = 'b'.repeat(40)
+const repository = { full_name: 'alexj11324/Mikka', id: 1427517699, owner: { id: 183887963 } }
+const transferredRepository = { ...repository, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
 const options = { digest, token: 'test', currentRunId: 99 }
 const artifact = { name: `e2b-runtime-inputs-${digest}`, expired: false, created_at: '2026-11-09T20:01:00Z',
-  workflow_run: { id: 10, head_branch: 'main', head_sha: sha } }
+  workflow_run: { id: 10, repository_id: 1427517699, head_repository_id: 1427517699, head_branch: 'main', head_sha: sha } }
 const run = { id: 10, run_attempt: 2, head_sha: sha, head_branch: 'main', event: 'push',
   path: '.github/workflows/e2b-official-runtime.yml', status: 'completed', conclusion: 'failure',
-  run_started_at: '2026-11-09T20:00:00Z', repository: { full_name: 'alexj11324/Mikka' }, head_repository: { full_name: 'alexj11324/Mikka' } }
+  run_started_at: '2026-11-09T20:00:00Z', repository, head_repository: repository }
 const buildStep = 'Build private versioned candidates and require official file conservation'
 const gateStep = 'Require real Claude Code and Codex subscriptions on the private candidates'
 function api({ artifacts = [artifact], previousRun = run, steps = [{ name: buildStep, conclusion: 'failure' }], pages = 1 } = {}) {
@@ -221,12 +223,11 @@ test('a Cloudflare promotion compares against the last published release, not th
 })
 
 function publicationHistory({ name = 'release / templates', sourceCommit = 'd'.repeat(40),
-  workflowHead = 'e'.repeat(40), workerSha = 'c'.repeat(40), mutateReport = () => {} } = {}) {
+  workflowHead = 'e'.repeat(40), workerSha = 'c'.repeat(40), mutateReport = () => {}, recordedRepository = repository } = {}) {
   const started = new Date(Date.now() - 60_000).toISOString()
-  const repository = { id: 1427517699, full_name: 'alexj11324/Mikka' }
   const releaseRun = (id, headSha, extra = {}) => ({ id, run_attempt: 2, head_sha: headSha, head_branch: 'main',
     event: 'workflow_run', status: 'completed', conclusion: 'success', run_started_at: started,
-    path: '.github/workflows/e2b-official-runtime.yml', repository, head_repository: repository, ...extra })
+    path: '.github/workflows/e2b-official-runtime.yml', repository: recordedRepository, head_repository: recordedRepository, ...extra })
   const publishedRun = releaseRun(27, workflowHead, { event: 'workflow_dispatch' })
   const runs = [releaseRun(30, 'a'.repeat(40), { event: 'push' }), releaseRun(29, 'f'.repeat(40)),
     releaseRun(28, 'b'.repeat(40), { path: '.github/workflows/other.yml' }), publishedRun]
@@ -240,12 +241,12 @@ function publicationHistory({ name = 'release / templates', sourceCommit = 'd'.r
   mutateReport(report)
   const archive = execFileSync('python3', ['-c', 'import io,sys,zipfile\nb=io.BytesIO()\nwith zipfile.ZipFile(b,"w",zipfile.ZIP_DEFLATED) as z: z.writestr("release.json",sys.stdin.buffer.read())\nsys.stdout.buffer.write(b.getvalue())\n'],
     { input: JSON.stringify(report), stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 })
-  const root = 'https://api.github.com/repos/alexj11324/Mikka'
+  const root = 'https://api.github.com/repos/' + recordedRepository.full_name
   const artifact = { id: 321, name: 'e2b-release-evidence-27-2', expired: false, size_in_bytes: archive.length,
     created_at: new Date(Date.now() - 30_000).toISOString(), expires_at: new Date(Date.now() + 3600_000).toISOString(),
     digest: 'sha256:' + createHash('sha256').update(archive).digest('hex'),
     url: root + '/actions/artifacts/321', archive_download_url: root + '/actions/artifacts/321/zip',
-    workflow_run: { id: 27, repository_id: repository.id, head_repository_id: repository.id,
+    workflow_run: { id: 27, repository_id: recordedRepository.id, head_repository_id: recordedRepository.id,
       head_branch: 'main', head_sha: workflowHead } }
   const state = { runs, publication, artifacts: [artifact], detail: structuredClone(artifact),
     latest: structuredClone(publishedRun), archive, calls: [] }
@@ -256,6 +257,7 @@ function publicationHistory({ name = 'release / templates', sourceCommit = 'd'.r
       return new Response(state.archive)
     }
     assert.equal(url.origin, 'https://api.github.com')
+    assert.ok(url.pathname.startsWith('/repositories/1427517699/'), 'all authenticated reads use the fixed repository ID')
     assert.equal(init.headers.authorization, 'Bearer test')
     if (url.pathname.endsWith('/actions/workflows/e2b-official-runtime.yml/runs')) {
       assert.equal(url.searchParams.get('branch'), 'main')
@@ -268,8 +270,11 @@ function publicationHistory({ name = 'release / templates', sourceCommit = 'd'.r
       return Response.json({ total_count: 1, jobs: [state.publication] })
     if (url.pathname.endsWith('/actions/runs/27/artifacts'))
       return Response.json({ total_count: state.artifacts.length, artifacts: state.artifacts })
-    if (url.pathname.endsWith('/actions/artifacts/321/zip'))
+    if (url.pathname.endsWith('/actions/artifacts/321/zip')) {
+      assert.equal(url.pathname, '/repositories/1427517699/actions/artifacts/321/zip')
+      assert.equal(init.redirect, 'manual')
       return new Response(null, { status: 302, headers: { location: 'https://productionresultssa1.blob.core.windows.net/runtime-fixture.zip' } })
+    }
     if (url.pathname.endsWith('/actions/artifacts/321')) return Response.json(state.detail)
     if (url.pathname.endsWith('/actions/runs/27')) return Response.json(state.latest)
     assert.fail('Unexpected offline history request: ' + url.pathname)
@@ -358,4 +363,38 @@ test('missing, stale, foreign or corrupt publication evidence fails closed befor
     await assert.rejects(lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl }))
   }
   await assert.rejects(lastPublishedSource({ token: 'test', fetchImpl: async () => new Response('', { status: 403 }) }), /github:403/)
+})
+
+
+test('historical old and transferred failures are recognized through the immutable repository endpoint', async () => {
+  for (const recorded of [repository, transferredRepository]) {
+    const previousRun = { ...run, repository: recorded, head_repository: recorded }
+    const mock = api({ previousRun })
+    assert.equal(await findFailedInputs({ ...options, ...mock }), 10)
+    assert.ok(mock.calls.every(url => url.pathname.startsWith('/repositories/1427517699/')))
+    assert.equal(previousRun.repository.full_name, recorded.owner.id === 183887963 ? 'alexj11324/Mikka' : 'aspectly-labs/Mikka')
+  }
+})
+
+test('mixed and foreign historical identities cannot suppress a runtime retry', async () => {
+  for (const recorded of [
+    { ...repository, id: 1 }, { ...repository, full_name: 'foreign/Mikka' },
+    { ...repository, owner: { id: 359279274 } },
+    { ...repository, full_name: transferredRepository.full_name },
+  ]) {
+    for (const field of ['repository', 'head_repository'])
+      assert.equal(await findFailedInputs({ ...options, ...api({ previousRun: { ...run, [field]: recorded } }) }), null)
+  }
+})
+
+test('published source accepts official historical names and rejects incoherent repository claims', async () => {
+  for (const [recorded, expected] of [[repository, sha], [transferredRepository, sha],
+    [{ full_name: repository.full_name, id: repository.id }, sha],
+    [{ ...repository, id: 1 }, null], [{ ...repository, owner: { id: 359279274 } }, null],
+    [{ ...repository, full_name: 'foreign/Mikka' }, null]]) {
+    const mock = publicationHistory({ sourceCommit: sha, workflowHead: sha, recordedRepository: recorded })
+    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl }), expected)
+    assert.ok(mock.calls.filter(path => !path.endsWith('/runtime-fixture.zip'))
+      .every(path => path.startsWith('/repositories/1427517699/')))
+  }
 })

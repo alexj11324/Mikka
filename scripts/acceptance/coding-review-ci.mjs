@@ -5,6 +5,7 @@
 import { resolve } from 'node:path'
 import { attestAcceptance, assertArtifactIdentity, downloadReleaseReport, releasePins } from './task-secrets-ci.mjs'
 import { assertReleaseIdentity, selectRelease, REPOSITORY } from './thread-lifecycle-ci.mjs'
+import { publicRepositoryId } from '../cloudflare-source.mjs'
 
 const SHA = /^[a-f0-9]{40}$/
 const positive = value => typeof value === 'string' && /^[1-9][0-9]*$/.test(value) && Number.isSafeInteger(Number(value))
@@ -49,6 +50,7 @@ export async function attestCodingWorkspace(env = process.env, { fetchImpl = fet
   const expected = { sourceCommit: options.workerSourceCommit, runId: options.releaseRunId,
     runAttempt: options.releaseRunAttempt, workflowId: workflow.id, event: run.event }
   assertReleaseIdentity(expected, workflow, run)
+  const artifactExpected = { ...expected, repositoryId: Number(publicRepositoryId), repositoryFullName: REPOSITORY }
   const jobs = await read(`/actions/runs/${expected.runId}/attempts/${expected.runAttempt}/jobs?per_page=100`)
   const selection = selectRelease(expected, jobs, [])
   check(selection.runtime === 'validated_and_published' && selection.selected === true)
@@ -56,15 +58,15 @@ export async function attestCodingWorkspace(env = process.env, { fetchImpl = fet
   check(Array.isArray(listing?.artifacts) && listing.total_count === listing.artifacts.length && listing.total_count <= 100)
   const matches = listing.artifacts.filter(item => item.name === `e2b-release-evidence-${expected.runId}-${expected.runAttempt}`)
   check(matches.length === 1)
-  const listed = assertArtifactIdentity(expected, run, matches[0], now())
-  const artifact = assertArtifactIdentity(expected, run, await read(`/actions/artifacts/${listed.id}`), now())
+  const listed = assertArtifactIdentity(artifactExpected, run, matches[0], now())
+  const artifact = assertArtifactIdentity(artifactExpected, run, await read(`/actions/artifacts/${listed.id}`), now())
   check(JSON.stringify(artifact) === JSON.stringify(listed))
   const pins = releasePins(await download({ selected: true, artifact }, { token: env.GITHUB_TOKEN, fetchImpl }), expected, options.workerSha)
   check(pins.workerSourceCommit === options.workerSourceCommit && pins.templates.claude_code === options.templates.claude_code
     && pins.templates.codex === options.templates.codex)
   // An upstream rerun or artifact replacement invalidates this selection.
   assertReleaseIdentity(expected, workflow, await read(`/actions/runs/${expected.runId}`))
-  check(JSON.stringify(assertArtifactIdentity(expected, run, await read(`/actions/artifacts/${artifact.id}`), now())) === JSON.stringify(artifact))
+  check(JSON.stringify(assertArtifactIdentity(artifactExpected, run, await read(`/actions/artifacts/${artifact.id}`), now())) === JSON.stringify(artifact))
   const final = await attest(env, { fetchImpl })
   check(final.sourceCommit === options.sourceCommit && final.publicBuild === options.sourceCommit)
   return { kind: 'coding-workspace-release-attestation', sourceCommit: options.sourceCommit, publicBuild: options.sourceCommit,

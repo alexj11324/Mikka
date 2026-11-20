@@ -38,12 +38,15 @@ concurrency:
   group: mobile-native-production
   cancel-in-progress: false
 
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
+
 jobs:
   release:
     name: EAS iOS build and TestFlight
     if: >-
-      github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&
-      github.repository_id == '1427517699' && github.repository_owner_id == '183887963'
+      (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     permissions:
@@ -85,6 +88,12 @@ jobs:
       - name: Validate the official UI pin before credential access
         if: steps.source.outputs.build_id == ''
         run: node -e "if (!/^[a-f0-9]{40}$/.test(process.env.OVERLAY_SHA || '')) process.exit(1)"
+      - name: Validate the selected private UI owner before credential access
+        run: |
+          node --input-type=module - <<'JS'
+          import { privateMikkaRepository } from './scripts/cloudflare-source.mjs'
+          privateMikkaRepository('mikka-hosted-ui')
+          JS
       - name: Read existing HOSTED_UI_READ_KEY through OIDC
         if: steps.source.outputs.build_id == ''
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -102,7 +111,7 @@ jobs:
         if: steps.source.outputs.build_id == ''
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: alexj11324/mikka-hosted-ui
+          repository: ${{ format('{0}/mikka-hosted-ui', vars.MIKKA_HOSTED_UI_GITHUB_OWNER || vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324') }}
           ref: ${{ env.OVERLAY_SHA }}
           ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui

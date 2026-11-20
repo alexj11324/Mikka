@@ -177,8 +177,9 @@ function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event
     assert.equal(options.redirect, 'error')
     const url = new URL(input)
     assert.equal(url.origin, 'https://api.github.com')
-    assert.equal(url.pathname.startsWith('/repos/' + REPOSITORY + '/'), true)
-    const route = url.pathname.slice(('/repos/' + REPOSITORY).length) + url.search
+    const main = url.pathname === '/repositories/1427517699/git/ref/heads/main'
+    assert.equal(main || url.pathname.startsWith('/repos/' + REPOSITORY + '/'), true)
+    const route = main ? '/git/ref/heads/main' : url.pathname.slice(('/repos/' + REPOSITORY).length) + url.search
     calls.push(route)
     if (route === '/actions/workflows/e2b-official-runtime.yml') return Response.json(workflow)
     if (route === '/actions/runs/123') return Response.json({ ...run, event: releaseEvent, run_attempt: rerun && ++runs > 1 ? 3 : 2 })

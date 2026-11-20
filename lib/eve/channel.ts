@@ -16,9 +16,9 @@ const capturedScope = z.object({
   expectedWorkspaceId: z.uuid().transform(value => value.toLowerCase()).optional(),
 })
 
-async function readSessionBody(request: Request) {
+async function readSessionBody(request: Request, allowEmpty: boolean) {
   try {
-    return body.parse(request.body ? await readPersonalSubmissionBody(request) : {})
+    return body.parse(request.body ? await readPersonalSubmissionBody(request, allowEmpty) : {})
   } catch (error) {
     if (error instanceof PersonalSubmissionBodyError || error instanceof z.ZodError) {
       return Response.json({ ok: false, error: 'messageRequired' }, { status: error instanceof PersonalSubmissionBodyError ? error.status : 400 })
@@ -71,11 +71,12 @@ export function mikkaEveChannel() {
     ...base.routes.map(route => route.transport === 'websocket' || !route.path.startsWith('/eve/v1/session') ? route : {
       ...route,
       async handler(request: Request, args: RouteHandlerArgs) {
-        const isSubmit = route.method === 'POST' && (route.path === '/eve/v1/session' || route.path === '/eve/v1/session/:sessionId')
+        const isCreate = route.method === 'POST' && route.path === '/eve/v1/session'
+        const isSubmit = isCreate || (route.method === 'POST' && route.path === '/eve/v1/session/:sessionId')
         let input: z.infer<typeof body> = {}
         let bodyRefusal: Response | undefined
         const auth = await authenticateEveRequest(request, isSubmit ? async () => {
-          const parsed = await readSessionBody(request)
+          const parsed = await readSessionBody(request, isCreate)
           if (parsed instanceof Response) { bodyRefusal = parsed; return null }
           input = parsed
           if (parsed.message === undefined) return {}
@@ -89,7 +90,7 @@ export function mikkaEveChannel() {
         if (bodyRefusal) return bodyRefusal
         if (!auth) return Response.json({ ok:false,error:'authRequired' }, { status:401 })
         const scope = scopeFromAuth(auth)
-        if (route.method === 'POST' && route.path === '/eve/v1/session') {
+        if (isCreate) {
           const session = await sessionFor(args,scope)
           await registerSession(scope,session.id)
           if (input.message === undefined) return Response.json({ ok:true, sessionId:session.id })

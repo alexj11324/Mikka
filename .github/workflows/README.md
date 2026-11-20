@@ -57,10 +57,16 @@ adding or duplicating regression suites.
 
 There are two intentionally different classes of PR checks:
 
-- **Required checks always run**, even on drafts: `UI policy (strict)`,
-  `Production build and browser interactions`, `Browser tests (before merge)`
-  and external GitGuardian. A skipped required job can be reported as
-  successful by GitHub, so draft status must never authorize a bypass.
+- **Required check names never become false green on drafts**: in the main `CI`
+  workflow, the lightweight selector and required aggregators (`UI policy
+  (strict)`, `Production build and browser interactions`) run on Draft PRs;
+  those aggregators explicitly **fail** until the PR is Ready. Core, Integration,
+  Source, Daemon, Analytics, Governance and DB runner-heavy jobs are deferred.
+  `ready_for_review` re-runs the complete applicable protected verification
+  even if the commit SHA has not changed. `Browser tests (before merge)` and
+  external GitGuardian retain their original workflows. A skipped required
+  job can be reported successful by GitHub; these named aggregators must never
+  skip or accept the draft as complete.
 - **Non-required specialized acceptances** (`E2B additive runtime release`
   offline PR test, E2B subscription custody, Read cache API acceptance,
   SSH device backend, Site search read contract and Unattended sandbox
@@ -74,8 +80,10 @@ There are two intentionally different classes of PR checks:
   and TestFlight-oriented review. Other specialized evidence may have its
   own intentional manual or source-version trigger.
 
-This reduces runner allocation without mistaking a draft-only skipped result
-for proof that a ready PR is safe to merge.
+This reduces runner allocation during the local red→green cycle without
+mistaking a draft-only skipped result for proof that a Ready PR is safe to
+merge. Draft check failure means "not yet a merge candidate," not an ordinary
+product regression. Main pushes and merge groups continue normal full coverage.
 
 ## Main pushes: postmerge checks
 
@@ -156,7 +164,9 @@ The previous published worker source comes from the successful publication's
 `e2b-release-evidence-RUN-ATTEMPT` artifact. The reader recognizes `templates`
 and historical `subscriptions` jobs, verifies their original attempt and report,
 and compares the report's `sourceCommit`: a later workflow head can publish an
-earlier served commit. Missing, expired or inconsistent publication evidence
+earlier served commit. It reuses the official repository identity and downloads
+by immutable repository ID, retaining the report's original recorded identity.
+Missing, expired or inconsistent publication evidence
 fails the automatic comparison before a paid builder starts. The explicit manual
 retry below remains available to the release owner. Source and regression
 boundaries are recorded in the [runtime reuse evidence](../../docs/ci/2984-runtime-reuse.json).

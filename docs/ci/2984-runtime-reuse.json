@@ -10,10 +10,19 @@
   "regressionCheckpoint": "d86dade94a7977c14e073820dc8c98e22d27f475",
   "sourceBlobs": {
     "before": "caf1450463e6293c82ef9c012808b0edfaf00183",
-    "after": "a230dbc02dd3882799690f185163fe32db4bf374",
-    "nodeRegression": "f77fd0c802315eab6b74f743b06a8c29edd9b2d9",
-    "artifactIdentityAndDownload": "a55edb760f77913f12595e476e55b9f47645f35c",
-    "reportIdentity": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f"
+    "initialRepairAt46cc": "a230dbc02dd3882799690f185163fe32db4bf374",
+    "initialNodeRegressionAt46cc": "f77fd0c802315eab6b74f743b06a8c29edd9b2d9",
+    "artifactReaderBeforeIntegration": "a55edb760f77913f12595e476e55b9f47645f35c",
+    "reportIdentity": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f",
+    "integratedImplementation": {
+      "scripts/e2b/runtime-inputs.mjs": "fd3f919d955f547db24f175a4bfdae8057a49a95",
+      "scripts/e2b/runtime-inputs.test.mjs": "2cd378b4161da15993ff0fa0408c1ea906f434eb",
+      "scripts/acceptance/task-secrets-ci.mjs": "f5e11abae81d4409ccb7f16c875ce640e4dee0ae",
+      "scripts/acceptance/task-secrets-ci.test.mjs": "9d46d4a1263095c75419dbc46d7ffb61cf6ad6da",
+      "scripts/acceptance/coding-review-ci.mjs": "3df22561dea3e818222aa501a6fa5dd0ad30404b",
+      "scripts/acceptance/coding-review-ci.test.mjs": "0834c0a27a9cdc060dfe5f461a9714c7920a4f71",
+      "scripts/acceptance/factory-visual-evidence.mjs": "09c9a4cc89d05d01b115e982e4490464616553c6"
+    }
   },
   "problem": "The history reader ignores the official templates publication job and treats the workflow head as the published worker source, even though a later main dispatch can publish an earlier served source.",
   "existingPublication": {
@@ -211,22 +220,187 @@
           "httpReads": 5,
           "archiveTransportCalls": 1
         }
-      ]
+      ],
+      "sourceCommit": "46cc2c27d169d7d70c5946b94cca56688ea391aa"
     },
-    "measurement": "For this one fixed run/jobs metadata sample the original reader returns null; the repaired source-only path returns the logged served source with a synthetic report transport fixture. This does not measure wall-time or paid-resource savings."
+    "measurement": "For this one fixed run/jobs metadata sample the original reader returns null; the repaired source-only path returns the logged served source with a synthetic report transport fixture. This does not measure wall-time or paid-resource savings.",
+    "qualification": "Historical first-pass source-only evidence at 46cc while the execution machine was unavailable. The later original Node results below supersede the unexecuted-Node status; V8 assertions are not counted as Node tests."
   },
   "nodeRegression": {
-    "command": "node --test scripts/e2b/runtime-inputs.test.mjs",
-    "declaredTests": 16,
-    "status": "authored_not_executed",
-    "reason": "The shared execution environment became unavailable during the first local test command. No local exit or completion receipt was returned. Node-only archive/hash/Python and canonical Git worker-input regressions are not claimed passed."
+    "status": "local_offline_passed_protected_ci_pending",
+    "validationRuntime": "Node 24.22.3 / Python 3.12.14; original CI-pinned tsx 4.23.15 and zod 4.6.7, with the original protocol workspace linked; no application install/build",
+    "before": {
+      "head": "d86dade94a7977c14e073820dc8c98e22d27f475",
+      "tree": "942a2d1637cb2998a5393ef49cd17dfff5da0a21",
+      "production_blob": "caf1450463e6293c82ef9c012808b0edfaf00183",
+      "test_blob": "09b20cede208860b58561969171a3da211f9ac0b",
+      "command": [
+        "node",
+        "--test",
+        "scripts/e2b/runtime-inputs.test.mjs"
+      ],
+      "node": "v24.22.3",
+      "python": "Python 3.12.14",
+      "started_at": "2026-11-20T23:42:34.312206+00:00",
+      "completed_at": "2026-11-20T23:42:37.152587+00:00",
+      "wall_seconds": 2.8403613909999876,
+      "exit_code": 1,
+      "summary": {
+        "tests": 13,
+        "suites": 0,
+        "pass": 12,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2739.079292
+      },
+      "log_sha256": "c35b92bd4d3d79ffae73d20ed8ca15c39f99d09f671d70c0e1e29231ab6119eb",
+      "log_bytes": 2334,
+      "source_unchanged": true,
+      "worktree_status_before": "",
+      "worktree_status_after": "",
+      "scope": "First actual original Node suite execution at the RED checkpoint. No source edits, model calls, dispatches or provider resources.",
+      "receiptSha256": "c0809a2f1842cc207fd6fc2e96623d037e79e5015608f47c82314ec026e3cf55",
+      "failure": "The sole publication-history test returned null for the templates job instead of its expected published source."
+    },
+    "runtimeGreen": {
+      "scope": "Original Node suite, real local Git worker inputs and Python ZIP/digest path with closed HTTP fixtures. Three original transfer-owner tests are retained, so the post-integration denominator is 19 rather than the earlier 16.",
+      "head": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+      "mergeParent": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "indexTree": "02320d8d34193730048ae7fc47a9d63d15ece7bd",
+      "node": "v24.22.3",
+      "command": [
+        "node",
+        "--test",
+        "scripts/e2b/runtime-inputs.test.mjs"
+      ],
+      "startedAt": "2026-11-20T23:44:16.769465+00:00",
+      "exitCode": 0,
+      "wallSeconds": 4.977104458000213,
+      "completedAt": "2026-11-20T23:44:21.746588+00:00",
+      "logSha256": "07d5a68cd06540c0741a50c1be5acf252fcf3a3372619e701bf04996c1d7c107",
+      "summary": {
+        "tests": 19,
+        "pass": 19,
+        "fail": 0,
+        "skipped": 0
+      },
+      "productionBlob": "fd3f919d955f547db24f175a4bfdae8057a49a95",
+      "testBlob": "2cd378b4161da15993ff0fa0408c1ea906f434eb"
+    },
+    "initialConsumerAttempt": {
+      "scope": "Local integrated working tree before commit; original offline acceptance guards only",
+      "head": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+      "mergeParent": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "indexTree": "9f892b2d117abf9e1eb02628aa55ad85e2f4d571",
+      "node": "v24.22.3",
+      "tsx": "4.23.15",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs",
+        "scripts/acceptance/coding-review-ci.test.mjs",
+        "scripts/acceptance/factory-visual-evidence.test.mjs"
+      ],
+      "startedAt": "2026-11-20T23:47:17.703861+00:00",
+      "exitCode": 1,
+      "wallSeconds": 1.711037837999811,
+      "completedAt": "2026-11-20T23:47:19.414933+00:00",
+      "logSha256": "977b0235d0d17d149726364c176597c6e09167f5dd602a45e311db7780ad2aa3",
+      "summary": {
+        "records": 27,
+        "pass": 26,
+        "fail": 1,
+        "skipped": 0
+      },
+      "cause": "The 16-case task-secrets file could not load because the restored minimal environment lacked the original @mikka/protocol workspace link. The separate coding-review (4) and Factory (22) tests passed, including the original FFmpeg byte-determinism case.",
+      "correction": "Restore the original workspace link and pinned zod 4.6.7; do not install or run the application."
+    },
+    "taskSecretFixtureFailure": {
+      "scope": "Original task-secrets offline guard suite after restoring pinned zod and the existing protocol workspace link; no production/model/network acceptance",
+      "head": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+      "mergeParent": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "indexTree": "9f892b2d117abf9e1eb02628aa55ad85e2f4d571",
+      "node": "v24.22.3",
+      "tsx": "4.23.15",
+      "zod": "4.6.7",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs"
+      ],
+      "startedAt": "2026-11-20T23:51:01.522178+00:00",
+      "exitCode": 1,
+      "wallSeconds": 2.763606935000098,
+      "completedAt": "2026-11-20T23:51:04.285807+00:00",
+      "logSha256": "c2cf944d10739ba57039afa6c2010a189cb979ea171fb80062bb47c19336dae9",
+      "summary": {
+        "tests": 16,
+        "pass": 14,
+        "fail": 2,
+        "skipped": 0
+      },
+      "cause": "After normal integration, the test main-ref mock still expected the mutable repository URL while the original owner web-deploy helper used the immutable repository endpoint. The real CLI fixture also omitted the newly imported cloudflare-source module.",
+      "correction": "Use the exact immutable main-ref and archive URLs in the closed fixture and copy the actual cloudflare-source dependency. All original positive and refusal assertions remain."
+    },
+    "taskSecretGreen": {
+      "scope": "Original task-secrets offline guard suite after exact fixture route/dependency integration; all original assertions retained",
+      "head": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+      "mergeParent": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "indexTree": "187979b6ea68eab5b7716d27c76f2a52f20d1d7a",
+      "node": "v24.22.3",
+      "tsx": "4.23.15",
+      "zod": "4.6.7",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs"
+      ],
+      "startedAt": "2026-11-20T23:51:57.530604+00:00",
+      "exitCode": 0,
+      "wallSeconds": 3.9277578860001086,
+      "completedAt": "2026-11-20T23:52:01.458382+00:00",
+      "logSha256": "c34ad2e0e6525815f9a75975dabc5dabb191f7483fb03429f2495fef3d232e98",
+      "summary": {
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "skipped": 0
+      },
+      "helperBlob": "f5e11abae81d4409ccb7f16c875ce640e4dee0ae",
+      "testBlob": "9d46d4a1263095c75419dbc46d7ffb61cf6ad6da"
+    },
+    "passedUnaffectedConsumerCases": {
+      "codingReview": 4,
+      "factoryVisualEvidence": 22,
+      "skipped": 0,
+      "sourceIndexTree": "9f892b2d117abf9e1eb02628aa55ad85e2f4d571",
+      "logSha256": "977b0235d0d17d149726364c176597c6e09167f5dd602a45e311db7780ad2aa3",
+      "qualification": "These 26 original cases completed successfully in the recorded multi-file command even though task-secrets failed to load. This is not a claim that the whole command passed."
+    },
+    "scope": "Only original offline suites with closed network fixtures. No live subscription, E2B, release, database, browser session or production acceptance. Final commit review and real protected CI are separate gates."
   },
   "ownership": [
     {
       "pr": 2821,
       "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
       "checkedFiles": 107,
-      "relationship": "Runtime inputs files are absent from its diff; its report-retention and attestation work is separate."
+      "relationship": "Runtime inputs files are absent from its diff; its report-retention and attestation work is separate.",
+      "recheckedAt": "2026-11-20T23:53:17.217632+00:00",
+      "currentReaderBlobs": {
+        "scripts/acceptance/task-secrets-ci.mjs": "a55edb760f77913f12595e476e55b9f47645f35c",
+        "scripts/acceptance/thread-lifecycle-ci.mjs": "625a96191e7c272c08b7a9f9db723a5f00cf0bbd",
+        "scripts/acceptance/coding-review-ci.mjs": "393d89d09e9ec0df529653c33c775aa85e3aa328",
+        "scripts/acceptance/factory-visual-evidence.mjs": "61fd9e3898cc6d5002ef472def96c6cdcac1582a"
+      },
+      "currentReaderQualification": "Fresh reads of the unchanged current #2821 head retain the legacy full-name guards/API paths and the old shared artifact reader. This PR neither replaces that owner work nor claims that all acceptance consumers have migrated."
     },
     {
       "pr": 2978,
@@ -243,6 +417,7 @@
   ],
   "retainedBoundaries": [
     "Fixed official workflow/repository and main history",
+    "Reuse the original owner official repository profile and bind both names and immutable repository IDs before reading artifact bytes",
     "Successful exact-attempt publication job and step",
     "Existing artifact identity, expiry, size, digest and bounded ZIP reader",
     "Existing complete runtime-report source/run/attempt/template identity",
@@ -250,9 +425,54 @@
     "No workflow, permission, timeout, trigger, publisher or model-policy change"
   ],
   "remaining": [
-    "Full original Node suites and applicable protected CI",
-    "Independent review of the current head",
+    "Independent review and applicable protected CI on the final current head",
     "Normal merge and exact merged-source verification by the root coordinator",
-    "No claim of production acceptance or measured paid-build savings"
-  ]
+    "Existing acceptance-consumer top-level identity migration remains a separately tracked owner dependency",
+    "No claim of production acceptance, real subscription execution or measured paid-build savings"
+  ],
+  "repositoryTransferIntegration": {
+    "mergedMain": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+    "previousBranchHead": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+    "method": "Normal two-parent integration; preserve the original owner officialMikkaRepository/publicRepositoryId implementation and immutable history routes, without a second identity profile.",
+    "officialIdentityBlob": "e1c7817f533fcb0b85f543e99aba25f8d0af7beb",
+    "repositoryId": 1427517699,
+    "currentRepository": "aspectly-labs/Mikka",
+    "readerFailure": {
+      "schema": "mikka-2984-independent-node-native-identity-red-v1",
+      "head": "d86dade94a7977c14e073820dc8c98e22d27f475",
+      "tree": "942a2d1637cb2998a5393ef49cd17dfff5da0a21",
+      "helper_blob": "a55edb760f77913f12595e476e55b9f47645f35c",
+      "node": "v24.22.3",
+      "started_at": "2026-11-20T23:52:09.896Z",
+      "completed_at": "2026-11-20T23:52:09.926Z",
+      "native_metadata_sha256": "a258506911eb42cfe73520f5f842a104bea06e01ca3784d122f7ab9d5963141c",
+      "native_metadata_refusal": "task_secret_ci:artifact_identity",
+      "diagnostic_only_old_owner_url_copy_accepted": 14354323589,
+      "tracked_source_changed": false,
+      "scope": "Original helper imported under Node. Native metadata rejected; changing only two URL owner spellings in a disposable in-memory diagnostic copy passes. No production metadata rewritten, no archive/network/deployment/provider/model operation.",
+      "identity_assertions": 3,
+      "checkout_assertions": 3,
+      "receiptSha256": "a7115c41efae84d01be575530320ae11a27a03e993a34854f687d4e0c0210426"
+    },
+    "repair": "The shared reader requires the caller-pinned official repository ID and full name after the existing official-run guard. It binds run/head/artifact IDs and unmodified native metadata URLs, then downloads only through the fixed immutable repository ID. Missing/foreign IDs fail before a request; storage receives no GitHub token.",
+    "negativeCoverage": [
+      "missing/string/unsafe expected repository ID",
+      "missing or foreign expected name",
+      "run/head ID or name mismatch",
+      "artifact run/head repository mismatch",
+      "foreign or stale metadata URLs",
+      "expired/missing/duplicate artifacts",
+      "changed detail digest or archive bytes",
+      "old report or newer native run attempt",
+      "non-public or unready template",
+      "missing/foreign legacy download proof",
+      "untrusted storage URL and credential forwarding"
+    ],
+    "callerCompatibility": [
+      "scripts/acceptance/task-secrets-ci.mjs",
+      "scripts/acceptance/coding-review-ci.mjs",
+      "scripts/acceptance/factory-visual-evidence.mjs"
+    ],
+    "callerScope": "Only the new shared artifact-reader contract is adapted in these three existing callers after their original guards. Their legacy top-level repository identity/route migration is not implemented or claimed accepted by this PR."
+  }
 }

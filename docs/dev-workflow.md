@@ -15,8 +15,17 @@ any time, and opening one never waits for, or stops, local building and
 verification.
 
 CI is the final gate, not the place to find out whether something works.
+**Development loop:** reproduce the failure on the actual local API, CLI,
+daemon or UI, run focused checks red→green, then build and verify the affected
+application locally against isolated inputs. Make small commits and push early
+Draft PR checkpoints for crash recovery, **but keep debugging locally rather
+than treating every Draft push/Actions run as another experiment**. A Draft
+runs lightweight required aggregators that fail closed; switch to Ready only
+after local proof, which triggers the complete protected CI on that same SHA.
+A remote failure that can be reproduced locally returns to the local loop;
+commit the fix, verify it locally, and request the final protected result again.
 Nobody sits waiting on CI, a merge or a deploy to check what can be checked
-locally. Push, open the PR and keep working; read CI when it reports.
+locally. External-only release and OAuth checks keep their original ownership.
 
 Ordinary acceptance follows [`acceptance.md`](acceptance.md): a local
 application, a real isolated database and, when the flow uses one, a real

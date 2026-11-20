@@ -3,10 +3,12 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 import { assertArtifactIdentity, downloadReleaseReport } from '../acceptance/task-secrets-ci.mjs'
 import { assertReportIdentity, TEMPLATE_KINDS } from './runtime-report.mjs'
 
-const REPOSITORY = 'alexj11324/Mikka'
+const officialRepository = repository => officialMikkaRepository(repository?.full_name, String(repository?.id),
+  repository?.owner?.id === undefined ? undefined : String(repository.owner.id))
 const WORKFLOW = '.github/workflows/e2b-official-runtime.yml'
 const FAILURE_STEPS = new Set([
   'Build private versioned candidates and require official file conservation',
@@ -75,13 +77,14 @@ export async function lastPublishedSource({ token, fetchImpl = fetch, maxRuns = 
 
 function publicationRun(run) {
   return id(run.id) && id(run.run_attempt) && run.path === WORKFLOW && run.head_branch === 'main'
-    && run.repository?.full_name === REPOSITORY && run.head_repository?.full_name === REPOSITORY
+    && officialRepository(run.repository) && officialRepository(run.head_repository)
     && run.status === 'completed' && run.conclusion === 'success'
     && ['workflow_dispatch', 'workflow_run'].includes(run.event) && /^[a-f0-9]{40}$/.test(run.head_sha ?? '')
 }
 
 async function publishedSourceFromReport(run, options) {
-  const expected = { sourceCommit: run.head_sha, runId: run.id, runAttempt: run.run_attempt }
+  const expected = { sourceCommit: run.head_sha, runId: run.id, runAttempt: run.run_attempt,
+    repositoryId: Number(publicRepositoryId), repositoryFullName: run.repository.full_name }
   const artifacts = []
   for await (const artifact of pages(`/actions/runs/${run.id}/artifacts`, 'artifacts', options)) {
     if (artifact.name === `e2b-release-evidence-${run.id}-${run.run_attempt}`) artifacts.push(artifact)
@@ -108,7 +111,7 @@ async function publishedSourceFromReport(run, options) {
 
 async function githubRead(path, { token, fetchImpl }) {
   if (!token) throw Error('runtimeInputs:githubTokenRequired')
-  const response = await fetchImpl(`https://api.github.com/repos/${REPOSITORY}${path}`, {
+  const response = await fetchImpl(`https://api.github.com/repositories/${publicRepositoryId}${path}`, {
     headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
     signal: AbortSignal.timeout(20_000), redirect: 'error', cache: 'no-store',
   })
@@ -142,7 +145,7 @@ export async function findFailedInputs({ digest, currentRunId, token, fetchImpl 
       || source.head_branch !== 'main' || !/^[a-f0-9]{40}$/.test(source.head_sha ?? '')) continue
     const run = await githubRead(`/actions/runs/${source.id}`, options)
     if (run.id !== source.id || run.path !== WORKFLOW || run.head_branch !== 'main' || run.head_sha !== source.head_sha
-      || run.repository?.full_name !== REPOSITORY || run.head_repository?.full_name !== REPOSITORY
+      || !officialRepository(run.repository) || !officialRepository(run.head_repository)
       || !['push', 'workflow_dispatch', 'workflow_run'].includes(run.event)
       || !(run.status === 'completed' && run.conclusion === 'failure' || run.status === 'in_progress' && run.conclusion === null)
       || !id(run.run_attempt) || !(Date.parse(artifact.created_at) >= Date.parse(run.run_started_at))) continue

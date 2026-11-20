@@ -9,6 +9,7 @@ const product = 'abc1234'.padEnd(40, '5'), overlay = 'c'.repeat(40), releasePin 
 const verified = Date.parse('2026-11-10T10:00:00.100Z')
 const iso = offset => new Date(verified + offset).toISOString()
 const repo = 'alexj11324/Mikka', issue = 'https://api.github.com/repos/' + repo + '/issues/1954'
+const api = '/repositories/1427517699'
 const workflow = '.github/workflows/e2b-official-runtime.yml'
 
 function fixture(change = {}) {
@@ -22,9 +23,9 @@ function fixture(change = {}) {
     outcome: 'promoted', ...change.record }
   const raw = change.raw?.(record) ?? JSON.stringify(record)
   const post = { ...owner, id: 81, body: 'MIKKA_CLOUDFLARE_WEB_PROMOTION_V1\n' + raw, ...change.post }
-  const env = { GITHUB_REPOSITORY: repo, GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: product,
+  const env = { GITHUB_REPOSITORY: repo, GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: product,
     GITHUB_RUN_ID: '55', GITHUB_RUN_ATTEMPT: '2', GITHUB_TOKEN: 'test', CLOUDFLARE_RECEIPT: '81-' + digest(post.body), ...change.env }
-  const started = { repository: { full_name: repo }, event: 'workflow_dispatch', path: workflow, head_sha: product, head_branch: 'main',
+  const started = { repository: { id: 1427517699, full_name: repo, owner: { id: 183887963 } }, event: 'workflow_dispatch', path: workflow, head_sha: product, head_branch: 'main',
     id: 55, run_attempt: 2, run_started_at: iso(30000), ...change.run }
   const anchor = { name: '_mikka-release.aspectlylabs.com.', type: 16, data: '"mikka-release-v1=sha256:' + digest(raw) + '"' }
   const calls = []
@@ -36,20 +37,20 @@ function fixture(change = {}) {
     if (u.origin === 'https://api.github.com') {
       if (change.observation && u.pathname.includes('/actions/runs/99/attempts/1')) return Response.json(u.pathname.endsWith('/jobs') ? change.observation.jobs : change.observation.run)
       assert.equal(options.headers.authorization, 'Bearer test')
-      if (u.pathname === '/repos/' + repo + '/compare/' + product + '...main') {
+      if (u.pathname === api + '/compare/' + product + '...main') {
         return Response.json({ status: (change.main ?? product) === product ? 'identical' : 'ahead', merge_base_commit: { sha: product }, ...change.served })
       }
       if (u.pathname.includes('/compare/')) {
-        const path = '/repos/' + repo + '/compare/' + env.GITHUB_SHA + '...' + product
+        const path = api + '/compare/' + env.GITHUB_SHA + '...' + product
         assert.equal(u.pathname, path)
         assert.equal(u.searchParams.get('per_page'), '1')
-        return Response.json({ url: 'https://api.github.com' + path, base_commit: { sha: env.GITHUB_SHA },
+        return Response.json({ url: 'https://api.github.com/repos/' + repo + '/compare/' + env.GITHUB_SHA + '...' + product, base_commit: { sha: env.GITHUB_SHA },
           merge_base_commit: { sha: env.GITHUB_SHA }, status: 'ahead', ahead_by: 1, behind_by: 0, ...change.comparison })
       }
-      const body = { ['/repos/' + repo + '/issues/comments/81']: post, ['/repos/' + repo + '/issues/comments/80']: prior,
-        ['/repos/' + repo + '/actions/runs/55/attempts/2']: started,
-        ['/repos/' + repo + '/git/ref/heads/main']: { object: { type: 'commit', sha: change.main ?? product } },
-        ['/repos/' + repo + '/releases/latest']: change.latestRelease ?? { target_commitish: 'f'.repeat(40) } }[u.pathname]
+      const body = { [api + '/issues/comments/81']: post, [api + '/issues/comments/80']: prior,
+        [api + '/actions/runs/55/attempts/2']: started,
+        [api + '/git/ref/heads/main']: { object: { type: 'commit', sha: change.main ?? product } },
+        [api + '/releases/latest']: change.latestRelease ?? { target_commitish: 'f'.repeat(40) } }[u.pathname]
       assert.ok(body, u.pathname)
       return Response.json(body)
     }
@@ -76,7 +77,7 @@ test('revalidates the live promoted Web on the original dispatch after 3976 seco
     const f = fixture({ elapsed })
     assert.deepEqual(await f.verify(), { product, releasePin })
     assert.equal(f.calls.length, 7)
-    assert.equal(f.calls.at(-1), '/repos/' + repo + '/compare/' + product + '...main')
+    assert.equal(f.calls.at(-1), api + '/compare/' + product + '...main')
   }
 })
 test('rejects dispatch, owner, hash, inventory, timing and current-main changes', async () => {
@@ -109,7 +110,7 @@ test('a later main dispatch publishes the served product only when it is already
   const head = '7'.repeat(40), env = { GITHUB_SHA: head }, run = { head_sha: head }
   const later = fixture({ env, run, main: head })
   assert.deepEqual(await later.verify(), { product, releasePin })
-  assert.ok(later.calls.includes('/repos/' + repo + '/compare/' + product + '...main'))
+  assert.ok(later.calls.includes(api + '/compare/' + product + '...main'))
   // A merge to main during the release does not block publishing the served commit.
   assert.deepEqual(await fixture({ env, run, main: 'e'.repeat(40) }).verify(), { product, releasePin })
   assert.deepEqual(await fixture({ env: { ...env, MIKKA_RUNTIME_SOURCE: product }, run, main: head }).verify(), { product, releasePin })
@@ -264,4 +265,21 @@ test('a successful gateway observation that serves current main starts both rele
   assert.equal((await fixture({ observation, event, env, latestRelease:{ target_commitish:product } }).trigger(workflow)).ready, true)
   // A gateway that no longer serves the observed pins fails loudly.
   await assert.rejects(fixture({ observation, event, env, headers:{ 'x-mikka-gateway-version-sha256':'1'.repeat(64) } }).trigger(workflow))
+})
+
+
+test('transferred native dispatches retain historical owner receipts and reject mixed repository profiles', async () => {
+  const env = { GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274' }
+  const repository = { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
+  assert.deepEqual(await fixture({ env, run: { repository } }).verify(), { product, releasePin })
+  const post = { issue_url: 'https://api.github.com/repos/aspectly-labs/Mikka/issues/1954', author_association: 'MEMBER' }
+  assert.deepEqual(await fixture({ env, run: { repository }, post, prior: post }).verify(), { product, releasePin })
+  for (const patch of [{ GITHUB_REPOSITORY_ID: '42' }, { GITHUB_REPOSITORY_OWNER_ID: '183887963' },
+    { GITHUB_REPOSITORY: 'foreign/Mikka' }, { GITHUB_REPOSITORY_OWNER_ID: '' }]) {
+    await assert.rejects(fixture({ env: { ...env, ...patch }, run: { repository } }).verify(), /dispatch/)
+  }
+  for (const invalid of [{ ...repository, id: 42 }, { ...repository, owner: { id: 183887963 } }]) {
+    await assert.rejects(fixture({ env, run: { repository: invalid } }).verify(), /runIdentity/)
+  }
+  await assert.rejects(fixture({ env, run: { repository }, post: { ...post, user: { id: 359279274, login: 'aspectly-labs' } } }).verify(), /ownerComment/)
 })

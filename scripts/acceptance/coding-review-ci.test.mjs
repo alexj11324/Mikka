@@ -15,14 +15,14 @@ function fixture() {
   const now = Date.now(), workflow = { id: 456, name: 'E2B additive runtime release', path: '.github/workflows/e2b-official-runtime.yml', state: 'active' }
   const run = { id: 123, run_attempt: 2, workflow_id: 456, name: workflow.name, path: workflow.path, head_sha: source, head_branch: 'main',
     event: 'push', status: 'completed', conclusion: 'success', run_started_at: new Date(now - 60000).toISOString(),
-    repository: { id: 789, full_name: repo }, head_repository: { id: 789, full_name: repo } }
+    repository: { id: 1427517699, full_name: repo }, head_repository: { id: 1427517699, full_name: repo } }
   const names = ['test', 'check', 'validate / build', 'await-web', 'subscriptions', 'publish / deploy', 'cleanup']
   const jobs = { total_count: names.length, jobs: names.map((name, index) => ({ id: index + 1, name, run_id: 123, run_attempt: 2,
     head_sha: source, status: 'completed', conclusion: 'success' })) }
   const artifact = { id: 321, name: 'e2b-release-evidence-123-2', expired: false, size_in_bytes: 1000, digest: 'sha256:' + 'd'.repeat(64),
     created_at: new Date(now - 10000).toISOString(), expires_at: new Date(now + 3600000).toISOString(),
     url: `${api}/actions/artifacts/321`, archive_download_url: `${api}/actions/artifacts/321/zip`,
-    workflow_run: { id: 123, repository_id: 789, head_repository_id: 789, head_branch: 'main', head_sha: source } }
+    workflow_run: { id: 123, repository_id: 1427517699, head_repository_id: 1427517699, head_branch: 'main', head_sha: source } }
   const report = { sourceCommit: source, workerSha: worker,
     templates: Object.fromEntries(['desktop', 'claude', 'codex'].map(kind => [kind, { name: `mikka-${source.slice(0, 12)}-123-2-${kind}`,
       baseTemplate: kind, templateId: `released-${kind}`, buildId: `build-${kind}`, preinstalled: true, public: true, buildStatus: 'ready' }])),
