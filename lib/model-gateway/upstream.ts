@@ -48,7 +48,7 @@ export function upstreamRequest(input: {
   body.model = managedLiteLlmModel(input.model)
   const credential = input.upstream.credential
   if (credential) Object.assign(body, {
-    model: `${credential.provider}/${input.protocol === 'openai' && credential.chatCompletionsOnly ? 'chat_completions/' : ''}${input.model}`,
+    model: `${credential.provider}/${credential.chatCompletionsOnly ? 'chat_completions/' : ''}${input.model}`,
     custom_llm_provider: credential.provider,
     api_key: credential.key,
     api_base: credential.apiBase.replace(/\/+$/, ''),

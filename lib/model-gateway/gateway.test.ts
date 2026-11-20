@@ -61,6 +61,9 @@ test('credits and BYOK reach only LiteLLM; credentials and routing come from the
     upstream: { ...upstream, credential: { key: 'person-key', provider: 'openai', apiBase: 'https://provider.test/v1/', chatCompletionsOnly: true } } })
   assert.equal(codex.url, 'http://litellm:4000/v1/responses')
   assert.equal(codex.body.model, 'openai/chat_completions/custom-model')
+  const claude = upstreamRequest({ protocol: 'anthropic', operation: 'messages', model: 'custom-model', body, clientHeaders,
+    upstream: { ...upstream, credential: { key: 'person-key', provider: 'openai', apiBase: 'https://provider.test/v1/', chatCompletionsOnly: true } } })
+  assert.equal(claude.body.model, 'openai/chat_completions/custom-model')
   assert.equal(codex.body.stream, true)
   assert.equal(codex.body.previous_response_id, 'previous')
   assert.throws(() => upstreamRequest({ protocol: 'openai', operation: 'messages', model: 'm', body: {}, clientHeaders, upstream }))
