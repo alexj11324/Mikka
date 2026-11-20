@@ -226,7 +226,7 @@ test('the last published source is the newest successful release whose templates
   const runs = [releaseRun(30, 'e'.repeat(40), { event: 'push' }), releaseRun(29, 'f'.repeat(40)),
     releaseRun(28, 'c'.repeat(40), { path: '.github/workflows/other.yml' }), releaseRun(27, published, { event: 'workflow_dispatch' })]
   const jobs = { 29: [{ name: 'check', head_sha: 'f'.repeat(40), steps: [] }],
-    27: [{ name: 'release / subscriptions', head_sha: published, steps: [{ name: publish, conclusion: 'success' }] }] }
+    27: [{ name: 'release / templates', head_sha: published, steps: [{ name: publish, conclusion: 'success' }] }] }
   const calls = []
   const fetchImpl = async input => {
     const url = new URL(input); calls.push(url.pathname)
