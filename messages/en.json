@@ -8616,9 +8616,9 @@
       "none": "No grouping"
     },
     "states": {
-      "ready": "Ready",
+      "ready": "Ready to merge",
+      "attention": "Needs attention",
       "pending": "Pending",
-      "failed": "Failed",
       "draft": "Draft",
       "open": "Open",
       "merged": "Merged",
@@ -8678,6 +8678,8 @@
       "unknown": "Not reported"
     },
     "linkedSnapshot": "Last delivered state. Open on GitHub for current checks and review.",
-    "resizePreview": "Resize pull request preview"
+    "resizePreview": "Resize pull request preview",
+    "is": "is",
+    "eitherOfStates": "either of {count} states"
   }
 }

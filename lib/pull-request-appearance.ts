@@ -12,7 +12,7 @@ export const PULL_REQUEST_COLORS = {
 export const PULL_STATE_TONES = {
   ready: 'text-success-foreground',
   pending: 'text-warning-foreground',
-  failed: 'text-destructive-foreground',
+  attention: 'text-destructive-foreground',
   draft: 'text-github-pr-draft',
   open: 'text-github-pr-open',
   merged: 'text-github-pr-merged',

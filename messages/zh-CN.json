@@ -8617,8 +8617,8 @@
     },
     "states": {
       "ready": "可合并",
+      "attention": "需处理",
       "pending": "检查中",
-      "failed": "检查失败",
       "draft": "草稿",
       "open": "打开",
       "merged": "已合并",
@@ -8678,6 +8678,8 @@
       "unknown": "未报告"
     },
     "linkedSnapshot": "上次交付时的状态。当前检查与审阅请在 GitHub 查看。",
-    "resizePreview": "调整拉取请求预览宽度"
+    "resizePreview": "调整拉取请求预览宽度",
+    "is": "为",
+    "eitherOfStates": "以下 {count} 种之一"
   }
 }

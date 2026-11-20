@@ -33,7 +33,7 @@ import {
 const stateKeys: Record<PullState, `states.${PullState}`> = {
   ready: "states.ready",
   pending: "states.pending",
-  failed: "states.failed",
+  attention: "states.attention",
   draft: "states.draft",
   open: "states.open",
   merged: "states.merged",
