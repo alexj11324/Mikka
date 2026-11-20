@@ -4,6 +4,28 @@ import { fixtureOrigin } from './guard.mjs'
 // A release-output scan uses this marker to prove the login helper is absent.
 export const FIXTURE_LOGIN_PROXY_MARKER = 'mikka-local-fixture-login-proxy-v1'
 
+/** Node's Fetch deliberately discards Host overrides. The owned proxy must
+ * preserve the configured public authority on its private loopback hop. */
+export function fixtureUpstreamRequest(upstream, path, { origin, body } = {}) {
+  const target = new URL(fixtureOrigin(upstream)), authority = new URL(fixtureOrigin(origin))
+  return new Promise((resolve, reject) => {
+    const encoded = body === undefined ? undefined : JSON.stringify(body)
+    const request = httpRequest({ hostname: target.hostname, port: target.port, path, method: encoded ? 'POST' : 'GET',
+      headers: { host: authority.host, origin: authority.origin, ...(encoded ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(encoded) } : {}) } }, response => {
+      const chunks = []; let size = 0
+      response.on('data', chunk => { size += chunk.length; if (size > 1024 * 1024) request.destroy(new Error('FIXTURE_UPSTREAM_BODY_LIMIT')); else chunks.push(chunk) })
+      response.once('error', reject)
+      response.once('end', () => {
+        const headers = new Headers()
+        for (let index = 0; index < response.rawHeaders.length; index += 2) headers.append(response.rawHeaders[index], response.rawHeaders[index + 1])
+        resolve(new Response(Buffer.concat(chunks), { status: response.statusCode, headers }))
+      })
+    })
+    request.setTimeout(15_000, () => request.destroy(new Error('FIXTURE_UPSTREAM_TIMEOUT')))
+    request.once('error', reject); request.end(encoded)
+  })
+}
+
 /** Login through the ordinary password endpoint; only the loopback harness knows the ephemeral password. */
 export async function startFixtureProxy({ origin, upstream, fixtures, defaultScene }) {
   origin = fixtureOrigin(origin); upstream = fixtureOrigin(upstream)
@@ -17,10 +39,7 @@ export async function startFixtureProxy({ origin, upstream, fixtures, defaultSce
       if (url.pathname.startsWith('/__fixture/')) {
         const scene = fixtures.get(url.pathname.slice('/__fixture/'.length))
         if (request.method !== 'GET' || !scene || url.search) { response.writeHead(404); response.end(); return }
-        const login = await fetch(`${upstream}/mikka/api/auth/sign-in/email`, {
-          method: 'POST', headers: { 'content-type': 'application/json', origin, host: publicUrl.host },
-          body: JSON.stringify({ email: scene.email, password: scene.password }), redirect: 'error', signal: AbortSignal.timeout(15_000),
-        })
+        const login = await fixtureUpstreamRequest(upstream, '/mikka/api/auth/sign-in/email', { origin, body: { email: scene.email, password: scene.password } })
         if (!login.ok) { await login.body?.cancel(); throw new Error('FIXTURE_PASSWORD_LOGIN_FAILED') }
         const identity = await login.json()
         if (identity?.user?.id !== scene.userId) throw new Error('FIXTURE_LOGIN_IDENTITY_MISMATCH')

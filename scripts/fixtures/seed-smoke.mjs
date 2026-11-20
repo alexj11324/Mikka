@@ -20,6 +20,8 @@ try {
   }
 } catch (error) {
   // PostgreSQL errors may retain parameters: never print the error object/message.
-  console.error(JSON.stringify({ fixtureSeedFailed: true, type: error.name, code: error.code, table: error.table, column: error.column, constraint: error.constraint }))
+  const missingColumn = /^column "([a-zA-Z_][a-zA-Z_0-9]*)"(?: of relation "([a-zA-Z_][a-zA-Z_0-9]*)")? does not exist$/.exec(error.message ?? '')
+  console.error(JSON.stringify({ fixtureSeedFailed: true, type: error.name, code: error.code, stage: error.fixtureStage,
+    table: error.table ?? missingColumn?.[2], column: error.column ?? missingColumn?.[1], constraint: error.constraint }))
   process.exitCode = 1
 } finally { await pool.end() }

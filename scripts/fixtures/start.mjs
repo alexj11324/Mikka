@@ -11,10 +11,11 @@ import { githubFixture } from '../../tests/fakes/github-fixture.mjs'
 import { startFakeLiteLlm, FAKE_LITELLM_KEY } from '../../tests/fakes/litellm.mjs'
 import { localModelAnswer, localDecision } from '../dev-local/model.mjs'
 import { grantLocalCredits } from '../dev-local/services.mjs'
-import { assertFixtureRuntime, fixtureManifest } from './guard.mjs'
+import { assertFixtureRuntime } from './guard.mjs'
+import { readCompiledBuild } from '../start-app.mjs'
 import { seedFixture } from './seed.mjs'
 import { FIXTURE_SCENARIOS, fixtureScenario } from './scenarios.mjs'
-import { startFixtureProxy } from './proxy.mjs'
+import { startFixtureProxy, fixtureUpstreamRequest } from './proxy.mjs'
 
 export async function availableFixturePort() {
   const socket = createServer()
@@ -28,7 +29,7 @@ export async function availableFixturePort() {
 export async function startFixture({ root = process.cwd(), env = process.env, scenario = env.MIKKA_FIXTURE ?? 'board', origin } = {}) {
   const names = scenario === 'all' ? FIXTURE_SCENARIOS : [fixtureScenario(scenario).name]
   origin ??= `http://127.0.0.1:${env.MIKKA_FIXTURE_PORT ?? await availableFixturePort()}`
-  const built = await fixtureManifest(root)
+  const built = await readCompiledBuild(root, { env })
   const { database } = assertFixtureRuntime({ env, built, origin })
   const authSecret = randomBytes(32).toString('base64url'), sealKey = randomBytes(32).toString('hex')
   const runtimeEnv = { ...env, E2E_DATABASE_URL: database.href, MIKKA_DATABASE_URL: database.href, DATABASE_URL: database.href,
@@ -54,8 +55,9 @@ export async function startFixture({ root = process.cwd(), env = process.env, sc
       E2B_API_URL: external.e2bOptions.apiUrl, E2B_SANDBOX_URL: external.e2bOptions.sandboxUrl, E2B_HTTP_VERSION: '1.1',
       GITHUB_APP_ID: '123', GITHUB_APP_PRIVATE_KEY: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString(),
       NODE_OPTIONS: `--import ${pathToFileURL(resolve(root, 'scripts/fixtures/preload.mjs')).href}`,
+      NITRO_HOST: '127.0.0.1', NITRO_PORT: new URL(upstream).port,
     })
-    app = spawn(process.execPath, ['scripts/start-app.mjs', '--hostname', '127.0.0.1', '--port', new URL(upstream).port], { cwd: root, env: childEnv, stdio: ['ignore', 'ignore', 'pipe'] })
+    app = spawn(process.execPath, ['.output/server/mikka-entry.mjs'], { cwd: root, env: childEnv, stdio: ['ignore', 'ignore', 'pipe'] })
     // Never forward raw stderr: database and HTTP exceptions can include secrets.
     app.stderr.resume()
     app.once('error', () => { failure = new Error('FIXTURE_APPLICATION_START_FAILED') })
@@ -69,7 +71,7 @@ export async function startFixture({ root = process.cwd(), env = process.env, sc
     let ready = false
     while (Date.now() < deadline) {
       if (failure) throw failure
-      try { const response = await fetch(`${upstream}/mikka/api/version`, { signal: AbortSignal.timeout(1_000) }); ready = response.ok; await response.body?.cancel() } catch { /* owned server is starting */ }
+      try { const response = await fixtureUpstreamRequest(upstream, '/mikka/api/version', { origin }); ready = response.ok; await response.body?.cancel() } catch { /* owned server is starting */ }
       if (ready) break
       await delay(100)
     }

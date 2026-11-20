@@ -37,9 +37,10 @@ async function capture(scene, editor = false) {
       await expect(page.getByText('评审 HTTP fake', { exact: true }).first()).toBeVisible()
       await expect(page.getByText('HTTP fake 验收', { exact: true }).first()).toBeVisible()
     } else if (scene === 'automations') await expect(page.getByText('检查待验收任务', { exact: true }).first()).toBeVisible()
-    else if (scene === 'pulls') await expect(page.getByText('HTTP fixture', { exact: true }).first()).toBeVisible()
+    else if (scene === 'pulls') await expect(page.getByText('HTTP fake acceptance', { exact: true }).first()).toBeVisible()
     else if (scene === 'bot-settings') {
       await page.getByRole('button', { name: '概览', exact: true }).first().click()
+      await page.getByRole('tab', { name: '详情', exact: true }).click()
       await expect(page.getByText('整理需求、检查实现与验收结果', { exact: true }).first()).toBeVisible()
     } else await expect(page.getByText('全部任务', { exact: true }).first()).toBeVisible()
     await page.evaluate(() => document.fonts.ready)

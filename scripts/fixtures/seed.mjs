@@ -17,6 +17,12 @@ export async function seedFixture(database, scene, env = process.env) {
   if (!env.BETTER_AUTH_SECRET) throw new Error('FIXTURE_AUTH_SECRET_REQUIRED')
   const githubToken = await symmetricEncrypt({ key: env.BETTER_AUTH_SECRET, data: 'mikka-local-synthetic-user-token' })
   const tx = await database.connect()
+  let stage = 'begin'
+  const query = tx.query.bind(tx)
+  tx.query = (sql, values) => {
+    stage = /^\s*(?:INSERT INTO|SELECT.*?FROM)\s+(["a-zA-Z_]["a-zA-Z_0-9]*)/s.exec(sql)?.[1]?.replaceAll('"', '') ?? stage
+    return query(sql, values)
+  }
   try {
     await tx.query('BEGIN')
     await tx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`ui-fixture:${scene}`])
@@ -43,7 +49,7 @@ export async function seedFixture(database, scene, env = process.env) {
         VALUES ($1,$2,$3,$4,'bleu','cercle','mikka','整理需求、检查实现与验收结果',$5,$5) ON CONFLICT DO NOTHING`, [id(key), userId, workspaceId, name, FIXTURE_TIME])
       await tx.query(`INSERT INTO resource_access_policies (kind,id,"workspaceId","ownerId",visibility,provenance) VALUES ('bot',$1,$2,$3,'private','created') ON CONFLICT DO NOTHING`, [id(key), workspaceId, userId])
     }
-    await tx.query(`INSERT INTO coordinator_bots ("userId","workspaceId","botId") VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [userId, workspaceId, id('coordinator')])
+    await tx.query(`INSERT INTO coordinator_bots ("ownerId","workspaceId","botId","createdAt") VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [userId, workspaceId, id('coordinator'), FIXTURE_TIME])
     if (scene !== 'empty') {
       for (const [index, state] of [...states, 'custom'].entries()) {
         const issueId = id(`task-${state}`), status = state === 'custom' ? 'review' : state
@@ -76,7 +82,7 @@ export async function seedFixture(database, scene, env = process.env) {
       }
     }
     await tx.query('COMMIT')
-  } catch (error) { await tx.query('ROLLBACK'); throw error }
+  } catch (error) { error.fixtureStage = stage; await query('ROLLBACK'); throw error }
   finally { tx.release() }
   return { ...fixture, password }
 }
