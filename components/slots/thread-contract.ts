@@ -99,6 +99,8 @@ export type ThreadScreenProps = {
   /** Who the person talks to: the Bot's id (null: the Coordinator) and its name. */
   botId: string | null
   name: string
+  /** The accessible name of the existing transcript viewport. */
+  transcriptLabel?: string
   /** Its mark, for the author line (an entry's own author wins). */
   mark: ReactNode
   /** null while the first read is on its way. */

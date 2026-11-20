@@ -181,4 +181,6 @@ the same rule as the web applies (merge the layer's export first).
 
 Every chat entrance calls `ThreadScreen`. The `host` identifies its containing surface without selecting a new style. The original official thread presentation remains in the official provider; group and Artifact transcript presentations share the public `ThreadTranscript` renderer through that same provider. This renderer contains only the existing public primitives. The readers still own history, delivery, unread state and callbacks; keyed rows, the scroll container and composer placement belong to the screen. Optional message nodes carry existing event/card contents, not another list.
 
+The optional `transcriptLabel` names the existing native transcript viewport as a region. Coordinator readers supply their existing conversation translation, as they do for embedded transcripts; the inner log keeps its original name and live-region attributes. Providers add no wrapper or visible content for this label.
+
 An error part's optional `failure` identifies the current `live` or `welcome` failure. Providers pass it to `data-message-failure` on their existing error line, without adding an element or changing its contents. Historical failures keep the `past` marker in the supplied recovery notice; the surrounding error line does not duplicate it.
