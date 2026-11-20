@@ -129,7 +129,7 @@ seeds legacy data before this migration, then executes the exact SQL twice.
 
 Rollback starts by reverting the new readers/writers. Existing name/color
 snapshots remain readable by the prior application. A later reviewed migration
-may remove the two task triggers/functions, reference table, entity table and
+may remove both task triggers, their three helper functions, the reference table, entity table and
 new composite index. Keep `labelIds` in historical snapshots until their
 normal retention lifecycle removes them; they grant no access. No production
 data or old migration file needs to be deleted to roll back the application.

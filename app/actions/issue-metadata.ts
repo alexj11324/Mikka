@@ -3,7 +3,7 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
-import { db } from '@/lib/db'
+import { db, withDatabaseTransaction } from '@/lib/db'
 import { persistIssueMetadata } from '@/lib/issue-metadata-store'
 import { issueMembersChanged } from '@/lib/live/issue-detail'
 import { agents, bots, issues, issueMembers, users } from '@/lib/db/schema'
@@ -42,7 +42,7 @@ export type IssueMetadataPatch = z.infer<typeof patchSchema>
 
 export async function getIssuePropertyOptions(id: string) {
   const { issue, user } = await requireIssueAccess(id)
-  return db.transaction(async tx => {
+  return db.transaction(tx => withDatabaseTransaction(tx, async () => {
   const [locked] = await tx.select().from(issues).where(eq(issues.id, id)).for('share')
   requireLockedIssueScope(locked, user.id, issue.scopeVersion, issue.workspaceId)
   await requireCurrentIssueWorkspace(user, issue.workspaceId, issue.id)
@@ -61,7 +61,7 @@ export async function getIssuePropertyOptions(id: string) {
     labelRecords: choices.labelRecords,
     isOwner: user.id === issue.userId,
   }
-  })
+  }))
 }
 
 /** 新建任务's Assignee, Labels and Access choices for one workspace, before any task exists: its active members and

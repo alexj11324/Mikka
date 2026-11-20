@@ -120,6 +120,8 @@ test('workspace task label HTTP management and real task writers preserve tenant
     assert.deepEqual(oldClient.issue!.metadata.labelIds, [bug.id])
     const options = await as(member, () => actions.getNewTaskOptions(workspace.id))
     assert.ok(options.labelRecords.some(label => label.id === review.id), 'an unused registry label is selectable')
+    const taskOptions = await as(owner, () => actions.getIssuePropertyOptions(privateTask))
+    assert.deepEqual(taskOptions.labelRecords, options.labelRecords)
     const { rows: countBefore } = await pool.query('SELECT count(*)::int n FROM issues WHERE "userId"=$1', [member])
     const invalid = command([foreign.id])
     assert.ok((await as(member, () => tasks.createTaskOnly(invalid))).error)
