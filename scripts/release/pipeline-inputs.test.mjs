@@ -43,6 +43,8 @@ test('a failed stage blocks the next writer while a completed rollback restores 
   assert.throws(() => baselineOrigin({ ...summary, verification: { status: 'fail' } }))
   assert.deepEqual(baselineOrigin({ ...summary, status: 'failed', rollback: { status: 'passed' } }), previousOrigin)
   assert.equal(baselineOrigin({ ...summary, previousOrigin: null, rollback: { status: 'passed' } }), null)
+  assert.throws(() => baselineOrigin({ ...summary, target: 'staging' }, 'production'))
+  assert.deepEqual(baselineOrigin({ ...summary, target: 'production' }, 'production'), origin)
 })
 
 test('artifact selection requires the original attempt, complete provenance, immutable digest and unexpired bytes', () => {
