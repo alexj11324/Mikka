@@ -15,6 +15,8 @@ test('a real image or recording counts, a placeholder table does not', () => {
   assert.equal(hasScreenshot('See ![settings](https://github.com/user-attachments/assets/abc-123).'), true)
   assert.equal(hasScreenshot('<img alt="sidebar" src="https://private-user-images.githubusercontent.com/1/shot.png" />'), true)
   assert.equal(hasScreenshot('<video src="https://example.com/demo.mp4"></video>'), true)
+  assert.equal(hasScreenshot('[常规](https://cursor.com/agents/run/artifacts?path=%2Fopt%2Fcursor%2Fartifacts%2Fsettings.png)'), true)
+  assert.equal(hasScreenshot('<img alt="Open in Web" src="https://cursor.com/assets/images/open-in-web-dark.png">'), false)
   assert.equal(hasScreenshot('| Before | After |\n| --- | --- |\n| ... | ... |'), false)
   assert.equal(hasScreenshot('I looked at it locally.'), false)
   assert.equal(hasScreenshot('<!-- ![](https://example.com/hidden.png) --> nothing'), false)

@@ -27,7 +27,7 @@ const stripComments = (text) => {
 }
 
 const OPT_OUT = /screenshots?:\s*not needed:\s*(\S(?:.|\n){7,})/i
-const IMAGE = /!\[[^\]]*\]\(\s*https?:\/\/[^)\s]+\)|<img\b[^>]*\bsrc\s*=\s*["']https?:\/\/|<video\b[^>]*\bsrc\s*=\s*["']https?:\/\/|https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+|https:\/\/private-user-images\.githubusercontent\.com\/\S+/i
+const IMAGE = /!\[[^\]]*\]\(\s*https?:\/\/[^)\s]+\)|\[[^\]]*\]\(\s*https?:\/\/[^)\s]*\.(?:png|jpe?g|gif|webp|mp4|mov)(?:[?#][^)\s]*)?\)|<img\b(?![^>]*\bsrc\s*=\s*["']https:\/\/cursor\.com\/assets\/images\/open-in-)[^>]*\bsrc\s*=\s*["']https?:\/\/|<video\b[^>]*\bsrc\s*=\s*["']https?:\/\/|https:\/\/github\.com\/user-attachments\/assets\/[A-Za-z0-9-]+|https:\/\/private-user-images\.githubusercontent\.com\/\S+/i
 
 export function isFrontendVisual(file) {
   return FRONTEND_VISUAL.test(file)
@@ -70,4 +70,4 @@ function main() {
   process.exit(1)
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main()
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main()
