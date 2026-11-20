@@ -1,6 +1,7 @@
 import { issueBranch } from '@mikka/protocol/orchestrator'
 import type { RunReport } from '@mikka/protocol/run'
 import type { PublicationErrorCode } from '@/lib/github/run-pull-request'
+import { pullRequestBranchPrefix } from '@/lib/code-review/settings-contract'
 
 /** A per-repository push approval stored before decision 2026-11-02-1600. Kept for old rows; nothing reads it. */
 export interface RepositoryPushApproval {
@@ -11,10 +12,23 @@ export interface RepositoryPushApproval {
 }
 
 /** The task's own identifier as its branch (`mikka/al-12`); every task has one from creation. */
-export function publicationBranch(identifier: string | null | undefined): string | null {
+export function publicationBranch(identifier: string | null | undefined, prefix = 'mikka'): string | null {
   const match = identifier?.match(/^([a-z0-9]+(?:-[a-z0-9]+)*)-([1-9][0-9]*)$/i)
-  if (!match || !Number.isSafeInteger(Number(match[2]))) return null
-  return issueBranch(match[1], Number(match[2]))
+  const parsed = pullRequestBranchPrefix.safeParse(prefix)
+  if (!match || !Number.isSafeInteger(Number(match[2])) || !parsed.success) return null
+  const name = issueBranch(match[1], Number(match[2])).slice('mikka/'.length)
+  return parsed.data ? `${parsed.data}/${name}` : name
+}
+
+/** Failed verification can never become ready through a saved preference. */
+export function publicationDraft(preferred: boolean, verify: RunReport['verify']['status'], factoryBound = false) {
+  return preferred || verify === 'failed' || (verify === 'not_run' && !factoryBound)
+}
+
+/** Provider validation retains the task identifier, even with a custom path. */
+export function validPublicationBranch(branch: string, identifier: string) {
+  const slash = branch.lastIndexOf('/')
+  return publicationBranch(identifier, slash < 0 ? '' : branch.slice(0, slash)) === branch
 }
 
 export function publicationGate(input: {

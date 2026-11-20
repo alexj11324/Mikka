@@ -1,4 +1,5 @@
 import * as settingsActions from '@/app/actions/settings'
+import * as reviewSettingsActions from '@/app/actions/review-settings'
 import * as taskDomainActions from '@/app/actions/task-domain'
 import * as projectResourcesActions from '@/app/actions/project-resources'
 import * as enabledModels from '@/app/actions/enabled-models'
@@ -58,6 +59,9 @@ const functions = {
   'settings.resetPersonalSettings': settingsActions.resetPersonalSettings,
   'settings.resetWorkspaceSettings': settingsActions.resetWorkspaceSettings,
   'settings.getSettingsSchema': settingsActions.getSettingsSchema,
+  'review-settings.getCodeReviewRepositories': reviewSettingsActions.getCodeReviewRepositories,
+  'review-settings.saveCodeReviewRepository': reviewSettingsActions.saveCodeReviewRepository,
+  'review-settings.deleteCodeReviewRepository': reviewSettingsActions.deleteCodeReviewRepository,
   'desktop.readBatch': createReadBatch(() => desktopActions),
   'desktop.bootstrap': desktopBootstrap,
   'desktop.session': desktopSession,

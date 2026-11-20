@@ -5,12 +5,13 @@ import type { ResolvedSetting } from '@mikka/protocol/settings'
 export const pullRequestBranchPrefix = z.string().trim().max(80)
   .regex(/^(?:[A-Za-z0-9][A-Za-z0-9_-]*(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)*\/?)?$/)
   .transform(value => value.replace(/\/$/, ''))
-export const pullRequestTitlePrefix = z.string().trim().max(80).refine(value => !/[\x00-\x1f\x7f]/.test(value))
+const hasControl = (value: string) => [...value].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
+export const pullRequestTitlePrefix = z.string().trim().max(80).refine(value => !hasControl(value))
 export const REVIEW_SEVERITIES = ['low', 'medium', 'high', 'critical'] as const
 export const REVIEW_OUTPUTS = ['comments', 'summary'] as const
-export const reviewModel = z.string().trim().max(200).refine(value => !/[\x00-\x20\x7f]/.test(value))
+export const reviewModel = z.string().trim().max(200).refine(value => !hasControl(value) && !value.includes(' '))
 export const reviewIgnoredPaths = z.array(z.string().trim().min(1).max(250)
-  .refine(value => !value.startsWith('/') && !value.includes('\\') && !value.split('/').includes('..') && !/[\x00-\x1f\x7f]/.test(value)))
+  .refine(value => !value.startsWith('/') && !value.includes('\\') && !value.split('/').includes('..') && !hasControl(value)))
   .max(100).transform(values => [...new Set(values)])
 export const reviewRepositoryKey = z.string().regex(/^v2\/github\.com\/[a-z0-9-]{1,39}\/[a-z0-9._-]{1,100}$/)
 export const reviewRepositoryInput = z.strictObject({

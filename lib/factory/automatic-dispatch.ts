@@ -18,6 +18,8 @@ import { notifyDeviceWork } from '../device-gateway-notify'
 import type { FactoryTask, createFactoryStore } from './store'
 import { assertRecoveredCheck, type FrozenFactoryCheck } from './check-start-recovery'
 import { candidateRecheckRound, candidateRecheckDispatchSource, refreshRecheckSource, admitRecheckSource } from './candidate-recheck'
+import { withDatabaseClient } from '@/lib/db'
+import { codeReviewConfiguration } from '@/lib/code-review/settings-storage'
 
 /** Provider I/O boundary; no model input selects these callbacks. */
 export const factoryAutomaticRuntime = {
@@ -88,6 +90,7 @@ export function automaticFactoryDispatch(pool: Pool) {
     // the planner's role, credential, read-only grant or native session.
     const firstImplementation = !check && source.kind === 'plan'
     const selectStageProfile = check || firstImplementation
+    const reviewConfig = task.stage === 'review' && !checkStart ? await withDatabaseClient(tx, () => codeReviewConfiguration(workspaceId)) : null
     const continueImplementation = !check && !firstImplementation
     if (checkStart && (!check || checkStart.taskId !== task.id || checkStart.candidateId !== task.candidateId ||
         checkStart.sourceEventId !== task.sourceEventId || checkStart.attemptId === task.attemptId ||
@@ -113,6 +116,7 @@ export function automaticFactoryDispatch(pool: Pool) {
       ownerId: task.userId, workspaceId, botId: task.botId,
     }, { issueId: task.issueId, stage: task.stage, location: source.deviceKind === 'cloud' ? 'cloud' : 'local',
       defaultHarness: source.harness, cloudPurpose: source.remoteUrl ? 'task' : 'desktop',
+      ...(reviewConfig?.model ? { asked: { harness: source.harness, model: reviewConfig.model } } : {}),
       ...(source.agentDefinition?.pinnedDeviceId ? { deviceId: source.agentDefinition.pinnedDeviceId } : {}),
     }, { transaction: tx }) : undefined
     if (profileChoice?.target.kind === 'none') throw new FactoryError('factoryCheckHarnessUnavailable')

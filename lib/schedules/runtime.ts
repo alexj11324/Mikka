@@ -55,7 +55,8 @@ export const automationSeams:AutomationSeams={
     }
   },
   /** The creator's 创建并派发, keyed by the occurrence: a retried run finds the same request and the same task. */
-  async dispatch({ownerId,workspaceId,scheduleId,occurrenceId,task,event,source,single,thread,run}){
+  async dispatch(input){
+    const {ownerId,workspaceId,scheduleId,occurrenceId,task,event,source,single,thread,run} = await (await import('@/lib/code-review/automation')).configuredReviewDispatch(input)
     const botId=await dispatchBot(ownerId,workspaceId,task)
     const [{db},{recordPersonalSubmission},{createIssueFromRequest}]=await Promise.all([import('@/lib/db'),import('@/lib/coordinator-submission'),import('@/lib/coordinator/issue-create')])
     // An event-started run carries the event after the creator's request, marked as GitHub's data or the webhook's.

@@ -19,6 +19,7 @@ import { readIssueMetadata } from './issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
 import { taskIdentifiers } from './task-identifier-server'
 import { publicationBranch } from './run-publication-policy'
+import { publicationDefaults } from './code-review/settings-storage'
 import { admitRepositoryTask, matchesRepositoryAdmission } from './repository-admission'
 import { lockCliAgentPolicy, lockCliTaskScope } from './agent-tool-approval/policy-store'
 import type { WorkerDefinitionSnapshot } from './agent-kit/worker'
@@ -178,7 +179,8 @@ export async function acceptLocalRun(input: {
     if (previous && effectiveExecution?.projectId && previous.baseBranch !== effectiveBaseBranch) throw new ActionFailureError('projectRepositoryDenied')
     const identifier = previous?.identifier ?? (await taskIdentifiers([{ id: task.id, ownerId: task.userId, scope: task.scope, number: readIssueMetadata(task.content).number, issuedIdentifier: task.issuedIdentifier }], tx)).get(task.id) ?? null
     if (definition.traceContext && identifier) definition.traceContext.taskNumber = identifier
-    const branch = previous?.branch ?? publicationBranch(identifier)
+    const defaults = await publicationDefaults({ userId: input.userId, workspaceId: task.workspaceId }, tx)
+    const branch = previous?.branch ?? publicationBranch(identifier, defaults.branchPrefix)
     if (!branch) throw invalid('taskIdentifierRequired')
     const admission = admitRepositoryTask({ ...context, userId: input.userId, issueId: task.id, deviceId: input.deviceId, agentId: input.agentId, remoteKey: repo.repoPath, remoteUrl: repo.remoteUrl, targetBranch: branch, now: new Date() })
     if (!admission) throw invalid('repositoryMismatch')
@@ -188,7 +190,8 @@ export async function acceptLocalRun(input: {
     // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
     scheduleThreadTitle(tx, input.id, input.userId, 'created')
     await tx.insert(agentRuns).values({ id: input.id, userId: input.userId, botId: input.botId, issueId: task.id, agentId: input.agentId, deviceId: input.deviceId, deviceRepoId: repo.id, status: 'queued', kind: 'implement', source: input.source ?? null, origin: input.origin, originRef: input.originRef ?? null, baseBranch: effectiveBaseBranch, ...copyRunPrompt({ prompt: input.prompt, promptTaskStart: input.promptTaskStart ?? 0, promptTaskLength: input.promptTaskLength ?? null }), agentDefinition: { ...definition, repositoryAdmission: admission }, dispatchKey: input.dispatch?.requestKey ?? null, dispatchFingerprint: dispatchHash })
-    await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: effectiveBaseBranch, pushApproved: true })
+    await tx.insert(runPublications).values({ runId: input.id, userId: input.userId, issueId: task.id, scopeVersion: task.scopeVersion, issueTitle: task.title, remoteUrl: repo.remoteUrl, remoteKey: repo.repoPath, identifier, branch, baseBranch: effectiveBaseBranch, pushApproved: true,
+      titlePrefix: defaults.titlePrefix, autoMerge: defaults.autoMerge, defaultDraft: defaults.draft })
     if (input.requestEventId && !input.continuation && !input.sourceRunId && (await requestedRunSettings(client, input.userId, input.requestEventId)).pin)
       await client.query('UPDATE agent_runs SET "conversationPinnedAt"=clock_timestamp() WHERE id=$1', [input.id])
     await runListChanged(tx, input.id)

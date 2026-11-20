@@ -9,6 +9,7 @@ import { DEFAULT_TITLE_TRIGGERS, type ThreadTitleTriggers } from '@/lib/thread-t
 import { archivePreferenceChanged, workspaceListChanged } from '@/lib/live/lists'
 import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
 import { personalSettingValues, workspaceSettingValues } from './schema'
+import { mirrorCodeReviewSetting } from '@/lib/code-review/settings-storage'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Reader = Pick<typeof db, 'select'>
@@ -66,6 +67,7 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
       await tx.insert(workspaceSettingValues).values({ workspaceId: context.workspaceId, key, ...changed })
         .onConflictDoUpdate({ target: [workspaceSettingValues.workspaceId, workspaceSettingValues.key], set: changed })
     }
+    if (field.storage) await mirrorCodeReviewSetting(tx, scope, context, key, value)
     // Existing runtime readers and clients retain their typed columns during incremental adoption.
     if (field.legacy === 'archive-days' && scope === 'personal') {
       const days = value === null ? 30 : value as number

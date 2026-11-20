@@ -4,6 +4,8 @@ import { normalizeRepository } from '@mikka/protocol/repository'
 import { bodyWithPublicationEvidence, factoryPullRequestText, validPublicationEvidence, type PublicationEvidence } from '@/lib/captures/publication-contract'
 import { maskCredentials } from '@/lib/secrets/mask'
 import { readReviewChecks } from './review-checks'
+import { validPublicationBranch } from '@/lib/run-publication-policy'
+import { pullRequestTitlePrefix } from '@/lib/code-review/settings-contract'
 
 import { PublicationError, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
 export { PublicationError, PUBLICATION_ERRORS, type PublicationErrorCode, type PublishedPullRequest } from '@/lib/run-publication-result'
@@ -115,6 +117,9 @@ export async function openRunPullRequest(options: Options & {
   branch: string; commit: string; baseBranch: string | null
   allowCreate?: boolean
   draft?: boolean
+  titlePrefix?: string
+  autoMerge?: boolean
+  verificationStatus?: 'passed' | 'failed' | 'not_run'
   /** Host-generated links to captures whose producer explicitly checked them for public sharing. */
   visualEvidence?: PublicationEvidence
   /** The host holds current task/approval authority for each bounded write. */
@@ -122,7 +127,11 @@ export async function openRunPullRequest(options: Options & {
   /** Bookkeeping once the repository is read with the owner's token; it must not throw. */
   onVerified?: (binding: GitHubRepositoryBinding) => Promise<void>
 }): Promise<PublishedPullRequest> {
-  if (!/^mikka\/[a-z0-9-]+-[1-9][0-9]*$/.test(options.branch) || !/^[a-f0-9]{40,64}$/i.test(options.commit) || !z.uuid().safeParse(options.issueId).success) throw new PublicationError('publication_mismatch')
+  if (!validPublicationBranch(options.branch, options.identifier) || !/^[a-f0-9]{40,64}$/i.test(options.commit) || !z.uuid().safeParse(options.issueId).success) throw new PublicationError('publication_mismatch')
+  const prefix = pullRequestTitlePrefix.safeParse(options.titlePrefix ?? '')
+  if (!prefix.success) throw new PublicationError('publication_mismatch')
+  if (options.autoMerge && (options.draft || options.verificationStatus !== 'passed')) throw new PublicationError('publication_mismatch')
+  if (options.autoMerge && options.installationId) throw new PublicationError('github_identity_required')
   const visualEvidence = options.visualEvidence === undefined ? undefined : validPublicationEvidence(options.visualEvidence)
   if (options.visualEvidence !== undefined && (!visualEvidence || visualEvidence.issueId !== options.issueId || visualEvidence.sha !== options.commit)) throw new PublicationError('factory_public_evidence_required')
   const access = await repositoryAccess(options)
@@ -200,7 +209,26 @@ export async function openRunPullRequest(options: Options & {
       if (converted.data.convertPullRequestToDraft.pullRequest.id !== pr.node_id) throw new PublicationError('github_request_failed')
       return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: 'draft', ...lines, ...review, ...(evidenceDigest ? { evidenceDigest } : {}) }
     }
-    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open', ...lines, ...review, ...(evidenceDigest ? { evidenceDigest } : {}) }
+    let autoMergeEnabled = false
+    if (options.autoMerge && !pr.draft && pr.state === 'open' && !pr.merged_at) {
+      if (!pr.node_id) throw new PublicationError('github_request_failed')
+      const nodeId = pr.node_id
+      await write(async () => {
+        const latest = verified(await request(`${path}/pulls/${pr.number}`, writeToken))
+        if (latest.node_id !== nodeId || latest.state !== 'open' || latest.draft || latest.merged_at) throw new PublicationError('pull_request_conflict')
+        if (latest.head.sha?.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+        const head = parse(z.object({ object: z.object({ sha: z.string() }) }), await request(`${path}/git/ref/heads/${options.branch.split('/').map(encodeURIComponent).join('/')}`, writeToken))
+        if (head.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
+        const enabled = parse(z.object({ data: z.object({ enablePullRequestAutoMerge: z.object({ pullRequest: z.object({ id: z.string(), autoMergeRequest: z.object({ enabledAt: z.string() }) }) }) }) }),
+          await request('/graphql', writeToken, { method: 'POST', body: {
+            query: 'mutation($id: ID!, $head: GitObjectID!) { enablePullRequestAutoMerge(input: {pullRequestId: $id, expectedHeadOid: $head, mergeMethod: MERGE}) { pullRequest { id autoMergeRequest { enabledAt } } } }',
+            variables: { id: nodeId, head: options.commit },
+          } }))
+        if (enabled.data.enablePullRequestAutoMerge.pullRequest.id !== nodeId) throw new PublicationError('github_request_failed')
+      })
+      autoMergeEnabled = true
+    }
+    return { url: pr.html_url, ...(pr.title ? { title: pr.title } : {}), state: pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open', ...lines, ...review, ...(evidenceDigest ? { evidenceDigest } : {}), ...(autoMergeEnabled ? { autoMergeEnabled } : {}) }
   }
   const enriched = async (raw: unknown): Promise<PublishedPullRequest> => {
     // The original POST/list is already a complete authority receipt. Never
@@ -243,13 +271,16 @@ export async function openRunPullRequest(options: Options & {
         if (current.object.sha.toLowerCase() !== options.commit.toLowerCase()) throw new PublicationError('branch_changed')
       }
       return request(`${path}/pulls`, writeToken, { method: 'POST', body: {
-      title: visualEvidence ? factoryPullRequestText(options.issueId).title : `${options.identifier}: ${maskCredentials(options.title)}`.slice(0, 256),
+      title: `${prefix.data ? `${maskCredentials(prefix.data)} ` : ''}${visualEvidence ? factoryPullRequestText(options.issueId).title : `${options.identifier}: ${maskCredentials(options.title)}`}`.slice(0, 256),
       head: options.branch, base: options.baseBranch ?? binding.defaultBranch,
       ...(options.draft ? { draft: true } : {}),
       body: (() => {
         const prose = visualEvidence ? factoryPullRequestText(options.issueId)
           : { key: options.identifier, title: maskCredentials(options.title), summary: maskCredentials(options.summary) }
-        const body = `${pullRequestBody(undefined, prose)}${options.draft ? '\n\nVerification was not run: no repository verification command is configured. This draft needs human review.' : ''}\n\n${marker}`
+        const draftNote = !options.draft ? '' : options.verificationStatus === 'passed' ? '\n\nOpened as a draft by the pull request defaults.'
+          : options.verificationStatus === 'failed' ? '\n\nVerification failed. This draft needs human review.'
+          : '\n\nVerification was not run: no repository verification command is configured. This draft needs human review.'
+        const body = `${pullRequestBody(undefined, prose)}${draftNote}\n\n${marker}`
         const value = visualEvidence ? bodyWithPublicationEvidence(body, options.issueId, visualEvidence) : body
         if (!value) throw new PublicationError('pull_request_conflict')
         return value
