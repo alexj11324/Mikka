@@ -10,7 +10,7 @@ import { getWorkspaceBotDefaults, listBotsForWorkspace } from '@/app/actions/bot
 import { listProjectResources } from '@/app/actions/project-resources'
 import { getModelOrder } from '@/app/actions/model-order'
 import { findThreadReferences } from '@/app/actions/task-runs'
-import { automationLinearLabels, automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, duplicateAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
+import { automationLinearLabels, automationRunAsChoices, setAutomationRunAs, automationLinearTeams, automationSlackChannels, deleteAutomation, createAutomation, duplicateAutomation, pauseAutomation, resumeAutomation, runAutomationNow, takeOverAutomation, updateAutomation } from '@/app/actions/automations'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -93,7 +93,7 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const stale = Boolean(current && baseline && dirty && current.version !== baseline.version)
   const requestId = useRef(crypto.randomUUID())
   const pendingRun = useRef<{ scope: string; requestId: string } | null>(null)
-  const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver' | 'duplicate'>(null)
+  const [busy, setBusy] = useState<null | 'save' | 'toggle' | 'run' | 'delete' | 'takeOver' | 'duplicate' | 'runAs'>(null)
   const duplicateRequest = useRef<{ target: string; requestId: string } | null>(null)
   const [cancellingRun, setCancellingRun] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -137,6 +137,11 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
   const modelOrder = useSWR(workspaceId && draft?.agent ? ['automation-models', workspaceId] as const : null, async ([, shown]) => {
     const result = await getModelOrder(shown)
     return 'error' in result && result.error ? null : result as { entries: { harness: string; model: string }[] }
+  }, { revalidateOnFocus: false })
+  // Runs as' choices: every active member for an owner or admin, else only the reader.
+  const runAsChoices = useSWR(workspaceId && !creating ? ['automation-run-as', workspaceId] as const : null, async ([, shown]) => {
+    const result = await automationRunAsChoices(shown)
+    return 'error' in result && result.error ? [] : (result as { members: { id: string; name: string }[] }).members
   }, { revalidateOnFocus: false })
   const [menuOpen, setMenuOpen] = useState(false)
   const workspaces = useSWR(menuOpen ? '/api/workspace/switcher' : null, fetchSettingsData<WorkspaceSwitcher>, { revalidateOnFocus: false, shouldRetryOnError: false })
@@ -243,6 +248,16 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
     } finally { setBusy(null) }
   }
 
+  async function runAs(userId: string | null) {
+    if (!current || !workspaceId || busy) return
+    setBusy('runAs')
+    try {
+      const result = await setAutomationRunAs({ scheduleId: current.id, version: current.version, userId }, workspaceId)
+      if ('error' in result && result.error) { toast.error(actionError(result.error)); if (result.error === 'scheduleVersionConflict') await automation.mutate(); return }
+      await automation.mutate()
+      await invalidateAutomationList(mutateCache, workspaceId, false)
+    } finally { setBusy(null) }
+  }
   async function duplicate(target: string) {
     if (!current || !workspaceId || busy) return
     setBusy('duplicate')
@@ -282,6 +297,12 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
         ...ownBots.map(bot => ({ value: bot.id, label: bot.name })), ...(otherBot ? [{ value: otherBot.id, label: otherBot.name }] : [])],
       value => set({ botId: value || null }))] : []),
     ] },
+    // Runs as saves on choice, as its own command (it is not part of the draft).
+    ...(current && current.definition.task.kind === 'dispatch_task' ? [{ id: 'runs-as', label: t('runsAs'), controls: [select(t('runsAs'), current.run_as_user_id ?? '', [
+      { value: '', label: t('runsAsCreator', { name: creator }) },
+      ...(current.run_as_user_id && !runAsChoices.data?.some(member => member.id === current.run_as_user_id) ? [{ value: current.run_as_user_id, label: current.run_as_name ?? current.run_as_user_id }] : []),
+      ...(runAsChoices.data ?? []).filter(member => member.id !== current.owner_id).map(member => ({ value: member.id, label: member.name }))],
+    value => { void runAs(value || null) }, busy !== null)] }] : []),
     ...(draft.eachRun === 'existing_thread' && workspaceId ? [{ id: 'thread', content: <ThreadPicker workspaceId={workspaceId} value={draft.singleThreadId} onChange={singleThreadId => set({ singleThreadId })} /> }] : []),
     { id: 'environment', label: t('environment'), controls: [select(t('environment'), draft.environmentId ?? '', [{ value: '', label: t('environmentDefault') },
       ...(draft.environmentId && !shownEnvironments.some(environment => environment.id === draft.environmentId) ? [{ value: draft.environmentId, label: draft.environmentId }] : []),
@@ -309,8 +330,14 @@ export function AutomationEditor({ workspaceId, userId, id, template, onOpen, on
       ? select(t('notify'), draft.notify?.channel ?? '', [{ value: '', label: t('notifyOff') },
         ...(draft.notify && !slackChannels.data?.channels.some(channel => channel.id === draft.notify!.channel) ? [{ value: draft.notify.channel, label: draft.notify.channel }] : []),
         ...(slackChannels.data?.channels ?? []).map(channel => ({ value: channel.id, label: `#${channel.name}` }))],
-      value => set({ notify: value ? { channel: value, locale: locale === 'en' ? 'en' : 'zh-CN' } : null }), !slackChannels.data && !draft.notify)
+      value => set({ notify: value ? { ...draft.notify, channel: value, locale: draft.notify?.locale ?? (locale === 'en' ? 'en' : 'zh-CN') } : null }), !slackChannels.data && !draft.notify)
       : { kind: 'button', label: t('notifyChoose'), onClick: () => setSlackWanted(true), disabled: busy !== null }] },
+    ...(draft.notify ? [
+      { id: 'post-as-runner', label: t('postAsRunner'), controls: [{ kind: 'switch' as const, label: t('postAsRunner'), checked: draft.notify.postAsRunner === true,
+        onChange: (on: boolean) => set({ notify: { ...draft.notify!, postAsRunner: on || undefined } }) }] },
+      { id: 'quiet', label: t('quiet'), controls: [{ kind: 'switch' as const, label: t('quiet'), checked: draft.notify.quiet === true,
+        onChange: (on: boolean) => set({ notify: { ...draft.notify!, quiet: on || undefined } }) }] },
+    ] : []),
     { id: 'timezone', label: t('timezone'), controls: [select(t('timezone'), draft.timezone, (zones.includes(draft.timezone) ? zones : [draft.timezone, ...zones]).map(zone => ({ value: zone, label: zone })),
       value => set({ timezone: value, fold: null }))] },
   ]
