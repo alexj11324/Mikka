@@ -13,6 +13,15 @@ if (target) {
 if (!target && process.env.REQUIRE_DB === '1') throw new Error('Domain admission requires isolated PG17')
 
 test('Verified domain admission stays within the chosen Organization', { skip: !target, timeout: 120_000 }, async t => {
+  // DNS is the external boundary; grants, authorization and verification persistence use PG17.
+  const dnsRecords = new Map<string, string[][]>()
+  let dnsError: string | undefined
+  t.mock.module('node:dns/promises', { namedExports: { ...await import('node:dns/promises'),
+    resolveTxt: async (name: string) => {
+      if (dnsError) throw Object.assign(new Error('DNS fixture unavailable'), { code: dnsError })
+      return dnsRecords.get(name) ?? []
+    },
+  } })
   const db = new Pool({ connectionString: target })
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
@@ -71,6 +80,39 @@ test('Verified domain admission stays within the chosen Organization', { skip: !
     assert.deepEqual(await domains.removeAllowedDomain(b, id, owner.id), { removed: true, domain: null })
     const replacement = await domains.addAllowedDomain(b, owner, { domain })
     assert.notEqual(replacement.domain.id, id)
+  })
+  await t.test('DNS proof is scoped to the exact Organization grant, checked fresh, and required for admission', async () => {
+    assert.deepEqual(await domains.listJoinableOrganizations(visitor, sessionId), { organizations: [] })
+    await assert.rejects(domains.joinOrganizationByDomain(a, visitor, sessionId), denied)
+    const ruleA = (await domains.listAllowedDomains(a, owner.id)).domains[0]
+    const ruleB = (await domains.listAllowedDomains(b, owner.id)).domains[0]
+    await assert.rejects(domains.verifyAllowedDomain(a, ruleA.id, member.id), denied)
+    await assert.rejects(domains.verifyAllowedDomain(a, ruleA.id, visitor.id), denied)
+    await assert.rejects(domains.verifyAllowedDomain(a, ruleB.id, owner.id), { detail: 'not_found' })
+    const missing = await domains.verifyAllowedDomain(a, ruleA.id, owner.id)
+    assert.equal(missing.verified, false)
+    assert.equal(missing.domain.verificationError, 'record_missing')
+    assert.equal(missing.domain.verifiedAt, null)
+    assert.ok(missing.domain.lastCheckedAt)
+    const aRecord = domains.organizationDomainRecord(a, ruleA)
+    const bRecord = domains.organizationDomainRecord(b, ruleB)
+    dnsRecords.set(aRecord.name, [[aRecord.value.slice(0, 20), aRecord.value.slice(20)]])
+    const verified = await domains.verifyAllowedDomain(a, ruleA.id, owner.id)
+    assert.equal(verified.verified, true)
+    assert.ok(verified.domain.verifiedAt)
+    assert.equal(verified.domain.verificationError, null)
+    assert.deepEqual(verified.dns, aRecord)
+    assert.equal((await domains.verifyAllowedDomain(b, ruleB.id, owner.id)).verified, false,
+      'a DNS proof for one organization cannot authorize another organization')
+    dnsError = 'ETIMEOUT'
+    const unavailable = await domains.verifyAllowedDomain(a, ruleA.id, owner.id)
+    assert.equal(unavailable.domain.verificationError, 'lookup_failed')
+    assert.equal(unavailable.domain.verifiedAt, null)
+    assert.deepEqual(await domains.listJoinableOrganizations(visitor, sessionId), { organizations: [] })
+    dnsError = undefined
+    dnsRecords.set(aRecord.name, [[aRecord.value], [bRecord.value]])
+    assert.equal((await domains.verifyAllowedDomain(a, ruleA.id, owner.id)).verified, true)
+    assert.equal((await domains.verifyAllowedDomain(b, ruleB.id, owner.id)).verified, true)
   })
   await t.test('discover only exact matches and independently choose one organization', async () => {
     assert.deepEqual((await domains.listJoinableOrganizations(visitor, sessionId)).organizations.map(row => row.id), [a, b])

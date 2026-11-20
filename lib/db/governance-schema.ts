@@ -49,17 +49,21 @@ export const organizationJoinDomains = pgTable('mikka_organization_join_domains'
   domain: varchar('domain', { length: 253 }).notNull(),
   createdByUserId: text('createdByUserId'),
   createdAt: timestamp('createdAt', { withTimezone: true }),
+  verifiedAt: timestamp('verifiedAt', { withTimezone: true }),
+  lastCheckedAt: timestamp('lastCheckedAt', { withTimezone: true }),
+  verificationError: text('verificationError').$type<'record_missing' | 'lookup_failed'>(),
 }, table => [
   unique('mikka_org_join_domain_unique').on(table.organizationId, table.domain),
   index('mikka_org_join_domain_idx').on(table.domain),
 ])
 
-/** A pending invitation grants only Organization Member; no Workspace or Project ACL. */
+/** Unscoped invitations grant only the organization role. Team scopes are explicit. */
 export const organizationInvitations = pgTable('mikka_organization_invitations', {
   id: uuid('id').primaryKey(),
   organizationId: uuid('organizationId').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   createdBy: text('createdBy').notNull(),
   email: text('email').notNull(),
+  role: text('role').$type<'admin' | 'member'>().notNull().default('member'),
   tokenHash: text('tokenHash').notNull().unique(),
   status: text('status').$type<'pending' | 'accepted' | 'revoked'>().notNull().default('pending'),
   expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
@@ -91,6 +95,13 @@ export const organizationEntitlements = pgTable('mikka_organization_entitlements
   billingWorkspaceId: uuid('billingWorkspaceId'),
   updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** Keep missing/removed teams detectable until an invitation is accepted or revoked. */
+export const organizationInvitationTeams = pgTable('mikka_organization_invitation_teams', {
+  invitationId: uuid('invitationId').notNull().references(() => organizationInvitations.id, { onDelete: 'cascade' }),
+  teamId: uuid('teamId').notNull(),
+  workspaceId: uuid('workspaceId').notNull(),
+}, table => [primaryKey({ columns: [table.invitationId, table.teamId] }), index('mikka_org_invitation_teams_team_idx').on(table.teamId)])
 
 /** An organization designates an existing account; no balances change owners. */
 export const organizationBillingAccounts = pgTable('mikka_organization_billing_accounts', {
