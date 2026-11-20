@@ -1,5 +1,5 @@
 import 'server-only'
-import { generateText, NoObjectGeneratedError, Output } from 'ai'
+import { generateText, NoObjectGeneratedError, NoOutputGeneratedError, Output } from 'ai'
 import { z } from 'zod'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { cleanShortTitle, isCjk, parseShortTitle, shortTitlePrompt, SHORT_TITLE_CHARS_MAX } from './short-title'
@@ -32,6 +32,8 @@ export async function generateShortTitle(ownerId: string, text: { title: string;
   } catch (error) {
     // The model answered but not in the schema's shape: read the title out of its text, as before structured output.
     if (NoObjectGeneratedError.isInstance(error) && error.text) return parseShortTitle(error.text, cjk)
+    // The model stopped without any output (a content filter, a length stop): no title, as before structured output.
+    if (NoOutputGeneratedError.isInstance(error)) return null
     throw error
   }
 }
