@@ -108,7 +108,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
         await measureNavigation(page, info, `首次进入${name}`, destination, () => link.click())
       }
       for (let round = 1; round <= 3; round++) {
-        for (const [name, destination] of [['账户', account], ['成员', members], ['团队', teams], ['常规', workspace], ['偏好设置', preferences]] as const) {
+        for (const [name, destination] of [['个人资料', account], ['成员', members], ['团队', teams], ['工作区常规', workspace], ['常规', preferences]] as const) {
           const link = await sidebarLink(name)
           await measureNavigation(page, info, `${name}-缓存返回-${round}`, destination, () => link.click())
         }

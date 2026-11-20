@@ -2206,7 +2206,9 @@
     "searchPlaceholder": "搜索设置…",
     "noResults": "没有匹配的设置",
     "groups": {
-      "personal": "账号",
+      "personal": "个人",
+      "agent": "Agent",
+      "review": "审阅",
       "workspace": "工作区",
       "administration": "管理",
       "yourTeams": "你的团队"
@@ -2219,13 +2221,21 @@
         "title": "成员"
       },
       "preferences": {
-        "title": "偏好设置"
+        "title": "常规"
+      },
+      "appearance": {
+        "title": "外观"
+      },
+      "instructions": {
+        "title": "指令",
+        "keywords": "记忆 建议"
       },
       "memory": {
         "title": "记忆与建议"
       },
       "account": {
-        "title": "账户"
+        "title": "个人资料",
+        "keywords": "账户 资料 隐私"
       },
       "teams": {
         "title": "团队"
@@ -2237,7 +2247,8 @@
         "title": "安全"
       },
       "connections": {
-        "title": "连接"
+        "title": "集成",
+        "keywords": "连接 插件 MCP"
       },
       "bot-permissions": {
         "title": "应用与运行权限"
@@ -2259,7 +2270,7 @@
         "title": "个人访问令牌"
       },
       "general": {
-        "title": "常规"
+        "title": "工作区常规"
       },
       "permissions": {
         "title": "团队权限"

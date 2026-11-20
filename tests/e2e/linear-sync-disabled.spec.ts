@@ -10,7 +10,7 @@ test('paused Linear settings do not poll state or start OAuth', async ({ page })
   })
   await page.getByRole('button', { name: '工作区菜单', exact: true }).click()
   await page.getByRole('menuitem', { name: '设置', exact: true }).click()
-  await page.getByRole('link', { name: '连接', exact: true }).click()
+  await page.getByRole('link', { name: '集成', exact: true }).click()
   // The list reads availability once for Linear's state word.
   await expect(page.getByRole('link', { name: '打开 Linear', exact: true })).toBeVisible()
   await expect.poll(() => availabilityReads).toBe(1)

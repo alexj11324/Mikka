@@ -2206,7 +2206,9 @@
     "searchPlaceholder": "Search settings…",
     "noResults": "No matching settings",
     "groups": {
-      "personal": "Account",
+      "personal": "Personal",
+      "agent": "Agent",
+      "review": "Review",
       "workspace": "Workspace",
       "administration": "Administration",
       "yourTeams": "Your teams"
@@ -2219,13 +2221,21 @@
         "title": "Members"
       },
       "preferences": {
-        "title": "Preferences"
+        "title": "General"
+      },
+      "appearance": {
+        "title": "Appearance"
+      },
+      "instructions": {
+        "title": "Instructions",
+        "keywords": "memory suggestions"
       },
       "memory": {
         "title": "Memory and suggestions"
       },
       "account": {
-        "title": "Account"
+        "title": "Profile",
+        "keywords": "account privacy"
       },
       "teams": {
         "title": "Teams"
@@ -2237,7 +2247,8 @@
         "title": "Security"
       },
       "connections": {
-        "title": "Connections"
+        "title": "Integrations",
+        "keywords": "connections plugins MCP"
       },
       "bot-permissions": {
         "title": "App & run permissions"
@@ -2259,7 +2270,7 @@
         "title": "Personal access tokens"
       },
       "general": {
-        "title": "General"
+        "title": "Workspace general"
       },
       "permissions": {
         "title": "Team permissions"

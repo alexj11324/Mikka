@@ -5,24 +5,28 @@ import { useLayoutEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from '@/components/settings/settings-link'
 import { useSearchParams } from '@/lib/client-runtime/navigation'
 import useSWR from 'swr'
-import { Bell, Blocks, Brain, Building2, ChartColumn, CircleCheck, CircleDashed, Container, CreditCard, FileText, Gauge, HardDrive, KeyRound, Landmark, Lock, Monitor, Plus, Shield, ShieldCheck, SlidersHorizontal, SquareTerminal, SquareUserRound, UserRound, Users, type IconGlyph } from '@/components/icons'
+import { Bell, Blocks, Brain, Building2, ChartColumn, CircleCheck, CircleDashed, Cloud, Container, CreditCard, FileText, Folder, Gauge, GitPullRequest, HardDrive, History, Keyboard, KeyRound, Landmark, Lightbulb, Monitor, Plus, Shield, ShieldCheck, SlidersHorizontal, SquareTerminal, SquareUserRound, Star, Sun, UserRound, Users, type IconGlyph } from '@/components/icons'
 import { listTeams } from '@/app/actions/teams'
 import { Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/sidebar'
 import { SearchInput } from '@/components/ui/search-input'
 import { RAIL_ITEMS } from '@/components/nav/icon-rail'
 import { settingsItemVisible } from '@/lib/settings-sidebar-search'
-import { settingsHref, visibleSettingsSections, type SettingsSectionId } from '@/lib/settings-sections'
+import { SETTINGS_GROUPS, settingsHref, visibleSettingsSections, type SettingsGroup, type SettingsSectionId } from '@/lib/settings-sections'
 import { ResizablePane } from '@/components/ui/resizable-pane'
 import type { SettingsSidebarProps } from '@/components/slots/settings-sidebar-contract'
 
-const icons: Record<SettingsSectionId, IconGlyph> = {
-  account: UserRound, security: Shield, preferences: SlidersHorizontal, notifications: Bell, memory: Brain, connections: Blocks, 'bot-permissions': ShieldCheck,
-  models: Gauge, logins: KeyRound, privacy: Lock, computers: Monitor, developer: SquareTerminal,
-  general: Building2, 'issue-states': CircleDashed, members: Users, teams: SquareUserRound, permissions: CircleCheck, secrets: HardDrive, environments: Container,
-  audit: FileText, organization: Landmark, usage: ChartColumn, billing: CreditCard, cloud: Blocks,
-}
+const icons = {
+  preferences: SlidersHorizontal, appearance: Sun, account: UserRound, security: Shield, notifications: Bell,
+  models: Gauge, environments: Container, connections: Blocks, logins: KeyRound, developer: SquareTerminal, computers: Monitor,
+  instructions: Brain, shortcuts: Keyboard, git: GitPullRequest, 'review-repositories': Folder, 'review-config': CircleCheck, activity: History,
+  general: Building2, 'issue-states': CircleDashed, members: Users, teams: SquareUserRound, permissions: ShieldCheck, secrets: HardDrive,
+  audit: FileText, organization: Landmark, usage: ChartColumn, billing: CreditCard, cloud: Cloud,
+  referrals: Star, experiments: Lightbulb, 'cloud-credentials': Cloud,
+} satisfies Record<SettingsSectionId, IconGlyph>
 
-export function SettingsSidebar({ section, activeSection, admin, personal = false, billing = true, cloudAdmin = false, workspaceName, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: SettingsSidebarProps) {
+const GROUP_TITLES = { personal: 'Personal', agent: 'Agent', review: 'Review', workspace: 'Workspace' } as const satisfies Record<SettingsGroup, string>
+
+export function SettingsSidebar({ section, activeSection, admin, personal = false, billing = true, cloudAdmin = false, organization = false, workspaceName, selectedTeamId, workspaceId, onSectionChange, onIntent, onRail }: SettingsSidebarProps) {
   const i18nText = useTranslations();
   const [query, setQuery] = useState('')
   const params = useSearchParams()
@@ -34,14 +38,14 @@ export function SettingsSidebar({ section, activeSection, admin, personal = fals
   // Recheck visibility changes before paint as well as route/team changes.
   useLayoutEffect(() => {
     contentRef.current?.querySelector('[aria-current="page"]')?.closest('[data-slot="sidebar-group"]')?.scrollIntoView({ block: 'nearest' })
-  }, [creating, section, selectedTeamId, teams.length, personal, admin, billing, cloudAdmin])
+  }, [creating, section, selectedTeamId, teams.length, personal, admin, billing, cloudAdmin, organization])
   const normalizedQuery = query.trim().toLowerCase()
   const joinedTeams = teams.filter(team => team.role && (!workspaceId || team.workspaceId === workspaceId) && `${team.name} ${team.identifier}`.toLowerCase().includes(normalizedQuery))
   const href = (id: SettingsSectionId) => settingsHref(id, workspaceId)
-  const groups = (['personal', 'workspace'] as const).map(group => {
+  const groups = SETTINGS_GROUPS.map(group => {
     const groupLabel = group === 'workspace' && workspaceName ? workspaceName : i18nText(`Settings.groups.${group}`)
-    const items = visibleSettingsSections({ admin, personal, billing, cloudAdmin }).filter(item => item.group === group && settingsItemVisible({
-      query, groupTitle: group === 'personal' ? 'Account' : 'Workspace', groupLabel, itemTitle: item.title,
+    const items = visibleSettingsSections({ admin, personal, billing, cloudAdmin, organization }).filter(item => item.group === group && settingsItemVisible({
+      query, groupTitle: GROUP_TITLES[group], groupLabel, itemTitle: item.title,
       label: i18nText(`Settings.sections.${item.id}.title` as never),
       keywords: i18nText.has(`Settings.sections.${item.id}.keywords` as never) ? i18nText(`Settings.sections.${item.id}.keywords` as never) : '',
       section: item.id, routed: Boolean(activeSection),

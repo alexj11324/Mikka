@@ -1,7 +1,9 @@
 import type { ComponentProps, ReactNode } from 'react'
 import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 
 /**
  * S-Q: a section that is still loading keeps its shape instead of rendering nothing.
@@ -103,6 +105,32 @@ export function SettingRow({
       <div className="shrink-0 text-sm">{children}</div>
     </div>
   )
+}
+
+/**
+ * A switch row's control. The caller passes the existing save function;
+ * a later generic settings write can replace `onCheckedChange` without changing the row.
+ */
+export function SettingSwitch({ label, checked, disabled, onCheckedChange }: {
+  label: string
+  checked: boolean
+  disabled?: boolean
+  onCheckedChange: (checked: boolean) => void
+}) {
+  return <Switch aria-label={label} checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
+}
+
+/** A select row's control. Options are the caller's; the value is not read from a new API. */
+export function SettingSelect({ label, value, onValueChange, options }: {
+  label: string
+  value: string
+  onValueChange: (value: string | null) => void
+  options: readonly { value: string; label: string }[]
+}) {
+  return <Select value={value} onValueChange={onValueChange}>
+    <SelectTrigger aria-label={label} className="w-40"><SelectValue /></SelectTrigger>
+    <SelectContent>{options.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
+  </Select>
 }
 
 /** Spread on the Button in a section header (添加, 打开设置…): gray-filled secondary, small. */
