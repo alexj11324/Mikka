@@ -55,6 +55,32 @@ adding or duplicating regression suites.
 
 ## Draft pull requests
 
+`pr-acceptance.yml` separately checks the PR's `## Acceptance` declaration on
+open, edit, synchronize, reopen, ready and draft transitions. It executes only
+the default branch's reviewed checker, reads all changed filenames through
+GitHub, and publishes the **`PR acceptance`** commit status on the PR head.
+Missing evidence adds `acceptance:missing`; a corrected declaration removes it.
+Drafts are not evaluated and retain a pending status, which is not acceptance.
+The existing required source/security checks still run on drafts.
+
+After this workflow is merged, Alex enables **`PR acceptance`** as an additional
+required status check for `main` in GitHub branch protection. The job name
+`Inspect PR acceptance` is not the head status to require. Workflow YAML does
+not change that repository setting. Declaration checks establish that the PR
+names its evidence; independent review still decides whether it proves the
+change. The checker never calls a model or runs PR-provided code.
+
+To inspect a PR with the same checker, run:
+
+```sh
+node scripts/ci/pr-acceptance-github.mjs --repo alexj11324/Mikka --pr PR_NUMBER
+```
+
+Replace `PR_NUMBER` with its number. For an authorized live admission rehearsal,
+add `--publish` with the existing `GITHUB_TOKEN` credential delivery; never put
+the token in command arguments. This updates the same status and label. The
+trusted workflow itself starts automatically only after it exists on `main`.
+
 There are two intentionally different classes of PR checks:
 
 - **Required checks always run**, even on drafts: `UI policy (strict)`,
