@@ -5681,6 +5681,14 @@
       "sourceSeparator": "、",
       "sectionsHint": "在分组间跳转",
       "openHint": "打开"
+    },
+    "profileMark": {
+      "state": {
+        "working": "运行中",
+        "idle": "空闲",
+        "needs-you": "等你处理",
+        "failed": "失败"
+      }
     }
   },
   "SuggestionsPage": {
