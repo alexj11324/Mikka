@@ -1570,7 +1570,7 @@
         "POST"
       ],
       "maxDuration": 120,
-      "sourceHash": "968e4ca03db292665649e95759b8784de8d20fbddb21dfd1043894ed41fc0c2c"
+      "sourceHash": "0f5014a03287922cec3f9d1bbbd9a2ae401a5ce104f1ee8268bfa2f8ca6201a6"
     },
     {
       "path": "/mikka/api/me/invitations",
@@ -2902,6 +2902,81 @@
       ],
       "maxDuration": 300,
       "sourceHash": "cd49a4d17ff60e20d56e050860e405c62d76d40e6a0dcb8ae0ce7d6d07664e83"
+    },
+    {
+      "path": "/mikka/api/v1/artifacts",
+      "template": "/api/v1/artifacts",
+      "source": "app/api/v1/artifacts/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "ae061d05058cb33052bd221095ee14ed29bddcfd27d216da4aace4e17c853306"
+    },
+    {
+      "path": "/mikka/api/v1/artifacts/[artifactId]",
+      "template": "/api/v1/artifacts/[artifactId]",
+      "source": "app/api/v1/artifacts/[artifactId]/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "36a818ffb832ba0308cdec8f6a5464275b999ebcaf963cd236c1777bfc834716"
+    },
+    {
+      "path": "/mikka/api/v1/bots",
+      "template": "/api/v1/bots",
+      "source": "app/api/v1/bots/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "1ac31228c42df5d0e5acd61287b2daf1ee8e7f03406b9bc70605c73ab609d297"
+    },
+    {
+      "path": "/mikka/api/v1/bots/[botId]/messages",
+      "template": "/api/v1/bots/[botId]/messages",
+      "source": "app/api/v1/bots/[botId]/messages/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "e6a922836a5cb94f10ac3b5915a23dea2cca0d9dc1cb09a5f73f8762400eb3ab"
+    },
+    {
+      "path": "/mikka/api/v1/drive/volumes",
+      "template": "/api/v1/drive/volumes",
+      "source": "app/api/v1/drive/volumes/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "92bce881df61db9ac56587dc676f51be3031055cda961122a20e2b2077e23fcf"
+    },
+    {
+      "path": "/mikka/api/v1/drive/volumes/[volumeId]/files",
+      "template": "/api/v1/drive/volumes/[volumeId]/files",
+      "source": "app/api/v1/drive/volumes/[volumeId]/files/route.ts",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "sourceHash": "0d66343f539c678416aaf0f5c4873f27b452df9cb2cdd6e367b17b01b7f6c51e"
+    },
+    {
+      "path": "/mikka/api/v1/threads",
+      "template": "/api/v1/threads",
+      "source": "app/api/v1/threads/route.ts",
+      "methods": [
+        "GET"
+      ],
+      "sourceHash": "ca344c0ab78776fe5878735cc3dee1de3de12faf79a78263640414c2e4092db9"
+    },
+    {
+      "path": "/mikka/api/v1/threads/[runId]/messages",
+      "template": "/api/v1/threads/[runId]/messages",
+      "source": "app/api/v1/threads/[runId]/messages/route.ts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "sourceHash": "94d44f7b9864332523cabc798c1ec911b43c316124c6d0d9164cb998c518fd49"
     },
     {
       "path": "/mikka/api/version",

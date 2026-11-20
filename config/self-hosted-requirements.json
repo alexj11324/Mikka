@@ -3826,5 +3826,159 @@
     "behavior": "The one mark registry: a status, priority, thread group or run indicator in, the shape and tone every surface draws out. Pure data, no installation dependency.",
     "test": "lib/state-mark.test.ts",
     "suite": "test:lib-units"
+  },
+  "app/api/v1/artifacts/[artifactId]/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read one artifact version for a scoped PAT or an mksvc_ service key, under the resource ACL of the credential's own Workspace, from the installation database and configured artifact storage.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/artifacts/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List artifacts a scoped PAT or service key may read in its own Workspace, from the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/bots/[botId]/messages/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read a shared Bot chat (masked) or hand a Bot a peer message and wake it through the existing coordinator outbox, under the Bot ACL of the credential's Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/bots/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List Bots a scoped PAT or service key may discover in its own Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/drive/volumes/[volumeId]/files/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read or compare-and-swap write one file of a bot, thread, environment or team Workspace Drive folder, using the installation database and configured Drive storage.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/drive/volumes/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List a bot, thread, environment or team Workspace Drive scope and its default folder's files for a scoped PAT or service key.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/threads/[runId]/messages/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read a thread (masked) or send a peer message that queues, steers or continues it on its owner's own admission, under the thread ACL of the credential's Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "app/api/v1/threads/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "List threads a scoped PAT or service key may read in its own Workspace.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "drizzle/20261120044938_agent_bot_interop.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Adds bot/run ACL subjects (explicit grants only), the bot, thread and environment Drive scopes, the interop PAT scopes and the peer thread-send receipt table to the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/drive/contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure Drive contract, including the agent Drive scopes and their storage namespace; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/interop/artifacts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked, tenant-pinned artifact reads from the installation database and configured artifact storage.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/bots.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked Bot discovery, masked chat reads and peer sends through the existing coordinator outbox.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/drive.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked Drive folders for bot, thread, environment and team Workspace scopes on the existing Drive store and its compare-and-swap.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/errors.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure interop refusal codes registered for user copy; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/interop/http.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Authenticates /api/v1 interop requests by scoped PAT or mksvc_ service key and maps refusals to their codes.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/principal.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "The interop principal pinned to one Workspace and the owner-or-own-grant ACL decision in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/threads.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "ACL-checked thread reads, masked checkpoint diffs and idempotent peer sends that continue a thread on its owner's admission.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/interop/tool-schemas.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure tool input schemas shared by the Bot and the worker MCP; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/interop/tools.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Runs one interop tool for a principal and returns its registered refusal code.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
+  },
+  "lib/resource-access/contract.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure resource ACL contract, including the bot and run subject kinds; no external service.",
+    "test": "lib/interop/interop.test.ts",
+    "suite": "test:interop"
+  },
+  "lib/thread-continue.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Sends a message to a thread or continues an ended thread on the owner's admission; a peer send is recorded as peer, never as the owner.",
+    "test": "tests/thread-continue.db.test.ts",
+    "suite": "test:bot-threads-db"
+  },
+  "workflows/coordinator/interop-steps.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "A Bot's interop tool step: the Bot acts in its own Workspace with its owner's identity and its own grants.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
   }
 }
