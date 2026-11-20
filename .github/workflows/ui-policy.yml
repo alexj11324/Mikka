@@ -17,8 +17,29 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/pnpm-install
-      - name: Compare exact frontend outputs without changing build configuration
-        run: node --experimental-test-module-mocks apps/frontend/scripts/frontend-determinism-probe.mjs
+      - name: Run unchanged regression with bounded CPU contention and retain cleanup inputs
+        run: |
+          mkdir -p "$PROBE_DIRECTORY"
+          failed=0
+          load_a=''
+          load_b=''
+          trap 'if [ -n "$load_a" ]; then kill "$load_a" "$load_b" 2>/dev/null || true; fi' EXIT
+          for mode in normal loaded-1 loaded-2 loaded-3; do
+            if [ "$mode" = loaded-1 ]; then
+              yes > /dev/null & load_a=$!
+              yes > /dev/null & load_b=$!
+            fi
+            probe_case="$PROBE_DIRECTORY/$mode"
+            mkdir -p "$probe_case"
+            if PROBE_CASE_DIRECTORY="$probe_case" node --experimental-test-module-mocks --import ./apps/frontend/scripts/frontend-determinism-snapshot.mjs --test --test-concurrency=1 apps/frontend/scripts/build.test.mjs > "$probe_case/test.log" 2>&1; then
+              echo "$mode: passed"
+            else
+              echo "$mode: failed"
+              failed=1
+            fi
+            tail -n 12 "$probe_case/test.log"
+          done
+          exit "$failed"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

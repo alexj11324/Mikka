@@ -22,7 +22,7 @@ async function captureBuild(config) {
   const snapshot = { define: config.define, build: config.build, base: config.base }
   const beforeMinify = []
   config.plugins.push({ name: 'frontend-determinism-capture', enforce: 'post',
-    renderChunk(code, chunk) { beforeMinify.push({ ...chunk, code, type: 'chunk' }); return null },
+    renderChunk(code, chunk) { beforeMinify.push({ ...chunk, moduleIds: [...chunk.moduleIds], code, type: 'chunk' }); return null },
   })
   const result = await vite.build(config)
   captures.push({ config: snapshot, beforeMinify, outputs: (Array.isArray(result) ? result : [result]).flatMap(value => value.output ?? []) })
@@ -39,8 +39,8 @@ function inventory(outputs) {
     bytes: Buffer.from(output.type === 'chunk' ? output.code : output.source),
     ...(output.type === 'chunk' ? {
       facade: output.facadeModuleId, imports: output.imports, dynamicImports: output.dynamicImports, exports: output.exports,
-      modules: Object.keys(output.modules),
-      logical: 'chunk:' + hash(Object.keys(output.modules).sort().join('\n')),
+      modules: output.moduleIds ?? Object.keys(output.modules),
+      logical: 'chunk:' + (output.facadeModuleId ?? output.name) + ':' + hash([...(output.moduleIds ?? Object.keys(output.modules))].sort().join('\n')),
     } : { logical: 'asset:' + output.fileName.replace(/-[\w-]{8}(?=\.)/, '-HASH') }),
   }))
 }
