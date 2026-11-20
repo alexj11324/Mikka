@@ -32,6 +32,7 @@ let pathname = '/mikka/en', search = ''
 let serverVersion: { build: string } = { build: 'fixture-current' }
 const notices: unknown[] = []
 const notes = [{ n: 1, kind: 'region' as const, url: 'https://example.com', label: 'fixture', note: 'keep this note', rect: { x: 0, y: 0, width: 1, height: 1, viewportWidth: 1, viewportHeight: 1 } }]
+let ThreadTranscript: typeof import('../slots/thread-transcript')['ThreadTranscript']
 let composer: { sending?: boolean; editableWhileSending?: boolean; value: string; onChange: (value: string) => void; onSubmit: () => void }
 const plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 const nothing = () => null
@@ -41,7 +42,8 @@ mock.module(new URL('../../hooks/use-factory-questions.ts', import.meta.url).hre
   useFactoryQuestions: () => ({ questions: [], error: null, reload: nothing }),
 } })
 mock.module(new URL('../slots/thread.tsx', import.meta.url).href, { namedExports: {
-  ThreadScreen: (props: import('../slots/thread-contract').ThreadScreenProps) => {
+  ThreadScreen: (props: import('../slots/thread-contract').ThreadScreenProps | import('../slots/thread-contract').ThreadTranscriptScreenProps) => {
+    if ('transcript' in props) return <ThreadTranscript {...props} />
     composer = props.composer
     const { entries } = props
     return <div data-official-thread="">
@@ -135,6 +137,7 @@ before(async () => {
   }
   ;({ createRoot } = await import('react-dom/client'))
   ;({ RetryReplyButton } = await import('./retry-reply-button'))
+  ;({ ThreadTranscript } = await import('../slots/thread-transcript'))
   ;({ CoordinatorChat } = await import('./coordinator-chat'))
   ;({ VersionGuard } = await import('../version-guard'))
   Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })

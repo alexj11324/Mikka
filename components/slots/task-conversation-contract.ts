@@ -2,7 +2,11 @@
 // task opens as the task's whole conversation, its attempts oldest first, scrolled to the attempt opened. A layer builds
 // it from IssueThreadPanel's `before`, `focusRunId` and `transcriptOnly` (components/workspace/issue-thread-panel.tsx).
 
+import type { ThreadHost } from '@/components/slots/thread-contract'
+
 export type TaskConversationProps = {
+  /** Where the conversation is rendered; does not change its route or commands. */
+  host?: ThreadHost
   issueId: string
   /** The attempt opened; the conversation scrolls to it. */
   runId: string
