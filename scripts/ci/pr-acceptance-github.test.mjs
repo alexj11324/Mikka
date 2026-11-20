@@ -27,7 +27,7 @@ async function github(t, { files = [{ filename: 'docs/guide.md' }], body = '', d
     else if (req.url === '/repos/example/project/labels' && req.method === 'POST') { labelExists = true; reply(201, data) }
     else if (req.url === '/repos/example/project/issues/7/labels' && req.method === 'POST') { pr.labels = data.labels.map(name => ({ name })); reply(200, pr.labels) }
     else if (req.url === '/repos/example/project/issues/7/labels/acceptance%3Amissing' && req.method === 'DELETE') { pr.labels = []; reply(200, []) }
-    else if (req.url === `/repos/example/project/statuses/${head}` && req.method === 'POST') reply(201, { id: writes.length, ...data })
+    else if (/^\/repos\/example\/project\/statuses\/[a-f0-9]{40}$/.test(req.url) && req.method === 'POST') reply(201, { id: writes.length, ...data })
     else reply(404, {})
   })
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
@@ -60,6 +60,24 @@ test('all changed-file pages participate in screenshot admission', async t => {
 
 test('editing the body during the check cannot publish a stale success', async t => {
   const fixture = await github(t, { body: '## Acceptance\nNot needed: documentation only.', changeOnRead: (pr, reads) => { if (reads === 2) pr.body = '' } })
+  await assert.rejects(checkPullRequest(fixture.args), { code: 'prAcceptanceChangedDuringCheck' })
+  assert.deepEqual(fixture.writes.map(item => item.data.state), ['pending'])
+})
+
+test('a previous-head success never supplies acceptance for a changed head', async t => {
+  const fixture = await github(t, { body: '## Acceptance\nNot needed: documentation only.' })
+  assert.equal((await checkPullRequest(fixture.args)).status, 'pass')
+  const nextHead = 'c'.repeat(40)
+  fixture.pr.head.sha = nextHead
+  fixture.pr.body = ''
+  assert.equal((await checkPullRequest(fixture.args)).status, 'fail')
+  const states = fixture.writes.filter(item => item.path.includes('/statuses/'))
+    .map(item => [item.path.split('/').at(-1), item.data.state])
+  assert.deepEqual(states, [[head, 'pending'], [head, 'success'], [nextHead, 'pending'], [nextHead, 'failure']])
+})
+
+test('a head change during the check leaves the old head pending instead of passing', async t => {
+  const fixture = await github(t, { body: '## Acceptance\nNot needed: documentation only.', changeOnRead: (pr, reads) => { if (reads === 2) pr.head.sha = 'c'.repeat(40) } })
   await assert.rejects(checkPullRequest(fixture.args), { code: 'prAcceptanceChangedDuringCheck' })
   assert.deepEqual(fixture.writes.map(item => item.data.state), ['pending'])
 })
