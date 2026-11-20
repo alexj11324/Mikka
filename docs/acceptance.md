@@ -6,52 +6,29 @@ model and release authorization.
 
 ## Ordinary functional acceptance
 
-Run ordinary functional acceptance locally, in the session's cloud Linux
-container, against `pnpm dev`, a real isolated PostgreSQL database and a real
-daemon from source when the flow uses one ([dev workflow](dev-workflow.md)).
-Do not wait for CI, a merge or a deploy to check what can be checked here. A
-deployed site and provider OAuth are not prerequisites for ordinary business
-checks. Keep the existing rule against starting those services or builds on
-the developer's Mac.
+Use the [runner/checker process](../.agents/acceptance/PROCESS.md) for the scope
+plan, executable plan, execution, and independent final verdict. The
+[project adapter](../.agents/acceptance/PROJECT.md) identifies local commands,
+scripted model/provider boundaries, fixture screenshots, probes, and the
+distinct device/E2B evidence. Run ordinary behavior through the API/CLI in
+isolated cloud Linux; UI captures use a local production build of the official
+public/private pair.
 
-Use the existing shared SMOKE account in **Acme Inc.** for acceptance against
-the shared application, following [the workspace contract](#shared-production-acceptance-workspace).
-Do not sign in as Alex. Isolated regression harnesses that bootstrap their own
-disposable database use `acquireTestAccounts` in
-`scripts/test-accounts/session.mjs` and `pool.mjs`. Those harnesses provision
-owner/peer fixtures through normal email sign-up/sign-in and verify the real
-session. Follow their lease renewal, release and evidence auditing. Their
-results establish the isolated fixture path. Subscriptions serve their owner
-only (decision 2026-11-17-1400), so subscription checks use the account's own.
-
-The shared adapter implements `isolated-ci` for loopback application targets
-and `isolated-docker` for the separately bound Docker environment. Both keep
-the database on a loopback `*_e2e` target. Its environment descriptor binds the
-application version, origin and actual database identity. These checks remain
-in force. This is an implementation boundary, not a user policy prohibiting deployed or other test
-environments. Where that adapter is not implemented, use an existing supported
-automatic test-identity fixture or authorized session for that environment and
-record the actual capability gap. Ordinary acceptance runs through the API
-and CLI (`pnpm test:local-loop`) under the
-[accepted policy](design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
-The general browser suite is retired. Retained targeted Desktop, Analytics and
-self-hosted checks keep the source-bound scopes in the
-[workflow reference](../.github/workflows/README.md).
+Isolated harnesses acquire owner/peer accounts through
+`scripts/test-accounts/session.mjs` and `pool.mjs`, as
+[test accounts](test-accounts.md) describes. The supported adapters keep the
+database on loopback `*_e2e`, bind the actual application/database identity,
+and preserve lease ownership and cleanup. A pool result establishes that
+isolated fixture path. For shared production, use the
+[shared workspace contract](#shared-production-acceptance-workspace) instead.
 
 ## Record the version and environment
 
-Record the branch/revision, the local run (and the Git-linked CI run once it
-reports), application origin, database and daemon environment, UTC interval, expected/actual behavior and observed request
-IDs. Keep code and environment fixed during each run. Reuse completed checks
-when their code and environment remain applicable, using Git's PR/commit-to-CI
-association instead of repeatedly comparing identifiers. Recheck the affected
-behavior when code/environment changes or the recorded version does not match.
-
-Keep account credentials, cookies, tokens and retained browser state out of
-logs, screenshots, reports and model-visible output. A real application/DB/daemon
-run proves those paths; a scripted model or provider fixture does not prove a
-real external provider worked. Record those distinctions without making an
-unrelated real-model or OAuth run a prerequisite for a documentation change.
+The [process](../.agents/acceptance/PROCESS.md#3-execute-and-collect-evidence)
+owns source/environment binding, sanitized artifacts, evidence reuse, and
+`pass` / `fail` / `uncertain` decisions. A fake response proves the exercised
+contract, not a live external service. A production-only limitation needs its
+owner and internal account alias in the PR's Acceptance declaration.
 
 ## Historical Factory candidates awaiting checks
 
@@ -101,8 +78,8 @@ never request passwords or verification codes in chat.
 
 There is no separate Infisical vault for an OAuth test account; the Aspectly Labs
 organization has no such project. Use the existing authorized provider/browser
-sessions above. Live model-path acceptance uses the shared test account and the
-subscription paths described in [Live model acceptance](#live-model-acceptance).
+sessions above. Use the authorized internal account for the external OAuth check. Model
+acceptance remains scripted under the policy below.
 Preserve provider verification checks.
 
 For `account_not_linked`, diagnose the provider identity, existing account and
@@ -117,20 +94,17 @@ ordinary functional acceptance.
 
 ## Live model acceptance
 
-For a change that runs model work, cover the official Claude Code subscription
-with `claude-haiku-5-5` and the official Codex subscription with `gpt-6-luna`.
-Keep each existing case on its originally bound subscription. Record a blocked
-path's real quota, rate-limit or provider error and continue the independent
-path. Both passing paths complete the model coverage. One passing path does
-not prove the other.
+This anchor is retained for existing links. The former live-subscription test
+instructions are superseded by Alex's
+[scripted model acceptance decision](design/decisions/2026-11-20-1855-scripted-model-acceptance.md)
+and [#2891](https://github.com/alexj11324/Mikka/issues/2891).
 
-The DeepSeek/API-key leg never gates a merge or acceptance. Do not send paid
-API-key prompts to retry a blocked leg or substitute Pro, another provider or
-another model. The existing `test:local-loop` driver still requires a real
-DeepSeek key and asserts Flash selection, so its local-flow results do not
-establish either subscription path. Record that implementation gap without
-making it an additional gate. The built-in Decision judge is separate from
-these user-selectable coding models and keeps its configured model.
+Development, CI, local-loop, and nightly acceptance use scripted or recorded
+responses at the LiteLLM HTTP boundary. Keep admission, authorization, tool
+execution, the daemon, and the isolated database real. Cover both applicable
+native protocols with their recorded or scripted provenance; do not call a
+live provider or supply a model key. Fixture evidence does not establish live
+subscription compatibility, model quality, or deployed model mappings.
 
 ## Personal Workspace acceptance
 
@@ -167,41 +141,12 @@ unavailable policy metadata blocks the subscription attempt.
 The report contains closed status/error codes rather than account labels,
 credentials, device names or Agent instructions.
 
-An execution attempt requires an existing enabled, online local device, its
-matching Agent, source pins and one explicit harness:
-
-```sh
-corepack pnpm acceptance:personal \
-  --origin http://127.0.0.1:3000 --workspace PERSONAL_WORKSPACE_UUID \
-  --operation execute --harness codex --device-id DEVICE_UUID --agent-id CODEX_AGENT_UUID \
-  --expected-build APPLICATION_SHA --revision DRIVER_SHA
-```
-
-Run the independent Claude case with `--harness claude_code` and its originally
-bound Agent/subscription. Each command runs one case: Codex uses `gpt-6-luna` and
-Claude Code uses `claude-haiku-5-5`. A successful case does not cover the other
-subscription. There is no automatic model/provider fallback or retry. Personal
-execution cannot choose an implicit cloud machine. The device must advertise a
-successful native subscription preflight with the exact versions in
-`packages/daemon/harness/pins.json`; metadata readiness still cannot prove that
-the server can acquire a real provider lease or that a model call succeeded.
-The existing execution and native receipt checks establish that evidence.
-
-Add `--probe files --expected-worker-sha WORKER_SHA
---expected-worker-source WORKER_SOURCE_SHA` to reuse the Files acceptance driver.
-Personal fixtures use the normal personal task action, without a Team. Its
-immutable installed-worker marker and native shell/file receipts remain required;
-a source daemon without that release installation cannot pass them. A single
-successful Files case reports `partial` and the required/verified harness lists.
-Both original subscriptions remain necessary for complete coverage.
-
-Readiness reports `startup_personal_runtime_unavailable` when the normal
-subscription endpoint cannot expose its configured backend,
-`startup_personal_subscription_missing` when the account has no matching source,
-`startup_personal_model_missing_or_ambiguous` for an absent or foreign fixed-model
-candidate, and separate device/native-runtime/Agent errors for a missing,
-disabled, offline or incompatible target. Record blocked cases as blocked;
-fixture metadata and empty harness lists do not prove native model execution.
+Model-backed execution acceptance follows the scripted LiteLLM and native
+protocol cases in the [project adapter](../.agents/acceptance/PROJECT.md).
+The earlier `--operation execute` subscription commands are not part of the
+acceptance workflow. Metadata readiness remains a read-only capability check;
+it does not prove dispatch, files, or a model result. Record the real daemon,
+run, and persisted effect for every execution claim.
 
 ## Shared production acceptance workspace
 
@@ -218,80 +163,40 @@ Ordinary acceptance must not sign in as Alex. For production checks described
 below, use this shared-account team scope rather than an isolated account-pool
 lease. Keep the normal identity, membership and cleanup checks.
 
-### Issue #1918: authorized owned Codex Cloud MCP case
+### Historical owned-account cases
 
-For this case, Alex explicitly authorized the existing 2023 account and its
-own Codex `gpt-6-luna` subscription
-([decision](design/decisions/2026-11-11-1405-owned-codex-cloud-mcp-acceptance.md)).
-Run `scripts/acceptance/cloud-native-mcp.mjs` with the complete
-`MIKKA_TEST_ACCOUNT_EMAIL` / `MIKKA_TEST_ACCOUNT_PASSWORD` environment pair,
-mapped in memory from the existing Infisical `prod:/` `ALEX_TEST_EMAIL` /
-`ALEX_TEST_PASSWORD`. Keep `SMOKE_OWNER_*` unchanged.
-
-Pass `--expected-build`, `--expected-worker-sha`, `--expected-worker-source`
-and a unique `--output` path. The existing `VERCEL_TEAM_TOKEN` supplies the
-read-only published runtime configuration check. Without `--execute`, the command only prints
-its preparation contract and makes no network calls. Execution creates one
-normal cloud task on the owned Luna source, calls the configured public
-DeepWiki native MCP once, and verifies its paired Task CLI input/output,
-later handoff and root-owned worker release markers. The native shell proof
-reads the README and release markers; it uses the existing probe assignment
-policy and does not set the assignment's `readOnly` flag, which disables that
-shell. The task instructions prohibit writes, commits, pushes and messages.
-
-The report and adjacent `.fixture.jsonl` journal use private files and a new
-case ID. Cleanup targets only that case's MCP connection, Profile, task and
-machine, then restores and closes its sessions. The result records
-`actor: authorized_2023_codex` and `ownedScope.access: owner`. It does not
-replace the existing shared SMOKE Claude result or complete the two-model
-candidate publication gate. The production worker pins must already match
-the version being accepted. The account's normal `apiKeyAfterQuota` setting
-must be false; the driver checks it and preserves the setting.
-
-The one-time setup and the subsequent fixed-deployment production verification
-are recorded in [issue #1415 acceptance report](acceptance/issue-1415/final-report.md).
-The setup made the existing Claude and Codex subscription sources visible; it
-created no API key and is not a model-prompt result.
+Issue #1918's one-time owned-account authorization and subscription evidence
+remain historical provenance in the
+[owned Codex Cloud decision](design/decisions/2026-11-11-1405-owned-codex-cloud-mcp-acceptance.md)
+and [issue #1415 report](acceptance/issue-1415/final-report.md).
+They do not authorize this workflow to send real model prompts or substitute
+that account for the shared internal acceptance identity.
 
 ## Production acceptance after a merge
 
-After the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
+After merging, verify the exact merge SHA and follow the existing
+[release process](dev-workflow.md#5-ownership-and-merging) and
+[build source of truth](operations/build-source-of-truth.md). GitHub Actions
+builds the trusted artifacts; the release owner controls Cloudflare staging,
+promotion, and migration windows. A PR, build, or deployment start is not a
+serving-version receipt.
 
-1. Watch the Vercel production deployment of the merge commit until it is
-   READY, and confirm the production domain serves that commit.
-2. Pending migrations run through the existing flow. `pnpm build` runs
-   `scripts/migrate.mjs` in the production-mode GitHub Actions build before
-   deploying the prebuilt output to Vercel. See
-   [migration bootstrap](migration-bootstrap.md). Do not apply SQL by hand.
-3. Decide whether the change needs production acceptance (Alex, 2026-11-07):
-   - **No**, when a local production build can show it: UI, interaction,
-     navigation, page refresh, layout and copy. CI plus the PR's screenshots
-     of a local production build accept it. Note on the issue that production
-     serves the merge commit, and close it. Do not sign in to production,
-     wait for a merge window or hold `main` for these.
-   - **Yes**, only for what cannot be tested locally: real subscriptions
-     (Claude Code, Codex), OAuth sign-in, model providers, the GitHub App,
-     payments, push notifications and other external services. Check those
-     criteria in production with the shared test account in the Acme Inc.
-     workspace (above) and a real task; leave no junk data. A simulated or
-     scripted test is not production acceptance.
-4. Write the evidence on the issue: time, run id and a log summary, with no
-   secrets or personal data. Then close the issue.
+Local production-build screenshots cover UI, interactions, navigation,
+refresh, layout, and copy. Track the serving release separately. For a
+`Production only` exception, verify the specific external behavior using its
+named internal account after the correct version serves it. OAuth, app
+installation, payments, and push are examples. Send no real model prompts;
+a scripted local test does not establish an external provider result.
 
-The [2026-11-07 production acceptance decision](design/decisions/2026-11-07-1400-production-acceptance-scope.md)
-calls for automatic sign-in, a Coordinator message and task dispatch after each
-Web release. The implemented `production-smoke.yml` job runs
-`scripts/ops/production-smoke.mjs`, which signs in and reads the shell,
-capabilities and shared-team Coordinator runtime. `AGENTS.md` records that
-implementation and keeps messaging and dispatch in separate live acceptance
-until the automatic-smoke gap is implemented. The workflow writes its result
-and artifact on every run. Inspect a failure and fix the responsible path
-through the normal release flow. See [production smoke](production-smoke.md)
-for the exact coverage.
+Record UTC time, source/release identity, run ID, result, and sanitized
+supporting evidence on the issue. Keep production acceptance open while its
+required evidence is absent. The [production smoke](production-smoke.md) guide
+and actual workflow define the automatic route/sign-in/read coverage; inspect
+real failures and fix the responsible owner through the normal release flow.
 
 If production breaks, fix forward with a new PR or revert through a revert
 PR. Never delete deployments, revoke shared tokens, change production Neon
-settings or create paid resources without Alex.
+settings, or create paid resources without Alex.
 
 ## When the check specifically targets a deployed origin
 

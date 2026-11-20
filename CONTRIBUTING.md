@@ -103,17 +103,16 @@ cannot.
    summaries across 1–4 dynamic shards. Required gate names stay stable; every
    selected lane must succeed. Weekly and manual runs cover the full inventory.
    See the [selection, trust and fallback rules](docs/ci/incremental.md).
-3. **Ordinary acceptance uses API and CLI.** Acceptance runs locally through
-   the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
-   with screenshots of a local production build of the official UI (`pnpm build`, `pnpm start`, with `mikka-hosted-ui`). `browser-gate.yml` only keeps the protected
-   check name "Browser tests (before merge)" and passes at once. The specs
-   under `tests/e2e/` stay as retained fixtures. The general browser suite is
-   retired. Targeted Desktop and Analytics jobs retain their
-   explicitly selected build/browser checks. `site-search.yml` runs its
-   spec with Playwright's request client. See the
-   [workflow reference](.github/workflows/README.md) for actual scopes. Decisions
-   [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
-   [`design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md`](docs/design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
+3. **Run and independently review acceptance.** Follow the
+   [runner/checker process](.agents/acceptance/PROCESS.md) and
+   [project adapter](.agents/acceptance/PROJECT.md) for the two plan reviews,
+   API/CLI execution, official fixture screenshots, and final evidence verdict.
+   Models are scripted or replayed at the LiteLLM boundary, with a loopback
+   PostgreSQL 17 `*_e2e` database. Missing required evidence is `uncertain`.
+   Put the report and checker verdict in the PR's `## Acceptance` declaration;
+   `PR acceptance` validates the declaration without calling a model. The
+   retired general browser suite remains retired; retained targeted checks
+   keep the [workflow reference](.github/workflows/README.md)'s scope.
 4. **Release from trusted artifacts.** GitHub Actions builds the official
    artifacts from reviewed source. Test the selected immutable artifact in
    Cloudflare staging before promoting that same digest. Run tests that need
