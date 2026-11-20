@@ -14,7 +14,7 @@ const git = async (cwd, args) => (await execute('git', ['-c', 'user.name=HTTP fi
   { cwd, env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0' } })).stdout.trim()
 
 /** Real local Git state, shared HTTP handler, no GitHub access or model call. */
-export async function githubFixture({ conflict = false } = {}) {
+export async function githubFixture({ conflict = false, githubAccountId = 456 } = {}) {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-github-http-')), source = join(directory, 'source'), bare = join(directory, 'origin.git')
   await git(directory, ['init', '--initial-branch=trunk', source])
   await writeFile(join(source, 'README.md'), 'base\n')
@@ -33,7 +33,7 @@ export async function githubFixture({ conflict = false } = {}) {
   }
   const pulls = [{ number: 41, node_id: 'MVP_PR_41', title: 'HTTP fixture', html_url: 'https://github.com/mikka-e2e/core-loop/pull/41',
     state: 'open', draft: false, merged: false, head: { ref: 'mikka/http-1', repo: { id: 789 } }, base: { ref: 'trunk', repo: { id: 789 } } }]
-  const scenario = { barePath: bare, githubAccountId: 456, harness: 'synthetic-codex' }, observations = []
+  const scenario = { barePath: bare, githubAccountId, harness: 'synthetic-codex' }, observations = []
   const github = createGitHubRoutes({ getScenario: () => scenario, getPullRequests: () => pulls, git, observe: item => observations.push(item), origin: 'http://127.0.0.1' })
   const server = createServer(async (request, response) => {
     try {
@@ -42,7 +42,7 @@ export async function githubFixture({ conflict = false } = {}) {
   })
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
   const origin = `http://127.0.0.1:${server.address().port}`
-  return { head, github, pulls, observations, fetch: externalServiceFetch(origin),
+  return { origin, head, github, pulls, observations, fetch: externalServiceFetch(origin),
     currentBase: () => git(bare, ['rev-parse', 'refs/heads/trunk']),
     parents: sha => git(bare, ['show', '-s', '--format=%P', sha]),
     async close() { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await rm(directory, { recursive: true, force: true }) } }
