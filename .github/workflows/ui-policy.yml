@@ -11,7 +11,7 @@ jobs:
       NODE_OPTIONS: --max-old-space-size=4096
       MIKKA_EDITION: cloud
       MIKKA_DEPLOYMENT_ID: build-output-contract
-      PROBE_DIRECTORY: ${{ runner.temp }}/frontend-determinism
+      PROBE_DIRECTORY: /tmp/frontend-determinism-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -23,6 +23,6 @@ jobs:
         if: always()
         with:
           name: frontend-determinism-${{ github.sha }}
-          path: ${{ runner.temp }}/frontend-determinism
+          path: ${{ env.PROBE_DIRECTORY }}
           if-no-files-found: error
           retention-days: 1
