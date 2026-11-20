@@ -23,27 +23,28 @@ function event(kind) {
   }
 }
 
-test('automatic builds use the real main push or owner-authored same-repository PR source', () => {
-  for (const kind of ['push', 'pull_request']) {
-    const { env, payload } = event(kind)
-    assert.equal(trustedBuildSource(env, payload), revision)
-  }
+test('automatic publication uses the real main push allowed by the existing protected environment', () => {
+  const { env, payload } = event('push')
+  assert.equal(trustedBuildSource(env, payload), revision)
 })
 
-test('forks, untrusted authors, mismatched runs and simulated dispatches cannot obtain build authority', () => {
+test('PRs including the owner\'s, foreign actors, mismatched runs and simulated dispatches cannot obtain publication authority', () => {
+  const pr = event('pull_request')
+  assert.throws(() => trustedBuildSource(pr.env, pr.payload))
+  pr.payload.pull_request.head.repo.fork = true
+  assert.throws(() => trustedBuildSource(pr.env, pr.payload))
   for (const mutate of [
-    value => { value.payload.pull_request.head.repo.fork = true },
-    value => { value.payload.pull_request.head.repo.full_name = 'outsider/Mikka' },
-    value => { value.payload.pull_request.head.repo.id = 7 },
-    value => { value.payload.pull_request.user.id = 7 },
-    value => { value.payload.pull_request.base.ref = 'release' },
+    value => { value.env.GITHUB_REPOSITORY = 'outsider/Mikka' },
+    value => { value.env.GITHUB_REPOSITORY_ID = '7' },
+    value => { value.env.GITHUB_ACTOR_ID = '7' },
+    value => { value.env.GITHUB_REF = 'refs/heads/feature' },
     value => { value.env.GITHUB_TRIGGERING_ACTOR = 'outsider' },
-    value => { value.env.GITHUB_WORKFLOW_SHA = revision },
+    value => { value.env.GITHUB_WORKFLOW_SHA = merge },
     value => { value.env.GITHUB_WORKFLOW_REF = 'alexj11324/Mikka/.github/workflows/other.yml@refs/heads/main' },
     value => { value.env.GITHUB_EVENT_NAME = 'workflow_dispatch' },
     value => { value.env.GITHUB_EVENT_NAME = 'pull_request_target' },
   ]) {
-    const value = event('pull_request'); mutate(value)
+    const value = event('push'); mutate(value)
     assert.throws(() => trustedBuildSource(value.env, value.payload))
   }
   const value = event('push'); value.payload.after = merge

@@ -33,9 +33,13 @@ Backend-only work (Eve / Task) should not import paid UI source unless a reviewe
 ## Service builds and release manifests
 
 `cloudflare-api-image.yml` is the public content-addressed producer for an actual
-`push` to `main`, or an owner-authored, same-repository PR to `main` run by the
-release owner. It does not manufacture a manual-dispatch event. Forks and other
-untrusted PRs receive no Registry, Cloudflare or private UI credentials. The old
+`push` to `main` by the release owner. It does not manufacture a manual-dispatch
+event. The existing `cloudflare-runtime-release` protection rejects PR merge
+refs, including the owner's same-repository PRs. That rule remains intact: PRs
+run the existing credential-free image qualifications, and Registry publication
+starts after merging into main. Pre-merge Registry publication is therefore
+blocked by the current environment policy, not verified acceptance. Forks
+receive no Registry, Cloudflare or private UI credentials. The old
 manual publishers remain available for release-owner operations already in
 progress; they are not the automatic build path.
 
@@ -80,9 +84,9 @@ digests, never a mutable tag.
 
 ### Qualification ownership
 
-Trusted PR and main builds use `service-build (<service>)` in the unified
-producer. The legacy automatic image jobs now qualify untrusted PRs without
-credentials; their manual publication jobs remain unchanged. These are moved
+Main builds use `service-build (<service>)` in the unified producer. The legacy
+automatic image jobs still qualify every PR without credentials; their manual
+publication jobs remain unchanged. These are moved
 gates, not deleted gates:
 
 | Existing gate | Unified producer execution |

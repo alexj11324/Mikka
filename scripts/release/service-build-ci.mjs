@@ -23,24 +23,13 @@ export function trustedBuildSource(env, event) {
   assert.equal(env.GITHUB_ACTOR_ID, '183887963')
   assert.equal(env.GITHUB_ACTOR, 'alexj11324')
   assert.equal(env.GITHUB_TRIGGERING_ACTOR, 'alexj11324')
-  let source
-  if (env.GITHUB_EVENT_NAME === 'push') {
-    assert.equal(env.GITHUB_REF, 'refs/heads/main')
-    assert.equal(event.ref, 'refs/heads/main')
-    source = env.GITHUB_SHA
-    assert.equal(event.after, source)
-  } else {
-    assert.equal(env.GITHUB_EVENT_NAME, 'pull_request')
-    assert.equal(event.pull_request?.head?.repo?.full_name, repository)
-    assert.equal(event.pull_request.head.repo.id, 1427517699)
-    assert.equal(event.pull_request.head.repo.fork, false)
-    assert.equal(event.pull_request.user?.id, 183887963)
-    assert.equal(event.pull_request.base?.ref, 'main')
-    assert.equal(event.pull_request.base?.repo?.full_name, repository)
-    assert.equal(env.GITHUB_REF, 'refs/pull/' + event.number + '/merge')
-    assert.ok(Number.isSafeInteger(event.number) && event.number > 0)
-    source = event.pull_request.head.sha
-  }
+  // The existing protected publication environment only permits main. PR
+  // qualification stays credential-free; do not simulate another event/ref.
+  assert.equal(env.GITHUB_EVENT_NAME, 'push')
+  assert.equal(env.GITHUB_REF, 'refs/heads/main')
+  assert.equal(event.ref, 'refs/heads/main')
+  const source = env.GITHUB_SHA
+  assert.equal(event.after, source)
   assert.match(source ?? '', /^[a-f0-9]{40}$/)
   assert.equal(env.GITHUB_WORKFLOW_REF, repository + '/.github/workflows/' + workflow + '@' + env.GITHUB_REF)
   assert.match(env.GITHUB_WORKFLOW_SHA ?? '', /^[a-f0-9]{40}$/)
@@ -75,8 +64,8 @@ export function checkedServiceCache(name, receipt, run, jobs, artifact) {
     assert.equal(run[field].fork, false)
   }
   assert.equal(run.path, '.github/workflows/' + workflow)
-  assert.ok(['push', 'pull_request'].includes(run.event))
-  if (run.event === 'push') assert.equal(run.head_branch, 'main')
+  assert.equal(run.event, 'push')
+  assert.equal(run.head_branch, 'main')
   assert.equal(run.status, 'completed')
   assert.equal(run.actor?.id, 183887963)
   assert.equal(run.triggering_actor?.id, 183887963)
@@ -130,7 +119,7 @@ async function cachedService(name, context, image) {
       || artifact.workflow_run?.head_repository_id !== 1427517699) continue
     const origin = await github('actions/runs/' + artifact.workflow_run.id)
     if (origin.actor?.id !== 183887963 || origin.triggering_actor?.id !== 183887963
-      || origin.path !== '.github/workflows/' + workflow || !['push', 'pull_request'].includes(origin.event)) continue
+      || origin.path !== '.github/workflows/' + workflow || origin.event !== 'push' || origin.head_branch !== 'main') continue
     const receipt = await readCacheArtifact(artifact)
     if (receipt.contextDigest !== context.contextDigest || (context.kind === 'container' && receipt.imageDigest !== image?.imageDigest)) continue
     // A matching image built on an unmerged branch is not a main release source.
