@@ -7,7 +7,11 @@ export const RESOURCE_ACTIONS = ['canDiscover', 'canReadMetadata', 'canReadConte
 export type ResourceAction = typeof RESOURCE_ACTIONS[number]
 export type ResourceVisibility = 'shared' | 'private' | 'quarantined'
 export type ResourceReference = { kind: ResourceKind; id: string; workspaceId: string }
-export type ResourceSubject = { kind: 'account' | 'service'; id: string }
+export const RESOURCE_SUBJECT_KINDS = ['account', 'service', 'bot', 'run'] as const
+/** `bot` and `run` subjects are authorized only by an explicit grant, never by
+ * ownership or `shared` visibility (decision 2026-11-19-2200-agent-bot-interop). */
+export type ResourceSubjectKind = typeof RESOURCE_SUBJECT_KINDS[number]
+export type ResourceSubject = { kind: ResourceSubjectKind; id: string }
 export type ResourcePolicy = ResourceReference & { ownerId: string | null; visibility: ResourceVisibility; revision: number;
   parentKind: ResourceKind | null; parentId: string | null; provenance: string; createdAt: Date; updatedAt: Date }
 export type ResourceCapabilities = Record<ResourceAction, boolean>
