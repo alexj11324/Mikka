@@ -470,5 +470,10 @@
     "command": "pnpm test:factory-activity",
     "kind": "integration",
     "env": {}
+  },
+  "integration-http-fakes": {
+    "command": "pnpm test:http-fakes",
+    "kind": "integration",
+    "env": {}
   }
 }
