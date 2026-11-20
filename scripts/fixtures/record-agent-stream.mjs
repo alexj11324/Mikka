@@ -3,6 +3,7 @@ import { readFile, writeFile, stat, unlink } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { recordingMetadata, scenarios, validateFixture } from './schema.mjs'
 import { sanitizeRecording, scanSensitive, sha256 } from './sanitize.mjs'
+import { pullRequestSchema } from '../../lib/issue-metadata.ts'
 
 const sourceKeys = ['harness', 'cliVersion', 'runDate', 'sourceRuntime', 'scenario']
 export async function convertAgentExport(raw) {
@@ -10,6 +11,10 @@ export async function convertAgentExport(raw) {
   try { exported = JSON.parse(raw) } catch { throw new Error('recording_export_invalid_json') }
   if (exported?.schemaVersion !== 1 || exported.provenance !== 'existing-run-export' || !Array.isArray(exported.events) || !exported.events.length) throw new Error('recording_export_contract_required')
   if (!scenarios.includes(exported.scenario)) throw new Error('recording_scenario_required')
+  // The daemon publishes a branch; the server subsequently opens its PR.
+  // Keep that separate host observation separate from the adapter's stream.
+  const publication = exported.publication
+  if (publication !== undefined && (publication?.status !== 'published' || !pullRequestSchema.safeParse(publication.pullRequest).success)) throw new Error('recording_source_publication_invalid')
   const lines = [], types = new Set()
   const first = exported.events[0]
   const origin = first.createdAt ? Date.parse(first.createdAt) : 0
@@ -38,7 +43,7 @@ export async function convertAgentExport(raw) {
     tools: types.has('tool-input-available') && (types.has('tool-output-available') || types.has('tool-output-error')),
     'long-running': lines.at(-1).t >= 60_000,
     crash: exit.outcome === 'failed' && typeof exit.error === 'string' && !exit.quota && !exit.providerFailure,
-    'success-pr': exit.outcome === 'succeeded' && exit.stopReason === 'submitted' && lines.some(line => line.chunk?.type === 'data-publish' && line.chunk.data?.pushed && line.chunk.data?.pullRequest),
+    'success-pr': exit.outcome === 'succeeded' && exit.stopReason === 'submitted' && publication?.status === 'published' && lines.some(line => line.chunk?.type === 'data-publish' && line.chunk.data?.pushed),
     quota: exit.stopReason === 'quota_exhausted' || Boolean(exit.quota),
   }[scenario]
   if (!covered) throw new Error('recording_scenario_not_observed')
@@ -48,6 +53,7 @@ export async function convertAgentExport(raw) {
   const metadata = recordingMetadata.parse({
     schemaVersion: 1, provenance: 'existing-run-export', ...Object.fromEntries(sourceKeys.map(key => [key, exported[key]])),
     sourceSha256: sha256(raw), fixtureSha256: sha256(fixture), eventTypes: [...types].sort(), replayEvidence: [],
+    ...(publication ? { sourcePublicationSha256: sha256(JSON.stringify(publication)) } : {}),
   })
   if (scanSensitive(metadata).length || scanSensitive(sanitized).length) throw new Error('recording_sensitive_material_remaining')
   return { fixture, metadata }
