@@ -790,6 +790,11 @@ test('a message to an ended thread runs it again in the same thread; only its ow
     const sender = await store.conversation(teammate, 'bot', peerBot)
     const message = { to: runBox.mailboxId, key: randomUUID(), text: 'Schema changed; please regenerate.' }
     await assert.rejects(store.send(sender, message), /Recipient unavailable/, 'no canSteer, no delivery')
+    // Shared visibility gives canSteer, but continuing an ended run needs the owner's explicit grant.
+    await pool.query(`UPDATE resource_access_policies SET visibility='shared' WHERE kind='thread' AND id=$1`, [initial.runId])
+    await assert.rejects(store.send(sender, message), /explicit grant/)
+    assert.equal((await pool.query('SELECT 1 FROM run_messages WHERE "dedupeKey"=$1', [message.key])).rowCount, 0, 'a refused envelope leaves nothing')
+    await pool.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='thread' AND id=$1`, [initial.runId])
     await pool.query(`INSERT INTO resource_access_grants ("resourceKind","resourceId","subjectKind","subjectId",capabilities) VALUES ('thread',$1,'bot',$2,'{canSteer}')`, [initial.runId, peerBot])
     const receipt = await store.send(sender, message)
     assert.ok(receipt.continuationRunId, JSON.stringify(receipt))

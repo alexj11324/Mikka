@@ -174,6 +174,8 @@ test('interop reads, sends and Drive follow the ACL of the caller\'s own Workspa
     await grant('artifact', artifact, 'service', serviceId, ['canReadContent'])
     // A private parent keeps the child closed: the artifact's thread needs the service's own grant too.
     assert.deepEqual(await runInteropTool(asService, 'read_artifact', { artifactId: artifact }), notFound)
+    // A service needs its own grant on every ancestor, the shared task included.
+    await grant('task', issue, 'service', serviceId, ['canReadContent'])
     await grant('thread', thread, 'service', serviceId, ['canReadContent'])
     assert.equal((await runInteropTool(asService, 'read_artifact', { artifactId: artifact }) as { content: string }).content, '# Design')
     assert.equal((await runInteropTool(asService, 'read_thread_messages', { runId: thread }) as { rootRunId: string }).rootRunId, thread)
@@ -220,6 +222,8 @@ test('interop reads, sends and Drive follow the ACL of the caller\'s own Workspa
       VALUES($1,$2,'Interop service',$3,$4,'Interop service',$5)`, [serviceId, team.id, owner, randomUUID(), createHash('sha256').update(token).digest('hex')])
     const read = () => artifactRoute.GET(new Request(`http://localhost/mikka/api/v1/artifacts/${artifact}`, { headers: { authorization: `Bearer ${token}` } }), { params: Promise.resolve({ artifactId: artifact }) })
     assert.equal((await read()).status, 404)
+    // A service needs its own grant on every ancestor, the shared task included.
+    await grant('task', issue, 'service', serviceId, ['canReadContent'])
     await grant('thread', thread, 'service', serviceId, ['canReadContent'])
     await grant('artifact', artifact, 'service', serviceId, ['canReadContent'])
     const served = await read()
@@ -227,6 +231,49 @@ test('interop reads, sends and Drive follow the ACL of the caller\'s own Workspa
     assert.equal(((await served.json()) as { content: string }).content, '# Design')
     await pool.query('UPDATE mikka_workspace_service_identities SET enabled=false WHERE id=$1', [serviceId])
     assert.equal((await read()).status, 401)
+  })
+
+  await t.test('a service still needs its own grant on every ancestor; a Bot passes a shared one', async () => {
+    const parent = randomUUID(), child = randomUUID(), serviceId = randomUUID()
+    await pool.query(`INSERT INTO resource_access_policies(kind,id,"workspaceId","ownerId",visibility,provenance) VALUES('project',$1,$2,$3,'shared','created')`, [parent, team.id, owner])
+    await pool.query(`INSERT INTO resource_access_policies(kind,id,"workspaceId","ownerId",visibility,"parentKind","parentId",provenance) VALUES('project',$1,$2,$3,'private','project',$4,'created')`, [child, team.id, owner, parent])
+    const allowed = async (kind: string, id: string) => (await pool.query<{ ok: boolean }>(
+      `SELECT mikka_resource_acl_allowed($1,$2,$3,'project',$4,'canReadContent') AS ok`, [kind, id, team.id, child])).rows[0]!.ok
+    await grant('project', child, 'service', serviceId, ['canReadContent'])
+    await grant('project', child, 'bot', teammateBot, ['canReadContent'])
+    assert.equal(await allowed('service', serviceId), false, 'a shared parent does not stand in for the service\'s own grant')
+    assert.equal(await allowed('bot', teammateBot), true, 'a Bot passes a parent shared within the tenant')
+    await grant('project', parent, 'service', serviceId, ['canReadContent'])
+    assert.equal(await allowed('service', serviceId), true)
+  })
+
+  await t.test('continuing an ended thread needs the owner\'s explicit grant; a working thread does not', async () => {
+    const live = randomUUID()
+    await pool.query(`INSERT INTO agent_runs(id,"userId","agentId","workspaceId",status) VALUES($1,$2,$3,$4,'running')`, [live, owner, agent, team.id])
+    // Shared visibility gives the teammate canSteer on both threads, but no explicit grant.
+    await pool.query(`UPDATE resource_access_policies SET visibility='shared' WHERE kind='thread' AND id=ANY($1::uuid[])`, [[live, thread]])
+    try {
+      assert.deepEqual(await runInteropTool(asTeammate, 'send_to_thread', { runId: live, text: 'heads up', key: 'gate-live-1' }), { runId: live, continued: false })
+      const refused = await runInteropTool(asTeammate, 'send_to_thread', { runId: thread, text: 'wake up', key: 'gate-ended-1' })
+      assert.deepEqual(refused, { error: 'interop_send_unavailable', detail: 'continuation_requires_grant' })
+      const { sendToThread } = await import('./threads')
+      const { ContinuationGrantRequired } = await import('./continuation-grant')
+      await assert.rejects(sendToThread(asTeammate, { runId: thread, text: 'wake up', key: 'gate-ended-1' }),
+        (error: Error) => error.cause instanceof ContinuationGrantRequired)
+      // The teammate's Bot inherits its owner's shared canSteer, not a grant.
+      assert.deepEqual(await runInteropTool(asTeammateBot, 'send_to_thread', { runId: thread, text: 'wake up', key: 'gate-ended-2' }),
+        { error: 'interop_send_unavailable', detail: 'continuation_requires_grant' })
+      await pool.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities) VALUES('thread',$1,'account',$2,'{canReadContent,canSteer}')
+        ON CONFLICT ("resourceKind","resourceId","subjectKind","subjectId") DO UPDATE SET capabilities=excluded.capabilities`, [thread, teammate])
+      // The gate passes; this fixture thread has no task repository, so the continuation itself is refused.
+      assert.deepEqual(await runInteropTool(asTeammate, 'send_to_thread', { runId: thread, text: 'wake up', key: 'gate-ended-3' }),
+        { error: 'interop_send_unavailable', detail: 'thread_cannot_continue' })
+      assert.deepEqual(await runInteropTool(asTeammateBot, 'send_to_thread', { runId: thread, text: 'wake up', key: 'gate-ended-4' }),
+        { error: 'interop_send_unavailable', detail: 'thread_cannot_continue' }, 'the member account behind a Bot may hold the grant')
+    } finally {
+      await pool.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='thread' AND id=ANY($1::uuid[])`, [[live, thread]])
+      await pool.query(`UPDATE resource_access_grants SET capabilities='{canReadContent}' WHERE "resourceKind"='thread' AND "resourceId"=$1 AND "subjectKind"='account' AND "subjectId"=$2`, [thread, teammate])
+    }
   })
 
   await t.test('a run mirrors its own thread and the team folder; a Bot thread adds its Bot', async () => {

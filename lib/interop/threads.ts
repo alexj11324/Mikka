@@ -7,7 +7,15 @@ import { readRunChain, readRunChainCheckpoint, type RunChain } from '@/lib/run-c
 import { secretMaskerFor } from '@/lib/secrets/runtime'
 import { maskDeep } from '@/lib/secrets/mask'
 import { InteropError, type InteropErrorDetail } from './errors'
-import { admitPrincipal, principalSender, requireInterop, type InteropPrincipal } from './principal'
+import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
+import { ContinuationGrantRequired, hasExplicitContinuationGrant, type ContinuationSubject } from './continuation-grant'
+import { admitPrincipal, principalOwner, principalSender, principalSubject, requireInterop, type InteropPrincipal } from './principal'
+
+/** The sender's own subject and, for a run or Bot, the member account behind it. */
+function continuationSubjects(principal: InteropPrincipal): ContinuationSubject[] {
+  const owner = principalOwner(principal), subject = principalSubject(principal)
+  return [...(owner ? [{ kind: 'account' as const, id: owner }] : []), ...(subject ? [subject] : [])]
+}
 
 /** Enough of a transcript to act on; the full stream stays a human surface. */
 const AGENT_TEXT_TAIL = 8_000
@@ -140,6 +148,11 @@ export async function sendToThread(principal: InteropPrincipal, input: { runId: 
   const { ownerId, chain } = await authorizedThread(principal, parsed.data.runId, 'canSteer')
   const sender = principalSender(principal)
   const text = sender.kind === 'account' && sender.id === ownerId ? parsed.data.text : `[From ${sender.kind} ${sender.id}]\n${parsed.data.text}`
+  // Waking an ended thread spends its owner's subscription, quota and machine: a peer needs the owner's explicit grant.
+  const latest = chain.attempts.find(attempt => attempt.runId === chain.latestRunId)
+  const ended = !UNFINISHED_RUN_STATUSES.some(status => status === latest?.status)
+  if (ended && principalOwner(principal) !== ownerId && !await hasExplicitContinuationGrant(pool, chain.rootRunId, continuationSubjects(principal)))
+    throw new InteropError('interop_send_unavailable', { detail: 'continuation_requires_grant', cause: new ContinuationGrantRequired() })
   const digest = sendDigest(parsed.data.text, parsed.data.delivery)
   const receipt = [chain.rootRunId, sender.kind, sender.id, parsed.data.key]
   const { rowCount } = await pool.query(`INSERT INTO interop_thread_sends ("rootRunId","senderKind","senderId",key,"requestDigest")

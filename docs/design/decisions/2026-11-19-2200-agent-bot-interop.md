@@ -39,9 +39,11 @@ the target object must pass the ACL above.
 subject is authorized **only by an explicit grant** — the ownership and
 `shared` visibility shortcuts stay `account`-only on the resource itself, so
 granting a Bot access to a thread never also exposes it to every teammate, and
-no Bot inherits anything by existing. Each ancestor must be shared within the
-tenant or carry the subject's own grant: an artifact under a private thread
-needs a grant on the thread too, as it would for an account. Reads ask `canReadContent`; sends ask `canSteer`.
+no Bot inherits anything by existing. For a `bot` or `run`, each ancestor must
+be shared within the tenant or carry the subject's own grant: an artifact under
+a private thread needs a grant on the thread too, as it would for an account. A
+`service` keeps its pre-existing rule and needs its own explicit grant on every
+ancestor, shared or not. Reads ask `canReadContent`; sends ask `canSteer`.
 
 ## 2. Reading
 
@@ -90,6 +92,17 @@ needs a grant on the thread too, as it would for an account. Reads ask `canReadC
 - A send through `/api/v1` is always peer data, even from the thread's owner:
   an API client is not the person typing, so its rows are never editable owner
   words.
+
+- **Continuing an ended thread needs the owner's explicit grant** (coordinator
+  review, 2026-11-20). A message to a thread that is still working is
+  delivered on `canSteer` as above. Continuing a thread that has ended starts a
+  new run on its owner's subscription, quota and machine, so a peer (another
+  member, their run or Bot, a service key) needs an explicit, unexpired grant
+  with `canSteer` on the thread's root run: for its own subject, or for the
+  member account behind a run or Bot. `canSteer` that comes only from `shared`
+  visibility or a parent does not count. Without one, `send_to_thread` returns
+  `interop_send_unavailable` / `continuation_requires_grant` and the mailbox
+  refuses the envelope. The owner's own sends are unaffected.
 
 ## 4. Drive
 

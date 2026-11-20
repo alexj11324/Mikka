@@ -6811,7 +6811,8 @@
       "thread_cannot_continue": "此线程无法继续。",
       "delivery_unavailable": "此线程不支持这种送达方式。",
       "delivery_uncertain": "此前用同一个 key 的发送没有记录结果，不会再次发送。",
-      "bot_unavailable": "Bot 不可用。"
+      "bot_unavailable": "Bot 不可用。",
+      "continuation_requires_grant": "续跑已结束的线程需要线程主人的显式授权。"
     },
     "interop_diff_unavailable": {
       "default": "无法读取改动。",

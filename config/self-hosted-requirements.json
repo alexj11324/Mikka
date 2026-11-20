@@ -4001,5 +4001,12 @@
     "behavior": "Owner-created, owner- or admin-revoked explicit grants to Bot, run and service subjects in the same Workspace, audited through the existing ACL events.",
     "test": "lib/interop/interop.db.test.ts",
     "suite": "test:interop-db"
+  },
+  "lib/interop/continuation-grant.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Checks the owner's explicit canSteer grant before a peer continues an ended thread, in the installation database.",
+    "test": "lib/interop/interop.db.test.ts",
+    "suite": "test:interop-db"
   }
 }

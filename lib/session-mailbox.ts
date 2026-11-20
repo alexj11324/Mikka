@@ -309,7 +309,18 @@ export class SessionMailbox {
       if (target.kind === 'run' && !target.disabled && target.latestRunId) {
         const { rows: [latest] } = await client.query<{ deviceId: string | null; status: string }>('select r."deviceId",r.status from agent_runs r where r.id=$1', [target.latestRunId])
         // An ended run is continued in its own thread after COMMIT; a live one reads its inbox on the work signal.
-        if (latest && TERMINAL.includes(latest.status)) resume = { ownerId: target.userId, runId: target.latestRunId, messageId: id }
+        if (latest && TERMINAL.includes(latest.status)) {
+          // Continuing spends the owner's subscription, quota and machine: another member needs the owner's
+          // explicit canSteer grant on the thread, not one implied by shared visibility (decision 2026-11-19-2200 §3).
+          if (target.userId !== actor.userId) {
+            const root = (await client.query<{ id: string }>(ROOT_RUN, [target.sessionKey])).rows[0]?.id
+            const subject = senderSubject(box, actor)
+            const { hasExplicitContinuationGrant } = await import('./interop/continuation-grant')
+            if (!root || !await hasExplicitContinuationGrant(client, root, [{ kind: 'account', id: actor.userId }, ...(subject ? [subject] : [])]))
+              throw new MailboxError('Continuing an ended run needs its owner\'s explicit grant', 403)
+          }
+          resume = { ownerId: target.userId, runId: target.latestRunId, messageId: id }
+        }
         else wake = latest?.deviceId ?? undefined
       }
       if (target.kind === 'coordinator' && !target.disabled && wakeDepth < MAILBOX_NOTIFICATION_LIMIT) {

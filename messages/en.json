@@ -6811,7 +6811,8 @@
       "thread_cannot_continue": "This thread cannot continue.",
       "delivery_unavailable": "This delivery mode is unavailable for the thread.",
       "delivery_uncertain": "The earlier send with this key has no recorded outcome; it is not sent again.",
-      "bot_unavailable": "The Bot is unavailable."
+      "bot_unavailable": "The Bot is unavailable.",
+      "continuation_requires_grant": "Continuing this ended thread needs its owner's explicit grant."
     },
     "interop_diff_unavailable": {
       "default": "The diff is unavailable.",
