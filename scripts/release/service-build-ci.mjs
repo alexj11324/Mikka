@@ -340,6 +340,7 @@ async function build(service, planFile, directory) {
     await bundle(directory, 'cloudflare/task-sandbox/wrangler.jsonc', 'workers/task-sandbox.mjs', env)
     await artifact('worker', 'workers/task-sandbox.mjs')
   } else if (service === 'litellm') {
+    run('node', ['--test', 'cloudflare/litellm/worker.test.mjs'], 'LITELLM_WORKER_TESTS')
     run('docker', ['buildx', 'build', '--platform', 'linux/amd64', '--load', '--label', 'org.opencontainers.image.revision=' + revision,
       '--label', 'com.mikka.context=' + input.contextDigest, '-t', tag, 'deploy/litellm'], 'LITELLM_IMAGE')
     run('bash', ['deploy/litellm/offline-check.sh', tag], 'LITELLM_OFFLINE')
@@ -462,6 +463,7 @@ async function qualifyCachedLiteLlm(planDirectory, pull) {
     } finally { await rm(directory, { recursive: true, force: true }) }
     return
   }
+  command('node', ['--test', 'cloudflare/litellm/worker.test.mjs'], { env, stage: 'LITELLM_WORKER_TESTS' })
   command('corepack', ['pnpm', 'install', '--frozen-lockfile', '--ignore-scripts'], { env, stage: 'QUALIFICATION_INSTALL' })
   command('bash', ['deploy/litellm/offline-check.sh', receipt.image], { env, stage: 'LITELLM_OFFLINE' })
   command('bash', ['deploy/litellm/conversion-check.sh', receipt.image], { env, stage: 'LITELLM_PROTOCOLS' })

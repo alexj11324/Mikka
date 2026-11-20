@@ -182,7 +182,7 @@ test('the unified service producer retains the existing image qualification gate
     "run('python3', ['cloudflare/task-sandbox/native-history.test.py'], 'TASK_HISTORY')",
     "run('bash', ['scripts/release/verify-task-image.sh', tag], 'TASK_VERIFY')",
     "run('bash', ['scripts/build-cloudflare-eve-image.sh', '--independent'], 'EVE_OFFLINE_COMPILE')"]) assert.ok(build.includes(gate), gate)
-  for (const script of ['deploy/litellm/offline-check.sh', 'deploy/litellm/conversion-check.sh']) assert.equal(build.split(script).length - 1, 2, 'new and cached images both qualify: ' + script)
+  for (const script of ['cloudflare/litellm/worker.test.mjs', 'deploy/litellm/offline-check.sh', 'deploy/litellm/conversion-check.sh']) assert.equal(build.split(script).length - 1, 2, 'new and cached images both qualify: ' + script)
   const task = await readFile(new URL('./release/verify-task-image.sh', import.meta.url), 'utf8')
   for (const gate of ['--network none --cap-drop ALL --security-opt=no-new-privileges', '--user 1000:1000',
     'claude --version', 'codex --version', '--cap-add NET_ADMIN', 'review-guest-image.test.py',

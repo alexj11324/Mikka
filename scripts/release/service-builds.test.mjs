@@ -152,4 +152,3 @@ test('a manifest rejects mutable image references, traversal, and forged artifac
     assert.throws(() => validateReleaseManifest(altered))
   }
 })
-

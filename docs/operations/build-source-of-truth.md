@@ -94,6 +94,7 @@ gates, not deleted gates:
 | Task Node contract tests and Python native-history test | `TASK_TESTS` and `TASK_HISTORY` in `Build and verify service` |
 | Task Dockerfile's standard device-handoff test and pinned CLI installation | The same Task Dockerfile, built from the declared minimal context |
 | Task offline non-root capability checks and review-listener isolation | `scripts/release/verify-task-image.sh`, preserving both original Docker commands |
+| LiteLLM Worker cold-start budget and request cancellation | `cloudflare/litellm/worker.test.mjs` before new publication and during cached-image qualification |
 | LiteLLM offline health/master-key guard | The unchanged `deploy/litellm/offline-check.sh` |
 | Both CLI protocols through LiteLLM and a local fake provider; seven passes and zero skips | The unchanged `deploy/litellm/conversion-check.sh` before new publication, or `litellm-qualification` after independently pulling and checking the cached platform image |
 | Eve network-isolated compilation and portable Node image | The same `build-cloudflare-eve-image.sh` with standalone resource packaging, followed by the same Eve Dockerfile |
