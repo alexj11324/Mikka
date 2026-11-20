@@ -2,8 +2,10 @@
 
 This archive preserves exact public source bytes from successful serving
 releases. Its files are historical evidence, not current application build
-inputs. Contract tests verify their Git blob identities, copy them into a
-temporary directory and execute the old caller against the current service.
+inputs. Each archived module has a `.txt` suffix; `release.json` retains its
+original source path and Git blob identity. Contract tests verify those exact
+bytes, restore the original paths in a temporary directory and execute the old
+caller against the current service. Current-source lint rules remain unchanged.
 
 - [Eve caller from `64a3a8df`](released-64a3a8df/README.md) covers run creation,
   startup and full/metadata-only reads through the World Worker.

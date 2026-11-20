@@ -108,7 +108,24 @@ for proof that a ready PR is safe to merge.
   deployment supplies the next opportunity; no polling or new release identity
   is introduced. A declined gate explicitly records that no OTA was published.
   Main events do not cancel an active OTA; PR preview cancellation stays local
-  to its PR ref.
+  to its PR ref. After the policy permits the candidate, production OTA compares
+  the actual Git trees of `apps/mobile`, `packages/protocol`, and the reviewed
+  private mobile layer with the most recent verified publication. A later
+  Web-only merge therefore preserves an earlier, unpublished mobile change;
+  unchanged mobile inputs do not read an Expo credential or publish an update.
+  The immutable `mobile-production-ota-source` artifact records only source and
+  tree identities and is uploaded before Expo access. It becomes publication
+  evidence only when the original run attempt's later `Publish to production`
+  step succeeded, with both policy and input checks intact. Overall workflow
+  success alone is insufficient. Only the latest trusted source artifact is
+  considered: failed/cancelled publication or expired evidence cannot borrow an
+  older baseline. With no verified baseline, automatic events explicitly decline;
+  an owner must use the existing manual dispatch with valid staging references
+  and the same policy/window checks for the first publication or recovery.
+  Receipts are retained for 90 days. Recovery uses a fresh manual run, because
+  reruns cannot overwrite an existing immutable source artifact. Malformed
+  provenance fails closed even on manual dispatch. Tests verify this contract;
+  they do not prove that an Expo production update or a device install occurred.
 - The `ui-policy.yml` concurrency key includes `github.run_id` only on `main`.
   This prevents GitHub from evicting an older *pending* main verification,
   in addition to not cancelling a running main job. Superseded PR checks may

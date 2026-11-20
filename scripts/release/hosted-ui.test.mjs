@@ -169,3 +169,20 @@ test('completed automatic staging can wake OTA, while a new main push cannot can
   assert.ok(parsed.jobs.update.if.includes('!github.event.workflow_run.head_repository.fork'))
   assert.equal(parsed.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}")
 })
+
+test('mobile input evidence precedes Expo access and stays immutable before a guarded publication', async () => {
+  const steps = (await mobileUpdateWorkflow()).jobs.update.steps
+  const select = steps.find(step => step.id === 'mobile-source')
+  const source = steps.find(step => step.name === 'Preserve the immutable mobile source receipt')
+  const expo = steps.find(step => step.with?.['secret-name'] === 'EXPO_TOKEN')
+  const publish = steps.find(step => step.name === 'Publish to production')
+  assert.equal(select.run, 'node scripts/release/mobile-ota-source.mjs select')
+  assert.equal(select.env.GH_TOKEN, '${{ steps.source-token.outputs.token }}')
+  assert.equal(source.with.name, 'mobile-production-ota-source')
+  assert.equal(source.with.path, '${{ runner.temp }}/mobile-ota-source/release.json')
+  assert.equal(source.with['if-no-files-found'], 'error')
+  assert.equal(source.with.overwrite, undefined)
+  assert.ok(steps.indexOf(select) < steps.indexOf(source) && steps.indexOf(source) < steps.indexOf(expo))
+  for (const step of [source, expo, publish]) assert.ok(step.if.includes("steps.mobile-source.outputs.selected == 'true'"))
+  assert.ok(publish.run.indexOf('mobile-ota-source.mjs verify') < publish.run.indexOf('eas-cli@'))
+})

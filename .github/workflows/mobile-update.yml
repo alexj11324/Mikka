@@ -170,9 +170,71 @@ jobs:
           ELIGIBILITY_REASON: ${{ steps.eligibility.outputs.reason }}
         run: |
           printf 'Production OTA was not published: %s. Type checking completed; no production Expo credential was read.\n' "$ELIGIBILITY_REASON" >> "$GITHUB_STEP_SUMMARY"
+      - name: Read the private UI checkout credential through OIDC
+        if: steps.eligibility.outputs.allowed == 'true'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /platform
+          secret-name: HOSTED_UI_READ_KEY
+          recursive: false
+          include-imports: false
+      - name: Require the authorized private UI credential
+        if: steps.eligibility.outputs.allowed == 'true'
+        run: |
+          if [ -z "$HOSTED_UI_READ_KEY" ]; then
+            echo '::error::The authorized private UI credential was not delivered.'
+            exit 1
+          fi
+      - name: Check out the private UI
+        if: steps.eligibility.outputs.allowed == 'true' && env.HOSTED_UI_READ_KEY != ''
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: alexj11324/mikka-hosted-ui
+          ref: ${{ steps.eligibility.outputs.overlay_sha }}
+          ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
+          path: .hosted-ui
+          persist-credentials: false
+      - name: Use the private UI's mobile layer
+        if: steps.eligibility.outputs.allowed == 'true'
+        env:
+          OVERLAY_SHA: ${{ steps.eligibility.outputs.overlay_sha }}
+        run: |
+          echo "HOSTED_UI_READ_KEY=" >> "$GITHUB_ENV"
+          test "$(git -C .hosted-ui rev-parse HEAD)" = "$OVERLAY_SHA"
+          test -d .hosted-ui/mobile || { echo "::error::Official mobile UI checkout required."; exit 1; }
+          echo "MIKKA_MOBILE_OVERLAY_DIR=.hosted-ui/mobile" >> "$GITHUB_ENV"
+          echo "::notice::Bundling the private UI layer at $(git -C .hosted-ui rev-parse HEAD)."
+      - name: Compare actual mobile release inputs
+        if: steps.eligibility.outputs.allowed == 'true'
+        id: mobile-source
+        env:
+          GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          OVERLAY_SHA: ${{ steps.eligibility.outputs.overlay_sha }}
+        run: node scripts/release/mobile-ota-source.mjs select
+      - name: Record when mobile inputs do not authorize an OTA
+        if: steps.eligibility.outputs.allowed == 'true' && steps.mobile-source.outputs.selected != 'true'
+        env:
+          SOURCE_REASON: ${{ steps.mobile-source.outputs.reason }}
+        run: |
+          printf 'Production OTA was not published: %s. No production Expo credential was read.\n' "$SOURCE_REASON" >> "$GITHUB_STEP_SUMMARY"
+      # This immutable file records inputs, not success. Its consumer also
+      # checks the original attempt's later Publish to production step.
+      - name: Preserve the immutable mobile source receipt
+        if: steps.eligibility.outputs.allowed == 'true' && steps.mobile-source.outputs.selected == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mobile-production-ota-source
+          path: ${{ runner.temp }}/mobile-ota-source/release.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Read the existing production Expo credential through OIDC
         if: >-
-          steps.eligibility.outputs.allowed == 'true' &&
+          steps.eligibility.outputs.allowed == 'true' && steps.mobile-source.outputs.selected == 'true' &&
           (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_run') && github.ref == 'refs/heads/main' &&
           github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
           github.repository_owner_id == '183887963'
@@ -187,47 +249,15 @@ jobs:
           secret-name: EXPO_TOKEN
           recursive: false
           include-imports: false
-      - name: Read the private UI checkout credential through OIDC
-        if: steps.eligibility.outputs.allowed == 'true' && env.EXPO_TOKEN != ''
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: HOSTED_UI_READ_KEY
-          recursive: false
-          include-imports: false
-      - name: Require the authorized production credentials
-        if: steps.eligibility.outputs.allowed == 'true'
+      - name: Require the authorized production Expo credential
+        if: steps.eligibility.outputs.allowed == 'true' && steps.mobile-source.outputs.selected == 'true'
         run: |
-          if [ -z "$EXPO_TOKEN" ] || [ -z "$HOSTED_UI_READ_KEY" ]; then
-            echo '::error::Authorized production OTA credentials were not delivered.'
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo '::error::The authorized production Expo credential was not delivered.'
             exit 1
           fi
-      - name: Check out the private UI
-        if: steps.eligibility.outputs.allowed == 'true' && env.EXPO_TOKEN != '' && env.HOSTED_UI_READ_KEY != ''
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          repository: alexj11324/mikka-hosted-ui
-          ref: ${{ steps.eligibility.outputs.overlay_sha }}
-          ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
-          path: .hosted-ui
-          persist-credentials: false
-      - name: Use the private UI's mobile layer
-        if: steps.eligibility.outputs.allowed == 'true' && env.EXPO_TOKEN != ''
-        env:
-          OVERLAY_SHA: ${{ steps.eligibility.outputs.overlay_sha }}
-        run: |
-          echo "HOSTED_UI_READ_KEY=" >> "$GITHUB_ENV"
-          test "$(git -C .hosted-ui rev-parse HEAD)" = "$OVERLAY_SHA"
-          test -d .hosted-ui/mobile || { echo "::error::Official mobile UI checkout required."; exit 1; }
-          echo "MIKKA_MOBILE_OVERLAY_DIR=.hosted-ui/mobile" >> "$GITHUB_ENV"
-          echo "::notice::Bundling the private UI layer at $(git -C .hosted-ui rev-parse HEAD)."
       - name: Recheck the owner window immediately before publication
-        if: steps.eligibility.outputs.allowed == 'true' && env.EXPO_TOKEN != ''
+        if: steps.eligibility.outputs.allowed == 'true' && steps.mobile-source.outputs.selected == 'true' && env.EXPO_TOKEN != ''
         id: publication-eligibility
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
@@ -240,13 +270,17 @@ jobs:
         run: node .mikka-cloud/operations/business-api/pipeline-policy.mjs mobile-eligibility
       - name: Publish to production
         if: >-
-          env.EXPO_TOKEN != '' && steps.publication-eligibility.outputs.allowed == 'true' &&
+          env.EXPO_TOKEN != '' && steps.mobile-source.outputs.selected == 'true' && steps.publication-eligibility.outputs.allowed == 'true' &&
           steps.publication-eligibility.outputs.overlay_sha == steps.eligibility.outputs.overlay_sha
         working-directory: apps/mobile
-        run: npx -y eas-cli@27.2.0 update --channel production --platform ios --message "$(git log -1 --format=%s)" --non-interactive
+        env:
+          OVERLAY_SHA: ${{ steps.eligibility.outputs.overlay_sha }}
+        run: |
+          node ../../scripts/release/mobile-ota-source.mjs verify
+          npx -y eas-cli@27.2.0 update --channel production --platform ios --message "$(git log -1 --format=%s)" --non-interactive
       - name: Record a closed window before publication
         if: >-
-          steps.eligibility.outputs.allowed == 'true' &&
+          steps.eligibility.outputs.allowed == 'true' && steps.mobile-source.outputs.selected == 'true' &&
           (steps.publication-eligibility.outputs.allowed != 'true' ||
            steps.publication-eligibility.outputs.overlay_sha != steps.eligibility.outputs.overlay_sha)
         run: echo 'Production OTA was not published because the final owner window or staged UI identity no longer matched.' >> "$GITHUB_STEP_SUMMARY"

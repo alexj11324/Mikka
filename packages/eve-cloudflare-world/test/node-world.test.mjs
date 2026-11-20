@@ -73,7 +73,7 @@ test('the last serving Eve caller creates and reads a run through the new World 
   const receipt = JSON.parse(await readFile(new URL('release.json', fixture), 'utf8'))
   const releasedRoot = join(directory, 'released-caller')
   for (const [path, blob] of Object.entries(receipt.files)) {
-    const bytes = await readFile(new URL(path, fixture))
+    const bytes = await readFile(new URL(path + '.txt', fixture))
     expect(createHash('sha1').update(`blob ${bytes.length}\0`).update(bytes).digest('hex'), path).toBe(blob)
     const target = join(releasedRoot, path)
     await mkdir(dirname(target), { recursive: true })
