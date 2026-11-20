@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { buildEnvironment, command, releaseId, verifyOverlayMain } from '../cloudflare-native-oci.mjs'
 import { childEnvironment, withOverlayKey } from '../cloudflare-ci.mjs'
 import { assertInputCoverage, buildContexts, registryImage, releaseManifest, serviceDigest, serviceNames, validateServiceManifest } from './service-builds.mjs'
+import { uiOverlay } from '../../lib/ui-overlay.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const hash = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex')
@@ -16,6 +17,10 @@ const readJson = async path => JSON.parse(await readFile(path, 'utf8'))
 const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
 const output = async (name, value) => { assert.ok(process.env.GITHUB_OUTPUT); await appendFile(process.env.GITHUB_OUTPUT, name + '=' + value + '\n') }
 const serviceSteps = ['Build and verify service', 'Publish immutable service image', 'Upload service artifact', 'Upload service cache receipt']
+
+export function verifyServiceOverlay(directory, overlaySource) {
+  return uiOverlay(directory, { MIKKA_UI_OVERLAY_DIR: join(directory, '.hosted-ui'), MIKKA_UI_OVERLAY_SHA: overlaySource })
+}
 
 export function trustedBuildSource(env, event) {
   assert.equal(env.GITHUB_ACTIONS, 'true')
@@ -233,6 +238,7 @@ async function install(service, context) {
       command('git', ['fetch', '--quiet', '--no-tags', 'git@github.com:alexj11324/mikka-hosted-ui.git', context.overlayCommit], { cwd: overlay, env, stage: 'OVERLAY_FETCH' })
       command('git', ['checkout', '--quiet', '--detach', 'FETCH_HEAD'], { cwd: overlay, env, stage: 'OVERLAY_CHECKOUT' })
       verifyOverlayMain(overlay, context.overlayCommit, env)
+      verifyServiceOverlay(root, context.overlayCommit)
     })
   }
   const env = childEnvironment(process.env, context.sourceCommit, context.overlayCommit)
