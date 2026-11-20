@@ -4308,5 +4308,12 @@
     "behavior": "Checks the owner's explicit canSteer grant before a peer continues an ended thread, in the installation database.",
     "test": "lib/interop/interop.db.test.ts",
     "suite": "test:interop-db"
+  },
+  "lib/factory/agent-profile-mark.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Pure Agent Profile mark glyphs, colours and thread-status-to-ProfileMarkState mapping; no network or credentials.",
+    "test": "components/labels/profile-mark.test.tsx",
+    "suite": "test:lib-units"
   }
 }
