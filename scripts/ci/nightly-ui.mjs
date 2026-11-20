@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { appendFile, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
-import { tmpdir } from 'node:os'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { artifactFor, checkedRun, github, readArtifactMembers, repository } from '../release/pipeline-inputs.mjs'
 import { checkedServiceCache } from '../release/service-build-ci.mjs'
@@ -66,7 +65,11 @@ export async function selectNightlyUi({ source, api = github }) {
 }
 
 export async function restoreNightlyUi(packet, output) {
-  const directory = await mkdtemp(join(tmpdir(), 'mikka-nightly-ui-'))
+  output = resolve(output)
+  await mkdir(dirname(output), { recursive: true })
+  // Stage beside the destination: workspaces may be mounted on a different
+  // filesystem from the system temporary directory, where rename is EXDEV.
+  const directory = await mkdtemp(join(dirname(output), '.mikka-nightly-ui-'))
   try {
     const archive = join(directory, 'web.zip'), staged = join(directory, 'web')
     await writeFile(archive, packet.archive, { flag: 'wx', mode: 0o600 })
@@ -85,7 +88,6 @@ export async function restoreNightlyUi(packet, output) {
       overlay: packet.web.overlayCommit, reused: packet.web.reused, contextDigest: packet.web.contextDigest,
       webRun: packet.web.build.runId, webAttempt: packet.web.build.runAttempt, webArtifact: packet.web.build.artifactId,
       assetsDigest: packet.web.artifacts.assets.digest }
-    await mkdir(dirname(output), { recursive: true })
     await rm(output, { recursive: true, force: true })
     await rename(staged, output)
     return evidence
