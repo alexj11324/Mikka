@@ -16,6 +16,7 @@ import { archiveReport, artifactRedirect, assertArtifactIdentity, assertDriverAt
 
 const SHA = 'a'.repeat(40), WORKER = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const TOKEN = 'synthetic-private-github-token', API = `https://api.github.com/repos/${REPOSITORY}`
+const MAIN_API = 'https://api.github.com/repositories/1427517699'
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const workflow = { id: 456, name: RELEASE_NAME, path: RELEASE_WORKFLOW, state: 'active' }
 const started = new Date(Date.now() - 60_000).toISOString()
@@ -166,7 +167,7 @@ function reader(fixture, mutate = () => {}) {
     calls.push(url); mutate(fixture, calls)
     assert.equal(options.headers.authorization, `Bearer ${TOKEN}`); assert.equal(options.redirect, 'error')
     const data = { [`${API}/actions/workflows/e2b-official-runtime.yml`]: fixture.workflow, [`${API}/actions/runs/123`]: fixture.run,
-      [`${API}/git/ref/heads/main`]: fixture.main, [`${API}/actions/runs/123/attempts/2/jobs?per_page=100`]: fixture.jobs,
+      [`${MAIN_API}/git/ref/heads/main`]: fixture.main, [`${API}/actions/runs/123/attempts/2/jobs?per_page=100`]: fixture.jobs,
       [`${API}/actions/runs/123/artifacts?per_page=100`]: fixture.listing, [`${API}/actions/artifacts/321`]: fixture.artifact }
     assert.ok(Object.hasOwn(data, url), 'only fixed read-only GitHub routes are used')
     return Response.json(data[url])
@@ -356,7 +357,7 @@ test('real CI CLI binds artifact bytes then refuses changed source/attempt/publi
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   mkdirSync(root); mkdirSync(temp)
   for (const file of ['scripts/acceptance/task-secrets-ci.mjs', 'scripts/acceptance/thread-lifecycle-ci.mjs',
-    'scripts/release/web-deploy.mjs', 'scripts/ci-docs-only.mjs',
+    'scripts/release/web-deploy.mjs', 'scripts/cloudflare-source.mjs', 'scripts/ci-docs-only.mjs',
     'scripts/e2b/runtime-report.mjs', 'scripts/e2b/build-template.py']) {
     const target = join(root, file); mkdirSync(dirname(target), { recursive: true }); copyFileSync(new URL('../../' + file, import.meta.url), target)
   }
@@ -378,7 +379,7 @@ test('real CI CLI binds artifact bytes then refuses changed source/attempt/publi
     + `if((o.method??'GET')!=='GET')throw Error('write_refused');if(url==='https://productionresultssa12.blob.core.windows.net/result'){if(o.headers)throw Error('token_forwarded');return new Response(Buffer.from(f.archive,'base64'))}\n`
     + `if(url==='https://app.aspectlylabs.com/mikka/api/version')return Response.json({build:f.publicBuild});if(o.headers.authorization!=='Bearer ${TOKEN}')throw Error('token_missing');\n`
     + `if(url==='${API}/actions/artifacts/321/zip')return new Response(null,{status:302,headers:{location:'https://productionresultssa12.blob.core.windows.net/result'}});\n`
-    + `const routes={'${API}/actions/workflows/e2b-official-runtime.yml':f.workflow,'${API}/actions/runs/123':f.run,'${API}/git/ref/heads/main':f.main,'${API}/actions/runs/123/attempts/2/jobs?per_page=100':f.jobs,'${API}/actions/runs/123/artifacts?per_page=100':f.listing,'${API}/actions/artifacts/321':f.artifact};if(!Object.hasOwn(routes,url))throw Error('route_refused');return Response.json(routes[url])};\n`)
+    + `const routes={'${API}/actions/workflows/e2b-official-runtime.yml':f.workflow,'${API}/actions/runs/123':f.run,'${MAIN_API}/git/ref/heads/main':f.main,'${API}/actions/runs/123/attempts/2/jobs?per_page=100':f.jobs,'${API}/actions/runs/123/artifacts?per_page=100':f.listing,'${API}/actions/artifacts/321':f.artifact};if(!Object.hasOwn(routes,url))throw Error('route_refused');return Response.json(routes[url])};\n`)
   const cliEnv = { PATH: process.env.PATH, ...env(), GITHUB_SHA: source, APPLICATION_SHA: source, EXPECTED_SOURCE_SHA: source,
     EXPECTED_WORKER_SHA: worker, EXPECTED_WORKER_SOURCE_SHA: source, RUNNER_TEMP: temp, FIXTURE_PATH: fixturePath,
     GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: output, GITHUB_ENV: environment }

@@ -3,8 +3,10 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
-const REPOSITORY = 'alexj11324/Mikka'
+const officialRepository = repository => officialMikkaRepository(repository?.full_name, String(repository?.id),
+  repository?.owner?.id === undefined ? undefined : String(repository.owner.id))
 const WORKFLOW = '.github/workflows/e2b-official-runtime.yml'
 const FAILURE_STEPS = new Set([
   'Build private versioned candidates and require official file conservation',
@@ -57,7 +59,7 @@ export async function lastPublishedSource({ token, fetchImpl = fetch, maxRuns = 
   let seen = 0
   for await (const run of pages(`/actions/workflows/${WORKFLOW.split('/').pop()}/runs?branch=main&status=success`, 'workflow_runs', options)) {
     if (++seen > maxRuns) return null
-    if (run.path !== WORKFLOW || run.head_branch !== 'main' || run.repository?.full_name !== REPOSITORY
+    if (run.path !== WORKFLOW || run.head_branch !== 'main' || !officialRepository(run.repository)
       || !['workflow_dispatch', 'workflow_run'].includes(run.event) || !/^[a-f0-9]{40}$/.test(run.head_sha ?? '') || !id(run.run_attempt)) continue
     for await (const job of pages(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`, 'jobs', options)) {
       if (/^(?:release \/ )?subscriptions$/.test(job.name ?? '') && job.head_sha === run.head_sha
@@ -69,7 +71,7 @@ export async function lastPublishedSource({ token, fetchImpl = fetch, maxRuns = 
 
 async function githubRead(path, { token, fetchImpl }) {
   if (!token) throw Error('runtimeInputs:githubTokenRequired')
-  const response = await fetchImpl(`https://api.github.com/repos/${REPOSITORY}${path}`, {
+  const response = await fetchImpl(`https://api.github.com/repositories/${publicRepositoryId}${path}`, {
     headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
     signal: AbortSignal.timeout(20_000), redirect: 'error', cache: 'no-store',
   })
@@ -103,7 +105,7 @@ export async function findFailedInputs({ digest, currentRunId, token, fetchImpl 
       || source.head_branch !== 'main' || !/^[a-f0-9]{40}$/.test(source.head_sha ?? '')) continue
     const run = await githubRead(`/actions/runs/${source.id}`, options)
     if (run.id !== source.id || run.path !== WORKFLOW || run.head_branch !== 'main' || run.head_sha !== source.head_sha
-      || run.repository?.full_name !== REPOSITORY || run.head_repository?.full_name !== REPOSITORY
+      || !officialRepository(run.repository) || !officialRepository(run.head_repository)
       || !['push', 'workflow_dispatch', 'workflow_run'].includes(run.event)
       || !(run.status === 'completed' && run.conclusion === 'failure' || run.status === 'in_progress' && run.conclusion === null)
       || !id(run.run_attempt) || !(Date.parse(artifact.created_at) >= Date.parse(run.run_started_at))) continue

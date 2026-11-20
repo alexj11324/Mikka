@@ -102,6 +102,16 @@ test('native submission rejects oversized or malformed bodies before delivery', 
     assert.equal((await current.handler(malformed, args)).status, 400)
     assert.deepEqual(admittedOwners, [])
   }
+  // HTTP bridges can expose the body of a native sessions.create as an empty stream.
+  const create = route('POST', '/eve/v1/session')
+  const emptyBody = new Request('https://app.test/eve/v1/session', {
+    method: 'POST', headers: { origin: 'https://app.test', cookie: 'owner=alice' }, body: '',
+  })
+  assert.ok(emptyBody.body)
+  const response = await create.handler(emptyBody, args)
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { ok: true, sessionId })
+  assert.deepEqual(admittedOwners, [])
 })
 
 test('an authenticated send cannot use captured expectations to start another owner or Workspace session', async () => {
