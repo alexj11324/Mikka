@@ -7,12 +7,12 @@ import { fileURLToPath } from 'node:url'
 import { buildEnvironment, command, releaseId, verifyOverlayMain } from '../cloudflare-native-oci.mjs'
 import { childEnvironment, withOverlayKey } from '../cloudflare-ci.mjs'
 import { assertInputCoverage, buildContexts, registryImage, releaseManifest, serviceDigest, serviceNames, validateServiceManifest } from './service-builds.mjs'
+import { actionsMikkaRepository, officialMikkaRepository, privateMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 import { uiOverlay } from '../../lib/ui-overlay.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const hash = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex')
 const workflow = 'cloudflare-api-image.yml'
-const repository = 'alexj11324/Mikka'
 const readJson = async path => JSON.parse(await readFile(path, 'utf8'))
 const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
 const output = async (name, value) => { assert.ok(process.env.GITHUB_OUTPUT); await appendFile(process.env.GITHUB_OUTPUT, name + '=' + value + '\n') }
@@ -24,8 +24,8 @@ export function verifyServiceOverlay(directory, overlaySource) {
 
 export function trustedBuildSource(env, event) {
   assert.equal(env.GITHUB_ACTIONS, 'true')
-  assert.equal(env.GITHUB_REPOSITORY, repository)
-  assert.equal(env.GITHUB_REPOSITORY_ID, '1427517699')
+  const repository = actionsMikkaRepository(env)
+  assert.ok(repository, 'Official Mikka workflow repository required')
   assert.equal(env.GITHUB_ACTOR_ID, '183887963')
   assert.equal(env.GITHUB_ACTOR, 'alexj11324')
   assert.equal(env.GITHUB_TRIGGERING_ACTOR, 'alexj11324')
@@ -53,7 +53,7 @@ async function source() {
 
 async function github(path, missing = false) {
   assert.ok(process.env.GH_TOKEN)
-  const result = await fetch('https://api.github.com/repos/' + repository + '/' + path, { redirect: 'error', signal: AbortSignal.timeout(30000),
+  const result = await fetch('https://api.github.com/repositories/' + publicRepositoryId + '/' + path, { redirect: 'error', signal: AbortSignal.timeout(30000),
     headers: { authorization: 'Bearer ' + process.env.GH_TOKEN, accept: 'application/vnd.github+json', 'user-agent': 'mikka-service-build' } })
   if (missing && result.status === 404) { await result.body?.cancel(); return null }
   assert.equal(result.status, 200, 'GitHub build provenance unavailable')
@@ -86,8 +86,7 @@ export function checkedServiceCache(name, receipt, run, jobs, artifact) {
   validateServiceManifest(name, receipt)
   assert.equal(receipt.build.workflow, workflow)
   for (const field of ['repository', 'head_repository']) {
-    assert.equal(run[field]?.id, 1427517699)
-    assert.equal(run[field].full_name, repository)
+    assert.ok(officialMikkaRepository(run[field]?.full_name, String(run[field]?.id)))
     assert.equal(run[field].private, false)
     assert.equal(run[field].fork, false)
   }
@@ -156,7 +155,7 @@ export function selectServicePublications(plan, cached, receipts, artifacts, job
 
 async function readCacheArtifact(artifact) {
   assert.ok(artifact.size_in_bytes > 0 && artifact.size_in_bytes <= 128 * 1024)
-  const link = await fetch('https://api.github.com/repos/' + repository + '/actions/artifacts/' + artifact.id + '/zip', {
+  const link = await fetch('https://api.github.com/repositories/' + publicRepositoryId + '/actions/artifacts/' + artifact.id + '/zip', {
     redirect: 'manual', signal: AbortSignal.timeout(30000), headers: { authorization: 'Bearer ' + process.env.GH_TOKEN,
       accept: 'application/vnd.github+json', 'user-agent': 'mikka-service-build' } })
   assert.equal(link.status, 302)
@@ -235,7 +234,7 @@ async function install(service, context) {
     await withOverlayKey(process.env, async env => {
       const overlay = join(root, '.hosted-ui')
       command('git', ['init', '--quiet', overlay], { env, stage: 'OVERLAY_INIT' })
-      command('git', ['fetch', '--quiet', '--no-tags', 'git@github.com:alexj11324/mikka-hosted-ui.git', context.overlayCommit], { cwd: overlay, env, stage: 'OVERLAY_FETCH' })
+      command('git', ['fetch', '--quiet', '--no-tags', 'git@github.com:' + privateMikkaRepository('mikka-hosted-ui') + '.git', context.overlayCommit], { cwd: overlay, env, stage: 'OVERLAY_FETCH' })
       command('git', ['checkout', '--quiet', '--detach', 'FETCH_HEAD'], { cwd: overlay, env, stage: 'OVERLAY_CHECKOUT' })
       verifyOverlayMain(overlay, context.overlayCommit, env)
       verifyServiceOverlay(root, context.overlayCommit)

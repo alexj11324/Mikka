@@ -24,7 +24,7 @@ test('only actual successful same-repository main pushes or explicit recovery ac
     "github.event_name == 'workflow_run'", "github.event.workflow_run.event == 'push'", "github.event.workflow_run.conclusion == 'success'",
     'github.event.workflow_run.head_repository.id == github.event.repository.id']) assert.ok(job.if.includes(required))
   assert.equal(job.environment, 'cloudflare-runtime-release')
-  assert.deepEqual(job.permissions, { contents: 'read', actions: 'read', 'id-token': 'write' })
+  assert.deepEqual(job.permissions, { contents: 'read', actions: 'read', issues: 'read', 'id-token': 'write' })
   const select = job.steps.find(step => step.id === 'select')
   assert.equal(select.run, 'node scripts/release/pipeline-inputs.mjs')
   const token = job.steps.find(step => step.name === 'Read the existing Cloudflare deployment identity')
@@ -100,7 +100,7 @@ test('read-only migration admission precedes candidate preparation and deploymen
     const index = job.steps.indexOf(admission)
     assert.equal(admission['working-directory'], 'operations')
     assert.equal(admission.if, "steps.select.outputs.status == 'selected'")
-    assert.deepEqual(admission.env, { GH_TOKEN: expectedToken, MIKKA_PUBLIC_ACTIONS_TOKEN: expectedToken })
+    assert.deepEqual(admission.env, { GH_TOKEN: expectedToken, MIKKA_PUBLIC_ACTIONS_TOKEN: '${{ github.token }}' })
     assert.equal(admission['continue-on-error'], undefined)
     assert.equal(workflow.env?.CLOUDFLARE_API_TOKEN, undefined)
     assert.equal(job.env?.CLOUDFLARE_API_TOKEN, undefined)

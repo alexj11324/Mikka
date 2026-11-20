@@ -1,10 +1,10 @@
 // Release evidence for the Web Cloudflare serves: GitHub reads, the current-main fence,
 // Desktop source ancestry and the exact-source wait used by acceptance drivers.
 import { setTimeout as sleep } from 'node:timers/promises'
+import { officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 const SHA = /^[a-f0-9]{40}$/
 export const PRODUCTION_VERSION_URL = 'https://app.aspectlylabs.com/mikka/api/version'
-const REPOSITORY = 'alexj11324/Mikka'
 const WEB_WORKFLOW = '.github/workflows/web-deploy.yml'
 const BUILD_STEPS = ['Build (runs migrations last, as the Vercel build did)',
   'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
@@ -24,7 +24,7 @@ export async function githubRead(path, { token, fetchImpl, timeoutMs = 20_000 })
   if (!token) throw Error('webDeploy:githubTokenRequired')
   let response
   try {
-    response = await fetchImpl(`https://api.github.com/repos/${REPOSITORY}${path}`, {
+    response = await fetchImpl(`https://api.github.com/repositories/${publicRepositoryId}${path}`, {
       headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28' },
       signal: AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs))), redirect: 'error', cache: 'no-store',
     })
@@ -69,7 +69,8 @@ export async function containsDesktopSource({ expectedBuild, publicCommit, token
   if (publicCommit === expectedBuild) return true
   const path = `/compare/${expectedBuild}...${publicCommit}`
   const comparison = await githubRead(path + '?per_page=1', { token, fetchImpl, timeoutMs })
-  if (comparison.url !== `https://api.github.com/repos/${REPOSITORY}${path}`
+  if (!['alexj11324/Mikka', 'aspectly-labs/Mikka'].some(repository =>
+    comparison.url === `https://api.github.com/repos/${repository}${path}`)
     || comparison.base_commit?.sha !== expectedBuild || !SHA.test(comparison.merge_base_commit?.sha ?? '')
     || !['ahead', 'behind', 'diverged', 'identical'].includes(comparison.status)
     || !Number.isSafeInteger(comparison.ahead_by) || comparison.ahead_by < 0
@@ -98,7 +99,8 @@ export async function waitForWebDeployment({ expectedBuild, expectedOverlay, tok
     const data = await githubRead(`/actions/workflows/web-deploy.yml/runs?head_sha=${webBuild}&branch=main&per_page=100`,
       { token, fetchImpl, timeoutMs: Math.min(20_000, remaining()) })
     const runs = (data.workflow_runs ?? []).filter(run => run.head_sha === webBuild && run.head_branch === 'main'
-      && run.path === WEB_WORKFLOW && run.repository?.full_name === REPOSITORY && run.head_repository?.full_name === REPOSITORY
+      && run.path === WEB_WORKFLOW && [run.repository, run.head_repository].every(repository => officialMikkaRepository(repository?.full_name,
+        String(repository?.id), repository?.owner?.id === undefined ? undefined : String(repository.owner.id)))
       && ['push', 'workflow_dispatch'].includes(run.event)).sort((a, b) => b.id - a.id)
     const run = runs[0]
     if (!run && !checkedPublisher) {

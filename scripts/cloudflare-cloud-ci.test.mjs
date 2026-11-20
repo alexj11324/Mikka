@@ -10,7 +10,7 @@ import { runCloudCi, sourceContext, verifyPublicReceipt, verifyPublishedArtifact
 
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 const env = {
-  GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699',
+  GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
   GITHUB_SHA: 'a'.repeat(40), GITHUB_WORKFLOW_SHA: 'a'.repeat(40),
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_REF_NAME: 'main',
   GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/cloud-services-ci.yml@refs/heads/main',
@@ -166,8 +166,8 @@ test('pinned private helper receives original Actions context and only publish w
 test('workflow uses public manual main qualification and uploads the single receipt file', async () => {
   const workflow = await readFile(new URL('../.github/workflows/cloud-services-ci.yml', import.meta.url), 'utf8')
   assert.match(workflow, /on:\n  workflow_dispatch:\n    inputs:\n      cloud_source_sha:/)
-  assert.match(workflow, /permissions:\n  contents: read\njobs:/)
-  assert.match(workflow, /if: github.repository == 'alexj11324\/Mikka' && github.event_name == 'workflow_dispatch' && github.ref == 'refs\/heads\/main'/)
+  assert.match(workflow, /permissions:\n  contents: read\n(?:env:\n(?:  MIKKA_(?:PRIVATE|HOSTED_UI)_GITHUB_OWNER:[^\n]+\n)+)?jobs:/)
+  assert.match(workflow, /if: \(github.repository_id == '1427517699' && \(github.repository_owner_id == '183887963' \|\| github.repository_owner_id == '359279274'\)\) && github.event_name == 'workflow_dispatch' && github.ref == 'refs\/heads\/main'/)
   // The stage runs PostgreSQL 17's initdb from the pinned PGDG noble (24.04)
   // packages, so the image is pinned to that release: `ubuntu-latest` moved to
   // 26.04 on 2026-11-19 and the stage failed before any product check ran.
@@ -176,7 +176,7 @@ test('workflow uses public manual main qualification and uploads the single rece
   assert.match(workflow, /node-version: 24\.22\.1/)
   assert.match(workflow, /corepack prepare pnpm@10\.34\.3 --activate/)
   assert.match(workflow, /MIKKA_CLOUD_SOURCE_SHA: \$\{\{ inputs.cloud_source_sha }}/)
-  assert.match(workflow, /repository: alexj11324\/mikka-cloud\n          ref: \$\{\{ inputs\.cloud_source_sha }}\n          token: \$\{\{ steps\.source-token\.outputs\.token }}\n          path: \.mikka-cloud\n          persist-credentials: false/)
+  assert.match(workflow, /repository: \$\{\{ format\('\{0\}\/mikka-cloud', vars\.MIKKA_PRIVATE_GITHUB_OWNER[^\n]+\}\}\n          ref: \$\{\{ inputs\.cloud_source_sha }}\n          token: \$\{\{ steps\.source-token\.outputs\.token }}\n          path: \.mikka-cloud\n          persist-credentials: false/)
   assert.doesNotMatch(workflow, /MIKKA_CLOUD_READ_TOKEN:/)
   assert.match(workflow, /uses: actions\/create-github-app-token@[a-f0-9]{40}/)
   assert.match(workflow, /repositories: mikka-cloud\n          permission-contents: read/)
@@ -197,6 +197,25 @@ test('workflow uses public manual main qualification and uploads the single rece
   assert.doesNotMatch(workflow, /pull_request:|push:|WORKERS_CI|secrets\.MIKKA_CLOUD_READ_TOKEN|CLOUDFLARE_API_TOKEN|permission-contents: write/)
 })
 
+test('a new private hosted workflow is refused before importing private code, without rewriting historical verification', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'mikka-private-runner-admission-'))
+  try {
+    const publicRoot = join(directory, 'public')
+    const publicSource = await repository(publicRoot, 'alexj11324/Mikka', { '.gitignore': '/.mikka-cloud/\n' })
+    const privateRoot = join(publicRoot, '.mikka-cloud')
+    const privateSource = await repository(privateRoot, 'alexj11324/mikka-cloud', {
+      '.github/workflows/new-hosted.yml': 'on: push\njobs:\n  added:\n    runs-on: ubuntu-latest\n    steps: []\n',
+      'scripts/cloudflare-ci.mjs': 'throw new Error("PRIVATE_MODULE_EXECUTED")\n',
+    })
+    const buildEnv = { ...env, GITHUB_SHA: publicSource, GITHUB_WORKFLOW_SHA: publicSource, MIKKA_CLOUD_SOURCE_SHA: privateSource }
+    await assert.rejects(runCloudCi({ env: buildEnv, publicRoot }), /CLOUD_PUBLIC_CI_PRIVATE_RUNNER_PLACEMENT/)
+    await assert.rejects(runCloudCi({ env: buildEnv, publicRoot, verify: true }), /PRIVATE_MODULE_EXECUTED/)
+    await assert.rejects(runCloudCi({ env: buildEnv, publicRoot, publish: true }), /PRIVATE_MODULE_EXECUTED/)
+  } finally {
+    await rm(directory, { recursive: true, force: true })
+  }
+})
+
 test('CLI reports fixed errors without raw failure values', () => {
   const script = fileURLToPath(new URL('./cloudflare-cloud-ci.mjs', import.meta.url))
   const result = spawnSync(process.execPath, [script, 'private-sentinel'], { cwd: dirname(script), encoding: 'utf8' })
@@ -215,6 +234,7 @@ test('CLI preserves public qualification stages from a pinned private runner and
       '.gitignore': '/.mikka-cloud/\n',
       [script]: await readFile(new URL('./cloudflare-cloud-ci.mjs', import.meta.url), 'utf8'),
       'scripts/cloudflare-source.mjs': await readFile(new URL('./cloudflare-source.mjs', import.meta.url), 'utf8'),
+      'scripts/ci/private-runner-placement.mjs': await readFile(new URL('./ci/private-runner-placement.mjs', import.meta.url), 'utf8'),
     })
     const privateSource = await repository(join(publicRoot, '.mikka-cloud'), 'alexj11324/mikka-cloud', {
       'scripts/cloudflare-ci.mjs': 'export function runCi({env}) { throw new Error(env.TEST_DIAGNOSTIC) }',
