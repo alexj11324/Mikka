@@ -2,7 +2,7 @@
 
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { Pencil } from '@/components/icons'
+import { Check, Copy, Pencil } from '@/components/icons'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -132,7 +132,7 @@ function WorkspaceId({ id }: { id: string }) {
   return <SettingRow title={t('id')} description={t('idHint')}>
     <span className="flex items-center gap-2 font-mono text-xs">
       {id.slice(0, 4)}…{id.slice(-4)}
-      <Button type="button" size="sm" variant="ghost" aria-label={t('copyId')} onClick={() => { void navigator.clipboard.writeText(id).then(() => { setCopied(true) }) }}>{copied ? t('copied') : t('copyId')}</Button>
+      <Button type="button" size="icon" variant="ghost" aria-label={copied ? t('copied') : t('copyId')} onClick={() => { void navigator.clipboard.writeText(id).then(() => { setCopied(true) }) }}>{copied ? <Check data-icon /> : <Copy data-icon />}</Button>
     </span>
   </SettingRow>
 }

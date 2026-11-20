@@ -84,13 +84,20 @@ export function AppearanceSettings() {
     </SettingsSection>
     <Button type="button" variant="ghost" size="sm" className="self-start" aria-expanded={advanced} onClick={() => setAdvanced(open => !open)}>{t('advanced')}<ChevronRight data-icon /></Button>
     {advanced ? <SettingsSection><ColorRow label={t('border')} value={ui.border ?? '#e5e5e5'} onChange={border => paint({ border })} /></SettingsSection> : null}
-    <Button type="button" variant="outline" className="h-auto w-full justify-between px-5 py-4" aria-expanded={themesOpen} onClick={() => setThemesOpen(open => !open)}>
-      {t('exploreEntry')}
-      <ChevronRight data-icon />
-    </Button>
-    {themesOpen && ui.customThemes.length > 0 ? <SettingsSection>{ui.customThemes.map(theme => <SettingRow key={theme.id} title={theme.name}>
-      <Button type="button" size="sm" variant="outline" onClick={() => paint({ themeId: 'mikka', accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}>{t('useTheme')}</Button>
-    </SettingRow>)}</SettingsSection> : null}
+    <SettingsSection title={t('explore')}>
+      <Button type="button" variant="ghost" className="h-auto w-full justify-between rounded-none px-5 py-4" aria-expanded={themesOpen} onClick={() => setThemesOpen(open => !open)}>
+        <span className="flex min-w-0 flex-col items-start gap-0.5 text-left">
+          <span className="text-sm font-medium">{t('exploreCard')}</span>
+          <span className="text-sm font-normal text-muted-foreground">{t('exploreHint')}</span>
+        </span>
+        <ChevronRight data-icon />
+      </Button>
+    </SettingsSection>
+    {themesOpen ? <SettingsSection>
+      {ui.customThemes.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">{t('myThemesEmpty')}</p> : ui.customThemes.map(theme => <SettingRow key={theme.id} title={theme.name}>
+        <Button type="button" size="sm" variant="outline" onClick={() => paint({ themeId: 'mikka', accent: theme.accent, fill: theme.fill, foreground: theme.foreground })}>{t('useTheme')}</Button>
+      </SettingRow>)}
+    </SettingsSection> : null}
     <SettingsSection title={t('background')}>
       <SettingRow title={t('dashboardBackground')} description={t('dashboardHint')}>
         <div className="flex items-center gap-2">
