@@ -328,14 +328,21 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     // than folding it into the one-line diagnostic that hides its detail.
     if (error?.code === 'API_DEV_ROUTES_STALE') console.error(error.message)
     else {
-      const known = new Set(['EVE_SERVICE_START_FAILED', 'EVE_SERVICE_START_TIMEOUT', 'EVE_SERVICE_EXITED', 'EVE_SERVICE_STORAGE_MISMATCH', 'API_CONFIG_NOT_LOADED', 'API_DEV_LOCAL_WORLD_REQUIRED'])
-      console.error('[dev] Startup failed', { name: error?.name ?? 'Error', code: error?.code ?? (known.has(error?.message) ? error.message : 'API_DEV_START_FAILED') })
+      // A startup refusal is only diagnosable if its own words survive. The
+      // preflight decides the database and the overlay before anything listens,
+      // and its two codes are the ones a person can act on, so they are named
+      // rather than folded into the generic one; the message carries the rest.
+      const known = new Set(['EVE_SERVICE_START_FAILED', 'EVE_SERVICE_START_TIMEOUT', 'EVE_SERVICE_EXITED', 'EVE_SERVICE_STORAGE_MISMATCH', 'API_CONFIG_NOT_LOADED', 'API_DEV_LOCAL_WORLD_REQUIRED', 'DEV_DATABASE_UNREACHABLE', 'DEV_DATABASE_MISSING'])
+      const message = String(error?.message ?? '')
+      const named = [...known].find(code => message.startsWith(code)) ?? (known.has(message) ? message : null)
+      console.error('[dev] Startup failed', { name: error?.name ?? 'Error', code: error?.code ?? named ?? 'API_DEV_START_FAILED', message: message.slice(0, 300) })
       // The peer's own stderr is the only place its refusal is explained — "A dev
       // server is already running for this eve agent", a module error, a port
       // clash. A bare EVE_SERVICE_EXITED would send the developer hunting for a
       // cause this process already has in hand.
       const words = error?.detail?.reason ?? error?.detail?.stderr?.trim()
-      if (words) for (const line of words.split('\n').slice(-12)) console.error(`[dev] eve: ${line}`)
+      if (words) for (const line of words.split('
+').slice(-12)) console.error(`[dev] eve: ${line}`)
     }
     process.exitCode = 1
   }

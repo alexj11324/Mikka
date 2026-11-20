@@ -1,6 +1,5 @@
 import { seedFixtureWorkspace } from './helpers/task-workspace'
 // Next captures AsyncLocalStorage when its work stores are first imported.
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -174,22 +173,16 @@ test('run result publication commits one owner-scoped result through retries and
     await t.test('device completion and server terminal transitions persist diagnostics under their existing fences', async () => {
       const { completeRunForDevice } = await import('../lib/run-completion')
       const { failRunForDaemonUpgrade } = await import('../lib/run-leases')
-      const { AfterContext } = await import('next/dist/server/after/after-context')
-      const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
-      const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
-      const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
-      const { NextRequest } = await import('next/server')
-      // Like issue-scope-detachment.db.test.ts, supply Next's real request
-      // lifecycle and drain after() work without replacing any database writer.
+      const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
+      const { NextRequest } = await import('../lib/server-runtime/server')
+      // Like issue-scope-detachment.db.test.ts, run the real request scope and
+      // drain its after queue without replacing any database writer.
       async function failFromRequest(...args: Parameters<typeof failRunForDaemonUpgrade>) {
-        const waits: Promise<unknown>[] = [], errors: unknown[] = [], closes: Array<() => void> = []
-        const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: close => { closes.push(close) }, onTaskError: error => { errors.push(error) } })
-        const request = new NextRequest(`http://127.0.0.1/mikka/v1/runs/${args[0]}/complete`)
-        const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
-        return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
+        const scope = createRequestScope(new NextRequest(`http://127.0.0.1/mikka/v1/runs/${args[0]}/complete`))
+        return runRequestScope(scope, async () => {
           try { return await failRunForDaemonUpgrade(...args) }
-          finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
-        }))
+          finally { await scope.after.finish() }
+        })
       }
       const f = await fixture()
       const stranger = await fixture()

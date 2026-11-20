@@ -26,7 +26,7 @@ import {
   CircleX,
 } from "@/components/icons";
 import type { ComponentProps, ReactNode } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { isValidElement } from "react";
 import { CodeBlock } from "./code-block";
 

@@ -1,6 +1,5 @@
 import { Pool } from 'pg'
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace'
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
@@ -63,9 +62,9 @@ dbTest('capture metadata reads do not transfer the inline file', async t => {
 })
 
 dbTest('artifact evidence follows each real submission version, not the artifact creator or mutable latest version', async t => {
-  const [{ createRequestDatabaseScope, pool }, { submitArtifact, readArtifactContent }, { runEvidence }, { artifactStorage }, { workAsyncStorage }, { workUnitAsyncStorage }] = await Promise.all([
+  const [{ createRequestDatabaseScope, pool }, { submitArtifact, readArtifactContent }, { runEvidence }, { artifactStorage }, { createRequestScope, runRequestScope }] = await Promise.all([
     import('../db'), import('../artifacts/store'), import('./store'), import('../artifacts/storage'),
-    import('next/dist/server/app-render/work-async-storage.external'), import('next/dist/server/app-render/work-unit-async-storage.external'),
+    import('../../apps/api/src/context'),
   ])
   const scope = createRequestDatabaseScope(databaseUrl!)
   const observer = new Pool({ connectionString: databaseUrl!, max: 1 })
@@ -75,11 +74,14 @@ dbTest('artifact evidence follows each real submission version, not the artifact
   // Only the post-response scheduler is a fixture. Submit, receipt, version,
   // evidence and file reads use their real code and the isolated database.
   let scheduled = 0
-  const request = { type: 'request', phase: 'action' } as NonNullable<ReturnType<typeof workUnitAsyncStorage.getStore>>
   const submit = async (runId: string, input: Parameters<typeof submitArtifact>[1], userId = alice, issue: string = issueId) => {
     type CommittedVersion = { artifactId: string; version: number; sha256: string }
     const notifications: Promise<CommittedVersion[]>[] = []
-    const afterContext = { after: () => {
+    const scope = createRequestScope(new Request('http://127.0.0.1/mikka/api/captures'))
+    // Count the product's own after() calls, as the retired framework fixture did.
+    // Enqueueing a watcher here instead would make every submit look like it
+    // scheduled work, refusal included.
+    scope.after.add = () => {
       scheduled++
       // Live run/chat/artifact/project-map notifications depend on gateway
       // configuration. Check the committed data they announce, not their count.
@@ -89,11 +91,8 @@ dbTest('artifact evidence follows each real submission version, not the artifact
         JOIN artifact_versions v ON v."artifactId"=a.id AND v.version::text=e.payload->>'version'
         WHERE e."userId"=$1 AND e."runId"=$2 AND e."issueId"=$3 AND e.kind='artifact_submitted'
           AND e."dedupeKey"='artifact_submitted:'||a.id::text||':'||v.version::text`, [userId, runId, issue]).then(result => result.rows))
-    } }
-    const result = await workAsyncStorage.run(
-      { afterContext } as unknown as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,
-      () => workUnitAsyncStorage.run(request, () => submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input)),
-    )
+    }
+    const result = await runRequestScope(scope, () => submitArtifact({ userId, runId, issueId: issue, authorName: 'Fixture Agent' }, input))
     const observed = await Promise.all(notifications)
     if ('error' in result) assert.deepEqual(observed, [], 'a refused submission schedules no background work')
     else {
@@ -405,6 +404,8 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
     const previous = Object.fromEntries(names.map(name => [name, process.env[name]]))
     const objects = new Map<string, Uint8Array>()
     let readFailure: 'denied' | 'offline' | null = null
+    let objectReads = 0
+    const ranges: (string | null)[] = []
     try {
       Object.assign(process.env, { R2_ACCOUNT_ID: 'synthetic', R2_ACCESS_KEY_ID: 'synthetic', R2_SECRET_ACCESS_KEY: 'synthetic', R2_ARTIFACTS_BUCKET: 'test' })
       globalThis.fetch = async (input, init) => {
@@ -418,10 +419,22 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
           return new Response(null, { status: 200 })
         }
         if (request.method === 'DELETE') { objects.delete(key); return new Response(null, { status: 204 }) }
+        if (request.method === 'HEAD') {
+          const stored = objects.get(key)
+          return stored ? new Response(null, { status: 200, headers: { 'content-length': String(stored.length) } }) : new Response(null, { status: 404 })
+        }
         if (readFailure === 'denied') return new Response(null, { status: 403 })
         if (readFailure === 'offline') throw new TypeError('fetch failed')
+        objectReads += 1
         const bytes = objects.get(key)
-        return bytes ? new Response(new Uint8Array(bytes)) : new Response(null, { status: 404 })
+        if (!bytes) return new Response(null, { status: 404 })
+        const range = request.headers.get('range')
+        ranges.push(range)
+        // Like S3: a range wider than the object returns the whole thing.
+        const upper = Number(range?.match(/^bytes=0-(\d+)$/)?.[1])
+        return Number.isSafeInteger(upper) && upper + 1 < bytes.length
+          ? new Response(new Uint8Array(bytes.subarray(0, upper + 1)), { status: 206 })
+          : new Response(new Uint8Array(bytes))
       }
       const r2 = await store.beginUpload(local, { title: 'R2', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
       assert.ok(!('error' in r2) && r2.upload.target === 'storage')
@@ -439,8 +452,22 @@ dbTest('captures stay with their run\'s owner, uploads are checked, and recordin
       readFailure = null
       const verified = await store.completeUpload(local, r2.captureId)
       assert.ok(!('error' in verified))
+      assert.ok(ranges.includes(`bytes=0-${PNG.length}`), 'the checked read is bounded by the announced size')
       await fetch(r2.upload.url, { method: 'PUT', headers: r2.upload.headers, body: swapped })
       assert.deepEqual((await store.readCapture(alice, r2.captureId))?.bytes, PNG, 'replayed signed PUT cannot replace verified evidence')
+      // A signed PUT that stored more than was announced is refused from the
+      // bucket's own metadata, before any byte of it reaches the server.
+      const oversized = await store.beginUpload(local, { title: 'Oversized', contentType: 'image/png', size: PNG.length, sha256: sha(PNG) })
+      assert.ok(!('error' in oversized) && oversized.upload.target === 'storage')
+      const stagingKey = new URL(oversized.upload.url).pathname
+      objects.set(stagingKey, new Uint8Array([...PNG, 0]))
+      const readsBefore = objectReads
+      const refused = await store.completeUpload(local, oversized.captureId)
+      assert.ok('error' in refused)
+      assert.equal(refused.message, `Expected ${PNG.length} bytes, got ${PNG.length + 1}.`)
+      assert.equal(objectReads, readsBefore, 'an oversized file is refused from its metadata, not by reading it')
+      assert.equal(objects.has(stagingKey), false, 'the refused staging object is deleted')
+      assert.equal((await pool.query('SELECT status FROM run_captures WHERE id=$1', [oversized.captureId])).rows[0].status, 'failed')
       const objectShare = await store.createCaptureShare(alice, r2.captureId)
       assert.ok(objectShare)
       const sharedObject = await measured(() => store.sharedCapture(objectShare.token))

@@ -5,7 +5,6 @@ import { GovernanceError } from '@/lib/governance/errors'
 import { changePersonalProject } from '@/lib/project-input'
 import { personalProjectSelectionFor } from '@/lib/resource-access/personal-project-selection'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ workspaceId: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {

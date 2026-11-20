@@ -1,5 +1,5 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { withRequestLog } from '@/lib/request-log'
 import { auth } from '@/lib/auth'
 import { withBasePath } from '@/lib/base-path'
@@ -12,7 +12,6 @@ import { mobileWebWorkspace, MobileWebScopeError } from '@/lib/mobile-web-scope'
 import en from '@/messages/en.json'
 import zh from '@/messages/zh-CN.json'
 
-export const dynamic = 'force-dynamic'
 type HandoffSession = { session: { id: string }; user: { id: string; email: string } }
 const pendingCookie = 'mikka-mobile-handoff'
 const path = withBasePath('/api/mobile/open')
@@ -32,7 +31,7 @@ async function handleGET(request: Request) {
   if (requiresConfirmation && !token) return new NextResponse(null, { status: 403, headers: safeHeaders })
   if (!token) return NextResponse.redirect(new URL(withBasePath(target), url.origin), { status: 303, headers: safeHeaders })
   try {
-    // HTTP router mode prevents nextCookies() from mutating the ambient Next
+    // The router flag stops the cookie plugin from writing into the ambient
     // response before the person confirms. Direct auth.api calls run that hook.
     const exchanged = await auth.handler(new Request(new URL(withBasePath('/api/auth/one-time-token/verify'), url.origin), {
       method: 'POST', headers: { 'content-type': 'application/json', origin: url.origin }, body: JSON.stringify({ token }),

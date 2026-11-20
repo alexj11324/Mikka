@@ -9,7 +9,6 @@ import { acquireWorkspaceMembership } from '@/lib/workspace-membership-guard'
 import { createWritePolicySettings } from '@/lib/operations/write-policy-settings'
 import { personalWritesEnabled } from '@/lib/operations/write-feature'
 
-export const dynamic='force-dynamic'
 export const maxDuration=300
 const handler=createAgentDefinitionHandler({
   enabled:agentKitEnabled,

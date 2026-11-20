@@ -11,6 +11,7 @@
   - The board's default filter 「负责人：我」 and its 全部 / 工作区 / 个人 segment (Figma 77:2), with the lock on a personal task's card.
   - The 任务 page (`?section=tasks`, [2026-11-09-2330](2026-11-09-2330-overview-as-work-area-tab.md)'s 「看板 is a view of 任务」): the board is the entry.
   - [2026-11-10-0659](2026-11-10-0659-task-code-chips-and-work-area-tabs.md), 「A thread … is its title … The title is the task's title without its code」 and 「It has no icon … and no state badge」: a thread is named by the conversation's own short title, with one small activity mark after it while it is working, waiting or failed.
+- Superseded in part by: [2026-11-18-0300](2026-11-18-0300-one-status-icon-set.md) (the status icons are lucide in one table with the run states; 受阻 wears the shared octagon; the exception covers the task page's status menu).
 - Unchanged: [2026-11-10-1341](2026-11-10-1341-sidebar-short-title-limits.md). A task's title is whatever the person or the model wrote, with no limit, and the task detail keeps the full title.
 
 ## One status

@@ -265,8 +265,8 @@ before(async () => {
   } } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => enabled, wakeCoordinator: () => { throw new Error('test must not execute wake') } } })
   mock.module('@/lib/eve/retry',{namedExports:{retryEveTurn:async()=>retryQueued?{queued:true}:{queued:false,reason:retryWorking?'working':'nothingToRetry'}}})
-  mock.module('next/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
-  mock.module('next/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
+  mock.module('@/lib/server-runtime/server', { namedExports: { NextResponse: { json: (body: unknown, options?: ResponseInit) => Response.json(body, options) }, after: (callback: () => unknown) => callbacks.push(callback) } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => actionHeaders, cookies: async () => ({ get: () => undefined }) } })
   ;({ POST } = await import('../app/api/coordinator/messages/route'))
   ;({ sendCoordinatorMessage, sendSuggestion, retryCoordinatorTurn, getCoordinatorChat, pollCoordinatorChat } = await import('../app/actions/coordinator'))
 })
@@ -759,7 +759,7 @@ test('the composer carries its captured Workspace expectation through the native
   const client = mock.module(new URL('./auth-client.ts', import.meta.url).href, { namedExports: {
     authClient: { getSession: async () => ({ data: { user: { id: 'owner' } }, error: null }) },
   } })
-  const translations = mock.module('next-intl', { namedExports: { useTranslations: () => (key: string) => key } })
+  const translations = mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
   try {
     const { useCoordinatorSubmit } = await import('../components/coordinator/use-coordinator-submit')
     const held: { composer?: ReturnType<typeof useCoordinatorSubmit> } = {}

@@ -1,9 +1,9 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useLayoutEffect, useRef, useState } from 'react'
 import { SettingsLink as Link } from '@/components/settings/settings-link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import useSWR from 'swr'
 import { Bell, Blocks, Brain, Building2, ChartColumn, CircleCheck, Container, CreditCard, FileText, Gauge, HardDrive, KeyRound, Landmark, Lock, Monitor, Plus, Shield, ShieldCheck, SlidersHorizontal, SquareTerminal, SquareUserRound, UserRound, Users, type IconGlyph } from '@/components/icons'
 import { listTeams } from '@/app/actions/teams'

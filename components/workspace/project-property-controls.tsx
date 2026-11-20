@@ -3,7 +3,7 @@
 import { useId, useState, type ReactNode } from 'react'
 import { Box, Users, UserRound, CalendarDays, CalendarCheck, Tag, GitBranch, Plus, type IconGlyph } from '@/components/icons'
 import { parseISO } from 'date-fns'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { cn } from '@/lib/utils'
 import { hasDependencyCycle, projectPeople, type ProjectChanges, type ProjectDraft } from '@/lib/project-input'
 import { Button } from '@/components/ui/button'

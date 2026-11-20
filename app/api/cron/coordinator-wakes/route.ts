@@ -3,7 +3,6 @@ import { cronJob } from '@/lib/background'
 import { cronUnauthorized } from '@/lib/cron-auth'
 import { replayCoordinatorWake, retryCoordinatorWakes } from '@/lib/coordinator/wake'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
 const headers = { 'cache-control': 'no-store' }
 

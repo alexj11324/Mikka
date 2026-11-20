@@ -11,7 +11,7 @@
 // list holds every PR the person can read, not only the ones Mikka produced
 // (hooks/code-review/use-review-page.ts). GitHub stays one explicit icon away.
 import { ChevronDown, ChevronRight, ExternalLink, Pin } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { cn } from "cn";
 import { compactAge } from "@/components/nav/compact-age";
 import { Button } from "@/components/ui/button";

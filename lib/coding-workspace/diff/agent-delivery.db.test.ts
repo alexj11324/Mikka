@@ -53,12 +53,12 @@ test('agent review delivery with PostgreSQL 17 and real Git source proofs', { sk
     const migrations = new URL('../../../drizzle/', import.meta.url)
     for (const name of orderMigrations((await readdir(migrations)).filter(name => name.endsWith('.sql'))))
       await pool.query(await readFile(new URL(name, migrations), 'utf8'))
-    const next = await import('next/server')
-    mock.module('next/server', { namedExports: { ...next, after() {} } })
-    mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
+    const next = await import('@/lib/server-runtime/server')
+    mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after() {} } })
+    mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
       get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {},
     }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en',
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const { resolveRunWorktree } = await import('../identity')
     const { validateWorkspaceReceipt } = await import('../receipt')

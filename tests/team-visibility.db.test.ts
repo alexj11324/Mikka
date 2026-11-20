@@ -15,13 +15,13 @@ if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Visibility d
 test('real API/core visibility: immutable tenant, optional Team, provider scope and suspension', { skip: !authorized }, async t => {
   // Server actions need a Next request boundary even when actAs pins a valid workspace.
   // Supply only the browser transport; authentication and ACL still use the real fixture DB.
-  const request = mock.module('next/headers', { namedExports: {
+  const request = mock.module('@/lib/server-runtime/headers', { namedExports: {
     headers: async () => new Headers(),
     cookies: async () => ({ get: () => undefined }),
   } })
   t.after(() => request.restore())
-  const intl = await import('next-intl/server')
-  const locale = mock.module('next-intl/server', { namedExports: { ...intl, getLocale: async () => 'en',
+  const intl = await import('@/lib/intl/i18n-server')
+  const locale = mock.module('@/lib/intl/i18n-server', { namedExports: { ...intl, getLocale: async () => 'en',
     getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   t.after(() => locale.restore())
   const { Pool } = await import('pg')

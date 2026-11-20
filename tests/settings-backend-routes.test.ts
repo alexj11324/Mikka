@@ -37,7 +37,7 @@ before(async () => {
     if (sessionFailure) throw sessionFailure
     return user ? { user, session: { id: currentSession.getStore() ?? syntheticSessionId, userId: user.id } } : null
   } } } } })
-  mock.module('next-intl/server', { namedExports: { getTranslations: async () => (key: string) => key } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => (key: string) => key } })
   mock.module('@/lib/workspace-switcher', { namedExports: { loadWorkspaceSwitcher: async (...args: unknown[]) => {
     switcherCalls.push(args)
     if (switcherFailure) throw switcherFailure

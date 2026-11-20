@@ -1,6 +1,6 @@
 'use server'
 
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { listOwnerBots } from '@/lib/coordinator/coordinator-bot'
 import { ActionFailureError } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'

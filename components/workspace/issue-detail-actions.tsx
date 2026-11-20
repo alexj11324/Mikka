@@ -3,7 +3,7 @@
 import { issueKeys } from '@/lib/swr/keys'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { createLinkedIssue, setIssueDeleted, toggleIssuePreference, updateIssueRelation } from '@/app/actions/issue-operations'
 import { updateIssueMetadata } from '@/app/actions/issue-metadata'

@@ -21,8 +21,8 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('panel notifications follow actual committed writes and persisted owner/workspace scopes', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const nextServer = await import('next/server')
-  const scheduler = mock.module('next/server', { namedExports: { ...nextServer,
+  const nextServer = await import('@/lib/server-runtime/server')
+  const scheduler = mock.module('@/lib/server-runtime/server', { namedExports: { ...nextServer,
     after: (work: () => Promise<void>) => { pending.push(work) },
   } })
   const coordinator = await isolateCoordinatorWakes(t)

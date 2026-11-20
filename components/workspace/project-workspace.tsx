@@ -1,5 +1,5 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useViewState } from '@/lib/hooks/view-state'
 import { useAgentCopy } from '@/hooks/use-agent-copy'
@@ -11,7 +11,7 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Empty, EmptyContent, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
-import dynamic from 'next/dynamic'
+import dynamic from '@/lib/client-runtime/dynamic'
 
 import { PROJECT_STATUSES, PROJECT_ICON_TINTS, projectTaskCounts, type ProjectTaskPaging, type Project } from './project-properties'
 import type { WorkspaceSettings } from '@/lib/workspace-access'

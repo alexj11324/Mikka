@@ -7,10 +7,7 @@
     "plugins": [],
     "paths": {
       "@/*": ["../../*"],
-      "@ui-slot/*": ["../../components/slots/*"],
-      "next/navigation": ["./src/renderer/next-navigation.ts"],
-      "next/link": ["./src/renderer/next-link.tsx"],
-      "next/dynamic": ["./src/renderer/dynamic.tsx"]
+      "@ui-slot/*": ["../../components/slots/*"]
     }
   },
   "include": ["src/renderer", "../../types", "../../lib/platform/window.d.ts"],

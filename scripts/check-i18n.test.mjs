@@ -107,7 +107,7 @@ test('findHardcodedText catches Chinese in template literals', () => {
 
 test('findMissingTranslationKeys resolves namespaced and object-form translators', () => {
   const source = `
-    import { useTranslations, getTranslations } from 'next-intl'
+    import { useTranslations, getTranslations } from '@/lib/intl/i18n-client'
     export async function Demo() {
       const t = useTranslations('Auth')
       const statusT = useTranslations('Issue.status')
@@ -123,7 +123,7 @@ test('findMissingTranslationKeys resolves namespaced and object-form translators
 
 test('findMissingTranslationKeys skips dynamic and ambiguous keys', () => {
   const source = `
-    import { useTranslations } from 'next-intl'
+    import { useTranslations } from '@/lib/intl/i18n-client'
     export function Demo({ kind }: { kind: string }) {
       const t = useTranslations('Auth')
       return <p>{t(\`status.\${kind}\`)}{t('title')}</p>

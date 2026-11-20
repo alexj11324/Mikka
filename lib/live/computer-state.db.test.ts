@@ -16,7 +16,7 @@ const url = process.env.E2E_DATABASE_URL
 if (process.env.REQUIRE_DB === '1') assert.ok(url, 'actual isolated PostgreSQL required')
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 const scheduled: (() => Promise<void>)[] = []
-mock.module('next/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (work: () => Promise<void>) => { scheduled.push(work) } } })
 let ComputerStore: typeof import('../computer/store')['ComputerStore']
 let syncComputerReviews: typeof import('../computer/reviews')['syncComputerReviews']
 let decideComputerReview: typeof import('../computer/reviews')['decideComputerReview']

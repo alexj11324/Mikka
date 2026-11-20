@@ -8,7 +8,6 @@ import { botModelMenu, botModelScope, chooseBotModel, refreshBotModelMenu } from
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { openChatBotId } from '@/lib/coordinator/coordinator-bot'
 
-export const dynamic = 'force-dynamic'
 
 const botParam = z.uuid().nullable()
 // An option id as the menu lists it: a binding uuid, `credits:<vendor/model>` (Mikka 额度), or `apikey:<keyId>:<model>` (lib/bot-model-menu-view.ts).

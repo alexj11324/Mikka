@@ -18,7 +18,6 @@ import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@
 import { MESSAGE_MAX } from '@/lib/message-limits'
 import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 
-export const dynamic = 'force-dynamic'
 
 const botParam = z.uuid().nullable()
 

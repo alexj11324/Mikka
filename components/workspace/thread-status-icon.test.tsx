@@ -3,7 +3,7 @@ import { before, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 // The icon's label reads as its key.
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 let threadGroupOfRun: typeof import('./thread-status-icon')['threadGroupOfRun']
 let GROUP_BADGES: typeof import('./thread-status-icon')['GROUP_BADGES']
 let ThreadStatusIcon: typeof import('./thread-status-icon')['ThreadStatusIcon']

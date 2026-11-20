@@ -8,7 +8,7 @@ import useSWRInfinite from 'swr/infinite'
 import { useSWRConfig } from 'swr'
 import { usePreferences } from '@/components/settings/use-preferences'
 import { unstable_serialize } from 'swr/infinite'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { listConversations } from '@/app/actions/task-runs'
 import { Button } from '@/components/ui/button'
 import { SearchInput } from '@/components/ui/search-input'
@@ -89,6 +89,8 @@ export function ConversationDirectory({ ownerId, workspaceId, botId, revision = 
   }
   const failedDays = prefs.failed?.patch.archiveIdleAfterDays
   return <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-4" aria-label={pullsOnly ? categories('pullRequests') : t('title')}>
+    {/* R-100: the directory is a page, not a conversation, so it names itself at the size 设置 and the other rail pages use. */}
+    <h1 className="text-xl font-semibold text-foreground">{pullsOnly ? categories('pullRequests') : t('title')}</h1>
     <Label className="flex items-center gap-2 text-sm">{t('archiveIdle')}
       <NativeSelect value={prefs.data?.archiveIdleAfterDays ?? 30} disabled={!prefs.data || saving}
         onChange={event=>void changeDays(Number(event.target.value))}>

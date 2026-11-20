@@ -1,7 +1,7 @@
 'use server'
 import { ownerIssueListsChanged } from '@/lib/live/lists'
 
-import { cookies } from 'next/headers'
+import { cookies } from '@/lib/server-runtime/headers'
 import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireUser, requireIssueAccess } from '@/lib/issue-access'

@@ -1,4 +1,4 @@
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Skeleton } from '@/components/ui/skeleton'
 
 /** A page's content while it loads: announced as loading, not as a task editor, since every page uses it (UI audit states-04). */

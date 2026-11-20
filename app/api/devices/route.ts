@@ -2,7 +2,6 @@ import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { listDispatchableDevices } from '@/lib/devices/dispatchable'
 
-export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 
 export async function GET(request: Request) {

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { useCallback, useMemo, useRef } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { useLiveBotChatList, useLiveGroupList } from '@/hooks/use-live-lists'
 import type { BotView } from '@/app/actions/bots'
 import useSWR, { unstable_serialize } from 'swr'

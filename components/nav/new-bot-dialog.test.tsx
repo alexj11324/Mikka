@@ -12,7 +12,7 @@ mock.module(new URL('../slots/new-bot.tsx', import.meta.url).href, { namedExport
   NewBot: (next: NewBotProps) => { props = next; return null },
 } })
 mock.module(new URL('../slots/bot-avatar.tsx', import.meta.url).href, { namedExports: { BotAvatar: () => null } })
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => Object.assign((key: string) => `${namespace}.${key}`, { has: () => false }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => Object.assign((key: string) => `${namespace}.${key}`, { has: () => false }) } })
 mock.module('sonner', { namedExports: { toast: { error: (text: string) => { toasts.push(text) }, success: () => {} } } })
 
 const selectedScopes: (string | undefined)[] = []

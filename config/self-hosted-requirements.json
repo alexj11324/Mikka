@@ -1,4 +1,39 @@
 {
+  "lib/project-resources/device-checkouts.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Use the installation database under the existing active Project content lease to list, set or clear only the signed-in person's local-device Git directory bookmarks.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "drizzle/20261117062300_device_project_checkouts.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Store private Git directory bookmarks scoped to their account, local device and Project. Device removal and Project or account deletion erase the associated bookmarks.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "app/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Save a private checkout bookmark for an owned local device and a readable active Project. No filesystem access or execution is granted.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "app/api/workspaces/[workspaceId]/devices/[deviceId]/project-checkout/clear/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Clear only the signed-in person’s checkout bookmark for the specified local device and active Project.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
+  "app/api/workspaces/[workspaceId]/projects/[projectId]/device-checkouts/route.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read only the signed-in person’s local checkout bookmarks for an active, readable Project.",
+    "test": "tests/device-project-checkouts.db.test.ts",
+    "suite": "test:project-resources-db"
+  },
   "lib/subscription-ui.ts": {
     "mode": "built-in",
     "environment": [],
@@ -700,8 +735,11 @@
   },
   "apps/api/scripts/dev.mjs": {
     "mode": "built-in",
-    "environment": [],
-    "behavior": "The development server uses Nitro's native drain during worker replacement so admitted requests can finish with their original worker.",
+    "environment": [
+      "MIKKA_UI_OVERLAY_DIR",
+      "MIKKA_LOCAL_TEST_ACCOUNTS"
+    ],
+    "behavior": "The development server uses Nitro’s native drain during worker replacement so admitted requests can finish with their original worker, and before it listens it prepares a loopback database, the official UI overlay’s dependencies and one local development account.",
     "test": "apps/api/runtime/dev-tracing.test.mjs"
   },
   "apps/api/scripts/finalize-build.mjs": {
@@ -1267,6 +1305,111 @@
     "behavior": "Validate audit events locally. Forwarded location metadata is read only from a recognized deployment ingress.",
     "test": "lib/audit/events.test.ts",
     "suite": "test:audit"
+  },
+  "lib/auth-cookies.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Carry Better Auth's renewed session cookies into the request's cookie journal so the transport commits them, replacing the framework integration's after hook.",
+    "test": "lib/auth-cookies.test.ts",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/dynamic.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Load a component on first render behind the caller's loading boundary. There is no server render to skip, so the deployment needs no configuration.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/link.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Render an application route as an anchor that navigates in place, adding the deployment base path exactly once. Modified clicks, downloads and external URLs stay with the browser.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/localized-navigation.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Navigate with the active locale applied to the href, and keep an explicit locale choice in the NEXT_LOCALE cookie under the deployment base path.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/location.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read and write the browser's location as router state, stripping the deployment base path and separating locale segments. An installation that serves auth as a server document keeps those links on the server entry.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose the browser router hooks. Route assets are already in the bundle, so a prefetch resolves without any server read.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/client-runtime/script.tsx": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Load a third-party script once per key and re-announce readiness on each mount. No installation configuration and no server runtime are involved.",
+    "test": "components/auth/turnstile.test.tsx",
+    "suite": "test:signup-turnstile"
+  },
+  "lib/intl/i18n-client.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Expose the client translation hooks directly over use-intl instead of a framework package. Messages are bundled, so no installation value is read.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/intl/i18n-server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Translate on the server from the locale of the request in scope, falling back to the default locale when the request carries none.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-only.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Mark a module as server-only so the browser build rejects it. This replaces the framework marker package; the build enforces the boundary, not the deployment.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/headers.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Read the current request's headers and cookie jar from the request scope. Headers stay read-only and cookie writes are journalled until the response boundary commits them.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/localized-navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Build locale-prefixed redirect targets for server code, agreeing with the browser helper on every application path.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/navigation.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Raise a redirect or not-found answer from nested handler code as a marker the request dispatcher turns into the matching HTTP response.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/react.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Serve the server graph's React entry, replacing only cache with the request-scoped memo so one request's reads are never shared with another.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
+  },
+  "lib/server-runtime/server.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Provide the server request and response types, including the deployment base path on the request URL and the after-work queue bound to the request scope.",
+    "test": "lib/runtime-entrypoints.test.tsx",
+    "suite": "test:lib-units"
   },
   "lib/auth-error.ts": {
     "mode": "built-in",
@@ -1938,6 +2081,13 @@
     "environment": [],
     "behavior": "The Cloudflare sandbox adapter requires an injected workspace binding and a scoped grant. Ordinary Compose installations do not supply the private binding.",
     "test": "apps/api/scripts/cloudflare-api.test.mjs"
+  },
+  "lib/eve/host-authorization.mjs": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Sign the internal Eve scope with the host key supplied by the caller and the existing clock-skew allowance.",
+    "test": "lib/eve/auth.test.ts",
+    "suite": "test:eve"
   },
   "lib/eve/product-definitions.ts": {
     "mode": "built-in",
@@ -3615,5 +3765,38 @@
     "behavior": "Resolve the signed-in or acting person and authorize a task read against the installation's own PostgreSQL records, including workspace membership, token scope and Enterprise principal.",
     "test": "tests/task-presentation.db.test.ts",
     "suite": "test:task-presentation-db"
+  },
+  "drizzle/20261119165111_agent_runs_status_lease_idx.sql": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Indexes agent_runs on (status, leaseExpiresAt) so the due-timer recovery sweep and the lease reclaim stop scanning the table once per pass and once per owner. Schema only; the installation database serves it.",
+    "test": "lib/run-recovery-due.db.test.ts",
+    "suite": "test:run-recovery-db"
+  },
+  "lib/account/billing-cleanup.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Cancels a deleted account’s Stripe subscription before its workspace row is removed, so the installation stops billing a person who no longer has an account. Needs no installation dependency when the workspace has no customer.",
+    "test": "lib/account/owner-cleanup.db.test.ts",
+    "suite": "test:account-db"
+  },
+  "lib/link-preview.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Fetches a link preview from a public address only. Every connection resolves the host and refuses a private answer at dial time, so the installation never reaches an internal or metadata address on a person’s behalf.",
+    "test": "lib/link-preview.test.ts",
+    "suite": "test:coordinator-events"
+  },
+  "apps/api/scripts/dev-preflight.mjs": {
+    "mode": "built-in",
+    "environment": [
+      "MIKKA_DATABASE_URL",
+      "DATABASE_URL",
+      "E2E_DATABASE_URL",
+      "MIKKA_UI_OVERLAY_DIR",
+      "MIKKA_LOCAL_TEST_ACCOUNTS"
+    ],
+    "behavior": "Prepares what pnpm dev needs before anything listens: a loopback PostgreSQL database created and migrated, the official UI overlay’s own dependencies installed when missing, and one development account whose password is generated on the machine and kept in a gitignored file. Refuses to create a database anywhere but this machine.",
+    "test": "apps/api/scripts/dev-preflight.test.mjs"
   }
 }

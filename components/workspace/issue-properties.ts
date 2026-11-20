@@ -10,6 +10,9 @@ type StatusOption = Option & { surfaceClassName: string; borderClassName: string
 /** A priority's mark is the registry's bars, one filled (low) to three (high), and 紧急 its amber square. */
 type PriorityOption = { label: string; icon: LucideIcon }
 
+// A status glyph and a priority glyph are both the mark registry's (`components/workspace/state-mark.tsx`): a status
+// draws its own mark, wrapped as an icon for the call sites that take one, so the menu row, the chip and the dot
+// beside them can never drift into three drawings of the same state.
 const statusOptions = {
   backlog: { label: 'Backlog', icon: STATUS_ICONS.backlog, surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },
   todo: { label: 'Todo', icon: STATUS_ICONS.todo, surfaceClassName: 'bg-muted/25', borderClassName: 'border-border' },

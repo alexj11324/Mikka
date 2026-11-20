@@ -4,7 +4,6 @@ import { createOwnedBot } from '@/lib/bot-create'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 
-export const dynamic = 'force-dynamic'
 
 /** `POST /api/mobile/bots`: 新建 Bot from the app: `{ name, color, shape }`, in the person's current workspace. */
 async function handlePOST(request: Request) {

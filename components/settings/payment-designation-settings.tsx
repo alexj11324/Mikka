@@ -3,7 +3,7 @@
 import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { getCreditShare, getPaymentDesignation, updateCreditShare, updatePaymentDesignation } from '@/app/actions/personal-policy'
 import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { Switch } from '@/components/ui/switch'

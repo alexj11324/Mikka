@@ -1,6 +1,5 @@
 import { scopeSubtest,teamResumeBootstrap } from './support/scope-acceptance.mjs'
 import { SCOPE_DATABASES } from '../scripts/scope-acceptance-policy.mjs'
-import 'next/dist/server/node-environment-baseline'
 import { installTeamSessionFixture } from './fixtures/team-auth-runtime.mjs'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
@@ -136,21 +135,14 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   const {issueForUser}=await import('../lib/issue-access')
   const {createIssueForTeam,promoteIssueToTeam,setIssueScope,saveIssue}=await import('../app/actions/issues')
   const {exchangeDocument}=await import('../app/actions/collaboration')
-  const {AfterContext}=await import('next/dist/server/after/after-context')
-  const {workAsyncStorage}=await import('next/dist/server/app-render/work-async-storage.external')
-  const {workUnitAsyncStorage}=await import('next/dist/server/app-render/work-unit-async-storage.external')
-  const {createRequestStoreForAPI}=await import('next/dist/server/async-storage/request-store')
-  const {NextRequest}=await import('next/server')
+  const {createRequestScope,runRequestScope}=await import('../apps/api/src/context')
+  const {NextRequest}=await import('../lib/server-runtime/server')
   const Y=await import('yjs')
   async function withAfter<T>(fn:()=>Promise<T>) {
-    const waits:Promise<unknown>[]=[],errors:unknown[]=[],closes:Array<()=>void>=[]
-    const afterContext=new AfterContext({waitUntil:promise=>{waits.push(promise)},onClose:callback=>{closes.push(callback)},onTaskError:error=>{errors.push(error)}})
-    const request=new NextRequest('http://127.0.0.1/mikka')
-    // Include Next 16.4's optional HMR argument; local 16.1 ignores it.
-    const requestStore:ReturnType<typeof createRequestStoreForAPI>=Reflect.apply(createRequestStoreForAPI,undefined,[request,new URL(request.url),{tags:[],expirationsByCacheKind:new Map()},undefined,undefined,undefined])
-    return workAsyncStorage.run({afterContext} as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,()=>workUnitAsyncStorage.run(requestStore,async()=>{
-      try{return await fn()}finally{for(const close of closes)close();await Promise.all(waits);assert.deepEqual(errors,[])}
-    }))
+    const scope=createRequestScope(new NextRequest('http://127.0.0.1/mikka'))
+    return runRequestScope(scope,async()=>{
+      try{return await fn()}finally{await scope.after.finish()}
+    })
   }
   const {retryLinearIssue}=await import('../app/actions/linear-sync')
   const {syncAppIssueToLinear}=await import('../lib/linear-sync/issue-sync')

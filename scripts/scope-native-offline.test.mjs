@@ -194,7 +194,7 @@ test('actual frozen SQL directory and sync/async reads include all pinned migrat
   const inventory=await promisify(execFile)('git',['ls-files','-z','--','drizzle/*.sql'],{encoding:'utf8',timeout:5000})
   const pinnedSqlFiles=inventory.stdout.split('\0').filter(file=>dirname(file)==='drizzle').map(file=>basename(file)).sort()
   assert.ok(pinnedSqlFiles.length>0)
-  const output=await promisify(execFile)(process.execPath,['--import','./scripts/credential-diagnostics-offline.mjs','--import','./scripts/server-test.mjs','--import','tsx','scripts/scope-native-offline-startup.mjs','migration-cache'],{timeout:20000,maxBuffer:1<<20,env:{PATH:process.env.PATH,HOME:'/workspace',TSX_DISABLE_CACHE:'1',NODE_DISABLE_COMPILE_CACHE:'1',MIGRATE:'0',VERCEL_ENV:'',NEXT_TELEMETRY_DISABLED:'1'}})
+  const output=await promisify(execFile)(process.execPath,['--import','./scripts/credential-diagnostics-offline.mjs','--import','./scripts/server-test.mjs','--import','tsx','scripts/scope-native-offline-startup.mjs','migration-cache'],{timeout:20000,maxBuffer:1<<20,env:{PATH:process.env.PATH,HOME:'/workspace',TSX_DISABLE_CACHE:'1',NODE_DISABLE_COMPILE_CACHE:'1',MIGRATE:'0',VERCEL_ENV:''}})
   const evidence=output.stdout.split('\n').filter(line=>line.startsWith('{')).map(line=>JSON.parse(line)).find(row=>row.frozenMigrationCache)
   assert.deepEqual(evidence,{frozenMigrationCache:true,pinnedSqlEntries:pinnedSqlFiles.length,pinnedSqlFiles,syntheticCacheOnlyEntry:true,nativeTransportAttempts:0,nativeSqlSubmissions:0})
 })
@@ -204,7 +204,7 @@ for (const phase of ['scope','team','team-resume']) test(`actual ${phase} suite 
   try {
     await promisify(execFile)(process.execPath, ['--import','./scripts/credential-diagnostics-offline.mjs','--import','./scripts/server-test.mjs','--import','tsx','scripts/scope-native-offline-startup.mjs',phase], {
       timeout: 20000, maxBuffer: 1 << 20,
-      env: { PATH: process.env.PATH, HOME: '/workspace', TSX_DISABLE_CACHE: '1', NODE_DISABLE_COMPILE_CACHE: '1', NEXT_TELEMETRY_DISABLED: '1', NODE_ENV: 'development', ISSUE184_LOCAL_TEST: '1', REQUIRE_DB: '1', MIGRATE: '0', VERCEL_ENV: '', BETTER_AUTH_URL: 'http://127.0.0.1:3100' },
+      env: { PATH: process.env.PATH, HOME: '/workspace', TSX_DISABLE_CACHE: '1', NODE_DISABLE_COMPILE_CACHE: '1', NODE_ENV: 'development', ISSUE184_LOCAL_TEST: '1', REQUIRE_DB: '1', MIGRATE: '0', VERCEL_ENV: '', BETTER_AUTH_URL: 'http://127.0.0.1:3100' },
     })
   } catch (error) { failure = error }
   assert.equal(failure?.code, 1, 'the real suite deliberately fails at its first connection gate')

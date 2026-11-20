@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { Check, ChevronDown, Circle, SquareTerminal, X } from '@/components/icons'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { LOCAL_RECONNECT, LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 import type { DeviceView } from '@/app/actions/agents'
 import { Button } from '@/components/ui/button'

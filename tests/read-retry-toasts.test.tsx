@@ -63,7 +63,7 @@ stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
 stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', threadTopologyKey: (id: string) => ['issue-thread-topology', id], IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
 stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
-mock.module('next/dynamic', { defaultExport: () => Empty })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => Empty })
 
 const issue = { id: 'issue', userId: 'owner', title: 'Retained task', content: { type: 'doc', content: [] }, status: 'review', priority: 'normal', revision: 1, identifier: 'FIX-1', metadata: {}, createdAt: new Date(0), updatedAt: new Date(0) }
 stub('app/actions/issues.ts', { pollIssue: () => read('task', { viewerId: 'owner', version: '1', issue }), pollIssueVersionSummaries: async () => ({ viewerId: 'owner', snapshot: { version: '1', items: [] } }), listIssueVersions: async () => [], saveIssue: async () => { throw new Error('This read test must not save') } })
@@ -108,7 +108,7 @@ const browser = new Window({ url: 'https://fixture.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
 let SWRConfig: typeof import('swr')['SWRConfig'], useSWRConfig: typeof import('swr')['useSWRConfig'], serialize: typeof import('swr')['unstable_serialize']
 let Toaster: typeof import('sonner')['Toaster'], toast: typeof import('sonner')['toast']
-let IntlProvider: typeof import('next-intl')['NextIntlClientProvider']
+let IntlProvider: typeof import('@/lib/intl/i18n-client')['NextIntlClientProvider']
 let ArtifactLibrary: typeof import('../components/artifacts/artifact-library')['ArtifactLibrary']
 let ArtifactViewer: typeof import('../components/artifacts/artifact-viewer')['ArtifactViewer']
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
@@ -135,7 +135,7 @@ before(async () => {
   ;({ createRoot } = await import('react-dom/client'))
   ;({ SWRConfig, useSWRConfig, unstable_serialize: serialize } = await import('swr'))
   ;({ Toaster, toast } = await import('sonner'))
-  ;({ NextIntlClientProvider: IntlProvider } = await import('next-intl'))
+  ;({ NextIntlClientProvider: IntlProvider } = await import('@/lib/intl/i18n-client'))
   ;({ ArtifactLibrary } = await import('../components/artifacts/artifact-library'))
   ;({ ArtifactViewer } = await import('../components/artifacts/artifact-viewer'))
   ;({ IssueThreadPanel } = await import('../components/workspace/issue-thread-panel'))

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { removeDevice, renameDevice, sendDeviceCommand, setDeviceDescription, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
 import type { ActionResult } from '@/lib/action-result'

@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { localTaskState, type TaskReason } from '@/hooks/use-bot-tasks'
 
 /**

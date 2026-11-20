@@ -3,7 +3,6 @@ import { cronJob } from '@/lib/background'
 import { cronUnauthorized } from '@/lib/cron-auth'
 import { writeDueBriefings } from '@/lib/suggestions/store'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
 
 /** Leaves time to answer before maxDuration; whoever is left is written by the next run. */

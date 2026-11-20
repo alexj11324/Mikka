@@ -57,7 +57,7 @@ test('explicit workspace MCP sharing keeps requester, resource grants, tokens an
     const directory = new URL('../../drizzle/', import.meta.url)
     for (const migration of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(migration, directory), 'utf8'))
     await pool.query(await readFile(new URL('20261104003000_mcp_workspace_shares.sql', directory), 'utf8'))
-    mock.module('next/server', { namedExports: { after() {} } })
+    mock.module('@/lib/server-runtime/server', { namedExports: { after() {} } })
     const { issueRunToken, verifyRunToken } = await import('@/lib/mcp/worker')
     const { runMcpAuthority, runCustomMcp } = await import('./run-mcp')
     const { submitArtifact, readArtifact } = await import('@/lib/artifacts/store')

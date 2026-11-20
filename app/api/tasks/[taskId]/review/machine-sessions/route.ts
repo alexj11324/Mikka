@@ -1,7 +1,6 @@
 import { ReviewAuthorityError, withTaskReviewAuthority } from '@/lib/coding-workspace/review-authority'
 import { readReviewSession, type ReviewSessionKind } from '@/lib/coding-workspace/review-sessions'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }

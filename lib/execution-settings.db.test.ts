@@ -278,7 +278,7 @@ test(
         mock.module(new URL(path, import.meta.url).href, {
           namedExports: exports,
         });
-      mock.module("next/headers", {
+      mock.module("@/lib/server-runtime/headers", {
         namedExports: { headers: async () => new Headers() },
       });
       stub("./auth.ts", {

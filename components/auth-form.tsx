@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { authClient } from '@/lib/auth-client'
 import { getPathname } from '@/i18n/navigation'
 import { Auth } from '@/components/blocks/auth-19/components/auth'

@@ -23,7 +23,7 @@ test('onboarding backfill, new accounts and session-owned idempotent completion'
     await pool.query(progressMigration)
     let sessionUser: string | null = 'bob'
     mock.module('@/lib/db', { namedExports: { db: drizzle(pool) } })
-    mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
+    mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers() } })
     // Only the existing session boundary is synthetic; storage and the action execute for real.
     mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => sessionUser ? { user: { id: sessionUser }, session: { id: 'onboarding-fixture-session' } } : null } } } })
     const { onboardingDone, readOnboardingProgress, setupChecklistDismissed, dismissSetupChecklist, restoreSetupChecklist } = await import('./onboarding')

@@ -3,6 +3,9 @@
  * (`components/workspace/state-mark.tsx`, decision 2026-11-19-1600). They keep lucide's props so a call site that
  * passed `className` or `data-icon` still compiles: the size and the colour come from the status's own mark, which
  * is what every call site was spelling out by hand.
+ *
+ * A run under way is the registry's too: `Mark`'s `spin` turns 进行中's own ring as a broken arc while the run is
+ * live (decision 2026-11-18-0300), so no glyph here is drawn by hand.
  */
 export { STATUS_ICONS as STATUS_MARKS, STATUS_ICONS } from './state-mark'
 

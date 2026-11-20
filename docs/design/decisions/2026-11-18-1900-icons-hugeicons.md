@@ -29,7 +29,7 @@ BoardUI 的图标 prop 收的是组件引用（`leadingIcon={RiAddLine}`），Hu
 
 - 名字相同的 Hugeicons 图标通常就是同一个符号（`Check`、`Plus`、`ChevronDown`、`Server`、`Lock`），直接用。
 - 名字对不上而形状对得上的换名字：看板 = `Kanban`（Hugeicons 没有 `Columns3`），书签夹 = `Pin02`（`Pin` 是地图针），刷新 = `Reload`，撤销/重做 = `Undo`/`Redo`，用户组 = `UserMultiple03`。
-- 优先级没有 1/2/3 递增条形的对应物，改用 1/2/3 根等高条（`SignalLow` → `Tally1`、`SignalMedium` → `Tally2`、`SignalHigh` → `Tally3`），`ISSUE_PRIORITIES` 原来靠 `viewBox` 裁切凑高度的那套也随之删掉。
+- **优先级是这套里唯一自绘的字形**。Alex 在同一天否掉了等高 tally 条（「这我不允许啊！我要求使用低中高那种上楼梯的柱子」），所以低中高回到三根同一基线、逐级升高的柱子：低一根短的、中两根、高三根，画在 `components/icons/index.tsx` 的 `own()` 里，和导入的字形共用 24 盒子、调用点传的线宽（`strokeWidth: 3`）与 `currentColor`。`ISSUE_PRIORITIES` 仍以 `SignalLow`/`SignalMedium`/`SignalHigh` 使用它们，调用点不变；`Tally1/2/3` 不再出现在这套里。
 
 ## 执行
 

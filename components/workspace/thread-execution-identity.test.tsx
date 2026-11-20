@@ -3,7 +3,7 @@ import { before, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ThreadExecutionEvidence } from '../../lib/thread-execution-identity-view'
 
-mock.module('next-intl',{namedExports:{useTranslations:()=> (key:string,params?:Record<string,unknown>)=>params?`${key}(${Object.values(params).join('|')})`:key}})
+mock.module('@/lib/intl/i18n-client',{namedExports:{ useLocale: () => 'en',useTranslations:()=> (key:string,params?:Record<string,unknown>)=>params?`${key}(${Object.values(params).join('|')})`:key}})
 let Content: typeof import('./thread-execution-identity')['ThreadExecutionIdentityContent']
 before(async()=>{({ThreadExecutionIdentityContent:Content}=await import('./thread-execution-identity'))})
 const evidence:ThreadExecutionEvidence={id:'00000000-0000-4000-8000-000000000001',harness:'claude_code',model:'claude-test',credentialType:'subscription',subscriptionRoute:'claude_code_cli',

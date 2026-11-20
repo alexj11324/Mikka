@@ -1,7 +1,6 @@
 import { frameDocument, frameHeaders } from '@mikka/protocol/artifact-frame'
 import { routeArtifact } from '@/lib/artifacts/route'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `GET /api/artifacts/:id/versions/:n/frame`: an HTML artifact as the page the

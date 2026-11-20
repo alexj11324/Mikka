@@ -6,11 +6,11 @@ import { mock, test } from 'node:test'
 import { RUN_DECISION_CATALOGUE } from './mcp-tool'
 import { dbUrl, seedAgent, seedBot, seedIssue, seedPersonalWorkspace, seedProject, seedProjectTasks, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { createApiHandler } from '../../apps/api/src/application'
-import * as apiServer from '../../apps/api/compat/server'
+import * as apiServer from '../../lib/server-runtime/server'
 import { ownLiveRuntime } from '../../tests/support/live-runtime'
 
 test('decision HTTP routes and worker MCP persist through real token authorization', { skip: !dbUrl }, async t => {
-  mock.module('next/server', { namedExports: apiServer })
+  mock.module('@/lib/server-runtime/server', { namedExports: apiServer })
   const live = await ownLiveRuntime(t)
   mock.module('@/lib/auth', { namedExports: {
     MOBILE_APP_ORIGIN: 'mikka://', auth: { api: { getSession: async () => null } },

@@ -4,7 +4,6 @@ import { GovernanceError } from '@/lib/governance/errors'
 import { identitySummary, manageIdentity } from '@/lib/enterprise/management'
 import { organizationSession, organizationAccountSession } from '@/lib/enterprise/http'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
   const session = await organizationSession(request, (await context.params).organizationId)

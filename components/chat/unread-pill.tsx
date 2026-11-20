@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ArrowDown, ArrowUp, X } from '@/components/icons'
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'

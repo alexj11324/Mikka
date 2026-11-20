@@ -4,7 +4,6 @@ import { listOrganizationMembers, addOrganizationMember, updateOrganizationMembe
 import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { organizationSession } from '@/lib/enterprise/http'
 
-export const runtime = 'nodejs'
 type Context = { params: Promise<{ organizationId: string }> }
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
   const { organizationId } = await context.params

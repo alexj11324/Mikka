@@ -4,7 +4,6 @@
 **/.env.*
 **/*.log
 .vercel
-.next
 .output
 .hosted-ui
 .artifacts

@@ -8,7 +8,7 @@ import { beginOwnerListRead, readRevisions } from '@/lib/live/revision-read'
 import { withReadOnlyPolicyObservation } from '@/lib/desktop-rpc/read-batch-context'
 import type { ListLiveRead } from '@/lib/live/list-read'
 
-import { cookies, headers } from 'next/headers'
+import { cookies, headers } from '@/lib/server-runtime/headers'
 import { afterJob } from '@/lib/background'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'

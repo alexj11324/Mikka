@@ -222,6 +222,9 @@ do what Linear does. Figma: `220:5022` (MIK-25).
   under the title come the code and how long ago, then the properties in one
   column (an icon and label, then the value, ▾ where it opens choices) in
   Capy's order; a property with nothing set is left out and the ⋯ menu sets it.
+  The bar carries one primary action — the task's own conversation, which is
+  where its work is (R-62, R-89); everything else in it is a tool or goes into
+  ⋯ (R-91). [2026-11-18-2030](decisions/2026-11-18-2030-task-page-surface.md)
 - **R-79** No breadcrumb, title bar or page header shows the workspace's
   name. There is one workspace on screen, the name cannot be clicked there,
   and it is shown and switched only from the avatar menu at the bottom left.
@@ -519,7 +522,9 @@ Figma: page `395:15023`, frames F1–F10 (listed in `decisions.md`).
   other family stands in for a status. Paid blocks keep their own icons
   ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-as-shipped.md)).
   A new glyph is a line in that file, not a new package (ui-policy
-  `icons/glyph-set`).
+  `icons/glyph-set`). Priority is the one mark Mikka draws itself: low, normal
+  and high are three bars on one baseline, rising one step each, in the set's
+  box and stroke (ui-policy `icons/priority-bars`).
 - **R-76** Every workspace feature is on by default. Only a workspace admin
   turns one off (Settings › 工作区 or 团队权限), and members see the current
   value read-only. A person's own subscriptions and API keys are not such a

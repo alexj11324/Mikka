@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { auth } from '@/lib/api-auth'
 import { actAs } from '@/lib/acting-user'
 import { ActionFailureError } from '@/lib/action-error'

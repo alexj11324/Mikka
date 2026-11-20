@@ -7,7 +7,7 @@ import { Window } from 'happy-dom'
 const copySuccess = mock.fn()
 const copyError = mock.fn()
 mock.module('sonner', { namedExports: { toast: { success: copySuccess, error: copyError } } })
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 
 const browser = new Window({ url: 'https://fixture.example/mikka' })
 let container: HTMLDivElement, root: Root

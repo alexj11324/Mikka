@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { createThreadReplyVersion, getThreadReplyVersions } from '@/app/actions/agents'
 import { useActionError } from '@/lib/use-action-error'
 import { Button } from '@/components/ui/button'

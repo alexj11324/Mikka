@@ -8,7 +8,7 @@ import { singleFlight } from '@/lib/single-flight'
 import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
 
 import { createHash } from 'node:crypto'
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { deviceOnlineStates, deviceSessionOpen } from '@/lib/device-presence'
 import { gatewayConfig } from '@/lib/builtin-gateway/config'

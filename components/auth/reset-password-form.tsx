@@ -1,7 +1,7 @@
 'use client'
 
 import { useLayoutEffect, useRef, useState, type FormEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ArrowRight, LockKeyhole } from '@/components/icons'
 import { Auth } from '@/components/blocks/auth-19/components/auth'
 import { AuthCard } from '@/components/blocks/auth-19/components/auth-card'

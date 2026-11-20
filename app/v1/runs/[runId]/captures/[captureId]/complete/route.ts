@@ -3,7 +3,6 @@ import { z } from 'zod'
 import { completeUpload } from '@/lib/captures/store'
 import { captureFailure, captureJson, deviceRun } from '@/lib/captures/device'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `POST /v1/runs/:runId/captures/:captureId/complete`: the file has been

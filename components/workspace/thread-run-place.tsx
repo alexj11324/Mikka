@@ -1,6 +1,6 @@
 'use client'
 
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { Cloud, Copy, Laptop, Server } from '@/components/icons'
 import { toast } from 'sonner'
 import { useThreadMachine } from '@/hooks/use-thread-run-reads'

@@ -4,7 +4,6 @@ import { dispatchVerifiedGitHubWebhook, readGitHubWebhookBody } from '@/lib/gith
 import { relayOfficialGitHubWebhook } from '@/lib/github/official-cloud-relay'
 import { CloudServiceError } from '@/lib/cloud-services/errors'
 
-export const runtime = 'nodejs'
 const noStore = { 'Cache-Control': 'no-store' }
 
 async function handlePOST(request: Request) {

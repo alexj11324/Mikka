@@ -13,7 +13,7 @@ const wakeSuite = mock.fn(async (_suite: unknown) => 1)
 const notifications = [{ userId: 'owner', source: 'github', externalId: 'comment:7' }]
 const readNotifications = mock.fn(async (_event: string, _payload: unknown) => notifications)
 const ingest = mock.fn(async (_notifications: unknown[]) => {})
-mock.module('next/server', { namedExports: { after: (callback: () => Promise<void>) => callbacks.push(callback) } })
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (callback: () => Promise<void>) => callbacks.push(callback) } })
 const heavyModules = ['lib/github/publication-webhook.ts', 'lib/github/ci-suite-wake.ts', 'lib/suggestions/sources.ts', 'lib/suggestions/store.ts']
 mock.module(new URL('../../../../lib/github/publication-webhook.ts', import.meta.url).href, { namedExports: { refreshPublishedPullRequest: refresh } })
 mock.module(new URL('../../../../lib/github/ci-suite-wake.ts', import.meta.url).href, { namedExports: { wakeLinkedCiSuite: wakeSuite } })

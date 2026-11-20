@@ -3,7 +3,7 @@
 import { ReadResponseError } from '@/lib/swr/retry'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { ArrowUpRight, Blocks, ChevronDown, ChevronRight, Ellipsis, Plus } from '@/components/icons'
 import { toast } from 'sonner'
 

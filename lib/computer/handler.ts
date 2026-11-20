@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { createBotSchema, viewerRequestSchema } from '@mikka/protocol/computer'
 import { ComputerError, type ComputerStore } from './store'

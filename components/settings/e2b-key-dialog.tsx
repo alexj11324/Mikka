@@ -3,7 +3,7 @@
 import { settingsKeys } from '@/lib/swr/keys'
 import { useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { deleteE2BKey, saveE2BKey, type getE2BKeyCapability } from '@/app/actions/workspace-secrets'
 import { settingsRead } from '@/lib/settings-read'
 import { Button } from '@/components/ui/button'

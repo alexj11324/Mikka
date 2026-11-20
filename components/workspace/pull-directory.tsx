@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import useSWR from "swr";
 import useSWRInfinite, { unstable_serialize } from "swr/infinite";
-import { useTranslations } from "next-intl";
+import { useTranslations } from "@/lib/intl/i18n-client";
 import { Copy, Pin, X } from "lucide-react";
 import { listConversations } from "@/app/actions/task-runs";
 import { withBasePath } from "@/lib/base-path";
@@ -261,6 +261,10 @@ export function PullDirectory({
       : grouping === "state"
         ? t(stateKeys[key as PullState])
         : key;
+  // A repository that is not connected gets one state, not two: the banner that
+  // offers 连接 already says why the list is empty, and offering 清除筛选 beside it
+  // would point at a filter that changes nothing (R-96).
+  const notConnected = Boolean(repositoryError) || Boolean(repositories && !repositories.connected);
   const filtered =
     filters.search ||
     filters.state ||
@@ -323,7 +327,7 @@ export function PullDirectory({
       }}
     >
       <div className="flex min-w-0 flex-wrap items-center gap-2 px-4 pt-4">
-        <h1 className="me-1 text-xl font-semibold">{t("title")}</h1>
+        <h1 className="me-1 text-xl font-semibold text-foreground">{t("title")}</h1>
         <Tabs
           value={filters.view}
           onValueChange={(value) => set({ view: value as PullFilters["view"], state: "" })}
@@ -411,7 +415,7 @@ export function PullDirectory({
                 ))}
               </div>
             )}
-            {data && !visible.length && !error && (
+            {data && !visible.length && !error && !notConnected && (
               <Empty className="min-h-72 border-0">
                 <EmptyHeader>
                   <EmptyMedia variant="icon">

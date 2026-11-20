@@ -18,7 +18,7 @@ const key = Symbol.for('mikka.test.workspace-live')
 const stateAccess = 'globalThis[Symbol.for("mikka.test.workspace-live")]'
 const wrapper = '({ children }) => children'
 const fixtureModules = new Map([
-  ['next-intl', `export const NextIntlClientProvider = ${wrapper}; export const useTranslations = () => value => value; export const useLocale = () => 'en';`],
+  ['@/lib/intl/i18n-client', `export const NextIntlClientProvider = ${wrapper}; export const IntlProvider = ${wrapper}; export const useTranslations = () => value => value; export const useLocale = () => 'en';`],
   ['lucide-react', 'export const ArrowLeft = () => null;'],
   ['sonner', 'export const toast = { error() {}, dismiss() {} };'],
   ['@/messages/en.json', 'export default {};'], ['@/messages/zh-CN.json', 'export default {};'],

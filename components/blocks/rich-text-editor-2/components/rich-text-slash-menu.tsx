@@ -3,7 +3,7 @@ import { IconTile } from "@/components/reui/icon-tile"
 import { PluginKey } from "@tiptap/pm/state"
 import { Extension, type Editor, type Range } from "@tiptap/react"
 import { Suggestion, type SuggestionProps } from "@tiptap/suggestion"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 import { CommandShortcut } from "@/components/ui/command"
 import {

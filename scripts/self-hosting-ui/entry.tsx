@@ -1,7 +1,7 @@
 // Screenshot composition only. These are the existing production components,
 // fonts, tokens and content width; no product route imports this entry.
 import { createRoot } from 'react-dom/client'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import { SWRConfig } from 'swr'
 import { CloudSettings, CloudModelSettings } from '@/components/settings/cloud-settings'
 import { GitHubAppSettings } from '@/components/plugins/github-app-settings'

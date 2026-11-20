@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Users } from '@/components/icons'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { acceptWorkspaceInvitation } from '@/app/actions/workspace'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -57,7 +57,7 @@ export function InvitationCard({ token, email }: { token: string; email: string 
     </CardContent>
     <CardFooter className="flex flex-col gap-3">
       {!joined && token && (email ? <>
-        <Button className="w-full" disabled={pending} onClick={() => void accept()}>{pending && <Spinner data-icon="inline-start" />}{t('accept')}</Button>
+        <Button className="w-full" disabled={pending} onClick={() => void accept()}>{pending && <Spinner data-icon="inline-start" aria-hidden="true" />}{t('accept')}</Button>
         <Button variant="ghost" disabled={pending} onClick={() => void switchAccount()}>{t('switchAccount')}</Button>
       </> : <>
         <Link href={`/sign-in?next=${encodeURIComponent(next)}`} className={buttonVariants({ className: 'w-full' })}>{t('signInToAccept')}</Link>
@@ -103,7 +103,7 @@ export function OrganizationInvitationCard({ token, email }: { token: string; em
       {joined && !serverOnly ? <Link href="/settings?section=organization" className={buttonVariants({ className: 'w-full' })}>{t('openOrganization')}</Link>
         : !joined && token && (email ? <>
           <Button className="w-full" disabled={pending} onClick={() => void accept()}>
-            {pending && <Spinner data-icon="inline-start" />}{t('accept')}
+            {pending && <Spinner data-icon="inline-start" aria-hidden="true" />}{t('accept')}
           </Button>
           <Button variant="ghost" disabled={pending} onClick={() => void switchAccount()}>{invite('switchAccount')}</Button>
         </> : <>

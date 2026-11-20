@@ -2,7 +2,7 @@
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { EditorView } from "@tiptap/pm/view"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 import { toast } from 'sonner'
 import { avatarImageSrc } from '@/lib/default-avatar'
 import { isLegacyTaskInstruction } from '@/lib/task-description'
