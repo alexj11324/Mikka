@@ -131,9 +131,9 @@ test('API workflow keeps source qualification unprivileged and publication on th
   assert.ok(!workflow.includes('WORKERS_CI'))
   const plan = sections['service-plan']
   for (const condition of ["github.repository_id == '1427517699'", "github.actor_id == '183887963'",
-    "github.triggering_actor == 'alexj11324'", "github.event_name == 'push'", "github.event_name == 'pull_request'",
-    'github.event.pull_request.head.repo.full_name == github.repository', 'github.event.pull_request.head.repo.fork == false',
-    'github.event.pull_request.user.id == 183887963']) assert.ok(plan.split('\n').find(line => line.trim().startsWith('if:')).includes(condition), condition)
+    "github.triggering_actor == 'alexj11324'", "github.event_name == 'push'", "github.ref == 'refs/heads/main'"])
+    assert.ok(plan.split('\n').find(line => line.trim().startsWith('if:')).includes(condition), condition)
+  assert.ok(!plan.includes("github.event_name == 'pull_request'"), 'the protected environment rejects every PR ref, including the owner\'s')
   assert.ok(plan.includes('needs: source'))
   assert.ok(plan.includes('environment: cloudflare-runtime-release'))
   assert.ok(plan.includes('permission-contents: read'))
@@ -159,6 +159,21 @@ test('API workflow keeps source qualification unprivileged and publication on th
   assert.ok(manifest.includes('name: Upload release manifest'))
   assert.ok(!manifest.includes('secrets.'))
   assert.ok(!manifest.includes('id-token: write'))
+  const planName = 'name: service-build-plan-${{ github.run_id }}-${{ github.run_attempt }}'
+  assert.ok(plan.includes(planName), 'a rerun publishes a distinct plan artifact')
+  assert.ok(plan.includes('plan-artifact: ${{ steps.plan-artifact.outputs.artifact-id }}'))
+  for (const section of [build, qualification, manifest]) {
+    assert.ok(section.includes('artifact-ids: ${{ needs.service-plan.outputs.plan-artifact }}'), 'a failed-job retry retains the actual original plan')
+    assert.ok(section.includes('merge-multiple: true'), 'artifact IDs download directly into the expected plan directory')
+    assert.ok(section.includes('github-token: ${{ github.token }}'))
+    assert.ok(section.includes('run-id: ${{ github.run_id }}'))
+  }
+  assert.ok(manifest.includes('pattern: service-{web,api,eve,task,world,litellm}-${{ github.run_id }}-*'))
+  assert.equal((workflow.match(/overwrite: true/g) ?? []).length, 1, 'only the disposable cache pointer may be overwritten')
+  const cacheUpload = build.slice(build.indexOf('      - name: Upload service cache receipt'))
+  assert.ok(cacheUpload.includes('overwrite: true'))
+  assert.ok(build.includes('name: service-${{ matrix.service }}-${{ github.run_id }}-${{ github.run_attempt }}'))
+  assert.ok(manifest.includes('name: release-manifest-${{ github.run_id }}-${{ github.run_attempt }}'))
 })
 
 test('the unified service producer retains the existing image qualification gates', async () => {
@@ -175,4 +190,12 @@ test('the unified service producer retains the existing image qualification gate
   const conversion = await readFile(new URL('../deploy/litellm/conversion-check.sh', import.meta.url), 'utf8')
   assert.ok(conversion.includes("grep -qx '# pass 7'"))
   assert.ok(conversion.includes("grep -qx '# skipped 0'"))
+  for (const name of ['cloudflare-eve-image.yml', 'cloudflare-task-sandbox.yml', 'cloudflare-litellm-image.yml']) {
+    const workflow = await readFile(new URL('../.github/workflows/' + name, import.meta.url), 'utf8')
+    const automatic = workflow.slice(workflow.indexOf('\njobs:'), workflow.indexOf('  publish:'))
+    assert.ok(automatic.includes("if: github.event_name == 'pull_request'"), 'every PR keeps its original qualification: ' + name)
+    for (const authority of ['secrets.', 'id-token: write', 'environment: cloudflare-runtime-release']) assert.ok(!automatic.includes(authority), name + ' must remain credential-free')
+    assert.ok(workflow.includes('  workflow_dispatch:'))
+    assert.ok(!workflow.slice(0, workflow.indexOf('\npermissions:')).includes('  push:'), 'main builds have one producer: ' + name)
+  }
 })

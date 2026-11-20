@@ -61,6 +61,24 @@ test('overlay and public build settings affect only the declared consumers', asy
   assert.deepEqual(serviceNames.filter(name => before.services[name].contextDigest !== after.services[name].contextDigest), ['web'])
 })
 
+test('the production input declarations isolate a proxy configuration edit and do not rebuild it for API-only code', async t => {
+  const { directory, put, git } = await fixture(t)
+  const inputs = await readBuildInputs()
+  await put('config/service-build-inputs.json', JSON.stringify(inputs))
+  await put('package.json', '{"private":true}\n')
+  await put('deploy/litellm/config.yaml', 'model_list: []\n')
+  await put('apps/api/runtime/http-policy.mjs', 'export const limit = 1\n')
+  git(['add', '.'])
+  const first = await buildContexts({ directory, inputs })
+  await put('deploy/litellm/config.yaml', 'model_list: []\n# reviewed proxy setting\n')
+  const proxy = await buildContexts({ directory, inputs })
+  assert.deepEqual(serviceNames.filter(name => proxy.services[name].contextDigest !== first.services[name].contextDigest), ['litellm'])
+  await put('apps/api/runtime/http-policy.mjs', 'export const limit = 2\n')
+  const api = await buildContexts({ directory, inputs })
+  assert.notEqual(api.services.api.contextDigest, proxy.services.api.contextDigest)
+  assert.equal(api.services.litellm.contextDigest, proxy.services.litellm.contextDigest)
+})
+
 test('migrations have an independent context so a migration-only change does not rebuild services', async t => {
   const { directory, put } = await fixture(t)
   const before = await buildContexts({ directory })

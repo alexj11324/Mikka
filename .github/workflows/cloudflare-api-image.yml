@@ -86,7 +86,10 @@ jobs:
 
   service-plan:
     needs: source
-    if: github.repository_id == '1427517699' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.repo.fork == false && github.event.pull_request.user.id == 183887963))
+    # The existing environment rejects refs/pull/*/merge, including owner PRs.
+    # Keep that protection: PRs run the credential-free legacy image gates;
+    # Registry publication starts only after a real merge into main.
+    if: github.repository_id == '1427517699' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 10
@@ -99,12 +102,13 @@ jobs:
       changed: ${{ steps.plan.outputs.changed }}
       litellm_reused: ${{ steps.plan.outputs.litellm_reused }}
       overlay: ${{ steps.selection.outputs.overlay }}
+      plan-artifact: ${{ steps.plan-artifact.outputs.artifact-id }}
     env:
       CLOUDFLARE_ACCOUNT_ID: d8f6630c7869111a5139bc5ed4d24ace
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -161,11 +165,16 @@ jobs:
           import assert from 'node:assert/strict'
           import {readFile,appendFile} from 'node:fs/promises'
           import {execFileSync} from 'node:child_process'
-          const operations = execFileSync('git',['-C','.operations-input','rev-parse','HEAD'],{encoding:'utf8'}).trim()
-          assert.match(operations,/^[a-f0-9]{40}$/)
-          const selected = JSON.parse(await readFile('.operations-input/docs/operations/releases/hosted-api-staging.json','utf8'))
-          assert.match(selected.overlaySource,/^[a-f0-9]{40}$/)
-          await appendFile(process.env.GITHUB_OUTPUT,'overlay='+selected.overlaySource+'\n')
+          try {
+            const operations = execFileSync('git',['-C','.operations-input','rev-parse','HEAD'],{encoding:'utf8'}).trim()
+            assert.match(operations,/^[a-f0-9]{40}$/)
+            const selected = JSON.parse(await readFile('.operations-input/docs/operations/releases/hosted-api-staging.json','utf8'))
+            assert.match(selected.overlaySource,/^[a-f0-9]{40}$/)
+            await appendFile(process.env.GITHUB_OUTPUT,'overlay='+selected.overlaySource+'\n')
+          } catch {
+            console.error('APPROVED_BUILD_SELECTION_UNAVAILABLE')
+            process.exitCode = 1
+          }
           JS
       - name: Read existing content tags with a short-lived pull credential
         id: registry-read
@@ -182,9 +191,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/release/service-build-ci.mjs plan "$RUNNER_TEMP/service-build-plan"
       - name: Upload the service build plan
+        id: plan-artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: service-build-plan
+          name: service-build-plan-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/service-build-plan/
           if-no-files-found: error
           retention-days: 90
@@ -209,7 +219,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -221,7 +231,10 @@ jobs:
       - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: service-build-plan
+          artifact-ids: ${{ needs.service-plan.outputs.plan-artifact }}
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+          merge-multiple: true
           path: ${{ runner.temp }}/service-build-plan
       - name: Build and verify service
         env:
@@ -261,6 +274,9 @@ jobs:
           name: ${{ steps.receipt.outputs.cache_name }}
           path: ${{ runner.temp }}/service-cache/service-receipt.json
           if-no-files-found: error
+          # Only this discovery pointer is replaceable on a retry of the same
+          # run. Original service artifacts remain immutable per run/attempt.
+          overwrite: true
           retention-days: 90
 
   litellm-qualification:
@@ -276,7 +292,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -287,7 +303,10 @@ jobs:
           version: 10.34.3
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: service-build-plan
+          artifact-ids: ${{ needs.service-plan.outputs.plan-artifact }}
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+          merge-multiple: true
           path: ${{ runner.temp }}/service-build-plan
       - name: Read the immutable image with a short-lived pull credential
         id: registry
@@ -313,7 +332,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
@@ -321,13 +340,20 @@ jobs:
           node-version: 24
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          name: service-build-plan
+          artifact-ids: ${{ needs.service-plan.outputs.plan-artifact }}
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
+          merge-multiple: true
           path: ${{ runner.temp }}/service-build-plan
       - name: Restore verified service artifacts
         if: needs.service-plan.outputs.changed == 'true'
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          pattern: service-*-${{ github.run_id }}-${{ github.run_attempt }}
+          # A failed-job retry retains successful matrix jobs from their original
+          # attempts. The manifest verifies each job and preserves that origin.
+          pattern: service-{web,api,eve,task,world,litellm}-${{ github.run_id }}-*
+          github-token: ${{ github.token }}
+          run-id: ${{ github.run_id }}
           path: ${{ runner.temp }}/service-results
       - name: Verify every service and write the immutable manifest
         env:

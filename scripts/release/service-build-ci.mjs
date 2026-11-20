@@ -15,6 +15,7 @@ const repository = 'alexj11324/Mikka'
 const readJson = async path => JSON.parse(await readFile(path, 'utf8'))
 const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim()
 const output = async (name, value) => { assert.ok(process.env.GITHUB_OUTPUT); await appendFile(process.env.GITHUB_OUTPUT, name + '=' + value + '\n') }
+const serviceSteps = ['Build and verify service', 'Publish immutable service image', 'Upload service artifact', 'Upload service cache receipt']
 
 export function trustedBuildSource(env, event) {
   assert.equal(env.GITHUB_ACTIONS, 'true')
@@ -23,24 +24,13 @@ export function trustedBuildSource(env, event) {
   assert.equal(env.GITHUB_ACTOR_ID, '183887963')
   assert.equal(env.GITHUB_ACTOR, 'alexj11324')
   assert.equal(env.GITHUB_TRIGGERING_ACTOR, 'alexj11324')
-  let source
-  if (env.GITHUB_EVENT_NAME === 'push') {
-    assert.equal(env.GITHUB_REF, 'refs/heads/main')
-    assert.equal(event.ref, 'refs/heads/main')
-    source = env.GITHUB_SHA
-    assert.equal(event.after, source)
-  } else {
-    assert.equal(env.GITHUB_EVENT_NAME, 'pull_request')
-    assert.equal(event.pull_request?.head?.repo?.full_name, repository)
-    assert.equal(event.pull_request.head.repo.id, 1427517699)
-    assert.equal(event.pull_request.head.repo.fork, false)
-    assert.equal(event.pull_request.user?.id, 183887963)
-    assert.equal(event.pull_request.base?.ref, 'main')
-    assert.equal(event.pull_request.base?.repo?.full_name, repository)
-    assert.equal(env.GITHUB_REF, 'refs/pull/' + event.number + '/merge')
-    assert.ok(Number.isSafeInteger(event.number) && event.number > 0)
-    source = event.pull_request.head.sha
-  }
+  // The existing protected publication environment only permits main. PR
+  // qualification stays credential-free; do not simulate another event/ref.
+  assert.equal(env.GITHUB_EVENT_NAME, 'push')
+  assert.equal(env.GITHUB_REF, 'refs/heads/main')
+  assert.equal(event.ref, 'refs/heads/main')
+  const source = env.GITHUB_SHA
+  assert.equal(event.after, source)
   assert.match(source ?? '', /^[a-f0-9]{40}$/)
   assert.equal(env.GITHUB_WORKFLOW_REF, repository + '/.github/workflows/' + workflow + '@' + env.GITHUB_REF)
   assert.match(env.GITHUB_WORKFLOW_SHA ?? '', /^[a-f0-9]{40}$/)
@@ -65,6 +55,28 @@ async function github(path, missing = false) {
   return result.json()
 }
 
+async function githubItems(path, key) {
+  const values = []
+  for (let page = 1; ; page++) {
+    const packet = await github(path + (path.includes('?') ? '&' : '?') + 'per_page=100&page=' + page)
+    assert.ok(Array.isArray(packet[key]) && Number.isSafeInteger(packet.total_count))
+    values.push(...packet[key])
+    if (values.length >= packet.total_count) return values
+    assert.ok(packet[key].length && page < 100, 'Incomplete GitHub artifact or job inventory')
+  }
+}
+
+function checkedServiceJob(name, receipt, jobs) {
+  const selected = jobs.filter(job => job.name === 'service-build (' + name + ')'
+    && String(job.run_id) === receipt.build.runId && String(job.run_attempt) === receipt.build.runAttempt)
+  assert.equal(selected.length, 1)
+  const [job] = selected
+  assert.equal(job.status, 'completed'); assert.equal(job.conclusion, 'success')
+  assert.equal(job.head_sha, receipt.sourceCommit)
+  for (const step of serviceSteps) assert.deepEqual(job.steps.filter(value => value.name === step).map(value => value.conclusion), ['success'])
+  return job
+}
+
 export function checkedServiceCache(name, receipt, run, jobs, artifact) {
   validateServiceManifest(name, receipt)
   assert.equal(receipt.build.workflow, workflow)
@@ -75,22 +87,16 @@ export function checkedServiceCache(name, receipt, run, jobs, artifact) {
     assert.equal(run[field].fork, false)
   }
   assert.equal(run.path, '.github/workflows/' + workflow)
-  assert.ok(['push', 'pull_request'].includes(run.event))
-  if (run.event === 'push') assert.equal(run.head_branch, 'main')
+  assert.equal(run.event, 'push')
+  assert.equal(run.head_branch, 'main')
   assert.equal(run.status, 'completed')
+  assert.ok(['success', 'failure'].includes(run.conclusion), 'Cancelled or incomplete workflows cannot supply release artifacts')
   assert.equal(run.actor?.id, 183887963)
   assert.equal(run.triggering_actor?.id, 183887963)
   assert.equal(run.head_sha, receipt.sourceCommit)
   assert.equal(String(run.id), receipt.build.runId)
   assert.equal(String(run.run_attempt), receipt.build.runAttempt)
-  const selected = jobs.filter(job => job.name === 'service-build (' + name + ')')
-  assert.equal(selected.length, 1)
-  const [job] = selected
-  assert.equal(job.status, 'completed'); assert.equal(job.conclusion, 'success')
-  assert.equal(String(job.run_id), receipt.build.runId); assert.equal(String(job.run_attempt), receipt.build.runAttempt)
-  for (const step of ['Build and verify service', 'Publish immutable service image', 'Upload service artifact', 'Upload service cache receipt']) {
-    assert.deepEqual(job.steps.filter(value => value.name === step).map(value => value.conclusion), ['success'])
-  }
+  checkedServiceJob(name, receipt, jobs)
   assert.equal(String(artifact.id), receipt.build.artifactId)
   assert.equal(artifact.name, 'service-' + name + '-' + receipt.build.runId + '-' + receipt.build.runAttempt)
   assert.equal(artifact.expired, false)
@@ -99,6 +105,48 @@ export function checkedServiceCache(name, receipt, run, jobs, artifact) {
   assert.equal(artifact.workflow_run?.repository_id, 1427517699)
   assert.equal(artifact.workflow_run?.head_repository_id, 1427517699)
   return receipt
+}
+
+/** A failed-job retry keeps successful matrix outputs from older attempts.
+ * Resolve every original job before choosing the latest successful artifact;
+ * a partial upload from a failed attempt is never a publication receipt. */
+export function selectServicePublications(plan, cached, receipts, artifacts, jobs, { runId, runAttempt }) {
+  for (const value of [runId, runAttempt]) assert.match(value ?? '', /^[1-9][0-9]*$/)
+  const selected = new Map()
+  for (const original of receipts) {
+    const name = original.service
+    assert.ok(serviceNames.includes(name))
+    assert.equal(original.build?.runId, runId)
+    assert.equal(original.build.workflow, workflow)
+    assert.match(original.build.runAttempt ?? '', /^[1-9][0-9]*$/)
+    assert.ok(BigInt(original.build.runAttempt) <= BigInt(runAttempt))
+    assert.equal(original.sourceCommit, plan.sourceCommit)
+    if (original.contextDigest !== plan.services[name].contextDigest) continue
+    if (cached[name]) continue
+    const matchingJobs = jobs.filter(job => job.name === 'service-build (' + name + ')'
+      && String(job.run_id) === runId && String(job.run_attempt) === original.build.runAttempt)
+    // The full archive precedes the last cache-upload gate. Such an archive
+    // may exist after failure and must not displace a proven earlier attempt.
+    if (matchingJobs.length === 1 && (matchingJobs[0].status !== 'completed' || matchingJobs[0].conclusion !== 'success')) continue
+    checkedServiceJob(name, original, jobs)
+    const artifactName = 'service-' + name + '-' + runId + '-' + original.build.runAttempt
+    const matchingArtifacts = artifacts.filter(artifact => artifact.name === artifactName && !artifact.expired)
+    assert.equal(matchingArtifacts.length, 1)
+    const [artifact] = matchingArtifacts
+    assert.equal(String(artifact.workflow_run?.id), runId)
+    assert.equal(artifact.workflow_run.head_sha, plan.sourceCommit)
+    assert.equal(artifact.workflow_run.head_branch, 'main')
+    assert.equal(artifact.workflow_run.repository_id, 1427517699)
+    assert.equal(artifact.workflow_run.head_repository_id, 1427517699)
+    const receipt = { ...original, build: { ...original.build, artifactId: String(artifact.id) }, digest: serviceDigest(original) }
+    delete receipt.service
+    validateServiceManifest(name, receipt)
+    const previous = selected.get(name)
+    if (!previous || BigInt(previous.receipt.build.runAttempt) < BigInt(receipt.build.runAttempt))
+      selected.set(name, { name, receipt, artifactName })
+  }
+  for (const name of serviceNames) assert.ok(cached[name] || selected.has(name), 'No successful original service publication: ' + name)
+  return [...selected.values()]
 }
 
 async function readCacheArtifact(artifact) {
@@ -130,7 +178,7 @@ async function cachedService(name, context, image) {
       || artifact.workflow_run?.head_repository_id !== 1427517699) continue
     const origin = await github('actions/runs/' + artifact.workflow_run.id)
     if (origin.actor?.id !== 183887963 || origin.triggering_actor?.id !== 183887963
-      || origin.path !== '.github/workflows/' + workflow || !['push', 'pull_request'].includes(origin.event)) continue
+      || origin.path !== '.github/workflows/' + workflow || origin.event !== 'push' || origin.head_branch !== 'main') continue
     const receipt = await readCacheArtifact(artifact)
     if (receipt.contextDigest !== context.contextDigest || (context.kind === 'container' && receipt.imageDigest !== image?.imageDigest)) continue
     // A matching image built on an unmerged branch is not a main release source.
@@ -139,7 +187,7 @@ async function cachedService(name, context, image) {
     const path = 'actions/runs/' + receipt.build.runId + '/attempts/' + receipt.build.runAttempt
     assert.equal(String(artifact.workflow_run.id), receipt.build.runId)
     const run = await github(path)
-    if (run.status !== 'completed') continue
+    if (run.status !== 'completed' || !['success', 'failure'].includes(run.conclusion)) continue
     const { jobs } = await github(path + '/jobs?per_page=100')
     const original = await github('actions/artifacts/' + receipt.build.artifactId, true)
     if (!original || original.expired) continue
@@ -224,6 +272,10 @@ async function bundle(directory, configPath, filename, env) {
 async function build(service, planFile, directory) {
   const revision = await source(), context = await readJson(planFile), input = context.services[service]
   assert.ok(input && serviceNames.includes(service)); assert.equal(context.sourceCommit, revision)
+  const current = (await buildContexts({ overlayCommit: context.overlayCommit,
+    publicSettings: JSON.parse(process.env.API_PUBLIC_BUILD_SETTINGS || '{}') })).services[service]
+  assert.equal(current.contextDigest, input.contextDigest, 'Build inputs or public settings changed after planning')
+  assert.deepEqual(current.files, input.files)
   await install(service, context)
   await mkdir(directory, { recursive: true })
   const release = releaseId(revision, process.env.GITHUB_RUN_ID, process.env.GITHUB_RUN_ATTEMPT)
@@ -353,17 +405,27 @@ async function finish(planDirectory, resultDirectory, destination) {
   await source()
   const context = await readJson(join(planDirectory, 'build-plan.json'))
   const cached = await readJson(join(planDirectory, 'cached-services.json'))
-  const { artifacts } = await github('actions/runs/' + process.env.GITHUB_RUN_ID + '/artifacts?per_page=100')
-  const published = { ...cached }
+  const artifacts = await githubItems('actions/runs/' + process.env.GITHUB_RUN_ID + '/artifacts', 'artifacts')
+  const receipts = []
+  const attempts = new Set()
   for (const item of await readdir(resultDirectory, { withFileTypes: true })) {
-    if (!item.isDirectory()) continue
+    assert.ok(item.isDirectory(), 'Expected an original service artifact directory')
     const receipt = await readJson(join(resultDirectory, item.name, 'service-receipt.json'))
-    const name = receipt.service; assert.ok(serviceNames.includes(name) && !published[name])
-    const matches = artifacts.filter(artifact => artifact.name === 'service-' + name + '-' + process.env.GITHUB_RUN_ID + '-' + process.env.GITHUB_RUN_ATTEMPT && !artifact.expired)
-    assert.equal(matches.length, 1)
-    receipt.build.artifactId = String(matches[0].id)
-    for (const artifact of Object.values(receipt.artifacts)) assert.equal(hash(await readFile(join(resultDirectory, item.name, artifact.path))), artifact.digest)
-    delete receipt.service; published[name] = receipt
+    assert.equal(item.name, 'service-' + receipt.service + '-' + receipt.build?.runId + '-' + receipt.build?.runAttempt)
+    assert.match(receipt.build.runAttempt ?? '', /^[1-9][0-9]*$/)
+    receipts.push(receipt)
+    attempts.add(receipt.build.runAttempt)
+  }
+  const jobs = []
+  for (const attempt of attempts) jobs.push(...await githubItems('actions/runs/' + process.env.GITHUB_RUN_ID + '/attempts/' + attempt + '/jobs', 'jobs'))
+  const uniqueJobs = [...new Map(jobs.map(job => [job.id, job])).values()]
+  const selected = selectServicePublications(context, cached, receipts, artifacts, uniqueJobs, {
+    runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT,
+  })
+  const published = { ...cached }
+  for (const { name, receipt, artifactName } of selected) {
+    for (const artifact of Object.values(receipt.artifacts)) assert.equal(hash(await readFile(join(resultDirectory, artifactName, artifact.path))), artifact.digest)
+    published[name] = receipt
   }
   const manifest = releaseManifest(context, published)
   await writeFile(destination, JSON.stringify(manifest, null, 2) + '\n')
@@ -406,13 +468,21 @@ async function qualifyCachedLiteLlm(planDirectory, pull) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [action, ...args] = process.argv.slice(2)
-  if (action === 'plan') await plan(...args)
-  else if (action === 'build') await build(...args)
-  else if (action === 'publish') await publish(...args)
-  else if (action === 'finish') await finish(...args)
-  else if (action === 'record-cache') await recordCache(...args)
-  else if (action === 'qualify-pull') await qualifyCachedLiteLlm(args[0], true)
-  else if (action === 'qualify') await qualifyCachedLiteLlm(args[0], false)
-  else throw new Error('Usage: service-build-ci.mjs plan | build | publish | finish | record-cache | qualify-pull | qualify')
+  try {
+    const [action, ...args] = process.argv.slice(2)
+    if (action === 'plan') await plan(...args)
+    else if (action === 'build') await build(...args)
+    else if (action === 'publish') await publish(...args)
+    else if (action === 'finish') await finish(...args)
+    else if (action === 'record-cache') await recordCache(...args)
+    else if (action === 'qualify-pull') await qualifyCachedLiteLlm(args[0], true)
+    else if (action === 'qualify') await qualifyCachedLiteLlm(args[0], false)
+    else assert.fail('Unknown service build action')
+  } catch (error) {
+    // Failed JSON parsing or a third-party exception can contain input bytes.
+    // Keep stage/location diagnostics; never echo settings or private source.
+    const location = /service-build-ci\.mjs:(\d+:\d+)/.exec(error.stack ?? '')?.[1]
+    console.error('SERVICE_BUILD_FAILED', { name: error.name, code: error.code, location })
+    process.exitCode = 1
+  }
 }

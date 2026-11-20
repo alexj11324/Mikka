@@ -33,9 +33,13 @@ Backend-only work (Eve / Task) should not import paid UI source unless a reviewe
 ## Service builds and release manifests
 
 `cloudflare-api-image.yml` is the public content-addressed producer for an actual
-`push` to `main`, or an owner-authored, same-repository PR to `main` run by the
-release owner. It does not manufacture a manual-dispatch event. Forks and other
-untrusted PRs receive no Registry, Cloudflare or private UI credentials. The old
+`push` to `main` by the release owner. It does not manufacture a manual-dispatch
+event. The existing `cloudflare-runtime-release` protection rejects PR merge
+refs, including the owner's same-repository PRs. That rule remains intact: PRs
+run the existing credential-free image qualifications, and Registry publication
+starts after merging into main. Pre-merge Registry publication is therefore
+blocked by the current environment policy, not verified acceptance. Forks
+receive no Registry, Cloudflare or private UI credentials. The old
 manual publishers remain available for release-owner operations already in
 progress; they are not the automatic build path.
 
@@ -80,9 +84,9 @@ digests, never a mutable tag.
 
 ### Qualification ownership
 
-Trusted PR and main builds use `service-build (<service>)` in the unified
-producer. The legacy automatic image jobs now qualify untrusted PRs without
-credentials; their manual publication jobs remain unchanged. These are moved
+Main builds use `service-build (<service>)` in the unified producer. The legacy
+automatic image jobs still qualify every PR without credentials; their manual
+publication jobs remain unchanged. These are moved
 gates, not deleted gates:
 
 | Existing gate | Unified producer execution |
@@ -110,8 +114,14 @@ After the service upload succeeds, a small
 original artifact ID. Cache lookup verifies this archive's GitHub digest, the
 original service job and all its build/publication/upload steps. Another service
 may have failed in that older run; this does not discard a separately successful
-service build. The final candidate manifest's workflow must still succeed in
-full, including the latest LiteLLM qualification.
+service build. Cancelled or incomplete workflows cannot supply release artifacts.
+A full retry writes `service-build-plan-<runId>-<attempt>` and consumers use
+the actual planning job's artifact ID. A failed-job retry retains that earlier
+plan and successful services from their original attempts; the final collector
+verifies each original job and selects only its successful full artifact. Only the small discovery cache pointer may be replaced during
+that retry; the original service archives and final manifests remain immutable.
+The final candidate manifest's workflow must still succeed in full, including
+the latest LiteLLM qualification.
 
 Job `release-manifest` verifies these artifact digests and uploads
 `release-manifest-<runId>-<attempt>` with member `release-manifest.json` in its
