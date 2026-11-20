@@ -18,10 +18,12 @@ export async function seedFixture(database, scene, env = process.env) {
   const githubToken = await symmetricEncrypt({ key: env.BETTER_AUTH_SECRET, data: 'mikka-local-synthetic-user-token' })
   const tx = await database.connect()
   let stage = 'begin'
-  const query = tx.query.bind(tx)
-  tx.query = (sql, values) => {
+  const originalQuery = tx.query
+  const query = originalQuery.bind(tx)
+  tx.query = (...args) => {
+    const sql = typeof args[0] === 'string' ? args[0] : args[0]?.text ?? ''
     stage = /^\s*(?:INSERT INTO|SELECT.*?FROM)\s+(["a-zA-Z_]["a-zA-Z_0-9]*)/s.exec(sql)?.[1]?.replaceAll('"', '') ?? stage
-    return query(sql, values)
+    return originalQuery.apply(tx, args)
   }
   try {
     await tx.query('BEGIN')
@@ -83,6 +85,6 @@ export async function seedFixture(database, scene, env = process.env) {
     }
     await tx.query('COMMIT')
   } catch (error) { error.fixtureStage = stage; await query('ROLLBACK'); throw error }
-  finally { tx.release() }
+  finally { tx.query = originalQuery; tx.release() }
   return { ...fixture, password }
 }
