@@ -39,7 +39,9 @@ function selectedFiles(inputs, service, files) {
     return inputs.groups[group]
   }), ...definition.paths].map(pattern)
   const exclude = inputs.exclude.map(pattern)
-  return files.filter(file => include.some(match => match.test(file)) && !exclude.some(match => match.test(file))).sort()
+  const required = (definition.requiredInputs ?? []).map(pattern)
+  return files.filter(file => required.some(match => match.test(file))
+    || (include.some(match => match.test(file)) && !exclude.some(match => match.test(file)))).sort()
 }
 
 export function trackedFiles(directory = root) {
@@ -154,35 +156,43 @@ function validateBuild(build) {
   assert.match(build.workflow ?? '', /^[a-z0-9-]+\.yml$/)
 }
 
+export function validateServiceManifest(name, service) {
+  assert.ok(serviceNames.includes(name))
+  assert.equal(service.kind, ['web', 'world'].includes(name) ? 'worker' : 'container', name)
+  assert.match(service.contextDigest ?? '', digest)
+  assert.match(service.sourceCommit ?? '', sha)
+  if (['api', 'web'].includes(name)) assert.match(service.overlayCommit ?? '', sha)
+  else assert.ok(service.overlayCommit === undefined || service.overlayCommit === null || sha.test(service.overlayCommit))
+  assert.equal(typeof service.reused, 'boolean')
+  validateBuild(service.build)
+  if (service.apiBuild) {
+    for (const key of ['runId', 'runAttempt', 'artifactId']) assert.match(service.apiBuild[key] ?? '', /^[1-9][0-9]*$/)
+    for (const key of ['sourceCommit', 'overlayCommit']) assert.match(service.apiBuild[key] ?? '', sha)
+    for (const key of ['imageDigest', 'workerDigest']) assert.match(service.apiBuild[key] ?? '', digest)
+  }
+  assert.ok(service.artifacts && typeof service.artifacts === 'object' && !Array.isArray(service.artifacts))
+  if (service.kind === 'container') {
+    assert.match(service.localImageId ?? '', digest)
+    assert.match(service.imageDigest ?? '', digest)
+    assert.match(service.image ?? '', /^registry\.cloudflare\.com\/[a-f0-9]{32}\/mikka-[a-z0-9-]+@sha256:[a-f0-9]{64}$/)
+    assert.equal(service.image.split('@')[1], service.imageDigest)
+  } else assert.equal(service.imageDigest, undefined)
+  for (const artifact of Object.values(service.artifacts)) {
+    assert.match(artifact.digest ?? '', digest)
+    assert.ok(typeof artifact.path === 'string' && /^[a-zA-Z0-9_./-]+$/.test(artifact.path) && !artifact.path.startsWith('/')
+      && !artifact.path.split('/').some(part => !part || part === '.' || part === '..' || part === '.git' || part.startsWith('.env')))
+    if (artifact.artifactId !== undefined) assert.match(artifact.artifactId, /^[1-9][0-9]*$/)
+  }
+  assert.equal(service.digest, serviceDigest(service), 'Release service artifact digest differs')
+  return service
+}
+
 export function validateReleaseManifest(manifest) {
   assert.equal(manifest?.version, 1)
   assert.match(manifest.sourceCommit ?? '', sha)
   assert.ok(manifest.overlayCommit === null || sha.test(manifest.overlayCommit ?? ''))
   assert.deepEqual(Object.keys(manifest.services ?? {}).sort(), [...serviceNames].sort())
-  for (const [name, service] of Object.entries(manifest.services)) {
-    assert.ok(['container', 'worker'].includes(service.kind), name)
-    assert.match(service.contextDigest ?? '', digest)
-    assert.match(service.sourceCommit ?? '', sha)
-    assert.equal(typeof service.reused, 'boolean')
-    validateBuild(service.build)
-    if (service.apiBuild) {
-      for (const key of ['runId', 'runAttempt', 'artifactId']) assert.match(service.apiBuild[key] ?? '', /^[1-9][0-9]*$/)
-      for (const key of ['sourceCommit', 'overlayCommit']) assert.match(service.apiBuild[key] ?? '', sha)
-      for (const key of ['imageDigest', 'workerDigest']) assert.match(service.apiBuild[key] ?? '', digest)
-    }
-    assert.ok(service.artifacts && typeof service.artifacts === 'object' && !Array.isArray(service.artifacts))
-    if (service.kind === 'container') {
-      assert.match(service.imageDigest ?? '', digest)
-      assert.match(service.image ?? '', /^registry\.cloudflare\.com\/[a-f0-9]{32}\/mikka-[a-z0-9-]+@sha256:[a-f0-9]{64}$/)
-      assert.equal(service.image.split('@')[1], service.imageDigest)
-    } else assert.equal(service.imageDigest, undefined)
-    for (const artifact of Object.values(service.artifacts)) {
-      assert.match(artifact.digest ?? '', digest)
-      assert.ok(typeof artifact.path === 'string' && artifact.path && !artifact.path.startsWith('/') && !artifact.path.split('/').some(part => part === '..' || part === '.git' || part.startsWith('.env')))
-      if (artifact.artifactId !== undefined) assert.match(artifact.artifactId, /^[1-9][0-9]*$/)
-    }
-    assert.equal(service.digest, serviceDigest(service), 'Release service artifact digest differs')
-  }
+  for (const [name, service] of Object.entries(manifest.services)) validateServiceManifest(name, service)
   assert.match(manifest.migrations?.contextDigest ?? '', digest)
   assert.ok(Array.isArray(manifest.migrations.files) && manifest.migrations.files.every(file => /^drizzle\/[^/]+\.sql$/.test(file)))
   return manifest
@@ -195,7 +205,7 @@ export function releaseManifest(plan, published, previous = null) {
   for (const name of serviceNames) {
     const context = plan.services[name]
     const existing = previous?.services[name]
-    if (existing?.contextDigest === context.contextDigest) services[name] = { ...existing, reused: true }
+    if (!published[name] && existing?.contextDigest === context.contextDigest) services[name] = { ...existing, reused: true }
     else {
       assert.ok(published[name], 'No published artifact for changed service: ' + name)
       const result = published[name]

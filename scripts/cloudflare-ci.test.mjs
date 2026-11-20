@@ -99,13 +99,22 @@ test('API publication rejects a foreign workflow, actor, source or manual run id
 
 test('API workflow keeps source qualification unprivileged and publication on the standard protected main runner', async () => {
   const workflow = await readFile(new URL('../.github/workflows/cloudflare-api-image.yml', import.meta.url), 'utf8')
-  const source = workflow.slice(workflow.indexOf('  source:'), workflow.indexOf('  publish:'))
-  const publish = workflow.slice(workflow.indexOf('  publish:'))
-  assert.ok(source.includes("if: github.event_name == 'pull_request'"))
+  const jobs = [...workflow.slice(workflow.indexOf('\njobs:')).matchAll(/^  ([a-z][a-z-]+):\n([\s\S]*?)(?=^  [a-z][a-z-]+:\n|$(?![\s\S]))/gm)]
+  assert.deepEqual(jobs.map(job => job[1]), ['source', 'publish', 'service-plan', 'service-build', 'litellm-qualification', 'release-manifest'])
+  const sections = Object.fromEntries(jobs.map(job => [job[1], job[2]]))
+  const { source, publish } = sections
+  for (const [name, text] of Object.entries(sections)) assert.equal((text.match(/runs-on: ubuntu-latest/g) ?? []).length, 1, name)
+  assert.ok(source.includes("if: github.event_name == 'pull_request' || github.event_name == 'push'"))
   assert.ok(!source.includes('secrets.'))
+  assert.ok(!source.includes('id-token: write'))
+  assert.ok(!source.includes('environment:'))
   assert.ok(!source.includes('cloudflare-native-oci.mjs prepare'))
-  assert.equal((workflow.match(/runs-on: ubuntu-latest/g) ?? []).length, 2)
   assert.ok(!workflow.includes('self-hosted'))
+  assert.ok(!workflow.includes('pull_request_target'))
+  const triggers = workflow.slice(0, workflow.indexOf('\npermissions:'))
+  assert.ok(triggers.includes('  push:\n    branches: [main]'))
+  assert.ok(triggers.includes('  pull_request:\n    branches: [main]'))
+  assert.ok(!triggers.includes('paths:'))
   assert.ok(publish.includes("github.event_name == 'workflow_dispatch'"))
   assert.ok(publish.includes("github.ref == 'refs/heads/main'"))
   assert.ok(publish.includes("github.actor_id == '183887963'"))
@@ -120,4 +129,50 @@ test('API workflow keeps source qualification unprivileged and publication on th
   assert.ok(publish.includes('path: .cloudflare-ci/api-image-receipt.json'))
   assert.ok(publish.includes('include-hidden-files: true'))
   assert.ok(!workflow.includes('WORKERS_CI'))
+  const plan = sections['service-plan']
+  for (const condition of ["github.repository_id == '1427517699'", "github.actor_id == '183887963'",
+    "github.triggering_actor == 'alexj11324'", "github.event_name == 'push'", "github.event_name == 'pull_request'",
+    'github.event.pull_request.head.repo.full_name == github.repository', 'github.event.pull_request.head.repo.fork == false',
+    'github.event.pull_request.user.id == 183887963']) assert.ok(plan.split('\n').find(line => line.trim().startsWith('if:')).includes(condition), condition)
+  assert.ok(plan.includes('needs: source'))
+  assert.ok(plan.includes('environment: cloudflare-runtime-release'))
+  assert.ok(plan.includes('permission-contents: read'))
+  assert.ok(plan.includes('persist-credentials: false'))
+  assert.ok(!plan.includes('HOSTED_UI_READ_KEY'))
+  const build = sections['service-build']
+  assert.ok(build.includes('needs: service-plan'))
+  assert.ok(build.includes("if: needs.service-plan.outputs.changed == 'true'"))
+  assert.ok(build.includes("(matrix.service == 'api' || matrix.service == 'web') && secrets.HOSTED_UI_READ_KEY || ''"))
+  assert.ok(build.includes('environment: cloudflare-runtime-release'))
+  for (const step of ['Build and verify service', 'Publish immutable service image', 'Upload service artifact', 'Upload service cache receipt']) assert.ok(build.includes('name: ' + step), step)
+  const qualification = sections['litellm-qualification']
+  assert.ok(qualification.includes('needs: service-plan'))
+  assert.ok(qualification.includes("if: needs.service-plan.outputs.litellm_reused == 'true'"))
+  assert.ok(qualification.includes('mode: read'))
+  assert.ok(!qualification.includes('secrets.'))
+  assert.ok(qualification.includes('name: Prove both CLI protocols through the cached proxy'))
+  const manifest = sections['release-manifest']
+  assert.ok(manifest.includes('needs: [service-plan, service-build, litellm-qualification]'))
+  assert.ok(manifest.includes("needs.service-plan.result == 'success'"))
+  assert.ok(manifest.includes("needs.service-build.result == 'success' || needs.service-plan.outputs.changed == 'false'"))
+  assert.ok(manifest.includes("needs.litellm-qualification.result == 'success' || needs.service-plan.outputs.litellm_reused == 'false'"))
+  assert.ok(manifest.includes('name: Upload release manifest'))
+  assert.ok(!manifest.includes('secrets.'))
+  assert.ok(!manifest.includes('id-token: write'))
+})
+
+test('the unified service producer retains the existing image qualification gates', async () => {
+  const build = await readFile(new URL('./release/service-build-ci.mjs', import.meta.url), 'utf8')
+  for (const gate of ["run('node', ['--test', ...tests], 'TASK_TESTS')",
+    "run('python3', ['cloudflare/task-sandbox/native-history.test.py'], 'TASK_HISTORY')",
+    "run('bash', ['scripts/release/verify-task-image.sh', tag], 'TASK_VERIFY')",
+    "run('bash', ['scripts/build-cloudflare-eve-image.sh', '--independent'], 'EVE_OFFLINE_COMPILE')"]) assert.ok(build.includes(gate), gate)
+  for (const script of ['deploy/litellm/offline-check.sh', 'deploy/litellm/conversion-check.sh']) assert.equal(build.split(script).length - 1, 2, 'new and cached images both qualify: ' + script)
+  const task = await readFile(new URL('./release/verify-task-image.sh', import.meta.url), 'utf8')
+  for (const gate of ['--network none --cap-drop ALL --security-opt=no-new-privileges', '--user 1000:1000',
+    'claude --version', 'codex --version', '--cap-add NET_ADMIN', 'review-guest-image.test.py',
+    'guard.py prepare-cloudflare', 'guard.py verify', '0:1000:660', 'aiohttp.__version__']) assert.ok(task.includes(gate), gate)
+  const conversion = await readFile(new URL('../deploy/litellm/conversion-check.sh', import.meta.url), 'utf8')
+  assert.ok(conversion.includes("grep -qx '# pass 7'"))
+  assert.ok(conversion.includes("grep -qx '# skipped 0'"))
 })

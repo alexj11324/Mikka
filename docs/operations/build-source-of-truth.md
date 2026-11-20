@@ -30,6 +30,105 @@ For a shared World authority hotfix, `.github/workflows/cloudflare-world-deploy.
 
 Backend-only work (Eve / Task) should not import paid UI source unless a reviewed, independently testable build dependency truly requires it. Docker must send only required build context, not the entire dependency or Git-history tree.
 
+## Service builds and release manifests
+
+`cloudflare-api-image.yml` is the public content-addressed producer for an actual
+`push` to `main`, or an owner-authored, same-repository PR to `main` run by the
+release owner. It does not manufacture a manual-dispatch event. Forks and other
+untrusted PRs receive no Registry, Cloudflare or private UI credentials. The old
+manual publishers remain available for release-owner operations already in
+progress; they are not the automatic build path.
+
+The producer reads the already approved UI selection from a fixed read-only
+operations checkout. Only API and Web check out that exact UI commit and verify
+its membership in the UI repository's main history. Compilers receive a filtered
+environment without checkout, Registry or deployment credentials.
+
+`config/service-build-inputs.json` records the six service input boundaries.
+`scripts/release/service-builds.mjs` hashes sorted file names, file bytes, file
+type, executable permission and declared build parameters. A new Git commit or
+run ID alone does not change a context. Import-closure checks reject omitted
+public source dependencies. Database migration files have a separate digest.
+
+| Service | Actual input boundary | Output |
+| --- | --- | --- |
+| Web | Frontend, shared client/server contracts, public build settings and pinned official UI | Worker plus `web.tar.gz` containing `site/` and `proof/renderer-manifest.json` |
+| API | Node API, shared application code, runtime resources, World business adapter, and the frontend shell currently embedded by the API compiler | OCI image, ingress Worker and the generated `routes.json` |
+| Eve | Eve application and shared server code/resources; the standalone resource packager removes the former API/frontend compilation prerequisite | OCI image and runtime Worker |
+| Task | Daemon/protocol sources, pinned CLI harness, task runtime, sandbox Dockerfile and image qualification inputs | OCI image and machine Worker |
+| World | Cloudflare World source and its shared deployment/session-control contracts | Original World module archive format |
+| LiteLLM | Proxy image/configuration, Worker and its shared protocol-fields module | OCI image and runtime Worker |
+
+Shared code is an explicit dependency, not an assumption that all six services
+are independent. In particular, the API still embeds the frontend shell and the
+LiteLLM protocol gate executes the application's gateway handler. That gate is
+separate from image content: every trusted candidate runs it, using the cached
+immutable image when the proxy inputs are unchanged. A change
+confined to `deploy/litellm` leaves the other five contexts unchanged. Task sends
+only its selected files to Docker; API, Eve and LiteLLM retain their narrow image
+contexts.
+
+Before building, `service-plan` queries the Cloudflare OCI manifest endpoint for
+each container's context tag. Only HTTP 404 means an absent image. Reuse requires
+the original successful service job and its unexpired artifact; a tag without
+that proof is rebuilt and qualified. Authentication or digest failures stop the
+run. Service/cache artifacts are retained for 90 days; expiration never permits
+unproved reuse. New publication verifies the Registry manifest digest
+against Docker's published digest and records the local image ID for the private
+publisher's independent platform-image check. Release decisions use immutable
+digests, never a mutable tag.
+
+### Qualification ownership
+
+Trusted PR and main builds use `service-build (<service>)` in the unified
+producer. The legacy automatic image jobs now qualify untrusted PRs without
+credentials; their manual publication jobs remain unchanged. These are moved
+gates, not deleted gates:
+
+| Existing gate | Unified producer execution |
+| --- | --- |
+| Task Node contract tests and Python native-history test | `TASK_TESTS` and `TASK_HISTORY` in `Build and verify service` |
+| Task Dockerfile's standard device-handoff test and pinned CLI installation | The same Task Dockerfile, built from the declared minimal context |
+| Task offline non-root capability checks and review-listener isolation | `scripts/release/verify-task-image.sh`, preserving both original Docker commands |
+| LiteLLM offline health/master-key guard | The unchanged `deploy/litellm/offline-check.sh` |
+| Both CLI protocols through LiteLLM and a local fake provider; seven passes and zero skips | The unchanged `deploy/litellm/conversion-check.sh` before new publication, or `litellm-qualification` after independently pulling and checking the cached platform image |
+| Eve network-isolated compilation and portable Node image | The same `build-cloudflare-eve-image.sh` with standalone resource packaging, followed by the same Eve Dockerfile |
+| World authority dry-run bundle and module checksums | `service-build (world)`, preserving `modules/**`, `source.txt` and `SHA256SUMS` |
+| API image self-verification | The existing `start.mjs verify-image` command, explicitly under BuildKit `--network=none` |
+
+### Consumer contract
+
+Each built service uploads `service-<service>-<runId>-<attempt>` with
+`service-receipt.json`. Artifact paths are relative to that original GitHub
+artifact archive. API uses keys `ingress` and `routes`; Web uses `assets`,
+`worker` and `gateway`; Eve, Task and LiteLLM use `worker`. World uses `worker` with the path
+`SHA256SUMS`; the checksum list verifies every module and `source.txt`. World's
+only additional archive member is `service-receipt.json`.
+
+After the service upload succeeds, a small
+`service-cache-<service>-<context digest without sha256:>` artifact records its
+original artifact ID. Cache lookup verifies this archive's GitHub digest, the
+original service job and all its build/publication/upload steps. Another service
+may have failed in that older run; this does not discard a separately successful
+service build. The final candidate manifest's workflow must still succeed in
+full, including the latest LiteLLM qualification.
+
+Job `release-manifest` verifies these artifact digests and uploads
+`release-manifest-<runId>-<attempt>` with member `release-manifest.json` in its
+`Upload release manifest` step. Every service carries its own original
+`sourceCommit`, `overlayCommit`, `release` and
+`build: {runId, runAttempt, artifactId, workflow}`. Container services also carry
+`localImageId`, `imageDigest` and a digest-pinned `image`. API and Web retain their
+original UI SHA; services without UI use `null`. Reuse preserves this metadata
+and all artifact bytes; it does not relabel an old build as a new run.
+
+A service's deployment digest covers its image digest and named artifact
+digests. It excludes the newer candidate's commit, run ID and `reused` marker.
+The private publisher verifies the original workflow/job/upload step and archive
+before using any service. It then compares the candidate with the deployed
+manifest, rather than treating every main merge as a six-service deployment.
+Build success alone does not authorize production promotion.
+
 ## What current docs are authoritative?
 
 Read in this order for an active engineering operation: `AGENTS.md`, [documentation index](../README.md), this page, relevant active design/operations references, and **latest main source plus the actual current #1953/#1954 release selection**. Dated audits, archived screenshots, older handoffs and `docs/design/decisions.md` are historical context only. Remove obsolete records once their active references are replaced; preserve current security, migration, recovery and release evidence.

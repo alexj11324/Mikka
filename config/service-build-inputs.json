@@ -19,7 +19,16 @@
       "packages/config/**",
       "patches/**",
       "config/service-build-inputs.json",
-      "scripts/release/service-builds.mjs"
+      "scripts/release/service-builds.mjs",
+      "packages/*/package.json",
+      "apps/*/package.json",
+      "scripts/release/service-build-ci.mjs",
+      "scripts/cloudflare-native-oci.mjs",
+      "scripts/cloudflare-ci.mjs",
+      "scripts/cloudflare-source.mjs",
+      "lib/deployment-id.mjs",
+      ".github/workflows/cloudflare-api-image.yml",
+      ".github/actions/cloudflare-registry-credentials/**"
     ],
     "application": [
       "lib/**",
@@ -73,7 +82,8 @@
       "packages/daemon/scripts/**",
       "packages/daemon/src/agents/capture-video.mjs",
       "scripts/e2b/**",
-      "scripts/build-subscription-worker.mjs"
+      "scripts/build-subscription-worker.mjs",
+      "scripts/release/runtime-resources.mjs"
     ]
   },
   "services": {
@@ -131,7 +141,12 @@
       ],
       "dockerfile": "cloudflare/api/Dockerfile",
       "repository": "mikka-api",
-      "overlay": true
+      "overlay": true,
+      "requiredInputs": [
+        "scripts/e2b/*.py",
+        "scripts/e2b/*.mjs",
+        "scripts/e2b/*.sh"
+      ]
     },
     "eve": {
       "kind": "container",
@@ -164,7 +179,12 @@
         "cloudflare/eve-runtime/runtime/**"
       ],
       "dockerfile": "cloudflare/eve-runtime/Dockerfile",
-      "repository": "mikka-eve"
+      "repository": "mikka-eve",
+      "requiredInputs": [
+        "scripts/e2b/*.py",
+        "scripts/e2b/*.mjs",
+        "scripts/e2b/*.sh"
+      ]
     },
     "task": {
       "kind": "container",
@@ -177,16 +197,25 @@
         "cloudflare/task-sandbox/**",
         "scripts/e2b/terminal-gateway.py",
         "scripts/e2b/preview-gateway.py",
-        "scripts/e2b/preview_firewall.py"
+        "scripts/e2b/preview_firewall.py",
+        "scripts/release/verify-task-image.sh"
       ],
       "entrypoints": [
         "packages/daemon/bin/cloud-worker.ts",
         "packages/daemon/scripts/build-cloud-worker.mjs",
         "cloudflare/task-sandbox/src/**",
-        "cloudflare/task-sandbox/runtime/**"
+        "cloudflare/task-sandbox/runtime/**",
+        "cloudflare/task-sandbox/machine.mjs",
+        "packages/daemon/test/cloudflare-task-handoff.node-test.ts"
       ],
       "dockerfile": "cloudflare/task-sandbox/Dockerfile",
-      "repository": "mikka-native-task"
+      "repository": "mikka-native-task",
+      "requiredInputs": [
+        "packages/daemon/test/cloudflare-task-handoff.node-test.ts",
+        "cloudflare/task-sandbox/*.test.mjs",
+        "cloudflare/task-sandbox/*.test.py",
+        "cloudflare/task-sandbox/test/**"
+      ]
     },
     "world": {
       "kind": "worker",
@@ -211,10 +240,11 @@
       ],
       "paths": [
         "deploy/litellm/**",
-        "cloudflare/litellm/**"
+        "cloudflare/litellm/**",
+        "lib/model-gateway/protocol-fields.mjs"
       ],
       "entrypoints": [
-        "cloudflare/litellm/src/**"
+        "cloudflare/litellm/worker.mjs"
       ],
       "dockerfile": "deploy/litellm/Dockerfile",
       "repository": "mikka-litellm"
