@@ -1,4 +1,4 @@
-import { auth } from '@/lib/api-auth'
+import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { writeAllowed } from '@/lib/mobile-api'
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 import { loadWorkspaceContext, WorkspaceError } from '@/lib/workspace-access'
@@ -37,6 +37,8 @@ export async function POST(request: Request) {
   for (const chunk of chunks) { audio.set(chunk, offset); offset += chunk.byteLength }
   try {
     const { workspace } = await loadWorkspaceContext(session.tokenWorkspaceId, session.user)
+    // A workspace-scoped token transcribes only in its own workspace, as every other workspace route checks.
+    if (!apiWorkspaceAllowed(session, workspace.id)) return failure('notFound', 404)
     const { transcribeChatAudio } = await import('@/lib/chat-attachments/transcribe')
     return Response.json({ text: await transcribeChatAudio(session.user.id, workspace.id, audio) }, { headers })
   } catch (error) {

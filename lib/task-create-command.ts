@@ -4,7 +4,7 @@ import { ISSUE_PRIORITY_CODES, ISSUE_STATUS_CODES } from './issue-meta'
 import { labelSchema } from './issue-metadata'
 
 /** Who the new task is assigned to (Capy's Assignee): a workspace member, or one of the person's Bots. A Bot is
- * stored as the task's delegate (lib/issue-metadata.ts) and is woken with the assignment (lib/task-assignment-wake.ts). */
+ * stored as the task's delegate (lib/issue-metadata.ts) and is woken with the assignment (lib/task-create-properties.ts, issueAssignedEvent in lib/coordinator-events.ts). */
 export const createAssigneeSchema = z.strictObject({ kind: z.enum(['user', 'bot']), id: z.string().min(1).max(128) })
 export type CreateAssignee = z.infer<typeof createAssigneeSchema>
 

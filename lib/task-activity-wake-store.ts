@@ -38,7 +38,7 @@ export async function recordTaskActivityWakes(tx: Transaction, input: {
   const wakes = taskActivityWakes({ writerId: writer.id, before: input.before, after: input.after, version: input.version,
     assigned: assigned && owned(assigned) ? assigned : null, own: own.filter(owned) })
   for (const wake of wakes) {
-    const event = (text: string | null) => issueActivityEvent(task, wake.bot, { kind: wake.kind, key: wake.key, actorName: writer.name?.trim() || 'A teammate', text })
+    const event = (text: string | null) => issueActivityEvent(task, wake.bot, { kind: wake.kind, key: wake.key, actorId: writer.id, actorName: writer.name?.trim() || 'A teammate', text })
     try {
       await recordCoordinatorEvent(tx, event(wake.text))
     } catch (error) {

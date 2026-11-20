@@ -294,6 +294,8 @@ test('a comment on a task wakes its assigned Bot, an @-mention wakes the writerâ
       [helper, 'mention', 'Can @Helper check the token too?'],
     ].sort())
     assert.ok(rows.every(row => row.payload.title === 'Comment wake' && row.payload.identifier === created.identifier))
+    // The wake names its author's account and that the author owns these Bots, for the prompt's untrusted-content framing.
+    assert.ok(rows.every(row => row.payload.actorId === owner && row.payload.byOwner === true))
     assert.equal((await pool.query('select 1 from agent_runs where "issueId"=$1', [id])).rowCount, 0)
   } finally {
     await pool.query('delete from issues where "userId"=$1', [owner])

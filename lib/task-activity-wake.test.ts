@@ -52,11 +52,14 @@ test('a Bot chip wakes only when added, only for a known Bot, once per descripti
 })
 
 test('the wake goes to the Bot owner, keyed by the activity, with the comment text bounded', () => {
-  const event = issueActivityEvent({ id: 'issue-1', identifier: 'MIKKA-3', title: 'Fix login' }, captain, { kind: 'comment', key: 'comment:t1:0', actorName: 'Alex', text: 'x'.repeat(3000) })
+  const event = issueActivityEvent({ id: 'issue-1', identifier: 'MIKKA-3', title: 'Fix login' }, captain, { kind: 'comment', key: 'comment:t1:0', actorId: 'writer', actorName: 'Alex', text: 'x'.repeat(3000) })
+  assert.equal(event.payload.actorId, 'writer')
+  assert.equal(event.payload.byOwner, false, 'a writer who does not own the Bot is marked as such')
+  assert.equal(issueActivityEvent({ id: 'i', identifier: null, title: 't' }, captain, { kind: 'comment', key: 'k', actorId: 'owner', actorName: 'O', text: 'hi' }).payload.byOwner, true)
   assert.equal(event.userId, 'owner')
   assert.equal(event.botId, 'bot-1')
   assert.equal(event.kind, 'issue_activity')
   assert.equal(event.dedupeKey, 'issue_activity:issue-1:bot-1:comment:t1:0')
   assert.equal((event.payload.text as string).length, 2000)
-  assert.equal('text' in issueActivityEvent({ id: 'i', identifier: null, title: 't' }, captain, { kind: 'mention', key: 'k', actorName: 'A', text: null }).payload, false)
+  assert.equal('text' in issueActivityEvent({ id: 'i', identifier: null, title: 't' }, captain, { kind: 'mention', key: 'k', actorId: 'writer', actorName: 'A', text: null }).payload, false)
 })

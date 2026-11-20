@@ -4,10 +4,14 @@ import { mock, test } from 'node:test'
 class FakeChatFileError extends Error { constructor(readonly code: string) { super(code) } }
 class FakeWorkspaceError extends Error {}
 let signedIn = true
+let tokenWorkspaceId: string | undefined
 const transcribed: { userId: string; workspaceId: string; size: number }[] = []
 let failWith: Error | null = null
 
-mock.module('@/lib/api-auth', { namedExports: { auth: { api: { getSession: async () => signedIn ? { user: { id: 'user-1' }, tokenWorkspaceId: undefined } : null } } } })
+mock.module('@/lib/api-auth', { namedExports: {
+  auth: { api: { getSession: async () => signedIn ? { user: { id: 'user-1' }, tokenWorkspaceId } : null } },
+  apiWorkspaceAllowed: (session: { tokenWorkspaceId?: string }, workspaceId: string) => !session.tokenWorkspaceId || session.tokenWorkspaceId === workspaceId,
+} })
 mock.module('@/lib/mobile-api', { namedExports: { writeAllowed: () => true } })
 mock.module('@/lib/chat-attachments/extract', { namedExports: { ChatFileError: FakeChatFileError } })
 mock.module('@/lib/workspace-access', { namedExports: { WorkspaceError: FakeWorkspaceError, loadWorkspaceContext: async () => ({ workspace: { id: 'ws-1' } }) } })
@@ -41,4 +45,15 @@ test('dictation without an OpenAI transcription key names the missing key', asyn
   assert.equal(response.status, 409)
   assert.deepEqual(await response.json(), { error: 'audioKeyRequired' })
   failWith = null
+})
+
+test('a token scoped to another workspace cannot transcribe in this one', async () => {
+  transcribed.length = 0
+  tokenWorkspaceId = 'ws-other'
+  const response = await send(new Uint8Array([1]))
+  assert.equal(response.status, 404)
+  assert.deepEqual(transcribed, [])
+  tokenWorkspaceId = 'ws-1'
+  assert.equal((await send(new Uint8Array([1]))).status, 200)
+  tokenWorkspaceId = undefined
 })

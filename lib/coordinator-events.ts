@@ -184,11 +184,14 @@ export const ISSUE_ACTIVITY_TEXT_MAX = 2000
  * names the comment (thread and message) or the description version, so the same activity wakes a Bot once.
  */
 export function issueActivityEvent(task: { id: string; identifier: string | null; title: string }, bot: { id: string; ownerId: string },
-  activity: { kind: 'comment' | 'mention'; key: string; actorName: string; text: string | null }): CoordinatorEventInput {
+  activity: { kind: 'comment' | 'mention'; key: string; actorId: string; actorName: string; text: string | null }): CoordinatorEventInput {
   return {
     userId: bot.ownerId, botId: bot.id, kind: 'issue_activity', dedupeKey: `issue_activity:${task.id}:${bot.id}:${activity.key}`,
     issueId: task.id, runId: null,
+    // Who wrote it, and whether that is the Bot's owner: anyone who may steer the task can comment on it, so the
+    // prompt quotes the text as untrusted content from that author (lib/coordinator/context.ts).
     payload: { activity: activity.kind, title: task.title, identifier: task.identifier, actorName: activity.actorName,
+      actorId: activity.actorId, byOwner: activity.actorId === bot.ownerId,
       ...(activity.text ? { text: activity.text.slice(0, ISSUE_ACTIVITY_TEXT_MAX) } : {}) },
   }
 }
