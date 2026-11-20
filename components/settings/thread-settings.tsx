@@ -1,7 +1,7 @@
 'use client'
 
 import { useTranslations } from '@/lib/intl/i18n-client'
-import { SettingRow, SettingSelect, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { useThreadTitleSettings } from '@/hooks/settings/use-thread-title-settings'
 import type { ThreadTitleTriggers } from '@/lib/thread-title'
 
@@ -35,10 +35,13 @@ function TitleScope({ scope, workspaceId = null }: { scope: 'mine' | 'workspace'
         onChange={event => titles.type(event.target.value)} onBlur={titles.commit} />
     </div>
     <SettingRow title={t('triggers')} description={t('triggersHint')}>
-      <SettingSelect label={t('triggers')} value={triggerValue} options={options} onValueChange={value => {
-        if (!value || value === triggerValue) return
+      <select aria-label={t('triggers')} className="h-8 rounded-md border bg-background px-2 text-sm" value={triggerValue} disabled={!titles.canEdit || titles.busy} onChange={event => {
+        const value = event.target.value
+        if (value === triggerValue) return
         titles.setTriggers(value === 'workspace' ? null : value as ThreadTitleTriggers)
-      }} />
+      }}>
+        {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+      </select>
     </SettingRow>
     {titles.message ? <p role={titles.message.kind === 'saved' ? 'status' : 'alert'} className="px-5 py-3 text-sm text-muted-foreground">{titles.message.text}</p> : null}
   </SettingsSection>
