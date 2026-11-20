@@ -1,12 +1,14 @@
 import type { HostedRuntimeSnapshot } from '@/lib/subscription-model-snapshot'
 
 export const WRITE_PLANNING_MODEL = 'mikka-planning'
+// Already-issued snapshots retain their signed runtime identifier.
+const LEGACY_WRITE_PLANNING_SNAPSHOT = 'openai/gpt-6-luna'
 
 /** The managed planner is configured for both image input and tool use.
  * This is a capability admission check, not evidence that any image was sent
  * or that a particular inference understood one. Unverified routes fail closed. */
 export function supportsWritePlanning(runtime: HostedRuntimeSnapshot): boolean {
-  return runtime.harness === 'ai_sdk' && runtime.model === WRITE_PLANNING_MODEL && runtime.modelSelection === undefined
+  return runtime.harness === 'ai_sdk' && (runtime.model === WRITE_PLANNING_MODEL || runtime.model === LEGACY_WRITE_PLANNING_SNAPSHOT) && runtime.modelSelection === undefined
 }
 
 /** Select the managed planner only for a new execution whose frozen

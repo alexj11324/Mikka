@@ -4,6 +4,7 @@ import { runtimeForWritePlanning, supportsWritePlanning } from './write-planning
 
 test('write planning uses only the managed image and tool capable planner',()=>{
  assert.equal(supportsWritePlanning({harness:'ai_sdk',model:'mikka-planning'}),true)
+ assert.equal(supportsWritePlanning({harness:'ai_sdk',model:'openai/gpt-6-luna'}),true, 'existing signed snapshots remain eligible')
  for (const runtime of [{harness:'ai_sdk',model:'nvidia/nemotron-3.5-lightning-free'},{harness:'codex',model:'mikka-planning'},{harness:'ai_sdk',model:'openai/gpt-6-luna-decisions'},{harness:'ai_sdk',model:null}]) assert.equal(supportsWritePlanning(runtime),false)
 })
 
