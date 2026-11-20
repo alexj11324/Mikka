@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react'
+import { createContext, useContext, useEffect, useId, useRef, type ClipboardEvent, type DragEvent, type FormEvent, type KeyboardEvent } from 'react'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
@@ -123,3 +123,12 @@ export function useChatComposer({ ref, value, onChange, onSubmit, sending = fals
 }
 
 export type ChatComposerState = ReturnType<typeof useChatComposer>
+
+/** Caller-supplied controls share the rendered composer's existing commands. */
+export const ChatComposerStateContext = createContext<ChatComposerState | null>(null)
+
+export function useChatComposerState() {
+  const state = useContext(ChatComposerStateContext)
+  if (!state) throw new Error('Chat composer controls require a composer')
+  return state
+}
