@@ -3861,5 +3861,12 @@
     "behavior": "Validate a saved list view's scope, name and small filter object before it is stored; no external service.",
     "test": "lib/saved-views-store.db.test.ts",
     "suite": "test:settings-prefs-db"
+  },
+  "lib/list-owner-lock.ts": {
+    "mode": "built-in",
+    "environment": [],
+    "behavior": "Serialize one person's writes to a list in one workspace with a transaction-scoped PostgreSQL advisory lock, so pin and saved-view limits hold under concurrent requests.",
+    "test": "lib/saved-views-store.db.test.ts",
+    "suite": "test:settings-prefs-db"
   }
 }

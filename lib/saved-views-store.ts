@@ -8,6 +8,7 @@ import {
   type SavedView,
   type SavedViewScope,
 } from "./saved-views";
+import { withListOwnerLock } from "./list-owner-lock";
 
 type Queryable = Pick<Pool, "query">;
 type Row = {
@@ -45,29 +46,32 @@ export async function listSavedViews(
  * already holds MAX_SAVED_VIEWS other views.
  */
 export async function saveView(
-  database: Queryable,
+  database: Pick<Pool, "connect">,
   ownerId: string,
   raw: SaveViewInput,
 ): Promise<SavedView | null> {
   const input = saveViewInput.parse(raw);
-  const { rows } = await database.query<Row>(
-    `INSERT INTO saved_views (id,"ownerId","workspaceId",scope,name,filters)
-      SELECT $1,$2,$3,$4,$5,$6::jsonb
-      WHERE EXISTS (SELECT 1 FROM saved_views WHERE "ownerId"=$2 AND "workspaceId"=$3 AND scope=$4 AND name=$5)
-        OR (SELECT count(*) FROM saved_views WHERE "ownerId"=$2 AND "workspaceId"=$3 AND scope=$4)<$7
-    ON CONFLICT ("ownerId","workspaceId",scope,name) DO UPDATE SET filters=EXCLUDED.filters,"updatedAt"=now()
-    RETURNING id,scope,name,filters,"createdAt"`,
-    [
-      randomUUID(),
-      ownerId,
-      input.workspaceId,
-      input.scope,
-      input.name,
-      JSON.stringify(input.filters),
-      MAX_SAVED_VIEWS,
-    ],
-  );
-  return rows[0] ? view(rows[0]) : null;
+  // Counted under the person's own lock, as pins are: concurrent saves cannot pass MAX_SAVED_VIEWS.
+  return withListOwnerLock(database, ["saved_views", ownerId, input.workspaceId], async (tx) => {
+    const { rows } = await tx.query<Row>(
+      `INSERT INTO saved_views (id,"ownerId","workspaceId",scope,name,filters)
+        SELECT $1,$2,$3,$4,$5,$6::jsonb
+        WHERE EXISTS (SELECT 1 FROM saved_views WHERE "ownerId"=$2 AND "workspaceId"=$3 AND scope=$4 AND name=$5)
+          OR (SELECT count(*) FROM saved_views WHERE "ownerId"=$2 AND "workspaceId"=$3 AND scope=$4)<$7
+      ON CONFLICT ("ownerId","workspaceId",scope,name) DO UPDATE SET filters=EXCLUDED.filters,"updatedAt"=now()
+      RETURNING id,scope,name,filters,"createdAt"`,
+      [
+        randomUUID(),
+        ownerId,
+        input.workspaceId,
+        input.scope,
+        input.name,
+        JSON.stringify(input.filters),
+        MAX_SAVED_VIEWS,
+      ],
+    );
+    return rows[0] ? view(rows[0]) : null;
+  });
 }
 
 /** Deletes one of the person's own views; false when there was none. */

@@ -14,7 +14,7 @@ const valid = isE2eTarget(target) && target === process.env.MIKKA_DATABASE_URL
 if (process.env.REQUIRE_DB === '1' && !valid) throw new Error('Saved view tests require a matching isolated loopback _e2e URL')
 
 test('saved views and PR pins stay with their owner and workspace, replace by name and stop at their limits', { skip: !valid }, async t => {
-  const pool = new Pool({ connectionString: target, max: 3 })
+  const pool = new Pool({ connectionString: target, max: 5 })
   const alex = `views-alex-${randomUUID()}`, dana = `views-dana-${randomUUID()}`
   const here = randomUUID(), there = randomUUID()
   try {
@@ -68,6 +68,22 @@ test('saved views and PR pins stay with their owner and workspace, replace by na
       assert.equal(await setPullPins(pool, alex, { workspaceId: there, urls: ['https://github.com/acme/app/pull/999'], pinned: true }), 'pinLimit')
       assert.equal((await listPullPins(pool, alex, there)).length, MAX_PULL_PINS)
       assert.notEqual(await setPullPins(pool, alex, { workspaceId: there, urls: [many[0]], pinned: true }), 'pinLimit', 'an existing pin is not over the limit')
+    })
+
+    await t.test('concurrent writes at the edge of a limit: exactly one passes it', async () => {
+      const space = randomUUID()
+      const filled = Array.from({ length: MAX_PULL_PINS - 1 }, (_, index) => `https://github.com/acme/edge/pull/${index + 1}`)
+      for (let index = 0; index < filled.length; index += 100)
+        await setPullPins(pool, alex, { workspaceId: space, urls: filled.slice(index, index + 100), pinned: true })
+      const racing = await Promise.all([1001, 1002, 1003].map(n =>
+        setPullPins(pool, alex, { workspaceId: space, urls: [`https://github.com/acme/edge/pull/${n}`], pinned: true })))
+      assert.equal(racing.filter(result => result !== 'pinLimit').length, 1)
+      assert.equal((await listPullPins(pool, alex, space)).length, MAX_PULL_PINS)
+      for (let index = 0; index < MAX_SAVED_VIEWS - 1; index++)
+        await saveView(pool, alex, { workspaceId: space, scope: 'threads', name: `edge ${index}`, filters: {} })
+      const saves = await Promise.all(['a', 'b', 'c'].map(name => saveView(pool, alex, { workspaceId: space, scope: 'threads', name, filters: {} })))
+      assert.equal(saves.filter(Boolean).length, 1)
+      assert.equal((await listSavedViews(pool, alex, space, 'threads')).length, MAX_SAVED_VIEWS)
     })
 
     await t.test('deleting the person removes their rows', async () => {

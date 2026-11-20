@@ -2,6 +2,7 @@ import "server-only";
 import type { Pool } from "pg";
 import { z } from "zod";
 import { githubPullRequestKey } from "./issue-metadata";
+import { withListOwnerLock } from "./list-owner-lock";
 
 type Queryable = Pick<Pool, "query">;
 /** Pins per person per workspace: far more than a list shows, few enough to read in one go. */
@@ -31,28 +32,30 @@ export async function listPullPins(
 
 /** Pins or unpins PRs; 'pinLimit' when pinning would pass MAX_PULL_PINS. Returns the pins after the change. */
 export async function setPullPins(
-  database: Queryable,
+  database: Pick<Pool, "connect">,
   userId: string,
   raw: z.input<typeof pullPinsInput>,
 ): Promise<string[] | "pinLimit"> {
   const input = pullPinsInput.parse(raw);
   const keys = [...new Set(input.urls.map(githubPullRequestKey))];
-  if (!input.pinned) {
-    await database.query(
-      `DELETE FROM pull_pins WHERE "userId"=$1 AND "workspaceId"=$2 AND "pullKey"=ANY($3::text[])`,
+  // The limit is counted under the person's own lock: two tabs pinning at once cannot both pass it.
+  return withListOwnerLock(database, ["pull_pins", userId, input.workspaceId], async (tx) => {
+    if (!input.pinned) {
+      await tx.query(
+        `DELETE FROM pull_pins WHERE "userId"=$1 AND "workspaceId"=$2 AND "pullKey"=ANY($3::text[])`,
+        [userId, input.workspaceId, keys],
+      );
+      return listPullPins(tx, userId, input.workspaceId);
+    }
+    const { rows: [held] } = await tx.query<{ others: number }>(
+      `SELECT count(*)::int AS others FROM pull_pins WHERE "userId"=$1 AND "workspaceId"=$2 AND NOT ("pullKey"=ANY($3::text[]))`,
       [userId, input.workspaceId, keys],
     );
-    return listPullPins(database, userId, input.workspaceId);
-  }
-  const { rowCount } = await database.query(
-    `INSERT INTO pull_pins ("userId","workspaceId","pullKey")
-      SELECT $1,$2,key FROM unnest($3::text[]) key
-      WHERE (SELECT count(*) FROM pull_pins WHERE "userId"=$1 AND "workspaceId"=$2 AND NOT ("pullKey"=ANY($3::text[])))
-        + cardinality($3::text[]) <= $4
-    ON CONFLICT DO NOTHING`,
-    [userId, input.workspaceId, keys, MAX_PULL_PINS],
-  );
-  const pins = await listPullPins(database, userId, input.workspaceId);
-  if (!rowCount && !keys.every((key) => pins.includes(key))) return "pinLimit";
-  return pins;
+    if (held.others + keys.length > MAX_PULL_PINS) return "pinLimit" as const;
+    await tx.query(
+      `INSERT INTO pull_pins ("userId","workspaceId","pullKey") SELECT $1,$2,key FROM unnest($3::text[]) key ON CONFLICT DO NOTHING`,
+      [userId, input.workspaceId, keys],
+    );
+    return listPullPins(tx, userId, input.workspaceId);
+  });
 }
