@@ -7,7 +7,9 @@ const stub = (path: string, namedExports: Record<string, unknown>) => mock.modul
 stub('../due-timer.ts', { armDueTimerSoon: (kind: string) => { assert.equal(kind, 'schedules'); armed++ } })
 stub('../coordinator/wake.ts', { coordinatorEnabled: () => true, wakeCoordinator: async () => {} })
 stub('../db/index.ts', { pool: { query: async () => ({ rows: [{ workspaceId: 'w' }] }) }, withDatabaseClient: async () => null })
-stub('../workspace-db.ts', { workspacePool: {} })
+stub('../workspace-db.ts', { workspacePool: {}, workspaceDb: {
+  transaction: async () => assert.fail('The timer-arm fixture must not enter the mocked schedule store membership transaction'),
+} })
 stub('../issue-access.ts', { issueForUser: async () => null })
 stub('../credentials/chat-guard.ts', { assertCredentialSafeChat: async () => {} })
 let failed = 0
