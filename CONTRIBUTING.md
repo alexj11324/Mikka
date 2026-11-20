@@ -88,12 +88,13 @@ code rejected.
 Slow checks run less often and later. Each layer catches what the one before
 cannot.
 
-1. **While writing, locally** (the agent's cloud Linux container): `pnpm
-   typecheck`, `pnpm lint`, the unit tests for what you changed, and the
-   end-to-end acceptance of the flow you changed against `pnpm dev`, the
-   daemon from source and the local database ([`docs/dev-workflow.md`](docs/dev-workflow.md)). CI is the
-   final gate; do not wait on it, a merge or a deploy to check what you can
-   check here.
+1. **Before pushing, use isolated cloud Linux.** Run the affected type, lint,
+   and unit checks first. When the change affects a packaged runtime, build
+   the affected artifact in that environment and test that same local build
+   against isolated dependencies. Keep it off the registry and production
+   traffic. Exercise the changed flow through the API and CLI with the local
+   database and daemon when relevant. See the
+   [development workflow](docs/dev-workflow.md).
 2. **Every pull request and push to main** (CI, `ui-policy.yml`): trusted
    Nx Core selection runs affected unit, daemon and PostgreSQL suites plus the
    existing source/security policies. PR checks use GitHub's synthetic merge
@@ -101,9 +102,7 @@ cannot.
    Selected DB suites keep PG17 isolation, clone databases and strict no-skip
    summaries across 1–4 dynamic shards. Required gate names stay stable; every
    selected lane must succeed. Weekly and manual runs cover the full inventory.
-   The Web release workflow builds `main` on GitHub Actions and uploads the
-   prebuilt output to Vercel. See
-   [selection, trust and fallback rules](docs/ci/incremental.md).
+   See the [selection, trust and fallback rules](docs/ci/incremental.md).
 3. **Ordinary acceptance uses API and CLI.** Acceptance runs locally through
    the API and the CLI (`pnpm test:local-loop`), and UI changes are checked
    with screenshots of a local production build of the official UI (`pnpm build`, `pnpm start`, with `mikka-hosted-ui`). `browser-gate.yml` only keeps the protected
@@ -115,6 +114,11 @@ cannot.
    [workflow reference](.github/workflows/README.md) for actual scopes. Decisions
    [`design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md`](docs/design/decisions/2026-11-01-1520-no-browser-tests-in-ci.md),
    [`design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md`](docs/design/decisions/2026-11-01-2225-api-cli-acceptance-and-backend-owner.md).
+4. **Release from trusted artifacts.** GitHub Actions builds the official
+   artifacts from reviewed source. Test the selected immutable artifact in
+   Cloudflare staging before promoting that same digest. Run tests that need
+   real provider credentials or Cloudflare behavior in this protected stage.
+   See the [build source of truth](docs/operations/build-source-of-truth.md).
 
 Documentation-only regular files retain a fast path after full DB inventory
 validation. Unknown files, deletions/renames, mode changes, shared/security,
