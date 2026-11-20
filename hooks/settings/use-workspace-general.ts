@@ -175,10 +175,9 @@ export function useArchivedBots(workspaceId: string) {
   const [pending, setPending] = useState<string | null>(null)
   const [failed, setFailed] = useState<{ botId: string; message: string } | null>(null)
   const bots = list.data && !list.data.error ? list.data.bots : []
-  // Members have no section. A thrown call has no code and used to paint 操作未成功 on this page; only a catalogued failure stays.
-  const coded = typeof list.data?.error === 'string' ? list.data.error : null
-  const denied = coded === 'workspaceAccessDenied'
-  const readError = coded && !denied && actionError(coded) !== actionError() ? actionError(coded) : null
+  // Members intentionally have no archived-bot section; other failures are not an empty list.
+  const denied = list.data?.error === 'workspaceAccessDenied'
+  const readError = !denied && (list.error || list.data?.error) ? actionError(list.data?.error) : null
 
   async function takeOver(botId: string) {
     setPending(botId)
