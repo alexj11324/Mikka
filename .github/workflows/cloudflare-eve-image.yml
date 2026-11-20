@@ -37,6 +37,11 @@ on:
       - 'packages/eve-cloudflare-world/**'
       - 'cloudflare/eve-runtime/**'
       - 'scripts/build-eve.mjs'
+      - 'scripts/check-eve-image.sh'
+      - 'scripts/verify-eve-image*.mjs'
+      - 'lib/abuse/model.ts'
+      - 'lib/abuse/model.test.ts'
+      - 'lib/abuse/policy.ts'
       - 'scripts/package-cf-eve-host.mjs'
       - 'scripts/build-cloudflare-eve-image.sh'
       - 'scripts/compile-cloudflare-eve-host.sh'
@@ -68,6 +73,8 @@ jobs:
           skip-electron: 'true'
       - name: Bind the existing release format
         run: echo "MIKKA_DEPLOYMENT_ID=$(node lib/deployment-id.mjs)" >> "$GITHUB_ENV"
+      - name: Check, build and verify the local Eve image
+        run: pnpm check:eve-image
       # The business API publisher consumes this existing World artifact.
       - name: Bundle the private World authority from the locked public source
         env:
@@ -92,10 +99,6 @@ jobs:
           path: ${{ runner.temp }}/eve-world-artifact/
           if-no-files-found: error
           retention-days: 1
-      - name: Compile the official Eve runtime and shared product resources offline
-        run: bash scripts/build-cloudflare-eve-image.sh
-      - name: Build the portable Node 24 image
-        run: docker build -f cloudflare/eve-runtime/Dockerfile -t mikka-eve-qualification .
   publish:
     permissions:
       contents: read
