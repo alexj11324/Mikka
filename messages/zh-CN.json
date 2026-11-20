@@ -5124,6 +5124,13 @@
       "otherDevices": "其他设备",
       "effort": "推理强度",
       "effortDefault": "默认",
+      "efforts": {
+        "low": "低",
+        "medium": "中",
+        "high": "高",
+        "xhigh": "超高",
+        "max": "最高"
+      },
       "access": "访问权限",
       "accessPrivate": "仅自己",
       "accessShared": "工作区",

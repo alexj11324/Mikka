@@ -5124,6 +5124,13 @@
       "otherDevices": "Other devices",
       "effort": "Effort",
       "effortDefault": "Default",
+      "efforts": {
+        "low": "Low",
+        "medium": "Medium",
+        "high": "High",
+        "xhigh": "Extra high",
+        "max": "Max"
+      },
       "access": "Access",
       "accessPrivate": "Private",
       "accessShared": "Workspace",

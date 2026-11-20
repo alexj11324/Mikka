@@ -28,7 +28,7 @@ export function useBotSettings(botId: string, workspaceId: string | undefined, v
   const environments = useSWR(visible ? ['bot-environments', workspaceId ?? null] : null, async () => {
     const result = await listBotEnvironments(workspaceId)
     if (result.error) throw new Error(result.error)
-    return result.environments
+    return result
   }, { shouldRetryOnError: false, revalidateOnFocus: false })
   const run = async (work: () => Promise<BotSettingsValue | null>) => {
     try {
@@ -39,7 +39,8 @@ export function useBotSettings(botId: string, workspaceId: string | undefined, v
   }
   return {
     loaded: !!data, loadError: !!error, retry: () => { void mutate() }, value: data ?? null,
-    environments: (environments.data ?? []).map(item => ({ value: item.id, label: item.name })),
+    environments: (environments.data?.environments ?? []).map(item => ({ value: item.id, label: item.name })),
+    shareable: environments.data?.shareable === true,
     save: (patch: BotSettingsPatch) => run(() => request(botId, workspaceId, { method: 'PATCH', body: patch })),
     transfer: (ownerId: string) => run(async () => { await request(botId, workspaceId, { method: 'POST', path: '/transfer', body: { ownerId } }); return null }),
   }

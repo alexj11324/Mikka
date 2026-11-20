@@ -26,7 +26,7 @@ let failChoose = false
 mock.module(new URL('../../app/actions/bots.ts', import.meta.url).href, { namedExports: {
   getWorkspaceBotDefaults: async (workspaceId?: string) => { selectedScopes.push(workspaceId); calls.push('defaults'); return defaultsResult },
   createBot: async (input: Record<string, unknown>, workspaceId?: string) => { selectedScopes.push(workspaceId); created.push(input); return { id: 'new-bot', name: input.name, color: input.color, shape: input.shape } },
-  listBotEnvironments: async () => { calls.push('environments'); return { environments: [{ id: 'env-default', name: 'Default', repositoryKeys: ['v2/github.com/acme/app'] }] } },
+  listBotEnvironments: async () => { calls.push('environments'); return { environments: [{ id: 'env-default', name: 'Default', repositoryKeys: ['v2/github.com/acme/app'] }], shareable: false } },
   setBotEffort: async (botId: string, effort: string | null) => { calls.push(`effort:${botId}:${effort}`); return { id: botId, effort } },
 } })
 mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { namedExports: {

@@ -54,7 +54,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
   const environments = useSWR(open ? ['new-bot-environments', workspaceId] : null, async () => {
     const result = await listBotEnvironments(workspaceId)
     if (result.error) throw new Error(result.error)
-    return result.environments
+    return result
   }, { shouldRetryOnError: false, revalidateOnFocus: false })
   const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices, { shouldRetryOnError: false, revalidateOnFocus: false })
 
@@ -86,7 +86,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
   }
 
   // Environment: undefined keeps the server's pick (the one listing the 仓库 choice, else the workspace default, the first here).
-  const environmentChoices: NewBotChoice[] = (environments.data ?? []).map(item => ({ value: item.id, label: item.name, detail: item.repositoryKeys[0]?.replace(/^v2\/github\.com\//, '') }))
+  const environmentChoices: NewBotChoice[] = (environments.data?.environments ?? []).map(item => ({ value: item.id, label: item.name, detail: item.repositoryKeys[0]?.replace(/^v2\/github\.com\//, '') }))
   const environmentValue = environment ?? environmentChoices[0]?.value ?? null
   const environmentDetail: NewBotDetail = {
     choices: environmentChoices, value: environmentValue,
@@ -104,7 +104,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
     label: machineChoices.find(choice => choice.value === machine)?.label ?? t('machineDefault'),
     onChange: setMachine, disabled: saving,
   }
-  const effortChoices: NewBotChoice[] = [{ value: NO_EFFORT, label: t('effortDefault') }, ...MODEL_ROUTING_EFFORTS.map(value => ({ value, label: value }))]
+  const effortChoices: NewBotChoice[] = [{ value: NO_EFFORT, label: t('effortDefault') }, ...MODEL_ROUTING_EFFORTS.map(value => ({ value, label: t(`efforts.${value}`) }))]
   const effortDetail: NewBotDetail = {
     choices: effortChoices, value: effort, label: effortChoices.find(choice => choice.value === effort)?.label ?? t('effortDefault'),
     onChange: setEffort, disabled: saving,
@@ -149,5 +149,7 @@ export function NewBotDialog({ open, onOpenChange, onCreated, workspaceId }: { o
 
   return open ? <NewBot onClose={() => onOpenChange(false)} name={name} onName={setName} maxLength={NAME_LENGTH} color={color} shape={shape}
     onColor={setColor} onShape={setShape} model={modelDetail} repository={repositoryDetail}
-    environment={environmentDetail} machine={machineDetail} effort={effortDetail} access={accessDetail} saving={saving} onSubmit={() => { void submit() }} /> : null
+    environment={environmentDetail} machine={machineDetail} effort={effortDetail}
+    // A personal workspace has no one to share with: no Access row there.
+    access={environments.data?.shareable ? accessDetail : undefined} saving={saving} onSubmit={() => { void submit() }} /> : null
 }

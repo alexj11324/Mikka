@@ -34,6 +34,8 @@ export type BotOverviewSettings = {
   value: BotSettingsValue | null
   /** The workspace's Environments, the default first. */
   environments: { value: string; label: string }[]
+  /** A team workspace: Access can be shared. A personal one has no one to share with, so its Access shows no choice. */
+  shareable?: boolean
   save: (patch: BotSettingsPatch) => Promise<string | null>
   /** Transfer ownership to another active member. */
   transfer: (ownerId: string) => Promise<string | null>

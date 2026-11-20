@@ -87,8 +87,14 @@ export async function getBotSettings(botId: string, workspaceId?: string): Promi
 }
 
 /** The Environments a Bot can work in here, the workspace default first. */
-export async function listBotEnvironments(workspaceId?: string): Promise<ActionResult<{ environments: import('@/lib/bot-environment').BotEnvironmentOption[] }>> {
-  return workspaceAction(async () => ({ environments: await (await import('@/lib/bot-environment')).botEnvironmentOptions((await getOwner(workspaceId)).workspaceId) }))
+export async function listBotEnvironments(workspaceId?: string): Promise<ActionResult<{ environments: import('@/lib/bot-environment').BotEnvironmentOption[]; shareable: boolean }>> {
+  return workspaceAction(async () => {
+    const shown = (await getOwner(workspaceId)).workspaceId
+    const [{ botEnvironmentOptions }, { botsShareable }] = await Promise.all([import('@/lib/bot-environment'), import('@/lib/bot-access')])
+    // `shareable`: a team workspace, where a Bot's Access can be shared.
+    const [environments, shareable] = await Promise.all([botEnvironmentOptions(shown), botsShareable(shown)])
+    return { environments, shareable }
+  })
 }
 
 /** The reasoning effort of the Bot's chat model; null is the model's default. */
