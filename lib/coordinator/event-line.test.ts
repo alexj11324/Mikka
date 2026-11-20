@@ -58,3 +58,20 @@ test("an Agent's report outside a thread stays a report, with no run to name", (
   const inRun = eventPrompt({ kind: 'run_report', issueId, runId, payload: { text: 'Half way' } })
   assert.deepEqual(eventLine('run_report', inRun), { kind: 'runReport', runId, issueId, status: null, title: null })
 })
+
+test('a task assigned to a Bot wakes it with the task and who assigned it, and reads back as that line (Capy issue_activity)', () => {
+  const assigned = eventPrompt({ kind: 'issue_assigned', issueId, runId: null, payload: { title: '登录页在 Safari 17 上白屏', identifier: 'MIKKA-12', actorName: 'Alex' } })
+  assert.match(assigned, /^\[Event\] Alex assigned you task MIKKA-12 "登录页在 Safari 17 上白屏"\. Issue: /)
+  assert.match(assigned, /get_issue/)
+  assert.deepEqual(eventLine('issue_assigned', assigned), { kind: 'issueAssigned', runId: null, issueId, status: 'Alex', title: '登录页在 Safari 17 上白屏' })
+})
+
+test('a comment on or a mention in an assigned task wakes the Bot with its text and reads back as its own line', () => {
+  const commented = eventPrompt({ kind: 'issue_activity', issueId, runId: null, payload: { activity: 'comment', title: 'Fix login', identifier: 'MIKKA-3', actorName: 'Alex', text: 'Use the new token' } })
+  assert.match(commented, /^\[Event\] Alex commented on task MIKKA-3 "Fix login"\. Issue: /)
+  assert.match(commented, /\nComment: Use the new token\n/)
+  assert.deepEqual(eventLine('issue_activity', commented), { kind: 'issueCommented', runId: null, issueId, status: 'Alex', title: 'Fix login' })
+  const mentioned = eventPrompt({ kind: 'issue_activity', issueId, runId: null, payload: { activity: 'mention', title: 'Fix login', identifier: null, actorName: 'Alex' } })
+  assert.match(mentioned, new RegExp(`^\\[Event\\] Alex mentioned you on task ${issueId} "Fix login"\\.`))
+  assert.deepEqual(eventLine('issue_activity', mentioned), { kind: 'issueMentioned', runId: null, issueId, status: 'Alex', title: 'Fix login' })
+})
