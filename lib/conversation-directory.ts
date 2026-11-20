@@ -11,7 +11,7 @@ import { runBotId } from './run-bot-name'
 import { runChainSql, RUN_CHAIN_MAX_DEPTH, type RunChainQueryable } from './run-chain'
 import { UNFINISHED_RUN_STATUSES } from './agent-run-statuses'
 import { threadName } from './issue-threads'
-import { pullRequestSchema, type IssuePullRequest } from './issue-metadata'
+import { directoryPullSchema, type DirectoryPull } from './conversation-directory-input'
 import { threadTitle } from './short-title'
 
 type Row = {
@@ -69,10 +69,12 @@ function conversationQuery() {
       WHERE agent_runs.id=root.id LIMIT 1) bot ON true
       CROSS JOIN LATERAL (
         SELECT coalesce(jsonb_agg(jsonb_strip_nulls(jsonb_build_object(
-          'url',pr->'url','title',pr->'title','state',pr->'state','additions',pr->'additions','deletions',pr->'deletions'
+          'url',pr->'url','title',pr->'title','state',pr->'state','additions',pr->'additions','deletions',pr->'deletions',
+          'head',pr->'branch','headSha',pr->'headSha','author',pr->'author',
+          'createdAt',coalesce(pr->'createdAt',to_jsonb(to_char(published AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"')))
         )) ORDER BY pr->>'url'), '[]'::jsonb) AS pulls
         FROM (
-          SELECT DISTINCT ON (p."pullRequest"->>'url') p."pullRequest" AS pr
+          SELECT DISTINCT ON (p."pullRequest"->>'url') p."pullRequest" AS pr,p."createdAt" AS published
           FROM assigned a JOIN run_publications p ON p."runId"=a.id
           WHERE a.root=root.id AND NOT a."depthExceeded" AND p."userId"=${owner}
             AND p."issueId"=root."issueId" AND p.status='published'
@@ -152,8 +154,8 @@ function item(row: Row, linkedTasks?: DirectoryTaskLink[]) {
   const first = linkedTasks?.[0]
   return {
     ...(linkedTasks?.length ? { linkedTasks } : {}),
-    pulls: row.pulls.flatMap((raw): IssuePullRequest[] => {
-      const parsed = pullRequestSchema.safeParse(raw)
+    pulls: row.pulls.flatMap((raw): DirectoryPull[] => {
+      const parsed = directoryPullSchema.safeParse(raw)
       return parsed.success ? [parsed.data] : []
     }),
     kind: row.kind, id: row.id, issueId: first?.id ?? row.issueId,
@@ -165,15 +167,19 @@ function item(row: Row, linkedTasks?: DirectoryTaskLink[]) {
   }
 }
 
-export async function conversationDirectory(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
+/** `projectIssueIds` is the caller's authorized read of `input.projectId` (projects live in the workspace database). */
+export type DirectoryScope = { projectIssueIds?: string[] }
+
+export async function conversationDirectory(database: RunChainQueryable, reader: ConversationReader, workspaceId: string, raw: DirectoryInput, scope?: DirectoryScope): Promise<ConversationDirectoryPage> {
   const { userId } = taskReaderScope(reader)
-  return await withConversationWorkspace(reader, workspaceId, () => directoryPage(database, userId, workspaceId, raw)) ?? { items: [], cursor: null }
+  return await withConversationWorkspace(reader, workspaceId, () => directoryPage(database, userId, workspaceId, raw, scope)) ?? { items: [], cursor: null }
 }
 
-async function directoryPage(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput): Promise<ConversationDirectoryPage> {
+async function directoryPage(database: RunChainQueryable, userId: string, workspaceId: string, raw: DirectoryInput, scope?: DirectoryScope): Promise<ConversationDirectoryPage> {
   const input = directoryInput.parse(raw)
+  if (input.projectId && !scope?.projectIssueIds) throw new Error('conversationDirectoryProjectUnresolved')
   const param = (i: number) => '$' + (facts.params.length + i)
-  const [archived,bot,search,state,id,pinned,at,pullState,kind] = Array.from({length:9}, (_,i) => param(4+i))
+  const [archived,bot,search,state,id,pinned,at,pullState,kind,project,since] = Array.from({length:11}, (_,i) => param(4+i))
   const statement = conversationQuery() + `, candidates AS (
     SELECT kind,pulls,unread,id,title,"agentName",harness,"issueId",identifier,"taskTitle",status,pinned,touched,asked,state,at,archived,"botId" FROM visible
     UNION ALL
@@ -183,11 +189,14 @@ async function directoryPage(database: RunChainQueryable, userId: string, worksp
   ) SELECT * FROM candidates WHERE (${archived}::boolean IS NULL OR archived=${archived})
     AND (${pullState}='all' OR (${pullState}='linked' AND jsonb_array_length(pulls)>0) OR pulls @> jsonb_build_array(jsonb_build_object('state',${pullState}::text)))
     AND (${bot}::uuid IS NULL OR "botId"=${bot}) AND (${state}='all' OR state=${state})
+    AND (${project}::uuid[] IS NULL OR "issueId"=ANY(${project}::uuid[]))
+    AND (${since}::timestamptz IS NULL OR EXISTS (SELECT 1 FROM jsonb_array_elements(pulls) pull WHERE (pull->>'createdAt')::timestamptz>=${since}::timestamptz))
     AND (${search}='' OR strpos(lower(coalesce(title,nullif(trim(asked),''),"taskTitle","agentName")),lower(${search}))>0)
     AND (${id}::uuid IS NULL OR (pinned,touched,candidates.id,kind)<(${pinned}::boolean,${at}::timestamptz,${id}::uuid,coalesce(${kind}::text,'')))
     ORDER BY pinned DESC,touched DESC,candidates.id DESC,kind DESC LIMIT 101`
   const rows = (await database.query(statement,[...facts.params,userId,workspaceId,RUN_CHAIN_MAX_DEPTH,input.archived === 'any' ? null : input.archived,input.botId ?? null,
-    input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState,input.cursor?.kind ?? null])).rows as Row[]
+    input.search,input.state,input.cursor?.id ?? null,input.cursor?.pinned ?? null,input.cursor?.at ?? null,input.pullState,input.cursor?.kind ?? null,
+    scope?.projectIssueIds ?? null,input.since ?? null])).rows as Row[]
   const page = rows.slice(0,100), last = page.at(-1)
   const linked = await linkedTasksForChats(database, userId, workspaceId, page.filter(row => row.kind === 'chat').map(row => row.id))
   return { items: page.map(row => item(row, row.kind === 'chat' ? linked.get(row.id) : undefined)).filter(row=>!input.search || row.title.toLowerCase().includes(input.search.toLowerCase())),

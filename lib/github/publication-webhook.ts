@@ -21,6 +21,8 @@ const pullRequestEvent = z.object({
     changed_files: z.number().int().nonnegative().optional(),
     head: z.object({ sha: z.string().regex(/^[a-f0-9]{40,64}$/i), ref: z.string().min(1).max(1024).optional() }).optional(),
     updated_at: z.iso.datetime({ offset: true }).optional(),
+    created_at: z.iso.datetime({ offset: true }).optional(),
+    user: z.object({ login: z.string().max(100) }).nullable().optional(),
   }),
 })
 
@@ -120,7 +122,8 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
   const patch = JSON.stringify({ title: pr.title, state, ...lines,
     ...(pr.changed_files === undefined ? {} : { changedFiles: pr.changed_files }),
     ...(pr.head ? { headSha: pr.head.sha.toLowerCase(), ...(pr.head.ref ? { branch: pr.head.ref } : {}) } : {}),
-    ...(pr.updated_at ? { githubUpdatedAt: new Date(pr.updated_at).toISOString() } : {}) })
+    ...(pr.updated_at ? { githubUpdatedAt: new Date(pr.updated_at).toISOString() } : {}),
+    ...(pr.user?.login ? { author: pr.user.login } : {}), ...(pr.created_at ? { createdAt: new Date(pr.created_at).toISOString() } : {}) })
   const { rows } = await database.query<{ id: string | null; issueId: string | null; runId: string; changed: boolean }>(`WITH matched AS (
       SELECT "runId","userId","issueId" FROM run_publications WHERE lower(rtrim("pullRequest"->>'url','/'))=$1
         AND (NOT $2::jsonb ? 'githubUpdatedAt' OR coalesce("pullRequest"->>'githubUpdatedAt','')<=$2::jsonb->>'githubUpdatedAt')
