@@ -359,9 +359,9 @@ test('API-key runs: frozen by id at dispatch, scoped gateway token at claim, sub
     const response = await claim(p.deviceId, runId, p.token)
     assert.equal(response.status, 200, await response.clone().text())
     await assertGatewayCredential(await response.json(), 'openai', secret)
-    // A Claude Code run: the saved key is Codex's, so the device's own login runs it.
+    // LiteLLM converts the selected OpenAI key's protocol for Claude Code too.
     const other = await queueRun(p.id, { issueId: await task(p.id, p.workspaceId), agentId: p.agents.claude_code, repo: p.remote, model: 'key-model-c' }, p.botId)
-    assert.equal((await definition(other.runId)).apiKey, undefined)
+    assert.deepEqual((await definition(other.runId)).apiKey, { keyId: key.id, model: 'key-model-c' })
   })
 
   await t.test('own device signed in, a key stored, no key model saved: the key is not injected', async () => {

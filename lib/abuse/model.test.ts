@@ -267,7 +267,7 @@ test('failure to persist the header identity stops upstream before settlement', 
   }) }
   beforeSettlement = async () => { assert.equal(cancelled, true) }
   const wrapped = await hostedModel('workspace', 'fixture-model')
-  await assert.rejects(wrapped.doStream({ prompt: [] }), /header identity persistence failed/)
+  await assert.rejects(async () => wrapped.doStream({ prompt: [] }), /header identity persistence failed/)
   assert.equal(settlements.at(-1)?.cost, null)
 })
 

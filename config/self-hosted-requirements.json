@@ -3799,6 +3799,6 @@
     ],
     "behavior": "The sole SDK client sends managed models and authorized BYOK requests to LiteLLM, preserving cost and request receipts without following redirects or exposing the master key to Agents.",
     "test": "lib/model-gateway/litellm-client.test.ts",
-    "suite": "test:subscription-usability"
+    "suite": "test:agent-kit-model"
   }
 }

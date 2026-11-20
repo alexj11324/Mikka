@@ -33,6 +33,6 @@ test('API key chat routes through LiteLLM and reopens authorization at every cal
     apiKey: 'synthetic-key', baseUrl: 'https://provider.fixture.invalid/v1', provider: 'openai', modelId: 'chosen-model',
   } })
   allowed = false
-  await assert.rejects(model.doGenerate({ prompt: [] }), /apiKeyNotFound/)
+  await assert.rejects(async () => model.doGenerate({ prompt: [] }), /apiKeyNotFound/)
   assert.equal(calls, 1, 'revoked access cannot dispatch another model request')
 })
