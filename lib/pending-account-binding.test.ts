@@ -10,6 +10,7 @@ let actionError: string | null = null
 let toolTags: string[] | undefined = ['important', 'openWorldHint']
 const calls: unknown[][] = []
 const reviews: unknown[][] = []
+const scrubs: unknown[] = []
 const client = { query: async () => ({ rows: [], command: 'SELECT' }) } as unknown as PoolClient
 observeCommitEffects(client)
 const liveEffects: Array<() => Promise<unknown>> = []
@@ -43,6 +44,7 @@ stub('./composio.ts', {
 })
 stub('./coordinator-event-store.ts', { recordCoordinatorEvent: async () => {} })
 stub('./cloud-computer/credential-reviews.ts', { executeCredentialOperation: async (...args: unknown[]) => { reviews.push(['credential', ...args.slice(1)]); return { data: {} } } })
+stub('./cloud-computer/action-reviews.ts', { scrubBrowserMutation: async (_q: unknown, actionId: string) => { scrubs.push(actionId) } })
 const appCalls: unknown[][] = []
 stub('./app-tools-server.ts', { executeAppToolCall: async (_client: unknown, userId: string, call: { toolkit: string }, accountId: string | null) => { appCalls.push([userId, call.toolkit, accountId]); return { successful: true, data: {} } } })
 stub('./plugins/catalog.ts', { composioToolkitLister: () => async () => ({ items: [] }), isNoAuthToolkit: async (_list: unknown, id: string) => id === 'hackernews' })
@@ -119,12 +121,14 @@ test('credential reviews retain their own approval authority without a Composio 
 })
 
 test('a legacy browser card can only decline: approval has no executor any more', async () => {
-  calls.length = 0; reviews.length = 0
+  calls.length = 0; reviews.length = 0; scrubs.length = 0
   row = { id: 'review', action: 'browser_operation', input: { summary: 'Review' }, connectedAccountId: null, createdAt: new Date() }
   assert.equal((await actions.decidePendingAction('u', 'review', false)).status, 'declined')
+  assert.deepEqual(scrubs, ['review'], 'a declined card loses its executable payload')
   row = { id: 'review', action: 'browser_operation', input: { summary: 'Review' }, connectedAccountId: null, createdAt: new Date() }
   const approved = await actions.decidePendingAction('u', 'review', true)
   assert.equal(approved.status, 'failed'); assert.equal(approved.error, 'pendingActionUnavailable')
+  assert.deepEqual(scrubs, ['review', 'review'], 'a failed card loses its executable payload too')
   assert.deepEqual(reviews, []); assert.deepEqual(calls, [])
 })
 

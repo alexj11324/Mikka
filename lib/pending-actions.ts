@@ -27,7 +27,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     await pendingActionsChanged(executor, row.id, userId)
     if (!approve && row.action !== 'credential_operation') {
       await recordCoordinatorEvent(executor, actionDecidedEvent(row, { status: 'declined', error: null, outcome: {} }, { botId: row.botId }))
-      return null
+      return row.action === 'browser_operation' ? row : null
     }
     return { ...row, action: row.action } as const
   }
@@ -35,6 +35,10 @@ export async function decidePendingAction(userId: string, id: string, approve: b
   // credential reviews still see the claimed decision before their own cleanup.
   const row = approve ? await claim(db) : await db.transaction(claim)
   if (!row) return { status: 'declined' as const, error: null }
+  if (!approve && row.action === 'browser_operation') {
+    await (await import('@/lib/cloud-computer/action-reviews')).scrubBrowserMutation(pool, row.id)
+    return { status: 'declined' as const, error: null }
+  }
 
   if ((row.action === 'browser_operation' || row.action === 'credential_operation') && Date.now() - row.createdAt.getTime() > 5 * 60_000) {
     await db.update(pendingActions).set({ status: 'failed', error: 'browserActionExpired' }).where(eq(pendingActions.id, row.id))
@@ -69,6 +73,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     }
   }
   await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))
+  if (row.action === 'browser_operation') await (await import('@/lib/cloud-computer/action-reviews')).scrubBrowserMutation(pool, row.id)
   await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }, { botId: row.botId }))
   return { status, error }
 }
