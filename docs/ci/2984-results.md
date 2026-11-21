@@ -254,6 +254,62 @@ the [post-merge receipt](../operations/evidence/2984-bootstrap-postmerge.json)
 records a different, actual merged run. Test counts are not added across these
 different versions and described as one run.
 
+### Five additional duplicate file invocations: SDLC-018
+
+[#3046](https://github.com/aspectly-labs/Mikka/pull/3046) is exact
+`1b6e329091dd44e650c6bd25a7431258668f8bd3`, tree
+`55f61a555ce07f346d87e31a04a05334f77b07ea`. Its normal parents are
+`c398c01d775b35fc6c6a5418ce19123a20b37d15` and current-main
+`7b68ba333e89b9d4e36ed3f69553b7c9bd28d2f4`; no history was rewritten.
+Only three package script lines and six regressions in the existing selector
+test change. The existing task parser is reused.
+
+The literal root check retains its109 script references. Of13 overlapping test
+file contexts, five identical-argument duplicate invocations are removed;
+one explicit environment matrix and seven different loader, flag or database
+contexts remain. The retained primary calls are:
+
+| File | Existing owning entry retained |
+| --- | --- |
+| registry-compat | test:agent-kit-compat |
+| tool-defaults-compat | test:agent-kit-model |
+| issue-tools | test:coordinator-issue-mutations |
+| issue-workspace-settings | test:issue-readonly-dom |
+| search | test:integrations |
+
+Two shell semicolons had also been attached to filenames, hiding actual inputs
+from the original graph. Adding whitespace before those existing delimiters
+restores runtime-off as a direct graph input. Both mailbox legs, original
+r1/r2 exit handling and aggregate failure remain; a real negative-control test
+checks that the second leg still runs after the first fails.
+
+The94 task IDs and87 database-task inventory remain. All original1603 direct
+inputs survive, with runtime-off restoring the total to1604; the transitive
+path union is unchanged. All13 overlapping business-file blobs are unchanged.
+Of94 tasks,91 expanded input sets remain unchanged. This is a necessity
+classification of the complete literal check, not an arbitrary deduplication
+target.
+
+Original RED at6294 is35=30pass/5fail/0skip. Atc398, the original guards pass
+88/88 and registry6/6; seven complete original owning scripts execute16 native
+Node legs,772=771pass/1original demo opt-in skip,0fail/cancel,155.751047070s.
+Those results stay bound to c398. Main7b changes store.ts in a transitive input,
+so final1b separately reruns the original88/88 guards and the affected file
+groups40/40,37/37,6/6, all0skip, plus the original plan. It does not inherit a
+fictional new772-case execution.
+
+The before sample is actual main59b CI
+[44852387451/1](https://github.com/aspectly-labs/Mikka/actions/runs/44852387451/attempts/1):
+two selected jobs of20, Core136686904731 and Integration136686904801, on
+Node24.22.3. Five fixed cases appear10 times in those actual logs. The
+explicitly local c398 after sample contains five occurrences. After-change
+protected CI has **n=0**; these different execution environments do not prove a
+total wall-time saving. Independent
+[COMMENT6003447984](https://github.com/aspectly-labs/Mikka/pull/3046#pullrequestreview-6003447984)
+is bound to final1b, with0 current Spec/Standards code blockers and medium risk.
+Whole local gates, protected CI/security, normal merge and exact post-merge
+measurement remain outstanding.
+
 ## B1. Fixed-source local feedback before final CI
 
 The earlier [local-feedback evidence](2984-b1-local-feedback.json) records two
@@ -678,6 +734,107 @@ Original#2969 still owns the compiled fixture edition omission; original
 #2891 publication/fake fixes and#2912 chat assertion conflicts are tracked in
 their existing PRs rather than duplicated here.
 
+#### Medium whole-gate counterexample and six additional fixture repairs
+
+The same exact219 integration was then tested once with Medium's verified
+Node24.22.2. Native process321 exits1 after581.909827211s, including
+525.789686933s in the original gate. Agent UI now passes unchanged. The third
+coordinator leg instead reports130=123pass/7fail/0skip; the first two legs
+pass11/11 and173/173. The failures reach the production observed-executor
+guard through three previously missed fake sessions. Both complete original
+abuse-db legs again pass26/26 and5/5 naturally. PGstop0/status3/noPID and a clean
+exact219 source are recorded; no Ready record exists. Receipt SHA256:
+`b5917b48f977d81804c194f7af49d7db812e4638e7fddba2142ee8b431d4fbb2`.
+
+The original [#3009](https://github.com/aspectly-labs/Mikka/pull/3009) branch now
+contains six additional fixture fixes at
+`5995f33ad1de6dc522004d702d592667837e1d95`, tree
+`31bc749ebf91e10d8a10fbecef33939904df8fcd`. Four normal single-parent commits
+extend24fd:8a81→7dca→2f700→5995. No product, shared helper, package command or
+workflow changes in that increment. Submission, dispatch and startup cover
+the initial seven failures; message ingress, MCP settlement and workspace Bot
+creation are the additional actual successor paths found by full-entry runs
+and the remaining-boundary audit.
+
+The original three-file RED79=72/7 is retained. A first correction79=78/1
+exposes a separate early-import/scheduler path; after correcting load order,
+79/79 passes on a staged tree identical to7dca. Exact clean7dca still fails a
+later original full-entry leg8=3/5. The next three files produce actual
+RED23=16/7 and then23/23 after repair; workspace's original individual
+RED15=13/2 is also retained. A temporary caller input-count startup error ran
+no tests and is not a product RED.
+
+Two complete original coordinator invocations on exact clean5995 pass:
+
+| Environment | Native result | Duration |
+| --- | --- | ---: |
+| Edition unset, CI absent, synthetic HTTP | 404/404;0skip/cancel;exit0 |44.628488562s|
+| Outer Cloud, CI absent, synthetic HTTPS; fixtures set and restore their own builtin inputs |404/404;0skip/cancel;exit0|46.831796503s|
+
+Each invocation retains the original nine legs11/173/130/25/8/3/21/3/30.
+They are two environment samples, not808 unique cases or proof of a whole
+check. The author's original terminal results and current PR record establish
+these observations. The later host outage prevented independent re-reading
+of these two new raw receipts; that narrower verification limitation remains.
+Independent [COMMENT6003542707](https://github.com/aspectly-labs/Mikka/pull/3009#pullrequestreview-6003542707)
+is bound to5995:0 current static Spec/Standards blockers,455 original assert
+source-line judgments preserved, and the raw-receipt limitation stated above.
+The complete workspace entry, affected root typecheck and lint have **not
+started**. The219 integration still contains24fd, so the new5995 results do
+not qualify its old source. Normal integration and a new actual whole gate
+remain required.
+
+All66 remaining mocked-boundary candidates were rechecked through successor
+paths:50 backend and16 UI/route. Fifteen UI boundaries remain; workspace Bot
+creation was the additional real path. Conditional real-PG conversation reads
+were reclassified without pretending they had executed. The updated Owner
+audit covers84 open PRs and2910 file records, with15 fresh PRs and69 exact
+head/base matches reused. No same-root Owner fix was found in that sample.
+Existing product ownership is unchanged.
+
+#### Medium development failure and the native cleanup counterexample
+
+The temporary ownership caller first fails closed on Medium native324 because
+the live proc task-children interface is unavailable:0cases,0.001764531s.
+No application, database or browser starts in that attempt. An alternative
+native PPid/start-identity traversal preserves all process-ownership guards,
+and actual Medium tiny proof326 passes7/7 in0.267556125s, with kernel ECHILD and
+no remaining owned children. This proves the caller's narrow capability only.
+
+The subsequent real development invocation327 on fixed publicd30 and the same
+authorized official UI fails before readiness,37.245585090s total. Original
+PG17.12/396 setup3.866208161s and account bootstrap0.419980188s succeed.
+The locked Eve1.0.0-rc.9 diagnostic identifies a build-subprocess SIGKILL;
+it does not prove the outer CLI was killed or establish OOM as its cause.
+No browser starts; complete target journeys remain **0/2**.
+Original receipt SHA256:
+`b1643ad5b7c8c34c1bb0d07da94a07fba6c117998ac141799f74a2385bb867bb`.
+
+PG cleanup is normal, stop0/status3/noPID. Application cleanup is unconfirmed:
+after the original dev parent exits and its113/113 PPid snapshot succeeds,
+a later native observation raises PermissionError before supplementary
+signals. Read-only native328 later sees no readable task-owned path
+candidates; this does not rewrite the original failed cleanup. The interval
+04:34→06:10 has cumulative oom_kill2→3, without an identified killed PID.
+
+A separate real host-owned child counterexample proves that a kernel-confirmed
+exited zombie can return errno13 when enumerating its proc fd directory.
+The exact child is normally reaped afterward. Receipt SHA256:
+`487b81115144645ebf0e4bf839929ff70fdb90d5ff41e7a23362ad356ad961d5`.
+This demonstrates one real failure mode, not the exact cause of the earlier
+Medium PermissionError. A minimal correction for the next temporary caller
+would reap a natively confirmed dead direct child before dead-process fd
+inspection while retaining all live-child identity and signal guards.
+At this checkpoint that correction is an unexecuted draft, not tested code.
+
+After actual Small and Medium build failures, the existing stopped Large for
+closed#1329 is resumed once, with zero new resources. The native wait expires;
+the last actual06:17 observation is still starting. No second start or
+identical-input application retry is performed. Small was already confirmed
+stopped05:25. Medium is retained for the qualified fixture gate. The host is
+subsequently marked unavailable, so later remote resource state and cleanup
+are not claimed.
+
 ## E. Independent delivery and exact post-merge evidence
 
 The new policy follows actual dependency edges. Existing #2891's seven Draft
@@ -766,6 +923,29 @@ void that publication. Explicit #1752/#1954 Owner windows still apply; they are
 not replaced by a blanket main freeze inferred from a running E2B workflow.
 Individual downstream stale-source refusals retain their original cause and
 are not authorization to loosen a guard.
+
+### Two externally triggered Ready transitions: SDLC-017
+
+Two own incomplete PRs were changed from Draft to Ready by the native
+devin-ai-integration actor: #3008 event36838207317 at04:41:47Z and #3010
+event36839055424 at05:03:33Z. Their exact source heads did not change.
+They were returned to Draft at05:26:54Z and05:26:56Z after the mismatch was
+observed and verified. The native actor does not identify the initiating
+person, session or configuration; later bot comments do not prove causation.
+
+The two triggered runs are44867361635/1,21jobs=19success/2skip, and
+44869057419/1,14jobs=11success/3skip. Each normal re-Draft event has11 job
+records: four observed runs and57 jobs total. Ready intervals are2707s and
+1403s, each n=1. These runs remain historical evidence, not permission to use
+an incomplete local handoff.
+
+At fixed main59b, the sole production Ready writer is the existing mark-ready
+script and it verifies its original receipt. The54 workflows have no Devin
+or Ready writer. A68-PR/2756-file source audit finds no same-root repository
+repair. No new state toggler, polling agent or permission change is justified
+by the available evidence. The trigger remains an external integration Owner
+dependency. Separately proposed #3025 policy is unmerged and does not
+supersede current-main instructions or waive GitGuardian.
 
 ## F. One procedure and remaining acceptance
 
@@ -876,3 +1056,25 @@ describes the existing owner/admin repository-access controls. These identify
 the legitimate ownership boundary only. They do not establish that this
 installation is missing, suspended or misconfigured, and they do not authorize
 this remediation to change App settings, credentials or the original gate.
+
+### Execution availability and evidence preservation at this checkpoint
+
+Native main was refreshed at06:33 UTC:
+`7b68ba333e89b9d4e36ed3f69553b7c9bd28d2f4`, the normal#3014 merge.
+Its only changed files are lib/computer/store.ts and lib/computer/store.db.test.ts. The
+original#1752 and#1954 window/ownership records remain authoritative; no
+production action is performed by this remediation.
+
+The execution host is marked unavailable before workspace tests could start.
+One read-only host recovery attempt times out after45s. Native GitHub reads
+and writes still work, so source changes stay on their original branches and
+the one progress comment is updated in place. The two successful5995
+coordinator invocations are not repeated. Temporary Large source transport
+and cleanup changes have not executed; existing raw receipts on the host are
+not reconstructed from summaries or relabelled as independently re-read.
+
+This interruption grants no Ready, CI, security, migration or merge exception.
+The supported execution surface must be restored before the remaining local
+gates, development acceptance and precise resource shutdown can be observed.
+Unfinished repairs remain unfinished.
+
