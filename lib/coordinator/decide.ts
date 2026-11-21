@@ -7,6 +7,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { validatedAnswers, decisionRequestInput, DECISION_MODEL, DECISIONS_PATH, type DecisionReceiptModel, type DecisionInput, type DecisionQuestion, type DecisionAnswer } from './decision'
 import type { HostedModelBilling } from '@/lib/abuse/model'
 import { observeAiRequest, type AiMetadata } from '@/lib/tracing/ai'
+import { recordDecisionFailure, type DecisionFailureReason } from './decision-failure'
 
 const DECISION_TIMEOUT_MS = 5000
 const hash = (value: string) => createHash('sha256').update(value).digest('hex')
@@ -27,16 +28,20 @@ export interface DecisionExecution {
 /** Submit only to the configured Decisions provider after the existing workspace admission check. */
 export async function invokeDecision(purpose: string, input: DecisionInput, questions: DecisionQuestion[], signal?: AbortSignal, diagnostics?: {retainInvalidReceipt:true}, billingAdapter?: HostedModelBilling) {
   'use step'
-  if (signal?.aborted) return null
+  let preparation: DecisionFailureReason = 'preparation_failed'
+  try {
+  if (signal?.aborted) return recordDecisionFailure(purpose, 'cancelled')
   const { hostedBillingScope } = await import('@/lib/abuse/context')
   const scope = hostedBillingScope.getStore()
-  if (!scope) return null
+  if (!scope) return recordDecisionFailure(purpose, 'billing_scope_missing')
   const proxy = gatewayLiteLlm()
   const baseUrl = liteLLMBaseUrl(proxy?.url)
-  if (!proxy || !baseUrl) { console.error('Decision unavailable', { purpose: 'litellm-not-configured' }); return null }
+  if (!proxy || !baseUrl) return recordDecisionFailure(purpose, 'litellm_not_configured')
   const endpoint = baseUrl + DECISIONS_PATH.slice('/v1'.length)
   const { assertLiteLLMModelTransport } = await import('@/lib/model-admission/runtime')
+  preparation = 'admission_refused'
   await assertLiteLLMModelTransport(scope, DECISION_MODEL, baseUrl, signal)
+  preparation = 'billing_refused'
   const usage = await import('@/lib/abuse/runtime')
   const store = billingAdapter?.usage ?? usage.hostedUsage
   const callId = randomUUID()
@@ -50,6 +55,7 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
     await withSharedCredits(scope.workspaceId, payer => store.reserve(payer, DECISION_MODEL, callId), billingPrincipal)
   }
   let requestStarted = false
+  preparation = 'preparation_failed'
   try {
     return await observeAiRequest({ modelId: DECISION_MODEL, userId: scope.ownerId, route: 'litellm', operation: 'decision' }, async report => {
       const requestInput = decisionRequestInput(input)
@@ -61,7 +67,9 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
         ? [createHash('sha256').update(Buffer.from(part.image_url.slice(part.image_url.indexOf(',') + 1), 'base64')).digest('hex')]
         : []))
       const executionId = randomUUID(), startedAt = new Date().toISOString()
+      preparation = 'admission_refused'
       await assertLiteLLMModelTransport(scope, DECISION_MODEL, baseUrl, signal)
+      preparation = 'preparation_failed'
       if (signal?.aborted) throw new DOMException('Model request cancelled', 'AbortError')
       requestStarted = true
       const init: RequestInit = {
@@ -112,10 +120,15 @@ export async function invokeDecision(purpose: string, input: DecisionInput, ques
       return { answers: answers ?? new Map<string,Exclude<DecisionAnswer,{type:'refusal'}>>(), execution, ...(answers ? {} : {validationFailure:'invalid_response' as const}) }
     }, signal)
   } catch {
+    if (!requestStarted) recordDecisionFailure(purpose, signal?.aborted ? 'cancelled' : preparation)
     if (store) await store.settle(callId,requestStarted ? null : 0)
     // No upstream text, credentials, image bytes or untrusted purpose in logs.
     console.error('Decision unavailable', { purpose: purpose.replace(/[^a-z0-9_-]/gi, '').slice(0, 80) })
     return null
+  }
+  } catch (error) {
+    recordDecisionFailure(purpose, preparation)
+    throw error
   }
 }
 

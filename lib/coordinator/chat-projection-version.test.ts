@@ -85,7 +85,7 @@ for (const [path, exports] of [
   ['@/lib/task-identifier-server', { taskIdentifiers: unused }],
   ['@/lib/artifacts/store', { artifactSummaries: async () => ({}) }],
   ['@/lib/preferences', { readPreferences: unused, readCoordinatorPromptPreferences: unused }],
-  ['./triage-batch', { TRIAGE_RETRY_COOLDOWN_MS: 60_000 }],
+  ['./triage-batch', { TRIAGE_RETRY_COOLDOWN_MS: 60_000, triageDecisionReceipt: unused }],
   ['@/lib/schedules/store', { scheduledInbox: unused }],
   ['../live/chats', { botChatChanged: unused }],
 ] as const) mock.module(path, { namedExports: exports })

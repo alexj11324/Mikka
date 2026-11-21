@@ -30,9 +30,9 @@ import { projectMessageDisplays } from './display-projection'
 import type { ChatToolMetadata, ChatToolMetadataRow } from './chat-tool-metadata'
 import { coordinatorLeaseActive } from './lease'
 import { readPreferences } from '@/lib/preferences'
-import { TRIAGE_RETRY_COOLDOWN_MS } from './triage-batch'
-import type { TriageJudgment } from './triage-batch'
-import type { DecisionExecution } from './decide'
+import { TRIAGE_RETRY_COOLDOWN_MS, triageDecisionReceipt } from './triage-batch'
+import type { TriageCompletion } from './triage-batch'
+import type { DecisionFailureReason } from './decision-failure'
 import { scheduleChatResultSchema } from '@/lib/schedules/chat-result'
 import { botChatChanged } from '../live/chats'
 import { tokenWorkspace } from '@/lib/tokens/principal'
@@ -106,9 +106,8 @@ export async function claimTriageAttempt(event: TriageEventRecord, scope: { user
 
 /** Winning attempt and the exact event payload must still match. Persisting the
  * actual host receipt with the tier does not turn that choice into permission. */
-export async function completeTriageAttempt(event: TriageEventRecord & { observedRun?: unknown }, scope: { userId: string; botId: string }, attemptedAt: Date, judgment: TriageJudgment & { tier: CoordinatorEventTier; execution: DecisionExecution }): Promise<boolean> {
-  const receipt = { version: 1, method: 'model', eventId: event.id, eventKind: event.kind,
-    attemptedAt: attemptedAt.toISOString(), chosenTier: judgment.tier, observedRun: event.observedRun ?? null, execution: judgment.execution }
+export async function completeTriageAttempt(event: TriageEventRecord & { observedRun?: { id: string; status: string; finishedAt: Date | string | null } | null }, scope: { userId: string; botId: string }, attemptedAt: Date, judgment: TriageCompletion): Promise<boolean> {
+  const receipt = triageDecisionReceipt(event, attemptedAt, judgment)
   const applied = await db.update(coordinatorEvents).set({ tier: judgment.tier, triageDecision: receipt })
     .where(and(eventsOf(scope.userId, scope.botId), eq(coordinatorEvents.id, event.id), eq(coordinatorEvents.kind, event.kind),
       event.runId ? eq(coordinatorEvents.runId, event.runId) : isNull(coordinatorEvents.runId),
@@ -122,6 +121,13 @@ export async function completeTriageAttempt(event: TriageEventRecord & { observe
     .returning({ id: coordinatorEvents.id })
   if (applied.length) await botChatChanged(db, scope.userId, scope.botId)
   return applied.length === 1
+}
+
+export async function recordTriageFailure(event: TriageEventRecord, scope: { userId: string; botId: string }, attemptedAt: Date, reason: DecisionFailureReason): Promise<void> {
+  await db.update(coordinatorEvents).set({ triageDecision: sql`coalesce(${coordinatorEvents.triageDecision}, '{}'::jsonb) || ${JSON.stringify({ lastErrorReason: reason, lastErrorAt: attemptedAt.toISOString() })}::jsonb` })
+    .where(and(eventsOf(scope.userId, scope.botId), eq(coordinatorEvents.id, event.id),
+      eq(coordinatorEvents.lastTriageAttemptAt, attemptedAt), eq(coordinatorEvents.payload, event.payload),
+      isNull(coordinatorEvents.deliveredAt), isNull(coordinatorEvents.tier)))
 }
 
 /**
