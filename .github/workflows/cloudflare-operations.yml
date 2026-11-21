@@ -1,0 +1,307 @@
+name: Cloudflare protected operations
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_source_sha:
+        description: Reviewed operations main commit
+        type: string
+        required: true
+      operation:
+        description: Existing Cloudflare operator capability
+        type: choice
+        options: [operator-identity, capture-retention, eve-world-resources, github-webhook-prepare, cloudflare-billing-evidence, container-identity-metadata, private-source-download, vercel-project-billing, vercel-workflow-inventory, marketing-cloudflare-release, observe-cloudflare-runtime, runtime-native-alert, product-task-canary, production-daemon-qualification]
+        default: operator-identity
+        required: true
+      action:
+        description: Action validated by the selected private operator
+        type: choice
+        options: [verify, inspect, enable, disable, remove, authorize, prepare, read, deliver, release, rollback, inspect-legacy, release-legacy, rollback-legacy, cleanup-legacy, run]
+        default: verify
+        required: true
+      target:
+        description: World resource environment
+        type: choice
+        options: [staging, production]
+        default: staging
+      source_comment_id:
+        description: Owner request comment for private source delivery
+        type: string
+        required: false
+      billing_from:
+        description: Inclusive UTC billing date YYYY-MM-DD
+        type: string
+        required: false
+      billing_to:
+        description: Exclusive UTC billing date YYYY-MM-DD
+        type: string
+        required: false
+      product_source_sha:
+        description: Optional public main ancestor for the legacy inventory reader
+        type: string
+        required: false
+      observe_original_eve:
+        description: Inspect the original 21-item legacy cohort
+        type: boolean
+        default: false
+      operation_receipt:
+        description: Original operation receipt or private-run ID for recovery
+        type: string
+        required: false
+      promotion_post:
+        description: Original protected promotion comment id-SHA256
+        type: string
+        required: false
+      preparation_run:
+        description: Original private API preparation run-attempt
+        type: string
+        required: false
+      observation_history:
+        description: Eight original observation references, comma-separated, or auto
+        type: string
+        required: false
+      pressure_enrollment:
+        description: Original pressure enrollment run-attempt or operation receipt
+        type: string
+        required: false
+      alert_scope:
+        description: Existing native notification group
+        type: choice
+        options: [filesystem, pressure]
+        default: filesystem
+      alert_enrollment:
+        description: Original alert enrollment run-attempt or operation receipt
+        type: string
+        required: false
+      observation_run:
+        description: Original successful observation run-attempt or operation receipt
+        type: string
+        required: false
+      qualification_run:
+        description: Original public Cloud Services qualification run
+        type: string
+        required: false
+      qualification_attempt:
+        description: Original public qualification attempt
+        type: string
+        default: '1'
+        required: false
+      qualification_artifact:
+        description: Original public qualification receipt artifact
+        type: string
+        required: false
+permissions:
+  contents: read
+jobs:
+  operate:
+    if: github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274') && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ contains(fromJSON('["product-task-canary","marketing-cloudflare-release"]'), inputs.operation) && 35 || 30 }}
+    environment: cloudflare-runtime-release
+    concurrency:
+      group: cloudflare-protected-operations
+      cancel-in-progress: false
+      queue: max
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    env:
+      MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
+      MIKKA_MARKETING_GITHUB_OWNER: ${{ vars.MIKKA_MARKETING_GITHUB_OWNER || vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
+      MIKKA_CF_OPERATIONS_SHA: ${{ inputs.cloud_source_sha }}
+      MIKKA_OPERATION: ${{ inputs.operation }}
+      MIKKA_OPERATION_ACTION: ${{ inputs.action }}
+      WORLD_ENVIRONMENT: ${{ inputs.target }}
+      MIKKA_SOURCE_COMMENT_ID: ${{ inputs.source_comment_id }}
+      MIKKA_BILLING_FROM: ${{ inputs.billing_from }}
+      MIKKA_BILLING_TO: ${{ inputs.billing_to }}
+      MIKKA_OPERATOR_PRODUCT_SHA: ${{ inputs.product_source_sha || github.sha }}
+      MIKKA_OBSERVE_ORIGINAL_EVE: ${{ inputs.observe_original_eve }}
+      MIKKA_OPERATION_RECEIPT: ${{ inputs.operation_receipt }}
+      MIKKA_PROMOTION_POST: ${{ inputs.promotion_post }}
+      MIKKA_PREPARATION_RUN: ${{ inputs.preparation_run }}
+      MIKKA_OBSERVATION_HISTORY: ${{ inputs.observation_history }}
+      MIKKA_PRESSURE_ENROLLMENT: ${{ inputs.pressure_enrollment }}
+      MIKKA_ALERT_SCOPE: ${{ inputs.alert_scope }}
+      MIKKA_ALERT_ENROLLMENT: ${{ inputs.alert_enrollment }}
+      MIKKA_OBSERVATION_RUN: ${{ inputs.observation_run }}
+      MIKKA_OPERATIONS_CI_RUN_ID: ${{ inputs.qualification_run }}
+      MIKKA_OPERATIONS_CI_RUN_ATTEMPT: ${{ inputs.qualification_attempt }}
+      MIKKA_OPERATIONS_CI_ARTIFACT_ID: ${{ inputs.qualification_artifact }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.22.1'
+      - name: Admit the real protected workflow before private credential access
+        id: admission
+        run: node scripts/cloudflare-operations.mjs
+      - name: Select the isolated source App
+        id: source-app
+        env:
+          SOURCE_OWNER: ${{ steps.admission.outputs.owner }}
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import {appendFileSync} from 'node:fs'
+          const owner = process.env.SOURCE_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
+          JS
+      - name: Read the selected source App id
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
+          secret-name: GITHUB_APP_ID
+          recursive: false
+          include-imports: false
+      - name: Read the selected source App key
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
+          secret-name: GITHUB_APP_PRIVATE_KEY
+          recursive: false
+          include-imports: false
+      - name: Verify the selected App identity
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.source-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("CI_SOURCE_APP_ID_MISMATCH")'
+      - name: Mint the scoped read-only operations credential
+        id: source-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ env.GITHUB_APP_ID }}
+          private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.admission.outputs.owner }}
+          repositories: mikka-cloud
+          permission-contents: read
+          permission-actions: read
+          permission-issues: read
+      - name: Select the isolated website source App
+        id: marketing-app
+        if: inputs.operation == 'marketing-cloudflare-release'
+        env:
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import {appendFileSync} from 'node:fs'
+          const owner = process.env.MIKKA_MARKETING_GITHUB_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
+          JS
+      - name: Read the website source App id
+        if: inputs.operation == 'marketing-cloudflare-release'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: ${{ steps.marketing-app.outputs.secret-path }}
+          secret-name: GITHUB_APP_ID
+          recursive: false
+          include-imports: false
+      - name: Read the website source App key
+        if: inputs.operation == 'marketing-cloudflare-release'
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: ${{ steps.marketing-app.outputs.secret-path }}
+          secret-name: GITHUB_APP_PRIVATE_KEY
+          recursive: false
+          include-imports: false
+      - name: Verify the website source App identity
+        if: inputs.operation == 'marketing-cloudflare-release'
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.marketing-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("CI_SOURCE_APP_ID_MISMATCH")'
+      - name: Mint the separate read-only website credential
+        id: marketing-token
+        if: inputs.operation == 'marketing-cloudflare-release'
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
+        with:
+          app-id: ${{ env.GITHUB_APP_ID }}
+          private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
+          owner: ${{ steps.marketing-app.outputs.owner }}
+          repositories: mikka-web
+          permission-contents: read
+      - name: Remove App signing credentials before loading private source
+        run: |
+          echo 'GITHUB_APP_ID=' >> "$GITHUB_ENV"
+          echo 'GITHUB_APP_PRIVATE_KEY=' >> "$GITHUB_ENV"
+      - name: Check out the exact reviewed operations source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ steps.admission.outputs.repository }}
+          ref: ${{ inputs.cloud_source_sha }}
+          token: ${{ steps.source-token.outputs.token }}
+          path: .mikka-cloud
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify the canonical operations main source before private installation
+        env:
+          GH_TOKEN: ${{ steps.source-token.outputs.token }}
+        run: node scripts/cloudflare-operations.mjs source
+      - name: Select the fixed public operator driver
+        id: product-input
+        if: contains(fromJSON('["vercel-workflow-inventory","observe-cloudflare-runtime","product-task-canary","production-daemon-qualification"]'), inputs.operation)
+        run: node scripts/cloudflare-operations.mjs product-input
+      - name: Check out the immutable public operator driver
+        if: steps.product-input.outputs.source != ''
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ steps.product-input.outputs.source }}
+          path: .mikka-cloud/${{ steps.product-input.outputs.directory }}
+          persist-credentials: false
+      - name: Verify the public reader before installing its SDK
+        if: steps.product-input.outputs.source != ''
+        env:
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
+        run: node scripts/cloudflare-operations.mjs product
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+        with:
+          version: 10.34.3
+      - name: Install the locked operator dependencies
+        working-directory: .mikka-cloud
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install the locked public operator SDK
+        if: steps.product-input.outputs.source != ''
+        working-directory: .mikka-cloud/${{ steps.product-input.outputs.directory }}
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Prepare the existing reviewed canary browser driver
+        if: inputs.operation == 'product-task-canary' && steps.product-input.outputs.browser == 'true'
+        working-directory: .mikka-cloud
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --prefix operations/task-review-browser
+          google-chrome --version
+      - name: Execute the reviewed private operation
+        working-directory: .mikka-cloud
+        env:
+          GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
+          MIKKA_MARKETING_READ_TOKEN: ${{ steps.marketing-token.outputs.token }}
+          MIKKA_OPERATOR_PRODUCT_SHA: ${{ steps.product-input.outputs.source || inputs.product_source_sha || github.sha }}
+        run: node operations/public-operations.mjs

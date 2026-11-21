@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, mkdir, readFile, readdir, symlink, writeFile } from 'node:fs/promises'
+import {execFileSync} from 'node:child_process'
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import test from 'node:test'
 import { assessAudit } from './audit-policy.mjs'
+import { admitOperations, operationsClaims, operationsInput, verifyOperationsCheckout, verifyOperationsProduct, operationsProductInput } from '../cloudflare-operations.mjs'
 import { checkWorkflowRuns, releaseIdentity, RELEASE_WORKFLOWS, waitForReleaseChecks } from './ci-gate.mjs'
 import { artifactInventory, pinRuntime, sealArtifact, stageDesktop, verifyArtifact } from './evidence.mjs'
 import { workspaceSbom } from './workspace-sbom.mjs'
@@ -212,4 +214,218 @@ test('sealed artifacts retain either approved repository name across a transfer'
     if (repository === 'foreign/Mikka') await assert.rejects(verifyArtifact(input), /releaseSourceMismatch/)
     else assert.equal((await verifyArtifact(input)).sourceSha, sourceSha)
   }
+})
+
+
+function operatorEnv() {
+  return {GITHUB_ACTIONS:'true', GITHUB_REPOSITORY:'alexj11324/Mikka', GITHUB_REPOSITORY_ID:'1427517699',
+    GITHUB_REPOSITORY_OWNER_ID:'183887963', GITHUB_ACTOR_ID:'183887963', GITHUB_TRIGGERING_ACTOR:'alexj11324',
+    GITHUB_EVENT_NAME:'workflow_dispatch', GITHUB_REF:'refs/heads/main', GITHUB_REF_NAME:'main',
+    GITHUB_WORKFLOW_REF:'alexj11324/Mikka/.github/workflows/cloudflare-operations.yml@refs/heads/main',
+    GITHUB_SHA:sourceSha, GITHUB_WORKFLOW_SHA:sourceSha, GITHUB_RUN_ID:'123', GITHUB_RUN_ATTEMPT:'1',
+    MIKKA_CF_OPERATIONS_SHA:'b'.repeat(40), MIKKA_OPERATION:'operator-identity', MIKKA_OPERATION_ACTION:'verify',
+    MIKKA_OPERATIONS_CI_RUN_ID:'321', MIKKA_OPERATIONS_CI_RUN_ATTEMPT:'2', MIKKA_OPERATIONS_CI_ARTIFACT_ID:'456',
+    ACTIONS_ID_TOKEN_REQUEST_URL:'https://oidc.actions.githubusercontent.com/token', ACTIONS_ID_TOKEN_REQUEST_TOKEN:'synthetic-job-token'}
+}
+function operatorClaims(env = operatorEnv()) {
+  return {iss:'https://token.actions.githubusercontent.com', aud:'mikka-infisical', repository:env.GITHUB_REPOSITORY,
+    repository_id:env.GITHUB_REPOSITORY_ID, repository_owner_id:env.GITHUB_REPOSITORY_OWNER_ID, actor_id:env.GITHUB_ACTOR_ID,
+    ref:env.GITHUB_REF, workflow_ref:env.GITHUB_WORKFLOW_REF, workflow_sha:env.GITHUB_SHA, sha:env.GITHUB_SHA,
+    run_id:env.GITHUB_RUN_ID, run_attempt:env.GITHUB_RUN_ATTEMPT, environment:'cloudflare-runtime-release'}
+}
+
+test('operator admission binds the real OIDC producer before any private credential access', async () => {
+  const env = operatorEnv()
+  let reads = 0
+  const admitted = await admitOperations(env, async (url, options) => {
+    reads++
+    assert.equal(url.hostname, 'oidc.actions.githubusercontent.com')
+    assert.equal(url.searchParams.get('audience'), 'mikka-infisical')
+    assert.equal(options.redirect, 'error')
+    assert.equal(options.headers.authorization, 'Bearer synthetic-job-token')
+    return Response.json({value:'header.' + Buffer.from(JSON.stringify(operatorClaims(env))).toString('base64url') + '.signature'})
+  })
+  assert.equal(reads, 1)
+  assert.deepEqual(admitted, {repository:'alexj11324/Mikka', operationsRepository:'alexj11324/mikka-cloud',
+    driverSource:sourceSha, operationsSource:'b'.repeat(40), operation:'operator-identity', action:'verify'})
+  for (const patch of [{GITHUB_EVENT_NAME:'pull_request'}, {GITHUB_REPOSITORY_OWNER_ID:'359279274'},
+    {GITHUB_ACTOR_ID:'1'}, {GITHUB_TRIGGERING_ACTOR:'other'}, {GITHUB_WORKFLOW_SHA:'c'.repeat(40)},
+    {GITHUB_WORKFLOW_REF:'alexj11324/Mikka/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main'},
+    {MIKKA_PRIVATE_GITHUB_OWNER:'foreign'}, {MIKKA_OPERATION:'shell'}, {MIKKA_OPERATION_ACTION:'exec'},
+    {MIKKA_CF_OPERATIONS_SHA:'main'}, {MIKKA_OPERATIONS_CI_RUN_ID:'../123'},
+    {ACTIONS_ID_TOKEN_REQUEST_URL:'https://attacker.invalid/token'}]) {
+    let attempted = false
+    await assert.rejects(admitOperations({...env, ...patch}, async () => { attempted = true; throw Error('unexpected provider read') }))
+    assert.equal(attempted, false)
+  }
+  for (const key of ['iss', 'aud', 'repository', 'repository_id', 'repository_owner_id', 'actor_id',
+    'ref', 'workflow_ref', 'workflow_sha', 'sha', 'run_id', 'run_attempt', 'environment']) {
+    assert.throws(() => operationsClaims({...operatorClaims(env), [key]:'foreign'}, env))
+  }
+  const organization = {...env, GITHUB_REPOSITORY:'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID:'359279274',
+    GITHUB_WORKFLOW_REF:'aspectly-labs/Mikka/.github/workflows/cloudflare-operations.yml@refs/heads/main',
+    MIKKA_PRIVATE_GITHUB_OWNER:'aspectly-labs'}
+  assert.equal(operationsClaims(operatorClaims(organization), organization).operationsRepository, 'aspectly-labs/mikka-cloud')
+  assert.equal(operationsInput({...env, MIKKA_OPERATION:'capture-retention', MIKKA_OPERATION_ACTION:'inspect'}).operation, 'capture-retention')
+  assert.throws(() => operationsInput({...env, MIKKA_OPERATION:'capture-retention', MIKKA_OPERATION_ACTION:'read'}))
+  assert.equal(operationsInput({...env, MIKKA_OPERATION:'private-source-download', MIKKA_OPERATION_ACTION:'deliver', MIKKA_SOURCE_COMMENT_ID:'123'}).action, 'deliver')
+  assert.throws(() => operationsInput({...env, MIKKA_OPERATION:'private-source-download', MIKKA_OPERATION_ACTION:'deliver', MIKKA_SOURCE_COMMENT_ID:'../123'}))
+  assert.equal(operationsInput({...env, MIKKA_OPERATION:'vercel-project-billing', MIKKA_OPERATION_ACTION:'read', MIKKA_BILLING_FROM:'2026-11-01', MIKKA_BILLING_TO:'2026-11-20'}).action, 'read')
+  for (const date of ['2026-02-30', '2026-01-01', '../2026-11-01']) assert.throws(() => operationsInput({...env, MIKKA_OPERATION:'vercel-project-billing', MIKKA_OPERATION_ACTION:'read', MIKKA_BILLING_FROM:date, MIKKA_BILLING_TO:'2026-11-20'}))
+})
+
+test('the public operator scopes source credentials, keeps provider delivery private and never publishes raw evidence', async () => {
+  const workflow = await readFile(new URL('../../.github/workflows/cloudflare-operations.yml', import.meta.url), 'utf8')
+  const admission = workflow.indexOf('run: node scripts/cloudflare-operations.mjs')
+  const credentials = workflow.indexOf('uses: Infisical/secrets-action@')
+  const scrub = workflow.indexOf('Remove App signing credentials before loading private source')
+  const checkout = workflow.indexOf('Check out the exact reviewed operations source')
+  const sourceCheck = workflow.indexOf('run: node scripts/cloudflare-operations.mjs source')
+  const install = workflow.indexOf('run: pnpm install --frozen-lockfile --ignore-scripts')
+  const execute = workflow.indexOf('run: node operations/public-operations.mjs')
+  assert.ok(admission > 0 && admission < credentials && credentials < scrub && scrub < checkout && checkout < sourceCheck && sourceCheck < install && install < execute)
+  assert.match(workflow, /environment: cloudflare-runtime-release/)
+  assert.match(workflow, /permission-contents: read\n\s+permission-actions: read\n\s+permission-issues: read/)
+  assert.match(workflow, /repositories: mikka-cloud/)
+  assert.match(workflow, /MIKKA_PUBLIC_ACTIONS_TOKEN: \$\{\{ github.token \}\}/)
+  assert.match(workflow, /pnpm install --frozen-lockfile --ignore-scripts/)
+  assert.doesNotMatch(workflow, /CLOUDFLARE_API_TOKEN|upload-artifact|continue-on-error|inputs\.(?:script|command|path|env)/)
+})
+
+test('marketing recovery admits only original receipt references and isolates the website read credential', async () => {
+  const base = {...operatorEnv(), MIKKA_OPERATION:'marketing-cloudflare-release',
+    MIKKA_OPERATION_ACTION:'rollback', MIKKA_OPERATION_RECEIPT:'123-1-' + 'b'.repeat(40) + '-' + 'c'.repeat(64),
+    MIKKA_OPERATIONS_CI_RUN_ID:'', MIKKA_OPERATIONS_CI_RUN_ATTEMPT:'', MIKKA_OPERATIONS_CI_ARTIFACT_ID:'',
+    MIKKA_MARKETING_GITHUB_OWNER:'aspectly-labs'}
+  for (const action of ['rollback', 'rollback-legacy', 'cleanup-legacy']) {
+    assert.equal(operationsInput({...base, MIKKA_OPERATION_ACTION:action}).action, action)
+  }
+  for (const patch of [{MIKKA_OPERATION_RECEIPT:''}, {MIKKA_OPERATION_RECEIPT:'../123'},
+    {MIKKA_OPERATION_ACTION:'release'}, {MIKKA_OPERATION_ACTION:'verify'},
+    {MIKKA_OPERATION_ACTION:'inspect-legacy'}, {MIKKA_MARKETING_GITHUB_OWNER:'foreign'},
+    {MIKKA_OPERATIONS_CI_RUN_ID:'../123'}]) {
+    let oidc = false
+    await assert.rejects(admitOperations({...base, ...patch}, async () => {oidc = true; throw Error('unexpected credential admission')}))
+    assert.equal(oidc, false)
+  }
+  const workflow = await readFile(new URL('../../.github/workflows/cloudflare-operations.yml', import.meta.url), 'utf8')
+  const website = workflow.indexOf('Mint the separate read-only website credential')
+  assert.ok(website > workflow.indexOf('Mint the scoped read-only operations credential')
+    && website < workflow.indexOf('Remove App signing credentials before loading private source'))
+  assert.match(workflow, /owner: \$\{\{ steps\.marketing-app\.outputs\.owner \}\}\n\s+repositories: mikka-web\n\s+permission-contents: read/)
+  assert.match(workflow, /MIKKA_MARKETING_READ_TOKEN: \$\{\{ steps\.marketing-token\.outputs\.token \}\}/)
+  assert.match(workflow, /MIKKA_OPERATION_RECEIPT: \$\{\{ inputs\.operation_receipt \}\}/)
+})
+
+test('runtime operations reject unrelated receipts or incomplete activation before OIDC', async () => {
+  const receipt = '123-1-' + 'b'.repeat(40) + '-' + 'c'.repeat(64)
+  const base = {...operatorEnv(), MIKKA_OPERATION:'runtime-native-alert', MIKKA_OPERATION_ACTION:'enable',
+    MIKKA_ALERT_SCOPE:'filesystem', MIKKA_ALERT_ENROLLMENT:receipt,
+    MIKKA_PROMOTION_POST:'123-' + 'd'.repeat(64), MIKKA_PREPARATION_RUN:'321-1', MIKKA_OBSERVATION_RUN:'456-1'}
+  assert.equal(operationsInput(base).action, 'enable')
+  for (const patch of [{MIKKA_ALERT_SCOPE:'all'}, {MIKKA_ALERT_ENROLLMENT:''},
+    {MIKKA_PROMOTION_POST:'https://example.invalid'}, {MIKKA_PREPARATION_RUN:'321'},
+    {MIKKA_OBSERVATION_RUN:'private-123'}, {MIKKA_OPERATION_ACTION:'prepare'},
+    {MIKKA_OPERATION_ACTION:'disable'}]) {
+    let oidc = false
+    await assert.rejects(admitOperations({...base, ...patch}, async () => {oidc = true; throw Error('unexpected admission')}))
+    assert.equal(oidc, false)
+  }
+  const observe = {...operatorEnv(), MIKKA_OPERATION:'observe-cloudflare-runtime', MIKKA_OPERATION_ACTION:'read',
+    MIKKA_OPERATOR_PRODUCT_SHA:sourceSha, MIKKA_PROMOTION_POST:base.MIKKA_PROMOTION_POST,
+    MIKKA_PREPARATION_RUN:'321-1', MIKKA_OBSERVATION_HISTORY:Array.from({length:8}, (_, index) => `${123 + index}-1-` + 'b'.repeat(40) + '-' + 'c'.repeat(64)).join(','),
+    MIKKA_PRESSURE_ENROLLMENT:'456-1'}
+  assert.equal(operationsInput(observe).action, 'read')
+  for (const history of ['../123', receipt, Array(8).fill(receipt).join(','), Array(9).fill(receipt).join(',')]) {
+    assert.throws(() => operationsInput({...observe, MIKKA_OBSERVATION_HISTORY:history}))
+  }
+  const workflow = await readFile(new URL('../../.github/workflows/cloudflare-operations.yml', import.meta.url), 'utf8')
+  const choices = /action:\n[\s\S]*?options: \[([^\]]+)\]/.exec(workflow)?.[1].split(',').map(value => value.trim())
+  for (const action of ['prepare', 'enable', 'disable']) assert.ok(choices?.includes(action), 'Native alert action is not dispatchable: ' + action)
+})
+
+test('model and daemon drivers come only from the reviewed fixed private request files', async t => {
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'operations-driver-')))
+  t.after(() => rm(directory, {recursive:true, force:true}))
+  const env = {...operatorEnv(), MIKKA_OPERATION:'product-task-canary', MIKKA_OPERATION_ACTION:'verify'}
+  await assert.rejects(operationsProductInput(env, {directory}))
+  await mkdir(join(directory, '.github/release-requests'), {recursive:true})
+  const canary = join(directory, '.github/release-requests/product-task-canary.json')
+  await writeFile(canary, JSON.stringify({version:2, public_sha:sourceSha}))
+  assert.deepEqual(await operationsProductInput(env, {directory}), {source:sourceSha, directory:'public-source', browser:true})
+  await writeFile(canary, JSON.stringify({version:2, public_sha:'main'}))
+  await assert.rejects(operationsProductInput(env, {directory}))
+  await rm(canary)
+  await writeFile(join(directory, 'unreviewed.json'), JSON.stringify({version:2, public_sha:sourceSha}))
+  await symlink(join(directory, 'unreviewed.json'), canary)
+  await assert.rejects(operationsProductInput(env, {directory}))
+  await mkdir(join(directory, 'docs/operations/releases'), {recursive:true})
+  await writeFile(join(directory, 'docs/operations/releases/daemon-qualification.json'), JSON.stringify({driver:sourceSha}))
+  assert.deepEqual(await operationsProductInput({...env, MIKKA_OPERATION:'production-daemon-qualification'}, {directory}),
+    {source:sourceSha, directory:'product', browser:false})
+})
+
+
+test('the public source fence rejects unmerged or dirty operations before private installation', async t => {
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'protected-operations-source-')))
+  t.after(() => rm(directory, {recursive:true, force:true}))
+  await mkdir(join(directory, 'operations'))
+  await writeFile(join(directory, 'operations/public-operations.mjs'), 'export const reviewed = true\n')
+  const git = args => execFileSync('git', ['-C', directory, ...args], {encoding:'utf8', stdio:['ignore', 'pipe', 'pipe']}).trim()
+  git(['init', '--quiet'])
+  git(['remote', 'add', 'origin', 'https://github.com/alexj11324/mikka-cloud.git'])
+  git(['add', '.'])
+  git(['-c', 'user.name=CI fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'reviewed main'])
+  const main = git(['rev-parse', 'HEAD'])
+  let canonicalMain = main
+  const env = {...operatorEnv(), GH_TOKEN:'synthetic-private-source-token', MIKKA_CF_OPERATIONS_SHA:main}
+  const fetchImpl = async (url, options) => {
+    assert.equal(options.redirect, 'error')
+    assert.equal(options.headers.authorization, 'Bearer synthetic-private-source-token')
+    if (url === 'https://api.github.com/repositories/1448851980') return Response.json({id:1448851980,
+      full_name:'alexj11324/mikka-cloud', private:true, fork:false, owner:{id:183887963}})
+    assert.equal(url, 'https://api.github.com/repositories/1448851980/git/ref/heads/main')
+    return Response.json({object:{type:'commit', sha:canonicalMain}})
+  }
+  assert.equal((await verifyOperationsCheckout(env, {directory, fetchImpl})).operationsSource, main)
+  await writeFile(join(directory, 'operations/public-operations.mjs'), 'export const reviewed = false\n')
+  await assert.rejects(verifyOperationsCheckout(env, {directory, fetchImpl}))
+  git(['add', '.'])
+  git(['-c', 'user.name=CI fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'unmerged request'])
+  const pending = git(['rev-parse', 'HEAD'])
+  await assert.rejects(verifyOperationsCheckout({...env, MIKKA_CF_OPERATIONS_SHA:pending}, {directory, fetchImpl}))
+  canonicalMain = pending
+  assert.equal((await verifyOperationsCheckout({...env, MIKKA_CF_OPERATIONS_SHA:pending}, {directory, fetchImpl})).operationsSource, pending)
+})
+
+
+test('the legacy inventory SDK source is an exact public main ancestor before dependency installation', async t => {
+  const directory = await realpath(await mkdtemp(join(tmpdir(), 'protected-inventory-source-')))
+  t.after(() => rm(directory, {recursive:true, force:true}))
+  await mkdir(join(directory, 'scripts/ops'), {recursive:true})
+  for (const file of ['package.json', 'pnpm-lock.yaml', 'scripts/ops/vercel-workflow-inventory.mjs']) await writeFile(join(directory, file), '{}\n')
+  const git = args => execFileSync('git', ['-C', directory, ...args], {encoding:'utf8', stdio:['ignore', 'pipe', 'pipe']}).trim()
+  git(['init', '--quiet'])
+  git(['remote', 'add', 'origin', 'https://github.com/alexj11324/Mikka.git'])
+  git(['add', '.'])
+  git(['-c', 'user.name=CI fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'public inventory reader'])
+  const source = git(['rev-parse', 'HEAD'])
+  const env = {...operatorEnv(), MIKKA_OPERATION:'vercel-workflow-inventory', MIKKA_OPERATION_ACTION:'read',
+    MIKKA_OPERATOR_PRODUCT_SHA:source, MIKKA_OBSERVE_ORIGINAL_EVE:'true', MIKKA_PUBLIC_ACTIONS_TOKEN:'synthetic-public-token'}
+  let mainAncestor = true
+  const fetchImpl = async (url, options) => {
+    assert.equal(url, `https://api.github.com/repositories/1427517699/compare/${source}...${env.GITHUB_SHA}?per_page=1`)
+    assert.equal(options.redirect, 'error')
+    assert.equal(options.headers.authorization, 'Bearer synthetic-public-token')
+    return Response.json({url:`https://api.github.com/repos/alexj11324/Mikka/compare/${source}...${env.GITHUB_SHA}`,
+      base_commit:{sha:source}, merge_base_commit:{sha:mainAncestor ? source : 'c'.repeat(40)},
+      status:mainAncestor ? 'ahead' : 'diverged', behind_by:mainAncestor ? 0 : 1, ahead_by:1})
+  }
+  assert.equal((await verifyOperationsProduct(env, {directory, fetchImpl})).productSource, source)
+  mainAncestor = false
+  await assert.rejects(verifyOperationsProduct(env, {directory, fetchImpl}))
+  mainAncestor = true
+  await writeFile(join(directory, 'pnpm-lock.yaml'), 'dirty\n')
+  await assert.rejects(verifyOperationsProduct(env, {directory, fetchImpl}))
+  await assert.rejects(verifyOperationsProduct({...env, MIKKA_OPERATOR_PRODUCT_SHA:sourceSha}, {directory, fetchImpl}))
 })
