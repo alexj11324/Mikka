@@ -1,7 +1,7 @@
 {
   "issue": 2984,
   "finding": "SDLC-008",
-  "status": "Identity implementation locally verified; independent review, #3000 normal integration and final protected CI pending",
+  "status": "Identity and downstream immutable-API repair locally verified; current integrated head review and exact Ready CI/security receipts pending",
   "repository": "aspectly-labs/Mikka",
   "repositoryId": 1427517699,
   "source": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
@@ -207,13 +207,13 @@
     "boundary": "Original Node test suite; production helper remains unchanged. No actual network, VM or model request."
   },
   "dependencies": {
-    "artifactReader": "Task Secret actual canonical artifact metadata additionally requires the independently prepared #3000 reader. Integrate only after its normal main merge; do not duplicate that implementation.",
-    "producerJobContract": "Current shared publication job selector still names retired subscriptions/publish jobs; separate source/receipt investigation remains open, no gate has been removed."
+    "artifactReader": "Normally integrated original #3000 head8b5de3dacd3771737b0e25974c195deb057817e8 with mained905; repositoryId/fullName already verified by #3002 are passed unchanged to the one existing artifact reader. #3000 still must normally merge before this dependent PR.",
+    "producerJobContract": "Accepted #2789 producer contract and its retired consumer assumptions are separately repaired in Draft #3007 / SDLC-010. Product acceptance subscription/tool/version/cleanup assertions remain unchanged."
   },
   "completionLimits": [
     "The observed skipped receivers can have other eligibility reasons; the source counterexample proves the name predicate rejects every current official context, not that name was the sole cause of each native skip.",
-    "Canonical identity admission and exact source-only tests pass; they do not prove a new live API route, model/VM/product journey, published runtime or release acceptance.",
-    "#3000 normal main integration, independent exact-head review, applicable protected CI, normal merge and exact merged-source verification remain required.",
+    "The new routing observation is an actual unauthenticated HTTP GET to public GitHub; original-suite replay uses synthetic fixtures. Neither proves a paid model/VM/product journey, current publication, or release acceptance.",
+    "#3000 must merge normally first; final integrated-head independent review, applicable protected CI/GitGuardian, normal merge and exact merged-source verification remain required.",
     "SDLC-010 separately owns the old publication job/report/source contract. The identity repair does not weaken it or count unchanged/skipped publication as validated."
   ],
   "nodeGreen": {
@@ -504,5 +504,141 @@
         "readCompletedAt": "2026-11-21T00:22:56.627Z"
       }
     ]
+  },
+  "normalIntegration": {
+    "kind": "008 normal integration reuses tested 010 dependency-only tree",
+    "sourceTestedTree": "7cfb020bb90ad32af7d2fa2466623f197eb0a9a0",
+    "sourceReceipt": "research/runtime-publication-contract/baseline-integrated/receipt.json",
+    "sourceCount": 179,
+    "sourceSkip": 0,
+    "integratedTree": "7006522f8472acd29034a0af1326a6eb99d126de",
+    "parents": [
+      "1ff6f09d66f025f5c1fc2e2125e58a1ae9dfabc1",
+      "8b5de3dacd3771737b0e25974c195deb057817e8"
+    ],
+    "mainFilesRetained": [
+      ".github/workflows/device-gateway.yml",
+      ".github/workflows/mobile-screenshots.yml",
+      ".github/workflows/production-smoke.yml",
+      ".github/workflows/suggestions-cron.yml",
+      ".github/workflows/ui-policy.yml",
+      ".github/workflows/workspace-governance-acceptance.yml",
+      "docs/dev-workflow.md",
+      "scripts/acceptance/work-domain-production.mjs",
+      "scripts/acceptance/work-domain-production.test.mjs",
+      "scripts/ci-docs-only.test.mjs",
+      "scripts/ci/optimization.test.mjs",
+      "scripts/ci/select.test.mjs",
+      "scripts/cloudflare-native-oci.test.mjs",
+      "scripts/device-gateway/deploy.mjs",
+      "scripts/device-gateway/deploy.test.mjs",
+      "scripts/device-gateway/select-release.mjs",
+      "scripts/release/mobile-screenshots.mjs",
+      "scripts/release/mobile-screenshots.test.mjs",
+      "scripts/suggestions-cron/deploy.mjs"
+    ],
+    "allOtherBlobsIdenticalToTestedTree": true,
+    "remoteIntegrationCommit": "3946f274752d83d5388082e934770476e50e287d",
+    "localIntegrationCommit": "92fa29009a3db86b83912b4a331c117b62f2bcec",
+    "artifactAbi": "Use the caller-verified expected.repositoryId and expected.repositoryFullName; never replace the current fullName with legacy REPOSITORY.",
+    "testReuse": "All files outside the 19 exact #2994 main paths are byte-identical to dependency-only 7cfb020b tree; 179/179 source-bound result is historical reused evidence, not a claimed new integrated-head 179-test execution."
+  },
+  "downstreamMetadataRoute": {
+    "observedAt": "2026-11-21T00:59:33.172971+00:00",
+    "rootCause": "The shared and pre-checkout guards admitted canonical identity, but Task readGithub still used the retired personal-name URL with redirect:error. Native GitHub returns301 to immutable repository1427517699; source-only top-level guard tests missed this later phase.",
+    "nativeHttp": {
+      "observedAt": "2026-11-21T00:50:28.141221+00:00",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44839753192",
+      "method": "GET",
+      "requestBody": false,
+      "credentials": false,
+      "followRedirects": false,
+      "exitCode": 0,
+      "httpStatus": "301",
+      "location": "https://api.github.com/repositories/1427517699/actions/runs/44839753192",
+      "bodySha256": "5b4152ef1abcef950c7c6fa603919a48e247c56252a093ef432c7ac0ac87b007"
+    },
+    "red": {
+      "source": "92fa29009a3db86b83912b4a331c117b62f2bcec",
+      "testedIndexTree": "66edbac684a51ef6e91d136e0e2cb56959f37699",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs"
+      ],
+      "startedAt": "2026-11-21T00:53:56.498111+00:00",
+      "endedAt": "2026-11-21T00:54:00.987451+00:00",
+      "wallSeconds": 4.489338598000359,
+      "exitCode": 1,
+      "counts": {
+        "tests": 17,
+        "pass": 16,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "stdoutSha256": "74bde2ed1cb7e1c9d2b4db1839aabdb63d8b60f6ff590bbdbafc43ae6065e714",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "nativeObservation": "research/runtime-consumer-transfer/legacy-api-routing/receipt.json",
+      "scope": "Existing Task suite plus one native-301 routing/canonical artifact regression; no external request or model in test execution",
+      "remoteCommit": "eca34186fdaf20882352f96ddae48d094cd9ea64",
+      "firstError": "task_secret_ci:github",
+      "otherOriginalTests": "16 passing; only new canonical metadata route case fails"
+    },
+    "green": {
+      "source": "19879e4aa687f51d35679c5a3f00f71037783b11",
+      "testedIndexTree": "16bf9642521e8455b6df43907cd081eafe810c5c",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs"
+      ],
+      "startedAt": "2026-11-21T00:56:19.049844+00:00",
+      "endedAt": "2026-11-21T00:56:23.637610+00:00",
+      "wallSeconds": 4.5873730579996845,
+      "exitCode": 0,
+      "counts": {
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "stdoutSha256": "2f09d6ef10b29c811efcfd629937f075f9a70382aa3d75c8a9f10785cf6a6c5b",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "productionChange": "one fixed API origin switched to existing immutable publicRepositoryId; redirect:error and paired artifact metadata identity unchanged",
+      "scope": "Original 17 Task tests including actual-301 counterexample; synthetic test IO, no real model/provider",
+      "localImplementationCommit": "c5f8f2d32d922fbb1558ec6be11dd4c4b72547f3",
+      "productionBlob": "ab554b659ba50a220cdc43fdd2e3c8d76599b7a1",
+      "testBlob": "c63144ebd55be30f7aeab3053c55871be8bcf9f4"
+    },
+    "preservedChecks": [
+      "same redirect:error and20s timeout",
+      "existing fixed repository ID",
+      "paired official fullName/owner/ID",
+      "foreign artifact URLs reject",
+      "two original latest-run and main fences",
+      "original artifact size/digest/expiry/ZIP/report checks",
+      "token not forwarded to storage"
+    ],
+    "fixtureChange": "Only original fake API request keys follow the immutable metadata route. Artifact URL fields retain the actual full-name metadata contract. The new regression replays the observed301 for any old-name request.",
+    "staticChecks": {
+      "oxlint": "1.89.0 exact lock version; deny-warnings pass",
+      "syntax": "both changed original modules pass node --check",
+      "errorCause": "pass",
+      "polling": "pass after restoring missing local TypeScript5.9.3 from an identical pnpm-lock blob8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+      "cloudBoundary": "pass after same dependency restoration",
+      "initialFailures": "Two policy processes could not start because the recovered minimal worktree lacked TypeScript; both failures retained separately, not product failures or passes."
+    },
+    "exclusions": [
+      "Factory visual remains its finite original #1789 source/window; no scope expansion",
+      "No new API helper/validator/workflow/trigger",
+      "No paid model/VM/publication or Cloud/customer data operation"
+    ],
+    "reviewStatus": "The existing review6001366091 remains bound to earlier1ff; this main/artifact/API delta requires a new exact-head review."
   }
 }

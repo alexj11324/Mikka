@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
-import { affectsWorker } from './select-release.mjs'
+import { affectsWorker, selectRelease } from './select-release.mjs'
 import { readWebAuthority } from '../release/cloudflare-promoted-web.mjs'
 import { ALIAS, PROJECT, TEAM, WORKER, deployGateway, gitRepository, readJson, validateConfig } from './deploy.mjs'
 
@@ -253,4 +253,26 @@ test('protected promotion is checked twice with version identity, with no Vercel
     assert.equal(reads, 2)
     assert.ok(state.calls.every(path => path.startsWith('/client/v4/')))
   }
+})
+
+
+test('edge selection admits both official owner profiles and rejects mixed identities before provider reads', async () => {
+  const env = { GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_SHA: SOURCE,
+    GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963' }
+  let reads = 0
+  const read = async url => {
+    reads++
+    return new URL(url).hostname === ALIAS
+      ? Response.json({ build: SOURCE }, { headers: { 'cf-ray': 'fixture', 'x-mikka-gateway-version-sha256': '2'.repeat(64) } })
+      : Response.json({ Status: 3, Question: [{ name: '_mikka-release.aspectlylabs.com.', type: 16 }] })
+  }
+  for (const profile of [{}, { GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274' }]) {
+    for (const workload of ['device', 'cron']) assert.equal(await selectRelease(workload, { ...env, ...profile }, read), false)
+  }
+  const before = reads
+  for (const patch of [{ GITHUB_REPOSITORY_ID: '1' }, { GITHUB_REPOSITORY: 'foreign/Mikka' },
+    { GITHUB_REPOSITORY_OWNER_ID: '359279274' }, { GITHUB_REPOSITORY: 'aspectly-labs/Mikka' }]) {
+    await assert.rejects(selectRelease('device', { ...env, ...patch }, read), /reviewed_main_workflow_required/)
+  }
+  assert.equal(reads, before)
 })

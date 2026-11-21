@@ -9,11 +9,11 @@ import { assertCurrentMain, PRODUCTION_VERSION_URL } from '../release/web-deploy
 import { downloadReleaseReport, MAX_REPORT_BYTES, readReleaseArtifact,
   RuntimeArtifactError, assertReportIdentity, TEMPLATE_KINDS } from '../e2b/runtime-report.mjs'
 export { archiveReport, artifactRedirect, assertArtifactIdentity, downloadReleaseReport, MAX_ARCHIVE_BYTES, MAX_REPORT_BYTES } from '../e2b/runtime-report.mjs'
-import { actionsMikkaRepository } from '../cloudflare-source.mjs'
+import { actionsMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 export { REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW }
 const ROOT = resolve(import.meta.dirname, '../..')
-const API = `https://api.github.com/repos/${REPOSITORY}`
+const API = `https://api.github.com/repositories/${publicRepositoryId}`
 const SHA = /^[a-f0-9]{40}$/, DIGEST = /^[a-f0-9]{64}$/
 const positive = value => Number.isSafeInteger(value) && value > 0
 const number = value => typeof value === 'string' && /^[1-9][0-9]*$/.test(value) && positive(Number(value))
