@@ -3582,9 +3582,10 @@
           "arrow": "Arrow"
         },
         "colors": {
-          "ink": "Ink",
-          "graphite": "Graphite",
+          "blue": "Blue",
           "teal": "Teal",
+          "emerald": "Emerald",
+          "violet": "Violet",
           "pink": "Pink"
         }
       },

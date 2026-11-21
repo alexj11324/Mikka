@@ -127,20 +127,25 @@ test('a Profile mark is derived from its roles, then name and description, and s
   assert.notEqual(unnamed.icon, 'square', 'the Default glyph is never derived for a custom Profile')
   for (const name of ['a', 'b', 'Backend', 'Ops', '审查', 'x'.repeat(80)]) {
     const mark = deriveProfileMark({ name })
-    assert.ok(PROFILE_GLYPHS.includes(mark.icon)); assert.ok(PROFILE_COLORS.includes(mark.color)); assert.notEqual(mark.color, 'ink')
+    assert.ok(PROFILE_GLYPHS.includes(mark.icon)); assert.ok(PROFILE_COLORS.includes(mark.color)); assert.notEqual(mark.color, DEFAULT_PROFILE_MARK.color)
   }
   assert.deepEqual(resolveProfileMark({ name: 'Review' }, { icon: 'diamond', color: 'pink' }), { icon: 'diamond', color: 'pink' })
   assert.deepEqual(resolveProfileMark({ name: 'Review' }, null), deriveProfileMark({ name: 'Review' }))
   assert.deepEqual(resolveProfileMark({ name: 'Review' }, { icon: 'skull', color: 'red' }), deriveProfileMark({ name: 'Review' }), 'unknown ids fall back')
   assert.deepEqual(resolveProfileMark({ name: 'Review' }, { icon: 'arrow', color: null }), { icon: 'arrow', color: deriveProfileMark({ name: 'Review' }).color })
-  assert.deepEqual(DEFAULT_PROFILE_MARK, { icon: 'square', color: 'ink' })
+  assert.deepEqual(DEFAULT_PROFILE_MARK, { icon: 'square', color: 'blue' })
+  // Chromatic only: no white or grey left to pick.
+  assert.deepEqual([...PROFILE_COLORS], ['blue', 'teal', 'emerald', 'violet', 'pink'])
+  // Colours stored or frozen before 2026-11-20 keep a colour of their own.
+  assert.deepEqual(resolveProfileMark({ name: 'Review' }, { icon: 'lens', color: 'ink' }), { icon: 'lens', color: 'blue' })
+  assert.deepEqual(resolveProfileMark({ name: 'Review' }, { icon: 'lens', color: 'graphite' }), { icon: 'lens', color: 'violet' })
 })
 
 test('a Profile mark is a closed set beside the definition and never enters its digest', async () => {
   const { profileMarkInputSchema } = await import('./agent-profile-mark')
   assert.deepEqual(profileMarkInputSchema.parse({ icon: 'lens', color: 'teal' }), { icon: 'lens', color: 'teal' })
   assert.deepEqual(profileMarkInputSchema.parse({ icon: null }), { icon: null })
-  for (const bad of [{ icon: 'skull' }, { color: 'red' }, { color: 'amber' }, { color: 'violet' }, { icon: 'lens', svg: '<svg/>' }, { icon: '' }]) assert.equal(profileMarkInputSchema.safeParse(bad).success, false)
+  for (const bad of [{ icon: 'skull' }, { color: 'red' }, { color: 'amber' }, { color: 'ink' }, { color: 'graphite' }, { icon: 'lens', svg: '<svg/>' }, { icon: '' }]) assert.equal(profileMarkInputSchema.safeParse(bad).success, false)
   assert.throws(() => parseAgentProfile({ ...profile(), icon: 'lens' }), 'the mark is not a definition field')
   const workspaceId = randomUUID(), id = randomUUID()
   const seen: unknown[] = []

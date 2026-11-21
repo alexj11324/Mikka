@@ -9,8 +9,11 @@ import type { ThreadGroup } from '../thread-groups'
  */
 export const PROFILE_GLYPHS = ['square', 'chevrons', 'lens', 'lines', 'check', 'stairs', 'diamond', 'arrow'] as const
 export type ProfileGlyph = (typeof PROFILE_GLYPHS)[number]
-/** Ink and grey, then hues no task state or Agent brand mark uses (no amber, red, green, blue or the info/waiting violet). */
-export const PROFILE_COLORS = ['ink', 'graphite', 'teal', 'pink'] as const
+/**
+ * Chromatic only (Alex, 2026-11-20): white and grey read as "not working". These may share a hue with a task
+ * state, which is drawn with its own shapes; the dotted glyph is never read as a status.
+ */
+export const PROFILE_COLORS = ['blue', 'teal', 'emerald', 'violet', 'pink'] as const
 export type ProfileColor = (typeof PROFILE_COLORS)[number]
 export type ProfileMarkValue = { icon: ProfileGlyph; color: ProfileColor }
 
@@ -53,7 +56,7 @@ export const profileMarkStateRequiresText = (state: ProfileMarkState): boolean =
   state === 'needs-you' || state === 'failed'
 
 /** The built-in Default profile's fixed mark. */
-export const DEFAULT_PROFILE_MARK: ProfileMarkValue = { icon: 'square', color: 'ink' }
+export const DEFAULT_PROFILE_MARK: ProfileMarkValue = { icon: 'square', color: 'blue' }
 
 export const profileGlyphSchema = z.enum(PROFILE_GLYPHS)
 export const profileColorSchema = z.enum(PROFILE_COLORS)
@@ -63,6 +66,10 @@ export type ProfileMarkInput = z.infer<typeof profileMarkInputSchema>
 
 const isGlyph = (value: unknown): value is ProfileGlyph => typeof value === 'string' && (PROFILE_GLYPHS as readonly string[]).includes(value)
 const isColor = (value: unknown): value is ProfileColor => typeof value === 'string' && (PROFILE_COLORS as readonly string[]).includes(value)
+/** Colours before 2026-11-20, still in frozen runs and admitted by the column during a deploy: each keeps a colour of its own. */
+const LEGACY_COLORS: Readonly<Record<string, ProfileColor>> = { ink: 'blue', graphite: 'violet' }
+export const storedProfileColor = (value: unknown): ProfileColor | undefined =>
+  isColor(value) ? value : typeof value === 'string' ? LEGACY_COLORS[value] : undefined
 
 /** Responsibility words, English and Chinese; on a tie of position the earlier entry wins. */
 const GLYPH_WORDS: readonly [Exclude<ProfileGlyph, 'square'>, RegExp][] = [
@@ -75,8 +82,8 @@ const GLYPH_WORDS: readonly [Exclude<ProfileGlyph, 'square'>, RegExp][] = [
   ['chevrons', /\b(implement\w*|build\w*|cod(e|er|ing)|develop\w*|engineer\w*|backend|fix\w*)\b|实现|开发|编码|编程|构建|修复|后端/i],
 ]
 const HASHED_GLYPHS = PROFILE_GLYPHS.filter(glyph => glyph !== 'square')
-/** Default colours leave ink to the built-in Default so a custom Profile reads apart from it. */
-const HASHED_COLORS = PROFILE_COLORS.filter(color => color !== 'ink')
+/** Default colours leave the built-in Default's colour to it so a custom Profile reads apart from it. */
+const HASHED_COLORS = PROFILE_COLORS.filter(color => color !== DEFAULT_PROFILE_MARK.color)
 
 function hash(text: string) {
   let value = 0
@@ -109,7 +116,7 @@ export function deriveProfileMark(profile: { name: string; roles?: readonly stri
 /** A stored (or frozen) mark with any missing or unknown part filled from the derived default. */
 export function resolveProfileMark(profile: { name: string; roles?: readonly string[]; description?: string }, stored?: { icon?: unknown; color?: unknown } | null): ProfileMarkValue {
   const icon = isGlyph(stored?.icon) ? stored.icon : undefined
-  const color = isColor(stored?.color) ? stored.color : undefined
+  const color = storedProfileColor(stored?.color)
   if (icon && color) return { icon, color }
   const derived = deriveProfileMark(profile)
   return { icon: icon ?? derived.icon, color: color ?? derived.color }

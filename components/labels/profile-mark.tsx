@@ -175,8 +175,7 @@ export function ProfileMark({ icon, color, state = 'idle', label, size = 'md' }:
       useOwnColor && color === 'emerald' && 'text-avatar-3',
       useOwnColor && color === 'violet' && 'text-avatar-4',
       useOwnColor && color === 'pink' && 'text-avatar-2',
-      useOwnColor && color === 'ink' && 'text-foreground',
-      useOwnColor && !['blue', 'teal', 'emerald', 'violet', 'pink', 'ink'].includes(color) && 'text-muted-foreground',
+      useOwnColor && !['blue', 'teal', 'emerald', 'violet', 'pink'].includes(color) && 'text-muted-foreground',
     )}
     {...(label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': true })}
   >
@@ -205,7 +204,7 @@ export function ProfileMarkPicker({ value, disabled, onChange }: { value: Profil
       <ToggleGroup aria-label={t('color')} spacing={2} className="flex w-full gap-2" value={[value.color]} disabled={disabled}
         onValueChange={values => { const next = values[0] as ProfileColor | undefined; if (next) onChange({ color: next }) }}>
         {PROFILE_COLORS.map(id => <ToggleGroupItem key={id} value={id} aria-label={t(`colors.${id}`)} className="size-8 min-w-0 rounded-full p-0 data-pressed:bg-transparent">
-          <span aria-hidden="true" className={cn('size-6 rounded-full', id === 'ink' && 'bg-foreground', id === 'graphite' && 'bg-muted-foreground', id === 'teal' && 'bg-chart-2', id === 'pink' && 'bg-avatar-2', id === 'ink' && 'ring-1 ring-foreground/15 ring-inset',
+          <span aria-hidden="true" className={cn('size-6 rounded-full', id === 'blue' && 'bg-avatar-1', id === 'teal' && 'bg-chart-2', id === 'emerald' && 'bg-avatar-3', id === 'violet' && 'bg-avatar-4', id === 'pink' && 'bg-avatar-2',
             value.color === id && 'outline-2 outline-offset-2 outline-muted-foreground')} />
         </ToggleGroupItem>)}
       </ToggleGroup>
