@@ -166,7 +166,7 @@ test('Codex mailbox resume rejects unverified cross-version history before threa
 })
 
 test('Codex mailbox resume rejects missing or changed capability evidence before any native turn', { timeout: 30000 }, async t => {
-  for (const nativeVersion of ['0.163.0', '0.167.0'] as const) for (const change of ['missing-receipt', 'catalogue', 'header-catalogue', 'header-schema', 'header-session', 'missing-history', 'receipt-path', 'receipt-run', 'receipt-session', 'receipt-version', 'history-link'] as const) await t.test(nativeVersion + ' ' + change, async () => {
+  for (const nativeVersion of ['0.163.0', '0.167.0'] as const) for (const change of ['missing-receipt', 'catalogue', 'header-catalogue', 'header-schema', 'header-session', 'missing-history', 'receipt-path', 'receipt-run', 'receipt-session', 'receipt-version', 'history-link', 'history-malformed'] as const) await t.test(nativeVersion + ' ' + change, async () => {
     const f = fixture(), source = await original(f, nativeVersion), nextId = randomUUID(), current = transport('current', change === 'catalogue' ? 'mailbox_sent' : 'mailbox_inbox')
     f.controls(nextId, { userAgent: `mikka/${nativeVersion} (Synthetic Linux)` })
     const history = join(f.codexHome(source.runId), 'sessions', source.sessionId + '.jsonl')
@@ -179,6 +179,7 @@ test('Codex mailbox resume rejects missing or changed capability evidence before
       writeFileSync(history, JSON.stringify(header) + '\n')
     }
     if (change === 'missing-history') rmSync(history)
+    if (change === 'history-malformed') writeFileSync(history, '{"type":"session_meta","payload":{"id":' + '\n')
     if (change === 'receipt-path' || change === 'receipt-run' || change === 'receipt-session' || change === 'receipt-version') {
       const file = f.receipt(source.runId)
       // The old implementation has no receipt; the positive case above is
@@ -192,7 +193,17 @@ test('Codex mailbox resume rejects missing or changed capability evidence before
       const target = join(f.stateDir, 'synthetic-outside-history.jsonl')
       writeFileSync(target, readFileSync(history)); rmSync(history); symlinkSync(target, history)
     }
-    await assert.rejects(f.adapter().start({ ...f.options(nextId, current.mailbox), continueSession: { runId: source.runId, sessionId: source.sessionId, message: prompt } }), /Run mailbox/)
+    // The gate name is what diagnoses the next production rejection (#1468);
+    // without it every check collapses to one opaque line again. The cause
+    // must stay empty: fs and parser errors carry paths and history bytes.
+    await assert.rejects(
+      f.adapter().start({ ...f.options(nextId, current.mailbox), continueSession: { runId: source.runId, sessionId: source.sessionId, message: prompt } }),
+      (error: unknown) => error instanceof Error && error.message.startsWith('Run mailbox requires') &&
+        (error as { detail?: unknown }).detail === (change === 'missing-receipt' ? 'receipt' :
+          change === 'receipt-path' ? 'history_path' :
+          change === 'catalogue' || change.startsWith('receipt-') ? 'receipt_mismatch' : 'history_meta') &&
+        !(error as { cause?: unknown }).cause,
+    )
     assert.equal(current.calls.length, 0)
     assert.equal(f.trace(nextId).filter(item => item.method === 'turn/start' || item.method === 'thread/start').length, 0)
     await current.mailbox.close()
