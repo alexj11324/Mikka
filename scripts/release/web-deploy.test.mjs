@@ -33,7 +33,7 @@ function webFixture({ main = () => SHA, version = () => SHA, overlay = () => und
     assert.equal(init.redirect, 'error')
     if (url.origin === 'https://api.github.com') {
       assert.equal(init.headers.authorization, 'Bearer read-only-fixture')
-      assert.equal(url.pathname, '/repos/alexj11324/Mikka/git/ref/heads/main')
+      assert.equal(url.pathname, '/repositories/1427517699/git/ref/heads/main')
       return Response.json({ object: { type: 'commit', sha: main(elapsed, value => { elapsed = value }) } })
     }
     assert.equal(String(input), PRODUCTION_VERSION_URL)
