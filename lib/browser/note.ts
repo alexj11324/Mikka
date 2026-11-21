@@ -66,7 +66,7 @@ export function normalizeAddress(input: string, origin: string): string | null {
     else url = new URL(`https://${value}`)
   } catch { return null }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
-  if (!url.hostname || (!url.hostname.includes('.') && url.hostname !== 'localhost' && url.origin !== new URL(origin).origin)) return null
+  if (!url.hostname || (!url.hostname.includes('.') && url.hostname !== 'localhost' && url.hostname !== '[::1]' && url.origin !== new URL(origin).origin)) return null
   return url.href
 }
 
