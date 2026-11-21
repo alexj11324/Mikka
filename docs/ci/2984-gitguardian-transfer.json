@@ -660,5 +660,34 @@
     "Full classic protection and private ruleset administration details are not readable through this connection.",
     "No integration installation inventory, webhook delivery logs, GitGuardian account configuration, token or secret was accessed.",
     "No rerequest, dispatch, alternate scan, extra release or merge was performed."
-  ]
+  ],
+  "officialOwnerBoundary": {
+    "readAt": "2026-11-21T01:59:39.633Z",
+    "purpose": "Official authority boundary for restoring the existing GitGuardian integration/check; no new gate or runbook.",
+    "sources": [
+      {
+        "url": "https://docs.gitguardian.com/internal-monitoring/integrate-sources/vcs-integrations/github",
+        "title": "Integrate GitHub",
+        "claims": [
+          "GitGuardian Owner or Manager rights are needed to configure the integration.",
+          "The main GitGuardian App can be installed for the owner account or organization; an organization member may request installation from its owner.",
+          "Installation/repository access and the GitGuardian monitored perimeter are distinct: a repository can remain installed while monitoring is deselected."
+        ]
+      },
+      {
+        "url": "https://docs.github.com/en/apps/using-github-apps/reviewing-and-modifying-installed-github-apps",
+        "title": "Reviewing and modifying installed GitHub Apps",
+        "claims": [
+          "Organization owners can change repository access for an App installed on the organization.",
+          "Repository administrators can add their repositories to an existing App installation.",
+          "Configuration is account/organization scoped and may affect other repositories."
+        ]
+      }
+    ],
+    "observationBoundary": [
+      "These documents establish the legitimate owner/admin path only; they do not prove that the current installation is absent, misconfigured, suspended, or excluded from monitoring.",
+      "Current missing check runs/statuses remain an unverified existing security-check receipt; prior successful checks on different source versions are not current success.",
+      "No App settings, organization/repository permissions, credentials, rulesets, check suites or production state were modified."
+    ]
+  }
 }

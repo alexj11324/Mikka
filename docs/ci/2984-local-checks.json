@@ -1,0 +1,519 @@
+{
+  "schemaVersion": 1,
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "capturedAt": "2026-11-21T02:26:53.481852+00:00",
+  "scope": "Local full-check boundary and normal integration evidence; no Ready, merge, live release or production acceptance claimed.",
+  "candidateSnapshot": {
+    "capturedAt": "2026-11-21T02:24:51.939Z",
+    "main": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+    "candidates": [
+      {
+        "number": 2992,
+        "url": "https://github.com/aspectly-labs/Mikka/pull/2992",
+        "state": "open",
+        "draft": true,
+        "merged": false,
+        "merged_at": null,
+        "merge_commit_sha": "53af0d87c04c001482a84b1b33ab2e5d91efea78",
+        "head": "82cca799c30cceed517ba4d8daf22d17895c6bc3",
+        "base": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "base_ref": "main",
+        "updated_at": "2026-11-21T01:17:06Z"
+      },
+      {
+        "number": 3000,
+        "url": "https://github.com/aspectly-labs/Mikka/pull/3000",
+        "state": "open",
+        "draft": false,
+        "merged": false,
+        "merged_at": null,
+        "merge_commit_sha": "401c93aad406da2399449a885fdc0233e74e291f",
+        "head": "8b5de3dacd3771737b0e25974c195deb057817e8",
+        "base": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "base_ref": "main",
+        "updated_at": "2026-11-21T01:51:41Z"
+      },
+      {
+        "number": 3002,
+        "url": "https://github.com/aspectly-labs/Mikka/pull/3002",
+        "state": "open",
+        "draft": false,
+        "merged": false,
+        "merged_at": null,
+        "merge_commit_sha": "63c2dfae94aecbabaf0fe82b0e8fd993f3d69266",
+        "head": "249e3911f590eb7ead883bb35989ac5524af0fba",
+        "base": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "base_ref": "main",
+        "updated_at": "2026-11-21T01:51:43Z"
+      },
+      {
+        "number": 3004,
+        "url": "https://github.com/aspectly-labs/Mikka/pull/3004",
+        "state": "open",
+        "draft": true,
+        "merged": false,
+        "merged_at": null,
+        "merge_commit_sha": "967178e0f7a19884a26e9572724c52a32f0d8623",
+        "head": "290f41490c1a8ef7572b0ec3ce3f071bae5bfd08",
+        "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "base_ref": "main",
+        "updated_at": "2026-11-21T02:05:34Z"
+      },
+      {
+        "number": 3007,
+        "url": "https://github.com/aspectly-labs/Mikka/pull/3007",
+        "state": "open",
+        "draft": true,
+        "merged": false,
+        "merged_at": null,
+        "merge_commit_sha": "efaac6249eba20a7ea23f82c51d5313c96aaf696",
+        "head": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+        "base": "249e3911f590eb7ead883bb35989ac5524af0fba",
+        "base_ref": "feat/sdlc-2984-consumer-identity",
+        "updated_at": "2026-11-21T02:10:52Z"
+      }
+    ]
+  },
+  "publication070": {
+    "source": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+    "tree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90",
+    "normalIntegration": {
+      "reviewedAt": "2026-11-21T01:58:55.164266+00:00",
+      "head": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+      "tree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90",
+      "orderedParents": [
+        "0cb842e19e17f6a0853fcaa3e449f1e14a365037",
+        "59b7682fa34f80f402367d2bb40141034c9cf9fd"
+      ],
+      "ownerMainPathsCount": 10,
+      "ownerMainBlobs": {
+        ".agents/skills/local-first/SKILL.md": "a1b24833f8b0d239cb1c80c6f88e24272b696534",
+        ".github/pull_request_template.md": "468e7241b0e180ca03337d43567c66f6a674c653",
+        ".github/workflows/browser-gate.yml": "92c06ed07ecc9685483425c6f82b502f8e516541",
+        "AGENTS.md": "87020332bce271573cde1641d2276b1467633e0d",
+        "CONTRIBUTING.md": "6ea3248bf2e11d96572ae7b9897e71e0f863fc3e",
+        "docs/dev-workflow.md": "5c3635f626854baf09163876e1aae9218f56a3cd",
+        "package.json": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+        "scripts/dev/local-preflight.mjs": "4a43cda342d42a289d07106fd496a7bd9f80c66f",
+        "scripts/dev/local-preflight.test.mjs": "f3b66aa24a46e774986c5b8361ce0ca1130fe1eb",
+        "scripts/dev/mark-ready.mjs": "7315836f6e3c00b3250a7f0a6b6a5ad1a971bfe0"
+      },
+      "allOwnerBlobsExactMain": true,
+      "publicationSourceBlobs": {
+        "scripts/acceptance/coding-review-ci.mjs": "574e56341f7171f48c64fb92c1afdff082f4dc2c",
+        "scripts/acceptance/coding-review-ci.test.mjs": "7b8733649db17752dc2bcb53c5596b14499de74b",
+        "scripts/acceptance/coding-workspace-ci.mjs": "d7069b32f1395dc07c83c33af384deed63886ea4",
+        "scripts/acceptance/coding-workspace-ci.test.mjs": "f8e6a69823da708726830b4f92b1f625970b3392",
+        "scripts/acceptance/factory-visual-evidence.mjs": "eb5a5cd267583ea41742ba873c444f7fd55b42a8",
+        "scripts/acceptance/factory-visual-evidence.test.mjs": "2316f3d1095b619a12d9cd11a1984e6e19df39ed",
+        "scripts/acceptance/task-secrets-ci.mjs": "86ff9712621e3dc52b3e224fff01e702ac5870ec",
+        "scripts/acceptance/task-secrets-ci.test.mjs": "39f275a7344d78bdf87a0779449993bbe6741885",
+        "scripts/acceptance/task-secrets.mjs": "08a91f899a1134dcb74471ee0bae334583432049",
+        "scripts/acceptance/task-secrets.test.mjs": "cb18054a302add8b7a12f7af68df712315da7e5d",
+        "scripts/acceptance/thread-lifecycle-ci.mjs": "6ce63f8087b307100c4432413f64dc98a23ff0b2",
+        "scripts/acceptance/thread-lifecycle-ci.test.mjs": "fc074808512c034120f1fa7b929d3a9da3b015f1",
+        "scripts/e2b/runtime-inputs.mjs": "fd3f919d955f547db24f175a4bfdae8057a49a95",
+        "scripts/e2b/runtime-inputs.test.mjs": "2cd378b4161da15993ff0fa0408c1ea906f434eb",
+        "scripts/e2b/runtime-report.mjs": "50308430822db5acb976f3c7bfb6f9ae43c53ea2",
+        "scripts/e2b/runtime-report.test.mjs": "843374518c75274bef402473228ada05c4d420b3"
+      },
+      "publicationSourceBlobsUnchanged": true,
+      "threeProductDriversUnchanged": true,
+      "packageNonScriptsUnchanged": true,
+      "checkEntryUnchanged": true,
+      "lockBlob": "8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+      "workspaceBlob": "6eeaf2591d3cd172bef92788a19c7af2f7f282b0",
+      "ownerScriptDelta": [
+        "local:plan",
+        "local:check",
+        "local:ready",
+        "local:verify-ready",
+        "local:mark-ready",
+        "test:local-preflight",
+        "test:dev-local adds original Owner test"
+      ],
+      "workflowOwnerDelta": "Only inherited browser-gate merge_group trigger and concurrency scoping; echo remains echo, not product acceptance.",
+      "disposition": "No integration-specific source blocker; prior review6001972659 applies to unchanged 010 source inputs. Full local pnpm check on this actual integration is pending; no result is inferred or rerun invented.",
+      "focusedSuitesRerun": false,
+      "readyOrMergeChanged": false
+    },
+    "originalFullCheckReceipt": {
+      "evidence": {
+        "path": "research/runtime-publication-contract/full-check-070253d-resume/receipt.json",
+        "sha256": "2801c80fd6b60eb820a6726c158208b6e8ec64cb1ed626a3dd9b01c3825ab40b"
+      },
+      "receipt": {
+        "source": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+        "tree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90",
+        "startedAt": "2026-11-21T02:03:31.505005+00:00",
+        "processId": 2,
+        "status": "failed",
+        "node": "v24.22.3",
+        "pnpm": "10.34.3",
+        "lockSha256": "b69a4eeb908bf0dc817da0095f7a3b1d7066ae593e50367d8c28dd767b4b578d",
+        "database": {
+          "address": "127.0.0.1",
+          "port": 5432,
+          "name": "mikka_2984_publication_e2e",
+          "ownedData": "/workspace/scratch/b55cdf575d56/research/runtime-publication-contract/full-check-070253d/pgdata",
+          "requireDb": true,
+          "reusedOnlyOwnOrderlyStoppedEmptyCluster": true,
+          "nativeIdentity": {
+            "database": "mikka_2984_publication_e2e",
+            "address": "127.0.0.1",
+            "serverVersion": "17.12 (Debian 17.12-1.pgdg13+1)",
+            "serverVersionNumber": "170012",
+            "maxLocksPerTransaction": "512"
+          },
+          "serverIdentityVerified": true,
+          "migrationCount": 396
+        },
+        "stages": [
+          {
+            "name": "postgres-start",
+            "command": [
+              "/workspace/scratch/b55cdf575d56/research/pg17-local/root/usr/lib/postgresql/17/bin/pg_ctl",
+              "-D",
+              "/workspace/scratch/b55cdf575d56/research/runtime-publication-contract/full-check-070253d/pgdata",
+              "-l",
+              "/workspace/scratch/b55cdf575d56/research/runtime-publication-contract/full-check-070253d-resume/postgres.log",
+              "-o",
+              "-h 127.0.0.1 -p 5432 -c unix_socket_directories= -c timezone=UTC -c max_locks_per_transaction=512",
+              "-w",
+              "-t",
+              "60",
+              "start"
+            ],
+            "startedAt": "2026-11-21T02:03:31.510962+00:00",
+            "exit": 0,
+            "finishedAt": "2026-11-21T02:03:31.624872+00:00",
+            "wallSeconds": 0.11393577600028948,
+            "stdoutSha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad",
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "name": "database-identity",
+            "command": [
+              "/workspace/scratch/b55cdf575d56/research/pg17-local/root/usr/lib/postgresql/17/bin/psql",
+              "-h",
+              "127.0.0.1",
+              "-p",
+              "5432",
+              "-U",
+              "mikka_fixture",
+              "-d",
+              "mikka_2984_publication_e2e",
+              "-At",
+              "-c",
+              "SELECT json_build_object('database', current_database(), 'address', host(inet_server_addr()), 'serverVersion', current_setting('server_version'), 'serverVersionNumber', current_setting('server_version_num'), 'maxLocksPerTransaction', current_setting('max_locks_per_transaction'))"
+            ],
+            "startedAt": "2026-11-21T02:03:31.625341+00:00",
+            "exit": 0,
+            "finishedAt": "2026-11-21T02:03:31.640893+00:00",
+            "wallSeconds": 0.015565276999041089,
+            "stdoutSha256": "1f597f237d04207d55ecad06d2c7b24a7e56430ab9bdacd9875a5da83e94a29a",
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "name": "database-setup",
+            "command": [
+              "pnpm",
+              "test:e2e:setup"
+            ],
+            "startedAt": "2026-11-21T02:03:31.641797+00:00",
+            "exit": 0,
+            "finishedAt": "2026-11-21T02:03:36.475318+00:00",
+            "wallSeconds": 4.8335618050005,
+            "stdoutSha256": "a8e9b6b1942570178aeae449af0057e322c365b4ee41cded428a56822543a368",
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "name": "pnpm-check",
+            "command": [
+              "pnpm",
+              "check"
+            ],
+            "startedAt": "2026-11-21T02:03:36.486862+00:00",
+            "exit": 1,
+            "finishedAt": "2026-11-21T02:04:34.300298+00:00",
+            "wallSeconds": 57.81348574399999,
+            "stdoutSha256": "27e354bf55aeee80e38c467ea67115f67dd54602036d451b1dc73f54296f89e7",
+            "stderrSha256": "84acb86937e542385ecc8cb79b44fb7040ddfd6aac55a459dc83abbfaac9e590"
+          },
+          {
+            "name": "postgres-stop",
+            "command": [
+              "/workspace/scratch/b55cdf575d56/research/pg17-local/root/usr/lib/postgresql/17/bin/pg_ctl",
+              "-D",
+              "/workspace/scratch/b55cdf575d56/research/runtime-publication-contract/full-check-070253d/pgdata",
+              "-m",
+              "fast",
+              "-w",
+              "-t",
+              "60",
+              "stop"
+            ],
+            "startedAt": "2026-11-21T02:04:34.301031+00:00",
+            "exit": 0,
+            "finishedAt": "2026-11-21T02:04:34.603837+00:00",
+            "wallSeconds": 0.3028295550011535,
+            "stdoutSha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d",
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "name": "postgres-status",
+            "command": [
+              "/workspace/scratch/b55cdf575d56/research/pg17-local/root/usr/lib/postgresql/17/bin/pg_ctl",
+              "-D",
+              "/workspace/scratch/b55cdf575d56/research/runtime-publication-contract/full-check-070253d/pgdata",
+              "status"
+            ],
+            "startedAt": "2026-11-21T02:04:34.604318+00:00",
+            "exit": 3,
+            "finishedAt": "2026-11-21T02:04:34.606194+00:00",
+            "wallSeconds": 0.0018840060001821257,
+            "stdoutSha256": "e138ccb54fdb08283c6eb21159c53207bbbbf07077246e2804e18d22efe6e250",
+            "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          }
+        ],
+        "cleanup": {
+          "postgresStopExit": 0,
+          "postgresStatusExit": 3,
+          "orderlyStopConfirmed": true,
+          "pidfilePresent": false
+        },
+        "environmentBoundary": "Inherited toolchain/locale/home only; synthetic local database/auth values; no CI, GITHUB, provider or production credentials supplied.",
+        "priorSetupFailure": "Before pnpm check or migrations: temporary setup assertion expected server_version to be a bare 17.12 string. Native full and numeric server identities are captured below before admitting any test.",
+        "checkExit": 1,
+        "finishedAt": "2026-11-21T02:04:34.606492+00:00",
+        "wallSeconds": 63.09574506399986,
+        "trackedStatus": "",
+        "endingHead": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+        "endingTree": "b15cd9cec311f657d7d2eb8cd2252c927d898e90"
+      }
+    },
+    "failureClassification": {
+      "entry": "pnpm check",
+      "suite": "test:execution-rules",
+      "file": "packages/daemon/test/commands.test.ts",
+      "rpcFailureAt": "packages/daemon/src/rpc/server.ts:80",
+      "failedCases": 8,
+      "casesInFailingFile": 8,
+      "failure": "Unix socket listen EPERM during original RPC setup",
+      "followingCheckCommandsExecuted": false,
+      "changedOrSkippedAssertions": false,
+      "fullBeforeReadyRequirementSatisfied": false
+    },
+    "independentReview": {
+      "id": 6002104989,
+      "commit": "070253d0447d76f2bfc87fe0863ccd65f02d9e24",
+      "url": "https://github.com/aspectly-labs/Mikka/pull/3007#pullrequestreview-6002104989",
+      "codeBlockers": 0,
+      "fullLocalCheckPassed": false
+    },
+    "targetedProof": "Original198/198 and independent82/82 executed on code tree391cc3d9f98786667ffe4c8c2fc0d826a7c6d7e6;16 source/test blobs unchanged in070. Overlapping counts are not summed.",
+    "publicationEvidence": "https://github.com/aspectly-labs/Mikka/blob/070253d0447d76f2bfc87fe0863ccd65f02d9e24/docs/ci/2984-publication-contract.json"
+  },
+  "marketing290": {
+    "integration": {
+      "observedAt": "2026-11-21T02:06:57.778770+00:00",
+      "head": "290f41490c1a8ef7572b0ec3ce3f071bae5bfd08",
+      "tree": "155d188a06dcfc7ff2e51213c4930e206b0396f2",
+      "orderedParents": [
+        "ab7fbd7ee8f757a00333e09747610351f5d01b51",
+        "59b7682fa34f80f402367d2bb40141034c9cf9fd"
+      ],
+      "originMain": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "ownBlobsUnchanged": {
+        ".github/workflows/cloudflare-api-image.yml": "060a1bff5abf490db72111743195ad96a2ac5707",
+        "docs/ci/2984-marketing-identity.json": "7b4667f22a6ad38f38a2fddcc2fe4d2ab3039c1c",
+        "scripts/cloudflare-marketing-ci.mjs": "156d659fe07b45e178d398344bd6ab9d33d7b967",
+        "scripts/cloudflare-marketing-ci.test.mjs": "a6b28a430c4bd253695a3a9cf90425b8e45e9a28"
+      },
+      "ownerMainBlobsPreserved": {
+        ".agents/skills/local-first/SKILL.md": "a1b24833f8b0d239cb1c80c6f88e24272b696534",
+        ".github/pull_request_template.md": "468e7241b0e180ca03337d43567c66f6a674c653",
+        ".github/workflows/browser-gate.yml": "92c06ed07ecc9685483425c6f82b502f8e516541",
+        "AGENTS.md": "87020332bce271573cde1641d2276b1467633e0d",
+        "CONTRIBUTING.md": "6ea3248bf2e11d96572ae7b9897e71e0f863fc3e",
+        "docs/dev-workflow.md": "5c3635f626854baf09163876e1aae9218f56a3cd",
+        "package.json": "08d588b756cd46e2c2304d2212ab0387fbde9593",
+        "scripts/dev/local-preflight.mjs": "4a43cda342d42a289d07106fd496a7bd9f80c66f",
+        "scripts/dev/local-preflight.test.mjs": "f3b66aa24a46e774986c5b8361ce0ca1130fe1eb",
+        "scripts/dev/mark-ready.mjs": "7315836f6e3c00b3250a7f0a6b6a5ad1a971bfe0"
+      },
+      "lockAndWorkspaceUnchanged": true,
+      "nonScriptPackageFieldsUnchanged": true,
+      "originalFullCheckEntryUnchanged": true,
+      "fullLocalCheck": "Pending in serialized execution queue; earlier 8/86 focused and old-head CI are not a full current-head check.",
+      "readyOrMergeChangedByReviewer": false,
+      "integrationSpecificBlockers": 0,
+      "priorEvidenceScope": "Existing sourceContext/runMarketingCi regressions remain tied to their original source and inputs; no marketing dispatch, private checkout or publication was executed."
+    },
+    "originalLocalPlan": {
+      "source": "290f41490c1a8ef7572b0ec3ce3f071bae5bfd08",
+      "tree": "155d188a06dcfc7ff2e51213c4930e206b0396f2",
+      "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "command": [
+        "pnpm",
+        "local:plan"
+      ],
+      "node": "v24.22.3",
+      "pnpm": "10.34.3",
+      "startedAt": "2026-11-21T02:07:56.475678+00:00",
+      "exit": 0,
+      "wallSeconds": 12.359467241001767,
+      "finishedAt": "2026-11-21T02:08:08.835173+00:00",
+      "stdoutSha256": "53f4a021f42e7a8649f7d489cfd9788f4b8b8a372e58edf63cfe960c814c9cde",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "trackedStatus": "",
+      "plan": {
+        "changedFiles": [
+          ".github/workflows/cloudflare-api-image.yml",
+          "docs/ci/2984-marketing-identity.json",
+          "scripts/cloudflare-marketing-ci.mjs",
+          "scripts/cloudflare-marketing-ci.test.mjs"
+        ],
+        "full": true,
+        "docsOnly": false,
+        "reason": [
+          "global configuration, schema, policy or security input",
+          "unmapped file",
+          "changed source has unresolved/generated imports"
+        ],
+        "relevantUnits": [],
+        "suggested": [],
+        "explicitTests": [],
+        "selectedDbSuites": [
+          "test:abuse-db",
+          "test:account-db",
+          "test:active-agents",
+          "test:activity-actor-db",
+          "test:agent-kit-db",
+          "test:agent-tool-approval-db",
+          "test:approved-writes-db",
+          "test:artifact-migration-db",
+          "test:audit-db",
+          "test:bot-chats-db",
+          "test:bot-threads-db",
+          "test:captures-db",
+          "test:chat-attachments-db",
+          "test:cloud-backend-db",
+          "test:cloud-services-db",
+          "test:coding-workspace-db",
+          "test:computer-db",
+          "test:conversation-reads",
+          "test:coordinator-issue-create-db",
+          "test:coordinator-issue-tools-db",
+          "test:coordinator-native",
+          "test:coordinator-task-binding-db",
+          "test:credentials-db",
+          "test:desktop-auth",
+          "test:device-enrollment-db",
+          "test:device-revocation-db",
+          "test:domain-lifecycle-db",
+          "test:drive-db",
+          "test:enterprise-db",
+          "test:eve-db",
+          "test:execution-settings-db",
+          "test:factory",
+          "test:factory-activity-db",
+          "test:factory-activity-http-db",
+          "test:factory-all-dispatch-db",
+          "test:factory-approval-db",
+          "test:factory-check-independence-db",
+          "test:factory-checks-db",
+          "test:factory-monitor-db",
+          "test:factory-routing-db",
+          "test:github-connections-db",
+          "test:group-turns",
+          "test:groups",
+          "test:inbox-db",
+          "test:interop-db",
+          "test:issue-search-db",
+          "test:live-db",
+          "test:local-repository-migration-db",
+          "test:migration-steps-db",
+          "test:model-admission-db",
+          "test:onboarding-db",
+          "test:ops-db",
+          "test:organization-invitations-db",
+          "test:organization-join-domains-db",
+          "test:pat-api-db",
+          "test:pat-db",
+          "test:personal-mailbox-default-off-db",
+          "test:plugins-db",
+          "test:preview-driver",
+          "test:project-decisions-db",
+          "test:project-resources-db",
+          "test:project-v2-db",
+          "test:relation-cycle",
+          "test:run-dispatch",
+          "test:run-publication-db",
+          "test:run-recovery-db",
+          "test:schedules-db",
+          "test:scope-detachment-db",
+          "test:secrets-db",
+          "test:self-improvement-db",
+          "test:self-improvement-unit",
+          "test:session-mailbox-db",
+          "test:settings-activity-db",
+          "test:settings-prefs-db",
+          "test:skill-semantic-db",
+          "test:slack-installation-db",
+          "test:suggestion-artifact-db",
+          "test:task-identity-db",
+          "test:task-presentation-db",
+          "test:test-accounts-db",
+          "test:user-facts-db",
+          "test:visibility-db",
+          "test:web-auth-db",
+          "test:worker-authorization-db",
+          "test:workspace-admin-db",
+          "test:workspace-migration-db",
+          "test:workspace-permissions-migration-db"
+        ],
+        "hasBehaviors": true,
+        "sha": "290f41490c1a8ef7572b0ec3ce3f071bae5bfd08",
+        "base": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "clean": true
+      }
+    },
+    "unixSocketCapabilityProbe": {
+      "observedAt": "2026-11-21T02:08:08.861910+00:00",
+      "purpose": "Disposable AF_UNIX capability probe only, no product test or alternate gate.",
+      "result": "unavailable",
+      "phase": "socket",
+      "errno": 1,
+      "errorClass": "PermissionError"
+    },
+    "fullLocalCheckExecutedInThisRestrictedExecutor": false,
+    "reason": "The preceding original daemon test failure plus a minimal same-environment AF_UNIX probe establishes a missing environment capability. Repeating the same full check there would not repair that prerequisite.",
+    "beforeReadyRequirementSatisfied": false,
+    "nextExecutionBoundary": "Prepared original local:ready --test=check for the existing authorized Small VM; preparation is not a run or pass."
+  },
+  "interpretation": [
+    "These records correct the lack of observed full local pnpm check receipts at the earlier Ready transitions; no historical full pass is invented.",
+    "The existing local-first entry records the chosen scripts. It does not waive CONTRIBUTING Before Ready or the original independent CI and GitGuardian requirements.",
+    "Environment failures remain failures. Preserve all original assertions and use an authorized environment with the required capability.",
+    "Small source transfer or browser launch alone does not establish original full-check or product acceptance."
+  ],
+  "mainIntegrationAttribution": {
+    "ed905To59bPaths": 10,
+    "merges": [
+      {
+        "pr": 3006,
+        "merge": "1d53f13c5753ef5f75b54e6f886a3b5fa3087733",
+        "paths": 1,
+        "scope": "Browser scheduling"
+      },
+      {
+        "pr": 3001,
+        "merge": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "paths": 9,
+        "scope": "Local-first entry"
+      }
+    ],
+    "boundary": "All ten main-input blobs remain unchanged in070/290; attribution does not alter prior source-equivalence or test results."
+  }
+}

@@ -61,3 +61,9 @@ Factory visual workflow 在固定窗口出现 15 次 skipped。其 selector 只�
 保留旧历史 source URL、签名回执和真实 Alex actor；`Mikka-handoff` 是另一仓库，不能跟随本仓统一替换。Desktop 旧 `desktop-delivery/prepare.sh` 没有当前 workflow / package 调用路径；现行 Desktop CI 未见旧名字准入。`timings.mjs` 的旧 `gh api` 查找 URL 不是身份门槛，连接器的 301 不能证明原 gh CLI 失败，因此未捏造 collector 回归。当前 summary 使用 `GITHUB_REPOSITORY`，可跟随 canonical context。
 
 此核查证明范围内的去重、精确故障和未解决边界；**不构成 #2984 全项目结项、受保护 CI 全绿或生产验收完成**。完整 54 工作流分类、50 PR 清单、139 native run、精确 jobs / steps、原日志最小摘录和本地反例分别保存在同目录 JSON，主报告逐项记录了文件 SHA-256。
+
+## 后续 main 刷新：原 Owner 修复已合并
+
+原 6fe 快照及其 50 PR／139 runs 样本保持历史含义。随后只读刷新到 main `59b7682fa34f80f402367d2bb40141034c9cf9fd`：54 个 workflow 文件名不变，47 个 blob 不变；6 个文件逐一等于 #2994 的正式合并 `ed905baee7482c43b29e8b15480ebbae160278c1`，第 7 个变化是 #3006 正式合并 `1d53f13c5753ef5f75b54e6f886a3b5fa3087733` 的 Browser gate 原生 `merge_group` 与 event/ref concurrency。Browser job 仍只输出回声，不计浏览器验收。
+
+同一 JSON 的 `subsequentMainRefresh` 保留全部 54 个当前 blob／判定及 7 个变化的 Owner 归属。六项原 Owner 修复现在归为已合并；没有复制未合分支实现，没有增加 workflow 或平行身份 profile，也没有把这次 main 差异读取称为重新清点全部当前开放 PR。

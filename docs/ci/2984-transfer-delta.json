@@ -1847,5 +1847,509 @@
       "sha256": "4a70a0103df7f10de8736faca84c5ac27cb46ed59c306fc2e6b970a361099159",
       "bytes": 5262
     }
+  },
+  "subsequentMainRefresh": {
+    "observedAt": "2026-11-21T02:02:40.800479+00:00",
+    "earlierTransferInventory": {
+      "sha": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "workflows": 54,
+      "openPrSample": 50,
+      "capture": "2026-11-21T00:14:47.410096+00:00"
+    },
+    "currentMain": {
+      "sha": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+      "tree": "ecddff77bd9514b2b8cde2a9b6416d000686eb56",
+      "workflowCount": 54
+    },
+    "workflowNamesUnchanged": true,
+    "changedWorkflowPaths": [
+      {
+        "path": ".github/workflows/browser-gate.yml",
+        "beforeBlob": "a648074870b9ef1da109f47eba340a3b37ffdcb3",
+        "afterBlob": "92c06ed07ecc9685483425c6f82b502f8e516541",
+        "ownerPr": 3006,
+        "ownerMergeSha": "1d53f13c5753ef5f75b54e6f886a3b5fa3087733",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited native merge_group/concurrency scoping; still echo-only."
+      },
+      {
+        "path": ".github/workflows/device-gateway.yml",
+        "beforeBlob": "c5ed85dba752bf09f2eb515543d072a14a69350e",
+        "afterBlob": "da56991e994edc5bcb63b54ca64744746b6f11a9",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/mobile-screenshots.yml",
+        "beforeBlob": "2fa5e96e2cf1ac64bf18f28439ec41d113387ec2",
+        "afterBlob": "2a477f085f0bf2281167b039dbd5200375a0b593",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/production-smoke.yml",
+        "beforeBlob": "6a3d0d5f31ebbc5d945b00c4b0ed49ba908391e8",
+        "afterBlob": "9496e692019eaaa061d1c5ee41271ddcb127acb6",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/suggestions-cron.yml",
+        "beforeBlob": "b19e81af65c93d14bd380c2bc9e8437a53c34da7",
+        "afterBlob": "0720f70f8d9e5e6db195c6953582ddff9d965545",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "beforeBlob": "e5f2fd0dd1ba74d4a3dfe0a525e3d6ea07fff4f2",
+        "afterBlob": "e1a534079ec6916e45da4555042ea003af2032bf",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      },
+      {
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "beforeBlob": "a58ad7918b64eb648bba2c928b40eebb84d72521",
+        "afterBlob": "690be94e0af42d4014a836d90bdc849a370521f6",
+        "ownerPr": 2994,
+        "ownerMergeSha": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "matchesOwnerMergedBlob": true,
+        "reviewedDelta": "Inherited finite paired repository/owner identities plus immutable repository ID; original event/main/selected scope retained."
+      }
+    ],
+    "disposition": "Original 54-entry transfer inventory remains a source-bound historical sample. This is a later main-only workflow delta read, not a refreshed claim about all current open PRs. No new workflow was introduced. Original Owner changes are retained; Browser gate still executes an echo and cannot count as browser E2E.",
+    "mutations": "None",
+    "unchangedWorkflowCount": 47,
+    "existingOwnerTransferFixesNowMerged": 6,
+    "ownerBrowserNativeSchedulingFixes": 1,
+    "workflows": [
+      {
+        "path": ".github/workflows/analytics-ssr.yml",
+        "blob": "3db5d06af81808e30aa078124a3e5b0d74b95c88",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/app-icon.yml",
+        "blob": "2ad5b5fa99d72c4440c435bdd8f5bad44411bd36",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/browser-gate.yml",
+        "blob": "92c06ed07ecc9685483425c6f82b502f8e516541",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 3006,
+        "ownerMerge": "1d53f13c5753ef5f75b54e6f886a3b5fa3087733",
+        "nativeSchedulingChange": "merge_group checks_requested and event/ref concurrency; remains echo-only, not E2E"
+      },
+      {
+        "path": ".github/workflows/ci-dependencies.yml",
+        "blob": "265f36f2df15ce7c87748e6281d3f075ed39a8f3",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/ci-selection.yml",
+        "blob": "53a105de008b4c10c071ac6cfa61d2b5106b13b5",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloud-computer.yml",
+        "blob": "8339856ebe04f5f43ed38cf14e27cd5b20e1053f",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloud-services-ci.yml",
+        "blob": "2c2aaee3f6dbff75ef3f8e467cbe94c8fb481c32",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-api-image.yml",
+        "blob": "cd3fd311029ee6eaa58b82ab47a4ddb6710f3663",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-app-deploy.yml",
+        "blob": "4147ef9d2035e18d3922406af01fcaabc60916da",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-eve-image.yml",
+        "blob": "86e42170d2edabd1dbf0ce01a5040f4170813868",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-litellm-image.yml",
+        "blob": "ae1d5a8fed827b39dfba192c47962cab09d05540",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-task-sandbox.yml",
+        "blob": "35934a78878c1869478d988ad66b3008ff6ae86c",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/cloudflare-world-deploy.yml",
+        "blob": "e879db24bc41213db25f356cb1ef326844c52776",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/coding-workspace-acceptance.yml",
+        "blob": "ed2634bb7c5f08a3da4b5a74d0892dbe5416799c",
+        "originalClassification": "delegated_runtime_transfer_sdlc_008",
+        "classification": "delegated_runtime_transfer_sdlc_008",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/coding-workspace-review.yml",
+        "blob": "bfcdf85677863512a1c2bb506516eb485fe71def",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/credential-vault.yml",
+        "blob": "bf6d19c1047c0f76e3a5ca7d632391275375aa1a",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/desktop-release.yml",
+        "blob": "b8cc92ab8fea32f513c666cd30e62d1fdaf7208a",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/desktop.yml",
+        "blob": "8743e3cf23cd20e845bf058f645cfb18fcaeec52",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/device-gateway.yml",
+        "blob": "da56991e994edc5bcb63b54ca64744746b6f11a9",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/e2b-byos.yml",
+        "blob": "f47e498ff7ca99822bf97693a9ff3e45fd9a113e",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/e2b-official-runtime.yml",
+        "blob": "0a00f0dcfc5faa638c6a5415c1588d5f77f07aef",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/e2b-runtime-release.yml",
+        "blob": "f7967695ddb2e49c18e71f624d89af5282adc162",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/e2b-template.yml",
+        "blob": "db839737589af9bc329e405c8c3c5afeaaabaed0",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/engineering-sandbox.yml",
+        "blob": "0f6c15f6563d62ee1751f0255eac4a66672e257b",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/factory-visual-evidence-acceptance.yml",
+        "blob": "e3df78b9b2f141e8a8de313a6c74fe30d2a9dbce",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issue1415-deployed-production.yml",
+        "blob": "9593e0fe726f4b537ff8712d7e3e969f99e6e726",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issue1415-managed-inspection.yml",
+        "blob": "9ece51fc2a39c2d362446e68df1f9bbf2076f641",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-cleanup.yml",
+        "blob": "402b01de60f16f041ab9d0bd3b2036ad820e760e",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issues-1515-1517-diagnostics.yml",
+        "blob": "bb67205200d6777a626cecc3494762e49d491a5c",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/issues-1516-welcome-acceptance.yml",
+        "blob": "4757d62065017957f6e1e4300ab4695507ce40d8",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/local-device-node22.yml",
+        "blob": "f68c77281ffed3075ffa96c033fd3c99152e7bc2",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/marketing-build.yml",
+        "blob": "65c0c71426eb2c210f7c175379bd9032979cd972",
+        "originalClassification": "new_source_admission_gap_original_publisher_boundary",
+        "classification": "new_source_admission_gap_original_publisher_boundary",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/mobile-native.yml",
+        "blob": "d93a0345ad61c2eb14c5da6daa0c5e98ed9a199a",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/mobile-screenshots.yml",
+        "blob": "2a477f085f0bf2281167b039dbd5200375a0b593",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/mobile-update.yml",
+        "blob": "ea9519222df9640d0271240ee81b8eec31be0843",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/model-provider-fallback-acceptance.yml",
+        "blob": "80ae6622725b8bf0ecdcf13eccc09d0c6058df26",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/production-readiness.yml",
+        "blob": "0cd039a6c28eeccf2a417ff4f3e09255b371be29",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/production-smoke.yml",
+        "blob": "9496e692019eaaa061d1c5ee41271ddcb127acb6",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/project-decisions-acceptance.yml",
+        "blob": "1843a2db2c5336a65bb1afebcb9a766040f7a958",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/publish-daemon.yml",
+        "blob": "50ff259217a5bba988195d0ca4a41f1d61028c7f",
+        "originalClassification": "existing_official_profile_original_release_owner",
+        "classification": "existing_official_profile_original_release_owner",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/read-cache-production.yml",
+        "blob": "1b20760141dbc29b5b3652a31605ca0dd51ddb2f",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/read-cache.yml",
+        "blob": "afe65413fa476c617b82079809a0046b9a9a5ba9",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/run-trace-acceptance.yml",
+        "blob": "cf4d84379735f93813f76711450c1709b27150eb",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/self-hosted-production.yml",
+        "blob": "fd0c6875045e7eab8add45c126b00feca4aa5ced",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/site-search.yml",
+        "blob": "087fe34c28e7cb5512572961c8a1544345c71a88",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/ssh-device-backend.yml",
+        "blob": "1677c8ee25b72b1f7b550fee88b0fc5589e15450",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/subagents.yml",
+        "blob": "116080d9d31bf85774dedac96f79a92235575706",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/suggestions-cron.yml",
+        "blob": "0720f70f8d9e5e6db195c6953582ddff9d965545",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/task-attachment-production.yml",
+        "blob": "fb3a7ff76459ace55a2e90da94f688746b7edf59",
+        "originalClassification": "original_production_or_finite_acceptance_scope",
+        "classification": "original_production_or_finite_acceptance_scope",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "blob": "bc5fb61e0b28c29e640bab9abfc52c7fc73a054c",
+        "originalClassification": "delegated_runtime_transfer_sdlc_008",
+        "classification": "delegated_runtime_transfer_sdlc_008",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "blob": "614ac6b7d261f01a79b5bf88aa89faea2051839c",
+        "originalClassification": "delegated_runtime_transfer_sdlc_008",
+        "classification": "delegated_runtime_transfer_sdlc_008",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/ui-policy.yml",
+        "blob": "e1a534079ec6916e45da4555042ea003af2032bf",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      },
+      {
+        "path": ".github/workflows/unattended-sandbox.yml",
+        "blob": "2f6b102f98c9d0409b68e3b39a04eec8ee9ce3e9",
+        "originalClassification": "no_active_legacy_identity_admission_found",
+        "classification": "no_active_legacy_identity_admission_found",
+        "changedSinceOriginalCapture": false
+      },
+      {
+        "path": ".github/workflows/workspace-governance-acceptance.yml",
+        "blob": "690be94e0af42d4014a836d90bdc849a370521f6",
+        "originalClassification": "in_flight_owner_2994",
+        "classification": "merged_original_owner_2994",
+        "changedSinceOriginalCapture": true,
+        "ownerPr": 2994,
+        "ownerMerge": "ed905baee7482c43b29e8b15480ebbae160278c1"
+      }
+    ],
+    "classificationCounts": {
+      "no_active_legacy_identity_admission_found": 17,
+      "existing_official_profile_original_release_owner": 14,
+      "delegated_runtime_transfer_sdlc_008": 3,
+      "merged_original_owner_2994": 6,
+      "original_production_or_finite_acceptance_scope": 13,
+      "new_source_admission_gap_original_publisher_boundary": 1
+    },
+    "ownerMergeOrder": [
+      {
+        "pr": 3006,
+        "merge": "1d53f13c5753ef5f75b54e6f886a3b5fa3087733",
+        "firstParent": "ed905baee7482c43b29e8b15480ebbae160278c1",
+        "changedPaths": 1,
+        "scope": "Native Browser gate scheduling"
+      },
+      {
+        "pr": 3001,
+        "merge": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+        "firstParent": "1d53f13c5753ef5f75b54e6f886a3b5fa3087733",
+        "changedPaths": 9,
+        "scope": "Original local-first entry"
+      }
+    ]
   }
 }

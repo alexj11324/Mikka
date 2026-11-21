@@ -16,8 +16,8 @@ sampled job timestamps are in [2984-baseline.json](2984-baseline.json).
 | Repository | Examined scope | Necessary exclusions and existing owner |
 | --- | --- | --- |
 | Public Mikka | Main `c5a5871d3e4c471005c3f4f02eaadae6db27b052` at baseline; 54 workflows, 113 job templates; PRs, source/build declarations, local bootstrap, CI tools and active engineering instructions | Product changes under #2891/#2912/#2956 and deployments under #2897/#1954 retain their owners |
-| Private hosted UI | Exact current main verified; 27 open PRs, no repository workflow files; paired official builds and actual chat acceptance inspected | No private UI implementation copied, no independent builder introduced; chat/slot/permission changes remain #2912-owned |
-| Private Cloud | Exact current main verified; 14 workflows, 24 job templates; source pins, operations qualification, migration admission and original release receipts | Provider credentials, live databases, deployment, cutover and rollback remain original operations owners; full private source identities stay in the private PR/evidence |
+| Private hosted UI | Exact main at baseline capture verified; 27 open PRs, no repository workflow files; paired official builds and actual chat acceptance inspected | No private UI implementation copied, no independent builder introduced; chat/slot/permission changes remain #2912-owned |
+| Private Cloud | Exact main at baseline capture verified; 14 workflows, 24 job templates; source pins, operations qualification, migration admission and original release receipts | Provider credentials, live databases, deployment, cutover and rollback remain original operations owners; full private source identities stay in the private PR/evidence |
 
 The later inventory snapshot contains 59 public, 27 UI and 6 Cloud open PRs,
 including PRs opened by this remediation. The earlier 54/27/5 counts are a
@@ -45,11 +45,14 @@ queues and runner time are never summed and described as elapsed wall time.
 ### Integration checkpoint after the repository transfer
 
 On 2026-11-21, this documentation branch normally integrates main
-`ed905baee7482c43b29e8b15480ebbae160278c1`, the original Owner's #2994 merge.
-Its 19 changed paths are retained, including the three repaired CI test
-locators and isolated Cloudflare source fixture. The overlapping development
-guide retains both that Owner's `Ready for review` wording and this PR's
-dependency-based merge procedure. No unmerged Owner implementation is copied.
+`59b7682fa34f80f402367d2bb40141034c9cf9fd`, the original Owner's #3001 merge.
+The ten paths added since ed905 retain #3001's nine local-first paths and
+#3006's one native Browser scheduling change, merged earlier as
+`1d53f13c5753ef5f75b54e6f886a3b5fa3087733`. The earlier #2994 merge
+`ed905baee7482c43b29e8b15480ebbae160278c1` and its 19 changed paths are retained,
+including the three repaired CI test locators and isolated Cloudflare source
+fixture. Overlapping instructions retain the Owner's Ready procedure and this
+PR's dependency-based merge procedure. No unmerged Owner implementation is copied.
 
 The following is a dated result snapshot, not a replacement for the single
 issue progress comment. Five public implementation PRs have merged. The
@@ -64,10 +67,10 @@ their local proofs are not final protected CI or release acceptance.
 | SDLC-004 / private Cloud #418 migration preflight | Unmerged; exact head retained in private review | Independent 13/13 migration and 55/55 pipeline cases; existing qualified-ancestor contract applies, but the current-head GitGuardian receipt is missing |
 | SDLC-005 / #2993 repeated Site typecheck | Merged `128cf2776e1d00c664ac7c3e5b3dc0b78a0aea87` | Exact optimization and main CI passed; integrated tree has real build/HTTP proof, later local full-build attempt remains blocked |
 | SDLC-006 / #2995 producer event admission | Merged `ee36d52f3ee391ddd529f1135ff86fa8f55bd99d` | Exact 68/68 offline contracts and main CI passed; no live publication or product task claimed |
-| SDLC-007 / [#3000](https://github.com/aspectly-labs/Mikka/pull/3000) runtime history | Ready, unmerged `8b5de3dacd3771737b0e25974c195deb057817e8` | Nine original reviewed blobs and 19 Owner blobs preserved; new integration review [6001494107](https://github.com/aspectly-labs/Mikka/pull/3000#pullrequestreview-6001494107). Final CI and GitGuardian remain incomplete |
-| SDLC-008 / [#3002](https://github.com/aspectly-labs/Mikka/pull/3002) consumer identity | Draft, unmerged `249e3911f590eb7ead883bb35989ac5524af0fba` | Normal integration includes #3000's existing reader. The additional real legacy-API 301 path is reproduced by 16 pass/one fail, then 17/17 after the existing immutable-ID API is used; final delta review and CI remain required |
-| SDLC-009 / [#3004](https://github.com/aspectly-labs/Mikka/pull/3004) marketing source admission | Ready, unmerged `ab7fbd7ee8f757a00333e09747610351f5d01b51` | Original source step 86/86, original marketing eight cases and independent review passed. No actual marketing dispatch/private build/publication sample; final CI and GitGuardian remain incomplete |
-| SDLC-010 / [#3007](https://github.com/aspectly-labs/Mikka/pull/3007) publication consumer contract | Draft, unmerged `b6ea2ca78cd000cb46d218936eec5871a0a96f71` | Three original suites reproduce 61 pass/three fail from retired job/report/source assumptions. A real historical publication and archive are available; this checkpoint has no repaired GREEN or new live acceptance |
+| SDLC-007 / [#3000](https://github.com/aspectly-labs/Mikka/pull/3000) runtime history | Ready, unmerged `8b5de3dacd3771737b0e25974c195deb057817e8` | Nine original reviewed blobs and 19 Owner blobs preserved; integration review [6001494107](https://github.com/aspectly-labs/Mikka/pull/3000#pullrequestreview-6001494107). Primary CI `44846098568/1` succeeds with 19 success/2 skipped jobs. No observed full local `pnpm check` receipt before Ready; GitGuardian and merge remain incomplete |
+| SDLC-008 / [#3002](https://github.com/aspectly-labs/Mikka/pull/3002) consumer identity | Ready, unmerged `249e3911f590eb7ead883bb35989ac5524af0fba` | Normal integration includes #3000's reader. Real legacy-API 301 counterexample goes from 16 pass/one fail to 17/17 through the existing immutable-ID API. Primary CI `44848238113/1` succeeds with 19 success/2 skipped jobs; the full local Before Ready receipt and GitGuardian remain unverified |
+| SDLC-009 / [#3004](https://github.com/aspectly-labs/Mikka/pull/3004) marketing source admission | Draft, unmerged `290f41490c1a8ef7572b0ec3ce3f071bae5bfd08` | Normal integration of main `59b` retains all four reviewed implementation/test blobs and ten Owner paths. The previous ab7 head's CI `44845965398/1` succeeds with 19 success/2 skipped jobs; it is not current-head CI. Exact290 `local:plan` passes; full local Ready evidence, current CI and GitGuardian remain incomplete. No marketing dispatch/private build/publication sample |
+| SDLC-010 / [#3007](https://github.com/aspectly-labs/Mikka/pull/3007) publication consumer contract | Draft, unmerged `070253d0447d76f2bfc87fe0863ccd65f02d9e24` | Original RED is 61 pass/3 fail; repaired original suites pass 198/198 and independent focused suites pass 82/82, with all 16 source/test blobs retained through main `59b` integration. Exact070 full `pnpm check` fails on eight daemon Unix-socket EPERM cases; later stages do not run. [Review6002104989](https://github.com/aspectly-labs/Mikka/pull/3007#pullrequestreview-6002104989) finds no code-integration blocker, while Before Ready remains unmet. Historical archive replay is not new live acceptance |
 
 The first six rows' complete metrics and merge receipts remain below. Later
 rows retain their original PR ownership, dependencies and exact-version proof;
@@ -123,6 +126,51 @@ separately record real service staging/HTTP smoke completion, a failed session
 phase and automatic pipeline rejections. A partial phase or the release owner's
 already-serving version is not relabelled as full acceptance of a new head.
 
+### Later fixed-head observations for three remediation candidates
+
+The [later candidate sample](2984-final-candidate-ci.json) is separate from the
+five-head baseline: three exact heads, 28 workflow runs and 150 attempt job
+records. The first-useful result is selected across every returned workflow for
+each head and checked against the original job log and actual checkout SHA.
+
+| PR / measured head | First useful feedback | Actual assertion job, run/attempt and job ID | Job queue / execution | Real assertion count |
+| --- | ---: | --- | ---: | ---: |
+| #3000 / `8b5de3da` | 244 s | Source, `44845931133/1`, `136665494707` | 217 / 26 s | 78/78 |
+| #3002 / `249e3911` | 374 s | Local driver Linux Xvfb, `44847445855/1`, `136670541300` | 351 / 23 s | 1/1 |
+| #3004 / `ab7fbd7e` | 67 s | Source, `44844895642/1`, `136662067270` | 41 / 26 s | 86/86 |
+
+The actual checked-out synthetic merges are respectively
+`401c93aad406da2399449a885fdc0233e74e291f`,
+`63c2dfae94aecbabaf0fe82b0e8fd993f3d69266` and
+`87d7ca59700d69be2ece8edf5ecbf8c83e714517`.
+These source jobs qualify because they execute the recorded real contract
+tests. The Linux driver job finishes before #3002's later source job.
+Classifier completions, Browser echo jobs, pure identity/plan steps, expected
+Draft refusals without tests, skipped and cancelled jobs are excluded. The
+JSON retains the excluded jobs completing before **or in the same second as**
+the selected endpoint. Five skipped native records have reversed one-second
+timestamps; their zero execution represents no executed work, not adjusted
+raw timestamps. They do not become useful feedback.
+
+The three Ready CI attempts form another explicit denominator: 63 jobs, with
+19 successful and two skipped jobs per attempt. The existing attempt-aware
+collector gives:
+
+| PR / run | CI wall | Initial queue | Execution span after first start |
+| --- | ---: | ---: | ---: |
+| #3000 / `44846098568/1` | 2,445 s | 73 s | 2,372 s |
+| #3002 / `44848238113/1` | 1,878 s | 113 s | 1,765 s |
+| #3004 / `44845965398/1` | 2,246 s | 47 s | 2,199 s |
+
+First feedback starts at the earliest workflow creation for the fixed head,
+which can precede Ready; it is not Ready-to-feedback or push-to-feedback.
+The earlier Draft refusals/cancellations remain in the inventory. No observed
+full local `pnpm check` receipt precedes these three Ready transitions, and
+Actions success does not create that missing local or GitGuardian receipt.
+#3004 subsequently returns to Draft and integrates main as `290f4149`; its ab7
+results remain historical. Different source inputs and runner scheduling
+prevent a causal baseline-to-candidate CI speedup claim.
+
 ## B. Necessary work versus removable duplication
 
 The [54-workflow assessment](2984-baseline.json) classifies every public workflow
@@ -142,7 +190,7 @@ declare every command in the repository globally optimal.
 | Local migration-ready cache beside the migration ledger | Remove the incomplete cache in #2987; use the existing setup runner and ledger |
 | Repeated CI timing logic on retries | Correct the existing collector/summary in #2988; no new poller or validator |
 | Automatic runtime producer emits `workflow_run`, but three consumers admit only older event types | Repair eight existing event checks in #2995; preserve fixed workflow identity, repository/source/attempt/receipt checks and pre-credential revalidation |
-| Runtime publication history recognizes the retired `subscriptions` job and equates workflow head with published source | #3000 repairs the existing reader and shared artifact binding: real historical ZIP/source counterexample, original Node RED and independent61/61 GREEN; exact protected CI/merge remain pending. No paid rebuild is triggered for measurement |
+| Runtime publication history recognizes the retired `subscriptions` job and equates workflow head with published source | #3000 repairs the existing reader and shared artifact binding: real historical ZIP/source counterexample, original Node RED and independent61/61 GREEN. Exact primary Actions CI is successful; full local-gate evidence, GitGuardian and merge remain incomplete. No paid rebuild is triggered for measurement |
 | Repository transfer leaves active consumers and public marketing admission tied to an old owner/name pair | Reuse the existing finite official profiles and immutable repository ID in #3002/#3004; preserve coherent owner/name, original actors where enforced, source/attempt and credential boundaries. No parallel identity registry |
 | Publication consumers retain fields/jobs formally removed by accepted #2789 | #3007 reconciles the existing consumers with the producer's actual contract and #3000 reader; real product subscription, tool, version, terminal-state and cleanup assertions remain unchanged |
 
@@ -172,6 +220,15 @@ unchanged Alex actor, the different `Mikka-handoff` repository and the finite
 Factory #1789/#1783 scope remain deliberate exclusions. No dormant manual
 release predicate is widened to manufacture a new execution sample.
 
+A later main-only refresh at `59b7682fa34f80f402367d2bb40141034c9cf9fd`
+still has the same 54 workflow filenames. Forty-seven blobs are unchanged
+from the transfer capture. Six match #2994's merged identity fixes; the
+seventh is #3006's native Browser gate `merge_group` and event/ref concurrency
+change. The Browser job still only echoes and is not E2E. Every current blob
+and disposition is retained under `subsequentMainRefresh` in the same JSON.
+This refresh does not pretend that the original 50-PR inventory was recaptured
+at the later time, and it creates no new workflow or identity registry.
+
 ### Measured changes
 
 | Repair | Before | After and limits |
@@ -199,26 +256,61 @@ different versions and described as one run.
 
 ## B1. Fixed-source local feedback before final CI
 
-The [local-feedback evidence](2984-b1-local-feedback.json) records three real
-problems: two independently executed old/new source replays and one original
-Owner runtime report. The replays occurred after the historical failures and
-repairs. They prove a cheap deterministic entry point existed; they do not
-rewrite the original developer chronology or claim that queue differences were
-actually saved. The restored Linux computer used Node24.22.3 and the pinned
-TypeScript5.9.3 for the original route generator.
+The earlier [local-feedback evidence](2984-b1-local-feedback.json) records two
+independently executed old/new source replays and an original Owner report for
+a third problem. The later [HTTP/DB counterexample](2984-b1-2996-http-before-after.json)
+independently executes that third problem before and after its original fix.
+All replays occurred after the historical failures and repairs. They establish
+local reproduction and regression entries without rewriting the original
+developer chronology or claiming that queue differences were actually saved.
+The restored Linux computer used Node24.22.3 and the pinned TypeScript5.9.3 for
+the original route generator.
 
 | Problem / Owner | Original local entry point and fixed-source result | Native CI and limits |
 | --- | --- | --- |
 | Generated route source hash, #2973 / #2956 | Original `node apps/api/scripts/generate-routes.mjs --check`: old67199ca7 rejects stale output in0.664650439 s; fixed45144ea3 passes twice in0.631379609/0.714444750 s,395routes/522methods. Generated files and output hashes remain unchanged | Original Site44811835977/1,job136550118390 queued831 s and printed the first error947.0578911 s after creation. Fixed Site44815741395/1 passed, while primaryCI44815741718/1 failed unrelated original contracts. The original batch is unmerged |
 | Fixture preload uses the child cwd, #2969 / #2891 | Original preload in`.output/eve`: oldbf605701 reproduces nested-manifest ENOENT in0.032093036 s; fixedd30f6ec4 passes twice in0.035802252/0.034687927 s. Original guard/proxy/bundle suites pass6/6 at old source and7/7 at new source | Minimal explicitly synthetic manifest only. DB/LiteLLM URLs are parsed, not connected; original proxy tests use isolated loopback fixtures. No actual Eve/productHTTP/UI journey is claimed. The original Draft remains unmerged and itsCI44833174357/1 selector failed |
-| Empty native sessions.create body, #2996 / #2869 | [Original Owner report](https://github.com/aspectly-labs/Mikka/pull/2996#issuecomment-7052767951) binds09e694c3 to LinuxNode24/PG17/loopback-model execution: zero-byte creation, first text, Stop1.748 s, and a separate request settling13synthetic microdollars once | PRCI44831511577/1 failed a port-in-use case; failed-job retry/2 passed at the same source. Normal merge9bbe245ca19d4ac3863cfc75dd47d072ebba1d33 has mainCI44834869958/1 failure from old Draft-policy documentation/test contracts. Original localRED command/duration and a complete rawHTTP receipt are unknown; no independent rerun or exact merged runtime pass is invented |
+| Empty native sessions.create body, #2996 / #2869 | Independent original native SDK and actual zero-byte stream requests: four empty-body HTTP400 results at71320074 become four HTTP200 results at5f5d198d; `{}`2/2 remain200 and malformed JSON2/2 remain400. Two rounds verify the same scoped session in PostgreSQL and a fresh native client | Original fix is normally merged as9bbe245ca19d4ac3863cfc75dd47d072ebba1d33. Replay5f5d normally integrates that fix with the fixed d30 fixture candidate; it is not an exact9bbe main/deployment run. No browser or active Stop round is executed |
 
-The replay denominator is two problems, each with one RED and two GREEN
-invocations, plus two original test-suite runs. Complete UI→API→DB→new-browser
-readback remains zero. Synthetic manifests were removed; four fixed-source
-worktrees retained unchanged tracked files. Original commands, exits, UTC
-boundaries, source/tree/blob hashes, sample denominators and full limitations
-are retained in the JSON.
+The first two replay denominators remain one RED and two GREEN invocations
+per problem, plus their two original test-suite runs. Synthetic manifests were
+removed; the four fixed-source worktrees retained unchanged tracked files.
+Their original commands, exits, UTC boundaries and source/tree/blob hashes are
+not replaced by the later HTTP evidence.
+
+For the third case, exact RED source
+`71320074133a3ec4705ec94576b248de8d54b232` and GREEN source
+`5f5d198d70a1209b9b34ba927409a667985dc432` each produce the complete application
+through the original build stages, then run396 migrations and six fixture scenes
+on separate owned loopback PostgreSQL17.12 clusters. GREEN's three original
+#2996 implementation/test blobs match its merge source; RED retains the old
+coordinator implementation. Two rounds per phase each send the original native empty request and a
+stream producer that closes without writing bytes. That gives the four empty
+requests per phase, distinct from two `{}` and two malformed-JSON requests.
+The stream producer's zero written bytes are recorded separately from an
+unavailable observer body length. Repeated scoped DB and fresh-client snapshots
+find one session, eight fixture tasks and zero user messages. No user model
+turn is submitted; model call counters are not captured, so no stronger model
+accounting claim is made.
+
+The GREEN HTTP phase takes 20.87694 s, exits 0 and closes fixture, pool and
+PostgreSQL normally. RED's core HTTP assertions complete, but its temporary
+orchestrator exits 1 after wrongly waiting for an idle prewarmed session's cancel
+result. The original native call graph defers that new-session control result
+until a first turn. The failed orchestrator and original 20-second wait are
+retained; correcting the temporary caller does not change product assertions,
+timeouts or active Stop behavior. Interrupted builds and earlier failures also
+remain in the evidence. No elapsed-time speedup is inferred from the different
+HTTP outcomes or removal of that invalid orchestration assumption.
+
+The [original Owner report](https://github.com/aspectly-labs/Mikka/pull/2996#issuecomment-7052767951)
+at `09e694c3` separately records first text, Stop 1.748 s and a request settling
+13 synthetic microdollars once. Those are Owner results, not this replay's
+coverage. Original PRCI44831511577/1's port-in-use failure and successful retry/2,
+and exact9bbe mainCI44834869958/1's stale Draft-policy assertions, remain their
+own source-bound facts. Original developer local-RED timing is still unknown.
+The independent third replay has **0 browser and 0 active Stop rounds**; the
+complete UI→API→DB→new-browser denominator is separate in section D.
 
 The refreshed main also exposed three genuine test-integration failures after
 accepted#2998 added a Draft rejection step and explicit PR event types. On
@@ -240,8 +332,9 @@ The original repair subsequently merged normally as
 `ed905baee7482c43b29e8b15480ebbae160278c1` and is integrated here. Its 34
 native check runs are Actions results; the missing GitGuardian receipt is
 separately documented below and is not retrospectively counted as success.
-The old 51-case RED remains a result for its old source. This integration
-does not complete B1, the fixture journey or either original product epic.
+The old 51-case RED remains a result for its old source. Integrating its Owner
+fix is not an additional independent B1 reproduction or a completed fixture
+journey, and it does not finish either original product epic.
 
 ## C. Earlier migration diagnosis without deployment authority
 
@@ -305,6 +398,26 @@ rejects AF_UNIX socket construction. An independent minimal socket construction
 confirmed the capability failure; no application assertion was changed. The
 corresponding actual GitHub runner daemon/Node jobs passed at the reviewed heads.
 
+The later [exact local-gate evidence](2984-local-checks.json) preserves the same
+distinction after normal integration of main `59b`. At #3007 head `070253d0`, the
+original full `pnpm check` actually runs from 02:03:36.486862 to 02:04:34.300298 UTC
+and exits 1 after 57.813485744 s. All eight cases in
+`packages/daemon/test/commands.test.ts` fail at the original Unix socket listen
+in `packages/daemon/src/rpc/server.ts:80` with EPERM; subsequent check stages do
+not execute. The preceding original PG17 setup succeeds with 396 migrations,
+and cleanup confirms stop0/status3/no PID file. Focused 198/198 and 82/82 results
+at unchanged source blobs do not replace this failed full gate. An earlier
+wrapper attempt stops before tests on a PostgreSQL version-string assumption;
+the resumed run checks native `server_version_num=170012` and keeps the failed
+attempt as environment evidence.
+
+At marketing head `290f4149`, original `pnpm local:plan` passes in 12.359467241 s on
+a clean exact source, but a minimal AF_UNIX construction independently fails
+with errno 1 in this executor. That is a capability observation, not a passed
+product test or full Ready gate. The original full checks remain required on a
+healthy authorized environment; no assertion or stage is skipped to obtain a
+Ready record.
+
 The earlier official fixture from original #2969 was built with its pinned public
 source and approved read-only UI overlay. Missing overlay dependencies and the
 existing verified FFmpeg package were repaired through their original setup.
@@ -336,6 +449,10 @@ source, actual output manifest/log digests and the read-only pinned official
 overlay boundary. The private overlay SHA and code are not copied here.
 Provider credentials were not inherited, and native telemetry was disabled.
 
+This is the fixed unmerged #2891 fixture candidate. Main59b has neither its
+fixture package commands nor `scripts/fixtures/start.mjs`; the successful build
+does not establish that the fixture is already delivered as main's default.
+
 The subsequent [original backend fixture execution](2984-fixture-backend.json)
 at that same public source uses Node24.22.3 and PostgreSQL17.12. It verifies the
 actual `local-fixture` build manifest, runs `prepareFixture` in 3,781 ms with
@@ -347,8 +464,36 @@ environment failure before a product journey, not a failing product assertion.
 The original fixture, database client and PostgreSQL close normally at
 00:50:08.904 UTC; `pg_ctl status` exits 3 and no server remains running.
 
-Completed UI→API→DB→new-browser-readback rounds are **0** at this checkpoint.
-Two runs of the original seed smoke each passed six scenarios with identical
+The later [existing Small browser execution](2984-d-browser-fixture-entry-diagnosis.json)
+uses the same fixed d30 source and original compiled input. The three actual
+child executions remain distinct:
+
+| Invocation | Phase and observed result | Child exit / duration |
+| --- | --- | ---: |
+| First temporary caller | Bare Node22 cannot load the transitive `.ts` entry; no PG or browser starts. The outer wrapper's initial exit propagation was wrong; the original child receipt remains failed | 1 /0.715869506 s |
+| Second temporary caller | Original embedded PG starts, but its package has no `createdb` CLI. No browser starts; owned PG stops normally. The next caller uses the existing locked `pg` client | 1 /4.331587086 s |
+| Real browser attempt | Original prepare/start succeeds with396 migrations and six scenes; pinned Chromium156.0.8078.4 starts with its default launch. The first business page precondition fails before any mutation | 1 /48.056587349 s |
+
+The third invocation reaches the original fixture login path (HTTP303), then
+shows the community server status page. The unchanged fixture child lacks
+`MIKKA_EDITION`; its default community runtime adds the status-document marker
+before a full workspace mounts. This is a source-bound fixture entry defect
+under original #2887/#2969, not another browser launch failure. The inspected
+Owner candidate remains unmerged and has no observed edition repair. The
+[exact-d30 independent review6002319755](https://github.com/aspectly-labs/Mikka/pull/2969#pullrequestreview-6002319755)
+records this blocker in the original PR; it does not change that Owner's source,
+branch or PR state. A separate old right-rail selector in the temporary caller has not been exercised against
+an actual workspace and is not conflated with this failure.
+
+One of two planned business journeys starts; **0/2 complete, with zero observed
+business mutations**. Browser, fixture and DB client close through their original
+methods; owned PG stops, status exits3 and no server remains. Those cleanup
+fields are not extra child-exit telemetry. No live model, customer-data operation
+or production migration occurs. The two temporary caller defects, original
+child failures and their actual timings remain available without changing
+Owner source, timeout or business assertions.
+
+The earlier two runs of the original seed smoke each passed six scenarios with identical
 database snapshots and no duplicate rows, in 1.123749 and 0.867766 seconds.
 That proves repeatable seeding, not successful UI acceptance. Full safe evidence,
 including cleanup, is in the
@@ -378,13 +523,25 @@ The shared execution environment subsequently became unavailable. Uncommitted
 documentation patches were recovered against their original remote files using
 the authorized GitHub interface; existing branches, PRs and the single ledger
 were retained. The supplied Docker fallback was searched in available tools and
-the plugin directory; no callable Docker entry was returned. No paid substitute,
-new CI workflow or test-result simulation was introduced. The existing cloud computer was later restored with a fresh filesystem. The
+the plugin directory; no callable Docker entry was returned at that earlier
+point. No paid substitute, new CI workflow or test-result simulation was
+introduced. The existing cloud computer was later restored with a fresh filesystem. The
 original pushed branches were recovered through Git and normally integrated
 with main; new local results above are separately source-bound. The same public
 repository ID1427517699 is now`aspectly-labs/Mikka`. Historical receipt URLs
 are preserved. No new identity or permission grant was required to resume
 standard GitHub code writes.
+
+Later discovery of the original authorized Docker SDK/REST entry permits reuse
+of the existing Small environment. Its original Chromium can launch normally;
+launch is not a completed browser journey. Execution stays in the new task's
+own paths, with original Owner worktrees and databases left intact. Temporary
+callers use the project's existing `tsx` loader on Node22 and the locked `pg`
+client when that PostgreSQL package lacks the optional `createdb` CLI. These
+environment adaptations do not alter fixture source or assertions. The completed
+Small browser failure is recorded above; the full local-gate outcomes remain
+pending their finished receipts. Transfer, dependency installation or process
+startup is not acceptance.
 
 ## E. Independent delivery and exact post-merge evidence
 
@@ -481,7 +638,8 @@ AGENTS and CONTRIBUTING point to the existing development workflow. The new
 decision updates future batching and normal-merge policy; supersession notices
 preserve the historical decisions as history. The separately owned #2997/#2998 change merged during execution. Its local-first
 and explicitly failing Draft aggregate policy is preserved during normal
-integration; neither its implementation nor its performance is attributed to
+integration. The later #3001 native local-first handoff is also retained;
+neither its implementation nor its performance is attributed to
 #2984. The active instructions remove
 retired Web/Vercel queue assumptions, false automatic-production-migration
 claims, loose-protection advice, the pre-merge production acceptance cycle and
@@ -499,9 +657,11 @@ to recreate deleted E2B candidates or change a dispatch's original source.
 E2B's original cleanup/replacement procedure remains authoritative.
 
 This checkpoint is not closure of #2984. Remaining original-owner dependencies
-are #2969's normal delivery, actual fixture/browser and chat acceptance, real
-staging admission and production acceptance. The child's corrected startup is
-now independently observed; a completed browser journey is not. This
+are #2969's fixture-entry correction and normal delivery, actual browser and
+chat acceptance, real
+staging admission and production acceptance. The child's corrected startup and
+the third B1 HTTP/DB regression are now independently observed; a completed
+browser journey is not. This
 remediation still owns private #418's applicable current-head security checks,
 normal merge/regression, the four later public repairs in the checkpoint table,
 completed protected post-merge observations and this documentation PR's own
@@ -512,8 +672,9 @@ head8b5de3dacd3771737b0e25974c195deb057817e8, with independent61/61 original
 Node cases and the actual46376-byte historical ZIP digest verified. Its
 [fixed-source evidence](https://github.com/aspectly-labs/Mikka/blob/8b5de3dacd3771737b0e25974c195deb057817e8/docs/ci/2984-runtime-reuse.json)
 keeps original metadata, closed-adapter transport and true archive-byte checks
-separate. It still requires protectedCI, normal merge and exact merged-source
-verification. The main integration retains the nine reviewed implementation
+separate. Its exact primary Actions CI is now successful, while the missing
+full local Before Ready receipt, GitGuardian, normal merge and exact merged-source
+verification remain separate requirements. The main integration retains the nine reviewed implementation
 blobs. Its first local invocation passes 96 tests but fails to start the Task
 file because the original `tsx` loader was omitted; only that unstarted file
 is then run correctly and passes 16/16. The failed invocation remains failed,
@@ -526,6 +687,17 @@ The actual published source `b53e8f369ff23eb062b1cc8509e499a60ec0bbe0`
 differs from workflow head `5189fa615cfd7ce281ce7c7e17e477206dba2254`.
 These are an actual historical receipt and fixed-source rejection examples,
 not a newly executed publication or proof of a product subscription task.
+The repaired original eight-suite run passes 198/198, and an independent focused
+run passes 82/82. A closed replay reads the actual 46,376-byte archive, validates
+its digest and checks the original selector/report/identity boundaries. Native
+captured metadata and explicitly supported transport/Web fixtures remain
+distinguished in the
+[fixed-source evidence](https://github.com/aspectly-labs/Mikka/blob/070253d0447d76f2bfc87fe0863ccd65f02d9e24/docs/ci/2984-publication-contract.json).
+No real model, VM, new publication or product subscription is executed. Modern
+template publication requires the real publish/upload steps to succeed; the
+legacy subscription branch and all three product drivers' assertions remain
+intact. Normal main `59b` integration retains all 16 source/test blobs; the later
+full local check still fails at the environment boundary described in section D.
 Accepted #2789 merged as `25302463243fe27d86a74d4610ac2e6ad3750b3f`;
 its retained product subscription/tool/version/terminal/cleanup requirements
 are unchanged by this documentation correction.
@@ -558,3 +730,13 @@ receipt. This is an external integration dependency, not authorization to
 replace the scanner, use another identity, add a new gate or reduce the original
 requirement. The live progress comment tracks this and the unfinished work
 without creating a second issue ledger.
+
+Official [GitGuardian integration documentation](https://docs.gitguardian.com/internal-monitoring/integrate-sources/vcs-integrations/github)
+assigns configuration to GitGuardian Owners/Managers and organization App
+installation to the organization Owner; installation access and monitored
+repository perimeter are separate. GitHub's
+[existing-installation documentation](https://docs.github.com/en/apps/using-github-apps/reviewing-and-modifying-installed-github-apps)
+describes the existing owner/admin repository-access controls. These identify
+the legitimate ownership boundary only. They do not establish that this
+installation is missing, suspended or misconfigured, and they do not authorize
+this remediation to change App settings, credentials or the original gate.

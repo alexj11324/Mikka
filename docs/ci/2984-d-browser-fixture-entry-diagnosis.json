@@ -1,0 +1,424 @@
+{
+  "schema_version": 1,
+  "issue": 2984,
+  "captured_at": "2026-11-21T02:36:50.787411+00:00",
+  "purpose": "D real browser failure diagnosis against the unmodified original Owner fixture candidate; no business E2E pass is claimed.",
+  "public_source": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+  "tree": "33348a5d313ee170a1ec6c898edabdbda4281473",
+  "owner": {
+    "epic": 2891,
+    "issue": 2887,
+    "pr": 2969,
+    "branch": "feat/accept-2887-ui-fixtures",
+    "observed_head": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+    "state": "open",
+    "draft": true,
+    "last_pr_update": "2026-11-20T22:57:58Z",
+    "owner_issue_comment": 7052675159,
+    "owner_progress_comment": 7047967999,
+    "owner_progress_updated_at": "2026-11-21T02:17:40Z",
+    "observed_statement": "Original Owner still records full application startup/screenshots and official UI six-scene acceptance as unverified; no edition repair is present in the inspected PR or issue comments.",
+    "owner_sources": [
+      "https://github.com/aspectly-labs/Mikka/pull/2969",
+      "https://github.com/aspectly-labs/Mikka/issues/2887#issuecomment-7052675159",
+      "https://github.com/aspectly-labs/Mikka/issues/2891#issuecomment-7047967999"
+    ]
+  },
+  "environment": {
+    "resource": "previously existing stopped Small, resumed by root using the official native SDK",
+    "new_resources_created": 0,
+    "cpu": 2,
+    "memory_gib": 4,
+    "node": "22.22.1",
+    "pnpm": "10.34.3",
+    "playwright": "1.64.1",
+    "chromium": "156.0.8078.4",
+    "browser_revision": 1248,
+    "postgres": "17.12",
+    "database": "mikka_2984_browser_e2e",
+    "database_host": "127.0.0.1",
+    "database_cluster": "new independently owned cluster, not another Owner database",
+    "browser_downloads_for_these_attempts": 0,
+    "browser_security_overrides_added": false
+  },
+  "compiled_inputs": {
+    "manifest_sha256": "d803d3084af1d0730762084031f707c00421002cc44390cd8cabd35ff3620e69",
+    "target": "local-fixture",
+    "preset": "node-server",
+    "revision": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+    "renderer_manifest_sha256": "829c4b40e56ca1f68c0b953292d3476f99fa3453ab7975647a3cc531423261c3",
+    "renderer_target": "web",
+    "renderer_module_count": 42,
+    "renderer_server_module_count": 0,
+    "renderer_server_pages_flag_present": false,
+    "renderer_public_test_fixture_flag_present": false,
+    "index_sha256": "a29213fa4347303a11bdda2b9060e721854b0710494dd37dc1501bd349ed5051",
+    "index_bytes": 1754,
+    "index_has_server_page_marker": false,
+    "fixed_official_overlay_pin_matches_original_private_build_receipt": true,
+    "private_overlay_identity_and_source": "Retained only in authorized private checkout; intentionally absent here.",
+    "build_repeated_for_diagnosis": false
+  },
+  "attempts": [
+    {
+      "attempt": 1,
+      "directory": "research/fixture-recovery/docker-existing-readonly/d-browser-2026-11-21T02-16-38.840Z",
+      "source": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+      "script_sha256": "3bf3dd738035bc0645a593ad20779ac7f7bd64ef5abd48595ff14013eb5bf88d",
+      "execution": {
+        "startedAt": "2026-11-21T02:17:02.408145+00:00",
+        "finishedAt": "2026-11-21T02:17:03.124119+00:00",
+        "elapsedSeconds": 0.7158695059988531,
+        "exitCode": 1,
+        "stdoutSha256": "9ccdaa55ca614df7f9730245a854e0cabbc7b9bf0dcf07ddd9db822d6eb0133a"
+      },
+      "evidence_hashes": {
+        "transport.json": "85e554b36097a5c0f916746afeac953c8c2708ad1d5028ead63c23639f0d3634",
+        "execution.json": "3baab6c484e8ec1c658cef98113ea963d2663f6acffb28de6c38f679babe8c3e",
+        "application.stdout.log": "9ccdaa55ca614df7f9730245a854e0cabbc7b9bf0dcf07ddd9db822d6eb0133a"
+      },
+      "completed_browser_journeys": 0,
+      "phase": "temporary orchestration import, before receipt directory / PostgreSQL / browser",
+      "cause": "Node 22 bare entry cannot load the existing transitive local-test-mode.ts import; ERR_UNKNOWN_FILE_EXTENSION",
+      "wrapper_exit_boundary": "Initial Python wrapper omitted child-exit propagation and reported exit 0; the preserved Node execution receipt is exit 1. This is not acceptance success.",
+      "correction_for_next_attempt": "Use the existing tsx loader (node --import tsx), retain the original script; fix temporary wrapper log names and child-exit propagation.",
+      "postgres_started": false,
+      "browser_started": false
+    },
+    {
+      "attempt": 2,
+      "directory": "research/fixture-recovery/docker-existing-readonly/d-browser-2026-11-21T02-21-12.125Z",
+      "source": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+      "script_sha256": "3bf3dd738035bc0645a593ad20779ac7f7bd64ef5abd48595ff14013eb5bf88d",
+      "execution": {
+        "startedAt": "2026-11-21T02:21:30.897516+00:00",
+        "finishedAt": "2026-11-21T02:21:35.229095+00:00",
+        "elapsedSeconds": 4.331587086000582,
+        "exitCode": 1,
+        "stdoutSha256": "6214265410ad1d8727f7f0c2ab5ee11614f3a2ca4d1da8ca026523bda8e989e5"
+      },
+      "evidence_hashes": {
+        "transport.json": "77631cdeca78639244a3719e9ac945808f3a6a951ce56247fbe1ca1049d70e8d",
+        "receipt.json": "5bbaa287d45724a66cc2961bab4a9094057ee471cc8b14357f176c3a2fbb68e8",
+        "application.stdout.log": "6214265410ad1d8727f7f0c2ab5ee11614f3a2ca4d1da8ca026523bda8e989e5",
+        "failure.json": "a3285f62243129218eaa4b502dd2ad1f02ca58d255acdef58024944be3e5bf8d"
+      },
+      "completed_browser_journeys": 0,
+      "receipt_started_at": "2026-11-21T02:21:31.933Z",
+      "receipt_finished_at": "2026-11-21T02:21:35.218Z",
+      "node": "v22.22.1",
+      "cleanup": {
+        "reason": "failure",
+        "browserNotStarted": true,
+        "fixtureNotStarted": true,
+        "databaseClientNotStarted": true,
+        "postgresStopped": true,
+        "postgresStatusExit": 3,
+        "postgresStillRunning": false,
+        "elapsedMs": 103.76374300000043
+      },
+      "browser_started": false,
+      "phase": "temporary orchestration creates own disposable database",
+      "cause": "Existing embedded PostgreSQL distribution has initdb/pg_ctl/postgres but no createdb executable; spawn ENOENT.",
+      "correction_for_next_attempt": "Use the existing locked pg client against the verified newly started loopback cluster, then fixed literal CREATE DATABASE mikka_2984_browser_e2e; no product/fixture/guard/assertion change.",
+      "stages": [
+        {
+          "stage": "fixed-inputs-verified",
+          "at": "2026-11-21T02:21:31.985Z"
+        },
+        {
+          "stage": "failed",
+          "at": "2026-11-21T02:21:35.113Z"
+        }
+      ]
+    },
+    {
+      "attempt": 3,
+      "directory": "research/fixture-recovery/docker-existing-readonly/d-browser-2026-11-21T02-24-12.550Z",
+      "source": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+      "script_sha256": "1377c97a61aac41b9d3c59979dcaa74575046fbb0192c6c095329124310e908f",
+      "execution": {
+        "startedAt": "2026-11-21T02:24:45.487908+00:00",
+        "finishedAt": "2026-11-21T02:25:33.543391+00:00",
+        "elapsedSeconds": 48.05658734899953,
+        "exitCode": 1,
+        "stdoutSha256": "22688ec6ee5b258a74e4d11bde76761e6c739804630a9d6e9b4583e383da00ca"
+      },
+      "evidence_hashes": {
+        "transport.json": "b9ae695c98c0ff80b968effe112a1b6a7eb6ddd9d93499367ee2e3dfadef18bc",
+        "failure.png": "7e13a585dd8395195bac6627c3f32b993fff06a50098a084f255dbd169555276",
+        "failure-visible-text.txt": "291c89058e974cb79435c61540bfa19330c434afe047f06e15cffc446e03d8bf",
+        "receipt.json": "0ff50b51456dd8e9134b80c4c4e523b902765030376e6bff4e3cbe7dff227456",
+        "application.stdout.log": "22688ec6ee5b258a74e4d11bde76761e6c739804630a9d6e9b4583e383da00ca",
+        "failure.json": "bc4a031c9d17154b0d4bbdb07e49da30612fd529a0fbf3b6c0311874c1052d07"
+      },
+      "completed_browser_journeys": 0,
+      "receipt_started_at": "2026-11-21T02:24:46.475Z",
+      "receipt_finished_at": "2026-11-21T02:25:33.523Z",
+      "node": "v22.22.1",
+      "cleanup": {
+        "reason": "failure",
+        "browserClosed": true,
+        "fixtureClosed": true,
+        "databaseClientClosed": true,
+        "postgresStopped": true,
+        "postgresStatusExit": 3,
+        "postgresStillRunning": false,
+        "elapsedMs": 10466.835751999999
+      },
+      "browser_started": true,
+      "phase": "first business UI precondition after original fixture login",
+      "cause": "The unmodified fixture child has no MIKKA_EDITION; community runtime adds the status document marker before the full workspace is mounted.",
+      "planned_journeys": 2,
+      "attempted_journeys": 1,
+      "business_mutations_observed": 0,
+      "round_results": [],
+      "stages": [
+        {
+          "stage": "fixed-inputs-verified",
+          "at": "2026-11-21T02:24:46.526Z",
+          "source": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+          "manifestSha256": "d803d3084af1d0730762084031f707c00421002cc44390cd8cabd35ff3620e69",
+          "playwright": "1.64.1",
+          "clean": true
+        },
+        {
+          "stage": "owned-disposable-database-created",
+          "at": "2026-11-21T02:24:49.211Z",
+          "database": "mikka_2984_browser_e2e",
+          "method": "existing pg client with fixed SQL identifier",
+          "exactNewClusterVerified": true
+        },
+        {
+          "stage": "postgres-started",
+          "at": "2026-11-21T02:24:49.218Z",
+          "database": "mikka_2984_browser_e2e",
+          "address": "127.0.0.1",
+          "version": "PostgreSQL 17.12 on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 7.5.0-3ubuntu1~18.04) 7.5.0, 64-bit"
+        },
+        {
+          "stage": "original-prepareFixture-passed",
+          "at": "2026-11-21T02:24:54.500Z",
+          "elapsedMs": 5280.498049,
+          "migrationCount": 396
+        },
+        {
+          "stage": "original-startFixture-passed",
+          "at": "2026-11-21T02:25:02.142Z",
+          "elapsedMs": 7640.9882480000015,
+          "scenes": [
+            "empty",
+            "board",
+            "task",
+            "automations",
+            "bot-settings",
+            "pulls"
+          ]
+        },
+        {
+          "stage": "pinned-chromium-started",
+          "at": "2026-11-21T02:25:13.203Z",
+          "version": "156.0.8078.4",
+          "originalDefaultLaunch": true
+        },
+        {
+          "stage": "failed",
+          "at": "2026-11-21T02:25:23.056Z",
+          "name": "Error"
+        }
+      ],
+      "selected_http_observations": [
+        {
+          "round": 1,
+          "purpose": "write",
+          "at": "2026-11-21T02:25:16.535Z",
+          "method": "GET",
+          "pathname": "/__fixture/bot-settings",
+          "status": 303
+        }
+      ],
+      "http_capture_scope": "Browser response events only for /api/ and /__fixture/ paths; not a capture of all navigation/assets or the upstream password request.",
+      "page_errors": [],
+      "blocked_browser_egress": [],
+      "visible_status_page_terms": [
+        "Mikka 服务器",
+        "服务器地址",
+        "配置",
+        "数据库",
+        "认证",
+        "下载 Mikka 桌面版"
+      ],
+      "failed_assertion": {
+        "operation": "first seeded Bot name button must be visible",
+        "timeout_ms": 5000,
+        "selector": "getByRole(complementary, 右栏).getByRole(button, 验收助手)",
+        "classification": "No product workspace mounted; a separate hosted-layout selector risk remains untested."
+      }
+    }
+  ],
+  "causal_callgraph": [
+    {
+      "source": "scripts/fixtures/proxy.mjs",
+      "fact": "The existing proxy performs normal Better Auth password login, validates identity/cookies, and responds 303 to the original scene.path."
+    },
+    {
+      "source": "scripts/fixtures/scenarios.mjs",
+      "fact": "bot-settings selects the normal localized workspace/coordinator/bot route; no alternative UI URL is substituted."
+    },
+    {
+      "source": "scripts/fixtures/start.mjs",
+      "fact": "The app child receives only the explicit environment allow-list and fixed local fake/auth/database bindings. MIKKA_EDITION is absent; an outer env argument cannot pass it through."
+    },
+    {
+      "source": "lib/edition.ts",
+      "fact": "Missing edition selects community; edition is runtime configuration, not a browser build flag."
+    },
+    {
+      "source": "apps/api/runtime/server-page.ts",
+      "fact": "The cloud branch serves ordinary app HTML. The community branch adds data-mikka-server-page=status for an ordinary workspace page."
+    },
+    {
+      "source": "apps/desktop/src/renderer/app.tsx",
+      "fact": "Web status documents select ServerStatus before SessionApplication/Workspace can mount."
+    },
+    {
+      "source": "apps/api/runtime/server-page.test.ts",
+      "fact": "The original test explicitly preserves status-only behavior for missing edition and the retired UI flag; the cloud edition is the application case."
+    }
+  ],
+  "alternative_entry_assessment": {
+    "inspected_public_candidate": "d30f6ec4a4a1b66278587442e7fd91676ab2f709",
+    "inspected_current_main": "59b7682fa34f80f402367d2bb40141034c9cf9fd",
+    "dev_local": {
+      "command": "pnpm dev:local",
+      "existing_source_behavior": "Starts original Vite/Nitro development entry, official overlay and local HTTP/model services; inherits explicit runtime edition.",
+      "qualification": "Its own guard refuses NODE_ENV=production. Existing docs explicitly classify this as development, not production acceptance. It does not consume the fixed compiled artifact.",
+      "executed_for_this_diagnosis": false
+    },
+    "local_loop": {
+      "command": "pnpm test:local-loop",
+      "existing_source_behavior": "Starts the same dev-local entry unless attaching to an existing reviewed environment.",
+      "qualification": "Not an alternate compiled fixture launcher.",
+      "executed_for_this_diagnosis": false
+    },
+    "start": {
+      "command": "pnpm start --hostname 127.0.0.1 --port <owned-port>",
+      "existing_source_behavior": "Starts the real compiled application with runtime edition, but does not provision the fixture fakes, seed or fixture login. On d30, MIKKA_FIXTURE delegates back to the affected original startFixture.",
+      "qualification": "Replacing the existing fixture service setup would need new orchestration; none is introduced here.",
+      "executed_for_this_diagnosis": false
+    },
+    "main_fixture_status": "The inspected main59b contains no scripts/fixtures/start.mjs; d30 remains the original Owner unmerged candidate.",
+    "conclusion": "No already exposed production-build fixture option in these inspected paths preserves the original setup and changes the affected child edition. No entry swap or rebuild is performed."
+  },
+  "separate_unexecuted_selector_risk": {
+    "source": "docs/design/decisions/2026-11-09-2330-overview-as-work-area-tab.md",
+    "fact": "The hosted layout moved the old right-hand overview column into a work-area tab. The temporary script borrowed the public right-panel selector.",
+    "classification": "Potential stale selector in our temporary orchestration, separate from the proven current status-document failure.",
+    "required_followup": "After legitimate product UI entry is restored, inspect the actual DOM and adapt navigation/locators to the existing hosted contract while retaining actual Bot update HTTP, scoped PostgreSQL write, fresh-context normal-login readback and cleanup assertions."
+  },
+  "requested_owner_followup": "Original #2887/#2969 Owner should make its existing guarded official-UI fixture choose the intended application edition, preserve all current non-release/loopback/auth/fake guards, and prove the application UI is reached. Reuse the successful unchanged compiled product where valid; no alternative UI, marker removal or duplicate fixture is proposed.",
+  "public_source_evidence": [
+    {
+      "path": "scripts/fixtures/start.mjs",
+      "blob": "dc931390a0f67546d623b9024d19b685ea137a5c",
+      "sha256": "3e577d8cf49231ce12a5ae1c5fc616efa609eff304ea0405a4106f14a55122db"
+    },
+    {
+      "path": "scripts/fixtures/proxy.mjs",
+      "blob": "b9b9dea6524d63eba602b9b47e8822883f4ee936",
+      "sha256": "d8e6e0968984bb1840f9634ba6fbb42cf91950567ba5968ce385c3e08f3210b9"
+    },
+    {
+      "path": "scripts/fixtures/scenarios.mjs",
+      "blob": "c00ef218ecd6b38e2e160e9c4dcf1033df01a012",
+      "sha256": "cb1078be1ae48ea5675005608f3c595002a5a1d40d51f0422bfaf6eb3da493dd"
+    },
+    {
+      "path": "scripts/fixtures/guard.mjs",
+      "blob": "5fda70f782edfd78d47f60d568373f27f2ca198e",
+      "sha256": "8dd38f74c5968e8d642864cd406d7c59ba40f803450c2699beaff68acbd05818"
+    },
+    {
+      "path": "scripts/fixture.mjs",
+      "blob": "a5247094d08fd9a03fc1a356fe589899f0443184",
+      "sha256": "d9457e9b369fdb328d87dc91469ef1d0f18bef418164e8dce59abb33107ab161"
+    },
+    {
+      "path": "lib/edition.ts",
+      "blob": "bbee750760addebb58147a4913fa77d709e886c9",
+      "sha256": "779f421ebe198e6f99b851eca23e26bfa7a1af90fa1c4c2a277424df7084e12e"
+    },
+    {
+      "path": "lib/server-pages.ts",
+      "blob": "1984cb912432e691372217bee81b1a53c5db10c3",
+      "sha256": "f7ab025c6fd4747ba5c6b81f31dd510b58c16e22e319b813dd14642aa8501585"
+    },
+    {
+      "path": "apps/api/runtime/entry.ts",
+      "blob": "ce3853ecab402fec1f751e8ff90bdb121f187be6",
+      "sha256": "45e3ce1ebb69479545746b147407c361f2175213e84c5b79c244f2f02ba8a50c"
+    },
+    {
+      "path": "apps/api/runtime/server-page.ts",
+      "blob": "7d33341963af182a0a15f3022c6c0df4418197e5",
+      "sha256": "b55ccb8dc50a5adc5e50175cdfb138120391d059022eabc073ccc725704663fe"
+    },
+    {
+      "path": "apps/api/runtime/server-page.test.ts",
+      "blob": "e964fe67c417bdad098bc757bbf14ea9bbf2cc00",
+      "sha256": "19aeac209e47f75e5e6e5277d29448fcdff8d9fa77372821e39aa98696f71ec4"
+    },
+    {
+      "path": "apps/desktop/src/renderer/app.tsx",
+      "blob": "ac21b984aebbadeef19741198984d9a30189084b",
+      "sha256": "064a827d554b4f3597a109063b403a8ee3a0843935df6bac324fee06c852a077"
+    },
+    {
+      "path": "apps/frontend/vite.config.mjs",
+      "blob": "473a7f2958060ed603fd14341ad98f43f30d29d2",
+      "sha256": "a3864f2d6ae138cdc68191daf6f75b2ae4924985d3bfaa31caa0209019b194ca"
+    },
+    {
+      "path": "scripts/start-app.mjs",
+      "blob": "d70e0f5cca4cc15b2bf461c5c1381acfcc037993",
+      "sha256": "350533890b468347a8237d7c27a6cce36e031376bc1857d8bae59b66147f9bfd"
+    },
+    {
+      "path": "scripts/dev-local.mjs",
+      "blob": "87c2f14fd02cee0ecd70ee5b7767f12b2cde5c49",
+      "sha256": "102e63e369bddb2ca588a3bf73103bee83ebcf3171f91c1ef56f20fed1b8a71e"
+    },
+    {
+      "path": "scripts/dev-local/guard.mjs",
+      "blob": "a1189b65eeb9d5efa7eae12f92b170bbf2d441e8",
+      "sha256": "8ffae45c1149822d43aabaaaa43abaceabc8dba4206a2193ea8ca7ec8e6fa4c6"
+    },
+    {
+      "path": "scripts/dev-local/acceptance.mjs",
+      "blob": "c6edeb7309cbeb950d3d8aed71689f500fa4859e",
+      "sha256": "3ff67cbeef67e7a3d4460b90c8a55705712af5749584665ab2423f1133ee133e"
+    },
+    {
+      "path": "apps/api/scripts/dev-http.mjs",
+      "blob": "3899fa7160fbf43299a754cc773a1a1fe428f0b1",
+      "sha256": "c7c781e150b6f53e84d5cdc173ec458ab0fe3c1a46ed701d5b892917e4535dce"
+    },
+    {
+      "path": "docs/operations/web-runtime.md",
+      "blob": "7a6a761dd027f9f49b4850fc1ac05c4705b53645",
+      "sha256": "5d7d38105456ad5abb3b95710e8e775bd3a0c59b8bfc042ac7487e4e92dfd62d"
+    },
+    {
+      "path": "docs/design/decisions/2026-11-09-2330-overview-as-work-area-tab.md",
+      "blob": "92e1103de65e1958690b7274b98d199ce511f1ab",
+      "sha256": "8e1ac73c0249452e749aaa9e7a8e3b109fea14040e8f65a6e3dc6b9c79030c03"
+    }
+  ],
+  "boundaries": [
+    "No real model/provider request, production data operation, production release or production migration is performed or claimed by this browser diagnosis. The actual 396 local disposable-database migrations are recorded above.",
+    "No private UI source, private SHA, credential, cookie, signed URL or database password is included.",
+    "Browser launch, seed/startup and the server status page are not counted as a completed product journey. The planned two browser journeys remain 0/2.",
+    "No Owner source, branch, PR metadata, guard, timeout or business assertion was changed. The two prior temporary orchestration defects and original failures remain retained.",
+    "Cleanup fields record the original close methods and PostgreSQL status observed in the receipt; no additional child-exit signal telemetry is inferred."
+  ]
+}

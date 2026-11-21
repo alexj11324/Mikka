@@ -39,6 +39,24 @@ The general browser suite is retired. Retained targeted Desktop, Analytics and
 self-hosted jobs keep the scopes in the
 [workflow reference](../.github/workflows/README.md).
 
+### Local preflight and Ready handoff
+
+Use the existing Nx/CI dependency graph to **plan** the affected work, not the whole CI suite:
+
+```sh
+pnpm local:plan
+pnpm local:check --test=test:groups             # example: run the actual owning script
+# Reproduce the failure and repeat focused checks until green, then commit and push.
+pnpm local:ready --test=test:groups --accept=test:local-loop
+pnpm local:mark-ready --pr=1234                 # verifies exact HEAD and calls gh pr ready
+```
+
+This is not a new test registry: `local:plan` reads `scripts/ci/graph.mjs` and `scripts/ci/select.mjs`. When the graph conservatively requires global checks, the developer must **choose and execute an actual focused test** for the changed behavior; full trusted CI remains later. `local:ready` records successful tests and a real product acceptance command or existing local acceptance report under the ignored `.cache/dev-local/local-first/<HEAD>.json`. The report is not uploaded automatically and is **not** a cryptographic attestation; include the source SHA, commands, exits and applicable acceptance link/summary in the PR. For docs-only or tool-only work with no product behavior change use a substantive `--no-product-change='docs: reason'` or `tooling: reason` and preserve actual related test evidence where required. Do not claim a skipped check was run.
+
+The existing [CONTRIBUTING Before Ready requirement](../CONTRIBUTING.md) to pass the full `pnpm check` still applies. `local:ready` records the chosen scripts; a focused script does not waive that requirement. Where applicable, `pnpm local:ready --test=check` runs and records that same full command in one invocation, with the original product-acceptance or substantive no-product-change argument, so the full check need not be repeated solely to create the Ready record.
+
+The **Ready for review** handoff requires a **clean commit** and invalidates evidence if the source diff or base identity changes. GitHub UI/CLI may still allow a human to mark Ready without it; the owning Agent must use this supported handoff, and the remote CI remains the final independent protection. If CI reveals a locally reproducible failure, return to the local red→green loop rather than repeatedly dispatching Actions. CI/staging remain necessary for protected provider, OAuth, registry, migration and release gates outside the local environment.
+
 ## 2. Hot reload
 
 Debugging and pipeline runs use source with hot reload.

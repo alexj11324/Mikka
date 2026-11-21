@@ -6,7 +6,7 @@
 
 **公共仓现行规则仍要求原 GitGuardian 检查。新 head 上没有检查记录，是外部集成／验收回执缺口，不能记为成功，也不能用原生保护只列三项 Actions 检查来解释为豁免。**
 
-当前 `ed905baee7482c43b29e8b15480ebbae160278c1` 的 [workflow README](https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/.github/workflows/README.md) 明确列出独立外部必需检查 `GitGuardian Security Checks`；[AGENTS](https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/AGENTS.md) 和 [CONTRIBUTING](https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/CONTRIBUTING.md) 的最新 Draft/Ready 规则继续保留它。[#2997](https://github.com/aspectly-labs/Mikka/issues/2997) 明确外部 GitGuardian 不变，[#2984](https://github.com/aspectly-labs/Mikka/issues/2984) 明确禁止绕过。
+快照时的 main `ed905baee7482c43b29e8b15480ebbae160278c1` 的 [workflow README](https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/.github/workflows/README.md) 明确列出独立外部必需检查 `GitGuardian Security Checks`；[AGENTS](https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/AGENTS.md) 和 [CONTRIBUTING](https://github.com/aspectly-labs/Mikka/blob/ed905baee7482c43b29e8b15480ebbae160278c1/CONTRIBUTING.md) 的最新 Draft/Ready 规则继续保留它。[#2997](https://github.com/aspectly-labs/Mikka/issues/2997) 明确外部 GitGuardian 不变，[#2984](https://github.com/aspectly-labs/Mikka/issues/2984) 明确禁止绕过。
 
 旧 README 句子来自正常提交 `656f3e2f1bbc740cbcc4c1fd2d956663d9d9af87`；这并非只靠旧句子作裁决：最新明确保留条款来自 `719af8dde7b6592bf93b71f569f1adcc96abb899`（#2997）。已读取的浏览器门禁决策仅处理浏览器检查，不撤销 GitGuardian。
 
@@ -19,7 +19,7 @@
 | Cloud #418 | 原较早 head 的 check 136582941537 于 21:33:46 success；当前 head 为 0 check-runs、2 suites（Cursor/Claude）、0 statuses | 较早版本成功不能覆盖当前版本；准确私有 SHA 留在私有原始快照 |
 | Cloud 独立时间点 | #427 的 check 136633312437 于 23:22:05 success；#428（23:39）和 #433（00:32）的各自新 head 均为 0 check-runs、2 suites，无 GitGuardian | 缺口不只出现在 #418，仍不能据此断言 App 已卸载 |
 | Hosted UI | 当前 #259 head 的 check 136634044982 于 23:23:49 success；#258、#256 当前 head 也各有一次原成功扫描 | 精确旧 head 的成功仍是事实；未观测新 post-transfer push，不能据此推断新提交仍会触发 |
-| 当前 Public main | ed905 的完整返回 48 suites 中无 GitGuardian，部分 Actions 仍运行或排队 | 只是读取时点的记录，不是完整 main CI／发布验收 |
+| 快照时 Public main | ed905 的完整返回 48 suites 中无 GitGuardian，部分 Actions 仍运行或排队 | 只是读取时点的记录，不是完整 main CI／发布验收 |
 
 这些是有目的的固定来源样本，不能转换成全仓触发率。分母：Public PR 前／后各 1；Cloud 较早有扫描 head 3 个、较新缺扫描 head 3 个；Hosted UI 当前有历史成功 head 3 个、新 post-transfer push 0 个。所有原生列表使用 `per_page=100`，返回 total_count 均小于 100。
 
@@ -42,3 +42,9 @@ Public 的 `branches/main` 返回 `protected=true`，可见 required contexts �
 最小所有权裁决：由原仓库／组织和 GitGuardian App 集成 Owner 核查目的组织的现有集成范围与原生事件回执，并恢复适用精确 head 的原检查。#2984 保留这个外部依赖及证据缺口，继续可独立执行的代码工作；不改保护、不修改扫描范围、不新增替代扫描器、不发额外生产版本，不冒认已有 Owner 完成了 App 迁移。
 
 机器可读摘要：`2984-gitguardian-transfer.json`。完整私有 SHA、私有政策及原生原文另保存在私有分析快照，不放入公开交付。
+
+## 官方集成所有权边界补充
+
+[GitGuardian 官方 GitHub 集成文档](https://docs.gitguardian.com/internal-monitoring/integrate-sources/vcs-integrations/github)说明：GitGuardian Owner／Manager 配置集成；组织安装需要组织 Owner，普通成员可以请求安装。GitHub App 的安装／仓库访问范围与 GitGuardian 实际监控范围分别配置，仓库可以仍在安装范围内却不被监控。
+
+[GitHub 官方现有 App 安装文档](https://docs.github.com/en/apps/using-github-apps/reviewing-and-modifying-installed-github-apps)说明组织 Owner 可调整安装的仓库访问范围，仓库管理员可将其仓库加入现有安装。这些是原 Owner／管理员的正常操作边界，**不是目前 App 未安装、被暂停或配置错误的证据**，也不是本专项改变 App、账户、保护或扫描门槛的授权。上述精确 head 的缺回执结论仍保持未验证；实际根因需要原集成 Owner 的原生记录确认。
