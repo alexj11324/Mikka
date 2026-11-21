@@ -112,10 +112,12 @@ test('merge queue publication requires the numeric bot identity and a real main 
   Object.assign(env, { GITHUB_ACTOR_ID: '118344674', GITHUB_ACTOR: 'github-merge-queue[bot]', GITHUB_TRIGGERING_ACTOR: 'github-merge-queue[bot]' })
   assert.equal(trustedBuildSource(env, payload), revision)
   for (const patch of [
+    { GITHUB_TRIGGERING_ACTOR: 'alexj11324', GITHUB_EVENT_NAME: 'workflow_dispatch' },
     { GITHUB_ACTOR_ID: '7' }, { GITHUB_ACTOR: 'outsider' }, { GITHUB_ACTOR_ID: undefined },
     { GITHUB_EVENT_NAME: 'workflow_dispatch' }, { GITHUB_REF: 'refs/heads/feature' },
     { GITHUB_TRIGGERING_ACTOR: 'outsider' }, { GITHUB_REPOSITORY_ID: '7' },
   ]) assert.throws(() => trustedBuildSource({ ...env, ...patch }, payload))
+  assert.equal(trustedBuildSource({ ...env, GITHUB_TRIGGERING_ACTOR: 'alexj11324' }, payload), revision)
 })
 
 test('PRs including the owner\'s, foreign actors, mismatched runs and simulated dispatches cannot obtain publication authority', () => {
@@ -197,6 +199,7 @@ test('a successful service survives a sibling failure, but missing provenance or
   assert.equal(checkedServiceCache('litellm', receipt, run, [job], artifact), receipt)
   const bot = { id: 118344674, login: 'github-merge-queue[bot]' }
   assert.equal(checkedServiceCache('litellm', receipt, { ...run, actor: bot, triggering_actor: bot }, [job], artifact), receipt)
+  assert.equal(checkedServiceCache('litellm', receipt, { ...run, actor: bot, triggering_actor: { id: 183887963, login: 'alexj11324' } }, [job], artifact), receipt)
   for (const actor of [{ ...bot, id: 7 }, { ...bot, login: 'outsider' }, { login: bot.login }]) {
     for (const field of ['actor', 'triggering_actor'])
       assert.throws(() => checkedServiceCache('litellm', receipt, { ...run, [field]: actor }, [job], artifact))

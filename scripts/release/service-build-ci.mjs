@@ -32,7 +32,7 @@ export function trustedBuildSource(env, event) {
   assert.ok(repository, 'Official Mikka workflow repository required')
   const actor = Object.values(trustedActors).find(actor => actor.id === env.GITHUB_ACTOR_ID && actor.login === env.GITHUB_ACTOR)
   assert.ok(actor, 'Trusted main push actor required')
-  assert.equal(env.GITHUB_TRIGGERING_ACTOR, actor.login)
+  assert.ok([actor.login, trustedActors.owner.login].includes(env.GITHUB_TRIGGERING_ACTOR))
   // The existing protected publication environment only permits main. PR
   // qualification stays credential-free; do not simulate another event/ref.
   assert.equal(env.GITHUB_EVENT_NAME, 'push')

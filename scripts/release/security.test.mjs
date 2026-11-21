@@ -18,6 +18,7 @@ test('API image merge queue admission is confined to the paired bot identity on 
   const github = { repository_id: '1427517699', repository_owner_id: '359279274', ref: 'refs/heads/main', event_name: 'push',
     actor_id: '118344674', actor: 'github-merge-queue[bot]', triggering_actor: 'github-merge-queue[bot]' }
   assert.equal(allowed(github), true)
+  assert.equal(allowed({ ...github, triggering_actor: 'alexj11324' }), true)
   assert.equal(allowed({ ...github, actor_id: '183887963', actor: 'alexj11324', triggering_actor: 'alexj11324' }), true)
   for (const patch of [{ event_name: 'workflow_dispatch' }, { event_name: 'pull_request' }, { ref: 'refs/heads/feature' },
     { repository_id: '7' }, { repository_owner_id: '7' }, { actor_id: '7' }, { actor: 'outsider' },

@@ -48,8 +48,11 @@ test('merge queue provenance is accepted only on automatic main runs with both b
   const bot = { id: 118344674, login: 'github-merge-queue[bot]' }
   const original = { ...run(), actor: bot, triggering_actor: bot }
   assert.equal(selectAutomaticCandidate(event(original), original, source), 'selected')
+  const rerun = { ...original, triggering_actor: { id: 183887963, login: 'alexj11324' } }
+  assert.equal(selectAutomaticCandidate(event(rerun), rerun, source), 'selected')
   const deployed = { ...original, path: '.github/workflows/cloudflare-app-deploy.yml', event: 'workflow_run' }
   assert.equal(checkedRun(deployed, deployed.path, { automaticDeployment: true }).id, 101)
+  assert.equal(checkedRun({ ...deployed, triggering_actor: rerun.triggering_actor }, deployed.path, { automaticDeployment: true }).id, 101)
   assert.throws(() => checkedRun(deployed, deployed.path))
   for (const actor of [{ ...bot, id: 7 }, { ...bot, login: 'outsider' }, { login: bot.login }, undefined]) {
     for (const field of ['actor', 'triggering_actor']) {
