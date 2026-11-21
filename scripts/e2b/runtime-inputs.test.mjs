@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -221,31 +222,147 @@ test('a Cloudflare promotion compares against the last published release, not th
   assert.throws(() => releaseDecision({ ...promotion, workerHash: undefined }), /workerHashRequired/)
 })
 
-test('the last published source is the newest successful release whose templates were made public', async () => {
-  const published = 'd'.repeat(40), publish = 'Make only fully accepted candidates public'
-  const releaseRun = (id, headSha, extra = {}) => ({ id, run_attempt: 1, head_sha: headSha, head_branch: 'main', event: 'workflow_run',
-    path: '.github/workflows/e2b-official-runtime.yml', repository, ...extra })
-  const runs = [releaseRun(30, 'e'.repeat(40), { event: 'push' }), releaseRun(29, 'f'.repeat(40)),
-    releaseRun(28, 'c'.repeat(40), { path: '.github/workflows/other.yml' }), releaseRun(27, published, { event: 'workflow_dispatch' })]
-  const jobs = { 29: [{ name: 'check', head_sha: 'f'.repeat(40), steps: [] }],
-    27: [{ name: 'release / subscriptions', head_sha: published, steps: [{ name: publish, conclusion: 'success' }] }] }
-  const calls = []
-  const fetchImpl = async input => {
-    const url = new URL(input); calls.push(url.pathname)
+function publicationHistory({ name = 'release / templates', sourceCommit = 'd'.repeat(40),
+  workflowHead = 'e'.repeat(40), workerSha = 'c'.repeat(40), mutateReport = () => {}, recordedRepository = repository } = {}) {
+  const started = new Date(Date.now() - 60_000).toISOString()
+  const releaseRun = (id, headSha, extra = {}) => ({ id, run_attempt: 2, head_sha: headSha, head_branch: 'main',
+    event: 'workflow_run', status: 'completed', conclusion: 'success', run_started_at: started,
+    path: '.github/workflows/e2b-official-runtime.yml', repository: recordedRepository, head_repository: recordedRepository, ...extra })
+  const publishedRun = releaseRun(27, workflowHead, { event: 'workflow_dispatch' })
+  const runs = [releaseRun(30, 'a'.repeat(40), { event: 'push' }), releaseRun(29, 'f'.repeat(40)),
+    releaseRun(28, 'b'.repeat(40), { path: '.github/workflows/other.yml' }), publishedRun]
+  const publication = { id: 100, name, run_id: 27, run_attempt: 2, head_sha: workflowHead,
+    status: 'completed', conclusion: 'success',
+    steps: [{ name: 'Make only fully accepted candidates public', conclusion: 'success' }] }
+  const report = { sourceCommit, workerSha, templates: Object.fromEntries(['desktop', 'claude', 'codex'].map(kind => [kind, {
+    name: 'mikka-' + sourceCommit.slice(0, 12) + '-27-2-' + kind, baseTemplate: kind,
+    templateId: 'template-' + kind, buildId: 'build-' + kind, preinstalled: true, public: true, buildStatus: 'ready',
+  }])) }
+  mutateReport(report)
+  const archive = execFileSync('python3', ['-c', 'import io,sys,zipfile\nb=io.BytesIO()\nwith zipfile.ZipFile(b,"w",zipfile.ZIP_DEFLATED) as z: z.writestr("release.json",sys.stdin.buffer.read())\nsys.stdout.buffer.write(b.getvalue())\n'],
+    { input: JSON.stringify(report), stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1024 * 1024 })
+  const root = 'https://api.github.com/repos/' + recordedRepository.full_name
+  const artifact = { id: 321, name: 'e2b-release-evidence-27-2', expired: false, size_in_bytes: archive.length,
+    created_at: new Date(Date.now() - 30_000).toISOString(), expires_at: new Date(Date.now() + 3600_000).toISOString(),
+    digest: 'sha256:' + createHash('sha256').update(archive).digest('hex'),
+    url: root + '/actions/artifacts/321', archive_download_url: root + '/actions/artifacts/321/zip',
+    workflow_run: { id: 27, repository_id: recordedRepository.id, head_repository_id: recordedRepository.id,
+      head_branch: 'main', head_sha: workflowHead } }
+  const state = { runs, publication, artifacts: [artifact], detail: structuredClone(artifact),
+    latest: structuredClone(publishedRun), archive, calls: [] }
+  state.fetchImpl = async (input, init) => {
+    const url = new URL(input); state.calls.push(url.pathname)
+    if (url.origin === 'https://productionresultssa1.blob.core.windows.net') {
+      assert.equal(init.headers, undefined, 'GitHub credentials never reach archive storage')
+      return new Response(state.archive)
+    }
+    assert.equal(url.origin, 'https://api.github.com')
+    assert.ok(url.pathname.startsWith('/repositories/1427517699/'), 'all authenticated reads use the fixed repository ID')
+    assert.equal(init.headers.authorization, 'Bearer test')
     if (url.pathname.endsWith('/actions/workflows/e2b-official-runtime.yml/runs')) {
       assert.equal(url.searchParams.get('branch'), 'main')
       assert.equal(url.searchParams.get('status'), 'success')
-      return Response.json({ total_count: runs.length, workflow_runs: runs })
+      return Response.json({ total_count: state.runs.length, workflow_runs: state.runs })
     }
-    const id = /\/actions\/runs\/(\d+)\/attempts\/1\/jobs$/.exec(url.pathname)?.[1]
-    assert.ok(id, url.pathname)
-    return Response.json({ total_count: jobs[id].length, jobs: jobs[id] })
+    if (url.pathname.endsWith('/actions/runs/29/attempts/2/jobs'))
+      return Response.json({ total_count: 1, jobs: [{ name: 'check', head_sha: 'f'.repeat(40), steps: [] }] })
+    if (url.pathname.endsWith('/actions/runs/27/attempts/2/jobs'))
+      return Response.json({ total_count: 1, jobs: [state.publication] })
+    if (url.pathname.endsWith('/actions/runs/27/artifacts'))
+      return Response.json({ total_count: state.artifacts.length, artifacts: state.artifacts })
+    if (url.pathname.endsWith('/actions/artifacts/321/zip')) {
+      assert.equal(url.pathname, '/repositories/1427517699/actions/artifacts/321/zip')
+      assert.equal(init.redirect, 'manual')
+      return new Response(null, { status: 302, headers: { location: 'https://productionresultssa1.blob.core.windows.net/runtime-fixture.zip' } })
+    }
+    if (url.pathname.endsWith('/actions/artifacts/321')) return Response.json(state.detail)
+    if (url.pathname.endsWith('/actions/runs/27')) return Response.json(state.latest)
+    assert.fail('Unexpected offline history request: ' + url.pathname)
   }
-  assert.equal(await lastPublishedSource({ token: 'test', fetchImpl }), published)
-  assert.ok(!calls.some(path => /\/runs\/(30|28)\//.test(path)), 'a push or foreign run is never a publication')
-  jobs[27][0].steps[0].conclusion = 'skipped'
-  assert.equal(await lastPublishedSource({ token: 'test', fetchImpl }), null)
-  assert.equal(await lastPublishedSource({ token: 'test', fetchImpl, maxRuns: 1 }), null)
+  return state
+}
+
+test('the newest actual publication uses its report source, including current and historical job names', async () => {
+  for (const name of ['release / templates', 'templates', 'release / subscriptions', 'subscriptions']) {
+    const mock = publicationHistory({ name })
+    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl }), 'd'.repeat(40))
+    assert.ok(!mock.calls.some(path => /\/runs\/(30|28)\//.test(path)), 'a push or foreign run is never a publication')
+    mock.publication.steps[0].conclusion = 'skipped'
+    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl }), null)
+    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl, maxRuns: 1 }), null)
+  }
+})
+
+test('publication reuse compares the actual published worker rather than a later dispatch head', async () => {
+  const fixture = runtimeRepo(), { dir, write, commit } = fixture
+  try {
+    const published = commit(), publishedWorker = runtimeInputsDigest({ ref: published, cwd: dir })
+    write('docs/change.md', 'no worker change')
+    const documentationHead = commit()
+    let mock = publicationHistory({ sourceCommit: published, workflowHead: documentationHead, workerSha: publishedWorker })
+    const selected = await lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl })
+    assert.equal(selected, published)
+    const beforeWorkerHash = runtimeInputsDigest({ ref: selected, cwd: dir })
+    assert.equal(releaseDecision({ eventName: 'workflow_run', beforeWorkerHash,
+      workerHash: runtimeInputsDigest({ ref: documentationHead, cwd: dir }) }).changed, false)
+    write('packages/daemon/worker.ts', 'new worker still needs a release')
+    const changedHead = commit()
+    mock = publicationHistory({ sourceCommit: published, workflowHead: changedHead, workerSha: publishedWorker })
+    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl }), published)
+    assert.equal(releaseDecision({ eventName: 'workflow_run', beforeWorkerHash,
+      workerHash: runtimeInputsDigest({ ref: changedHead, cwd: dir }) }).changed, true)
+  } finally { fixture.dispose() }
+})
+
+test('foreign, unfinished and wrong-attempt publication metadata never select a release artifact', async () => {
+  const changes = [
+    mock => { mock.runs[3].path = '.github/workflows/other.yml' },
+    mock => { mock.runs[3].head_repository = { full_name: 'fork/Mikka' } },
+    mock => { mock.runs[3].status = 'in_progress' },
+    mock => { mock.runs[3].conclusion = 'failure' },
+    mock => { mock.runs[3].event = 'pull_request' },
+    mock => { mock.runs[3].head_branch = 'feature' },
+    mock => { mock.runs[3].head_sha = 'main' },
+    mock => { mock.publication.name = 'unrelated / templates' },
+    mock => { mock.publication.run_id = 28 },
+    mock => { mock.publication.run_attempt = 1 },
+    mock => { mock.publication.head_sha = 'f'.repeat(40) },
+    mock => { mock.publication.conclusion = 'failure' },
+  ]
+  for (const change of changes) {
+    const mock = publicationHistory(); change(mock)
+    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl }), null)
+    assert.ok(!mock.calls.some(path => path.includes('/artifacts')), 'invalid publication metadata must not read a report')
+  }
+})
+
+test('missing, stale, foreign or corrupt publication evidence fails closed before reuse', async () => {
+  for (const change of [
+    mock => { mock.artifacts = [] },
+    mock => { mock.artifacts.push(structuredClone(mock.artifacts[0])) },
+    mock => { mock.artifacts[0].name = 'e2b-release-evidence-27-1' },
+    mock => { mock.artifacts[0].expired = true },
+    mock => { mock.artifacts[0].workflow_run.head_repository_id++ },
+    mock => { mock.artifacts[0].workflow_run.head_sha = 'f'.repeat(40) },
+    mock => { mock.detail.digest = 'sha256:' + '0'.repeat(64) },
+    mock => { mock.archive = Buffer.from(mock.archive); mock.archive[0] ^= 1 },
+    mock => { mock.latest.run_attempt = 3 },
+    mock => { mock.latest.head_sha = 'f'.repeat(40) },
+  ]) {
+    const mock = publicationHistory(); change(mock)
+    await assert.rejects(lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl }))
+  }
+  for (const mutateReport of [
+    report => { report.sourceCommit = 'f'.repeat(40) },
+    report => { report.workerSha = 'main' },
+    report => { report.templates.codex.name = report.templates.codex.name.replace('-27-2-', '-27-1-') },
+    report => { report.templates.codex.public = false },
+    report => { report.templates.codex.buildStatus = 'building' },
+  ]) {
+    const mock = publicationHistory({ mutateReport })
+    await assert.rejects(lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl }))
+  }
+  await assert.rejects(lastPublishedSource({ token: 'test', fetchImpl: async () => new Response('', { status: 403 }) }), /github:403/)
 })
 
 
@@ -275,14 +392,9 @@ test('published source accepts official historical names and rejects incoherent 
     [{ full_name: repository.full_name, id: repository.id }, sha],
     [{ ...repository, id: 1 }, null], [{ ...repository, owner: { id: 359279274 } }, null],
     [{ ...repository, full_name: 'foreign/Mikka' }, null]]) {
-    const fetchImpl = async input => {
-      const url = new URL(input)
-      assert.ok(url.pathname.startsWith('/repositories/1427517699/'))
-      return url.pathname.endsWith('/runs')
-        ? Response.json({ total_count: 1, workflow_runs: [{ ...run, event: 'workflow_run', repository: recorded }] })
-        : Response.json({ total_count: 1, jobs: [{ name: 'subscriptions', head_sha: sha,
-          steps: [{ name: 'Make only fully accepted candidates public', conclusion: 'success' }] }] })
-    }
-    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl }), expected)
+    const mock = publicationHistory({ sourceCommit: sha, workflowHead: sha, recordedRepository: recorded })
+    assert.equal(await lastPublishedSource({ token: 'test', fetchImpl: mock.fetchImpl }), expected)
+    assert.ok(mock.calls.filter(path => !path.endsWith('/runtime-fixture.zip'))
+      .every(path => path.startsWith('/repositories/1427517699/')))
   }
 })

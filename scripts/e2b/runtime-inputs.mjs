@@ -4,6 +4,8 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
+import { assertArtifactIdentity, downloadReleaseReport } from '../acceptance/task-secrets-ci.mjs'
+import { assertReportIdentity, TEMPLATE_KINDS } from './runtime-report.mjs'
 
 const officialRepository = repository => officialMikkaRepository(repository?.full_name, String(repository?.id),
   repository?.owner?.id === undefined ? undefined : String(repository.owner.id))
@@ -52,21 +54,59 @@ export function pushRuntimeInputs({ ref, event, cwd = process.cwd() }, hash = ru
 
 const PUBLISH_STEP = 'Make only fully accepted candidates public'
 
-/** The source of the newest run that actually made templates public. A Cloudflare
- * promotion compares against it, not against the previous push. */
+/** The source of the newest run that actually made templates public. The run's
+ * head is the workflow source; a dispatch may publish an earlier served commit. */
 export async function lastPublishedSource({ token, fetchImpl = fetch, maxRuns = 200 }) {
   const options = { token, fetchImpl }
   let seen = 0
   for await (const run of pages(`/actions/workflows/${WORKFLOW.split('/').pop()}/runs?branch=main&status=success`, 'workflow_runs', options)) {
     if (++seen > maxRuns) return null
-    if (run.path !== WORKFLOW || run.head_branch !== 'main' || !officialRepository(run.repository)
-      || !['workflow_dispatch', 'workflow_run'].includes(run.event) || !/^[a-f0-9]{40}$/.test(run.head_sha ?? '') || !id(run.run_attempt)) continue
+    if (!publicationRun(run)) continue
+    const publications = []
     for await (const job of pages(`/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs`, 'jobs', options)) {
-      if (/^(?:release \/ )?subscriptions$/.test(job.name ?? '') && job.head_sha === run.head_sha
-        && job.steps?.some(step => step.name === PUBLISH_STEP && step.conclusion === 'success')) return run.head_sha
+      if (/^(?:release \/ )?(?:subscriptions|templates)$/.test(job.name ?? '') && job.head_sha === run.head_sha
+        && job.run_id === run.id && job.run_attempt === run.run_attempt && job.status === 'completed' && job.conclusion === 'success'
+        && job.steps?.some(step => step.name === PUBLISH_STEP && step.conclusion === 'success')) publications.push(job)
     }
+    if (!publications.length) continue
+    if (publications.length !== 1) throw Error('runtimeInputs:ambiguousPublication')
+    return publishedSourceFromReport(run, options)
   }
   return null
+}
+
+function publicationRun(run) {
+  return id(run.id) && id(run.run_attempt) && run.path === WORKFLOW && run.head_branch === 'main'
+    && officialRepository(run.repository) && officialRepository(run.head_repository)
+    && run.status === 'completed' && run.conclusion === 'success'
+    && ['workflow_dispatch', 'workflow_run'].includes(run.event) && /^[a-f0-9]{40}$/.test(run.head_sha ?? '')
+}
+
+async function publishedSourceFromReport(run, options) {
+  const expected = { sourceCommit: run.head_sha, runId: run.id, runAttempt: run.run_attempt,
+    repositoryId: Number(publicRepositoryId), repositoryFullName: run.repository.full_name }
+  const artifacts = []
+  for await (const artifact of pages(`/actions/runs/${run.id}/artifacts`, 'artifacts', options)) {
+    if (artifact.name === `e2b-release-evidence-${run.id}-${run.run_attempt}`) artifacts.push(artifact)
+  }
+  if (artifacts.length !== 1) throw Error('runtimeInputs:publicationArtifactRequired')
+  // Artifact metadata binds to the workflow head; the verified report binds to
+  // the actual published source. Keep the existing bounded/digest-checked reader.
+  const listed = assertArtifactIdentity(expected, run, artifacts[0])
+  const artifact = assertArtifactIdentity(expected, run, await githubRead(`/actions/artifacts/${listed.id}`, options))
+  if (JSON.stringify(artifact) !== JSON.stringify(listed)) throw Error('runtimeInputs:publicationArtifactChanged')
+  const bytes = await downloadReleaseReport({ selected: true, artifact }, options)
+  let report
+  try { report = JSON.parse(bytes) } catch (cause) { throw Error('runtimeInputs:publicationReportInvalid', { cause }) }
+  assertReportIdentity(report, { sourceCommit: report?.sourceCommit, workerSha: report?.workerSha,
+    runId: String(run.id), runAttempt: String(run.run_attempt) })
+  if (!TEMPLATE_KINDS.every(kind => report.templates[kind].public === true && report.templates[kind].buildStatus === 'ready'))
+    throw Error('runtimeInputs:publicationNotPublic')
+  const latest = await githubRead(`/actions/runs/${run.id}`, options)
+  if (!publicationRun(latest) || ['id', 'run_attempt', 'head_sha', 'path', 'event'].some(key => latest[key] !== run[key])
+    || latest.repository?.id !== run.repository?.id || latest.head_repository?.id !== run.head_repository?.id)
+    throw Error('runtimeInputs:publicationAttemptChanged')
+  return report.sourceCommit
 }
 
 async function githubRead(path, { token, fetchImpl }) {
