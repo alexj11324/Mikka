@@ -15,17 +15,17 @@ BEGIN
     PERFORM mikka_account_assert_writable(ledger_owner);
     RETURN NEW;
   END IF;
+  -- The companion lock exists only while the deletion job performs external cleanup.
   IF grant_value IS NOT NULL AND TG_TABLE_NAME IN ('agent_runs','cloud_machines') AND EXISTS (
     SELECT 1 FROM account_deletion_workspace_guards w
-    JOIN account_deletion_jobs j ON j.id=w."jobId"
+    JOIN account_deletion_guards g ON g."jobId"=w."jobId"
     JOIN pg_catalog.pg_locks holder ON holder.locktype='advisory' AND holder.mode='ExclusiveLock' AND holder.granted AND holder.objsubid=1
-      AND ((holder.classid::bigint<<32) | holder.objid::bigint)=hashtextextended('mikka-account-deletion-job:' || j.id::text,0)
+      AND ((holder.classid::bigint<<32) | holder.objid::bigint)=hashtextextended('mikka-account-deletion-job:' || w."jobId"::text,0)
     JOIN pg_catalog.pg_locks child ON child.pid=holder.pid AND child.database=holder.database AND child.locktype='advisory'
       AND child.mode='ExclusiveLock' AND child.granted AND child.objsubid=1
-      AND ((child.classid::bigint<<32) | child.objid::bigint)=hashtextextended('mikka-account-cloud-cleanup:' || j.id::text || ':' || grant_value,0)
-    WHERE w."workspaceId"=workspace_scope::uuid AND j.stage='external_pending'
-      AND j."subjectUserId"=CASE WHEN TG_TABLE_NAME='agent_runs' THEN row_data->>'userId' ELSE ledger_owner END
-      AND holder.database=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())
+      AND ((child.classid::bigint<<32) | child.objid::bigint)=hashtextextended('mikka-account-cloud-cleanup:' || w."jobId"::text || ':' || grant_value,0)
+    WHERE w."workspaceId"=workspace_scope::uuid
+      AND g."subjectId"=CASE WHEN TG_TABLE_NAME='agent_runs' THEN row_data->>'userId' ELSE ledger_owner END
   ) THEN RETURN NEW; END IF;
   IF EXISTS(SELECT 1 FROM account_deletion_workspace_guards WHERE "workspaceId"=workspace_scope::uuid) THEN
     RAISE EXCEPTION 'account_deletion_pending' USING ERRCODE='55000';

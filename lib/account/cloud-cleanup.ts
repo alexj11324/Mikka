@@ -3,8 +3,7 @@ import type { Pool } from 'pg'
 import { randomUUID } from 'node:crypto'
 import { observePoolCommits } from '@/lib/db/commit-effects'
 import { machineChanged } from '@/lib/live/computer-state'
-import type { SubscriptionDeletionLease } from './subscription-cleanup'
-import { cleanupErrorIdentifier } from './cleanup-result'
+import { cleanupErrorIdentifier, type AccountCleanupOptions } from './cleanup-result'
 
 export interface AccountCloudProvider {
   kill(workspaceId: string, sandboxId: string): Promise<void>
@@ -42,7 +41,7 @@ const ownerProvider = (ownerId: string): AccountCloudProvider => ({
 })
 
 /** Main Bot computers are keyed by workspace AND owner (20261029080001), never workspace alone. */
-export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool, runtime = ownerProvider(ownerId), job?: SubscriptionDeletionLease, blockerErrors: Record<string, string> = {}): Promise<string[]> {
+export async function cleanupOwnedCloudMachines(ownerId: string, database: Pool, runtime = ownerProvider(ownerId), { job, blockerErrors = {} }: AccountCleanupOptions = {}): Promise<string[]> {
   if (!job) return drain(ownerId, database, runtime, blockerErrors)
   const grant = randomUUID(), key = 'mikka-account-cloud-cleanup:' + job.id + ':' + grant
   await job.client.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [key])

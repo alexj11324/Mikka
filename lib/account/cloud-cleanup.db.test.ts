@@ -1,10 +1,47 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace } from '../../tests/support/workspace-admin-db'
 import { cleanupOwnedCloudMachines, type AccountCloudProvider } from './cloud-cleanup'
 import { acquireAccountDeletionLock } from './deletion-lock'
+
+test('workspace grant migration needs only workspace-side guards and refuses another job', { skip: !dbUrl }, async t => {
+  const admin = new Pool({ connectionString: dbUrl }), schema = `cloud_guard_${randomUUID().replaceAll('-', '')}`
+  await admin.query(`CREATE SCHEMA "${schema}"`)
+  const workspace = new Pool({ connectionString: dbUrl, options: `-c search_path=${schema},pg_catalog` })
+  t.after(async () => { await workspace.end(); await admin.query(`DROP SCHEMA "${schema}" CASCADE`); await admin.end() })
+  await workspace.query('CREATE TABLE cloud_machines ("workspaceId" uuid, "ownerId" text, state text)')
+  await workspace.query('CREATE TABLE agent_runs ("workspaceId" uuid, "userId" text, status text)')
+  const baseline = await readFile(new URL('../../drizzle/20261031050732_workspace_deletion_guards.sql', import.meta.url), 'utf8')
+  assert.match(baseline, /^-- target: DATABASE_URL/)
+  await workspace.query(baseline)
+  const migration = await readFile(new URL('../../drizzle/20261121055332_account_cloud_cleanup_grant.sql', import.meta.url), 'utf8')
+  await workspace.query(migration)
+  await workspace.query(migration)
+  assert.equal((await workspace.query("SELECT to_regclass('account_deletion_jobs') AS jobs")).rows[0].jobs, null)
+  const owner = randomUUID(), otherOwner = randomUUID(), job = randomUUID(), otherJob = randomUUID(), ws = randomUUID(), otherWs = randomUUID(), grant = randomUUID()
+  for (const id of [ws, otherWs]) {
+    await workspace.query(`INSERT INTO cloud_machines VALUES($1,$2,'running')`, [id, id === ws ? owner : otherOwner])
+    await workspace.query(`INSERT INTO agent_runs VALUES($1,$2,'running')`, [id, id === ws ? owner : otherOwner])
+    await workspace.query('INSERT INTO account_deletion_workspace_guards VALUES($1,$2)', [id, id === ws ? job : otherJob])
+  }
+  await workspace.query('INSERT INTO account_deletion_guards("subjectId","jobId") VALUES($1,$2)', [owner, job])
+  await workspace.query('INSERT INTO account_deletion_guards("subjectId","jobId") VALUES($1,$2)', [otherOwner, otherJob])
+  const lease = await acquireAccountDeletionLock(admin, job), child = await workspace.connect()
+  try {
+    await lease.client.query('SELECT pg_advisory_lock(hashtextextended($1,0))', [`mikka-account-cloud-cleanup:${job}:${grant}`])
+    await child.query('BEGIN')
+    await child.query("SELECT set_config('mikka.account_cloud_cleanup_grant',$1,true)", [grant])
+    assert.equal((await child.query(`UPDATE cloud_machines SET state='error' WHERE "workspaceId"=$1`, [ws])).rowCount, 1)
+    assert.equal((await child.query(`UPDATE agent_runs SET status='stopped' WHERE "workspaceId"=$1`, [ws])).rowCount, 1)
+    await child.query('COMMIT')
+    await child.query('BEGIN')
+    await child.query("SELECT set_config('mikka.account_cloud_cleanup_grant',$1,true)", [grant])
+    await assert.rejects(child.query(`UPDATE cloud_machines SET state='error' WHERE "workspaceId"=$1`, [otherWs]), { code: '55000', message: 'account_deletion_pending' })
+  } finally { await child.query('ROLLBACK'); child.release(); await lease.close() }
+})
 
 test('deletion lease authorizes guarded cloud cleanup but a setting alone does not', { skip: !dbUrl }, async t => {
   const database = new Pool({ connectionString: dbUrl, max: 5 }); t.after(() => database.end())
@@ -31,7 +68,7 @@ test('deletion lease authorizes guarded cloud cleanup but a setting alone does n
   } finally { await child.query('ROLLBACK'); child.release() }
   const kills: string[] = []
   const runtime: AccountCloudProvider = { kill: async (_ws, id) => { kills.push(id) }, endRuns: async () => {}, snapshots: async () => [], deleteSnapshot: async () => {} }
-  assert.deepEqual(await cleanupOwnedCloudMachines(owner, database, runtime, { id: job, client: lease.client }), [])
+  assert.deepEqual(await cleanupOwnedCloudMachines(owner, database, runtime, { job: { id: job, client: lease.client } }), [])
   assert.deepEqual(kills, [sandbox])
   assert.equal((await database.query('SELECT status FROM agent_runs WHERE id=$1', [workspaces[1].run])).rows[0].status, 'stopped')
   for (const ws of workspaces) assert.ok((await database.query('SELECT "revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [ws.device])).rows[0].revokedAt)
@@ -65,7 +102,7 @@ test('cloud deletion fences only this owner and requires acknowledged machine/sn
     async deleteSnapshot(workspaceId, id) { assert.equal(workspaceId, ws.id); deleted.push(id) },
   }
   const blockerErrors: Record<string, string> = {}
-  assert.deepEqual(await cleanupOwnedCloudMachines(owner, database, runtime, undefined, blockerErrors), ['cloud_runtime_cleanup_required'])
+  assert.deepEqual(await cleanupOwnedCloudMachines(owner, database, runtime, { blockerErrors }), ['cloud_runtime_cleanup_required'])
   assert.deepEqual(blockerErrors, { cloud_runtime_cleanup_required: 'Error' })
   assert.equal((await database.query('SELECT status FROM agent_runs WHERE id=$1', [ownRun])).rows[0].status, 'stopped')
   assert.equal((await database.query('SELECT status FROM agent_runs WHERE id=$1', [peerRun])).rows[0].status, 'running')
@@ -79,9 +116,9 @@ test('cloud deletion fences only this owner and requires acknowledged machine/sn
   assert.deepEqual(kills, [ownSandbox, ownSandbox]); assert.deepEqual(ended[0], [ownRun])
   assert.equal((await database.query('SELECT state FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [ws.id, peer])).rows[0].state, 'running')
   const inventoryErrors: Record<string, string> = {}, snapshotErrors: Record<string, string> = {}
-  assert.deepEqual(await cleanupOwnedCloudMachines(owner, database, { ...runtime, snapshots: async () => { throw Object.assign(new Error('inventory unavailable'), { code: 'inventory_failed' }) } }, undefined, inventoryErrors), ['cloud_snapshot_inventory_pending'])
+  assert.deepEqual(await cleanupOwnedCloudMachines(owner, database, { ...runtime, snapshots: async () => { throw Object.assign(new Error('inventory unavailable'), { code: 'inventory_failed' }) } }, { blockerErrors: inventoryErrors }), ['cloud_snapshot_inventory_pending'])
   assert.deepEqual(inventoryErrors, { cloud_snapshot_inventory_pending: 'Error:inventory_failed' })
-  assert.deepEqual(await cleanupOwnedCloudMachines(owner, database, { ...runtime, deleteSnapshot: async () => { throw new Error('delete unavailable') } }, undefined, snapshotErrors), ['cloud_snapshot_cleanup_required'])
+  assert.deepEqual(await cleanupOwnedCloudMachines(owner, database, { ...runtime, deleteSnapshot: async () => { throw new Error('delete unavailable') } }, { blockerErrors: snapshotErrors }), ['cloud_snapshot_cleanup_required'])
   assert.deepEqual(snapshotErrors, { cloud_snapshot_cleanup_required: 'Error' })
   const pendingWs = await seedWorkspace(database, owner, [{ userId: owner, role: 'admin' }])
   await database.query('INSERT INTO cloud_machines("workspaceId","ownerId","operationId","provisionLeaseId","provisionLeaseUntil") VALUES($1,$2,$3,$4,now()-interval \'1 minute\')', [pendingWs.id, owner, randomUUID(), randomUUID()])

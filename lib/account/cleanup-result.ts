@@ -1,3 +1,8 @@
+import type { PoolClient } from 'pg'
+
+export type AccountDeletionLease = { id: string; client: PoolClient }
+export interface AccountCleanupOptions { job?: AccountDeletionLease; blockerErrors?: Record<string, string> }
+
 /** Cleanup failures block account deletion; third-party retention/revocation exceptions are disclosed separately. */
 export interface AccountCleanupReport { blockedReasons: string[]; warnings: string[]; blockerErrors?: Record<string, string> }
 

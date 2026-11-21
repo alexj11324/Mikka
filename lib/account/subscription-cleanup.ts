@@ -1,11 +1,11 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import type { Pool, PoolClient } from 'pg'
-import { cleanupErrorIdentifier, type AccountCleanupReport } from './cleanup-result'
+import type { Pool } from 'pg'
+import { cleanupErrorIdentifier, type AccountCleanupReport, type AccountDeletionLease } from './cleanup-result'
 import type { SubscriptionService } from '@/lib/subscription-service'
 
 type Service = Pick<SubscriptionService, 'repository' | 'worker' | 'status'>
-export type SubscriptionDeletionLease = { id: string; client: PoolClient }
+export type SubscriptionDeletionLease = AccountDeletionLease
 export type SubscriptionCleanupFactory = (grant?: string) => Promise<Service>
 const runtime: SubscriptionCleanupFactory = async grant => (await import('@/lib/subscription-runtime')).subscriptionRuntime(false, true, { accountDeletionGrant: grant })
 
