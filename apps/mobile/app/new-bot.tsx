@@ -9,15 +9,14 @@ import { Field } from '@/components/ui'
 import { api, ApiError } from '@/lib/api'
 import { tap } from '@/lib/haptics'
 import { useHome } from '@/lib/home'
+import { mobileMessages } from '@/lib/messages'
 import { chatPath, openChat } from '@/lib/navigate'
 import { colors, font } from '@/lib/theme'
 
-// The same labels as messages/zh-CN.json; API values remain the shared shape/colour ids.
-const shapeLabels: Record<string, string> = { cercle: '圆形', squircle: '圆角方', nuage: '云朵', goutte: '水滴', fleur: '花', chat: '猫' }
-const colorLabels: Record<string, string> = {
-  encre: '墨色', brun: '棕色', rouge: '红色', orange: '橙色', ambre: '琥珀色', vert: '绿色',
-  turquoise: '青色', bleu: '蓝色', violet: '紫色', rose: '粉色', gris: '灰色', creme: '奶油色',
-}
+// The same catalog the web reads (messages/*.json newBot); API values remain the shared
+// shape/colour ids.
+const shapeLabels = mobileMessages.Shell.newBot.shapes as Record<string, string>
+const colorLabels = mobileMessages.Shell.newBot.colors as Record<string, string>
 
 /**
  * 新建 Bot (Comma design 06), a form sheet from 线程's 新建: a name, a shape and a colour, as on the web

@@ -44,7 +44,7 @@ const POLAR: Partial<Record<ExtraShape, (t: number) => number>> = {
 // The heart's dip and the cat's ears are lost if smoothed.
 const SHARP: ExtraShape[] = ['coeur', 'chat']
 
-function radii(id: ExtraShape) {
+export function extraShapeRadii(id: ExtraShape) {
   const out: number[] = []
   for (let i = 0; i < 64; i++) {
     const t = i / 64 * Math.PI * 2
@@ -68,7 +68,7 @@ let registered = false
 export function registerExtraShapes(table: Map<string, { id: string; radii: number[] }>) {
   if (registered) return
   registered = true
-  for (const id of EXTRA_SHAPE_IDS) table.set(id, { id, radii: radii(id) })
+  for (const id of EXTRA_SHAPE_IDS) table.set(id, { id, radii: extraShapeRadii(id) })
 }
 
 /** bloub's palette, 12 colours (Figma 195:3226). Ink turns cream in the dark theme. */
