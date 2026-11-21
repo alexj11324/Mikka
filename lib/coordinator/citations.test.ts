@@ -96,7 +96,7 @@ test('runTitle is the conversation\'s own bounded short title: stored title, els
   assert.equal(runTitle({ name: 'Check the logs', issue: null }), 'Check the logs', 'a standalone run')
   assert.equal(runTitle({ name: LONG_CJK, issue: null }), '修复登录后的工作区前缀和', 'long CJK: 12 characters')
   assert.equal([...runTitle({ name: LONG_CJK, issue: null })].length, 12)
-  assert.equal(runTitle({ name: LONG_LATIN, issue: null }), 'Fix the workspace prefix and', 'long Latin: 5 words')
+  assert.equal(runTitle({ name: LONG_LATIN, issue: null }), 'Fix the workspace prefix and query', 'long Latin: 6 words')
   assert.ok(runTitle({ name: 'x'.repeat(200), issue: null }).length <= 60, '60 characters at most')
   assert.equal(runTitle({ name: `${'修'.repeat(59)}…`, issue: null }), '修'.repeat(12), 'an already cut name is bounded again, without its ellipsis')
 })
@@ -104,7 +104,7 @@ test('runTitle is the conversation\'s own bounded short title: stored title, els
 test('runThreadName puts the task\'s code before the same conversation title', () => {
   assert.equal(runThreadName({ name: 'Speed up the home page', issue: { id: ISSUE, number: 12, identifier: 'MIK-12', title: LONG_CJK } }), 'MIK-12 Speed up the home page')
   assert.equal(runThreadName({ name: '', issue: { id: ISSUE, number: null, identifier: null, title: '首页提速' } }), '首页提速')
-  assert.equal(runThreadName({ name: LONG_LATIN, issue: null }), 'Fix the workspace prefix and')
+  assert.equal(runThreadName({ name: LONG_LATIN, issue: null }), 'Fix the workspace prefix and query')
 })
 
 test('a thread cited straight after its task is marked as that task\'s pair; anything between them keeps them apart', () => {
@@ -120,6 +120,6 @@ test('a thread cited straight after its task is marked as that task\'s pair; any
 test('the bounded fallback never ends inside a word', () => {
   assert.equal(runTitle({ name: '排查登录回调里丢失的 workspace 前缀和查询参数', issue: null }), '排查登录回调里丢失的', 'a Latin word that does not fit is left out whole')
   assert.equal(runTitle({ name: '升级 Next 到 16 并修复构建', issue: null }), '升级 Next 到 16', '12 characters, cut between words')
-  assert.equal(runTitle({ name: `Fix ${'a'.repeat(30)} ${'b'.repeat(40)} now`, issue: null }), `Fix ${'a'.repeat(30)}`, '36 characters, without half of the next word')
-  assert.equal(runTitle({ name: 'x'.repeat(200), issue: null }), 'x'.repeat(36), 'one unbroken word is still held to 36')
+  assert.equal(runTitle({ name: `Fix ${'a'.repeat(30)} ${'b'.repeat(40)} now`, issue: null }), `Fix ${'a'.repeat(30)}`, '60 characters, without half of the next word')
+  assert.equal(runTitle({ name: 'x'.repeat(200), issue: null }), 'x'.repeat(60), 'one unbroken word is still held to 60')
 })
