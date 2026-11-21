@@ -5,7 +5,6 @@ import { pool } from '@/lib/db'
 import { reconcileDue } from '@/lib/reconcile-due'
 import { armDueTimer, replaceStaleDueTimers } from '@/lib/due-timer'
 
-export const runtime = 'nodejs'
 // Run recovery's group-turn sweep keeps generating after the answer, as the run-recovery route does.
 export const maxDuration = 300
 const headers = { 'cache-control': 'no-store' }

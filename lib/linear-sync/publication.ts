@@ -1,5 +1,5 @@
 import 'server-only'
-import { Client } from 'pg'
+import { withDirectSession } from '../db/direct-session'
 import { and, eq, isNull } from 'drizzle-orm'
 import { db, pool } from '@/lib/db'
 import { issueDocuments, issues, linearIssueLinks, linearIssuePublications, linearSyncOutbox, linearTeamSyncs } from '@/lib/db/schema'
@@ -80,10 +80,8 @@ export async function withCurrentPublication<T>(snapshot: Publication, effect: (
  * while an old response is delayed. A dedicated short-lived connection keeps
  * these HTTP waits out of the request's query pool and preserves its DB target. */
 export async function withPublicationWriter<T>(publicationId: string, work: () => Promise<T>) {
-  const client = new Client({ ...pool.options })
-  try {
-    await client.connect()
+  return withDirectSession(pool, async client => {
     await client.query('select pg_advisory_lock(hashtextextended($1, 184))', [publicationId])
-    return await work()
-  } finally { await client.end().catch(() => undefined) }
+    return work()
+  })
 }

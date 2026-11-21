@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
-import { getReviewDiff, getReviewFile, getReviewPreview, getReviewSummary, mergeReview, openReviewTerminal, REVIEW_ENDPOINTS, ReviewRequestError, sendReviewTerminalInput, sendToAgent, terminalEvent } from './client'
+import { getReviewChecks, getReviewDiff, getReviewFile, getReviewPreview, getReviewSummary, mergeReview, openReviewTerminal, REVIEW_ENDPOINTS, ReviewRequestError, sendReviewTerminalInput, sendToAgent, terminalEvent } from './client' 
 import type { ReviewSummary } from './contract'
 
 const TASK = '6f1c8a52-1b0e-4c3a-9d2f-0a1b2c3d4e5f'
@@ -33,6 +33,14 @@ test('the endpoints live in one map under the task', () => {
   assert.equal(REVIEW_ENDPOINTS.merge('a/b'), '/api/tasks/a%2Fb/review/merge')
 })
 
+test('check contracts retain native log links while accepting historical checks without links', async () => {
+  const checks = [{ id: 'native-check-19', name: 'Build', status: 'failed', logExcerpt: 'Build failed',
+    logUrl: 'https://github.com/fixture/review/runs/19' }, { id: 'historical-check', name: 'Tests', status: 'passed' }]
+  answer(200, checks)
+  assert.deepEqual(await getReviewChecks(TASK), checks)
+  assert.equal(calls[0]!.url, `/api/tasks/${TASK}/review/checks`)
+})
+
 test('a summary is narrowed to the contract: unknown fields drop, permissions keep their reasons', async () => {
   answer(200, { ...summary, extra: 'ignored' })
   const read = await getReviewSummary(TASK)
@@ -43,6 +51,7 @@ test('a summary is narrowed to the contract: unknown fields drop, permissions ke
 test('a running task with no PR is a valid summary, and missing reasons default to none', async () => {
   answer(200, { ...summary, pr: null, running: true, branch: undefined, live: undefined, permissions: { canMerge: true, canSend: true, canTerminal: true } })
   const read = await getReviewSummary(TASK)
+  assert.ok(read)
   assert.equal(read.pr, null)
   assert.deepEqual(read.permissions.reasons, {})
 })
@@ -64,6 +73,7 @@ test('the review read passes the cursor and commit, and keeps a paged file witho
   answer(200, { summary, diff })
   const read = await getReviewDiff(TASK, { cursor: 'c1', commit: 'abc123' })
   assert.equal(calls[0].url, `/api/tasks/${TASK}/review?cursor=c1&commit=abc123`)
+  assert.ok(read)
   assert.equal(read.diff.files[0].patch, null)
   assert.equal(read.diff.source.reclaimed, true)
   answer(200, { summary, diff: { ...diff, source: { ...diff.source, kind: 'attempt' } } })
@@ -153,4 +163,35 @@ test('the preview: a running dev server gives its address; none, or no endpoint 
   assert.deepEqual(await getReviewPreview(TASK), { running: false })
   answer(500, { error: 'boom' })
   await assert.rejects(getReviewPreview(TASK), ReviewRequestError)
+})
+
+
+test('no scoped coding source is a normal null read and an access failure stays a failure', async () => {
+  answer(200, null)
+  assert.equal(await getReviewSummary(TASK), null)
+  assert.equal(await getReviewDiff(TASK), null)
+  answer(404, { error: 'workspace_not_found' })
+  await assert.rejects(getReviewSummary(TASK), ReviewRequestError)
+  await assert.rejects(getReviewDiff(TASK), ReviewRequestError)
+})
+
+test('file, check and cursor reads reject a different immutable snapshot even when the path or HEAD matches', async () => {
+  const reference = { snapshotId: TASK, sourceVersion: 'a'.repeat(64) }
+  const different = { ...reference, sourceVersion: 'b'.repeat(64) }
+  const file = { path: 'a.ts', status: 'modified', additions: null, deletions: null, patch: null, comments: 0 }
+  answer(200, { reviewRef: different, file, comments: [] })
+  await assert.rejects(getReviewFile(TASK, file.path, reference), ReviewRequestError)
+  assert.equal(new URL(calls[0].url, 'https://example.test').searchParams.get('sourceVersion'), reference.sourceVersion)
+  answer(200, { reviewRef: reference, file: { ...file, path: 'different.ts' }, comments: [] })
+  await assert.rejects(getReviewFile(TASK, file.path, reference), ReviewRequestError)
+  const checks = [{ id: 'skipped-native', status: 'neutral', name: 'Optional validation' }]
+  answer(200, { reviewRef: different, state: 'complete', checks })
+  await assert.rejects(getReviewChecks(TASK, reference), ReviewRequestError)
+  answer(200, { reviewRef: reference, state: 'complete', checks })
+  assert.deepEqual(await getReviewChecks(TASK, reference), checks)
+  const diff = { reviewRef: different, source: { kind: 'commit', at: '2026-11-08T00:00:00Z', reclaimed: false },
+    live: false, base: null, head: null, files: [file], empty: false }
+  answer(200, { summary, diff })
+  await assert.rejects(getReviewDiff(TASK, { cursor: 'next', reference }), ReviewRequestError)
+  assert.ok(calls.every(call => call.method === 'GET'))
 })

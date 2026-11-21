@@ -1,6 +1,5 @@
 import { scopeSubtest,teamResumeBootstrap } from './support/scope-acceptance.mjs'
 import { SCOPE_DATABASES } from '../scripts/scope-acceptance-policy.mjs'
-import 'next/dist/server/node-environment-baseline'
 import { installTeamSessionFixture } from './fixtures/team-auth-runtime.mjs'
 import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
@@ -64,20 +63,31 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   // Inject at the actual PostgreSQL commit boundary. workspaceDb deliberately
   // owns transaction dispatch, so replacing its method does not reach the
   // pinned client used by an authoritative workspace transaction.
-  function injectWorkspaceCommit(hooks: { beforeBegin?: () => void; afterCommit?: () => void | Promise<void> }) {
+  function injectWorkspaceCommit(receiptTable: 'team_issue_create_receipts' | 'team_issue_promotion_receipts',
+    requestId: string, hooks: { beforeReceiptRead?: () => void; afterCommit: () => void | Promise<void> }) {
+    const receiptInsert = 'insert into "' + receiptTable + '" '
+    const receiptRead = new RegExp('\\bfrom\\s+"' + receiptTable + '"', 'i')
     const originals = new Map<PoolClient, PoolClient['query']>()
     const acquire = (client: PoolClient) => {
       if (originals.has(client)) return
       const original = client.query
       originals.set(client, original)
+      let writesReceipt = false
       client.query = ((...args: unknown[]) => {
         const statement = args[0]
         const text = typeof statement === 'string' ? statement : statement && typeof statement === 'object' && 'text' in statement && typeof statement.text === 'string' ? statement.text : ''
-        if (/^\s*begin(?:\s|$)/i.test(text)) hooks.beforeBegin?.()
+        if (/^\s*(?:begin|rollback)(?:\s|$)/i.test(text)) writesReceipt = false
+        const parameters = Array.isArray(args[1]) ? args[1]
+          : statement && typeof statement === 'object' && 'values' in statement ? statement.values : undefined
+        if (Array.isArray(parameters) && parameters.includes(requestId)) {
+          if (receiptRead.test(text)) hooks.beforeReceiptRead?.()
+          if (text.trimStart().toLowerCase().startsWith(receiptInsert)) writesReceipt = true
+        }
         const result: unknown = Reflect.apply(original, client, args)
-        if (!/^\s*commit(?:\s|$)/i.test(text)) return result
+        if (!writesReceipt || !/^\s*commit(?:\s|$)/i.test(text)) return result
+        writesReceipt = false
         assert.ok(result && typeof result === 'object' && 'then' in result && typeof result.then === 'function', 'Drizzle COMMIT must use the promise query API')
-        return Promise.resolve(result).then(async value => { await hooks.afterCommit?.(); return value })
+        return Promise.resolve(result).then(async value => { await hooks.afterCommit(); return value })
       }) as PoolClient['query']
     }
     workspacePool.on('acquire', acquire)
@@ -86,27 +96,53 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
       for (const [client, original] of originals) client.query = original
     }
   }
+  function observeWorkspaceLockWaits() {
+    const originals=new Map<PoolClient,PoolClient['query']>()
+    const observed={timeouts:[] as string[],transactions:0}
+    const acquire=(client:PoolClient)=>{
+      if(originals.has(client)) return
+      const original=client.query;originals.set(client,original)
+      client.query=((...args:unknown[])=>{
+        const statement=args[0]
+        const text=typeof statement==='string'?statement:statement&&typeof statement==='object'&&'text' in statement&&typeof statement.text==='string'?statement.text:''
+        const result:unknown=Reflect.apply(original,client,args)
+        if(/^\s*begin(?:\s|$)/i.test(text)) {
+          assert.ok(result&&typeof result==='object'&&'then' in result&&typeof result.then==='function')
+          return Promise.resolve(result).then(async value=>{
+            // Bound a real blocked lock upgrade. This is not a deadline for
+            // promotion work, and every business query still reaches PG.
+            await Reflect.apply(original,client,["set local lock_timeout='1s'"])
+            observed.transactions++
+            return value
+          })
+        }
+        if(result&&typeof result==='object'&&'then' in result&&typeof result.then==='function') return Promise.resolve(result).catch((error:unknown)=>{
+          if(error&&typeof error==='object'&&'code' in error&&error.code==='55P03') observed.timeouts.push(error.code)
+          throw error
+        })
+        return result
+      }) as PoolClient['query']
+    }
+    workspacePool.on('acquire',acquire)
+    return {observed,restore(){
+      workspacePool.off('acquire',acquire)
+      for(const [client,original] of originals) client.query=original
+    }}
+  }
   const {db}=await import('../lib/db')
   const {teamIssueCreateRequests}=await import('../lib/db/schema')
   const {createIssueForUserInTransaction}=await import('../lib/issue-create')
   const {issueForUser}=await import('../lib/issue-access')
   const {createIssueForTeam,promoteIssueToTeam,setIssueScope,saveIssue}=await import('../app/actions/issues')
   const {exchangeDocument}=await import('../app/actions/collaboration')
-  const {AfterContext}=await import('next/dist/server/after/after-context')
-  const {workAsyncStorage}=await import('next/dist/server/app-render/work-async-storage.external')
-  const {workUnitAsyncStorage}=await import('next/dist/server/app-render/work-unit-async-storage.external')
-  const {createRequestStoreForAPI}=await import('next/dist/server/async-storage/request-store')
-  const {NextRequest}=await import('next/server')
+  const {createRequestScope,runRequestScope}=await import('../apps/api/src/context')
+  const {NextRequest}=await import('../lib/server-runtime/server')
   const Y=await import('yjs')
   async function withAfter<T>(fn:()=>Promise<T>) {
-    const waits:Promise<unknown>[]=[],errors:unknown[]=[],closes:Array<()=>void>=[]
-    const afterContext=new AfterContext({waitUntil:promise=>{waits.push(promise)},onClose:callback=>{closes.push(callback)},onTaskError:error=>{errors.push(error)}})
-    const request=new NextRequest('http://127.0.0.1/mikka')
-    // Include Next 16.4's optional HMR argument; local 16.1 ignores it.
-    const requestStore:ReturnType<typeof createRequestStoreForAPI>=Reflect.apply(createRequestStoreForAPI,undefined,[request,new URL(request.url),{tags:[],expirationsByCacheKind:new Map()},undefined,undefined,undefined])
-    return workAsyncStorage.run({afterContext} as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>,()=>workUnitAsyncStorage.run(requestStore,async()=>{
-      try{return await fn()}finally{for(const close of closes)close();await Promise.all(waits);assert.deepEqual(errors,[])}
-    }))
+    const scope=createRequestScope(new NextRequest('http://127.0.0.1/mikka'))
+    return runRequestScope(scope,async()=>{
+      try{return await fn()}finally{await scope.after.finish()}
+    })
   }
   const {retryLinearIssue}=await import('../app/actions/linear-sync')
   const {syncAppIssueToLinear}=await import('../lib/linear-sync/issue-sync')
@@ -135,6 +171,140 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     if exists(select 1 from team184_controls where "teamId"=new."teamId" and pause) then perform pg_advisory_xact_lock(hashtextextended('team184-barrier',0)); end if;
     return new; end $$`)
   await workspace.query('create trigger team184_inject before insert on mikka_team_issues for each row execute function team184_inject()')
+  await scopeSubtest(t, 'task attachments use current task ACLs and persist independently of any thread', async () => {
+    const route = await import('../app/api/tasks/[taskId]/attachments/route')
+    const { createLegacyPersonalAccessToken } = await import('../lib/tokens/store')
+    const taskId = randomUUID(), otherId = randomUUID(), fileId = randomUUID()
+    await app.query(`INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority)
+      SELECT id,$1,$2,'bound','File test','{"type":"doc"}','todo','normal' FROM unnest($3::uuid[]) AS id`, [owner, workspaceId, [taskId, otherId]])
+    const token = async (user: string, tenant: string) => (await createLegacyPersonalAccessToken(user, tenant, { name: 'File acceptance' })).token
+    const editor = await token(owner, workspaceId), member = await token(racer, workspaceId), elsewhere = await token(owner, personalWorkspaceId)
+    const server = createServer(async (incoming, outgoing) => {
+      try {
+        const incomingBytes: Buffer[] = []
+        for await (const chunk of incoming) incomingBytes.push(chunk)
+        const request = new Request(`http://${incoming.headers.host}${incoming.url}`, {
+          method: incoming.method, headers: incoming.headers as Record<string, string>,
+          body: incoming.method === 'POST' ? Buffer.concat(incomingBytes) : undefined,
+        })
+        const id = new URL(request.url).pathname.split('/')[2]!
+        const method = incoming.method as 'GET' | 'POST' | 'DELETE'
+        const response = await route[method](request, { params: Promise.resolve({ taskId: id }) })
+        outgoing.writeHead(response.status, Object.fromEntries(response.headers))
+        outgoing.end(Buffer.from(await response.arrayBuffer()))
+      } catch { outgoing.writeHead(500); outgoing.end() }
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    try {
+      const address = server.address()
+      assert.ok(address && typeof address !== 'string')
+      const endpoint = `http://127.0.0.1:${address.port}/tasks/${taskId}/attachments`
+      const data = new Uint8Array([0, 80, 68, 70, 255]), name = '附件 (1).bin'
+      const request = (who: string, method: 'GET' | 'POST' | 'DELETE' = 'GET', id = '', bytes = data, url = endpoint) => {
+        const body = new FormData()
+        body.set('file', new File([bytes], name))
+        return fetch(url + (id ? `?id=${id}` : ''), {
+          method, headers: { authorization: `Bearer ${who}` }, ...(method === 'POST' && { body }),
+        })
+      }
+      assert.equal((await request('mkp_' + '0'.repeat(43))).status, 401)
+      assert.deepEqual(await (await request(editor)).json(), { files: [], canEdit: true })
+      const file = { id: fileId, name, size: data.length }
+      for (const response of await Promise.all([request(editor, 'POST', fileId), request(editor, 'POST', fileId)])) {
+        assert.equal(response.status, 200)
+        assert.deepEqual(await response.json(), file)
+      }
+      assert.equal((await request(editor, 'POST', fileId, new Uint8Array([1]))).status, 409)
+      assert.deepEqual(await (await request(member)).json(), { files: [file], canEdit: true })
+      const { ensureTaskIdentifiers } = await import('../lib/task-identity-store')
+      const code = (await ensureTaskIdentifiers([{ id: taskId, ownerId: owner }])).get(taskId)
+      assert.ok(code)
+      const lookup = endpoint.replace(taskId, encodeURIComponent(code)) + `?id=${fileId}&format=url&fresh=1`
+      const metadata = await request(member, 'GET', '', data, lookup)
+      assert.equal(metadata.status, 200)
+      assert.equal(metadata.headers.get('cache-control'), 'private, no-store')
+      const link = await metadata.json()
+      assert.equal(link.expiresAt, null)
+      const resolved = new URL(link.url).href
+      assert.equal(resolved, `${endpoint}?id=${fileId}`)
+      assert.deepEqual(new Uint8Array(await (await request(member, 'GET', '', data, resolved)).arrayBuffer()), data)
+      const download = await request(member, 'GET', fileId)
+      assert.equal(download.status, 200)
+      assert.match(download.headers.get('content-disposition')!, /^attachment;/)
+      assert.deepEqual(new Uint8Array(await download.arrayBuffer()), data)
+      assert.equal((await request(elsewhere, 'GET', fileId)).status, 404)
+      assert.equal((await request(editor, 'GET', fileId, data, endpoint.replace(taskId, otherId))).status, 404)
+      await app.query(`UPDATE resource_access_policies SET visibility='private' WHERE kind='task' AND id=$1`, [taskId])
+      assert.equal((await request(member)).status, 404)
+      assert.equal((await request(member, 'GET', '', data, lookup)).status, 404)
+      assert.equal((await request(member, 'GET', '', data, resolved)).status, 404)
+      await app.query(`INSERT INTO resource_access_grants("resourceKind","resourceId","subjectKind","subjectId",capabilities)
+        VALUES('task',$1,'account',$2,ARRAY['canReadContent'])`, [taskId, racer])
+      assert.deepEqual(await (await request(member)).json(), { files: [file], canEdit: false })
+      assert.equal((await request(member, 'POST', randomUUID())).status, 404)
+      assert.equal((await request(member, 'DELETE', fileId)).status, 404)
+      await app.query(`UPDATE resource_access_grants SET capabilities=ARRAY['canSteer'] WHERE "resourceKind"='task' AND "resourceId"=$1 AND "subjectId"=$2`, [taskId, racer])
+      assert.equal((await request(member, 'GET', fileId)).status, 404)
+      assert.equal((await request(member, 'POST', randomUUID())).status, 404)
+      assert.equal((await request(member, 'DELETE', fileId)).status, 404)
+      assert.equal((await request(editor, 'DELETE', fileId)).status, 204)
+      assert.deepEqual(await (await request(editor)).json(), { files: [], canEdit: true })
+      assert.equal((await request(editor, 'GET', fileId)).status, 404)
+      assert.equal((await request(editor, 'GET', '', data, lookup)).status, 404)
+      // One more upload at the count boundary wins; declined uploads do not add rows.
+      for (let n = 0; n < 9; n++) assert.equal((await request(editor, 'POST', randomUUID())).status, 200)
+      const concurrent = await Promise.all([request(editor, 'POST', randomUUID()), request(editor, 'POST', randomUUID())])
+      assert.deepEqual(concurrent.map(r => r.status).sort(), [200, 409])
+      assert.equal((await (await request(editor)).json()).files.length, 10)
+      assert.equal((await request(editor, 'POST', randomUUID(), new Uint8Array(3 * 1024 * 1024 + 1))).status, 413)
+
+      // Drive the real S3 transport, retention trigger and existing cleanup worker
+      // against an isolated object server, including an interrupted final commit.
+      const objects = new Map<string, Buffer>()
+      const bucket = createServer(async (req, res) => {
+        const key = req.url!.slice('/private/'.length)
+        if (req.method === 'PUT') {
+          const parts = []
+          for await (const chunk of req) parts.push(Buffer.from(chunk))
+          objects.set(key, Buffer.concat(parts))
+          res.writeHead(200).end()
+        } else if (req.method === 'DELETE') { objects.delete(key); res.writeHead(204).end() }
+        else if (objects.has(key)) res.writeHead(200).end(objects.get(key))
+        else res.writeHead(404).end()
+      })
+      await new Promise<void>(resolve => bucket.listen(0, '127.0.0.1', resolve))
+      const bucketAddress = bucket.address()
+      assert.ok(bucketAddress && typeof bucketAddress !== 'string')
+      const settings = { S3_ENDPOINT: `http://127.0.0.1:${bucketAddress.port}`, S3_BUCKET: 'private', S3_ACCESS_KEY_ID: 'test', S3_SECRET_ACCESS_KEY: 'fixture-only' }
+      const previous = Object.fromEntries(Object.keys(settings).map(key => [key, process.env[key]]))
+      Object.assign(process.env, settings)
+      try {
+        const url = endpoint.replace(taskId, otherId), id = randomUUID()
+        assert.equal((await request(editor, 'POST', id, data, url)).status, 200)
+        assert.equal(objects.size, 1)
+        assert.deepEqual(new Uint8Array(await (await request(editor, 'GET', id, data, url)).arrayBuffer()), data)
+        const { cleanupChatFiles } = await import('../lib/chat-attachments/store')
+        const deniedId = randomUUID()
+        await app.query(`ALTER TABLE task_attachments ADD CONSTRAINT synthetic_commit_error CHECK(id <> '${deniedId}'::uuid)`)
+        assert.equal((await request(editor, 'POST', deniedId, data, url)).status, 500)
+        assert.equal(objects.size, 2)
+        assert.equal((await request(editor, 'GET', deniedId, data, url)).status, 404)
+        const retirement = await app.query(`UPDATE chat_attachment_retirements SET "notBefore"=now() WHERE "storageKey" LIKE $1 RETURNING "storageKey"`, [`task-files/${otherId}/%`])
+        assert.equal(retirement.rowCount, 1)
+        await cleanupChatFiles()
+        assert.equal(objects.size, 1)
+        assert.equal((await request(editor, 'DELETE', id, data, url)).status, 204)
+        await cleanupChatFiles()
+        assert.equal(objects.size, 0)
+      } finally {
+        for (const [key, value] of Object.entries(previous)) {
+          if (value === undefined) delete process.env[key]
+          else process.env[key] = value
+        }
+        await new Promise<void>((resolve, reject) => bucket.close(error => error ? reject(error) : resolve()))
+      }
+    } finally { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())) }
+  })
   await scopeSubtest(t, 'save, legacy scope click, title/document writes and manual retry keep personal data out of Linear',async()=>{
     const created=await withAfter(()=>actAs(owner,()=>saveIssue({title:'Legacy UI task',content,status:'todo',priority:'normal'})))
     assert.ok('issue' in created && created.issue);const id=created.issue.id
@@ -189,14 +359,79 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.equal((await workspace.query('select "teamId" from mikka_team_issues where "issueId"=$1',[original.id])).rows[0].teamId,badTeam)
     assert.equal(externalCalls,0)
   })
+  await scopeSubtest(t, 'team promotion completes while another admission holds the same membership SHARE lease',async()=>{
+    testGlobals.teamCreateTestUser=owner
+    const created=await withAfter(()=>saveIssue({workspaceId,title:'Promotion with a concurrent shared membership',content,status:'todo',priority:'normal'}))
+    assert.ok('issue' in created && created.issue)
+    const request={requestId:randomUUID(),issueId:created.issue.id,revision:created.issue.revision,teamId,expectedTeamId:null}
+    const holder=await workspace.connect(),locks=observeWorkspaceLockWaits()
+    try {
+      await holder.query('begin')
+      assert.equal((await holder.query('select id from mikka_workspaces where id=$1 for share',[workspaceId])).rowCount,1)
+      assert.deepEqual((await holder.query('select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2 for share',[workspaceId,owner])).rows,[{status:'active'}])
+      const heldTransaction=(await holder.query('select txid_current()::text as id')).rows[0].id
+      const result=await promoteIssueToTeam(request)
+      t.diagnostic(`Concurrent membership SHARE: result=${'error' in result?result.error:'complete'}, lockTimeouts=${JSON.stringify(locks.observed.timeouts)}`)
+      assert.deepEqual(locks.observed.timeouts,[],'promotion must remain compatible with an existing membership SHARE lease')
+      assert.ok('issue' in result && result.issue)
+      assert.ok(locks.observed.transactions>=2,'both real promotion phases must run while the shared lease is held')
+      assert.equal((await holder.query('select txid_current()::text as id')).rows[0].id,heldTransaction)
+      assert.equal(result.issue.id,request.issueId);assert.equal(result.issue.workspaceId,workspaceId);assert.equal(result.issue.revision,request.revision+1)
+      assert.equal(result.issue.linearSyncBlocked,true);assert.deepEqual(result.linearSync,{enabled:false,reason:'no_explicit_target'})
+      assert.deepEqual((await app.query('select status from team_issue_promotions where "requestId"=$1 and "issueId"=$2',[request.requestId,request.issueId])).rows,[{status:'complete'}])
+      assert.equal((await workspace.query('select count(*)::int n from team_issue_promotion_receipts r join mikka_team_issues t on t."issueId"=r."issueId" where r."requestId"=$1 and r."issueId"=$2 and r."ownerId"=$3 and r."teamId"=$4 and r."workspaceId"=$5 and t."userId"=$3 and t."teamId"=$4 and t."workspaceId"=$5',[request.requestId,request.issueId,owner,teamId,workspaceId])).rows[0].n,1)
+      assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[request.issueId])).rows[0].n,0)
+    } finally {
+      locks.restore()
+      try {await holder.query('rollback')} finally {holder.release()}
+    }
+  })
+  await scopeSubtest(t, 'cross-workspace promotion refuses before locking the original workspace membership',async()=>{
+    testGlobals.teamCreateTestUser=owner
+    const created=await withAfter(()=>saveIssue({workspaceId,title:'Retain the original promotion workspace',content,status:'todo',priority:'normal'}))
+    assert.ok('issue' in created && created.issue)
+    const initial=await promoteIssueToTeam({requestId:randomUUID(),issueId:created.issue.id,revision:created.issue.revision,teamId,expectedTeamId:null})
+    assert.ok('issue' in initial && initial.issue)
+    const otherWorkspace=randomUUID(),otherTeam=randomUUID(),id=initial.issue.id
+    await workspace.query('insert into mikka_workspaces (id,"userId",name) values ($1,$2,\'Other promotion workspace\')',[otherWorkspace,owner])
+    await workspace.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Synthetic\',$3,\'member\',\'active\')',[otherWorkspace,owner,`${owner}@example.invalid`])
+    await workspace.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Other promotion team\',\'OTHER\')',[otherTeam,otherWorkspace,owner])
+    const before={
+      task:(await app.query('select * from issues where id=$1',[id])).rows,
+      requests:(await app.query('select * from team_issue_promotions where "issueId"=$1 order by "requestId"',[id])).rows,
+      receipts:(await workspace.query('select * from team_issue_promotion_receipts where "issueId"=$1 order by "requestId"',[id])).rows,
+      links:(await workspace.query('select * from mikka_team_issues where "issueId"=$1',[id])).rows,
+    }
+    const request={requestId:randomUUID(),issueId:id,revision:initial.issue.revision,teamId:otherTeam,expectedTeamId:teamId}
+    const holder=await workspace.connect(),locks=observeWorkspaceLockWaits()
+    try {
+      await holder.query('begin')
+      assert.equal((await holder.query('select id from mikka_workspaces where id=$1 for update',[workspaceId])).rowCount,1)
+      assert.deepEqual((await holder.query('select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2 for update',[workspaceId,owner])).rows,[{status:'active'}])
+      const heldTransaction=(await holder.query('select txid_current()::text as id')).rows[0].id
+      const result=await promoteIssueToTeam(request)
+      t.diagnostic(`Cross-workspace original membership held: result=${'error' in result?result.error:'complete'}, lockTimeouts=${JSON.stringify(locks.observed.timeouts)}`)
+      assert.deepEqual(locks.observed.timeouts,[],'a cross-workspace refusal must not wait on the original membership')
+      assert.deepEqual(result,{error:'teamIssueChanged',requestId:request.requestId})
+      assert.equal((await holder.query('select txid_current()::text as id')).rows[0].id,heldTransaction)
+      assert.deepEqual((await app.query('select * from issues where id=$1',[id])).rows,before.task)
+      assert.deepEqual((await app.query('select * from team_issue_promotions where "issueId"=$1 order by "requestId"',[id])).rows,before.requests)
+      assert.deepEqual((await workspace.query('select * from team_issue_promotion_receipts where "issueId"=$1 order by "requestId"',[id])).rows,before.receipts)
+      assert.deepEqual((await workspace.query('select * from mikka_team_issues where "issueId"=$1',[id])).rows,before.links)
+      assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[id])).rows[0].n,0)
+    } finally {
+      locks.restore()
+      try {await holder.query('rollback')} finally {holder.release()}
+    }
+  })
   await scopeSubtest(t, 'existing task lost workspace commit response retains its shared tenant and resumes same receipt',async()=>{
     testGlobals.teamCreateTestUser=owner
     const created=await withAfter(()=>saveIssue({workspaceId,title:'Existing task lost response',content,status:'todo',priority:'normal'}))
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     const request={requestId:randomUUID(),issueId:id,revision:created.issue.revision,teamId,expectedTeamId:null}
     let mode:'lost'|'unavailable'|'normal'='lost'
-    const restore=injectWorkspaceCommit({
-      beforeBegin:()=>{if(mode==='unavailable') throw new Error('synthetic unavailable')},
+    const restore=injectWorkspaceCommit('team_issue_promotion_receipts', request.requestId, {
+      beforeReceiptRead:()=>{if(mode==='unavailable') throw new Error('synthetic unavailable')},
       afterCommit:()=>{if(mode==='lost'){mode='unavailable';throw new Error('synthetic lost response')}},
     })
     try {
@@ -234,7 +469,7 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     assert.ok('issue' in created && created.issue);const id=created.issue.id
     const request={requestId:randomUUID(),issueId:id,revision:created.issue.revision,teamId,expectedTeamId:null}
     let first=true
-    const restore=injectWorkspaceCommit({afterCommit:async()=>{if(first){first=false;await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,revoked])}}})
+    const restore=injectWorkspaceCommit('team_issue_promotion_receipts', request.requestId, {afterCommit:async()=>{if(first){first=false;await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,revoked])}}})
     try {
       assert.deepEqual(await promoteIssueToTeam(request),{error:'teamIssueAccessDenied',requestId:request.requestId})
       assert.deepEqual((await app.query('select scope,"linearSyncBlocked" from issues where id=$1',[id])).rows[0],{scope:'workspace',linearSyncBlocked:true})
@@ -452,11 +687,11 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
   await scopeSubtest(t, 'lost workspace commit response retries one request and preserves workspace visibility throughout completion',async()=>{
     const value=input(teamId)
     let mode:'lost'|'unavailable'|'normal'='lost'
-    // Throw only after the real first workspace transaction has committed.
+    // Throw only after this request’s real association transaction has committed.
     // The next attempt simulates an unavailable workspace recheck without
     // changing or deleting a fixture; restoring normal commits permits recovery.
-    const restore=injectWorkspaceCommit({
-      beforeBegin:()=>{if(mode==='unavailable') throw new Error('synthetic workspace recheck unavailable')},
+    const restore=injectWorkspaceCommit('team_issue_create_receipts', value.requestId, {
+      beforeReceiptRead:()=>{if(mode==='unavailable') throw new Error('synthetic workspace recheck unavailable')},
       afterCommit:()=>{if(mode==='lost') {mode='unavailable';throw new Error('synthetic lost commit response')}},
     })
     try {
@@ -480,10 +715,11 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     const value=input(teamId), {requestId,teamId:selectedTeam,...fields}=value
     const fingerprint=createHash('sha256').update(JSON.stringify({teamId:selectedTeam,...fields})).digest('hex')
     const id=randomUUID()
-    await db.transaction(async tx=>{
+    const {withTaskWorkspace}=await import('../lib/task-workspace')
+    await withTaskWorkspace(owner,workspaceId,()=>db.transaction(async tx=>{
       assert.ok(await createIssueForUserInTransaction(tx,owner,fields,userActor(owner),{workspaceId,id,linearSyncBlocked:true}))
       await tx.insert(teamIssueCreateRequests).values({requestId,issueId:id,ownerId:owner,teamId:selectedTeam,fingerprint})
-    })
+    }))
     await workspace.query('insert into team_issue_create_receipts ("requestId","issueId","ownerId","teamId","workspaceId") values ($1,$2,$3,$4,$5)',[requestId,id,owner,selectedTeam,workspaceId])
     assert.deepEqual(await query(owner,value),{error:'teamIssueChanged',requestId})
     assert.equal((await workspace.query('select count(*)::int n from mikka_team_issues where "issueId"=$1',[id])).rows[0].n,0)
@@ -495,10 +731,17 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     await app.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Synthetic\',$2,true,now(),now())',[lostOwner,`${lostOwner}@example.invalid`])
     await workspace.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Synthetic\',$3,\'member\',\'active\')',[workspaceId,lostOwner,`${lostOwner}@example.invalid`])
     let once=true
-    const restore=injectWorkspaceCommit({afterCommit:()=>{
+    const restore=injectWorkspaceCommit('team_issue_create_receipts', value.requestId, {afterCommit:()=>{
       if(once) {once=false;throw new Error('synthetic lost commit response')}
     }})
     try {
+      // A live notification may commit on this pool before the association does.
+      const other = await workspacePool.connect()
+      try {
+        await other.query('BEGIN')
+        await other.query('SELECT 1')
+        await other.query('COMMIT')
+      } finally { other.release() }
       assert.deepEqual(await query(lostOwner,value),{error:'teamIssueRetry',requestId:value.requestId})
       const row=(await app.query('select i.id,i.scope from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
       await workspace.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,lostOwner])
@@ -509,27 +752,47 @@ test('explicit team task creation across two real PostgreSQL databases', { skip:
     } finally {restore()}
   })
   await scopeSubtest(t, 'revocation between association and completion revokes creator access without moving the task',async()=>{
-    await workspace.query('insert into team184_controls ("teamId",pause) values ($1,true)',[raceTeam])
-    const gate=await workspace.connect(), revoke=await workspace.connect();const value=input(raceTeam)
-    let create:ReturnType<typeof query>|undefined, revocation:Promise<unknown>|undefined
+    const revoke=await workspace.connect(),value=input(raceTeam)
+    let associationCommitted=false,issueId:string|undefined
+    const restore=injectWorkspaceCommit('team_issue_create_receipts', value.requestId, {afterCommit:async()=>{
+      if(associationCommitted) return
+      associationCommitted=true
+      // The real association COMMIT has released its locks, but its promise
+      // has not returned to start completion. Inspect it from independent
+      // connections before revoking in the normal Workspace -> member order.
+      const receipt=await revoke.query('select r."issueId",r."ownerId",r."teamId",r."workspaceId",t."userId" as "linkedOwner",t."teamId" as "linkedTeam",t."workspaceId" as "linkedWorkspace" from team_issue_create_receipts r join mikka_team_issues t on t."issueId"=r."issueId" where r."requestId"=$1',[value.requestId])
+      assert.equal(receipt.rowCount,1,'the association receipt and relation must already be committed')
+      issueId=receipt.rows[0].issueId
+      assert.ok(issueId)
+      assert.deepEqual(receipt.rows[0],{issueId,ownerId:racer,teamId:raceTeam,workspaceId,linkedOwner:racer,linkedTeam:raceTeam,linkedWorkspace:workspaceId})
+      const preparing=await app.query('select i."workspaceId",i."ownershipState",i.scope,i."linearSyncBlocked",i.revision,r.status from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1 and i.id=$2',[value.requestId,issueId])
+      assert.equal(preparing.rowCount,1)
+      assert.deepEqual(preparing.rows[0],{workspaceId,ownershipState:'bound',scope:'workspace',linearSyncBlocked:true,revision:1,status:'preparing'})
+      await revoke.query('begin')
+      assert.equal((await revoke.query('select id from mikka_workspaces where id=$1 for update',[workspaceId])).rowCount,1)
+      assert.deepEqual((await revoke.query('select status from mikka_workspace_members where "workspaceId"=$1 and "userId"=$2 for update',[workspaceId,racer])).rows,[{status:'active'}])
+      assert.equal((await revoke.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,racer])).rowCount,1)
+      await revoke.query('commit')
+    }})
     try {
-      await gate.query("select pg_advisory_lock(hashtextextended('team184-barrier',0))")
-      create=query(racer,value)
-      let blocked=false
-      for(let i=0;i<500;i++) {if((await workspace.query("select 1 from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query like '%mikka_team_issues%'" )).rowCount){blocked=true;break}}
-      assert.ok(blocked,'association did not reach the barrier')
-      await revoke.query('begin');revocation=revoke.query("select pg_advisory_xact_lock(hashtextextended('mikka-team-relations',0))")
-      let waiting=false
-      for(let i=0;i<500;i++) {if((await workspace.query("select 1 from pg_stat_activity where datname=current_database() and wait_event_type='Lock' and query like '%mikka-team-relations%'" )).rowCount){waiting=true;break}}
-      assert.ok(waiting,'revocation did not wait for the relation lock')
-      await gate.query("select pg_advisory_unlock(hashtextextended('team184-barrier',0))");await revocation
-      await revoke.query('update mikka_workspace_members set status=\'inactive\' where "workspaceId"=$1 and "userId"=$2',[workspaceId,racer]);await revoke.query('commit')
-      assert.deepEqual(await create,{error:'teamIssueAccessDenied',requestId:value.requestId})
-      const row=(await app.query('select i.id,i.scope,i."linearSyncBlocked" from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
-      assert.equal(row.scope,'workspace');assert.equal(row.linearSyncBlocked,true)
+      // The pool also commits work belonging to other requests. Its COMMIT
+      // must never consume the revocation intended for this association.
+      const unrelated = await workspacePool.connect()
+      try {
+        await unrelated.query('BEGIN')
+        await unrelated.query('SELECT 1')
+        await unrelated.query('COMMIT')
+      } finally { unrelated.release() }
+      assert.equal(associationCommitted, false)
+      assert.deepEqual(await query(racer,value),{error:'teamIssueAccessDenied',requestId:value.requestId})
+      assert.ok(associationCommitted);assert.ok(issueId)
+      const row=(await app.query('select i.id,i."workspaceId",i."ownershipState",i.scope,i."linearSyncBlocked",i.revision,r.status from issues i join team_issue_create_requests r on r."issueId"=i.id where r."requestId"=$1',[value.requestId])).rows[0]
+      assert.deepEqual(row,{id:issueId,workspaceId,ownershipState:'bound',scope:'workspace',linearSyncBlocked:true,revision:1,status:'preparing'})
+      assert.equal(await issueForUser(racer,row.id),null);assert.ok(await issueForUser(owner,row.id))
+      assert.equal((await workspace.query('select count(*)::int n from team_issue_create_receipts r join mikka_team_issues t on t."issueId"=r."issueId" where r."requestId"=$1 and r."issueId"=$2 and r."ownerId"=$3 and r."teamId"=$4 and r."workspaceId"=$5 and t."userId"=$3 and t."teamId"=$4 and t."workspaceId"=$5',[value.requestId,issueId,racer,raceTeam,workspaceId])).rows[0].n,1)
       assert.equal((await app.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1',[row.id])).rows[0].n,0)
       assert.deepEqual(await query(racer,value),{error:'teamIssueAccessDenied',requestId:value.requestId})
-    } finally {await gate.query("select pg_advisory_unlock(hashtextextended('team184-barrier',0))");await revoke.query('rollback');gate.release();revoke.release();if(create) await Promise.allSettled([create])}
+    } finally {restore();await revoke.query('rollback');revoke.release()}
   })
   assert.equal(externalCalls,0)
   t.diagnostic(`Retained synthetic databases: ${appName}, ${workspaceName}; real provider calls: ${externalCalls}`)

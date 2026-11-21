@@ -1,17 +1,21 @@
 'use client'
 
+import { preloadTaskDetail } from '@/components/workspace/page-loaders'
 import { useViewScroll } from '@/lib/hooks/view-state'
-import { displayTaskTitle } from '@/lib/short-title'
-import { useState, type ComponentProps, type ReactNode, type Ref } from 'react'
+import { isValidElement, useState, type ComponentProps, type ReactNode, type Ref } from 'react'
 import { ScrollArea as ScrollAreaPrimitive } from '@base-ui/react/scroll-area'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, EyeOff, Flag, Link2, ListChecks, Lock, MessageSquare, Tag, Trash2 } from 'lucide-react'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
+import { Bell, Box, CalendarDays, Circle, CircleStop, CircleUserRound, Ellipsis, ExternalLink, EyeOff, Flag, Hash, Link2, ListChecks, Mail, MessageSquare, Tag, Trash2 } from '@/components/icons'
+import { toast } from 'sonner'
+import { useLiveScope } from '@/hooks/use-live-key'
+import { useActionError } from '@/lib/use-action-error'
+import { toggleIssuePreference } from '@/app/actions/issue-operations'
+import { workspaceSearch } from '@/components/workspace/workspace-navigation'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/reui/badge'
 import { Kanban, KanbanBoard as KanbanBoardPrimitive, KanbanColumn, KanbanColumnContent, KanbanItem, KanbanItemHandle, KanbanOverlay } from '@/components/reui/kanban'
 import { AvatarGroup, AvatarGroupCount } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { BotAvatar } from '@/components/nav/bot-avatar'
 import { LetterAvatar } from '@/components/nav/letter-avatar'
 import { HarnessMark } from '@/components/labels/entity-labels'
@@ -20,8 +24,12 @@ import type { IssueMetadata } from '@/lib/issue-metadata'
 import { formatDateOnly } from '@/lib/date-only'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuRadioGroup, ContextMenuRadioItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from '@/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { LabelDot, IssueMetadataControls, type MetadataRequest, type MetadataSavedIssue } from '@/components/workspace/issue-metadata-controls'
+import { LabelDot, IssueMetadataControls, type MetadataRequest, type OnMetadataChange } from '@/components/workspace/issue-metadata-controls'
 import { IssuePropertyMenu } from '@/components/workspace/issue-property-menu'
+import { IssueStatePicker } from '@/components/workspace/issue-state-picker'
+import { Mark } from '@/components/workspace/state-mark'
+import { useIssueStates } from '@/hooks/use-issue-states'
+import { groupIssueStates, issueStateLabel, taskIssueState } from '@/lib/issue-states'
 import { IssuePullRequestLink } from '@/components/workspace/issue-pull-request-link'
 import { CardControlBoundary, CardCreatedAt } from '@/components/workspace/issue-card-controls'
 import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
@@ -70,9 +78,10 @@ const AGENT_STATE_DOTS = { running: 'bg-muted-foreground motion-safe:animate-pul
 
 export type CardHandlers = {
   onOpen: (id: string) => void
-  onStatusChange: (task: BoardTask, status: IssueStatus) => void
+  /** `stateId` is the workspace state picked (lib/issue-states.ts); null keeps or takes the category's default. */
+  onStatusChange: (task: BoardTask, status: IssueStatus, stateId?: string | null) => void
   onPriorityChange: (task: BoardTask, priority: string) => void
-  onMetadataSaved: (issue: MetadataSavedIssue) => void
+  onMetadataSaved: OnMetadataChange
   onMetadataBusy: (busy: boolean) => void
   onDelete: (task: BoardTask) => void
   onDiscuss: (task: BoardTask) => void
@@ -93,8 +102,6 @@ export type CardContext = {
   blocks?: ReadonlyMap<string, TaskBlock>
   /** Cards the person just moved with the status menu (enter) or deleted (leave); others' changes are absent and snap (R-37). */
   motion?: ReadonlyMap<string, 'enter' | 'leave'>
-  /** A personal workspace: every task is the person's, so no card shows the private lock. */
-  personalWorkspace?: boolean
 }
 
 function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: CardHandlers & {
@@ -106,9 +113,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   const t = useTranslations('Board')
   const tCard = useTranslations('Shell.board.card')
   const tIssue = useTranslations('Issue')
-  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
-  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
   const controlsDisabled = disabled || isOverlay
   const [request, setRequest] = useState<MetadataRequest | null>(null)
@@ -143,11 +148,11 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
     show('dueDate') && metadata.dueDate && <span key="due" className={cn(meta, overdue && 'text-destructive-foreground')}><CalendarDays />{formatDateOnly(format, metadata.dueDate, { month: 'short', day: 'numeric' })}</span>,
   ].filter(Boolean)
 
-  const card = <BoardCard id={task.id} title={displayTaskTitle(task)} fullTitle={task.title} identifier={show('identifier') && task.identifier ? task.identifier : null} done={done} overlay={isOverlay}
-    personal={task.scope === 'personal' && !context.personalWorkspace ? <Tooltip><TooltipTrigger render={<span className="flex shrink-0" />}><Lock aria-label={tCard('personal')} className="size-3.5 text-muted-foreground" /></TooltipTrigger><TooltipContent>{tCard('personalHint')}</TooltipContent></Tooltip> : null}
+  const card = <BoardCard id={task.id} title={task.title} fullTitle={task.title} identifier={show('identifier') && task.identifier ? task.identifier : null} done={done} overlay={isOverlay}
+    personal={null}
     hasAssignee={Boolean(assigneeGroup)}
     assignee={show('assignee') ? <CardControlBoundary><IssueMetadataControls task={task} section="assignee" compact disabled={controlsDisabled} assigneeAvatar={assigneeGroup} request={request?.target === 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></CardControlBoundary> : null}
-    status={<CardControlBoundary><div className="-ml-[3px] flex"><IssuePropertyMenu label={tIssue('statusLabel')} value={task.status} options={statusOptions} icon={Circle} iconOnly compact disabled={controlsDisabled} onChange={value => onStatusChange(task, value as IssueStatus)} /></div></CardControlBoundary>}
+    status={<CardControlBoundary><div className="-ml-[3px] flex"><IssueStatePicker workspaceId={task.workspaceId} status={task.status} stateId={task.stateId} label={tIssue('statusLabel')} disabled={controlsDisabled} onChange={(status, stateId) => onStatusChange(task, status, stateId)} /></div></CardControlBoundary>}
     chips={chips} runState={show('agentState') && agentState ? agentState : null} block={block ? { reason: block.reason, label: blockLabel(tCard, block) } : null} createdAt={show('createdAt') ? <CardCreatedAt createdAt={task.createdAt} /> : null}
     // Opened from the context menu: labels, project and PR editors, rendered off-card.
     editors={isOverlay ? null : <div hidden><IssueMetadataControls task={task} section="all" compact disabled={controlsDisabled} request={request && request.target !== 'assignee' ? request : null} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>} />
@@ -156,7 +161,7 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
   const cardMotion = context.motion?.get(task.id)
   return <KanbanItem value={task.id} disabled={disabled} className={cn('shrink-0', cardMotion === 'enter' && 'animate-in fade-in-0 duration-150 motion-reduce:animate-none', cardMotion === 'leave' && 'pointer-events-none opacity-0 transition-opacity duration-150 motion-reduce:transition-none')} role="group" tabIndex={-1} aria-label={task.title}>
     <ContextMenu>
-      <ContextMenuTrigger render={<KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="block cursor-pointer touch-pan-y rounded-md outline-none select-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" data-focus-id={task.id} onClick={event => {
+      <ContextMenuTrigger render={<KanbanItemHandle cursor={false} role="group" tabIndex={disabled ? -1 : 0} className="block cursor-pointer touch-pan-y rounded-md outline-none select-none focus-visible:ring-2 focus-visible:ring-ring data-[dragging=true]:cursor-grabbing" aria-label={t('openTask', { title: task.title })} aria-roledescription={t('openableDraggableTask')} aria-keyshortcuts="Enter Space" data-focus-id={task.id} onPointerEnter={disabled ? undefined : preloadTaskDetail} onFocus={disabled ? undefined : preloadTaskDetail} onClick={event => {
         if (disabled || event.defaultPrevented || (event.target as HTMLElement).closest('[data-card-control]')) return
         onOpen(task.id)
       }} onKeyDownCapture={event => {
@@ -177,29 +182,52 @@ function TaskCard({ task, disabled, isOverlay = false, context, onOpen, onStatus
 }
 
 /** A card's context menu: status, priority, the metadata editors, 受阻, discuss and delete. */
-function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityChange, onDelete, onDiscuss, onBlockChange }: Pick<CardHandlers, 'onStatusChange' | 'onPriorityChange' | 'onDelete' | 'onDiscuss' | 'onBlockChange'> & {
+function TaskMenuItems({ task, disabled, block, ask, unread, onUnread, onStatusChange, onPriorityChange, onDelete, onDiscuss, onBlockChange }: Pick<CardHandlers, 'onStatusChange' | 'onPriorityChange' | 'onDelete' | 'onDiscuss' | 'onBlockChange'> & {
   task: BoardTask
   disabled: boolean
   block: boolean
   ask: (target: MetadataRequest['target']) => void
+  /** Mark as unread (S1-C); absent where the board has no unread list. */
+  unread?: boolean
+  onUnread?: (task: BoardTask, unread: boolean) => void
 }) {
+  const tMenu = useTranslations('IssueDetail.menu')
+  const tDetail = useTranslations('IssueDetail')
+  const viewer = useLiveScope()?.ownerId
+  const actionError = useActionError()
+  const subscribed = Boolean(viewer && task.metadata.subscriberUserIds.includes(viewer))
+  const taskUrl = () => { const url = new URL(window.location.href); url.search = workspaceSearch({ issue: task.id }); return url.href }
+  async function copy(text: string) {
+    try { await navigator.clipboard.writeText(text); toast.success(tDetail('copySuccess')) } catch { toast.error(tDetail('copyFailed')) }
+  }
+  async function subscribe() {
+    const result = await toggleIssuePreference({ id: task.id, kind: 'subscribe', enabled: !subscribed }).catch(() => ({ error: 'generic' }))
+    if (!result || ('error' in result && result.error)) toast.error(actionError('error' in result ? result.error : undefined))
+  }
   const tCard = useTranslations('Shell.board.card')
   const tIssue = useTranslations('Issue')
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
-  const statusOptions = ISSUE_STATUSES.map(item => ({ ...item, label: statusLabel(item.value) }))
   const priorityOptions = ISSUE_PRIORITIES.map(item => ({ ...item, label: priorityLabel(item.value) }))
+  // The workspace's states in the picker's order (Open, then Closed); the seven categories until they load.
+  const { states } = useIssueStates(task.workspaceId)
+  const current = states ? taskIssueState(states, task) : undefined
+  const stateOptions = states ? (({ open, closed }) => [...open, ...closed])(groupIssueStates(states)).map(state => ({ value: state.id, status: state.category, stateId: state.id as string | null, label: issueStateLabel(state, statusLabel), mark: <Mark shape={state.icon} tone={state.color} /> }))
+    : ISSUE_STATUSES.map(item => ({ value: item.value as string, status: item.value, stateId: null as string | null, label: statusLabel(item.value), mark: <item.icon className={item.indicatorClassName} /> }))
   return <>
     <ContextMenuSub>
       <ContextMenuSubTrigger disabled={disabled}><Circle />{tCard('status')}<ContextMenuShortcut>S</ContextMenuShortcut></ContextMenuSubTrigger>
-      <ContextMenuSubContent><ContextMenuRadioGroup value={task.status} onValueChange={value => onStatusChange(task, value as IssueStatus)}>
-        {statusOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon className={option.indicatorClassName} />{option.label}</ContextMenuRadioItem>)}
+      <ContextMenuSubContent><ContextMenuRadioGroup value={current?.id ?? task.status} onValueChange={value => {
+        const option = stateOptions.find(item => item.value === value)
+        if (option) onStatusChange(task, option.status, option.stateId)
+      }}>
+        {stateOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}>{option.mark}{option.label}</ContextMenuRadioItem>)}
       </ContextMenuRadioGroup></ContextMenuSubContent>
     </ContextMenuSub>
     <ContextMenuSub>
       <ContextMenuSubTrigger disabled={disabled}><Flag />{tCard('priority')}<ContextMenuShortcut>P</ContextMenuShortcut></ContextMenuSubTrigger>
       <ContextMenuSubContent><ContextMenuRadioGroup value={task.priority} onValueChange={value => onPriorityChange(task, String(value))}>
-        {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon {...option.iconProps} />{option.label}</ContextMenuRadioItem>)}
+        {priorityOptions.map(option => <ContextMenuRadioItem key={option.value} value={option.value}><option.icon />{option.label}</ContextMenuRadioItem>)}
       </ContextMenuRadioGroup></ContextMenuSubContent>
     </ContextMenuSub>
     <ContextMenuItem disabled={disabled} onClick={() => ask('assignee')}><CircleUserRound />{tCard('assignee')}<ContextMenuShortcut>A</ContextMenuShortcut></ContextMenuItem>
@@ -210,6 +238,12 @@ function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityC
     {onBlockChange && <ContextMenuItem disabled={disabled} onClick={() => onBlockChange(task, !block)}><CircleStop />{block ? tCard('unblock') : tCard('markBlocked')}</ContextMenuItem>}
     <ContextMenuItem onClick={() => onDiscuss(task)}><MessageSquare />{tCard('discuss')}</ContextMenuItem>
     <ContextMenuSeparator />
+    <ContextMenuItem onClick={() => { window.open(taskUrl(), '_blank', 'noopener,noreferrer') }}><ExternalLink />{tMenu('openNewTab')}</ContextMenuItem>
+    <ContextMenuItem onClick={() => { void copy(taskUrl()) }}><Link2 />{tMenu('copyLink')}</ContextMenuItem>
+    {task.identifier && <ContextMenuItem onClick={() => { void copy(task.identifier!) }}><Hash />{tMenu('copyId')}</ContextMenuItem>}
+    <ContextMenuItem disabled={disabled || !viewer} onClick={() => { void subscribe() }}><Bell />{subscribed ? tMenu('unsubscribe') : tMenu('subscribe')}</ContextMenuItem>
+    {onUnread && <ContextMenuItem onClick={() => onUnread(task, !unread)}><Mail />{unread ? tCard('markRead') : tCard('markUnread')}</ContextMenuItem>}
+    <ContextMenuSeparator />
     <ContextMenuItem variant="destructive" disabled={disabled} onClick={() => onDelete(task)}><Trash2 />{tCard('delete')}</ContextMenuItem>
   </>
 }
@@ -218,18 +252,22 @@ function TaskMenuItems({ task, disabled, block, ask, onStatusChange, onPriorityC
  * The same context menu around a UI layer's own card (the `board` slot's BoardScreen), with the editors it opens kept
  * off the card. The card stays as the layer draws it: the trigger adds no box of its own.
  */
-export function TaskContextMenu({ task, disabled, block, children, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: Omit<CardHandlers, 'onOpen'> & {
+export function TaskContextMenu({ task, disabled, block, unread, onUnread, children, onStatusChange, onPriorityChange, onMetadataSaved, onMetadataBusy, onDelete, onDiscuss, onBlockChange }: Omit<CardHandlers, 'onOpen'> & {
   task: BoardTask
   disabled: boolean
   block: boolean
+  unread?: boolean
+  onUnread?: (task: BoardTask, unread: boolean) => void
   children: ReactNode
 }) {
   const [request, setRequest] = useState<MetadataRequest | null>(null)
   const ask = (target: MetadataRequest['target']) => setRequest(current => ({ target, sequence: (current?.sequence ?? 0) + 1 }))
   return <>
     <ContextMenu>
-      <ContextMenuTrigger render={<div className="contents" />}>{children}</ContextMenuTrigger>
-      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={block} ask={ask} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
+      {isValidElement(children) && typeof children.type === 'string'
+        ? <ContextMenuTrigger render={children} data-focus-id={task.id} onPointerEnter={disabled ? undefined : preloadTaskDetail} onFocus={disabled ? undefined : preloadTaskDetail} />
+        : <ContextMenuTrigger render={<div className="contents" />} onPointerEnter={disabled ? undefined : preloadTaskDetail} onFocus={disabled ? undefined : preloadTaskDetail}>{children}</ContextMenuTrigger>}
+      <ContextMenuContent className="w-56"><TaskMenuItems task={task} disabled={disabled} block={block} ask={ask} unread={unread} onUnread={onUnread} onStatusChange={onStatusChange} onPriorityChange={onPriorityChange} onDelete={onDelete} onDiscuss={onDiscuss} onBlockChange={onBlockChange} /></ContextMenuContent>
     </ContextMenu>
     <div hidden><IssueMetadataControls task={task} section="all" compact disabled={disabled} request={request} onSaved={onMetadataSaved} onBusyChange={onMetadataBusy} /></div>
   </>

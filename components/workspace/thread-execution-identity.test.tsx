@@ -3,7 +3,7 @@ import { before, mock, test } from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { ThreadExecutionEvidence } from '../../lib/thread-execution-identity-view'
 
-mock.module('next-intl',{namedExports:{useTranslations:()=> (key:string,params?:Record<string,unknown>)=>params?`${key}(${Object.values(params).join('|')})`:key}})
+mock.module('@/lib/intl/i18n-client',{namedExports:{ useLocale: () => 'en',useTranslations:()=> (key:string,params?:Record<string,unknown>)=>params?`${key}(${Object.values(params).join('|')})`:key}})
 let Content: typeof import('./thread-execution-identity')['ThreadExecutionIdentityContent']
 before(async()=>{({ThreadExecutionIdentityContent:Content}=await import('./thread-execution-identity'))})
 const evidence:ThreadExecutionEvidence={id:'00000000-0000-4000-8000-000000000001',harness:'claude_code',model:'claude-test',credentialType:'subscription',subscriptionRoute:'claude_code_cli',
@@ -50,6 +50,29 @@ test('the frozen Agent 配置 words its selection reason in the reader\'s langua
   assert.doesNotMatch(legacy,/Declared capabilities/)
 })
 
+test('configured Skills are listed separately from the ones the run actually loaded', () => {
+  const agentProfile = { profileId: '00000000-0000-4000-8000-000000000009', name: 'Reviewer', version: 1, digest: 'd'.repeat(64), source: 'explicit' as const, reason: 'explicit' }
+  const configuredSkills = [
+    { id: 'independent-review', name: 'Independent review', version: 1, digest: 'a'.repeat(64), source: 'official' as const },
+    { id: 'personal:00000000-0000-4000-8000-000000000010', name: 'Deploy check', version: 1, digest: 'b'.repeat(64), source: 'personal' as const },
+  ]
+  const loadedSkills = [{ id: 'official:independent-review', name: 'Independent review', source: 'official' as const, digest: 'a'.repeat(64), loadedAt: '2026-11-10T00:00:00.000Z' }]
+  const html = renderToStaticMarkup(<Content evidence={{ ...evidence, agentProfile, configuredSkills, loadedSkills }} />)
+  for (const value of ['Independent review', 'Deploy check', 'skillSources.official', 'skillSources.personal']) assert.ok(html.includes(value), value)
+  // A configured Skill without a daemon receipt is not claimed as used.
+  assert.equal(html.match(/skillLoaded/g)?.length, 1)
+  assert.equal(html.match(/skillNotLoaded/g)?.length, 1)
+  assert.doesNotMatch(html, /00000000-0000-4000-8000-000000000010/)
+})
+
+test('a run without Profile Skills shows the empty state, not an invented list', () => {
+  const agentProfile = { profileId: '00000000-0000-4000-8000-000000000009', name: 'Reviewer', version: 1, digest: 'd'.repeat(64), source: 'decision' as const, reason: 'stage_fit' }
+  const html = renderToStaticMarkup(<Content evidence={{ ...evidence, agentProfile, configuredSkills: null, loadedSkills: null }} />)
+  assert.match(html, /skillsNone/)
+  assert.doesNotMatch(html, /skillLoaded|skillNotLoaded/)
+})
+
+
 test('the judged model strength, selected model, effort and reason are visible independently of the run model', () => {
   const html = renderToStaticMarkup(<Content evidence={{ ...evidence, modelRouting: {
     version: 2, required: 'light', model: 'gpt-6-luna', harness: 'codex', tier: 'light', effort: 'low', reason: 'difficulty_fit',
@@ -90,5 +113,14 @@ test('legacy evidence never shows a made-up routing decision', () => {
   for (const modelRouting of [undefined, null]) {
     const html = renderToStaticMarkup(<Content evidence={{ ...evidence, modelRouting }} />)
     assert.doesNotMatch(html, /data-model-routing|routingTier|routingDifficulty|routingEffort|routingReason/)
+  }
+})
+
+test('a model the task followed from its chat says so; a named or older one claims nothing', () => {
+  // Decision 2026-11-15-1630: the thread shows who decided its model; a followed model is not the person's pick.
+  const followed = renderToStaticMarkup(<Content evidence={{ ...evidence, modelFollowed: true }} />)
+  assert.ok(followed.includes('· modelFollowed'))
+  for (const modelFollowed of [false, null, undefined]) {
+    assert.doesNotMatch(renderToStaticMarkup(<Content evidence={{ ...evidence, modelFollowed }} />), /modelFollowed/)
   }
 })

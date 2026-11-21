@@ -55,7 +55,8 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
   const { agentActor } = await import('../lib/activity-actor')
   const { saveIssue, listIssueVersions, setIssueScope, promoteIssueToTeam, previewIssuePersonalScope, confirmIssuePersonalScope } = await import('../app/actions/issues')
   const { updateIssueMetadata } = await import('../app/actions/issue-metadata')
-  const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
+  const { readIssueMetadata } = await import('../lib/issue-metadata')
+  const { deriveIssueActivity } = await import('../lib/issue-activity')
   const { createLinkedIssue, updateIssueRelation } = await import('../app/actions/issue-operations')
   const { removeMember } = await import('../app/actions/collaboration')
   const { createAppIssueFromLinear, applyLinearIssueToApp } = await import('../lib/linear-sync/issue-sync')
@@ -179,12 +180,35 @@ test('actual action writer matrix records acting member/agent/system, ignores fo
     const legacy = expectIssue(await actInWorkspace(owner, () => saveIssue(input)))
     await db.update(issueVersions).set({ actorType: null, actorId: null }).where(eq(issueVersions.issueId, legacy.id))
     assert.equal((await actInWorkspace(owner, () => listIssueVersions(legacy.id)))[0].actor, null)
-    // Old execution-assignee metadata is retained when an unrelated property changes.
+    // Seed the actual old shape, without the modern writer's explicit
+    // delegate:null. That null is an intentional clear and must take priority.
     const legacyAssignee = { kind: 'agent' as const, id: randomUUID(), name: 'Historical executor', image: null }
-    const legacyContent = withIssueMetadata(legacy.content, { ...readIssueMetadata(legacy.content), assignee: legacyAssignee })
-    await db.update(issues).set({ content: legacyContent }).where(eq(issues.id, legacy.id))
-    const editedLegacy = expectIssue(await actInWorkspace(owner, () => updateIssueMetadata({ id: legacy.id, revision: legacy.revision, patch: { estimate: 8 } })))
-    assert.deepEqual(readIssueMetadata(editedLegacy.content).assignee, legacyAssignee)
+    const { delegate: _delegate, ...oldMetadata } = readIssueMetadata(legacy.content)
+    const legacyContent = { ...legacy.content, attrs: { ...legacy.content.attrs, mikka: { ...oldMetadata, assignee: legacyAssignee } } }
+    const legacyVersionId = randomUUID(), legacyRevision = legacy.revision + 1
+    await db.transaction(async tx => {
+      await tx.update(issues).set({ content: legacyContent, revision: legacyRevision }).where(eq(issues.id, legacy.id))
+      await tx.insert(issueVersions).values({ id: legacyVersionId, issueId: legacy.id, userId: owner, revision: legacyRevision, title: legacy.title, content: legacyContent, status: legacy.status, priority: legacy.priority, actorType: null, actorId: null })
+    })
+    const [originalLegacyVersion] = await db.select().from(issueVersions).where(eq(issueVersions.id, legacyVersionId))
+    assert.deepEqual(originalLegacyVersion.content, legacyContent)
+    assert.equal(Object.hasOwn(originalLegacyVersion.content.attrs!.mikka, 'delegate'), false)
+    const editedLegacy = expectIssue(await actInWorkspace(owner, () => updateIssueMetadata({ id: legacy.id, revision: legacyRevision, patch: { estimate: 8 } })))
+    assert.equal(readIssueMetadata(editedLegacy.content).assignee, null)
+    assert.deepEqual(readIssueMetadata(editedLegacy.content).delegate, legacyAssignee)
+    assert.deepEqual((await db.select().from(issueVersions).where(eq(issueVersions.id, legacyVersionId)))[0], originalLegacyVersion, 'normalizing the current task never rewrites its historical Agent assignment')
+    const legacyEvents = deriveIssueActivity(await db.select().from(issueVersions).where(eq(issueVersions.issueId, legacy.id)), []).filter(event => event.assignmentTarget === 'delegate')
+    assert.deepEqual(legacyEvents.map(event => [event.kind, event.assigneeName]), [['assigned', 'Historical executor']], 'the old Agent event survives; its representation change adds no fake event')
+    assert.equal(legacyEvents[0].actorKey, null, 'old history is not attributed to the current editor')
+    const clearedLegacy = expectIssue(await actInWorkspace(owner, () => updateIssueMetadata({ id: legacy.id, revision: editedLegacy.revision, patch: { delegate: null } })))
+    assert.equal(readIssueMetadata(clearedLegacy.content).assignee, null)
+    assert.equal(readIssueMetadata(clearedLegacy.content).delegate, null)
+    const clearedEvents = deriveIssueActivity(await db.select().from(issueVersions).where(eq(issueVersions.issueId, legacy.id)), [])
+    assert.deepEqual(clearedEvents.filter(event => event.assignmentTarget === 'delegate').map(event => [event.kind, event.assigneeName, event.actorKey]), [
+      ['assigned', 'Historical executor', null], ['unassigned', 'Historical executor', `user:${owner}`],
+    ])
+    assert.equal(clearedEvents.some(event => event.kind === 'unassigned' && event.assignmentTarget !== 'delegate'), false, 'clearing a Delegate never claims the human assignee was cleared')
+    assert.deepEqual((await db.select().from(issueVersions).where(eq(issueVersions.id, legacyVersionId)))[0], originalLegacyVersion)
   } finally {
     const owned = await db.select({ id: issues.id }).from(issues).where(eq(issues.userId, owner))
     for (const { id } of owned) {

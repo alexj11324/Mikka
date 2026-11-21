@@ -62,7 +62,8 @@ import {
   type ComputerSpecProvider,
 } from "../agents/run-context"
 import { requireRunToolApproval } from "../agents/tool-approval"
-import type { RunApps } from "../agents/run-apps"
+import { nativeMcpProcess, type RunApps } from "../agents/run-apps"
+import { taskMcpSecretValues } from '@mikka/protocol'
 import type { AgentSandbox } from "../agents/sandbox"
 import { carryHistory, ownDir, wipeRunCredentials } from "../agents/harness-home"
 import { claudeCredentialEnv, credentialDomain } from "../agents/run-credential"
@@ -142,7 +143,12 @@ export class ClaudeInitializationError extends Error {
  * socket, endpoint, platform bearer or extra filesystem permission in child. */
 /** One HTTP MCP entry per connected app, each pointing at the Mikka server. */
 export function claudeAppServers(apps?: RunApps) {
-  return Object.fromEntries((apps?.apps ?? []).map(app => [app.name, { type: 'http' as const, url: app.url, headers: { Authorization: `Bearer ${apps!.token}` } }]))
+  return {
+    ...Object.fromEntries((apps?.apps ?? []).map(app => [app.name, { type: 'http' as const, url: app.url, headers: { Authorization: `Bearer ${apps!.token}` } }])),
+    ...Object.fromEntries((apps?.servers ?? []).map(server => [server.name, server.transport === 'stdio'
+      ? { type: 'stdio' as const, ...nativeMcpProcess(server) }
+      : { type: server.transport, url: server.url, headers: server.headers }])),
+  }
 }
 
 export function claudeMailboxServer(mailbox: RunMailbox) {
@@ -462,9 +468,9 @@ function spawnBinary(binary?: string, oauthToken?: string) {
 
 function claudePrewarmOptionsKey(options: SessionOptions) {
   const { cwd, env, credential, github, apps, mcp, mcpHttpObservationUrl, machineEnvironment,
-    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume } = options
+    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, profileSkills, repositorySkills, model, effort, runId, requireSessionResume } = options
   return JSON.stringify({ cwd, env, credential, github, apps, mcp, mcpHttpObservationUrl, machineEnvironment,
-    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, model, effort, runId, requireSessionResume,
+    kind, factoryCheck, verifyCommand, networkAllow, policy, policyHash, skills, skillReceipt, profileSkills, repositorySkills, model, effort, runId, requireSessionResume,
     mailbox: options.mailbox?.tools })
 }
 
@@ -587,6 +593,8 @@ export class ClaudeAdapter implements AgentAdapter {
       policyHash: options.policyHash,
       skills: options.skills,
       skillReceipt: options.skillReceipt,
+      profileSkills: options.profileSkills,
+      repositorySkills: options.repositorySkills,
       runDir,
       privateDir: paths.privateDir,
       // Its session store, so `resume` works; keyed by the cwd it sees.
@@ -655,7 +663,7 @@ export class ClaudeAdapter implements AgentAdapter {
       return child
     }
     const credentialSecrets = [nativeToken, options.credential?.key].filter((value): value is string => Boolean(value && value !== NATIVE_AUTH_PLACEHOLDER))
-    const sensitiveText = [firstMessage, options.prompt ?? "", options.continueSession?.message ?? "", options.apps?.token ?? ""]
+    const sensitiveText = [firstMessage, options.prompt ?? "", options.continueSession?.message ?? "", options.apps?.token ?? "", ...taskMcpSecretValues(options.apps?.servers)]
     const capture = (error: unknown) => captureClaudeRunFailure(error, { runId: options.runId, appVersion: DAEMON_VERSION, provider: "claude", credential: options.credential ? "api_key" : "subscription", sensitiveText: [...sensitiveText, ...credentialSecrets] })
     const refreshOptions = externalAuth?.automaticRefresh ? {
       getOAuthToken: async ({ signal }: { signal: AbortSignal }): Promise<string | null> => {

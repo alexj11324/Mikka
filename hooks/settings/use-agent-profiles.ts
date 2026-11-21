@@ -1,13 +1,14 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import type { AgentProfile, AgentProfileDefinition } from '@/lib/factory/agent-profile-definition'
+import { agentProfileTemplateDefinition, type AgentProfileTemplateId } from '@/lib/factory/agent-profile-templates'
 import { deriveProfileMark, resolveProfileMark, type ProfileMarkValue } from '@/lib/factory/agent-profile-mark'
-import { profileDefinition, profileModelKey, profileRequest, ProfileRequestError, useAgentProfiles, type AgentProfilesView } from '@/components/settings/factory-profiles-data'
+import { profileDefinition, profileRequest, ProfileRequestError, useAgentProfiles } from '@/components/settings/factory-profiles-data'
 
-export type ProfileEditor = { profile?: AgentProfile; duplicate?: boolean }
+export type ProfileEditor = { profile?: AgentProfile; duplicate?: boolean; template?: AgentProfileTemplateId }
 const initialDefinition: AgentProfileDefinition = { name: '', description: '', roles: [], enabled: true, harness: 'auto', model: { mode: 'inherit' }, instructions: '', skills: [] }
 
 export type ProfileFailure = 'saveUnconfirmed' | 'versionConflict' | 'modelUnavailable' | 'skillUnavailable' | 'limitReached' | 'invalid' | 'profileMissing' | 'accessChanged' | 'saveFailed'
@@ -21,7 +22,8 @@ export function profileFailure(error: unknown): ProfileFailure {
     case 'agentProfileLimit': return 'limitReached'
     case 'agentProfileInvalid': case 'agentProfileTooLarge': return 'invalid'
     case 'agentProfileArchived': case 'agentProfileNotFound': return 'profileMissing'
-    case 'authRequired': case 'agentProfileScopeNotFound': case 'originMismatch': return 'accessChanged'
+    case 'skillNotFound': return 'profileMissing'
+    case 'authRequired': case 'agentProfileScopeNotFound': case 'originMismatch': case 'workspaceAccessDenied': return 'accessChanged'
     default: return 'saveFailed'
   }
 }
@@ -58,39 +60,35 @@ export function useAgentProfileList(workspaceId: string, onArchived?: () => void
 }
 
 /** One Agent 配置 being added, edited or duplicated: its draft and its save, with one request id per attempt. */
-export function useAgentProfileEditor({ workspaceId, editor, catalog, onSaved }: { workspaceId: string; editor: ProfileEditor; catalog: AgentProfilesView['catalog']; onSaved: () => void }) {
+export function useAgentProfileEditor({ workspaceId, editor, onSaved }: { workspaceId: string; editor: ProfileEditor; onSaved: () => void }) {
   const t = useTranslations('Settings.agentProfiles')
   const original = editor.duplicate ? undefined : editor.profile
   const [draft, setDraft] = useState<AgentProfileDefinition>(() => editor.profile
     ? { ...profileDefinition(editor.profile), ...(editor.duplicate ? { name: t('copyName', { name: editor.profile.name }).slice(0, 80) } : {}) }
-    : { ...initialDefinition })
-  const [roles, setRoles] = useState(draft.roles.join(', '))
-  const [modelMode, setModelMode] = useState(draft.model.mode)
-  const [modelKey, setModelKey] = useState(draft.model.mode === 'fixed' ? profileModelKey(draft.model) : '')
+    : editor.template
+      ? agentProfileTemplateDefinition(editor.template, { name: t(`templates.${editor.template}.name`), description: t(`templates.${editor.template}.description`) })
+      : { ...initialDefinition })
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<ProfileFailure | null>(null)
   // Only what the person picked is sent; the rest stays stored (edit) or is derived from the roles (add).
   const [chosenMark, setChosenMark] = useState<Partial<ProfileMarkValue>>({})
   const requestId = useRef<string | null>(null)
   const attempt = useRef<{ profile: AgentProfileDefinition; mark?: Partial<ProfileMarkValue> } | null>(null)
-  const models = catalog.models.filter(model => draft.harness === 'auto' || model.harness === draft.harness)
-  const selectedModel = models.find(model => profileModelKey(model) === modelKey)
   const frozen = error === 'saveUnconfirmed'
   function change(patch: Partial<AgentProfileDefinition>) { setDraft(current => ({ ...current, ...patch })); setError(null) }
-  const roleList = () => [...new Set(roles.split(/[,，\n]/).map(role => role.trim()).filter(Boolean))]
-  const derived = deriveProfileMark({ name: draft.name, roles: roleList(), description: draft.description })
+  const derived = deriveProfileMark({ name: draft.name, roles: [], description: draft.description })
   const stored = original ? resolveProfileMark(original, original) : derived
   const mark: ProfileMarkValue = { icon: chosenMark.icon ?? stored.icon, color: chosenMark.color ?? stored.color }
   function changeMark(patch: Partial<ProfileMarkValue>) { setChosenMark(current => ({ ...current, ...patch })); setError(null) }
 
   async function save() {
     if (pending) return
-    const roleNames = roleList()
-    if (!draft.name.trim() || roleNames.length > 12 || roleNames.some(role => role.length > 48) || (modelMode === 'fixed' && !selectedModel)) { setError('invalid'); return }
+    if (!draft.name.trim()) { setError('invalid'); return }
+    // An Agent 配置 is content only: the model and machine come from the task.
+    const { effort: _effort, ...content } = draft
     const sent = frozen && attempt.current ? attempt.current : {
       profile: {
-        ...draft, name: draft.name.trim(), description: draft.description.trim(), roles: roleNames,
-        model: modelMode === 'fixed' && selectedModel ? { mode: 'fixed', harness: selectedModel.harness, model: selectedModel.model, source: selectedModel.source } : { mode: 'inherit' },
+        ...content, name: draft.name.trim(), description: draft.description.trim(), roles: [], harness: 'auto', model: { mode: 'inherit' },
       } satisfies AgentProfileDefinition,
       ...(chosenMark.icon || chosenMark.color ? { mark: { ...chosenMark } } : {}),
     }
@@ -106,5 +104,5 @@ export function useAgentProfileEditor({ workspaceId, editor, catalog, onSaved }:
     finally { setPending(false) }
   }
 
-  return { original, draft, change, mark, changeMark, roles, setRoles, modelMode, setModelMode, modelKey, setModelKey, models, selectedModel, frozen, pending, error, setError, save }
+  return { original, draft, change, mark, changeMark, frozen, pending, error, setError, save }
 }

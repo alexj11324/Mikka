@@ -6,7 +6,7 @@ import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { sql } from 'drizzle-orm'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { botChatTargets, runBotChatTargets } from './chats'
@@ -20,8 +20,8 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('bot chat keys reach only the owner in the bot workspace, after the actual writer commits', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const nextServer = await import('next/server')
-  mock.module('next/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
+  const nextServer = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
   // Run writers also wake thread panels; panels.db.test.ts covers those keys.
   const panels = await import('./panels')
   mock.module(new URL('./panels.ts', import.meta.url).href, { namedExports: Object.fromEntries(Object.entries(panels).map(([name, value]) =>
@@ -43,7 +43,7 @@ test('bot chat keys reach only the owner in the bot workspace, after the actual 
   })
   const admin = new Pool({ connectionString: url, max: 1 })
   const name = `chat_live_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(url!); target.pathname = `/${name}`
   const database = new Pool({ connectionString: target.toString(), max: 6 })
   observePoolCommits(database)
@@ -95,7 +95,7 @@ test('bot chat keys reach only the owner in the bot workspace, after the actual 
     })
 
     await t.test('the actual turn writers publish once after COMMIT and nothing on rollback', async () => {
-      const store = await import('../coordinator/store')
+      const store = await import('@/tests/support/legacy-coordinator-store')
       await database.query(`INSERT INTO coordinator_sessions("userId","botId","leaseHolder","leaseUntil") VALUES('owner',$1,'fixture-holder',now()+interval '5 minutes')`, [bot])
       await database.query(`INSERT INTO coordinator_messages(id,"userId","botId",position,message) VALUES($1,'owner',$2,1,'{"role":"user","content":"Hello"}')`, [randomUUID(), bot])
       sent.length = 0

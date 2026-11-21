@@ -1,7 +1,6 @@
-// The default settings-audit slot (docs/ui-overlay.md): none. 审计日志 draws
-// its own list (AuditLogSettings); a layer that draws the page exports
-// `AuditLogPage` here and gets the same reads and filters as props.
-import type { ComponentType } from 'react'
 import type { SettingsAuditProps } from './settings-audit-contract'
 
-export const AuditLogPage: ComponentType<SettingsAuditProps> | null = null
+/** Type contract for public tooling. Official clients link the provider at build time. */
+export function AuditLogPage(_props: SettingsAuditProps): never {
+  throw new Error('UI_SLOT_REQUIRES_OFFICIAL_CLIENT: settings-audit')
+}

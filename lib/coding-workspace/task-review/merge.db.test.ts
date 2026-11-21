@@ -3,12 +3,15 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import test, { mock, type TestContext } from 'node:test'
 import { Pool } from 'pg'
+import { factoryEventId } from '../../factory/event-id'
+import { observePoolCommits } from '../../db/commit-effects'
 import { z } from 'zod'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
 import { WorkspaceReviewError, type DiffFilePatch, type TaskReviewRef } from '@mikka/protocol/coding-workspace-review'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../../tests/helpers/factory-visual-evidence'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 import { GitHubAccessError } from '../../github/user-access-error'
 import type { RequestBudget } from '../../request-budget'
 import type { FactoryTask } from '../../factory/store'
@@ -41,9 +44,11 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
   const database = 'task_review_merge_' + randomUUID().replaceAll('-', '') + '_e2e'
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'Task review merge acceptance requires PostgreSQL 17')
-  await admin.query('CREATE DATABASE "' + database + '" TEMPLATE template0')
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 16, connectionTimeoutMillis: 5000 })
+  // Match the HTTP route's request-scoped pool: real Factory writes publish after COMMIT.
+  observePoolCommits(pool)
   const environment = { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), ORVILO_DATABASE_URL: target.toString(),
     E2E_DATABASE_URL: target.toString(), BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
     BETTER_AUTH_URL: 'http://127.0.0.1:3199', WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex'),
@@ -57,12 +62,12 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
     const migrations = new URL('../../../drizzle/', import.meta.url)
     for (const name of orderMigrations((await readdir(migrations)).filter(name => name.endsWith('.sql'))))
       await pool.query(await readFile(new URL(name, migrations), 'utf8'))
-    const next = await import('next/server')
-    mock.module('next/server', { namedExports: { ...next, after() {} } })
-    mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
+    const next = await import('@/lib/server-runtime/server')
+    mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after() {} } })
+    mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
       get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {},
     }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en',
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const userAccess = await import('../../github/user-access')
     mock.module(new URL('../../github/user-access.ts', import.meta.url).href, { namedExports: { ...userAccess,
@@ -130,6 +135,9 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
         return { id, sessionId, recordedAt: new Date(row!.finishedAt.getTime() + 1000).toISOString() }
       }
       const producer = await completedRun('execute'), reviewer = await completedRun('review'), verifier = await completedRun('verify')
+      // The handoff gate requires the producer's ready visual capture; these
+      // merge fixtures exercise the claim/PUT path, not evidence collection.
+      await addFactoryVisualEvidence(pool, producer.id)
       const tx = await pool.connect()
       try {
         await tx.query('BEGIN')
@@ -153,6 +161,13 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
         await tx.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [taskId, candidateId])
         await tx.query('COMMIT')
       } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+      await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",branch,status,"pullRequest")
+        VALUES($1,$2,$3,$4,$5,'mikka/original-task','published',$6)`, [producer.id, owner.id, issueId, remote, repositoryKey, { url: pullUrl }])
+      // Same handoff gate as production: the producer declares the reviewed
+      // capture as public evidence before the owner can accept the merge.
+      const publication = await addFactoryPublicationEvidence(pool, taskId, { url: pullUrl })
+      assert.ok(publication)
+      const publicationEventId = factoryEventId('pr-visual-evidence', producer.id)
       const proof = await pool.connect()
       try {
         await proof.query('BEGIN')
@@ -165,8 +180,6 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
       tokens.set(owner.id, token)
       await saveGitHubConnection(owner.id, { githubAccountId: token.githubAccountId, githubLogin: 'merge-fixture' },
         { access_token: token.token, expires_in: 3600 })
-      await pool.query(`INSERT INTO run_publications("runId","userId","issueId","remoteUrl","remoteKey",branch,status,"pullRequest")
-        VALUES($1,$2,$3,$4,$5,'mikka/original-task','published',$6)`, [producer.id, owner.id, issueId, remote, repositoryKey, { url: pullUrl }])
       const deps = { database: pool, membership: pool }, scope = await ensureReviewScope(deps, who, producer.id, repoId)
       const before = Buffer.from('before\nstable\n'), after = Buffer.from('after\nstable\n'), nativePatch = '@@ -1,2 +1,2 @@\n-before\n+after\n stable\n'
       const tree = (bytes: Buffer) => new Map([['alpha.txt', { sha: gitBlobHash(bytes, headSha), mode: '100644', size: bytes.length }]])
@@ -237,13 +250,19 @@ test('Task review merge uses the real Factory receipt and exact source on Postgr
           (client, fresh) => result.render(client, fresh))
         return { status: rendered.status ?? result.status ?? 200, body: rendered.body as Projection }
       }
+      async function eventsSincePublication() {
+        const { rows } = await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [taskId])
+        assert.deepEqual(rows.find(row => row.eventId === publicationEventId)?.result, publication,
+          'claim and replay must preserve the original publication evidence')
+        return rows.filter(row => row.eventId !== publicationEventId)
+      }
       const rows = async () => ({
         merges: (await pool.query<MergeRow>('SELECT * FROM factory_merges WHERE "taskId"=$1 ORDER BY "createdAt",id', [taskId])).rows,
         receipts: (await pool.query<{ requestId: string; response: { eventId: string } }>(
           'SELECT "requestId",response FROM coding_workspace_review_receipts WHERE "boardId"=$1 AND action=\'task_merge\' ORDER BY "requestId"', [scope.boardId])).rows,
         task: (await pool.query<FactoryTask>('SELECT * FROM factory_tasks WHERE id=$1', [taskId])).rows[0]!,
         attempts: (await pool.query('SELECT * FROM factory_attempts WHERE "taskId"=$1 ORDER BY position', [taskId])).rows,
-        events: (await pool.query('SELECT * FROM factory_events WHERE "taskId"=$1 ORDER BY "eventId"', [taskId])).rows,
+        events: await eventsSincePublication(),
       })
       const puts = () => calls.filter(call => call.method === 'PUT')
       async function replaceCandidate() {

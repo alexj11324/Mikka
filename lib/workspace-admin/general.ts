@@ -14,6 +14,7 @@ import { deleteWorkspaceRows } from '@/lib/workspace-rows'
 import { teardownWorkspaceMachines } from '@/lib/cloud-computer/workspace-teardown'
 import { parseWorkspaceIcon } from './icon'
 import { ownerListChanged, workspaceListChanged, workspaceListScopesBeforeChange, workspaceListScopeChanged } from '../live/lists'
+import { markReviewSessionsRevoked, drainRevokedReviewSessions } from '../coding-workspace/review-sessions'
 
 export type MainTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
 
@@ -51,12 +52,12 @@ export async function updateWorkspaceGeneral(actorId: string, workspaceId: strin
   if (icon === false) throw new WorkspaceError('workspaceIconInvalid')
   return workspaceDb.transaction(async tx => {
     const { workspace, membership } = await requireWorkspace(tx, workspaceId, actorId, true)
-    // One lock for every slug change, so two renames cannot claim the same slug.
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('mikka-workspace-slugs', 0))`)
     const changes: Partial<typeof workspaces.$inferInsert> = {}
-    if (values.name !== undefined) changes.name = values.name
-    if (icon !== undefined) changes.icon = icon
+    if (values.name !== undefined && values.name !== workspace.name) changes.name = values.name
+    if (icon !== undefined && icon !== workspace.icon) changes.icon = icon
     if (values.slug !== undefined && values.slug !== workspace.slug) {
+      // Serialize namespace changes across Workspaces before checking redirects.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('mikka-workspace-slugs', 0))`)
       if (await slugBelongsElsewhere(tx, values.slug, workspaceId)) throw new WorkspaceError('workspaceSlugTaken')
       // Taking back one of this workspace's own old slugs removes its redirect.
       await tx.delete(workspaceSlugRedirects).where(and(eq(workspaceSlugRedirects.slug, values.slug), eq(workspaceSlugRedirects.workspaceId, workspaceId)))
@@ -192,6 +193,8 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   const botIds = botRows.map(row => row.id)
   const runOwners = botIds.length || issueIds.length ? await tx.selectDistinct({ userId: agentRuns.userId }).from(agentRuns)
     .where(sql`${botIds.length ? inArray(agentRuns.botId, botIds) : sql`false`} OR ${issueIds.length ? inArray(agentRuns.issueId, issueIds) : sql`false`}`) : []
+  // Deleting a task can cascade its Factory task while a Decision still references it.
+  await tx.execute(sql`delete from project_decisions where "workspaceId" = ${workspaceId}`)
   // A task deletion can cascade its run before the Artifact's SET NULL action.
   // Its tenant guard must keep rejecting missing/mismatched parents, so remove
   // this tenant's Artifacts before deleting either parent (including Bot-less runs).
@@ -221,7 +224,6 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
   const deletedBots = botIds.length ? (await tx.delete(bots).where(eq(bots.workspaceId, workspaceId)).returning({ id: bots.id })).length : 0
   await tx.delete(conversations).where(eq(conversations.workspaceId, workspaceId))
   for (const statement of [
-    sql`delete from project_decisions where "workspaceId" = ${workspaceId}`,
     sql`delete from subagent_events where "workspaceId" = ${workspaceId}`,
     sql`delete from cloud_machines where "workspaceId" = ${workspaceId}`,
     sql`delete from workspace_snapshots where "workspaceId" = ${workspaceId}`,
@@ -246,9 +248,17 @@ async function deleteAppData(tx: MainTransaction, workspaceId: string, teamIds: 
  * if the workspace transaction then fails a retry finishes the job.
  */
 export async function deleteWorkspaceData(actorId: string, workspaceId: string, confirmName: string): Promise<WorkspaceDeletion> {
+  const deletion = await deleteWorkspaceRecords(actorId, workspaceId, confirmName)
+  // Runs in the deleted workspace stop now; nothing rechecks them later (decision 2026-11-17-2215).
+  await (await import('@/lib/run-authority-stop')).stopRunsWithoutAuthority({ workspaceId })
+  return deletion
+}
+
+async function deleteWorkspaceRecords(actorId: string, workspaceId: string, confirmName: string): Promise<WorkspaceDeletion> {
   z.uuid().parse(workspaceId)
   const typed = z.string().max(200).parse(confirmName).trim()
-  return workspaceDb.transaction(async tx => {
+  let reviewIds: string[] = []
+  try { return await workspaceDb.transaction(async tx => {
     const { workspace } = await requireWorkspace(tx, workspaceId, actorId, true)
     // Every account keeps its one personal workspace (decision 2026-11-01-2310); only a team workspace is deleted.
     if (workspace.kind === 'personal') throw new WorkspaceError('workspacePersonalDelete')
@@ -256,11 +266,14 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
     const before = await workspaceListScopesBeforeChange(tx, workspaceId)
     const teamRows = await tx.select({ id: teams.id }).from(teams).where(eq(teams.workspaceId, workspaceId)).for('update')
     const teamIds = teamRows.map(row => row.id)
-    const projectRows = await tx.select({ id: teamProjects.projectId }).from(teamProjects).where(eq(teamProjects.workspaceId, workspaceId))
+    const projectRows = await tx.select({ id: projects.id }).from(projects).where(eq(projects.workspaceId, workspaceId))
     const projectIds = [...new Set(projectRows.map(row => row.id))]
     // The machines' sandboxes are killed before their rows go, so no refused deletion may follow: the billing check runs first too.
     const [billing] = await db.select({ status: workspaceBilling.status }).from(workspaceBilling).where(eq(workspaceBilling.workspaceId, workspaceId)).limit(1)
     if (billing?.status && (BILLING_LIVE_STATUSES as readonly string[]).includes(billing.status)) throw new WorkspaceError('workspaceHasActiveSubscription')
+    reviewIds = await markReviewSessionsRevoked(pool, { workspaceId }, 'membership_changed')
+    // The existing VM teardown retains its kill/retry protocol here. Human
+    // gateway close uses the captured IDs after the outer WS transaction.
     await teardownWorkspaceMachines(pool, workspaceId)
     const app = await db.transaction(main => deleteAppData(main, workspaceId, teamIds))
 
@@ -288,5 +301,5 @@ export async function deleteWorkspaceData(actorId: string, workspaceId: string, 
       deleted: { ...app, projects: deletedProjects, teams: deletedTeams, invitations, members },
       nextWorkspaceId: next?.id ?? null,
     }
-  })
+  }) } finally { await drainRevokedReviewSessions(pool, reviewIds) }
 }

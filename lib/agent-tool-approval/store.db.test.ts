@@ -62,9 +62,12 @@ test('a stopped run is never live', async () => {
 
 async function watchdogFixture(receipt = true) {
   const stoppedRun = randomUUID(), taskId = randomUUID(), attemptId = randomUUID(), epoch = randomUUID(), workerId = randomUUID()
+  // The workspace policy is the only policy now, so each fixture owns one: a
+  // second write in the same workspace would be a no-op and keep the revision.
+  const workspaceId = await seedWorkspace(actor.userId)
   await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [workerId,actor.userId,deviceId])
   await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"stopRequestedAt","leaseExpiresAt","agentId","workspaceId")
-    SELECT $1,"userId","deviceId",'running',now(),now()+interval '5 minutes',$3,"workspaceId" FROM agent_runs WHERE id=$2`, [stoppedRun,runId,workerId])
+    VALUES ($1,$2,$3,'running',now(),now()+interval '5 minutes',$4,$5)`, [stoppedRun,actor.userId,deviceId,workerId,workspaceId])
   const revision = (await readCliRunPolicy(pool,stoppedRun,actor.userId)).revision
   await pool.query(`INSERT INTO factory_tasks VALUES($1,$2,$3,'blocked')`, [taskId,actor.userId,epoch])
   await pool.query('INSERT INTO factory_attempts VALUES($1,$2,$3,$4)', [attemptId,taskId,stoppedRun,{
@@ -107,7 +110,7 @@ test('a changed policy revision cannot be hidden by an expired lease or watchdog
   for (const expired of [false,true]) {
     const current = await watchdogFixture()
     if (expired) await pool.query(`UPDATE agent_runs SET "stopRequestedAt"=NULL,"leaseExpiresAt"=now()-interval '1 second' WHERE id=$1`, [current.runId])
-    await setCliPolicy(pool,actor.userId,current.runId,'worker',current.revision,{permissions:{install_dependency:'deny'}})
+    await setCliPolicy(pool,actor.userId,current.runId,'workspace',current.revision,{permissions:{install_dependency:'deny'}})
     await assert.rejects(current.check(), error => error instanceof ApprovalUnavailable && error.revokeReason === undefined)
     const updated = await readCliRunPolicy(pool,current.runId,actor.userId)
     assert.notEqual(updated.revision,current.revision)
@@ -115,30 +118,31 @@ test('a changed policy revision cannot be hidden by an expired lease or watchdog
   }
 })
 
-test('a changed worker policy ends the live check for the old revision', async () => {
+test('a changed workspace policy ends the live check for the old revision', async () => {
   await pool.query('UPDATE agent_runs SET "stopRequestedAt"=NULL WHERE id=$1', [runId])
-  await setCliPolicy(pool, actor.userId, runId, 'worker', initialRevision, { permissions: { install_dependency:'deny' } })
+  await setCliPolicy(pool, actor.userId, runId, 'workspace', initialRevision, { permissions: { install_dependency:'deny' } })
   assert.equal(await store.check(actor, runId, initialRevision), false)
   const current = await readCliRunPolicy(pool,runId,actor.userId)
   assert.equal(current.policy.permissions.install_dependency, 'deny')
   assert.equal(await store.check(actor, runId, current.revision), true)
 })
 
-test('workspace may narrow agent policy, rejects forged generations, and invalidates a recreated fixture', async () => {
+test('the workspace is the only run-policy layer; a Bot head does not narrow it', async () => {
   const wid=randomUUID(), botId=randomUUID(), workerId=randomUUID(), scopedRun=randomUUID()
   await pool.query(`INSERT INTO bots VALUES ($1,$2,$3)`, [botId,wid,actor.userId])
   await seedWorkspace(actor.userId,wid,'team')
   const guard = (workspaceId: string, userId: string, signal: AbortSignal) => acquireWorkspaceMembership(pool, {workspaceId,userId},signal)
   await pool.query(`INSERT INTO agents (id,"userId",harness,"deviceId") VALUES ($1,$2,'codex',$3)`, [workerId,actor.userId,deviceId])
-  await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,$2,$3,$4)`, [actor.userId,botId,wid,{permissions:{install_dependency:'allow'}}])
-  await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",cli_run_policy) VALUES ($1,$2)`, [wid,{permissions:{install_dependency:'deny'}}])
+  // A Bot head deny is ignored: the workspace's allow is the whole decision.
+  await pool.query(`INSERT INTO agent_kit_heads (owner_id,bot_key,workspace_id,cli_run_policy) VALUES ($1,$2,$3,$4)`, [actor.userId,botId,wid,{permissions:{install_dependency:'deny'}}])
+  await pool.query(`INSERT INTO workspace_computer_policies ("workspaceId",cli_run_policy) VALUES ($1,$2)`, [wid,{permissions:{install_dependency:'allow'}}])
   await pool.query(`INSERT INTO agent_runs (id,"userId","deviceId",status,"leaseExpiresAt","agentId","botId","workspaceId") VALUES ($1,$2,$3,'running',now()+interval '5 minutes',$4,$5,$6)`, [scopedRun,actor.userId,deviceId,workerId,botId,wid])
-  const denied = await readCliRunPolicy(pool,scopedRun,actor.userId,guard)
-  assert.equal(denied.policy.permissions.install_dependency,'deny')
-  const asking = await setCliPolicy(pool,actor.userId,scopedRun,'workspace',denied.revision,{permissions:{install_dependency:'ask'}},guard)
-  await assert.rejects(setCliPolicy(pool,actor.userId,scopedRun,'workspace',denied.revision,{permissions:{install_dependency:'allow'}},guard))
+  const allowed = await readCliRunPolicy(pool,scopedRun,actor.userId,guard)
+  assert.equal(allowed.policy.permissions.install_dependency,'allow')
+  const asking = await setCliPolicy(pool,actor.userId,scopedRun,'workspace',allowed.revision,{permissions:{install_dependency:'ask'}},guard)
+  await assert.rejects(setCliPolicy(pool,actor.userId,scopedRun,'workspace',allowed.revision,{permissions:{install_dependency:'allow'}},guard))
   assert.equal(asking.policy.permissions.install_dependency,'ask')
-  assert.notEqual(asking.revision, denied.revision)
+  assert.notEqual(asking.revision, allowed.revision)
   await assert.rejects(pool.query(`UPDATE workspace_computer_policies SET cli_run_policy_generation=$2 WHERE "workspaceId"=$1`, [wid,randomUUID()]))
   const regenerated = await readCliRunPolicy(pool,scopedRun,actor.userId,guard)
   assert.equal(regenerated.policy.permissions.install_dependency, 'ask')
@@ -203,10 +207,10 @@ test('legacy local runs materialize stable sandbox defaults without changing exp
   assert.equal(first.policy.permissions.network,'allow')
   assert.equal(first.policy.permissions.git_push,'allow','push is the GitHub App grant, never ask')
   assert.equal(first.revision,second.revision)
-  assert.deepEqual(first.layers.agent,{})
+  assert.deepEqual(first.layers, { workspace: {} })
   const results = await Promise.allSettled([
-    setCliPolicy(pool,user,legacyRun,'worker',first.revision,{permissions:{install_dependency:'allow'}}),
-    setCliPolicy(pool,user,legacyRun,'worker',first.revision,{permissions:{install_dependency:'deny'}}),
+    setCliPolicy(pool,user,legacyRun,'workspace',first.revision,{permissions:{install_dependency:'allow'}}),
+    setCliPolicy(pool,user,legacyRun,'workspace',first.revision,{permissions:{install_dependency:'deny'}}),
   ])
   assert.equal(results.filter(result => result.status === 'fulfilled').length,1)
   assert.equal(results.filter(result => result.status === 'rejected').length,1)
@@ -224,7 +228,8 @@ test('unbound workers get open network defaults and only owned cloud devices are
  assert.equal(cloud.policy.permissions.network,'allow')
  assert.notEqual(cloud.revision,unbound.revision)
  await pool.query(`UPDATE agents SET cli_run_policy='{"permissions":{"network":"deny"}}' WHERE id=$1`,[worker])
- assert.equal((await readCliAgentPolicy(pool,user,worker,null)).policy.permissions.network,'deny')
+ // A worker policy is retired: it does not narrow the workspace decision.
+ assert.equal((await readCliAgentPolicy(pool,user,worker,null)).policy.permissions.network,'allow')
  await pool.query('UPDATE devices SET "ownerId"=$2 WHERE id=$1',[device,'someone-else'])
  await assert.rejects(readCliAgentPolicy(pool,user,worker,null),/agentPolicyUnavailable/)
 })
@@ -257,7 +262,7 @@ test('policy changes and live tool checks share run-before-policy lock order', {
   })
   const checking = new AgentToolApprovalStore({...checks,query:pool.query.bind(pool)}).checkState(actor,runId,current.revision)
   await held
-  const changing = setCliPolicy(settings,actor.userId,runId,'worker',current.revision,current.layers.worker)
+  const changing = setCliPolicy(settings,actor.userId,runId,'workspace',current.revision,current.layers.workspace)
   const results = await Promise.allSettled([checking,changing])
   assert.deepEqual(results.map(result => result.status === 'fulfilled' ? 'ok' : (result.reason as {code?:string}).code),['ok','ok'])
 })

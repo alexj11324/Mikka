@@ -19,11 +19,12 @@ import { withoutTaskEnv } from "../task-env"
  */
 function persisted(entries: Record<string, JournalEntry>): Record<string, JournalEntry> {
   return Object.fromEntries(Object.entries(entries).map(([id, entry]) => {
-    const { modelCredential, subscriptionLease, github, ...rest } = withoutTaskEnv(entry.assignment) as RunAssignment
+    const { modelCredential, subscriptionLease, github, mcp, ...rest } = withoutTaskEnv(entry.assignment) as RunAssignment
     const { token: githubToken, ...githubBinding } = github ?? {}
-    const assignment = { ...rest, ...(github ? { github: githubBinding } : {}) }
+    const { servers: _mcpSecrets, ...mcpBinding } = mcp ?? {}
+    const assignment = { ...rest, ...(mcp ? { mcp: mcpBinding } : {}), ...(github ? { github: githubBinding } : {}) }
     return [id, { ...entry, assignment: assignment as RunAssignment,
-      ...(entry.assignment.taskSecrets || entry.assignment.taskEnv ? { taskSecretsWithheld: true as const } : {}),
+      ...(entry.assignment.taskSecrets || entry.assignment.taskEnv || entry.assignment.mcp?.servers?.length ? { taskSecretsWithheld: true as const } : {}),
       ...(modelCredential ? { credentialWithheld: true as const } : {}) }]
   }))
 }
@@ -47,6 +48,8 @@ export interface JournalEntry {
   stopReason?: StopReason
   /** Fail closed on a crash in the external session-message delivery window. */
   questionResumeState?: "starting" | "accepted"
+  /** Only IDs and closed outcomes. A crash inside the native RPC is ambiguous. */
+  steerReceipts?: Record<string, "starting" | "accepted" | "refused">
   /** A durable help request still needs this worktree for its original session. */
   waitingQuestionId?: string
   /** The run was claimed with a model credential, which the journal file never holds. */

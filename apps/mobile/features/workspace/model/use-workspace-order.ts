@@ -11,15 +11,19 @@ const write = async (key: string, value: string) => { if (Platform.OS === 'web')
 /** The person's arrangement of their workspaces on this device (workspace-order.ts), and a way to change it. */
 export function useWorkspaceOrder(): [string[], (ids: string[]) => void] {
   const key = accountStorageKey(currentAccount().id, 'workspace_order')
-  const [ids, setIds] = useState<string[]>([])
+  const [order, setOrder] = useState<{ key: string; ids: string[] } | null>(null)
   useEffect(() => {
     let gone = false
-    read(key).then(raw => { if (!gone) setIds(parseWorkspaceOrder(raw)) }, () => undefined)
+    read(key).then(raw => {
+      if (gone) return
+      // A drag can save a new order while this device read is in flight.
+      setOrder(current => current?.key === key ? current : { key, ids: parseWorkspaceOrder(raw) })
+    }, () => undefined)
     return () => { gone = true }
   }, [key])
   const save = useCallback((next: string[]) => {
-    setIds(next)
+    setOrder({ key, ids: next })
     void write(key, JSON.stringify(next)).catch(() => undefined)
   }, [key])
-  return [ids, save]
+  return [order?.key === key ? order.ids : [], save]
 }

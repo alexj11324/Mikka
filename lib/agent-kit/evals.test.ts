@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { DECISION_MODEL } from '../coordinator/decision'
+import { DECISION_MODEL, LEGACY_DECISION_MODEL } from '../coordinator/decision'
 import { tool, type ToolSet } from 'ai'
 import { z } from 'zod'
 import { DEFAULT_AGENT_DEFINITION } from './builtin'
@@ -39,7 +39,7 @@ test('reports from an obsolete evaluator cannot authorize activation', async () 
   const baseline=await runEvalSuite({ ...options,run:async () => ({ text:'Unknown',outcome:'blocked',tools:[] }) })
   const candidate=await runEvalSuite({ ...options,run:async () => ({ text:'2026-01-15',outcome:'answered',tools:[{ name:'web_search',outcome:'ok',authorized:false,effectPerformed:false }] }) })
   assert.equal(compareReports(baseline,candidate).activationEligible,true)
-  for (const runnerVersion of ['mikka.eval.v1','mikka.eval.v2','mikka.eval.v3']) {
+  for (const runnerVersion of ['mikka.eval.v1','mikka.eval.v2','mikka.eval.v3','mikka.eval.v4']) {
     const obsolete=JSON.parse(JSON.stringify({baseline,candidate}))
     obsolete.baseline.runnerVersion=runnerVersion
     obsolete.candidate.runnerVersion=runnerVersion
@@ -134,4 +134,16 @@ test('live semantic decisions consume equivalent, negated, quoted and multilingu
   const report=await runEvalSuite({...options,run:async()=>({text,outcome:'blocked',tools:failed}),judge:async(input)=>{observed=input.trace.text;return scriptedJudge()}})
   assert.equal(observed,text);assert.equal(report.passed,1);assert.equal(report.results[0].semantic?.decision,'pass')
  }
+})
+
+test('stored reports with a legacy Decision receipt remain comparable after alias migration',async()=>{
+ const judge=async():Promise<SemanticVerdict>=>{
+  const verdict=await scriptedJudge()
+  return {...verdict,execution:{...verdict.execution,modelId:LEGACY_DECISION_MODEL}}
+ }
+ const options={definition:DEFAULT_AGENT_DEFINITION,cases:[CORE_EVAL_CASES[0]],mode:'live' as const,model:'synthetic-unit-contract',judge}
+ const baseline=await runEvalSuite({...options,run:async()=>({text:'unknown',outcome:'blocked',tools:[]})})
+ const candidate=await runEvalSuite({...options,run:async()=>({text:'2026-01-15',outcome:'answered',tools:[{name:'web_search',outcome:'ok',authorized:false,effectPerformed:false}]})})
+ assert.equal(candidate.results[0].semantic?.execution.modelId,LEGACY_DECISION_MODEL)
+ assert.equal(compareReports(baseline,candidate).activationEligible,true)
 })

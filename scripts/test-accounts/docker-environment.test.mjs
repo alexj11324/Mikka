@@ -49,7 +49,7 @@ function management(t, values = fixture(), responseOptions = {}) {
 function configuredEnvironment(t, overrides = {}) {
   const env = { E2E_DATABASE_URL: connectionString, MIKKA_DATABASE_URL: connectionString, DATABASE_URL: connectionString,
     BETTER_AUTH_URL: origin, MIKKA_TEST_DEPLOYMENT_SHA: deploymentSha, ...overrides }
-  const keys = [...Object.keys(env), 'ORVILO_DATABASE_URL', 'E2E_BASE_URL', 'VERCEL', 'VERCEL_ENV', 'DOCKER_PAT', 'DOCKER_ACCESS_TOKEN', 'DOCKER_TOKEN', 'RESEND_API_KEY', 'AI_GATEWAY_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY']
+  const keys = [...Object.keys(env), 'ORVILO_DATABASE_URL', 'E2E_BASE_URL', 'VERCEL', 'VERCEL_ENV', 'DOCKER_PAT', 'DOCKER_ACCESS_TOKEN', 'DOCKER_TOKEN', 'RESEND_API_KEY', 'AI_GATEWAY_API_KEY', 'ZEROCAT_API_KEY', 'MIKKA_LITELLM_URL', 'MIKKA_LITELLM_MASTER_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY']
   const before = new Map(keys.map(key => [key, process.env[key]]))
   for (const key of keys) { if (env[key] === undefined) delete process.env[key]; else process.env[key] = env[key] }
   t.after(() => { for (const [key, value] of before) { if (value === undefined) delete process.env[key]; else process.env[key] = value } })

@@ -1,3 +1,4 @@
+import type { ProjectExecutionSnapshot } from '../project-resources/contracts'
 import type { ExecutionIdentity } from '../execution-identity'
 import type { RunTraceContext } from '@mikka/protocol/trace-context'
 import type { AgentProfileSelection } from '../factory/agent-profile'
@@ -19,6 +20,11 @@ export interface WorkerModelDispatch {
   entry?: OrderEntry
   /** Host-validated difficulty choice, frozen with the actual model. */
   routing?: FrozenModelRoutingSnapshot
+  /** The model was not named: the task followed the dispatching chat's own
+   * (decision 2026-11-15-1630). Still pinned like a pick, never swapped silently. */
+  followed?: true
+  /** The reasoning effort the request asked for (an automation's), host-checked against the model. */
+  effort?: import('../model-routing').ModelRoutingEffort
 }
 
 export interface WorkerDefinitionSnapshot {
@@ -29,6 +35,10 @@ export interface WorkerDefinitionSnapshot {
   traceContext?: RunTraceContext
   /** Trusted dispatch identity; absent on historical runs, never inferred retroactively. */
   executionIdentity?: ExecutionIdentity
+  /** An explicitly sponsored coding task. Old and ordinary cloud runs keep the owner's E2B account. */
+  taskMachine?: import('../cloud-computer/sponsored-task').SponsoredTaskPlacement
+  /** Project/Repository/Environment configuration frozen at admission; never backfilled on old runs. */
+  projectExecution?: ProjectExecutionSnapshot
   /** Copied only from the host's authorized parent execution; legacy workers gain nothing. */
   customMcp?: McpAuthority
   schemaVersion: 1
@@ -38,7 +48,7 @@ export interface WorkerDefinitionSnapshot {
   definitionDigest: string
   promptDigest: string
   /** Pinned subscription or API key provenance, or CLI default selection; none is a model execution receipt. */
-  modelSource: 'native-default' | 'subscription' | 'api_key'
+  modelSource: 'native-default' | 'subscription' | 'api_key' | 'credits'
   cliModelSelection?: 'auto' | 'explicit'
   model?: string
   /** Absent on historical runs: a model argument alone never grants automatic switching. */
@@ -53,8 +63,10 @@ export interface WorkerDefinitionSnapshot {
   /** Host-selected automatic Cloud placement may recover on an authorized local device. Absent means no grant. */
   allowLocalRecovery?: true
   subscription?: { bindingId: string; modelId: string; route: string }
-  /** The person's API key the run uses, by id only; the key is opened at claim (`apiKeyForRun`). Never with `subscription`. */
+  /** The person's API key the run uses, by id only; the key is authorized at claim (`validateRunApiKey`). Never with `subscription`. */
   apiKey?: { keyId: string; model: string }
+  /** Paid by Mikka 额度 through the Mikka model gateway (decision 2026-11-15-2000): a catalogue model. Never with `subscription` or `apiKey`. */
+  credits?: { model: string }
   parent: { executionId: string; revisionId: string; revision: number; definitionDigest: string } | null
   /** Explicit parent-selected tools, frozen only for newly authorized runs. */
   mailbox?: WorkerMailboxGrant
@@ -65,9 +77,10 @@ export interface WorkerDefinitionSnapshot {
 }
 
 /** Captured atomically with dispatch, not retroactively inferred from a renamed Agent. */
-export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; model?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: AgentProfileSelection; policyCeiling?: RunPolicy; pinnedDeviceId?: string; allowLocalRecovery?: true; subscription?: { id: string; modelId: string; route: string } | null; apiKey?: { keyId: string; model: string } | null; mailboxEnabled?: boolean; mailboxScope?: WorkerMailboxScope; readOnly?: boolean }): WorkerDefinitionSnapshot {
+export function freezeWorkerDefinition(input: { harness: Harness; instructions: string; prompt: string; parent: DefinitionSnapshot | null; executionId: string | null; model?: string; modelDispatch?: WorkerModelDispatch; agentProfile?: AgentProfileSelection; policyCeiling?: RunPolicy; pinnedDeviceId?: string; allowLocalRecovery?: true; subscription?: { id: string; modelId: string; route: string } | null; apiKey?: { keyId: string; model: string } | null; credits?: { model: string } | null; mailboxEnabled?: boolean; mailboxScope?: WorkerMailboxScope; readOnly?: boolean }): WorkerDefinitionSnapshot {
   if (Boolean(input.parent) !== Boolean(input.executionId)) throw new Error('agentWorkerParentIncomplete')
-  if (input.subscription && input.apiKey) throw new Error('agentWorkerCredentialConflict')
+  if ([input.subscription, input.apiKey, input.credits].filter(Boolean).length > 1) throw new Error('agentWorkerCredentialConflict')
+  if (input.credits && input.harness !== 'codex' && input.harness !== 'claude_code') throw new Error('agentWorkerApiKeyMismatch')
   if (input.apiKey && input.harness !== 'codex' && input.harness !== 'claude_code') throw new Error('agentWorkerApiKeyMismatch')
   const apiKey = input.apiKey ? { keyId: z.uuid().parse(input.apiKey.keyId), model: z.string().trim().min(1).max(128).parse(input.apiKey.model) } : undefined
   const subscription = input.subscription ? { bindingId:z.uuid().parse(input.subscription.id),modelId:z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/).parse(input.subscription.modelId),route:input.subscription.route } : undefined
@@ -75,7 +88,9 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
   if (subscription && input.model && input.model !== subscription.modelId) throw new Error('agentWorkerSubscriptionMismatch')
   // Explicit dispatches already carry the provider model from their exact
   // binding. A subscription alone preserves the existing CLI auto selection.
-  const model = apiKey?.model ?? input.model
+  const credits = input.credits ? { model: z.string().trim().min(3).max(128).regex(/^[a-z0-9][a-z0-9.-]*\/[A-Za-z0-9][A-Za-z0-9._:-]*$/).parse(input.credits.model) } : undefined
+  if (credits && input.model && input.model !== credits.model) throw new Error('agentWorkerApiKeyMismatch')
+  const model = apiKey?.model ?? credits?.model ?? input.model
   const modelDispatch = apiKey ? apiKeyModelDispatch(input.modelDispatch, apiKey) : input.modelDispatch ? structuredClone(input.modelDispatch) : undefined
   const agentProfile = input.agentProfile ? structuredClone(input.agentProfile) : undefined
   const policyCeiling = input.policyCeiling ? runPolicySchema.parse(input.policyCeiling) : undefined
@@ -93,8 +108,8 @@ export function freezeWorkerDefinition(input: { harness: Harness; instructions: 
     ...(input.allowLocalRecovery === true ? { allowLocalRecovery: true as const } : {}),
     cliModelSelection: model ? 'explicit' : 'auto',
     schemaVersion: 1, kind: 'worker', harness: input.harness, instructions: input.instructions,
-    definitionDigest: workerDefinitionDigest({ harness: input.harness, instructions: input.instructions, model, modelDispatch, agentProfile, policyCeiling, pinnedDeviceId: input.pinnedDeviceId, allowLocalRecovery: input.allowLocalRecovery, subscription, apiKey, mailbox, customMcp, readOnly: input.readOnly }),
-    promptDigest: digest(input.prompt), modelSource: subscription ? 'subscription' : apiKey ? 'api_key' : 'native-default', ...(subscription ? { subscription } : {}), ...(apiKey ? { apiKey } : {}),
+    definitionDigest: workerDefinitionDigest({ harness: input.harness, instructions: input.instructions, model, modelDispatch, agentProfile, policyCeiling, pinnedDeviceId: input.pinnedDeviceId, allowLocalRecovery: input.allowLocalRecovery, subscription, apiKey, ...(credits ? { credits } : {}), mailbox, customMcp, readOnly: input.readOnly }),
+    promptDigest: digest(input.prompt), modelSource: subscription ? 'subscription' : apiKey ? 'api_key' : credits ? 'credits' : 'native-default', ...(subscription ? { subscription } : {}), ...(apiKey ? { apiKey } : {}), ...(credits ? { credits } : {}),
     parent: input.parent && input.executionId ? { executionId: input.executionId,revisionId: input.parent.revisionId,revision: input.parent.revision,definitionDigest: input.parent.definitionDigest } : null,
     ...(mailbox ? { mailbox } : {}),
     ...(customMcp ? { customMcp } : {}),

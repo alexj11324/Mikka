@@ -12,7 +12,7 @@ mock.module(new URL('../lib/auth-client.ts', import.meta.url).href, { namedExpor
   useSession: () => ({ data: userId ? { user: { id: userId } } : null, isPending: pending }),
   linkSocial: async () => ({ error: true }),
 }, endSession: async () => undefined } })
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useLocale: () => 'en', useFormatter: () => ({}) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate, useLocale: () => 'en', useFormatter: () => ({}) } })
 mock.module(new URL('../components/ui/button.tsx', import.meta.url).href, { namedExports: { Button: ({ render, children, nativeButton: _nativeButton, ...props }: ComponentProps<'button'> & { render?: ReactElement; nativeButton?: boolean }) => render ? cloneElement(render as ReactElement<ComponentProps<'button'>>, props, children) : <button {...props}>{children}</button> } })
 
 const browser = new Window({ url: 'https://mikka.example/en?settings=integrations' })
@@ -26,6 +26,14 @@ let permissions: Record<string, unknown> | null = null
 const patches: unknown[] = []
 let verification: { viewerId: string; repository: string; verifyCommand: string | null } | null = null
 let verificationSaveFails = false
+// Plugins › GitHub's abilities, as the tools route answers them (GitHub's live MCP list); null leaves the read pending.
+let toolsAnswer: ((viewerId: string) => Response) | null = null
+let toolRequests = 0
+const githubTools = [
+  { name: 'create_pull_request', displayName: 'Open new pull request', readOnly: false, description: 'Create a new pull request in a GitHub repository.' },
+  { name: 'merge_pull_request', displayName: 'Merge pull request', readOnly: false },
+  { name: 'get_file_contents', displayName: 'Get file or directory contents', readOnly: true, description: 'Get the contents of a file or directory.' },
+]
 const verificationPatches: unknown[] = []
 let container: HTMLDivElement
 let root: Root
@@ -49,12 +57,15 @@ beforeEach(() => {
   userId = 'viewer-a'; pending = false; requests.length = 0; composioRequests = 0; patches.length = 0; appAdmin = false; appRequests = 0
   permissions = null
   verification = null; verificationSaveFails = false; verificationPatches.length = 0
+  toolsAnswer = viewerId => Response.json({ viewerId, tools: githubTools, count: 3, readOnlyCount: 1, truncated: false }); toolRequests = 0
   browser.history.replaceState({}, '', '?settings=integrations')
   container = document.createElement('div')
   document.body.append(container)
   root = createRoot(container)
   globalThis.fetch = (input, init) => String(input).endsWith('/github')
     ? new Promise<Response>(resolve => { requests.push({ resolve }) })
+    : String(input).endsWith('/github/tools')
+      ? (toolRequests++, toolsAnswer ? Promise.resolve(toolsAnswer(userId ?? '')) : new Promise<Response>(() => {}))
     : String(input).endsWith('/github/manifest')
       ? (appRequests++, Promise.resolve(Response.json({ viewerId: userId, admin: appAdmin, configured: false, slug: null, installUrl: null })))
     : String(input).includes('/github/repositories/verification')
@@ -254,17 +265,65 @@ test('focus and visibility never ask GitHub again and never hide what is shown',
   }
 })
 
-test('the page lists what Agents can do, split into write and read, connected or not', async () => {
+test('before GitHub is linked the page says its tools are listed once it is, and asks GitHub for nothing', async () => {
   userId = 'viewer-tools'
   await render()
   await respondNotConnected(0, 'viewer-tools')
   const text = container.textContent ?? ''
   assert.ok(text.includes('githubDescription'))
-  for (const tool of ['githubTool.push', 'githubTool.pullRequest', 'githubTool.readCode', 'githubTool.readPullRequest', 'githubTool.readIssue', 'githubTool.readChecks']) assert.ok(text.includes(tool), tool)
-  assert.ok(text.includes('writeTools(2)') && text.includes('readTools(4)'))
-  assert.ok(text.includes('githubAbilitiesSummary(6,2,4)'))
+  assert.ok(text.includes('githubAbilitiesHeading') && text.includes('githubToolsNotConnected'))
+  assert.ok(!text.includes('githubAbilitiesSummary') && !text.includes('writeTools') && !text.includes('readTools'))
+  assert.equal(toolRequests, 0)
   assert.ok(!text.includes('githubRepositoryAccess') && !text.includes('githubConnectionHeading'))
   assert.ok([...container.querySelectorAll('button')].some(button => button.textContent === 'githubLink'))
+})
+
+test('a linked page lists every tool GitHub returns, by its title and description, split by its read-only mark', async () => {
+  userId = 'viewer-live-tools'
+  toolsAnswer = null
+  await render()
+  await respond(0, 'viewer-live-tools', 'live/tools')
+  await frame()
+  assert.equal(toolRequests, 1)
+  assert.ok(container.textContent?.includes('githubToolsLoading'))
+  assert.ok(!container.textContent?.includes('githubAbilitiesSummary'))
+
+  // Its own viewer, so the read left pending above is not joined: GitHub answers with its list.
+  userId = 'viewer-listed-tools'
+  toolsAnswer = viewerId => Response.json({ viewerId, tools: githubTools, count: 3, readOnlyCount: 1, truncated: false })
+  await act(async () => { root.unmount() }); root = createRoot(container); await render()
+  await respond(1, 'viewer-listed-tools', 'live/tools')
+  await frame()
+  const text = container.textContent ?? ''
+  for (const tool of githubTools) assert.ok(text.includes(tool.displayName), tool.displayName)
+  assert.ok(text.includes('Create a new pull request in a GitHub repository.') && text.includes('Get the contents of a file or directory.'))
+  assert.ok(text.includes('writeTools(2)') && text.includes('readTools(1)'))
+  assert.ok(text.includes('githubAbilitiesSummary(3,2,1)'))
+  assert.ok(!text.includes('githubTool.') && !text.includes('githubToolsLoading'))
+})
+
+test('GitHub asking to link again, or not answering, says so; a retry reads the list again', async () => {
+  userId = 'viewer-tools-reconnect'
+  toolsAnswer = viewerId => Response.json({ viewerId, error: 'githubReconnectRequired' }, { status: 401 })
+  await render()
+  await respond(0, 'viewer-tools-reconnect', 'tools/reconnect')
+  await frame()
+  assert.ok(container.textContent?.includes('githubToolsReconnect'))
+  assert.ok(!container.textContent?.includes('githubAbilitiesSummary'))
+
+  userId = 'viewer-tools-down'
+  toolsAnswer = viewerId => Response.json({ viewerId, error: 'githubUnavailable' }, { status: 502 })
+  await act(async () => { root.unmount() }); root = createRoot(container); await render()
+  await respond(1, 'viewer-tools-down', 'tools/down')
+  await frame()
+  const alert = container.querySelector('[role="alert"]')
+  assert.equal(alert?.textContent, 'githubToolsUnavailableretry')
+  toolsAnswer = viewerId => Response.json({ viewerId, tools: githubTools, count: 3, readOnlyCount: 1, truncated: false })
+  const before = toolRequests
+  await act(async () => { [...alert!.querySelectorAll('button')].find(button => button.textContent === 'retry')!.click() })
+  await frame()
+  assert.equal(toolRequests, before + 1)
+  assert.ok(container.textContent?.includes('githubAbilitiesSummary(3,2,1)'))
 })
 
 test('a connected page shows the account and a repository count; the names open in their own dialog', async () => {
@@ -395,11 +454,11 @@ test('every ability is listed with no control and the page never reads or saves 
   globalThis.fetch = (input, init) => { requested.push(String(input)); return original(input, init) }
   try {
     await render()
-    await respondNotConnected(0, 'viewer-permissions')
+    await respond(0, 'viewer-permissions', 'octo/permissions')
     await frame()
   } finally { globalThis.fetch = original }
   assert.equal(container.querySelectorAll('[role="group"]').length, 0, 'no allow / deny segment')
-  for (const name of ['githubTool.push', 'githubTool.pullRequest', 'githubTool.readCode']) assert.ok(container.textContent?.includes(name), name)
+  for (const tool of githubTools) assert.ok(container.textContent?.includes(tool.displayName), tool.displayName)
   assert.ok(!container.textContent?.includes('githubPushByApp'))
   assert.ok(!requested.some(url => url.endsWith('/github/permissions')))
   assert.equal(patches.length, 0)

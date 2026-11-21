@@ -59,7 +59,8 @@ export async function readServerInfo(options: { env?: Environment; query?: Query
     name: env.MIKKA_SERVER_NAME?.trim().slice(0, 120) || 'Mikka', address,
     version: APP_BUILD || env.MIKKA_BUILD_REVISION || env.VERCEL_GIT_COMMIT_SHA || 'development',
     status: { configuration: origin ? 'ready' : 'unavailable', database: databaseReady ? 'ready' : 'unavailable', authentication: authReady ? 'ready' : 'unavailable' },
-    communityUI: { enabled: env.MIKKA_COMMUNITY_UI === '1', frozen: true },
+    // Retain the v1 discovery field for installed clients.
+    communityUI: { enabled: false, frozen: true },
     clients: {
       web: { url: webConnectionURL(env), enabled: webConnectionEnabled(env), requiresHttps: true, serverAddressSupported: Boolean(origin?.startsWith('https://')) },
       desktop: { url: 'https://github.com/alexj11324/Mikka/releases/latest' },

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { agentImageQuery } from './agent-images'
-import { inlineMarkdown, isComponent, isImageQuery, isOpenUI, openUIText, parseOpenUI, splitOpenUI, type Component } from './openui-lang'
+import { inlineMarkdown, isComponent, isImageQuery, isOpenUI, openUIRootCount, openUIText, parseOpenUI, splitOpenUI, type Component } from './openui-lang'
 
 const WELCOME = 'root = Stack([TextContent("你好，Alex！我是你的 Coordinator。"), BeQuestions("刚开始使用", [{id:"start", title:"想先从哪里开始？", options:[{value:"a", label:"整理收件箱"}, {value:"b", label:"看看今天的日程"}], allowCustom:true}])])'
 
@@ -32,6 +32,8 @@ test('an approval and follow-ups get their named props', () => {
 test('not OpenUI, or broken OpenUI, is null', () => {
   assert.equal(parseOpenUI('普通的 **Markdown** 回复'), null)
   assert.equal(parseOpenUI('root = Stack([TextContent("没写完'), null)
+  assert.equal(parseOpenUI('root = {kind:"component"}'), null)
+  assert.equal(parseOpenUI('root = {kind:"component",name:"TextContent",props:{},args:"invalid"}'), null)
 })
 
 test('chips become the chat\'s citation tokens and links', () => {
@@ -66,4 +68,13 @@ test('a reply that opens with prose and then assigns root is a card, with its pr
   assert.ok(parseOpenUI(text))
   assert.equal(isOpenUI('先看例子：\n```\nroot = Stack([])\n```'), false)
   assert.equal(isOpenUI('the root = cause'), false)
+})
+
+test('counts assigned roots across merged messages without treating quoted text as a new card', () => {
+  const first = 'root = TextContent("root = BeApproval()")'
+  const second = 'root = BeButton("Continue", "continue")'
+  assert.equal(openUIRootCount(first), 1)
+  assert.equal(openUIRootCount([first, second].join('\n')), 2)
+  assert.equal((parseOpenUI([first, second].join('\n')) as Component).name, 'BeButton')
+  assert.equal(openUIRootCount('ordinary prose mentioning root = '), 0)
 })

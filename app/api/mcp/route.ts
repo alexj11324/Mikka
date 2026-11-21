@@ -22,8 +22,8 @@ import { ARTIFACT_KINDS } from '@/lib/db/schema'
 import { ARTIFACT_TITLE_MAX } from '@/lib/artifacts/limits'
 import { ProjectMapError } from '@/lib/project-map/contracts'
 import { RECORD_DECISION_TOOL } from '@/lib/project-map/mcp-tool'
+import { INTEROP_TOOLS, INTEROP_TOOL_IDS, WORKER_RUN_TOOLS } from '@/lib/interop/tool-schemas'
 
-export const dynamic = 'force-dynamic'
 // Leaves room for read_coordinator_messages to wait for a reply.
 export const maxDuration = 120
 
@@ -195,11 +195,12 @@ const handler = createMcpHandler(instance => {
 
   const issueChanges = {
     workspaceId: id.optional().describe('Workspace selected for this request; must match any token workspace.'),
+    confirmAccess: z.boolean().optional().describe('Only to replay a call that returned error accessChangeConfirmationRequired: the call would change who can read the task, and this confirms it. Nothing is written without it.'),
     status: z.enum(ISSUE_STATUS_CODES).optional(),
     priority: z.enum(ISSUE_PRIORITY_CODES).optional(),
     projectId: id.nullable().optional().describe('A project id from list_projects; null takes the issue out of its project.'),
     labels: z.array(z.string().trim().min(1).max(40)).max(12).optional().describe('The full set of label names; a known name keeps its color.'),
-    assigneeAgentId: id.nullable().optional().describe('An agent id from list_agents; null unassigns.'),
+    assigneeAgentId: id.nullable().optional().describe('Legacy field for the Agent Delegate only: use an agent id from list_agents. Null clears the delegate and preserves the human assignee.'),
   }
 
   server.registerTool('create_issue', {
@@ -325,6 +326,37 @@ function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return creat
   }, async (input, ctx) => message(await worker.ask(worker.workerRun(ctx.http?.authInfo), input)))
 
   server.registerTool('submit_artifact', SUBMIT_ARTIFACT, async (input, ctx) => outcome(await artifacts.submit(await artifacts.runSubmitter(worker.workerRun(ctx.http?.authInfo)), input)))
+
+  // Reads, sends and shared Drive across threads and Bots (decision 2026-11-19-2200).
+  // The run acts with its owner's identity and its own grants, pinned to the run's Workspace.
+  for (const name of INTEROP_TOOL_IDS) {
+    const { description, inputSchema } = INTEROP_TOOLS[name]
+    server.registerTool(name, { description, inputSchema: inputSchema as z.ZodObject<z.ZodRawShape> }, async (input: Record<string, unknown>, ctx) => {
+      const run = worker.workerRun(ctx.http?.authInfo)
+      const [{ runPrincipal }, { interopFailure, runInteropTool }] = await Promise.all([import('@/lib/interop/principal'), import('@/lib/interop/tools')])
+      let result
+      try { result = await runInteropTool(await runPrincipal(run.userId, run.id), name, input, ctx.mcpReq.signal) }
+      catch (error) { result = interopFailure(error) }
+      return outcome(result)
+    })
+  }
+
+  // The machine's Drive mirror asks which folders this run syncs; the server decides.
+  server.registerTool('drive_sync_scopes', { description: 'The shared Drive folders this run mirrors to ~/.mikka/drive, and whether each is writable.',
+    inputSchema: z.object({}).strict(), annotations: { readOnlyHint: true } }, async (_input, ctx) => {
+    const run = worker.workerRun(ctx.http?.authInfo)
+    const [{ runPrincipal }, { driveSyncScopes }, { interopFailure }] = await Promise.all([import('@/lib/interop/principal'), import('@/lib/interop/drive'), import('@/lib/interop/tools')])
+    try { return json({ scopes: await driveSyncScopes(await runPrincipal(run.userId, run.id)) }) }
+    catch (error) { return outcome(interopFailure(error)) }
+  })
+
+  server.registerTool('list_runs', { ...WORKER_RUN_TOOLS.list_runs, annotations: { readOnlyHint: true } },
+    async (input, ctx) => json(await withMcpWorkspace(ctx.http?.authInfo, undefined, userId => tools.listRuns(userId, input))))
+
+  server.registerTool('get_run', { ...WORKER_RUN_TOOLS.get_run, annotations: { readOnlyHint: true } }, async ({ runId }, ctx) => {
+    const run = await withMcpWorkspace(ctx.http?.authInfo, undefined, userId => tools.getRun(userId, runId))
+    return run ? json(run) : notFound('Run')
+  })
 
   server.registerTool('blocked', {
     title: 'Say you are blocked',

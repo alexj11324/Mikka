@@ -15,8 +15,17 @@ any time, and opening one never waits for, or stops, local building and
 verification.
 
 CI is the final gate, not the place to find out whether something works.
+**Development loop:** reproduce the failure on the actual local API, CLI,
+daemon or UI, run focused checks red→green, then build and verify the affected
+application locally against isolated inputs. Make small commits and push early
+Draft PR checkpoints for crash recovery, **but keep debugging locally rather
+than treating every Draft push/Actions run as another experiment**. A Draft
+runs lightweight required aggregators that fail closed; switch to Ready for review only
+after local proof, which triggers the complete protected CI on that same SHA.
+A remote failure that can be reproduced locally returns to the local loop;
+commit the fix, verify it locally, and request the final protected result again.
 Nobody sits waiting on CI, a merge or a deploy to check what can be checked
-locally. Push, open the PR and keep working; read CI when it reports.
+locally. External-only release and OAuth checks keep their original ownership.
 
 Ordinary acceptance follows [`acceptance.md`](acceptance.md): a local
 application, a real isolated database and, when the flow uses one, a real
@@ -29,6 +38,22 @@ is checked with screenshots of a local production build of the official UI
 The general browser suite is retired. Retained targeted Desktop, Analytics and
 self-hosted jobs keep the scopes in the
 [workflow reference](../.github/workflows/README.md).
+
+### Local preflight and Ready handoff
+
+Use the existing Nx/CI dependency graph to **plan** the affected work, not the whole CI suite:
+
+```sh
+pnpm local:plan
+pnpm local:check --test=test:groups             # example: run the actual owning script
+# Reproduce the failure and repeat focused checks until green, then commit and push.
+pnpm local:ready --test=test:groups --accept=test:local-loop
+pnpm local:mark-ready --pr=1234                 # verifies exact HEAD and calls gh pr ready
+```
+
+This is not a new test registry: `local:plan` reads `scripts/ci/graph.mjs` and `scripts/ci/select.mjs`. When the graph conservatively requires global checks, the developer must **choose and execute an actual focused test** for the changed behavior; full trusted CI remains later. `local:ready` records successful tests and a real product acceptance command or existing local acceptance report under the ignored `.cache/dev-local/local-first/<HEAD>.json`. The report is not uploaded automatically and is **not** a cryptographic attestation; include the source SHA, commands, exits and applicable acceptance link/summary in the PR. For docs-only or tool-only work with no product behavior change use a substantive `--no-product-change='docs: reason'` or `tooling: reason` and preserve actual related test evidence where required. Do not claim a skipped check was run.
+
+The **Ready for review** handoff requires a **clean commit** and invalidates evidence if the source diff or base identity changes. GitHub UI/CLI may still allow a human to mark Ready without it; the owning Agent must use this supported handoff, and the remote CI remains the final independent protection. If CI reveals a locally reproducible failure, return to the local red→green loop rather than repeatedly dispatching Actions. CI/staging remain necessary for protected provider, OAuth, registry, migration and release gates outside the local environment.
 
 ## 2. Hot reload
 
@@ -48,14 +73,13 @@ For production screenshots of a UI change, run
 `NITRO_PRESET=node-server pnpm build:app`, then `pnpm start` in cloud Linux
 with the isolated database configured. The build
 emits the Vite frontend and Nitro Node server into `.output`. Startup validates
-`.output/mikka-build.json` and serves the compiled application. Node 24 is
-required. `pnpm build` also builds the subscription worker, generates the Agent
-UI, runs type checks and invokes migrations. The official Web workflow builds
-with `NITRO_PRESET=vercel` into `.vercel/output` through
-`scripts/release/build-vercel.mjs`.
+`.output/mikka-build.json` and serves the compiled application. Node 22 (latest
+22.x) and Node 24 are supported; the manifest records the build runtime. `pnpm build` also builds the subscription worker, generates the Agent
+UI, runs type checks and invokes migrations. The official Web release is built
+by `cloudflare-api-image.yml` and deployed to Cloudflare
+([build source of truth](operations/build-source-of-truth.md)); Vercel is retired.
 
-`vercel.json` installs every workspace except `@mikka/mobile`, which the Web
-build does not use. Runtime and frontend build configuration lives in
+Runtime and frontend build configuration lives in
 `apps/api/nitro.config.ts` and `apps/frontend/vite.config.mjs`.
 
 ## 3. Environment
@@ -65,8 +89,11 @@ One command sets up a container: `eval "$(scripts/dev/bootstrap-local.sh)"`
 the cloud environment's setup script so every session starts ready. It
 provides:
 
-- **Node 24**, the version family required by the runtime and CI. The separate
-  Node 22 compatibility workflow covers its selected source tests only.
+- **Node 22 and 24** are supported throughout the app, Eve, API and daemon.
+  Bootstrap defaults to **24** from `.node-version`; production images stay on 24.
+  CI runs selected core/integration unit and database suites on both versions.
+  `local-device-node22.yml` also builds and starts the app and packaged Eve on
+  both versions; it retains the daemon/installer compatibility tests.
 - **PostgreSQL 17** at `127.0.0.1:5432`, database `mikka_e2e`; migrations with
   `pnpm migrate` (it runs by itself when every target is a loopback database;
   a remote database off Vercel still needs `MIGRATE=1` and `--allow-remote`).
@@ -78,6 +105,15 @@ gate acceptance or a merge. Live model acceptance follows the two subscription
 paths in [acceptance.md](acceptance.md#live-model-acceptance). See the
 [local model setup](local-runtime.md#which-model-local-runs-use) for the
 existing harness's limits.
+
+The required CI database matrix initializes its disposable PostgreSQL 17 service
+with `max_locks_per_transaction=512`. Four package lanes, each with concurrent
+test files, can tear down several full-migration schemas at once. PostgreSQL's
+lock table is shared across databases, so separate suite clones still compete
+for it; the default 64 can fail `DROP SCHEMA ... CASCADE` with SQLSTATE `53200`.
+This startup setting increases CI lock-table capacity without reducing test
+parallelism or bypassing cleanup. It does not change application or production
+database configuration.
 
 Signup limits never block local work. In local test-account mode
 (`localTestAccountsMode`, `scripts/test-accounts/database-target.mjs`) and
@@ -148,33 +184,28 @@ old module owners (backend was Codex's).
    does not require an up-to-date branch, and each merge reruns the full CI.
    Merge `main` in when there is a conflict, or when a change that just landed
    touches the same code and the PR must be checked against it.
-5. **After the merge** the owner watches the Vercel production deployment
-   until it is READY and the production domain serves that commit. After a
-   batch lands, leave `main` unchanged until both conditions hold. Pending
-   migrations run through the existing flow (`pnpm build` runs
-   `scripts/migrate.mjs`). A change a local production build can show (UI,
-   interaction, navigation, page refresh, layout, copy) is accepted by CI
-   and the PR's screenshots; the owner notes on the issue that production
-   serves the merge commit and closes it. Only what cannot be tested
-   locally (real subscriptions, OAuth, model providers, the GitHub App,
-   payments, push and other external services) is accepted in production,
-   with the shared test account and a real task (no junk data; see
-   [`acceptance.md`](acceptance.md)). A simulated test is not production
-   acceptance. The owner writes the evidence on the issue (time, run id,
-   log summary; no secrets or personal data) and closes the issue. Every
-   production Web deploy also triggers the implemented API smoke. The required
-   message/task smoke remains a documented coverage gap in
-   [production smoke](production-smoke.md).
-   A PR that touches only `apps/mobile/**` and documentation is the
-   exception: it merges once CI is green and it is mergeable, without
-   waiting for Web deploy or E2B to be idle. Its push still queues a Web
-   build (`queue: max`, `cancel-in-progress: false`) that rebuilds unchanged
-   web output, so the owner watches only the Mobile OTA run and reports its
-   update group ID.
-   It still does not merge while an E2B runtime release is in progress or
-   awaiting Web: that release is bound to the exact `main` SHA, so moving
-   `main` fails it with `mainChanged` and forces a rebuild. It also respects
-   any merge window an owner has posted on a PR or issue.
+5. **After the merge** the PR owner verifies the merge SHA, records the
+   post-merge regression and links its CI. For an official hosted change,
+   link the merged public source and the pinned UI Overlay when applicable to
+   the [existing release owner and window](https://github.com/alexj11324/Mikka/issues/1954).
+   Public GitHub Actions builds the product, and the release owner stages and
+   promotes its verified immutable artifacts following the
+   [build and release contract](operations/build-source-of-truth.md).
+   Pending production migrations use the reviewed database window and the
+   `production-migrate-database` phase. Record code delivery while a change
+   awaits promotion. Record production acceptance after the serving release,
+   public/UI source pair and requested behavior have been verified. Continue
+   independent protected merges subject to active owner release windows.
+   UI changes use CI and local production-build screenshots for interaction,
+   navigation, layout, refresh and copy. Check real providers and external
+   services with the shared account and a real task as described in
+   [acceptance](acceptance.md). Record the acceptance time, original run,
+   versions and result with secrets and personal data omitted. Follow the
+   [production smoke coverage](production-smoke.md) for the released surface.
+   A mobile-only change records the actual OTA run and update group when
+   published. Desktop and E2B use their existing source and receipt checks.
+   Respect any active release window announced by the owner and report the
+   decision when a platform skips or defers a candidate.
 6. **If production breaks,** fix forward with a new PR, or revert through a
    revert PR. Never delete deployments, revoke shared tokens, change
    production Neon settings or create paid resources without Alex.
@@ -194,13 +225,38 @@ contract in [`acceptance.md`](acceptance.md). Pull requests and branches have no
 runs on GitHub Actions, and only `main` deploys, to production
 ([decision 2026-11-05-1632](design/decisions/2026-11-05-1632-no-vercel-preview.md)).
 
-## 6. Numbers
+## 6. Rule IDs and migrations
 
-Rule ids (`R-xx`) and migration timestamps are assigned by the coordinator
-when it writes the issue, so parallel branches do not collide. A session
-that needs one and has none asks the coordinator. The coordinator assigns
-increasing timestamps. `scripts/check-migrations.mjs` refuses a timestamp at or below the newest one on `main`, so if they merge out
-of order, whoever merges the later one renames it.
+The coordinator assigns rule IDs (`R-xx`) when it writes the issue. Migration
+IDs are generated automatically, following the
+[Rails-style migration decision](design/decisions/2026-11-11-1151-automatic-migration-ids.md).
+
+To add a database migration:
+
+1. From the repository root, run `pnpm migration:new add_project_notes`.
+   It creates `drizzle/YYYYMMDDHHMMSS_add_project_notes.sql`.
+2. Write the SQL in that file. The generated header targets
+   `MIKKA_DATABASE_URL`; use `-- target: DATABASE_URL` for the workspace database.
+3. Run `pnpm check:migrations` and `pnpm test:migrations`. Verify the SQL against
+   an isolated database, covering both a fresh replay and an upgrade from the
+   preceding deployed schema.
+
+The generator takes the later of the current UTC second and the latest local
+migration ID plus one second. It reserves IDs atomically across this clone's
+Git worktrees and advances automatically on a collision, including concurrent
+invocations. There are no Agent ranges or manually allocated timestamps.
+
+The runner sorts pending files and checks each full filename against that
+database's `schema_migrations` ledger. A missing file runs even if its timestamp
+is older than an already executed file. Independent branches can merge in
+either order without renumbering; SQL dependencies still need to merge first.
+
+Keep inherited `main` migrations and every executed migration under their
+original names with their original SQL. Add a corrective migration for changes.
+The checker rejects malformed or duplicate IDs and changes to inherited history.
+Independent clones can still collide: regenerate an unexecuted migration with
+the command before merging, while retaining every executed file. Existing
+historical aliases and transaction rules remain in force.
 
 ## 7. E2B templates
 
@@ -210,8 +266,10 @@ The official CLI packages, Node/npm, system files and their layout remain
 intact: adding files is allowed; deleting or overwriting originals is not
 ([Alex's #1505 clarification](design/decisions/2026-11-03-1430-official-e2b-templates-unchanged.md)).
 
-A worker change on `main` runs `e2b-official-runtime.yml`, using the reusable
-`e2b-template.yml` candidate builder. The build checks every protected original
+A worker change on `main` is reported by `e2b-official-runtime.yml`. When the
+Cloudflare deployment workflow's serving-release observation shows that commit
+as current main, the same workflow runs the release by itself through the
+reusable `e2b-template.yml` candidate builder. The build checks every protected original
 file's hash, type, mode, owner and link before and after installation. Both
 Claude Code and Codex must complete real subscription executions on those
 candidates before public publication and production selection. Credentials

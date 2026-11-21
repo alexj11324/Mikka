@@ -50,7 +50,7 @@ export function factoryAuthorizationCheckpoint(tx: PoolClient): () => void {
 /** Slow planning precedes fresh membership acquisition. Source/Profile locks
  * stay on tx; the real membership lease remains pinned through this COMMIT. */
 export async function commitFactoryTransaction(tx: PoolClient,
-  heldMembership?: { ownerId: string; workspaceId: string; check: () => Promise<void> }) {
+  heldMembership?: { ownerId: string; workspaceId: string; check: (appExecutor?: Pick<PoolClient, 'query'>) => Promise<void> }) {
   assertFactoryTransaction(tx);
   const profiles = [...factoryTransactions.get(tx)!.profiles.values()];
   const members: ProfileLease[] = [];
@@ -72,10 +72,18 @@ export async function commitFactoryTransaction(tx: PoolClient,
           // first lease; retain and check the original through this COMMIT.
           if (scope.ownerId !== heldMembership.ownerId || scope.workspaceId !== heldMembership.workspaceId)
             throw new Error('factoryProfileMembershipMismatch');
-          await heldMembership.check();
+          await heldMembership.check(tx);
+          // The composing Task admission owns this lease already. Borrow it
+          // without a new WS checkout, and recheck Enterprise authority on
+          // the APP client that will commit the queued work.
+          const { borrowTaskWorkspaceMembership } = await import('../task-workspace');
+          const borrowed = borrowTaskWorkspaceMembership(scope.ownerId, scope.workspaceId);
+          if (!borrowed) throw new Error('factoryProfileMembershipMismatch');
+          try { await borrowed.check(tx); }
+          finally { await borrowed.close(); }
         } else members.push(await acquireProfileMembership(scope));
       }
-      for (const member of members) await member.check();
+      for (const member of members) await member.check(tx);
     }
     await tx.query('COMMIT');
     committed = true;

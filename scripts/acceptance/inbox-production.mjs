@@ -8,7 +8,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 import { createSessionClient, smokeAcceptanceAccount, selectAcceptanceTeam, restoreAcceptanceWorkspace } from './cloud-startup.mjs'
-import { assertCoreProductionTarget, attestCoreProduction, CORE_ORIGIN } from './self-hosted-production-target.mjs'
+import { assertCoreProductionTarget, attestCoreProduction, coreBusinessSelected, CORE_ORIGIN } from './self-hosted-production-target.mjs'
 import { selectInboxProduction, inboxSelectionFailure } from './inbox-production-target.mjs'
 import { inboxBindingJournal, inboxJournalEnvelope, INBOX_JOURNAL_PREFIX, inboxRecoveryFailure, readInboxRecovery } from './inbox-production-recovery.mjs'
 import { liveInvalidation, liveReadiness } from '../../lib/live/events.ts'
@@ -627,7 +627,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try {
     const event = JSON.parse(await readFile(process.env.GITHUB_EVENT_PATH, 'utf8'))
     const attestation = selecting ? JSON.parse(await readFile(directory + '/attestation.json', 'utf8')) : await attestCoreProduction({ event })
-    coreRequired = attestation.openIssues?.some(number => number !== 1820) === true
+    coreRequired = coreBusinessSelected(attestation)
     if (selecting) report = await selectInboxProduction({ event, attestation })
     else {
       const selection = JSON.parse(await readFile(directory + '/inbox-selection.json', 'utf8'))

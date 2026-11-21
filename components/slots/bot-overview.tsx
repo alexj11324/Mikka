@@ -1,6 +1,6 @@
-// The default bot-overview slot (docs/ui-overlay.md): none. The chat's 概览 keeps the community body in
-// components/nav/context-panel.tsx; a layer that draws it exports a component here.
-import type { ComponentType } from 'react'
 import type { BotOverviewProps } from './bot-overview-contract'
 
-export const BotOverview: ComponentType<BotOverviewProps> | null = null
+/** Official Web and Desktop resolve this component from the required provider. */
+export function BotOverview(_props: BotOverviewProps): never {
+  throw new Error('UI_SLOT_REQUIRES_OFFICIAL_CLIENT: bot-overview')
+}

@@ -1,12 +1,20 @@
 name: E2B additive runtime release
-# Build private candidates, preserve official files, prove both subscriptions,
-# then publish through the same version-bound Web deployment queue.
+# Build private candidates, preserve official files and pass build-time checks,
+# then publish them for the Cloudflare release that serves this exact commit.
+# A push only reports changed runtime inputs. The release starts by itself when
+# the Cloudflare deployment workflow's gateway observation shows current main
+# being served, or from a dispatch carrying a promotion receipt
+# (docs/operations/web-deploy.md).
 on:
+  workflow_run:
+    workflows: [Cloudflare application deployment]
+    types: [completed]
   push:
     branches: [main]
-    # An unrelated merge can obsolete an in-flight publication. Recheck the
-    # live worker on every main push; failed input fingerprints skip retries.
+    # The cheap check compares canonical installed-worker/template inputs
+    # across the complete push. Unrelated app edits never acquire the release queue.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths: &runtime_paths
       - 'package.json'
       - 'pnpm-lock.yaml'
@@ -21,7 +29,6 @@ on:
       - '.github/workflows/e2b-official-runtime.yml'
       - '.github/workflows/e2b-template.yml'
       - '.github/workflows/e2b-runtime-release.yml'
-      - 'scripts/e2b/validate-template-subscriptions.mjs'
       - 'scripts/e2b/cleanup-template-candidates.py'
       - 'scripts/e2b/runtime-report.mjs'
       - 'scripts/e2b/acceptance-daemon.mts'
@@ -30,19 +37,19 @@ on:
       - 'app/api/runs/[runId]/evidence/route.ts'
       # The wildcard also matches Next route brackets as literal directory names.
       - 'app/api/runs/**/evidence/route.ts'
-      - 'lib/computer/claude-startup-hint.ts'
-      - 'lib/computer/codex-startup-hint.ts'
+      - 'lib/computer/anonymous-startup-hint.ts'
       - 'scripts/acceptance/cloud-startup.mjs'
       - 'scripts/acceptance/cloud-startup.test.mjs'
       - 'scripts/acceptance/cloud-startup-evidence.mjs'
       - 'scripts/acceptance/team-workspace.mjs'
       - 'scripts/acceptance/team-workspace.test.mjs'
       - 'lib/smoke-account.ts'
-      - '.github/workflows/web-deploy.yml'
       - 'scripts/release/web-deploy.mjs'
-      - 'scripts/release/build-vercel.mjs'
       - 'scripts/release/web-deploy.test.mjs'
-      # This issue's acceptance requires a same-application-SHA runtime proof.
+      - 'scripts/release/cloudflare-promoted-web*.mjs'
+      - 'cloudflare/web/gateway.mjs'
+      - 'cloudflare/web/prepare.mjs'
+      # These paths select offline PR checks, not paid runtime build eligibility.
       - '.github/workflows/model-provider-fallback-acceptance.yml'
       - 'scripts/acceptance/model-provider-fallback.mjs'
       - 'scripts/acceptance/model-provider-fallback.test.mjs'
@@ -59,10 +66,20 @@ on:
         description: Reason for this manual runtime retry (recorded in the dispatch event)
         type: string
         required: true
+      cloudflare_receipt:
+        description: 'Promoted Web evidence (actions:RUN:ATTEMPT or historical issue 1954 comment ID and body SHA-256)'
+        type: string
 permissions:
   contents: read
+
 jobs:
   test:
+    # Skip expensive PR proof while drafting; main/manual runs are unaffected.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    # Only offline checks share a PR group. Main and manual runs each get their own.
+    concurrency:
+      group: e2b-offline-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -77,7 +94,7 @@ jobs:
           ln -s "$RUNNER_TEMP/runtime-gate-tests/node_modules" node_modules
           mkdir -p node_modules/@mikka
           ln -s "$GITHUB_WORKSPACE/packages/protocol" node_modules/@mikka/protocol
-      - run: node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/validate-template-subscriptions.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
+      - run: node --import tsx --test scripts/e2b/runtime-inputs.test.mjs scripts/e2b/runtime-report.test.mjs scripts/e2b/publish-template-env.test.mjs scripts/e2b/cloud-acceptance-release.test.mjs scripts/release/web-deploy.test.mjs scripts/release/cloudflare-promoted-web.test.mjs scripts/acceptance/cloud-startup.test.mjs scripts/acceptance/cloud-startup-report.test.mjs
       - run: python3 scripts/e2b/build-template.test.py
       - run: python3 packages/daemon/scripts/prepare-worker-install.test.py
       - run: python3 scripts/e2b/official-files.test.py
@@ -87,15 +104,15 @@ jobs:
   # Check before acquiring the publication queue or any E2B credentials.
   check:
     needs: test
-    if: github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
       actions: read
-      id-token: write
     outputs:
-      changed: ${{ steps.compare.outputs.changed || 'false' }}
+      changed: ${{ steps.history.outputs.changed || 'false' }}
+      receipt: ${{ github.event.inputs.cloudflare_receipt || steps.trigger.outputs.receipt }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -104,53 +121,67 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Refuse an obsolete source before runtime validation
-        run: node scripts/release/web-deploy.mjs main
+      - name: Use a Cloudflare gateway observation that serves current main
+        id: trigger
+        if: github.event_name == 'workflow_run'
+        run: node scripts/release/cloudflare-promoted-web.mjs trigger runtime
         env:
           GITHUB_TOKEN: ${{ github.token }}
-      - name: Check publication-control changes across this push
-        id: control
-        run: node scripts/release/web-deploy.mjs runtime-refresh
-        env:
-          RUNTIME_REFRESH: ${{ inputs.runtime-refresh }}
-      - name: Fingerprint runtime inputs and suppress a previously failed automatic retry
+      - name: Compare canonical worker inputs across this push and check failed attempts
         id: history
+        if: github.event_name != 'workflow_run' || steps.trigger.outputs.ready == 'true'
         run: node scripts/e2b/runtime-inputs.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RETRY_REASON: ${{ inputs.reason }}
-      - name: Read the Vercel team token through Infisical workload identity
-        if: steps.history.outputs.skip != 'true'
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /platform
-          secret-name: VERCEL_TEAM_TOKEN
-          include-imports: false
-      - name: Compare the worker hash with production
-        if: steps.history.outputs.skip != 'true'
-        id: compare
+      - name: Leave publication to the Cloudflare promotion
+        if: github.event_name == 'push' && steps.history.outputs.changed == 'true'
         run: |
-          wanted="$(python3 scripts/e2b/build-template.py --worker-hash --source-ref "$GITHUB_SHA")"
-          live="$(node scripts/e2b/publish-template-env.mjs --current)"
-          echo "worker hash $wanted; production $live"
-          if [ "$MANUAL_RETRY" = true ] || [ "$RUNTIME_REFRESH" = true ] || [ "$wanted" != "$live" ]; then echo "changed=true" >> "$GITHUB_OUTPUT"; else echo "changed=false" >> "$GITHUB_OUTPUT"; fi
+          echo "::notice title=Runtime inputs changed::This push publishes nothing. The release starts by itself once Cloudflare serves this commit."
+          printf '### Runtime inputs changed\n\nThis push publishes nothing. The release starts by itself when the Cloudflare gateway observation shows this commit being served (docs/operations/web-deploy.md).\n' >> "$GITHUB_STEP_SUMMARY"
+  web-ready:
+    needs: check
+    if: needs.check.outputs.changed == 'true' && github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 95
+    permissions:
+      contents: read
+      issues: read
+      actions: read
+    outputs:
+      # The commit Cloudflare serves; the release builds and publishes its worker.
+      source: ${{ steps.promoted.outputs.source }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Require the Cloudflare promotion receipt
+        if: needs.check.outputs.receipt == ''
+        run: |
+          echo "::error title=cloudflare_receipt required::Production Web is promoted by the Cloudflare deployment workflow. Dispatch again with that promotion's cloudflare_receipt."
+          exit 1
+      - name: Verify the promoted Cloudflare Web before allocating template builders
+        id: promoted
+        run: node scripts/release/cloudflare-promoted-web.mjs
         env:
-          RUNTIME_REFRESH: ${{ steps.control.outputs.refresh }}
-          MANUAL_RETRY: ${{ github.event_name == 'workflow_dispatch' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_RECEIPT: ${{ needs.check.outputs.receipt }}
   release:
-    needs: [test, check]
-    if: needs.check.outputs.changed == 'true'
+    needs: [test, check, web-ready]
+    if: needs.check.outputs.changed == 'true' && github.event_name != 'push'
     concurrency:
       group: e2b-official-runtime-release
       cancel-in-progress: false
       queue: max
     permissions:
       contents: read
+      issues: read
       actions: read
       id-token: write
     uses: ./.github/workflows/e2b-runtime-release.yml
+    with:
+      cloudflare_receipt: ${{ needs.check.outputs.receipt }}
+      source_sha: ${{ needs.web-ready.outputs.source }}

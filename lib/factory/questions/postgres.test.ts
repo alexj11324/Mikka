@@ -1,8 +1,13 @@
+import { builtinGateway } from '../../builtin-gateway/runtime';
+import { coordinatorWakeTransport } from '../../coordinator/wake-after-commit';
 import { measured, readMetrics } from '../../../tests/helpers/read-metrics';
 import type { ModelMessage } from 'ai';
 import { completeAttentionQuestions } from '../../coordinator/question-attention';
 import { factoryTestLifecycle } from "../../../tests/helpers/factory-test-authority";
 import { seedFixtureWorkspace } from '../../../tests/helpers/task-workspace';
+import { bindFixtureWorkspaceDatabase } from '../../../tests/helpers/workspace-database';
+import { bindFactoryQuestionsWorkspace, withFactoryBackgroundWorkspace } from '../background-workspace';
+import { seedRunProjectResources } from '../../../tests/helpers/run-project-resources';
 import { isolatedPostgresURL } from "../../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
@@ -26,7 +31,7 @@ import { threadQuestionStates } from "../../issue-thread-questions";
 import { readRunChain } from "../../run-chain";
 import { createFactoryReconciler } from "../reconcile";
 import { lostRunOutcome } from "../../run-retry";
-import { queueCloudQuestionContinuation } from "./queue-continuation";
+import { prepareCloudQuestionRecovery, queueCloudQuestionContinuation } from "./queue-continuation";
 import { questionExecutionContinuation } from "./execution-continuation";
 import { freezeWorkerDefinition } from "../../agent-kit/worker";
 import { blockQuestionRetry } from "./retry";
@@ -53,10 +58,29 @@ const rejects = (fn: () => Promise<unknown>, code: string) =>
     fn,
     (e: unknown) => e instanceof FactoryError && e.code === code,
   );
+test('cloud recovery preserves the cause when its machine lookup fails', async (t) => {
+  const cause = Object.assign(new Error('fixture lookup failed'), { code: '08006' });
+  const pool = new Pool();
+  t.mock.method(pool, 'query', async () => { throw cause; });
+  try {
+    await assert.rejects(prepareCloudQuestionRecovery(pool, 'owner', { runId: randomUUID(), workspaceId: randomUUID() }), error => {
+      assert.ok(error instanceof FactoryError);
+      assert.equal(error.code, 'factoryQuestionContinuationUnavailable');
+      assert.equal(error.cause, cause);
+      return true;
+    });
+  } finally {
+    await pool.end();
+  }
+});
+
 test(
   "PG17 execution questions: durable waiting, exact facts/human source, one continuation, rollback and stop fences",
   { skip: !dbURL, timeout: 120000 },
   async (t) => {
+    const previousWake = coordinatorWakeTransport.wake;
+    coordinatorWakeTransport.wake = async () => undefined;
+    t.after(() => { coordinatorWakeTransport.wake = previousWake; });
     const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `questions_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: fixtureURL, max: 1 });
@@ -116,6 +140,7 @@ test(
       };
     };
     const { store, dispatch, questions, assignments } = make(pool);
+    const closeWorkspaceDatabase = await bindFixtureWorkspaceDatabase(pool);
     try {
       const dir = new URL("../../../drizzle/", import.meta.url);
       for (const name of orderMigrations(
@@ -136,7 +161,7 @@ test(
         [sessionId, `fixture-${randomUUID()}`],
       );
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,'owner','Fixture device',true,now(),'[{"harness":"codex","installed":true}]')`,
+        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,'owner','Fixture device',true,now(),'[{"harness":"codex","installed":true}]',now())`,
         [deviceId],
       );
       await pool.query(
@@ -158,7 +183,7 @@ test(
         // This fixture represents an online daemon. Refresh its heartbeat for
         // each case so earlier database cases cannot age it past the real
         // liveness window before a later continuation is claimed.
-        await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId]);
+        await pool.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [deviceId]);
         const issueId = randomUUID(),
           eventId = randomUUID(),
           questionId = randomUUID();
@@ -248,6 +273,22 @@ test(
           )
         ).rows[0].n;
 
+      await t.test("recovering a stopped question settles its prior continuation once", async (st) => {
+        const f = await fixture("context", false);
+        const settle = st.mock.method(questions, "settle");
+        const record = st.mock.method(questions, "record");
+        const reconcile = createFactoryReconciler(pool, store, questions);
+        assert.deepEqual(await reconcile.run(userId, f.runId), { recovered: 1 });
+        const question = await questions.read(userId, f.questionId);
+        assert.equal(question.status, "open");
+        assert.equal(question.originRunId, f.runId);
+        assert.equal((await store.read(userId, f.task.id)).task.status, "waiting");
+
+        assert.deepEqual(await reconcile.run(userId, f.runId), { recovered: 0 });
+        assert.equal(settle.mock.callCount(), 1);
+        assert.equal(record.mock.callCount(), 1);
+      });
+
       await t.test("Coordinator attention completes a permission handoff once without another read or a fabricated answer", async (t) => {
         const normal = await fixture('permission');
         const missing = await fixture('permission');
@@ -325,7 +366,7 @@ test(
           const f = await fixture('context',true,async () => undefined,workspaceId);
           const botId=randomUUID(),childDevice=randomUUID(),childRepo=randomUUID(),connectionId=randomUUID(),credentialId=randomUUID();
           await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,$3,'Cloud fixture')`,[botId,workspaceId,userId]);
-          await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,$2,'Task VM','cloud',now(),'[{"harness":"codex","installed":true}]')`,[childDevice,userId]);
+          await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,$2,'Task VM','cloud',now(),'[{"harness":"codex","installed":true}]',now())`,[childDevice,userId]);
           await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,'main')`,[childRepo,childDevice,userId,target.repoPath,target.remoteUrl]);
           await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",state,epoch,provider,"secretName","providerSubject","secretDigest") VALUES($1,$2,$3,'connected',2,'codex','synthetic-secret-reference-' || $1::uuid::text,'synthetic-subject',repeat('a',64))`,[connectionId,userId,workspaceId]);
           await pool.query(`INSERT INTO byos_bindings(id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES($1,$2,$3,$4,$5,2,'codex_cli','fixture-model')`,[credentialId,userId,workspaceId,agentId,connectionId]);
@@ -340,10 +381,10 @@ test(
             if(result)return result;
             fallbackCalls++;throw new Error('Cloud question used local fallback');
           });
-          const service=createFactoryQuestions(pool,authorize,store,cloudDispatch,withSkills ? {lockOrigin:async (...args:Parameters<typeof assignments.lockQuestion>)=>{
+          const service=bindFactoryQuestionsWorkspace(pool,createFactoryQuestions(pool,authorize,store,cloudDispatch,withSkills ? {lockOrigin:async (...args:Parameters<typeof assignments.lockQuestion>)=>{
             try { await assignments.lockQuestion(...args); }
             catch(error) { if(error instanceof ImprovementError) throw new FactoryError('factoryQuestionContinuationUnavailable'); throw error; }
-          },continueQuestion:assignments.continueQuestion} : undefined,undefined,afterContinuation,beforeRecovery);
+          },continueQuestion:assignments.continueQuestion} : undefined,undefined,afterContinuation,beforeRecovery),null);
           return {...f,workspaceId,botId,childDevice,childRepo,connectionId,credentialId,definition,sandboxId,service,fallbackCalls:()=>fallbackCalls};
         };
         const failedContinuation = async (beforeRecovery?: Parameters<typeof createFactoryQuestions>[7], afterContinuation?: (owner:string,result:{continuationRunId:string})=>Promise<void>, target?: CloudQuestionTarget) => {
@@ -360,6 +401,54 @@ test(
           (SELECT count(*)::int FROM factory_events WHERE "taskId"=t.id) AS events,
           (SELECT to_jsonb(m) FROM thread_machines m WHERE "runId"=q."continuationRunId") AS machine
           FROM factory_questions q JOIN factory_tasks t ON t.id=q."taskId" WHERE q.id=$1`,[f.q.id])).rows[0];
+        const resourceState = async (f: Awaited<ReturnType<typeof cloudFixture>>) => (await pool.query(`SELECT
+          (SELECT to_jsonb(q) FROM factory_questions q WHERE id=$1) AS question,
+          (SELECT to_jsonb(t) FROM factory_tasks t WHERE id=$2) AS task,
+          (SELECT jsonb_agg(to_jsonb(r) ORDER BY id) FROM agent_runs r WHERE "issueId"=$3) AS runs,
+          (SELECT jsonb_agg(to_jsonb(m) ORDER BY "runId") FROM thread_machines m WHERE "issueId"=$3) AS machines,
+          (SELECT jsonb_agg(to_jsonb(e) ORDER BY "eventId") FROM factory_events e WHERE "taskId"=$2) AS events`,
+        [f.q.id,f.task.id,f.issueId])).rows[0];
+        for (const mutation of ['repository','environment-revision','environment-archive','project-archive','branch','legacy-environment','legacy-branch'] as const)
+          for (const recovering of [false,true]) await t.test(`${recovering ? 'cloud recovery' : 'cloud answer'} refuses ${mutation} before a child, VM transfer or provider preparation`, async () => {
+            let preparations=0;
+            const target={repoPath:'v2/github.com/mikka-ci/question-resources',remoteUrl:'https://github.com/mikka-ci/question-resources.git'};
+            const f=await cloudFixture('running',undefined,true,async()=>{preparations++;},target);
+            const legacy=mutation.startsWith('legacy-');
+            // An old source's absent snapshot is deliberate fixture history.
+            // New sources freeze the actual Project configuration before any edit.
+            let configured: Awaited<ReturnType<typeof seedRunProjectResources>>;
+            const configure=()=>seedRunProjectResources(pool,{ownerId:userId,workspaceId:f.workspaceId,issueId:f.issueId,
+              repositoryKey:target.repoPath,runtime:'cloud',harness:'codex',environment:mutation!=='legacy-branch'});
+            if(!legacy){
+              configured=await configure();
+              const {withProjectExecution}=await import('../../project-resources/store');
+              const {workerDefinitionDigest}=await import('../../agent-kit/worker-digest');
+              const snapshot=await withProjectExecution({userId,workspaceId:f.workspaceId,issueId:f.issueId,repositoryKey:target.repoPath,
+                runtime:'cloud',harness:'codex',baseBranch:'main'},async value=>value);
+              const definition={...f.definition,projectExecution:snapshot};
+              definition.definitionDigest=workerDefinitionDigest(definition);
+              await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1',[f.runId,JSON.stringify(definition)]);
+            }
+            let recovery: {requestId:string} & NonNullable<Awaited<ReturnType<typeof f.service.read>>['recoverReference']> | undefined;
+            if(recovering){
+              const first=await f.service.answer(human,{reference:questionReference(f.q),answerId:randomUUID(),text:'Continue the original resource fixture'});
+              await pool.query(`UPDATE agent_runs SET status='failed',"stopReason"='error',"sessionId"=$2,"finishedAt"=now() WHERE id=$1`,[first.continuationRunId,f.q.originSessionId]);
+              await f.service.settle(userId,first.continuationRunId);
+              const q=await f.service.read(userId,f.q.id);
+              recovery={requestId:randomUUID(),...q.recoverReference!};
+            }
+            if(legacy) configured=await configure();
+            if(mutation==='legacy-branch') await configured!.refuse('branch');
+            else if(mutation!=='legacy-environment') await configured!.refuse(mutation);
+            const before=await resourceState(f);
+            const expected=mutation==='repository'||mutation==='branch'||mutation==='legacy-branch'?'projectRepositoryDenied'
+              :mutation==='project-archive'?'projectArchived':'projectEnvironmentUnavailable';
+            await assert.rejects(()=>recovering ? f.service.recover(human,recovery!) : f.service.answer(human,{
+              reference:questionReference(f.q),answerId:randomUUID(),text:'Attempt revoked continuation'}),
+            (error:unknown)=>!!error&&typeof error==='object'&&'code' in error&&error.code===expected);
+            assert.deepEqual(await resourceState(f),before);
+            assert.equal(preparations,0);assert.equal(f.fallbackCalls(),0);
+          });
         for (const [expectedKind, target] of [
           ['deliverable', { repoPath: '/home/user/.mikka/bot-workspaces/question-delivery', remoteUrl: null }],
           ['repository', { repoPath: '/isolated', remoteUrl: 'fixture/repo' }],
@@ -379,24 +468,26 @@ test(
           const historyIds = [...new Set([f.runId, historyRunId])];
           const before = (await pool.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=ANY($1::uuid[]) ORDER BY id', [historyIds])).rows;
           const questionBefore = (await pool.query('SELECT to_jsonb(q) AS question FROM factory_questions q WHERE id=$1', [f.q.id])).rows;
-          const tx = await pool.connect();
-          try {
-            await tx.query('BEGIN');
-            // Exercise the outer claim composition used by device claims. Calling
-            // claimContinuation directly misses the execution-purpose regression.
-            const claimed = await createFactoryClaim(store, f.service)(tx, userId, f.childDevice, runId, new Date(Date.now() + 60000).toISOString());
-            assert.equal(claimed.factoryExecuteKind, expectedKind);
-            assert.equal(claimed.preserveQuestionWorktree, true);
-            assert.equal(claimed.continuesRunId, historyRunId);
-            assert.equal(claimed.resumeSessionId, f.q.originSessionId);
-            assert.equal(claimed.requireSessionResume, true);
-            assert.equal(claimed.questionId, f.q.id);
-            assert.equal(Object.hasOwn(claimed, 'factoryCheck'), false);
-            assert.doesNotMatch(claimed.followUp as string, /Current host-recorded command evidence|Persisted producer command observations/,
-              'execution answer/recovery does not receive independent-check instructions');
-            assert.deepEqual((await tx.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=ANY($1::uuid[]) ORDER BY id', [historyIds])).rows, before);
-            assert.deepEqual((await tx.query('SELECT to_jsonb(q) AS question FROM factory_questions q WHERE id=$1', [f.q.id])).rows, questionBefore);
-          } finally { await tx.query('ROLLBACK'); tx.release(); }
+          await withFactoryBackgroundWorkspace(pool, userId, { kind: 'task', id: f.task.id }, async () => {
+            const tx = await pool.connect();
+            try {
+              await tx.query('BEGIN');
+              // Exercise the outer claim composition used by device claims. Calling
+              // claimContinuation directly misses the execution-purpose regression.
+              const claimed = await createFactoryClaim(store, f.service)(tx, userId, f.childDevice, runId, new Date(Date.now() + 60000).toISOString());
+              assert.equal(claimed.factoryExecuteKind, expectedKind);
+              assert.equal(claimed.preserveQuestionWorktree, true);
+              assert.equal(claimed.continuesRunId, historyRunId);
+              assert.equal(claimed.resumeSessionId, f.q.originSessionId);
+              assert.equal(claimed.requireSessionResume, true);
+              assert.equal(claimed.questionId, f.q.id);
+              assert.equal(Object.hasOwn(claimed, 'factoryCheck'), false);
+              assert.doesNotMatch(claimed.followUp as string, /Current host-recorded command evidence|Persisted producer command observations/,
+                'execution answer/recovery does not receive independent-check instructions');
+              assert.deepEqual((await tx.query('SELECT to_jsonb(r) AS run FROM agent_runs r WHERE id=ANY($1::uuid[]) ORDER BY id', [historyIds])).rows, before);
+              assert.deepEqual((await tx.query('SELECT to_jsonb(q) AS question FROM factory_questions q WHERE id=$1', [f.q.id])).rows, questionBefore);
+            } finally { await tx.query('ROLLBACK'); tx.release(); }
+          });
           const current = (await pool.query('SELECT status,"agentDefinition" FROM agent_runs WHERE id=$1', [runId])).rows[0];
           assert.equal(current.status, 'queued');
           assert.equal(current.agentDefinition.definitionDigest, f.definition.definitionDigest);
@@ -566,57 +657,16 @@ test(
           assert.equal(f.fallbackCalls(),0);
           assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,2);
         });
-        await t.test('shared subscription answer preserves its lender and session, and revoked or foreign grants fail closed',async()=>{
-          const f=await cloudFixture('running'),lender='question-subscription-lender',custodyWorkspace=randomUUID();
+        await t.test('a teammate\'s subscription never continues an answer: it fails closed (decision 2026-11-17)',async()=>{
+          const f=await cloudFixture('running'),lender='question-subscription-teammate',custodyWorkspace=randomUUID();
           await pool.query(`UPDATE thread_machines SET "templateKind"='codex' WHERE "runId"=$1`,[f.runId]);
-          await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Lender','question-lender@example.invalid',true,now(),now())`,[lender]);
-          // The connection's custody workspace may differ from the workspace
-          // where the lender authorizes this run's frozen consumer binding.
+          await pool.query(`INSERT INTO "user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,'Teammate','question-teammate@example.invalid',true,now(),now())`,[lender]);
           await pool.query('UPDATE byos_connections SET "ownerId"=$2,"workspaceId"=$3 WHERE id=$1',[f.connectionId,lender,custodyWorkspace]);
           await pool.query('UPDATE byos_bindings SET "ownerId"=$2 WHERE id=$1',[f.credentialId,lender]);
-          await pool.query('INSERT INTO workspace_subscription_shares("ownerId","workspaceId","allowOthers") VALUES($1,$2,true)',[lender,f.workspaceId]);
-          const answer={reference:questionReference(f.q),answerId:randomUUID(),text:'Continue the same native session using its original shared subscription'};
-          type Mutation = [string,string,string,unknown[]];
-          const mutations:Mutation[]=[
-            ['deleted grant','DELETE FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2','INSERT INTO workspace_subscription_shares("ownerId","workspaceId","allowOthers") VALUES($1,$2,true)',[lender,f.workspaceId]],
-            ['sharing disabled','UPDATE workspace_subscription_shares SET "allowOthers"=false WHERE "ownerId"=$1 AND "workspaceId"=$2','UPDATE workspace_subscription_shares SET "allowOthers"=true WHERE "ownerId"=$1 AND "workspaceId"=$2',[lender,f.workspaceId]],
-            ['admin disabled','INSERT INTO workspace_personal_policies("workspaceId",subscriptions) VALUES($1,false)','DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1',[f.workspaceId]],
-            ['another workspace grant','UPDATE workspace_subscription_shares SET "workspaceId"=$3 WHERE "ownerId"=$1 AND "workspaceId"=$2','UPDATE workspace_subscription_shares SET "workspaceId"=$2 WHERE "ownerId"=$1 AND "workspaceId"=$3',[lender,f.workspaceId,custodyWorkspace]],
-            ['foreign binding workspace','UPDATE byos_bindings SET "workspaceId"=$3 WHERE id=$1 AND "workspaceId"=$2','UPDATE byos_bindings SET "workspaceId"=$2 WHERE id=$1 AND "workspaceId"=$3',[f.credentialId,f.workspaceId,custodyWorkspace]],
-            ['unrelated binding owner','UPDATE byos_bindings SET "ownerId"=$3 WHERE id=$1 AND "ownerId"=$2','UPDATE byos_bindings SET "ownerId"=$2 WHERE id=$1 AND "ownerId"=$3',[f.credentialId,lender,userId]],
-            ['unrelated connection owner','UPDATE byos_connections SET "ownerId"=$3 WHERE id=$1 AND "ownerId"=$2','UPDATE byos_connections SET "ownerId"=$2 WHERE id=$1 AND "ownerId"=$3',[f.connectionId,lender,userId]],
-            ['connection epoch','UPDATE byos_connections SET epoch=epoch+1 WHERE id=$1','UPDATE byos_connections SET epoch=epoch-1 WHERE id=$1',[f.connectionId]],
-          ];
-          for(const [label,change,restore,args] of mutations) {
-            await pool.query(change,args);
-            try {
-              await assert.rejects(f.service.answer(human,answer),{code:'factoryQuestionContinuationUnavailable'},label);
-              assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,1,label);
-              assert.equal((await pool.query('SELECT "sandboxId" FROM thread_machines WHERE "runId"=$1',[f.runId])).rows[0].sandboxId,f.sandboxId,label);
-              assert.equal((await pool.query('SELECT "answerId" FROM factory_questions WHERE id=$1',[f.q.id])).rows[0].answerId,null,label);
-            } finally { await pool.query(restore,args); }
-          }
-          const result=await f.service.answer(human,answer);
-          const edge=await questionExecutionContinuation(pool,result.task,result.task.attemptId);
-          assert.equal(edge?.sourceRunId,f.runId);
-          assert.equal(edge?.originSessionId,f.q.originSessionId);
-          assert.equal(edge?.continuationRunId,result.continuationRunId);
-          for(const [label,change,restore,args] of mutations) {
-            await pool.query(change,args);
-            try { assert.equal(await questionExecutionContinuation(pool,result.task,result.task.attemptId),null,label); }
-            finally { await pool.query(restore,args); }
-          }
-          const {rows:[child]}=await pool.query('SELECT "agentDefinition","questionContinuation" FROM agent_runs WHERE id=$1',[result.continuationRunId]);
-          assert.deepEqual(child.agentDefinition.subscription,f.definition.subscription);
-          assert.equal(child.agentDefinition.definitionDigest,f.definition.definitionDigest);
-          assert.equal(child.questionContinuation.requireSessionResume,true);
-          assert.equal((await pool.query('SELECT "ownerId","consumerId" FROM byos_bindings WHERE id=$1',[f.credentialId])).rows[0].ownerId,lender);
-          const {rows:[machine]}=await pool.query('SELECT "sandboxId","templateKind" FROM thread_machines WHERE "runId"=$1',[result.continuationRunId]);
-          assert.equal(machine.sandboxId,f.sandboxId);
-          assert.equal(machine.templateKind,'codex');
-          const claimed=await f.service.claimContinuation(userId,f.childDevice,result.continuationRunId,new Date(Date.now()+60000).toISOString());
-          assert.equal(claimed.resumeSessionId,f.q.originSessionId);
-          assert.equal(claimed.requireSessionResume,true);
+          const answer={reference:questionReference(f.q),answerId:randomUUID(),text:'Continue the same native session using a teammate subscription'};
+          await assert.rejects(f.service.answer(human,answer),{code:'factoryQuestionContinuationUnavailable'});
+          assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "issueId"=$1',[f.issueId])).rows[0].n,1);
+          assert.equal((await pool.query('SELECT "answerId" FROM factory_questions WHERE id=$1',[f.q.id])).rows[0].answerId,null);
           assert.equal(f.fallbackCalls(),0);
         });
         for(const machineState of ['running','paused']) await t.test(machineState+' same VM transfer and replay',async()=>{
@@ -861,6 +911,36 @@ test(
           assert.equal(await queued(changedTask.issueId), 0);
         },
       );
+      await t.test("a superseded continuation cannot claim or settle its replacement", async (st) => {
+        const f = await fixture();
+        const first = await questions.answer(orchestrator, facts(f));
+        const replacementRunId = randomUUID();
+        const lockTask = store.lockTask.bind(store);
+        st.mock.method(store, "lockTask", async (...args: Parameters<typeof lockTask>) => {
+          const task = await lockTask(...args);
+          await args[0].query(
+            'UPDATE factory_questions SET "continuationRunId"=$2 WHERE id=$1',
+            [f.questionId, replacementRunId],
+          );
+          return task;
+        });
+
+        await rejects(
+          () => questions.claimContinuation(userId, deviceId, first.continuationRunId, new Date(Date.now() + 60000).toISOString()),
+          "factoryQuestionContinuationUnavailable",
+        );
+        await pool.query(
+          `UPDATE agent_runs SET status='succeeded', "stopReason"='submitted', "sessionId"=$2 WHERE id=$1`,
+          [first.continuationRunId, f.q.originSessionId],
+        );
+        assert.equal(await questions.settle(userId, first.continuationRunId), null);
+        const { rows: [current] } = await pool.query(
+          'SELECT status, "continuationRunId" FROM factory_questions WHERE id=$1',
+          [f.questionId],
+        );
+        assert.deepEqual(current, { status: "resuming", continuationRunId: replacementRunId });
+      });
+
       await t.test(
         "known context facts answer ten times creates one strict original-session continuation",
         async () => {
@@ -966,20 +1046,21 @@ test(
         },
       );
       await t.test(
-        "answer and heartbeat share scope-before-run lock order",
+        "answer and Skill revalidation share scope-before-run lock order",
         { timeout: 15000 },
         async () => {
           const f = await fixture();
-          const [answer, heartbeat] = await Promise.all([
+          const [answer, revalidated] = await Promise.allSettled([
             questions.answer(orchestrator, facts(f)),
-            assignments.renewHeartbeat(userId, deviceId, [f.runId], true),
+            assignments.revalidate(userId, f.runId, randomUUID(), true),
           ]);
           assert.equal(await queued(f.issueId), 1);
-          assert.deepEqual(heartbeat.revoked, [f.runId]);
+          assert.equal(revalidated.status, "rejected");
+          assert.equal(answer.status, "fulfilled");
           const selection = (
             await pool.query(
               'SELECT * FROM improvement_skill_selections WHERE "runId"=$1',
-              [answer.continuationRunId],
+              [answer.status === "fulfilled" ? answer.value.continuationRunId : null],
             )
           ).rows[0];
           assert.equal(selection.versionId, BASELINE_ARTIFACT.versionId);
@@ -1784,6 +1865,8 @@ test(
         },
       );
     } finally {
+      await builtinGateway()?.stop();
+      await closeWorkspaceDatabase();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();

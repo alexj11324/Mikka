@@ -9,12 +9,16 @@ import { linearWebhookNotifications } from '@/lib/suggestions/sources'
 import { ingestNotifications } from '@/lib/suggestions/store'
 import { linearSyncDisabledResponse, linearSyncEnabled, linearSyncState } from '@/lib/linear-sync/flags'
 
-export const runtime = 'nodejs'
 
 async function handlePOST(request: Request) {
   const parsed = await parseLinearWebhookRequest(request, process.env.LINEAR_WEBHOOK_SECRET)
   if (!parsed.ok) return Response.json({ error: parsed.error }, { status: parsed.status })
   if ('ignored' in parsed) return new Response(null, { status: 200 })
+  // 自动化 Linear triggers (decision 2026-11-15-1930) are not sync: they run whether sync is on or off, before the ACK,
+  // so a failure is a 503 and Linear redelivers; the delivery ID makes a redelivery add nothing.
+  const { fireLinearAutomations } = await import('@/lib/schedules/runtime')
+  try { await fireLinearAutomations(parsed.deliveryId, parsed.payload) }
+  catch { return Response.json({ error: 'Could not queue automations' }, { status: 503 }) }
   const state = await linearSyncState()
   if (state === 'disabled') {
     if (!isLinearOAuthRevocation(parsed.payload)) return Response.json({ disabled: true })

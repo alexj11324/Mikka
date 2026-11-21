@@ -2,10 +2,10 @@
 
 import { SettingsLoading } from '@/components/settings/primitives'
 import { Fragment, useEffect, useState, type ReactNode } from 'react'
-import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from 'lucide-react'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import { removeDevice, renameDevice, sendDeviceCommand, setDeviceEnabled, type DeviceView } from '@/app/actions/agents'
+import { Check, Copy, Laptop, MoreHorizontal, Plus, Server } from '@/components/icons'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
+import type { DeviceView } from '@/app/actions/agents'
 import { HarnessLabel } from '@/components/labels/entity-labels'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -17,13 +17,12 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
 import { Switch } from '@/components/ui/switch'
-import { useActionError } from '@/lib/use-action-error'
+import { useDeviceActions } from '@/components/devices/use-device-actions'
+import { writeDeviceCommand } from '@/components/devices/copy-command.mjs'
 import { cn } from '@/lib/utils'
+import { canRenameDevice, DEVICE_NAME_MAX } from '@/lib/device-name'
 import type { SettingsDevicesProps } from '@/components/slots/settings-devices-contract'
 import { AgentMarks, installedAgents, sandboxBlockedAgents } from './agent-marks'
-
-type Command = 'redetect' | 'restart' | 'update'
-type Result = { error: string } | object
 
 /** Each agent's own published install command; the daemon detects it on 重新检测 Agent. */
 const AGENT_INSTALL = [
@@ -36,9 +35,17 @@ const AGENT_INSTALL = [
 /** The install commands in a popover; `label` replaces the trigger's words (a UI layer's own line). */
 export function InstallAgents({ label }: { label?: ReactNode } = {}) {
   const t = useTranslations('Devices')
+  const failureT = useTranslations('AiElements.message')
   const [copied, setCopied] = useState<string | null>(null)
-  function copy(command: string) {
-    void navigator.clipboard.writeText(command).then(() => setCopied(command), () => {})
+  const [copying, setCopying] = useState(false)
+  async function copy(command: string) {
+    if (copying) return
+    setCopying(true)
+    try {
+      const outcome = await writeDeviceCommand(command, navigator.clipboard)
+      if (outcome === 'copied') setCopied(command)
+      else { setCopied(null); toast.error(failureT('copyFailed')) }
+    } finally { setCopying(false) }
   }
   return <Popover>
     <PopoverTrigger className="shrink-0 cursor-pointer text-foreground underline underline-offset-2">{label ?? t('installAgent')}</PopoverTrigger>
@@ -47,7 +54,7 @@ export function InstallAgents({ label }: { label?: ReactNode } = {}) {
         <span className="text-xs"><HarnessLabel harness={harness} /></span>
         <span className="flex items-center gap-1">
           <code className="min-w-0 flex-1 truncate font-mono text-xs">{command}</code>
-          <Button variant="ghost" size="icon-sm" aria-label={t('copyInstall', { command })} onClick={() => copy(command)}>{copied === command ? <Check /> : <Copy />}</Button>
+          <Button variant="ghost" size="icon-sm" disabled={copying} aria-label={t('copyInstall', { command })} onClick={() => { void copy(command) }}>{copied === command ? <Check /> : <Copy />}</Button>
         </span>
       </div>)}
     </PopoverContent>
@@ -62,10 +69,21 @@ const USERNS_PERSIST = "echo 'kernel.apparmor_restrict_unprivileged_userns=0' | 
 /** A command the person runs on the device, with a copy button. */
 function FixCommand({ command }: { command: string }) {
   const t = useTranslations('Devices')
+  const failureT = useTranslations('AiElements.message')
   const [copied, setCopied] = useState(false)
+  const [copying, setCopying] = useState(false)
+  async function copy() {
+    if (copying) return
+    setCopying(true)
+    try {
+      const outcome = await writeDeviceCommand(command, navigator.clipboard)
+      if (outcome === 'copied') setCopied(true)
+      else { setCopied(false); toast.error(failureT('copyFailed')) }
+    } finally { setCopying(false) }
+  }
   return <span className="flex items-center gap-1">
     <code className="min-w-0 flex-1 break-all font-mono text-xs">{command}</code>
-    <Button variant="ghost" size="icon-sm" aria-label={t('copyInstall', { command })} onClick={() => { void navigator.clipboard.writeText(command).then(() => setCopied(true), () => {}) }}>{copied ? <Check /> : <Copy />}</Button>
+    <Button variant="ghost" size="icon-sm" disabled={copying} aria-label={t('copyInstall', { command })} onClick={() => { void copy() }}>{copied ? <Check /> : <Copy />}</Button>
   </span>
 }
 
@@ -121,26 +139,11 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
   const t = useTranslations('Devices')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
-  const translateError = useActionError()
+  const { busy, rename, remove, command, setEnabled } = useDeviceActions(device, onChanged)
   const [renaming, setRenaming] = useState(false)
   const [removing, setRemoving] = useState(false)
   const agents = installedAgents(device.harnesses)
   const blocked = sandboxBlockedAgents(device.harnesses)
-
-  async function run(action: () => Promise<Result>, done?: () => void): Promise<boolean> {
-    try {
-      const result = await action()
-      if ('error' in result) { toast.error(translateError(result.error)); return false }
-      done?.()
-      onChanged()
-      return true
-    } catch { toast.error(translateError('deviceSaveFailed')); return false }
-  }
-
-  // An offline device keeps the command until it reconnects (#491).
-  const command = (kind: Command) => run(() => sendDeviceCommand({ deviceId: device.id, kind }), () => {
-    toast.success(device.online ? t(`commands.sent.${kind}`, { name: device.name }) : t('commands.queued', { name: device.name }))
-  })
 
   const status = device.online
     ? t('online')
@@ -163,7 +166,7 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
     {/* 参与调度: the device's one switch (decision 2026-11-02-1400); on a phone it keeps its label on its own line. */}
     <span className="flex items-center gap-2 text-sm text-muted-foreground max-sm:order-last max-sm:basis-full max-sm:pl-8">
       <span aria-hidden="true">{t('allowScheduling')}</span>
-      <Switch checked={device.enabled} aria-label={t('allowSchedulingTo', { name: device.name })} onCheckedChange={enabled => { void run(() => setDeviceEnabled({ deviceId: device.id, enabled })) }} />
+      <Switch disabled={busy} checked={device.enabled} aria-label={t('allowSchedulingTo', { name: device.name })} onCheckedChange={enabled => { void setEnabled(enabled) }} />
     </span>
     <DropdownMenu>
       <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={t('menu', { name: device.name })} />}><MoreHorizontal data-icon="inline-start" /></DropdownMenuTrigger>
@@ -180,7 +183,7 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
-    <RenameDialog device={device} open={renaming} onOpenChange={setRenaming} onSave={name => run(() => renameDevice(device.id, name), () => setRenaming(false))} />
+    <RenameDialog device={device} open={renaming} onOpenChange={setRenaming} onSave={async name => { const saved = await rename(name); if (saved) setRenaming(false); return saved }} />
     <AlertDialog open={removing} onOpenChange={setRemoving}>
       <AlertDialogContent>
         <AlertDialogHeader>
@@ -189,11 +192,7 @@ function DeviceRow({ device, onChanged, onReconnect }: { device: DeviceView; onC
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{t('remove.cancel')}</AlertDialogCancel>
-          <AlertDialogAction variant="destructive" onClick={() => { void run(() => removeDevice(device.id), () => {
-            setRemoving(false)
-            // #536 adds the outcome; an older backend answers without it.
-            if (device.online) toast.success(t('remove.uninstalling', { name: device.name }))
-          }) }}>{t('remove.confirm')}</AlertDialogAction>
+          <AlertDialogAction variant="destructive" disabled={busy} onClick={async event => { event.preventDefault(); if (await remove()) setRemoving(false) }}>{t('remove.confirm')}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -207,7 +206,7 @@ function RenameDialog({ device, open, onOpenChange, onSave }: { device: DeviceVi
   const [saving, setSaving] = useState(false)
   useEffect(() => { if (open) setName(device.name) }, [open, device.name])
   const trimmed = name.trim()
-  const valid = trimmed.length > 0 && trimmed.length <= 60 && trimmed !== device.name
+  const valid = canRenameDevice(device.name, name)
   async function save() {
     if (!valid || saving) return
     setSaving(true)
@@ -220,7 +219,7 @@ function RenameDialog({ device, open, onOpenChange, onSave }: { device: DeviceVi
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor={`rename-${device.id}`} className="sr-only">{t('rename.label')}</FieldLabel>
-          <Input id={`rename-${device.id}`} autoFocus value={name} maxLength={60} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void save() } }} />
+          <Input id={`rename-${device.id}`} autoFocus value={name} maxLength={DEVICE_NAME_MAX} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); void save() } }} />
         </Field>
       </FieldGroup>
       <DialogFooter>
@@ -241,13 +240,16 @@ function DeviceGroup({ title, devices, onChanged, onReconnect }: { title: string
 /** 设置 › 设备's page as the open-source UI draws it; the slot settings-devices' default. */
 export function DevicesPageView({ devices, listError, onAdd, onChanged, onReconnect, localSetup }: SettingsDevicesProps) {
   const t = useTranslations('Devices')
+  const common = useTranslations('Common')
   return <div className="flex flex-col gap-6">
     <div className="flex items-center justify-between gap-3">
       <h1 className="text-xl font-semibold">{t('title')}</h1>
       <Button size="sm" variant="secondary" aria-keyshortcuts="Meta+N Control+N" onClick={onAdd}><Plus data-icon="inline-start" />{t('add.trigger')}</Button>
     </div>
     {localSetup}
-    {listError && <FieldError className="text-xs">{t('listError')}</FieldError>}
+    {listError && <FieldError className="flex items-center gap-2 text-xs">{t('listError')}
+      <Button size="sm" variant="secondary" onClick={onChanged}>{common('retry')}</Button>
+    </FieldError>}
     {/* Not read yet: rows' shapes, never 还没有设备 (review C6, R-39). A failed first read says only that. */}
     {!devices ? !listError && <div className="overflow-hidden rounded-xl border bg-card"><SettingsLoading bare label={t('loading')} /></div>
       : devices.length === 0 ? <Empty className="rounded-xl border"><EmptyHeader><EmptyTitle>{t('emptyTitle')}</EmptyTitle></EmptyHeader></Empty> : <>

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { writeTransaction, type WriteRequestContext, type WriteActor } from './write-transaction'
@@ -10,14 +10,9 @@ import type { WriteProvider } from './write-contract'
 import { writeBindingSchema as bindingSchema, prepareWriteBinding } from './write-binding'
 import { lockWritePolicy } from './write-policy-store'
 import { withWritePolicy } from './policy-authorization'
+import { snapshotDigest as digest } from './write-target'
 import { approvedWriteChanged } from '../live/approved-writes'
 
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical)
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)]))
-  return value
-}
-const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex')
 export interface StoredWriteProposal { id: string; userId: string; action: string; input: Record<string, unknown>; status: string; operationBinding: z.infer<typeof bindingSchema>; intentKey: string; context: Record<string, unknown> | null; createdAt: Date }
 type Proposal = StoredWriteProposal
 export interface ApprovedWriteView {
@@ -42,6 +37,7 @@ const writeOutcome = (receipt: NonNullable<OperationRecord['receipt']>): Approve
 // scope avoids inventing a workspace DB relationship or using a browser cookie.
 const scope = (owner: string) => `personal:${owner}`
 const identity = (p: Proposal) => ({ operationId: p.id, ownerId: p.userId, workspaceId: scope(p.userId) })
+const nativeBinding = (ownerId: string, action: string, input: unknown, binding: z.infer<typeof bindingSchema>, context: unknown) => ({ ownerId, botId: binding.run?.botId ?? null, action, input, accountId: binding.accountId, version: binding.version, context, policy: binding })
 const intent = (p: Proposal): OperationIntent => ({ ...identity(p), provider: p.operationBinding.provider, accountId: p.operationBinding.accountId, action: p.action, target: writeTarget(p.action as WriteActionName, p.input), approvalId: p.id, proposalDigest: digest([p.action, p.operationBinding]), payloadDigest: p.operationBinding.payloadDigest, ...(p.operationBinding.run ? { executionRunId: p.operationBinding.run.runId, policyScope: { botId: p.operationBinding.run.botId, workspaceId: p.operationBinding.run.workspaceId, version: p.operationBinding.run.policyVersion, ...(p.operationBinding.run.approvalDefault ? { approvalDefault: p.operationBinding.run.approvalDefault } : {}) } } : {}) })
 
 /** Pure projection only; callers must authenticate/authorize the read separately.
@@ -104,7 +100,10 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
       const run = p.operationBinding.run
       const guard = actor && run && context.guardForRun ? context.guardForRun({ ownerId: p.userId, botId: run.botId, workspaceId: run.workspaceId, runId: run.runId }) : context.guard
       if (run?.workspaceId && !guard) throw new OperationError('writePolicyUnavailable')
-      const authorize = run ? withWritePolicy(current, async (tx, binding, runId, phase) => { if (!actor) throw new OperationError('writeApprovalRequired'); await current(tx, binding, runId, phase) }, { allowCompleted: Boolean(actor), readbackOnly }) : current
+      const authorize = run ? withWritePolicy(current, async (tx, binding, runId, phase) => {
+        if (!actor && (!context.nativeWriteReview || await context.nativeWriteReview('ask', nativeBinding(p.userId, p.action, p.input, p.operationBinding, p.context)) !== 'allow')) throw new OperationError('writeApprovalRequired')
+        await current(tx, binding, runId, phase)
+      }, { allowCompleted: Boolean(actor), readbackOnly }) : current
       if (!actor && !run) throw new OperationError('operationAuthorizationRequired')
       const ledger = createOperationLedger(pool, actor ? withOperationSession(actor, authorize) : authorize, { ...context, guard })
       const row = readbackOnly ? await ledger.read(identity(p)) : await ledger.reserve(intent(p))
@@ -212,13 +211,15 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
           const policy = await lockWritePolicy(tx, { ...run, action }, { fallback: approvalDefault })
           if (policy.version !== first.version) throw new OperationError('writePolicyChanged')
           if (policy.decision === 'deny') throw new OperationError('writeDenied')
-          if (policy.decision === 'ask') {
+          const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId:run.runId, botId:run.botId, workspaceId:run.workspaceId, policyVersion:policy.version, decision:policy.decision, approvalDefault } })
+          const nativeDecision = context.nativeWriteReview ? await context.nativeWriteReview(policy.decision, nativeBinding(run.ownerId, action, input, binding, selected.context ?? null)) : policy.decision
+          if (nativeDecision === 'deny') throw new OperationError('writeDenied')
+          if (nativeDecision === 'ask') {
             await tx.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [JSON.stringify(['approved-write-pending-owner', run.ownerId])])
             const count = await tx.query(`SELECT count(*) FROM pending_actions WHERE "userId"=$1 AND status='pending' AND "createdAt">clock_timestamp()-interval '7 days'`, [run.ownerId])
             if (Number(count.rows[0].count) >= 20) throw new OperationError('tooManyPendingActions')
           }
-          const binding = bindingSchema.parse({ ...prepareWriteBinding(provider.name, selected, input), run: { runId:run.runId, botId:run.botId, workspaceId:run.workspaceId, policyVersion:policy.version, decision:policy.decision, approvalDefault } })
-          const id = randomUUID(), status = policy.decision === 'allow' ? 'running' : 'pending'
+          const id = randomUUID(), status = nativeDecision === 'allow' ? 'running' : 'pending'
           const inserted = await tx.query<Proposal>('INSERT INTO pending_actions (id,"userId",action,input,"intentKey","operationBinding",context,status) VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *', [id, run.ownerId, action, input, key, binding, selected.context ?? null, status])
           await approvedWriteChanged(tx, id, run.ownerId)
           return inserted.rows[0]
@@ -226,7 +227,7 @@ export function createApprovedWrites(pool: Pool, provider: WriteProvider, action
       }
       if (proposal.status === 'pending') return { status:'awaiting_approval' as const, actionId:proposal.id }
       if (proposal.status === 'declined') return { status:'declined' as const, actionId:proposal.id }
-      if (proposal.operationBinding.run?.decision !== 'allow') return { status:proposal.status, actionId:proposal.id }
+      if (proposal.operationBinding.run?.decision !== 'allow' && !context.nativeWriteReview) return { status:proposal.status, actionId:proposal.id }
       return { ...(await execute(proposal)), actionId:proposal.id }
     },
     async decide(actor: { userId: string; sessionId: string }, id: string, approve: boolean) {

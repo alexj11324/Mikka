@@ -42,8 +42,8 @@ test('registered Project RPC reads and writes stay inside a native human session
   // Reuse the API build's framework adapters. Auth, registry/actions, request
   // Workspace selection, resource ACLs and both PostgreSQL pools remain real.
   const framework = [
-    mock.module('next/headers', { namedExports: await import('../apps/api/compat/headers') }),
-    mock.module('next-intl/server', { namedExports: await import('../apps/api/compat/intl') }),
+    mock.module('@/lib/server-runtime/headers', { namedExports: await import('../lib/server-runtime/headers') }),
+    mock.module('@/lib/intl/i18n-server', { namedExports: await import('../lib/intl/i18n-server') }),
   ]
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
@@ -145,7 +145,7 @@ test('registered Project RPC reads and writes stay inside a native human session
         // Preserve the current missing-Project error contract; this test does
         // not require a new HTTP status design. The B control below must work.
         const expectedCode = new Map<number, string>([
-          [400, 'issueNotFound'], [403, 'workspaceAccessDenied'], [500, 'desktop_rpc_failed'],
+          [400, 'projectNotFound'], [403, 'workspaceAccessDenied'], [500, 'desktop_rpc_failed'],
         ]).get(events.response.status)
         assert.ok(expectedCode, 'use an existing native Project denial status')
         assert.equal(events.error?.code, expectedCode, 'preserve the actual native RPC status/code pairing')

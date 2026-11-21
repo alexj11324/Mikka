@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { isTerminalRunState, TERMINAL_RUN_STATES } from '@mikka/protocol/run-state'
 
 type CompletionEvent = {
   id: string; userId: string; botId: string | null; kind: string
@@ -7,7 +8,6 @@ type CompletionEvent = {
   /** Supplied by the existing visibleRuns gate, never by event prose. */
   observedRun?: { id: string; status: string; finishedAt: Date | string | null } | null
 }
-const TERMINAL = ['succeeded', 'failed', 'stopped', 'cancelled']
 
 /** Return the result of this Bot's own dispatched request. This is delivery,
  * not a semantic judgment, approval, publication receipt or billing fallback.
@@ -18,7 +18,7 @@ export async function deliverRunCompletion(
 ): Promise<boolean> {
   const run = event.observedRun
   if (event.kind !== 'run_finished' || event.userId !== scope.userId || event.botId !== scope.botId ||
-    !run || run.id !== event.runId || !TERMINAL.includes(run.status) || !run.finishedAt) return false
+    !run || run.id !== event.runId || !isTerminalRunState(run.status) || !run.finishedAt) return false
   const bot = (await pool.query<{ workspaceId: string }>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2', [scope.botId, scope.userId])).rows[0]
   if (!bot) return false
   // Workspace membership lives in its own database. Hold its ordinary row
@@ -44,7 +44,7 @@ export async function deliverRunCompletion(
       AND e.payload->>'status'=r.status AND e.payload->>'stopReason'=r."stopReason"
       AND b."workspaceId"=$11::uuid
     RETURNING e.id`, [event.id, scope.userId, scope.botId, event.runId, event.issueId,
-    JSON.stringify(event.payload), event.createdAt, TERMINAL, run.status, run.finishedAt, bot.workspaceId])
+    JSON.stringify(event.payload), event.createdAt, TERMINAL_RUN_STATES, run.status, run.finishedAt, bot.workspaceId])
     await membership.query('COMMIT')
     return result.rowCount === 1
   } catch (error) {

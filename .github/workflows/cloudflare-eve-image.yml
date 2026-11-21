@@ -1,0 +1,338 @@
+name: Cloudflare Eve image
+on:
+  workflow_dispatch:
+    inputs:
+      api_run_id:
+        description: Accepted API publication run ID
+        type: string
+        required: true
+      api_run_attempt:
+        description: Accepted API publication run attempt
+        type: string
+        required: true
+      api_image_digest:
+        description: Accepted API image digest
+        type: string
+        required: true
+      overlay_sha:
+        description: Accepted UI Overlay commit SHA
+        type: string
+        required: true
+      maintenance_owner_release:
+        description: Existing Eve owner routing release to maintain with this accepted API build
+        type: string
+        required: false
+      maintenance_workflow_postgres_patch:
+        description: SHA256 of the reviewed World Postgres 5.2.0 patch to backport to the maintenance image
+        type: string
+        required: false
+      maintenance_hosted_call_budget_sha:
+        description: SHA256 of the reviewed hosted policy with only the 120-second model call budget change
+        type: string
+        required: false
+  pull_request:
+    paths:
+      - 'apps/eve/**'
+      - 'lib/eve/**'
+      - 'packages/eve-cloudflare-world/**'
+      - 'cloudflare/eve-runtime/**'
+      - 'scripts/build-eve.mjs'
+      - 'scripts/check-eve-image.sh'
+      - 'scripts/verify-eve-image*.mjs'
+      - 'lib/abuse/model.ts'
+      - 'lib/abuse/model.test.ts'
+      - 'lib/abuse/policy.ts'
+      - 'scripts/package-cf-eve-host.mjs'
+      - 'scripts/build-cloudflare-eve-image.sh'
+      - 'scripts/compile-cloudflare-eve-host.sh'
+      - 'patches/@fantasticfour*'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/cloudflare-eve-image.yml'
+permissions:
+  contents: read
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
+jobs:
+  image:
+    # All PRs retain their existing credential-free qualification. The
+    # protected Registry producer is allowed to run only on real main pushes.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      NITRO_PRESET: node-server
+      WORKFLOW_TARGET_WORLD: '@workflow/world-postgres'
+      NODE_OPTIONS: --max-old-space-size=6144
+      MIKKA_BUILD_REVISION: ${{ github.sha }}
+      # Ordinary qualification builds the public server resources.
+      # Manual publication restores resources from the accepted official API image.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/pnpm-install
+        with:
+          skip-electron: 'true'
+      - name: Bind the existing release format
+        run: echo "MIKKA_DEPLOYMENT_ID=$(node lib/deployment-id.mjs)" >> "$GITHUB_ENV"
+      - name: Check, build and verify the local Eve image
+        run: pnpm check:eve-image
+      # The business API publisher consumes this existing World artifact.
+      - name: Bundle the private World authority from the locked public source
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          world="$RUNNER_TEMP/eve-world"
+          pnpm exec wrangler deploy --dry-run --config packages/eve-cloudflare-world/wrangler.jsonc --outdir "$world"
+          artifact="$RUNNER_TEMP/eve-world-artifact"
+          mkdir -p "$artifact/modules"
+          cp -a "$world/." "$artifact/modules/"
+          rm -f "$artifact/modules/README.md"
+          cd "$artifact"
+          find modules -type f -print -quit | grep -q .
+          git -C "$GITHUB_WORKSPACE" rev-parse HEAD > source.txt
+          find modules -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          sha256sum source.txt >> SHA256SUMS
+          sha256sum --check --status SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: eve-world-authority-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/eve-world-artifact/
+          if-no-files-found: error
+          retention-days: 1
+  publish:
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && github.triggering_actor == 'alexj11324'
+    runs-on: ubuntu-latest
+    environment: cloudflare-runtime-release
+    timeout-minutes: 60
+    env:
+      NITRO_PRESET: node-server
+      WORKFLOW_TARGET_WORLD: '@workflow/world-postgres'
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+      - name: Read the verified original public API build receipt
+        id: api
+        env:
+          GH_TOKEN: ${{ github.token }}
+          API_RUN_ID: ${{ inputs.api_run_id }}
+          API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          OVERLAY_SHA: ${{ inputs.overlay_sha }}
+        run: node scripts/load-cloudflare-api-receipt.mjs
+      - name: Preserve the verified Workflow Postgres patch from the main driver
+        if: inputs.maintenance_workflow_postgres_patch != ''
+        env:
+          WORKFLOW_POSTGRES_PATCH_SHA256: ${{ inputs.maintenance_workflow_postgres_patch }}
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
+        run: |
+          set -euo pipefail
+          [[ "$WORKFLOW_POSTGRES_PATCH_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          test -n "$MAINTENANCE_OWNER_RELEASE"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          patch_file="$RUNNER_TEMP/eve-workflow-postgres.patch"
+          git show "$GITHUB_SHA:patches/@workflow__world-postgres@5.2.0.patch" > "$patch_file"
+          printf '%s  %s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256" "$patch_file" | sha256sum --check --status
+      - name: Preserve the reviewed hosted model call budget from the main driver
+        if: inputs.maintenance_hosted_call_budget_sha != ''
+        env:
+          HOSTED_CALL_BUDGET_SHA256: ${{ inputs.maintenance_hosted_call_budget_sha }}
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
+        run: |
+          set -euo pipefail
+          [[ "$HOSTED_CALL_BUDGET_SHA256" =~ ^[a-f0-9]{64}$ ]]
+          test -n "$MAINTENANCE_OWNER_RELEASE"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          policy="$RUNNER_TEMP/eve-reviewed-hosted-policy.ts"
+          git show "$GITHUB_SHA:lib/abuse/policy.ts" > "$policy"
+          printf '%s  %s\n' "$HOSTED_CALL_BUDGET_SHA256" "$policy" | sha256sum --check --status
+      - name: Check out the original API product source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ steps.api.outputs.source }}
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: ./.github/actions/pnpm-install
+        with:
+          skip-electron: 'true'
+      - name: Apply the verified Workflow Postgres patch
+        if: inputs.maintenance_workflow_postgres_patch != ''
+        env:
+          WORKFLOW_POSTGRES_PATCH_SHA256: ${{ inputs.maintenance_workflow_postgres_patch }}
+        run: |
+          set -euo pipefail
+          patch_file="$RUNNER_TEMP/eve-workflow-postgres.patch"
+          printf '%s  %s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256" "$patch_file" | sha256sum --check --status
+          world=$(node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFileSync } from 'node:fs'
+          import { createRequire } from 'node:module'
+          import { dirname, resolve } from 'node:path'
+          const require = createRequire(resolve('apps/eve/package.json'))
+          const root = dirname(dirname(require.resolve('@workflow/world-postgres')))
+          const installed = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8'))
+          assert.equal(installed.name, '@workflow/world-postgres')
+          assert.equal(installed.version, '5.2.0')
+          console.log(root)
+          NODE
+          )
+          patch --directory="$world" --strip=1 --fuzz=0 --forward --batch --input="$patch_file"
+          git diff --exit-code
+          git diff --cached --exit-code
+          printf 'MIKKA_EVE_WORKFLOW_POSTGRES_PATCH=%s\n' "$WORKFLOW_POSTGRES_PATCH_SHA256"
+      - name: Check the reviewed hosted model call budget against the accepted API source
+        if: inputs.maintenance_hosted_call_budget_sha != ''
+        env:
+          HOSTED_CALL_BUDGET_SHA256: ${{ inputs.maintenance_hosted_call_budget_sha }}
+        run: |
+          set -euo pipefail
+          git diff --exit-code
+          git diff --cached --exit-code
+          policy="$RUNNER_TEMP/eve-reviewed-hosted-policy.ts"
+          printf '%s  %s\n' "$HOSTED_CALL_BUDGET_SHA256" "$policy" | sha256sum --check --status
+          node --input-type=module - <<'NODE'
+          import assert from 'node:assert/strict'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          import { join } from 'node:path'
+          const original = readFileSync('lib/abuse/policy.ts', 'utf8')
+          const reviewed = readFileSync(join(process.env.RUNNER_TEMP, 'eve-reviewed-hosted-policy.ts'), 'utf8')
+          const before = 'export const HOSTED_CALL_TIMEOUT_MS = 60_000'
+          const after = 'export const HOSTED_CALL_TIMEOUT_MS = 120_000'
+          assert.equal(original.split(before).length, 2)
+          assert.equal(reviewed, original.replace(before, after))
+          writeFileSync(join(process.env.RUNNER_TEMP, 'eve-original-hosted-policy.ts'), original)
+          NODE
+      - name: Issue a short-lived credential to read the original API image
+        id: registry-read
+        uses: ./.github/actions/cloudflare-registry-credentials
+        with:
+          mode: read
+      - name: Prepare the source-bound runtime release
+        env:
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
+          API_RUN_ID: ${{ inputs.api_run_id }}
+          API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          OVERLAY_SHA: ${{ inputs.overlay_sha }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry-read.outputs.username }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ steps.registry-read.outputs.password }}
+        run: node scripts/cloudflare-runtime-release.mjs prepare eve
+      - name: Verify the explicit maintenance owner selection
+        if: inputs.maintenance_owner_release != ''
+        env:
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
+        run: |
+          test "$MIKKA_RUNTIME_RELEASE" = "$MAINTENANCE_OWNER_RELEASE"
+          test "$RUNTIME_IMAGE_TAG" = "$MIKKA_DEPLOYMENT_ID-maintenance-$MAINTENANCE_OWNER_RELEASE"
+      # The business API publisher consumes this existing World artifact.
+      - name: Bundle the private World authority from the locked public source
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          set -euo pipefail
+          world="$RUNNER_TEMP/eve-world"
+          pnpm exec wrangler deploy --dry-run --config packages/eve-cloudflare-world/wrangler.jsonc --outdir "$world"
+          artifact="$RUNNER_TEMP/eve-world-artifact"
+          mkdir -p "$artifact/modules"
+          cp -a "$world/." "$artifact/modules/"
+          rm -f "$artifact/modules/README.md"
+          cd "$artifact"
+          find modules -type f -print -quit | grep -q .
+          git -C "$GITHUB_WORKSPACE" rev-parse HEAD > source.txt
+          find modules -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS
+          sha256sum source.txt >> SHA256SUMS
+          sha256sum --check --status SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: eve-world-authority-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/eve-world-artifact/
+          if-no-files-found: error
+          retention-days: 1
+      - name: Compile the official Eve runtime and shared product resources offline
+        env:
+          HOSTED_CALL_BUDGET_SHA256: ${{ inputs.maintenance_hosted_call_budget_sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HOSTED_CALL_BUDGET_SHA256:-}" ]]; then
+            bash scripts/build-cloudflare-eve-image.sh --prebuilt-api
+            exit
+          fi
+          policy="$RUNNER_TEMP/eve-reviewed-hosted-policy.ts"
+          original="$RUNNER_TEMP/eve-original-hosted-policy.ts"
+          compiled="$RUNNER_TEMP/eve-hosted-call-budget-compiled.sha256"
+          rm -f "$compiled"
+          git diff --exit-code
+          git diff --cached --exit-code
+          cmp "$original" lib/abuse/policy.ts
+          printf '%s  %s\n' "$HOSTED_CALL_BUDGET_SHA256" "$policy" | sha256sum --check --status
+          restore_policy() {
+            cp "$original" lib/abuse/policy.ts
+            git diff --exit-code
+            git diff --cached --exit-code
+          }
+          trap restore_policy EXIT
+          cp "$policy" lib/abuse/policy.ts
+          bash scripts/build-cloudflare-eve-image.sh --prebuilt-api
+          restore_policy
+          trap - EXIT
+          printf '%s\n' "$HOSTED_CALL_BUDGET_SHA256" > "$compiled"
+      - name: Verify the reviewed hosted model call budget
+        if: inputs.maintenance_hosted_call_budget_sha != ''
+        env:
+          HOSTED_CALL_BUDGET_SHA256: ${{ inputs.maintenance_hosted_call_budget_sha }}
+        run: |
+          set -euo pipefail
+          test "$(cat "$RUNNER_TEMP/eve-hosted-call-budget-compiled.sha256")" = "$HOSTED_CALL_BUDGET_SHA256"
+          cmp "$RUNNER_TEMP/eve-original-hosted-policy.ts" lib/abuse/policy.ts
+          git diff --exit-code
+          git diff --cached --exit-code
+          printf 'MIKKA_EVE_HOSTED_CALL_BUDGET_SHA256=%s\n' "$HOSTED_CALL_BUDGET_SHA256"
+      - name: Build the portable Node 24 image
+        run: |
+          image_tag="${RUNTIME_IMAGE_TAG:-$MIKKA_DEPLOYMENT_ID}"
+          labels=()
+          if [[ -n "${MIKKA_RUNTIME_RELEASE:-}" ]]; then
+            labels+=(--label "com.mikka.runtime-release=$MIKKA_RUNTIME_RELEASE")
+          fi
+          docker build -f cloudflare/eve-runtime/Dockerfile --label "org.opencontainers.image.revision=$MIKKA_BUILD_REVISION" --label "com.mikka.overlay=$MIKKA_UI_OVERLAY_SHA" --label "com.mikka.release=$MIKKA_DEPLOYMENT_ID" "${labels[@]}" -t "mikka-eve:$image_tag" .
+          image_id=$(docker image inspect --format '{{.Id}}' "mikka-eve:$image_tag")
+          echo "RUNTIME_TESTED_IMAGE_ID=$image_id" >> "$GITHUB_ENV"
+      - name: Issue a short-lived Registry publication credential
+        id: registry
+        uses: ./.github/actions/cloudflare-registry-credentials
+        with:
+          mode: publish
+      - name: Publish the verified runtime image
+        env:
+          MAINTENANCE_OWNER_RELEASE: ${{ inputs.maintenance_owner_release }}
+          API_RUN_ID: ${{ inputs.api_run_id }}
+          API_RUN_ATTEMPT: ${{ inputs.api_run_attempt }}
+          API_IMAGE_DIGEST: ${{ inputs.api_image_digest }}
+          OVERLAY_SHA: ${{ inputs.overlay_sha }}
+          CF_RUNTIME_REGISTRY_USERNAME: ${{ steps.registry.outputs.username }}
+          CF_RUNTIME_REGISTRY_PASSWORD: ${{ steps.registry.outputs.password }}
+        run: |
+          printf '%s' "$CF_RUNTIME_REGISTRY_PASSWORD" | docker login registry.cloudflare.com --username "$CF_RUNTIME_REGISTRY_USERNAME" --password-stdin > /dev/null
+          node scripts/cloudflare-runtime-release.mjs publish eve
+      - name: Upload the runtime OCI receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: runtime-eve-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/runtime-eve-receipt.json
+          if-no-files-found: error
+          retention-days: 1
+      - name: Remove the temporary Registry credentials
+        if: always()
+        run: node scripts/cloudflare-runtime-release.mjs cleanup

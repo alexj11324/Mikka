@@ -14,6 +14,7 @@ import {
   type ChatFileScope,
 } from '@mikka/protocol/chat-attachments'
 import { pool } from '@/lib/db'
+import { chatStorageCleanupOwner } from '@/lib/account-deletions-due'
 import { armDueTimerAfterCommit, armDueTimerSoon } from '@/lib/due-timer'
 import { workspacePool } from '@/lib/workspace-db'
 import {
@@ -224,6 +225,27 @@ export async function uploadChatFilePart(
   }
 }
 
+async function lockChatFileForCompletion(
+  client: PoolClient,
+  userId: string,
+  id: string,
+  tokenWorkspaceId?: string,
+) {
+  const row = (
+    await client.query<FileRow>(
+      `SELECT ${columns} FROM chat_attachments WHERE id=$1 AND "userId"=$2 FOR UPDATE`,
+      [id, userId],
+    )
+  ).rows[0]
+  if (!row || row.removedAt) throw new ChatFileError('notFound')
+  const workspaceId = await authorizeFileScope(userId, fileScope(row), client)
+  if (tokenWorkspaceId && workspaceId !== tokenWorkspaceId) throw new ChatFileError('notFound')
+  await client.query('SELECT mikka_account_assert_writable($1)', [userId])
+  if (row.state !== 'ready' && (!row.uploadExpiresAt || row.uploadExpiresAt.getTime() < Date.now()))
+    throw new ChatFileError('unavailable')
+  return { row, workspaceId }
+}
+
 /** Freeze the uploaded object under a new immutable key before making it readable. */
 export async function completeChatFile(
   userId: string,
@@ -235,22 +257,11 @@ export async function completeChatFile(
   let stage = 'read'
   try {
     await client.query('BEGIN')
-    const row = (
-      await client.query<FileRow>(
-        `SELECT ${columns} FROM chat_attachments WHERE id=$1 AND "userId"=$2 FOR UPDATE`,
-        [id, userId],
-      )
-    ).rows[0]
-    if (!row || row.removedAt) throw new ChatFileError('notFound')
-    const workspaceId = await authorizeFileScope(userId, fileScope(row), client)
-    if (tokenWorkspaceId && workspaceId !== tokenWorkspaceId) throw new ChatFileError('notFound')
-    await client.query('SELECT mikka_account_assert_writable($1)', [userId])
+    let { row, workspaceId } = await lockChatFileForCompletion(client, userId, id, tokenWorkspaceId)
     if (row.state === 'ready') {
       await client.query('COMMIT')
       return publicFile(row)
     }
-    if (!row.uploadExpiresAt || row.uploadExpiresAt.getTime() < Date.now())
-      throw new ChatFileError('unavailable')
     const bytes =
       inline ??
       row.inlineData ??
@@ -261,6 +272,25 @@ export async function completeChatFile(
           )
         : undefined)
     if (!bytes || bytes.length !== row.size) throw new ChatFileError('unreadable')
+    const hash = createHash('sha256').update(bytes).digest('hex')
+    const key = artifactStorage() === 'r2' ? `chat-files/${userId}/${id}/${hash}` : null
+    if (key !== row.storageKey) {
+      // Keep the final object discoverable to the existing draft/account cleanup trigger,
+      // including when the process disappears after PUT but before the ready row commits.
+      // An earlier unpublished attempt used a different body; only its locked draft owns it.
+      if (row.storageKey) await deleteArtifactObject(row.storageKey)
+      await client.query('UPDATE chat_attachments SET "storageKey"=$2 WHERE id=$1', [id, key])
+      await client.query('COMMIT')
+      await client.query('BEGIN')
+      const fresh = await lockChatFileForCompletion(client, userId, id, tokenWorkspaceId)
+      row = fresh.row
+      workspaceId = fresh.workspaceId
+      if (row.state === 'ready') {
+        await client.query('COMMIT')
+        return publicFile(row)
+      }
+      if (row.storageKey !== key) throw new ChatFileError('unavailable')
+    }
     stage = 'extract'
     const extracted = await extractChatFile(row.name, row.mediaType, bytes)
     let { text } = extracted
@@ -271,8 +301,6 @@ export async function completeChatFile(
       text = await transcribeChatAudio(userId, workspaceId, bytes, client)
       if (text.length > CHAT_FILE_MAX_TEXT) throw new ChatFileError('tooLong')
     }
-    const hash = createHash('sha256').update(bytes).digest('hex')
-    const key = artifactStorage() === 'r2' ? `chat-files/${userId}/${id}/${hash}` : null
     stage = 'store'
     if (key) await putArtifactObject(key, new Uint8Array(bytes), mediaType)
     stage = 'commit'
@@ -409,17 +437,19 @@ export async function validateChatFiles(
 
 /** Bounded cleanup of cancelled/abandoned uploads, expired PUT grants and deleted-chat objects. */
 export async function cleanupChatFiles() {
+  const availableDraft = chatStorageCleanupOwner('chat_attachments')
+  const availableRetirement = chatStorageCleanupOwner('chat_attachment_retirements')
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
     await client.query(
-      `DELETE FROM chat_attachments WHERE id IN (SELECT id FROM chat_attachments WHERE "usedAt" IS NULL AND ("removedAt" IS NOT NULL OR "createdAt"<now()-interval '1 day') AND ("uploadExpiresAt" IS NULL OR "uploadExpiresAt"<now()) LIMIT 50 FOR UPDATE SKIP LOCKED)`,
+      `DELETE FROM chat_attachments WHERE id IN (SELECT id FROM chat_attachments WHERE "usedAt" IS NULL AND ("removedAt" IS NOT NULL OR "createdAt"<now()-interval '1 day') AND ("uploadExpiresAt" IS NULL OR "uploadExpiresAt"<now()) AND ${availableDraft} LIMIT 50 FOR UPDATE SKIP LOCKED)`,
     )
     await client.query(
-      `INSERT INTO chat_attachment_retirements("storageKey","userId") SELECT "uploadKey","userId" FROM chat_attachments WHERE "uploadKey" IS NOT NULL AND "uploadExpiresAt"<now() ON CONFLICT DO NOTHING`,
+      `INSERT INTO chat_attachment_retirements("storageKey","userId") SELECT "uploadKey","userId" FROM chat_attachments WHERE "uploadKey" IS NOT NULL AND "uploadExpiresAt"<now() AND ${availableDraft} ON CONFLICT DO NOTHING`,
     )
     await client.query(
-      'UPDATE chat_attachments SET "uploadKey"=NULL,"uploadExpiresAt"=NULL WHERE "uploadExpiresAt"<now()',
+      `UPDATE chat_attachments SET "uploadKey"=NULL,"uploadExpiresAt"=NULL WHERE "uploadExpiresAt"<now() AND ${availableDraft}`,
     )
     await client.query('COMMIT')
   } catch (error) {
@@ -430,7 +460,7 @@ export async function cleanupChatFiles() {
   }
   const retired = (
     await pool.query<{ storageKey: string }>(
-      'SELECT "storageKey" FROM chat_attachment_retirements WHERE "notBefore"<=now() ORDER BY "notBefore" LIMIT 50',
+      `SELECT "storageKey" FROM chat_attachment_retirements WHERE "notBefore"<=now() AND ${availableRetirement} ORDER BY "notBefore" LIMIT 50`,
     )
   ).rows
   let removed = 0

@@ -1,7 +1,8 @@
 @import "../../../../app/globals.css";
 
-/* These are the exact files, weight ranges and display policy used by
- * app/[locale]/layout.tsx. No network font or metric-adjusted fallback. */
+/* These are the exact files, weight ranges and display policy the app shipped
+ * with when Next rendered the document; app/fonts/ still owns them. No network
+ * font or metric-adjusted fallback. */
 @font-face {
   font-family: "Mikka Inter";
   src: url("../../../../app/fonts/InterVariable.woff2") format("woff2");

@@ -1,11 +1,13 @@
-import { cn } from '@/lib/utils'
+import { Mark } from '@/components/workspace/state-mark'
+import { priorityMarkOf } from '@/lib/state-mark'
 
-/** Linear-style priority mark, 14px (Figma 看板/优先级): 紧急 is an amber square with a dark ! (`--warning-ink`), the rest three bars. Board cards and the list share it (R-25). */
-const PRIORITY_BARS: Record<string, number> = { high: 3, normal: 2, low: 1 }
-
+/**
+ * A priority's mark, from the one registry (`lib/state-mark.ts`): 紧急 is the amber square with its point cut out,
+ * the rest Linear's three bars at heights 4 / 7.5 / 11. Board cards, the list and the property menus share it (R-25),
+ * so a priority is drawn once and coloured once.
+ */
 export function PriorityIcon({ priority, label }: { priority: string; label?: string }) {
-  const a11y = label ? { role: 'img' as const, 'aria-label': label } : { 'aria-hidden': true as const }
-  if (priority === 'urgent') return <svg {...a11y} viewBox="0 0 14 14" className="size-3.5 shrink-0"><rect width="14" height="14" rx="3" className="fill-warning" /><path d="M7 3.5v4.25" className="stroke-warning-ink" strokeWidth="1.75" strokeLinecap="round" /><circle cx="7" cy="10.25" r="1" className="fill-warning-ink" /></svg>
-  const filled = PRIORITY_BARS[priority] ?? 0
-  return <svg {...a11y} viewBox="0 0 14 14" className="size-3.5 shrink-0">{[[1, 5], [5.5, 8], [10, 11]].map(([x, height], index) => <rect key={x} x={x} y={12.5 - height} width="3" height={height} rx="1" className={cn(index < filled ? 'fill-muted-foreground' : 'fill-foreground/15')} />)}</svg>
+  const mark = priorityMarkOf(priority)
+  const a11y = label ? { role: 'img' as const, 'aria-label': label, 'aria-hidden': false as const } : {}
+  return <Mark {...a11y} shape={mark.shape} tone={mark.tone} data-priority={priority} />
 }

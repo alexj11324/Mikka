@@ -1,19 +1,24 @@
 import type { RunAgentProfile } from '@/lib/agent-runs'
 import { DEFAULT_PROFILE_MARK, resolveProfileMark } from '@/lib/factory/agent-profile-mark'
+import { agentProfileSkillSource } from '@/lib/factory/agent-profile-skills'
+import { profileSkillRunReportSchema } from '@mikka/protocol/skill'
+import { causeFields } from '@mikka/protocol/coded-error'
 import 'server-only'
+import { z } from 'zod'
 import { createHash, randomBytes } from 'node:crypto'
-import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
+import { and, asc, eq, getTableColumns, inArray, isNull, lt, sql } from 'drizzle-orm'
 import {
-  CAPTURE_EXTENSIONS, CAPTURE_MAX_BYTES, captureKind, captureProblem, cleanCaptureTitle, sniffCaptureType,
-  type CaptureContentType, type CaptureSource, type CaptureUploadRequest, type CaptureUploadResponse, type CaptureView,
+  CAPTURE_EXTENSIONS, CAPTURE_MAX_BYTES, RECORDING_MAX_SECONDS, captureKind, captureProblem, cleanCaptureTitle, recordingStep, sniffCaptureType,
+  type CaptureContentType, type CaptureSource, type CaptureUploadRequest, type CaptureUploadResponse, type CaptureView, type RecordingStep,
 } from '@mikka/protocol/capture'
 import { withAccountWrite } from '@/lib/account/write-guard'
-import { db, pool } from '@/lib/db'
-import { agentRuns, runCaptureShares, runCaptureSteps, runCaptures } from '@/lib/db/schema'
-import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, presignArtifactPut, putArtifactObject } from '@/lib/artifacts/storage'
+import { db, pool, withDatabaseClient, withDatabaseTransaction } from '@/lib/db'
+import { agentRuns, runCaptureShares, runCaptureSteps, runCaptures, users } from '@/lib/db/schema'
+import { artifactStorage, deleteArtifactObject, getArtifactObjectBytes, headArtifactObject, ObjectStorageReadError, presignArtifactPut, putArtifactObject, type ArtifactObjectHead } from '@/lib/artifacts/storage'
 import { runArtifactSubmissions } from '@/lib/artifacts/run-submissions'
 import { executionIdentitySchema } from '@/lib/execution-identity'
 import { modelRoutingEvidenceSchema } from '@/lib/thread-execution-identity-view'
+import { runSkillPrompt } from '@mikka/protocol/run'
 import { taskActivityChanged } from '@/lib/factory/activity-live'
 
 // Screenshots and screen recordings in Neon (whose, which run, share links)
@@ -43,11 +48,13 @@ export function captureView(row: Pick<Row, 'id' | 'kind' | 'contentType' | 'titl
 }
 
 /** Puts checked bytes where files go and returns the columns that point at them. */
-async function place(owner: CaptureOwner, id: string, bytes: Uint8Array, contentType: CaptureContentType) {
+async function place(owner: CaptureOwner, id: string, bytes: Uint8Array, contentType: CaptureContentType, signal?: AbortSignal) {
+  signal?.throwIfAborted()
   const key = storageKey(owner, id, contentType)
   const storage = artifactStorage()
   // The file goes up before the row says ready, so a ready row never points at a missing object.
-  if (storage === 'r2') await putArtifactObject(key, bytes.buffer instanceof ArrayBuffer ? bytes as Uint8Array<ArrayBuffer> : new Uint8Array(bytes), contentType)
+  if (storage === 'r2') await putArtifactObject(key, bytes.buffer instanceof ArrayBuffer ? bytes as Uint8Array<ArrayBuffer> : new Uint8Array(bytes), contentType, signal)
+  signal?.throwIfAborted()
   return { storageKey: key, inlineContent: storage === 'inline' ? Buffer.from(bytes) : null, size: bytes.length, sha256: sha256(bytes) }
 }
 
@@ -114,16 +121,20 @@ async function writableBeginUpload(owner: CaptureOwner, input: CaptureUploadRequ
     const inserted = await tx.insert(runCaptures).values({
       id, userId: owner.userId, runId: owner.runId, issueId: owner.issueId, botId: owner.botId,
       kind, contentType: input.contentType, source: 'local', status: 'uploading', title,
-      storageKey: key, size: input.size, sha256: input.sha256, expiresAt,
+      storageKey: key, size: input.size, sha256: input.sha256, durationMs: input.durationMs ?? null, expiresAt,
     }).onConflictDoNothing().returning({ id: runCaptures.id })
     if (!inserted.length) return 'conflict' as const
+    if (input.steps?.length) await tx.insert(runCaptureSteps).values(input.steps.map(step => ({
+      id: crypto.randomUUID(), captureId: id, userId: owner.userId,
+      atMs: step.atMs, durationMs: step.durationMs ?? null, label: cleanCaptureTitle(step.label), source: step.source,
+    })))
     return null
   })
   if (reserved) return { error: reserved, message: reserved === 'conflict' ? 'Too many uploads in progress for this run.' : 'Run is no longer accepting uploads.' }
   if (storage === 'inline') return { captureId: id, upload: { target: 'server' } }
   const seconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000)
   if (seconds < 1) return { error: 'unavailable', message: 'Upload expired.' }
-  const signed = await presignArtifactPut(key, input.contentType, seconds)
+  const signed = await presignArtifactPut(key, input.contentType, seconds, input.size)
   return { captureId: id, upload: { target: 'storage', ...signed } }
 }
 
@@ -141,11 +152,12 @@ export async function resumeUpload(owner: CaptureOwner, captureId: string): Prom
 
 async function writableResumeUpload(owner: CaptureOwner, captureId: string): Promise<CaptureUploadResponse | CaptureError> {
   const row = await openUpload(owner, captureId)
-  if (!row || row.source !== 'local' || !row.storageKey || !row.expiresAt) return { error: 'not_found', message: 'No open upload with that id for this run.' }
+  // A reservation without an announced size could never be checked at completion.
+  if (!row || row.source !== 'local' || !row.storageKey || !row.expiresAt || !row.size) return { error: 'not_found', message: 'No open upload with that id for this run.' }
   if (artifactStorage() === 'inline') return { captureId, upload: { target: 'server' } }
   const seconds = Math.floor((row.expiresAt.getTime() - Date.now()) / 1000)
   if (seconds < 1) return { error: 'not_found', message: 'Upload expired.' }
-  return { captureId, upload: { target: 'storage', ...await presignArtifactPut(row.storageKey, row.contentType, seconds) } }
+  return { captureId, upload: { target: 'storage', ...await presignArtifactPut(row.storageKey, row.contentType, seconds, row.size) } }
 }
 
 /** The bytes of an upload sent to the server (no bucket configured). */
@@ -170,34 +182,66 @@ export async function completeUpload(owner: CaptureOwner, captureId: string): Pr
 
 async function writableCompleteUpload(owner: CaptureOwner, captureId: string): Promise<CaptureView | CaptureError> {
   // A lost success response is safe to retry for the original upload window.
-  const readyUpload = async () => (await db.select().from(runCaptures).where(and(
-    eq(runCaptures.id, captureId), eq(runCaptures.runId, owner.runId), eq(runCaptures.userId, owner.userId),
-    eq(runCaptures.source, 'local'), eq(runCaptures.status, 'ready'), sql`${runCaptures.expiresAt} > now()`,
-  )).limit(1))[0]
-  const completed = await readyUpload()
-  if (completed) return captureView(completed)
-  const row = await openUpload(owner, captureId)
-  if (!row || !row.storageKey) {
-    const winner = await readyUpload()
-    return winner ? captureView(winner) : { error: 'not_found', message: 'No open upload with that id for this run.' }
+  const ownedUpload = and(eq(runCaptures.id, captureId), eq(runCaptures.runId, owner.runId),
+    eq(runCaptures.userId, owner.userId), eq(runCaptures.source, 'local'))
+  const unexpired = sql`${runCaptures.expiresAt} > now()`
+  const [row] = await db.select().from(runCaptures).where(and(ownedUpload, unexpired,
+    inArray(runCaptures.status, ['uploading', 'ready']))).limit(1)
+  if (row?.status === 'ready') return captureView(row)
+  if (!row?.storageKey || !row.expiresAt || row.expiresAt.getTime() <= Date.now()) {
+    return { error: 'not_found', message: 'No open upload with that id for this run.' }
   }
+  // A reservation without an announced size could never be checked.
+  if (!row.size) return { error: 'not_found', message: 'No open upload with that id for this run.' }
+  const stagingKey = row.storageKey
+
+  // Only a lost conditional update needs a fresh read of the other writer's result.
+  const readyUpload = async () => (await db.select().from(runCaptures).where(and(
+    ownedUpload, unexpired, eq(runCaptures.status, 'ready'),
+  )).limit(1))[0]
   const storage = artifactStorage()
-  const bytes = row.inlineContent ? new Uint8Array(row.inlineContent)
-    : storage === 'r2' ? await getArtifactObjectBytes(row.storageKey).catch(() => null) : null
-  if (!bytes) return { error: 'not_found', message: 'The file has not arrived.' }
-  const problem = bytes.length !== row.size ? `Expected ${row.size} bytes, got ${bytes.length}.`
-    : sha256(bytes) !== row.sha256 ? 'The file does not match its sha256.'
-      : captureProblem(bytes, row.contentType)
-  if (problem) {
+  /** Ends the upload over a file that cannot be a capture; a concurrent winner still answers. */
+  const failUpload = async (problem: string): Promise<CaptureView | CaptureError> => {
     const failed = await db.update(runCaptures).set({ status: 'failed', error: problem, inlineContent: null, updatedAt: new Date() })
       .where(and(eq(runCaptures.id, row.id), eq(runCaptures.status, 'uploading'))).returning({ id: runCaptures.id })
-    if (storage === 'r2' && failed.length) await deleteArtifactObject(row.storageKey).catch(() => undefined)
+    if (storage === 'r2' && failed.length) await deleteArtifactObject(stagingKey).catch(() => undefined)
     if (!failed.length) {
       const winner = await readyUpload()
       if (winner) return captureView(winner)
     }
     return { error: 'invalid', message: problem }
   }
+  let bytes = row.inlineContent ? new Uint8Array(row.inlineContent) : null
+  if (!bytes && storage === 'r2') {
+    // The bucket's own metadata is read before any byte of the file: a replayed
+    // signed PUT may have stored more than the announcement allowed, and such a
+    // file is refused without ever being loaded into memory.
+    let head: ArtifactObjectHead | null = null
+    try {
+      head = await headArtifactObject(stagingKey)
+    } catch (error) {
+      console.warn('[capture upload] object metadata unavailable', { causes: causeFields(error) })
+      return { error: 'unavailable', message: 'Capture storage is unavailable. Retry the upload completion.' }
+    }
+    if (!head) return { error: 'not_found', message: 'The file has not arrived.' }
+    // A provider that reports no length still has its bytes checked below.
+    if (head.size !== null && head.size !== row.size) return failUpload(`Expected ${row.size} bytes, got ${head.size}.`)
+    try {
+      // Bounded by the announcement: the uploader may still grow its staging
+      // object until the signature expires, and only one byte more is read.
+      bytes = await getArtifactObjectBytes(stagingKey, row.size)
+    } catch (error) {
+      if (!(error instanceof ObjectStorageReadError && error.code === 404)) {
+        console.warn('[capture upload] object read unavailable', { causes: causeFields(error) })
+        return { error: 'unavailable', message: 'Capture storage is unavailable. Retry the upload completion.' }
+      }
+    }
+  }
+  if (!bytes) return { error: 'not_found', message: 'The file has not arrived.' }
+  const problem = bytes.length !== row.size ? `Expected ${row.size} bytes, got ${bytes.length}.`
+    : sha256(bytes) !== row.sha256 ? 'The file does not match its sha256.'
+      : captureProblem(bytes, row.contentType)
+  if (problem) return failUpload(problem)
   // A presigned PUT remains usable until expiry. Publish the verified bytes
   // under a fresh key the uploader cannot overwrite; also persist the exact
   // checked bytes for inline uploads in case a second PUT races completion.
@@ -208,7 +252,7 @@ async function writableCompleteUpload(owner: CaptureOwner, captureId: string): P
   if (storage === 'r2') {
     // The upload URL may still recreate its staging object until it expires.
     // Its eventual cleanup requires an object-storage lifecycle rule.
-    await deleteArtifactObject(ready ? row.storageKey : verifiedKey).catch(() => undefined)
+    await deleteArtifactObject(ready ? stagingKey : verifiedKey).catch(() => undefined)
   }
   if (ready) { taskActivityChanged(db, owner.runId); return captureView(ready) }
   const winner = await readyUpload()
@@ -240,23 +284,26 @@ export const RECORDING_STEPS_MAX = 200
  * A step on the run's recording in progress: its offset from the recording's
  * start and the agent's own description. Nothing is kept when no recording runs.
  */
-export async function recordStep(owner: { userId: string; runId: string }, input: { label: string; source: 'action' | 'mark' }, now = Date.now()) {
+export async function recordStep(owner: { userId: string; runId: string }, input: { label: string; source: 'action' | 'mark'; durationMs?: number }, now = Date.now()) {
   const row = await currentRecording(owner.runId)
   if (!row || row.userId !== owner.userId || !row.startedAt) return false
   const atMs = now - row.startedAt.getTime()
   if (atMs < 0 || (row.expiresAt && now > row.expiresAt.getTime())) return false
   const label = input.label.replace(/\s+/g, ' ').trim().slice(0, 200)
   if (!label) return false
+  if (input.durationMs !== undefined && (input.source !== 'action' || !Number.isSafeInteger(input.durationMs) || input.durationMs < 0 || input.durationMs > RECORDING_MAX_SECONDS * 1000)) return false
+  const durationMs = input.durationMs === undefined ? null : Math.min(input.durationMs, atMs)
   // One statement keeps the cap under concurrent steps.
-  const inserted = await db.execute(sql`INSERT INTO run_capture_steps (id,"captureId","userId","atMs",label,source)
-    SELECT ${crypto.randomUUID()},${row.id},${owner.userId},${atMs},${label},${input.source}
-    WHERE (SELECT count(*) FROM run_capture_steps WHERE "captureId"=${row.id}) < ${RECORDING_STEPS_MAX}`)
+  const inserted = await db.execute(sql`INSERT INTO run_capture_steps (id,"captureId","userId","atMs","durationMs",label,source)
+    SELECT ${crypto.randomUUID()},${row.id},${owner.userId},${atMs},${durationMs},${label},${input.source}
+    WHERE (SELECT count(*) FROM run_capture_steps WHERE "captureId"=${row.id}) < ${RECORDING_STEPS_MAX}
+      AND EXISTS (SELECT 1 FROM run_captures WHERE id=${row.id} AND status='recording')`)
   return (inserted.rowCount ?? 0) > 0
 }
 
 /** A recording's timeline, in order. */
 export async function recordingSteps(captureId: string) {
-  return db.select({ atMs: runCaptureSteps.atMs, label: runCaptureSteps.label, source: runCaptureSteps.source })
+  return db.select({ atMs: runCaptureSteps.atMs, label: runCaptureSteps.label, source: runCaptureSteps.source, durationMs: runCaptureSteps.durationMs })
     .from(runCaptureSteps).where(eq(runCaptureSteps.captureId, captureId)).orderBy(asc(runCaptureSteps.atMs), asc(runCaptureSteps.createdAt))
 }
 
@@ -266,16 +313,75 @@ export async function currentRecording(runId: string) {
   return row ?? null
 }
 
-export async function finishRecording(row: Row, input: { bytes: Uint8Array; durationMs: number }): Promise<CaptureView | CaptureError> {
-  return withAccountWrite(row.userId, () => writableFinishRecording(row, input))
+type FinishedRecording = { bytes: Uint8Array; durationMs: number; steps?: RecordingStep[] }
+
+/** Serialize remote stop/process/discard across application instances. */
+export async function withRecordingFinalization(row: Row, finalize: (current: Row) => Promise<CaptureView | CaptureError>): Promise<CaptureView | CaptureError> {
+  const client = await pool.connect()
+  try {
+    // Pin all nested capture/account transactions to this same connection.
+    // Five recordings must not exhaust a five-connection pool while each
+    // waits for a second connection to save its own result.
+    return await withDatabaseClient(client, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
+      await client.query("SET LOCAL lock_timeout = '105s'")
+      await client.query("SET LOCAL statement_timeout = '110s'")
+      await client.query("SET LOCAL idle_in_transaction_session_timeout = '120s'")
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`capture-finalize:${row.id}`])
+      const [current] = await db.select().from(runCaptures).where(and(eq(runCaptures.id, row.id), eq(runCaptures.userId, row.userId))).limit(1)
+      if (current?.status === 'ready') return captureView(current)
+      if (!current || current.status !== 'recording') return { error: 'conflict' as const, message: 'The recording already ended.' }
+      try { return await finalize(current) }
+      catch {
+        await failRecording(row.id, 'Recording not saved')
+        return { error: 'unavailable' as const, message: 'Recording could not be saved.' }
+      }
+    })))
+  } finally {
+    // A failed lock acquisition never changes another finalizer's status.
+    client.release()
+  }
 }
 
-async function writableFinishRecording(row: Row, input: { bytes: Uint8Array; durationMs: number }): Promise<CaptureView | CaptureError> {
+export async function finishRecording(row: Row, input: FinishedRecording, signal?: AbortSignal): Promise<CaptureView | CaptureError> {
+  signal?.throwIfAborted()
+  return withAccountWrite(row.userId, () => writableFinishRecording(row, input, signal))
+}
+
+async function writableFinishRecording(row: Row, input: FinishedRecording, signal?: AbortSignal): Promise<CaptureView | CaptureError> {
+  signal?.throwIfAborted()
   const problem = captureProblem(input.bytes, 'video/mp4')
+    ?? (!Number.isSafeInteger(input.durationMs) || input.durationMs <= 0 || input.durationMs > RECORDING_MAX_SECONDS * 1000 ? 'Invalid recording duration.' : null)
+    ?? (input.steps && (input.steps.length > RECORDING_STEPS_MAX || input.steps.some(step => !recordingStep.safeParse(step).success || step.atMs > input.durationMs)) ? 'Invalid recording timeline.' : null)
   if (problem) { await failRecording(row.id, problem); return { error: 'invalid', message: problem } }
-  const file = await place(row, row.id, input.bytes, 'video/mp4')
-  const [ready] = await db.update(runCaptures).set({ status: 'ready', ...file, durationMs: input.durationMs, expiresAt: null, updatedAt: new Date() })
-    .where(and(eq(runCaptures.id, row.id), eq(runCaptures.status, 'recording'))).returning()
+  // Concurrent finalizers cannot overwrite the winner's immutable file.
+  const fileId = crypto.randomUUID()
+  const cleanup = async () => {
+    // An interrupted PUT may already have stored this unique object. Cleanup
+    // gets its own short budget so failure can still commit before DB expiry.
+    if (artifactStorage() === 'r2') await deleteArtifactObject(storageKey(row, fileId, 'video/mp4'), AbortSignal.timeout(5_000)).catch(() => undefined)
+  }
+  let ready: Row | null
+  try {
+    const file = await place(row, fileId, input.bytes, 'video/mp4', signal)
+    ready = await db.transaction(async tx => {
+      signal?.throwIfAborted()
+      const [saved] = await tx.update(runCaptures).set({ status: 'ready', ...file, durationMs: input.durationMs, expiresAt: null, updatedAt: new Date() })
+        .where(and(eq(runCaptures.id, row.id), eq(runCaptures.userId, row.userId), eq(runCaptures.status, 'recording'))).returning()
+      if (!saved) return null
+      if (input.steps !== undefined) {
+        await tx.delete(runCaptureSteps).where(and(eq(runCaptureSteps.captureId, row.id), eq(runCaptureSteps.userId, row.userId)))
+        if (input.steps.length) await tx.insert(runCaptureSteps).values(input.steps.map(step => ({
+          id: crypto.randomUUID(), captureId: row.id, userId: row.userId, atMs: step.atMs,
+          durationMs: step.durationMs ?? null, label: cleanCaptureTitle(step.label), source: step.source,
+        })))
+      }
+      signal?.throwIfAborted()
+      return saved
+  }) } catch (error) {
+    await cleanup()
+    throw error
+  }
+  if (!ready) await cleanup()
   if (ready) taskActivityChanged(db, row.runId)
   return ready ? captureView(ready) : { error: 'conflict', message: 'The recording already ended.' }
 }
@@ -294,10 +400,18 @@ export async function failRecording(id: string, error: string) {
  */
 export async function runEvidence(userId: string, runId: string) {
   const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status, issueId: agentRuns.issueId, botId: agentRuns.botId,
+    // Evidence-only entry provenance (lib/run-origin.ts): owner-only acceptance
+    // reads may see it; lists, chat, events, logs and analytics never do.
+    origin: agentRuns.origin, originRef: agentRuns.originRef,
     harness: sql<string | null>`${agentRuns.agentDefinition}->>'harness'`,
     model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
     executionIdentity: sql<unknown>`${agentRuns.agentDefinition}->'executionIdentity'`,
     modelRouting: sql<unknown>`${agentRuns.agentDefinition}->'modelDispatch'->'routing'`,
+    // The model followed the dispatching chat's own (decision 2026-11-15-1630); null when someone named it or on older runs.
+    modelFollowed: sql<boolean | null>`(${agentRuns.agentDefinition}->'modelDispatch'->>'followed')::boolean`,
+    // What the prompt carried of the run's skills; a body it only deferred is
+    // shown beside the run so the person knows a skill waited on a file read.
+    skillPrompt: sql<unknown>`${agentRuns.report}->'skillPrompt'`,
     // The mark is presentation, not part of the frozen receipt: the Profile's current one, else derived from the frozen public summary.
     agentProfile: sql<RunAgentProfileMarkRow | null>`case when ${agentRuns.agentDefinition}->'agentProfile' is null then null else jsonb_build_object(
       'profileId',${agentRuns.agentDefinition}->'agentProfile'->'profileId','name',${agentRuns.agentDefinition}->'agentProfile'->'name',
@@ -306,6 +420,12 @@ export async function runEvidence(userId: string, runId: string) {
       'roles',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'roles','description',${agentRuns.agentDefinition}->'agentProfile'->'definition'->'description',
       'icon',(select p.icon from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId}),
       'color',(select p.color from factory_agent_profiles p where p.id::text=${agentRuns.agentDefinition}->'agentProfile'->>'profileId' and p."ownerId"=${agentRuns.userId})) end`,
+    // Only frozen, non-secret references: the pinned bodies stay out of this
+    // response. `loadedSkills` comes from the daemon's own load receipts.
+    agentSkills: sql<unknown>`case when jsonb_typeof(${agentRuns.agentDefinition}->'agentProfile'->'skills')='array' then (
+      select coalesce(jsonb_agg(jsonb_build_object('id',skill->>'id','name',skill->>'name','version',skill->'version','digest',skill->>'digest')),'[]'::jsonb)
+      from jsonb_array_elements(${agentRuns.agentDefinition}->'agentProfile'->'skills') skill) else '[]'::jsonb end`,
+    profileSkillReport: sql<unknown>`${agentRuns.report}->'profileSkills'`,
     credentialType: sql<'subscription' | 'api_key' | 'unknown'>`CASE WHEN ${agentRuns.agentDefinition}->'apiKey' IS NOT NULL AND ${agentRuns.agentDefinition}->'apiKey'<>'null'::jsonb THEN 'api_key' WHEN ${agentRuns.agentDefinition}->'subscription' IS NOT NULL AND ${agentRuns.agentDefinition}->'subscription'<>'null'::jsonb THEN 'subscription' ELSE 'unknown' END`,
     subscriptionRoute: sql<string | null>`${agentRuns.agentDefinition}->'subscription'->>'route'` })
     .from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
@@ -316,17 +436,46 @@ export async function runEvidence(userId: string, runId: string) {
   const routing = modelRoutingEvidenceSchema.safeParse(run.modelRouting)
   // Names for the identity's references, so the owner reads people and machines, not IDs.
   const labels = identity.success ? await (await import('@/lib/execution-identity-labels')).executionIdentityLabels(pool, (await import('@/lib/workspace-db')).workspacePool, userId, identity.data) : null
-  const captures = await db.select().from(runCaptures)
+  const captures = await db.select({
+    id: runCaptures.id, kind: runCaptures.kind, contentType: runCaptures.contentType, title: runCaptures.title,
+    size: runCaptures.size, durationMs: runCaptures.durationMs, source: runCaptures.source, createdAt: runCaptures.createdAt,
+  }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'ready'))).orderBy(asc(runCaptures.createdAt))
   const documents = await runArtifactSubmissions(pool, userId, [runId])
   const recording = await db.select({ id: runCaptures.id }).from(runCaptures)
     .where(and(eq(runCaptures.runId, runId), eq(runCaptures.userId, userId), eq(runCaptures.status, 'recording'))).limit(1)
+  // `skillPrompt` is dropped here and re-added parsed below, so the response
+  // never carries the raw report value.
+  const { agentSkills, profileSkillReport, skillPrompt: rawSkillPrompt, ...runView } = run
+  const skills = runSkillPrompt.safeParse(rawSkillPrompt)
   return {
-    run: { ...run, agentProfile: profileWithMark(run.agentProfile), executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null },
+    run: { ...runView, agentProfile: profileWithMark(run.agentProfile),
+      configuredSkills: configuredSkillRefs(agentSkills), loadedSkills: loadedSkillRefs(profileSkillReport),
+      executionIdentity: identity.success ? identity.data : null, labels, modelRouting: routing.success ? routing.data : null,
+      // Workspace skills this prompt inlined or deferred, distinct from the
+      // Profile Skills above that the agent loads on demand.
+      skillPrompt: skills.success ? skills.data : null },
     recording: recording.length > 0,
     captures: captures.map(captureView),
     artifacts: documents.map(document => ({ ...document, createdAt: document.createdAt.toISOString() })),
   }
+}
+
+const frozenSkillRef = z.object({
+  id: z.string().min(1).max(160), name: z.string().min(1).max(80),
+  version: z.number().int().positive().nullable().optional(), digest: z.string().max(64).nullable().optional(),
+})
+/** What the Profile selected, without its pinned body or any private path. */
+function configuredSkillRefs(raw: unknown) {
+  const parsed = z.array(frozenSkillRef).max(24).safeParse(raw)
+  if (!parsed.success) return []
+  return parsed.data.slice(0, 12).map(skill => ({ id: skill.id, name: skill.name, version: skill.version ?? null,
+    digest: skill.digest ?? null, source: agentProfileSkillSource(skill.id) }))
+}
+/** The daemon-reported loads only; assigned is never reported as used. */
+function loadedSkillRefs(raw: unknown) {
+  const parsed = profileSkillRunReportSchema.safeParse(raw)
+  return parsed.success ? parsed.data.loaded : []
 }
 
 type RunAgentProfileMarkRow = RunAgentProfile & { roles?: unknown; description?: unknown; icon?: unknown; color?: unknown }
@@ -381,10 +530,21 @@ export async function revokeCaptureShares(userId: string, captureId: string): Pr
 /** The capture a live share token opens. */
 export async function sharedCapture(token: string) {
   if (!token.startsWith(SHARE_PREFIX)) return null
-  const [share] = await db.select({ captureId: runCaptureShares.captureId }).from(runCaptureShares)
-    .where(and(eq(runCaptureShares.tokenHash, hashToken(token)), isNull(runCaptureShares.revokedAt))).limit(1)
-  if (!share) return null
-  const [row] = await db.select().from(runCaptures).where(and(eq(runCaptures.id, share.captureId), eq(runCaptures.status, 'ready'))).limit(1)
+  // A deleted account cannot leave an anonymous back door: the same rule
+  // artifacts apply (lib/artifacts/store.ts). Captures are owned by the person,
+  // not by a workspace — `run_captures` has no workspaceId and its userId has
+  // no foreign key — so the owner signal is the account row itself, not
+  // workspace membership (a Personal-workspace owner has no membership row at
+  // all). The deletion guard is checked too: it exists from the moment a
+  // deletion is requested, before the `user` row goes. Both ride in this
+  // statement so share authority and ready media stay one read.
+  const [row] = await db.select(getTableColumns(runCaptures)).from(runCaptureShares)
+    .innerJoin(runCaptures, eq(runCaptures.id, runCaptureShares.captureId))
+    .where(and(
+      eq(runCaptureShares.tokenHash, hashToken(token)), isNull(runCaptureShares.revokedAt), eq(runCaptures.status, 'ready'),
+      sql`exists (select 1 from ${users} where ${users.id} = ${runCaptures.userId})`,
+      sql`not exists (select 1 from "account_deletion_guards" where "subjectId" = ${runCaptures.userId})`,
+    )).limit(1)
   if (!row) return null
   const bytes = await fileOf(row)
   return bytes ? { ...captureView(row), bytes } : null

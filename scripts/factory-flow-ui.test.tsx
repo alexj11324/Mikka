@@ -30,10 +30,10 @@ mock.module('swr', { defaultExport: (key: string | null) => {
   if (key === `/api/factory/tasks/${TASK}`) return { data: detail, mutate: async () => detail }
   if (key?.startsWith('/api/factory/tasks?issueId=')) return { data: { tasks: [task] }, isLoading: false, mutate: async () => undefined }
   return { data: undefined, mutate: async () => undefined }
-}, namedExports: { useSWRConfig: () => ({ mutate: async (key: string) => { reloaded.push(key) } }) } })
+}, namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key), useSWRConfig: () => ({ mutate: async (key: string) => { reloaded.push(key) } }) } })
 // The report's CI checks row reads the review summary (its own SWR and live keys); these tests cover the flow, not that row.
 mock.module(new URL('../hooks/code-review/use-review-summary.ts', import.meta.url).href, { namedExports: { useReviewSummary: () => ({ data: undefined }) } })
-mock.module('next-intl', { namedExports: { useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '', relativeTime: (at: Date, now: Date) => `${Math.round((now.getTime() - at.getTime()) / 3_600_000)} 小时前` }), useNow: () => new Date('2026-11-05T01:00:00.000Z') } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: translationsFor, useFormatter: () => ({ dateTime: () => '', relativeTime: (at: Date, now: Date) => `${Math.round((now.getTime() - at.getTime()) / 3_600_000)} 小时前` }), useNow: () => new Date('2026-11-05T01:00:00.000Z') } })
 mock.module(new URL('../components/workspace/issue-thread-panel.tsx', import.meta.url).href, { namedExports: { IssueThreadPanel: () => null } })
 mock.module(new URL('../components/workspace/workspace-navigation.ts', import.meta.url).href, { namedExports: {
   navigate: (change: unknown) => { navigated.push(change) }, openArtifact: (id: string) => { navigated.push({ artifact: id }) },
@@ -103,6 +103,15 @@ test('a finished spec shows its stages, 方案待审 and the approve action; no 
   assert.equal(document.querySelector('h3[tabindex]'), null)
   await act(async () => { button('查看方案')!.click() })
   assert.deepEqual(opened.splice(0), ['spec-run'])
+})
+
+test('a cancelled flow stops on its last reached stage and a completed flow marks every step done', async () => {
+  for (const stage of ['cancelled', 'completed'] as const) {
+    flow = specFlow({ stage, stages: ['implement', 'review', 'handoff', stage], needsYou: null })
+    await render()
+    const states = [...document.querySelectorAll('[data-slot="stepper-item"]')].map(item => item.getAttribute('data-state'))
+    assert.deepEqual(states, ['completed', 'completed', 'completed', stage === 'cancelled' ? 'active' : 'completed'])
+  }
 })
 
 test('approve POSTs approve_spec with the revision once, even when clicked twice', async () => {
@@ -226,12 +235,16 @@ test('handoff shows the report counts and opens the acceptance Artifact', async 
   assert.deepEqual(navigated, [{ artifact: 'art-1' }])
 })
 
-test('a waiting question sends the person to the Bot chat (R-86)', async () => {
-  flow = specFlow({ stage: 'implement', stages: ['implement'], needsYou: { kind: 'question', since: '2026-11-05T00:00:00.000Z' } })
-  await render()
-  await act(async () => { button('去回答')!.click() })
-  assert.deepEqual(navigated, [{ section: 'coordinator', bot: 'bot-1', issue: null }])
-})
+for (const botId of ['bot-1', null]) {
+  test(`a waiting question opens the ${botId ? 'issuing Bot' : 'default Coordinator'} chat (R-86)`, async () => {
+    flow = specFlow({ botId, stage: 'implement', stages: ['implement'], needsYou: { kind: 'question', since: '2026-11-05T00:00:00.000Z' } })
+    await render()
+    const answer = button('去回答')
+    assert.ok(answer)
+    await act(async () => { answer.click() })
+    assert.deepEqual(navigated, [{ section: 'coordinator', bot: botId, issue: null }])
+  })
+}
 
 test('an older task keeps its acceptance row, not a flow block', async () => {
   detail = { task: { id: TASK, attemptId: 'a', route: {} } }

@@ -8,6 +8,7 @@
 - Superseded in part by: [2026-11-01-1520-no-browser-tests-in-ci](2026-11-01-1520-no-browser-tests-in-ci.md) (no manual Actions browser run either; GitHub-runner-only suites mean the database CI job)
 - Superseded in part by: [2026-11-01-1545-trunk-based](2026-11-01-1545-trunk-based.md) (rule 5: trunk-based merging replaces integration batches)
 - Superseded in part by: [2026-11-03-2359](2026-11-03-2359-issue-owner-merges-and-accepts-in-production.md) (the issue's owner merges its own PR; the coordinator does not)
+- Superseded in part by: [2026-11-11-1151](2026-11-11-1151-automatic-migration-ids.md) (rule 6: migration IDs are generated automatically; rule IDs retain coordinator allocation)
 - Replaces, in part:
   - [2026-11-01-0230-browser-tests-manual-only](2026-11-01-0230-browser-tests-manual-only.md): browser acceptance runs locally first; the manual Actions run is only for suites that need a GitHub-hosted runner.
   - [2026-11-01-0330-ui-figma-and-skill-review-before-code](2026-11-01-0330-ui-figma-and-skill-review-before-code.md) step 4–5: screenshots come from a local production build, and "merge" means the next integration batch.

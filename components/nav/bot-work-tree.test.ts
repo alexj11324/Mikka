@@ -1,13 +1,16 @@
 import test from 'node:test'
+import { directoryPullRequests } from '@/lib/pull-request-appearance'
 import assert from 'node:assert/strict'
 import { readIssueMetadata } from '@/lib/issue-metadata'
+import { taskPresentation, type TaskPresentation } from '@/lib/task-presentation'
 import { botWorkTree } from './bot-work-tree'
 
 type Issue = Parameters<typeof botWorkTree>[3][number]
 type Thread = Parameters<typeof botWorkTree>[2][number]
 const issue = (id: string, status = 'doing'): Issue => ({
-  id, status, identifier: `MIK-${id}`, title: `Task ${id}`, shortTitle: null,
+  id, status, stateId: null, identifier: `MIK-${id}`, issuedIdentifier: `MIK-${id}`, title: `Task ${id}`,
   ownerId: 'owner', ownerName: 'Owner', ownerImage: null, teamId: null,
+  workspaceId: 'workspace', projectId: null,
   scope: 'personal', priority: 'normal', revision: 1,
   createdAt: new Date('2026-11-10T00:00:00Z'), updatedAt: new Date('2026-11-10T00:00:00Z'),
   metadata: readIssueMetadata({ type: 'doc', content: [] }),
@@ -18,36 +21,46 @@ const run = (id: string, issueId: string | null, botId: string | null = 'bot', s
   agentName: 'Codex', harness: 'codex', prompt: 'Standalone work\nPrivate detail', lastReply: null, lastReplyAt: null,
 })
 
-test('a Bot contains one row per task, and the latest run decides its own task state', () => {
-  const tree = botWorkTree('workspace', ['bot'], [run('1', 'a'), run('2', 'a', 'bot', 'waiting_input')], [issue('a')])
-  const rows = tree.get('bot')!
-  assert.equal(rows.length, 1)
-  assert.equal(rows[0].name, 'MIK-a Task a')
-  assert.equal(rows[0].state, 'waiting')
-  assert.equal(rows[0].reason, 'needsReply')
-  assert.deepEqual(rows[0].runs.map(item => item.id), ['2', '1'])
+const present = (row: Issue, botIds: string[], projection?: Partial<TaskPresentation>): TaskPresentation => ({
+  ...taskPresentation({ status: 'todo', metadata: row.metadata }, undefined, null, () => false),
+  botDispatches: botIds.map(botId => ({ botId, runId: botId === 'bot' ? '2' : 'historical', harness: 'codex', name: botId })), ...projection,
 })
 
-test('another workspace, unknown Bots and MCP runs cannot enter the tree', () => {
-  const tree = botWorkTree('workspace', ['bot', 'coordinator'], [run('a', 'foreign', 'other-workspace-bot'), run('b', 'missing'), run('c', null, 'other-bot'), run('d', 'own', 'bot', 'running', 'd', 'mcp')], [issue('foreign'), issue('own')])
-  assert.equal(tree.size, 0)
-  assert.equal(botWorkTree(null, ['bot'], [run('a', null)], []).size, 0)
+test('historical dispatch and current dispatch share the workspace projection even without visible threads', () => {
+  const a = issue('a'), unused = issue('unused')
+  const projected = present(a, ['previous', 'bot'], { state: 'waiting', reason: 'pr_review', group: 'pending' })
+  const tree = botWorkTree('workspace', ['previous', 'bot', 'unrelated'], [
+    run('1', 'a'), run('2', 'a'), run('private', 'a', 'unrelated'), run('mcp', 'a', 'bot', 'running', 'z', 'mcp'),
+  ], [a, unused], { a: projected, unused: present(unused, []) })
+  for (const bot of ['previous', 'bot']) {
+    const rows = tree.get(bot)!
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].name, 'MIK-a Task a')
+    assert.equal(rows[0].state, projected.state)
+    assert.equal(rows[0].reason, projected.reason)
+    assert.deepEqual(rows[0].runs.map(item => item.id), bot === 'previous' ? ['historical'] : ['2', '1'])
+  }
+  assert.equal(tree.has('unrelated'), false)
 })
 
-test('owner-wide legacy runs with no dispatching Bot cannot be attributed to the selected workspace', () => {
-  const tree = botWorkTree('workspace', ['coordinator'], [run('a', 'own', null), run('b', null, null)], [issue('own')])
-  assert.equal(tree.size, 0)
+test('a bot work row summarizes PR states only across its authorized dispatches', () => {
+  const task = issue('a')
+  const runs = [{ ...run('1', 'a'), pullState: 'merged' as const }, { ...run('2', 'a'), pullState: 'open' as const }]
+  const tree = botWorkTree('workspace', ['bot'], runs, [task], { a: present(task, ['bot']) })
+  assert.equal(tree.get('bot')?.[0].pullState, 'open')
+  assert.equal(botWorkTree('other', ['bot'], runs, [task], { a: present(task, ['bot']) }).size, 0)
 })
 
-test('switching workspace uses its Bot roster, even when the owner-wide run and task lists retain both', () => {
-  const runs = [run('a', 'one', 'bot-one'), run('b', 'two', 'bot-two')]
-  const issues = [issue('one'), issue('two')]
-  assert.deepEqual([...botWorkTree('one', ['bot-one'], runs, issues).keys()], ['bot-one'])
-  assert.deepEqual([...botWorkTree('two', ['bot-two'], runs, issues).keys()], ['bot-two'])
+test('a missing projection, an out-of-workspace issue or an unauthorized Bot cannot enter the tree', () => {
+  const a = issue('a'), foreign = { ...issue('foreign'), workspaceId: 'another' }
+  const runs = [run('a-run', 'a'), run('foreign-run', 'foreign'), run('other', null, 'another-bot'), run('null-bot', null, null)]
+  const items = { foreign: present(foreign, ['bot']), a: present(a, ['another-bot']) }
+  assert.equal(botWorkTree('workspace', ['bot'], runs, [a, foreign], items).size, 0)
+  assert.equal(botWorkTree('workspace', ['bot'], runs, [a, foreign], {}).size, 0)
+  assert.equal(botWorkTree(null, ['bot'], runs, [a, foreign], items).size, 0)
 })
-
 test('a direct Agent execution keeps its work name and opens by run id; no task state is invented', () => {
-  const row = botWorkTree('workspace', ['bot'], [run('a', null)], []).get('bot')![0]
+  const row = botWorkTree('workspace', ['bot'], [run('a', null)], [], {}).get('bot')![0]
   assert.equal(row.issueId, null)
   assert.equal(row.name, 'Standalone work')
   assert.equal(row.state, null)
@@ -55,18 +68,31 @@ test('a direct Agent execution keeps its work name and opens by run id; no task 
 })
 
 test('a closed task stays closed while its run is active', () => {
-  const row = botWorkTree('workspace', ['bot'], [run('a', 'closed')], [issue('closed', 'done')]).get('bot')![0]
+  const closed = issue('closed', 'done')
+  const row = botWorkTree('workspace', ['bot'], [run('a', 'closed')], [closed], { closed: present(closed, ['bot'], { state: 'done' }) }).get('bot')![0]
   assert.equal(row.state, 'done')
 })
 
-test('sidebar task names use the existing short title and bound pending/manual titles; standalone runs are bounded too', () => {
-  const generated = { ...issue('a'), title: '完整的任务需求原文不应该出现在紧凑的导航里面', shortTitle: '登录回调修复' }
-  const pending = { ...issue('b'), title: '这是一个超过十二字限制的任务标题需要收短', shortTitle: null }
+test('sidebar task names bound the task title; standalone runs are bounded too', () => {
+  const generated = { ...issue('a'), title: '完整的任务需求原文不应该出现在紧凑的导航里面' }
+  const pending = { ...issue('b'), title: '这是一个超过十二字限制的任务标题需要收短' }
   const standalone = { ...run('c', null), prompt: 'one two three four five six seven eight' }
-  const rows = botWorkTree('workspace', ['bot'], [run('a', 'a'), run('b', 'b'), standalone], [generated, pending]).get('bot')!
-  assert.equal(rows[0].name, 'MIK-a 登录回调修复')
+  const rows = botWorkTree('workspace', ['bot'], [run('a', 'a'), run('b', 'b'), standalone], [generated, pending], { a: present(generated, ['bot']), b: present(pending, ['bot']) }).get('bot')!
+  assert.equal(rows[0].name, 'MIK-a 完整的任务需求原文不应该')
   assert.equal(rows[0].fullName, 'MIK-a 完整的任务需求原文不应该出现在紧凑的导航里面')
   assert.equal(rows[1].name, 'MIK-b 这是一个超过十二字限制的')
   assert.equal(rows[2].name, 'one two three four five six')
   assert.equal(generated.title, '完整的任务需求原文不应该出现在紧凑的导航里面')
+})
+
+test('each GitHub PR retains every authorized conversation across directory pages', () => {
+  const open = { url: 'https://github.com/First/Repo/pull/8', state: 'open' as const }
+  const merged = { url: 'https://github.com/second/repo/pull/8', state: 'merged' as const }
+  const rows = [
+    { id: 'one', pulls: [open, merged] },
+    { id: 'two', pulls: [{ ...open, url: open.url.toLowerCase() + '/' }] },
+  ]
+  assert.deepEqual(directoryPullRequests(rows, 'all').map(entry => [entry.pull.url, entry.conversations.map(row => row.id)]),
+    [[open.url, ['one', 'two']], [merged.url, ['one']]])
+  assert.deepEqual(directoryPullRequests(rows, 'merged').map(entry => entry.pull), [merged])
 })

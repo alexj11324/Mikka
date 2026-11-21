@@ -1,17 +1,18 @@
 import assert from 'node:assert/strict'
 import { after, before, beforeEach, mock, test } from 'node:test'
-import { COORDINATOR_MODEL } from './coordinator/model'
 import type { SubscriptionService } from './subscription-service'
 import type { BotSubscriptionChoice } from './bot-model-choice'
 
+/** A chat's Mikka 额度 pick (decision 2026-11-15-1900). */
+const CREDITS_MODEL = 'anthropic/claude-sonnet-5.5'
+const CREDITS = `credits:${CREDITS_MODEL}`
+const NOT_CHOSEN = { code: 'executionModelUnknown' }
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`
 const scope = { ownerId: 'alice', botId: null, workspaceId: id(2) }
 const binding = { id: id(3), ownerId: 'alice', consumerId: id(1), workspaceId: id(2), connectionId: id(4), connectionRevision: 7, modelId: 'subscription-model', route: 'claude_cpa' }
 let selected: string | undefined
 let available: { bindingId: string; provider?: string }[] = []
 let savedBinding: Pick<BotSubscriptionChoice, 'bindingId'> & Partial<BotSubscriptionChoice> | undefined
-let sharedAvailable: BotSubscriptionChoice[] = []
-let sharedSaved: BotSubscriptionChoice | undefined
 let settingsError: Error | undefined
 let catalogueError: Error | undefined
 let catalogueReads = 0
@@ -24,6 +25,11 @@ mock.module('./enabled-models', { namedExports: { hostedModelEnabled: async () =
 const hostedCalls: unknown[][] = []
 const hostedModel = { modelId: 'hosted-fixture' }
 mock.module(new URL('./db/index.ts', import.meta.url).href, { namedExports: { pool: null } })
+let savedEffort: string | null = null
+const effortReads: unknown[][] = []
+mock.module(new URL('./bot-model-effort.ts', import.meta.url).href, { namedExports: {
+  botModelEffort: async (...args: unknown[]) => { effortReads.push(args.slice(1)); return savedEffort },
+} })
 mock.module(new URL('./workspace-db.ts', import.meta.url).href, { namedExports: {
   workspaceDb: { select: () => ({ from: () => ({ where: async () => [{ userId: 'bob', name: 'Public teammate' }] }) }) },
 } })
@@ -38,13 +44,8 @@ mock.module(new URL('./execution-settings.ts', import.meta.url).href, { namedExp
     async botActive() { return botActive }
     async botModel() { if (settingsError) throw settingsError; return selected }
     async chatModels() { catalogueReads++; if (catalogueError) throw catalogueError; return available }
-    async pooledBindings() { return sharedAvailable }
     async chatBinding(...args: unknown[]) { bindingReads.push(args); return savedBinding }
-    async sharedChatBinding(_scope: unknown, botId: string, bindingId: string) {
-      return botId === id(1) && sharedSaved?.bindingId === bindingId ? sharedSaved : undefined
-    }
     async bindingForBot(_scope: unknown, _bot: unknown, bindingId: string) { return bindingId }
-    async bindingForOthersBot(_scope: unknown, _bot: unknown, _owner: unknown, bindingId: string) { return bindingId }
   },
 } })
 let keyChoice: { keyId: string; model: string; harness: string } | undefined
@@ -63,7 +64,7 @@ let fallback: { kind: 'api_key'; keyId: string; model: string } | { kind: 'subsc
 mock.module(new URL('./points-fallback.ts', import.meta.url).href, { namedExports: {
   hostedPointsRefusal: async (workspaceId: string) => { assert.equal(workspaceId, scope.workspaceId); return pointsRefusal },
   pointsFallback: async () => fallback,
-  hostedPointsHere: async () => ({ points: 1, trialLeft: 0 }),
+  hostedPointsHere: async () => ({ points: 1 }),
 } })
 mock.module(new URL('./abuse/resolve.ts', import.meta.url).href, { namedExports: {
   resolveDefaultHostedModel: async (...args: unknown[]) => { hostedCalls.push(args); return hostedModel },
@@ -87,11 +88,11 @@ const noSubscription = {
   workspace: async () => { throw new Error('subscription authority must not be requested') },
 }
 beforeEach(() => {
+  savedEffort = null
+  effortReads.length = 0
   selected = undefined
   available = []
   savedBinding = undefined
-  sharedAvailable = []
-  sharedSaved = undefined
   settingsError = undefined
   catalogueError = undefined
   catalogueReads = 0
@@ -116,52 +117,64 @@ test('A bot saved on an API key model freezes that key and resolves through it; 
   assert.equal(chatModels.length, 1)
   await assert.rejects(resolveFrozenHostedModel({ ...botScope, ownerId: 'mallory' }, frozen, noSubscription), { code: 'binding_mismatch' })
   await assert.rejects(resolveFrozenHostedModel({ ...botScope, botId: id(5) }, frozen, noSubscription), { code: 'binding_mismatch' })
-  // The key was withdrawn: the usual order, here Mikka 默认.
+  // The key was withdrawn: the usual order, which here has nothing, so the chat asks for a model.
   usableKeys = []
-  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  await assert.rejects(freezeBotModel(botScope, noSubscription), NOT_CHOSEN)
   usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['different-model'] }]
-  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  await assert.rejects(freezeBotModel(botScope, noSubscription), NOT_CHOSEN)
   // An Anthropic-only custom provider cannot serve a bot chat.
   usableKeys = [{ id: id(9), provider: 'custom', baseUrl: 'https://llm.example/anthropic', protocol: 'anthropic', models: ['deepseek-chat'] }]
-  assert.deepEqual(await freezeBotModel(botScope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  await assert.rejects(freezeBotModel(botScope, noSubscription), NOT_CHOSEN)
 })
 
-test('Coordinator without a subscription freezes and resolves the configured hosted default', async () => {
+test('Coordinator on a Mikka 额度 model freezes and resolves that catalogue model; with nothing chosen it asks for one', async () => {
+  await assert.rejects(freezeBotModel({ ...scope, workspaceId: null }, noSubscription), NOT_CHOSEN)
+  selected = CREDITS
+  workspaceCalls = 0
   const frozen = await freezeBotModel({ ...scope, workspaceId: null }, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: CREDITS_MODEL })
   assert.equal(workspaceCalls, 1)
   assert.equal(await resolveFrozenHostedModel(scope, frozen, noSubscription), hostedModel)
-  assert.deepEqual(hostedCalls, [[scope, COORDINATOR_MODEL]])
+  assert.deepEqual(hostedCalls, [[scope, CREDITS_MODEL]])
 })
 
-test('a saved choice whose account is gone, with no subscription bound, replies on Mikka 默认', async () => {
+test('the Bot\'s saved effort is frozen with the turn\'s model, read once in the turn\'s workspace', async () => {
+  selected = CREDITS
+  savedEffort = 'high'
+  const frozen = await freezeBotModel({ ...scope, workspaceId: null }, noSubscription)
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: CREDITS_MODEL, effort: 'high' })
+  assert.equal(workspaceCalls, 1, 'the workspace is resolved once for the model and its effort')
+  assert.deepEqual(effortReads, [[{ ownerId: 'alice', workspaceId: id(2) }, null]])
+})
+
+test('a saved choice whose account is gone, with nothing bound, asks for a model instead of a silent default', async () => {
   // The Settings page showed 未连接账号 and these bots refused (binding_required) instead of replying.
   selected = id(9)
   available = []
-  for (const botId of [null, id(1)]) {
-    const frozen = await freezeBotModel({ ...scope, botId }, noSubscription)
-    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
-  }
+  for (const botId of [null, id(1)]) await assert.rejects(freezeBotModel({ ...scope, botId }, noSubscription), NOT_CHOSEN)
 })
 
-test('Mikka 默认 picked in the composer stays hosted while a subscription is bound', async () => {
-  selected = '00000000-0000-0000-0000-000000000000'
+test('a Mikka 额度 model picked in the composer stays on Mikka 额度 while a subscription is bound', async () => {
+  selected = CREDITS
   available = [{ bindingId: binding.id, provider: 'claude' }]
   savedBinding = { bindingId: binding.id }
   for (const botId of [null, id(1)]) {
     const frozen = await freezeBotModel({ ...scope, botId }, noSubscription)
-    assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+    assert.deepEqual(frozen, { harness: 'ai_sdk', model: CREDITS_MODEL })
   }
+  // A Mikka 额度 pick never reads the subscription binding it replaced.
+  assert.equal(bindingReads.length, 0)
 })
 
-test('Bot without a subscription replies on the same hosted default as the Coordinator, in its own workspace', async () => {
+test('Bot on a Mikka 额度 model runs on the same hosted path as the Coordinator, in its own workspace', async () => {
   const bot = { ...scope, botId: id(1) }
+  selected = CREDITS
   const frozen = await freezeBotModel({ ...bot, workspaceId: null }, noSubscription)
-  assert.deepEqual(frozen, { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  assert.deepEqual(frozen, { harness: 'ai_sdk', model: CREDITS_MODEL })
   assert.deepEqual(workspaceBots, [bot.botId])
   // Same hosted path as the Coordinator: the hosted model applies admission and billing for this bot's workspace.
   assert.equal(await resolveFrozenHostedModel(bot, frozen, noSubscription), hostedModel)
-  assert.deepEqual(hostedCalls, [[bot, COORDINATOR_MODEL]])
+  assert.deepEqual(hostedCalls, [[bot, CREDITS_MODEL]])
 })
 
 test('a saved choice whose account is gone switches to a bound subscription, Claude first, not Mikka 默认', async () => {
@@ -214,75 +227,6 @@ test('settings errors propagate instead of selecting the hosted fallback', async
   assert.equal(hostedCalls.length, 0)
 })
 
-test('an explicit shared subscription freezes its exact saved model before own or pooled defaults', async () => {
-  catalogueError = new Error('unrelated own catalogue unavailable')
-  const botScope = { ...scope, botId: id(1) }
-  available = [{ bindingId: binding.id, provider: 'claude' }]
-  const shared = { ...binding, id: id(21), ownerId: 'bob', connectionId: id(22),
-    modelId: 'gpt-6-luna', route: 'codex_cpa' }
-  selected = shared.id
-  sharedSaved = { ...shared, bindingId: shared.id, provider: 'codex' }
-  // Catalogue deduplication need not expose the saved per-bot binding id.
-  sharedAvailable = [
-    { ...sharedSaved, bindingId: id(24), modelId: 'claude-haiku-5-5', provider: 'claude' },
-    { ...sharedSaved, bindingId: id(25) },
-  ]
-  const dependencies = {
-    service: () => ({ repository: {
-      binding: async (ownerId: string, bindingId: string) => {
-        if (ownerId === 'bob' && bindingId === shared.id) return shared
-        assert.equal(ownerId, scope.ownerId)
-        assert.equal(bindingId, binding.id)
-        return binding
-      },
-      connection: async (ownerId: string) => ({ ownerId, epoch: '7', state: 'connected' }),
-    } }) as unknown as SubscriptionService,
-    workspace: async (ownerId: string, workspaceId: string) => {
-      assert.equal(ownerId, botScope.ownerId)
-      assert.equal(workspaceId, botScope.workspaceId)
-    },
-  }
-  const frozen = await freezeBotModel(botScope, dependencies)
-  assert.equal(frozen.model, 'gpt-6-luna')
-  assert.equal(frozen.modelSelection?.type, 'subscription')
-  assert.deepEqual(frozen.modelSelection, { type: 'subscription', bindingId: shared.id,
-    ownerId: 'bob', runOwnerId: 'alice', consumerId: botScope.botId, workspaceId: botScope.workspaceId,
-    connectionId: shared.connectionId, connectionRevision: 7, modelId: 'gpt-6-luna', route: 'codex_cpa' })
-  assert.equal(catalogueReads, 0)
-})
-
-test('shared subscription menu exposes both providers without private account or quota details', async () => {
-  const { botModelMenu } = await import('./bot-model-menu')
-  const { ExecutionSettings } = await import('./execution-settings')
-  const { ownSubscriptionOption } = await import('./bot-model-menu-view')
-  const quota = { vendor: 'claude_code', source: 'official', status: 'ok', plan: 'PRIVATE-PLAN',
-    windows: [{ kind: 'five_hour', used: 0.2, resetsAt: '2099-01-01T00:00:00.000Z' }], observedAt: new Date().toISOString() }
-  sharedAvailable = [
-    { bindingId: id(31), connectionId: id(32), ownerId: 'bob', provider: 'claude', modelId: 'claude-haiku-5-5',
-      accountLabel: 'PRIVATE-LOGIN', plan: 'PRIVATE-PLAN', quota },
-    { bindingId: id(33), connectionId: id(34), ownerId: 'bob', provider: 'codex', modelId: 'gpt-6-luna',
-      accountLabel: 'PRIVATE-CODEX-LOGIN', plan: 'PRIVATE-PLAN', quota: { ...quota, vendor: 'codex' } },
-  ]
-  sharedSaved = { ...sharedAvailable[1], bindingId: id(35) }
-  selected = sharedSaved.bindingId
-  const query = { query: async () => ({ rows: [{ bindingId: selected }] }) } as never
-  const menu = await botModelMenu(query, new ExecutionSettings(query), scope, id(1))
-  const shared = menu.groups.filter(group => group.kind === 'subscription')
-  assert.deepEqual(shared.map(group => [group.provider, group.owner, group.credentialLabel, group.plan]),
-    [['claude', 'Public teammate', 'Public teammate', undefined], ['codex', 'Public teammate', 'Public teammate', undefined]])
-  assert.deepEqual(shared.flatMap(group => group.options), sharedAvailable.map(row => ({ id: row.bindingId, modelId: row.modelId, provider: row.provider })))
-  assert.deepEqual([menu.current.id, menu.current.modelId, menu.current.chosen, menu.current.credentialLabel],
-    [id(33), 'gpt-6-luna', true, 'Public teammate'])
-  assert.equal(menu.current.quota, undefined)
-  assert.ok(!JSON.stringify(menu).includes('PRIVATE-'))
-  assert.ok(!JSON.stringify(menu).includes('2099-01-01'))
-  assert.equal(ownSubscriptionOption(menu), null)
-  sharedAvailable = []
-  const withoutCatalogue = await botModelMenu(query, new ExecutionSettings(query), scope, id(1))
-  assert.deepEqual([withoutCatalogue.current.modelId, withoutCatalogue.current.chosen, withoutCatalogue.current.credentialLabel],
-    ['gpt-6-luna', true, 'Public teammate'])
-})
-
 test('an archived bot (its owner left the team) is refused before any model is chosen', async () => {
   botActive = false
   try {
@@ -291,11 +235,11 @@ test('an archived bot (its owner left the team) is refused before any model is c
   } finally { botActive = true }
 })
 
-test('Mikka 默认 with no points here runs on the next allowed model and says so; with none, it stays and is refused', async () => {
-  selected = '00000000-0000-0000-0000-000000000000'
+test('a Mikka 额度 model with no points here runs on the next allowed model and says so; with none, it stays and is refused', async () => {
+  selected = CREDITS
   pointsRefusal = 'verification_required'
-  // Nothing else can run: Mikka 默认 stays, and its refusal explains (decision 2026-11-02-1450).
-  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  // Nothing else can run: the Mikka 额度 model stays, and its refusal explains (decision 2026-11-02-1450).
+  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: CREDITS_MODEL })
   // The person's own key is next in 允许使用的模型: this turn runs on it, marked.
   fallback = { kind: 'api_key', keyId: id(9), model: 'deepseek-chat' }
   usableKeys = [{ id: id(9), provider: 'deepseek', baseUrl: null, protocol: 'anthropic', models: ['deepseek-chat'] }]
@@ -314,9 +258,10 @@ test('Mikka 默认 with no points here runs on the next allowed model and says s
   const frozen = await freezeBotModel(scope, dependencies)
   assert.equal(frozen.model, binding.modelId)
   assert.deepEqual([(frozen.modelSelection as { bindingId?: string }).bindingId, (frozen.modelSelection as { afterPoints?: true }).afterPoints], [binding.id, true])
-  // Points left: Mikka 默认, whatever else could run.
+  // Points left: the Mikka 额度 model, whatever else could run.
   pointsRefusal = null
-  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: COORDINATOR_MODEL })
+  savedBinding = undefined
+  assert.deepEqual(await freezeBotModel(scope, noSubscription), { harness: 'ai_sdk', model: CREDITS_MODEL })
 })
 
  test('a disabled hosted source never starts a new hosted turn', async () => {

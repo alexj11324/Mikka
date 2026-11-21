@@ -8,7 +8,12 @@ const HEARTBEAT_MS = 30_000
 type Timer = unknown
 export type LiveTicket = { url: string; protocol: string; expiresAt: number }
 export type LiveSocket = Pick<WebSocket, 'onopen' | 'onmessage' | 'onclose' | 'onerror' | 'readyState' | 'send' | 'close'>
-export type LiveObservation = { event: 'socket' | 'received' | 'skipped' | 'read'; state?: 'connecting' | 'open' | 'ready' | 'closed'; reason?: 'hidden' | 'revision_held' | 'unsubscribed' | 'covered' | 'invalid'; kind?: LiveKind; id?: string; rev?: number; key?: string }
+export type LiveObservation = { event: 'socket' | 'received' | 'skipped' | 'read'; state?: 'connecting' | 'open' | 'ready' | 'closed'; reason?: 'hidden' | 'revision_held' | 'unsubscribed' | 'covered' | 'invalid'; kind?: LiveKind; id?: string; rev?: number; key?: string
+  /** Round trip of the heartbeat that just answered, in milliseconds. Present only on
+   * `received`/`socket` observations that close a ping, and absent when the runtime
+   * cannot supply a monotonic clock. A browser clock adjustment cannot make it
+   * negative the way `Date.now()` arithmetic can. */
+  rttMs?: number }
 export interface LiveRuntime {
   ticket(signal: AbortSignal): Promise<LiveTicket | null>
   socket(ticket: LiveTicket): LiveSocket
@@ -45,6 +50,7 @@ const heldRevisions = (value: LiveSubscriptionOptions['revisions']) => new Map(O
 /** One connection per mounted owner/workspace; repeated badges share each SWR read. */
 export class LiveChannel {
   private subscriptions = new Set<Subscription>()
+  private retainers = new Set<symbol>()
   private socket: LiveSocket | null = null
   private controller: AbortController | null = null
   private unwatch: (() => void) | null = null
@@ -63,6 +69,8 @@ export class LiveChannel {
   skippedReads = 0
   private retryMs = 1_000
   private pong = true
+  /** Monotonic time the outstanding `ping` was sent at, null when none is in flight. */
+  private pingSentAt: number | null = null
   private timers = new Map<string, Timer>()
   private pending = new Map<string, PendingRead>()
   private lastRead = new Map<string, number>()
@@ -82,6 +90,23 @@ export class LiveChannel {
     return this.connected && subscriptions.every(subscription => this.supported(subscription))
   }
 
+  /** A routing hint may prepare this exact connection before any key exists.
+   * It gets one attempt. Only real subscriptions own retries and fallback. */
+  retain(): () => void {
+    const token = Symbol()
+    this.retainers.add(token)
+    if (this.retainers.size === 1 && !this.subscriptions.size) this.start()
+    return () => {
+      if (!this.retainers.delete(token)) return
+      if (!this.retainers.size && !this.subscriptions.size) this.dispose()
+    }
+  }
+
+  private start() {
+    this.unwatch ??= this.runtime.watchVisibility(() => this.visibilityChanged())
+    if (this.runtime.visible()) { this.fallback(); void this.connect() }
+  }
+
   subscribe(kind: LiveKind, id: string, keys: readonly string[], refresh: Subscription['refresh'], options: LiveSubscriptionOptions = {}): LiveSubscription {
     if (!LIVE_ID.test(id)) return Object.assign(() => {}, { update() {} })
     const subscription: Subscription = { kind, id, keys, refresh, minIntervalMs: Math.max(0, options.minIntervalMs ?? 0),
@@ -90,10 +115,7 @@ export class LiveChannel {
       deadlineObservation: Number.isFinite(options.deadline?.observation) ? options.deadline!.observation! : null,
       timer: `deadline:${++this.nextDeadline}`, revisions: heldRevisions(options.revisions), presence: options.presence }
     this.subscriptions.add(subscription)
-    if (this.subscriptions.size === 1) {
-      this.unwatch = this.runtime.watchVisibility(() => this.visibilityChanged())
-      if (this.runtime.visible()) { this.fallback(); void this.connect() }
-    }
+    if (this.subscriptions.size === 1) this.start()
     if (this.connected && this.runtime.visible()) this.invalidate(kind, id, true, false, undefined,
       this.supported(subscription) && this.coverageAfter !== null
         ? Math.max(this.coverageAfter, this.invalidationAfter.get(kind) ?? 0) : undefined)
@@ -105,7 +127,8 @@ export class LiveChannel {
       this.clear(subscription.timer)
       this.syncPresence()
       if (this.allSupported()) this.clear('fallback')
-      if (!this.subscriptions.size) this.dispose()
+      if (!this.subscriptions.size) { this.clear('retry'); this.clear('fallback') }
+      if (!this.subscriptions.size && !this.retainers.size) this.dispose()
       else for (const key of keys) {
         if ([...this.subscriptions].some(value => value.keys.includes(key))) continue
         this.pending.delete(key); this.lastRead.delete(key); this.inFlight.delete(key)
@@ -146,6 +169,7 @@ export class LiveChannel {
     this.unwatch?.()
     this.unwatch = null
     this.subscriptions.clear()
+    this.retainers.clear()
   }
 
   private clear(name: string) {
@@ -375,13 +399,17 @@ export class LiveChannel {
       if (generation !== this.generation || !this.connected) return
       if (!this.pong) { this.disconnected(generation); return }
       this.pong = false
+      // Record when the ping left, on the same clock the reply is timed with.
+      // Null when the runtime has no monotonic clock: then no rttMs is reported
+      // rather than measuring across a clock that can jump.
+      this.pingSentAt = this.runtime.monotonicNow?.() ?? null
       try { this.socket?.send('ping') } catch { this.disconnected(generation); return }
       this.heartbeat(generation)
     })
   }
 
   private async connect() {
-    if (!this.runtime.visible() || !this.subscriptions.size || this.connected || this.controller) return
+    if (!this.runtime.visible() || !this.subscriptions.size && !this.retainers.size || this.connected || this.controller) return
     this.clear('retry')
     const generation = ++this.generation
     const controller = this.controller = new AbortController()
@@ -407,7 +435,18 @@ export class LiveChannel {
       }
       socket.onmessage = message => {
         if (generation !== this.generation || !this.runtime.visible()) return
-        if (message.data === 'pong') { this.pong = true; return }
+        if (message.data === 'pong') {
+          this.pong = true
+          // Report the round trip this pong closes. Read-only: `pong`, the
+          // heartbeat cadence and every reconnect decision stay as they were.
+          const sentAt = this.pingSentAt
+          this.pingSentAt = null
+          const now = this.runtime.monotonicNow?.()
+          // A runtime without a monotonic clock reports no figure instead of
+          // measuring across a clock that can jump.
+          if (sentAt !== null && now !== undefined) this.observe({ event: 'received', rttMs: Math.max(0, Math.round(now - sentAt)) })
+          return
+        }
         if (typeof message.data !== 'string' || message.data.length > 2_048) return
         try {
           const parsed: unknown = JSON.parse(message.data)

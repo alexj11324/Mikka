@@ -3,7 +3,7 @@
 import { settingsKeys } from '@/lib/swr/keys'
 import { useCallback, useEffect, useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { openBillingPortal, startPlanCheckout, type getBilling } from '@/app/actions/billing'
 import { settingsRead } from '@/lib/settings-read'
@@ -133,6 +133,9 @@ export function useCreditBalance(workspaceId: string): CreditBalanceState {
 export type FreeAllowanceState = {
   /** Undefined until read, or when the read failed. */
   status: CardVerificationStatus | undefined
+  /** A failed status read is distinct from a verified or inapplicable allowance. */
+  error?: string | null
+  reload?: () => void
   /** Back from Checkout, waiting for the webhook (正在确认…). */
   confirming: boolean
   /** 验证 is on its way to Stripe. */
@@ -178,5 +181,7 @@ export function useFreeAllowance(workspaceId: string, enabled: boolean, onVerifi
     }
   }
 
-  return { status: status.data && !status.data.error ? status.data : undefined, confirming, redirecting, verify: () => void verify() }
+  const errorCode = enabled ? status.data?.error ?? (status.error ? readFailure('card_verification_read_failed', status.error) : null) : null
+  return { status: status.data && !status.data.error ? status.data : undefined, error: errorCode ? actionError(status.data?.error) : null,
+    reload: () => { void status.mutate() }, confirming, redirecting, verify: () => void verify() }
 }

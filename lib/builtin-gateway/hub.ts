@@ -1,8 +1,31 @@
 import { randomUUID } from 'node:crypto'
 import { CodedError } from '@mikka/protocol/coded-error'
+import { DEVICE_GATEWAY_PING_MS, DEVICE_GATEWAY_SILENCE_MS } from '@mikka/protocol/device'
 import { liveInvalidations, liveReady, withoutRevisions, type LiveInvalidation } from '../live/events'
-import { PRESENCE_ONLINE_MS, presenceCommand } from '../live/presence'
+import { presenceCommand } from '../live/presence'
 import { PresenceWatches, type DeviceSnapshot } from './presence'
+import { DeviceSessionReports, type SessionReportOptions } from './session-reports'
+
+/**
+ * A device is online while its socket is open and it connected or pinged
+ * within the daemon's own silence limit plus one ping interval (10 s pings,
+ * 30 s silence: 40 s).
+ *
+ * Close codes this gateway sends:
+ *
+ * | Code | Socket | Meaning                                                  |
+ * | ---- | ------ | -------------------------------------------------------- |
+ * | 4000 | device | replaced: a newer socket of the same device was claimed   |
+ * | 4001 | device | reserved: this daemon must update (`DEVICE_GATEWAY_UPDATE_REQUIRED_CODE`) |
+ * | 4001 | live   | browser ticket expired, session or live capability revoked |
+ * | 1011 | any    | the socket could not be written                           |
+ * | 1012 | any    | gateway unavailable or restarting (lost LISTEN, shutdown) |
+ *
+ * A device socket never gets 4001 for anything else: its ticket only
+ * authorizes the upgrade and device routes check authority on every call.
+ */
+const DEVICE_ONLINE_MS = DEVICE_GATEWAY_SILENCE_MS + DEVICE_GATEWAY_PING_MS
+const DEVICE_SOCKET_REPLACED_CODE = 4000
 
 export type GatewayPeer = { id: string; send(data: string): unknown; close(code: number, reason: string): unknown }
 export type GatewaySocket = { kind: 'live' | 'device'; key: string; expiresAt: number; revisions: boolean; presence?: boolean; sessionId?: string }
@@ -28,13 +51,18 @@ export interface GatewayBus {
   observe?(source: string, lost: () => void, signal?: AbortSignal): Promise<() => void>
 }
 type Connection = { peer: GatewayPeer; socket: GatewaySocket; claimed: boolean; seen: number; online: boolean; authorized: boolean;
-  source?: string; expiry?: ReturnType<typeof setTimeout>; stale?: ReturnType<typeof setTimeout> }
+  source?: string; expiry?: ReturnType<typeof setTimeout>; stale?: ReturnType<typeof setTimeout>
+  /** Device sockets: the session id reported to the application, and when the socket opened. */
+  socketId?: string; openedAt: number }
 type PendingSnapshot = { keys: Set<string>; states: Map<string, DeviceSnapshot>; sent: boolean;
   timer?: ReturnType<typeof setTimeout>; finish(error?: Error): void }
 const OFFLINE: GatewayPresence = { online: false, lastSeenAt: null }
 
 /** Holds sockets, never user content or database-backed heartbeats. Postgres
- * carries only the same invalidation keys and device wake signals as Workers. */
+ * carries only the same invalidation keys and device wake signals as Workers.
+ * The replica holding a device socket reports its session to the application
+ * (`DeviceSessionReports`); device claims, ordered by PostgreSQL, tell every
+ * replica when a newer socket replaced or followed a closed one. */
 export class GatewayHub {
   private connections = new Map<string, Connection>()
   private claims = new Map<string, Connection>()
@@ -43,8 +71,12 @@ export class GatewayHub {
   private presence: PresenceWatches
   private unsubscribe: () => void
   private revokedLive = new Map<string, ReturnType<typeof setTimeout>>()
+  private sessions: DeviceSessionReports
+  private stopping = false
 
-  constructor(private bus: GatewayBus, private now = Date.now, secret = '', private authorizeSession?: (sessionId: string, channel: string) => Promise<boolean>) {
+  constructor(private bus: GatewayBus, private now = Date.now, secret = '', private authorizeSession?: (sessionId: string, channel: string) => Promise<boolean>,
+    sessions: SessionReportOptions = {}) {
+    this.sessions = new DeviceSessionReports(now, sessions)
     this.presence = new PresenceWatches(secret, bus, now, (keys, signal) => this.snapshots(keys, signal),
       (peer, reply) => this.send(peer, JSON.stringify(reply)), (channel, home) => {
         this.receive({ type: 'live', key: channel, events: [{ kind: 'device_list', id: home }, { kind: 'thread_list', id: home }] })
@@ -61,7 +93,9 @@ export class GatewayHub {
   }
 
   async open(peer: GatewayPeer, socket: GatewaySocket) {
-    const connection: Connection = { peer, socket, claimed: false, seen: this.now(), online: false, authorized: !socket.sessionId }
+    const openedAt = this.now()
+    const connection: Connection = { peer, socket, claimed: false, seen: openedAt, online: false, authorized: !socket.sessionId, openedAt,
+      ...(socket.kind === 'device' ? { socketId: randomUUID() } : {}) }
     this.connections.set(peer.id, connection)
     if (socket.kind === 'live') {
       if (this.revokedLive.has(socket.key)) { this.remove(peer.id, 4001, 'live capability revoked'); return }
@@ -119,6 +153,11 @@ export class GatewayHub {
     if (notify && connection.socket.kind === 'device' && connection.claimed && connection.online) {
       connection.online = false; this.deviceChanged(connection)
     }
+    // A replaced socket is not the session's end; a stopping replica leaves
+    // its devices to their reconnect elsewhere or the application's backstop.
+    if (connection.socket.kind === 'device' && connection.claimed && connection.socketId && code !== DEVICE_SOCKET_REPLACED_CODE && !this.stopping) {
+      this.sessions.closed(connection.socket.key, id, connection.socketId, this.now())
+    }
     if (code !== undefined) { try { connection.peer.close(code, reason) } catch { /* already closed */ } }
   }
 
@@ -127,16 +166,16 @@ export class GatewayHub {
     for (const connection of this.connections.values()) {
       if (connection.socket.kind === 'device' && connection.socket.key === key && connection.claimed) seen = Math.max(seen, connection.seen)
     }
-    return seen && this.now() - seen < PRESENCE_ONLINE_MS ? seen : 0
+    return seen && this.now() - seen < DEVICE_ONLINE_MS ? seen : 0
   }
 
   private deviceDeadline(connection: Connection) {
     clearTimeout(connection.stale)
     connection.stale = setTimeout(() => {
       if (this.connections.get(connection.peer.id) !== connection || !connection.claimed) return
-      if (this.now() - connection.seen < PRESENCE_ONLINE_MS) { this.deviceDeadline(connection); return }
+      if (this.now() - connection.seen < DEVICE_ONLINE_MS) { this.deviceDeadline(connection); return }
       if (connection.online) { connection.online = false; this.deviceChanged(connection) }
-    }, Math.max(1, connection.seen + PRESENCE_ONLINE_MS - this.now()))
+    }, Math.max(1, connection.seen + DEVICE_ONLINE_MS - this.now()))
     connection.stale.unref?.()
   }
 
@@ -151,7 +190,7 @@ export class GatewayHub {
     for (const connection of this.connections.values()) {
       if (connection.socket.kind === 'device' && connection.socket.key === key && connection.claimed && connection.source) {
         return { key, connection: connection.peer.id, source: connection.source, seen: connection.seen,
-          online: connection.online && this.now() - connection.seen < PRESENCE_ONLINE_MS }
+          online: connection.online && this.now() - connection.seen < DEVICE_ONLINE_MS }
       }
     }
   }
@@ -252,20 +291,23 @@ export class GatewayHub {
       const pending = this.pendingSnapshots.get(message.request)
       if (!pending || !source) return
       for (const state of message.devices) if (pending.keys.has(state.key) && state.seen <= this.now() + 5000) {
-        pending.states.set(state.key, { ...state, source, online: state.online && this.now() - state.seen < PRESENCE_ONLINE_MS })
+        pending.states.set(state.key, { ...state, source, online: state.online && this.now() - state.seen < DEVICE_ONLINE_MS })
       }
       if (pending.sent && pending.states.size === pending.keys.size) pending.finish()
       return
     }
     if (message.type === 'device_state') {
       if (source && message.seen <= this.now() + 5000) this.presence.changed({ ...message, source,
-        online: message.online && this.now() - message.seen < PRESENCE_ONLINE_MS })
+        online: message.online && this.now() - message.seen < DEVICE_ONLINE_MS })
       return
     }
     if (message.type === 'claim' && source) {
       this.presence.changed({ key: message.key, connection: message.connection, source, seen: message.seen ?? this.now(), online: true }, true)
     }
     if (message.type === 'claim') {
+      // A newer socket of this device, on any replica, cancels this replica's
+      // pending disconnect for it.
+      this.sessions.claimed(message.key, message.connection)
       const opening = this.claims.get(message.connection)
       this.claims.delete(message.connection)
       // A peer may close after publishing but before its own ordered NOTIFY.
@@ -282,7 +324,7 @@ export class GatewayHub {
       return
     }
     if (message.type === 'presence') {
-      if (Number.isFinite(message.seen) && message.seen <= this.now() + 5_000 && this.now() - message.seen < PRESENCE_ONLINE_MS) {
+      if (Number.isFinite(message.seen) && message.seen <= this.now() + 5_000 && this.now() - message.seen < DEVICE_ONLINE_MS) {
         this.pendingPresence.get(message.request)?.(message.seen)
       }
       return
@@ -296,11 +338,12 @@ export class GatewayHub {
         if (peer.id === message.connection) {
           connection.claimed = true; connection.online = true; connection.source = source
           this.deviceDeadline(connection)
+          if (connection.socketId) this.sessions.opened(socket.key, peer.id, connection.socketId, connection.openedAt)
         }
         // Ignore claims committed before this socket's own claim. Postgres
         // delivers committed NOTIFYs in order, including this process's own,
         // so simultaneous reconnects converge without depending on clocks.
-        else if (connection.claimed) this.remove(peer.id, 4000, 'replaced', false)
+        else if (connection.claimed) this.remove(peer.id, DEVICE_SOCKET_REPLACED_CODE, 'replaced', false)
       } else if (message.type === 'work') {
         if (socket.kind === 'device') this.send(peer, 'work')
       } else if (socket.kind === 'live') {
@@ -321,12 +364,17 @@ export class GatewayHub {
     this.claims.clear()
     // Losing the publishing session releases its PG lease. Never attempt to
     // reconnect that failed session just to send an untrustworthy offline edge.
+    // Session reports go to the application directly, not over that session:
+    // after a lost LISTEN these closes are still reported after the grace (a
+    // stale one is ignored by socket id); a stopping replica reports none.
     for (const id of this.connections.keys()) this.remove(id, 1012, 'gateway restarting', false)
     for (const finish of this.pendingPresence.values()) finish(0)
     for (const pending of this.pendingSnapshots.values()) pending.finish(new CodedError('BUILTIN_GATEWAY_PRESENCE_UNAVAILABLE'))
   }
 
   stop() {
+    this.stopping = true
+    this.sessions.stop()
     this.unsubscribe(); this.disconnect()
     for (const timer of this.revokedLive.values()) clearTimeout(timer)
     this.revokedLive.clear()

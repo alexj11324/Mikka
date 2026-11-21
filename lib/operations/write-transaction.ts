@@ -1,10 +1,11 @@
+import { connectForCommitEffects } from '../db/commit-effects'
 import type { Pool, PoolClient } from 'pg'
 import { MailboxError } from '@/lib/mailbox-error'
 import { cancelMailboxBackend } from '@/lib/mailbox-pg-cancel'
 import { waitForMailboxGuard, type MailboxTransactionGuard, type MailboxTransactionLease } from '@/lib/mailbox-transaction-guard'
 
 export interface WriteActor { userId: string; sessionId: string }
-export interface WriteRequestContext { signal?: AbortSignal; actor?: WriteActor; guard?: MailboxTransactionGuard; modelRun?: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }; /** Judges whether a write no setting names is destructive; absent means ask. */ judgeWrite?: import('./write-judgment').WriteJudge; guardForRun?: (run: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }) => MailboxTransactionGuard | undefined }
+export interface WriteRequestContext { signal?: AbortSignal; actor?: WriteActor; guard?: MailboxTransactionGuard; modelRun?: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }; /** Host-verified native approval for one exact prepared write. */ nativeWriteReview?: import('./native-write-review').NativeWriteReview; /** Judges whether a write no setting names is destructive; absent means ask. */ judgeWrite?: import('./write-judgment').WriteJudge; guardForRun?: (run: { ownerId: string; botId: string | null; workspaceId: string | null; runId: string }) => MailboxTransactionGuard | undefined }
 export interface WriteTransactionOptions<T = unknown> {
   signal?: AbortSignal
   /** Acquired only after work holds APP authorization locks; retained through COMMIT. */
@@ -46,7 +47,7 @@ export async function writeTransaction<T>(pool: Pick<Pool, 'connect'>, work: (cl
   const closeLease = () => lease ? closingLease ??= Promise.resolve().then(() => lease!.close()) : Promise.resolve()
   try {
     check()
-    const connection = pool.connect().then(client => {
+    const connection = connectForCommitEffects(pool).then(client => {
       raw = client // Register ownership before the abortable waiter can reject.
       if (controller.signal.aborted) { release(client, cancelled()); throw cancelled() }
       return client
@@ -78,10 +79,10 @@ export async function writeTransaction<T>(pool: Pick<Pool, 'connect'>, work: (cl
       lease = await waitForMailboxGuard(pending, controller.signal)
       lease.signal?.addEventListener('abort', abort, { once: true })
       if (lease.signal?.aborted) abort()
-      await waitForMailboxGuard(lease.check(), controller.signal)
+      await waitForMailboxGuard(lease.check(tx), controller.signal)
     }
     if (options.guardedWork) result = await waitForMailboxGuard(options.guardedWork(tx, result, lease, controller.signal), controller.signal)
-    if (lease && options.guardedWork) await waitForMailboxGuard(lease.check(), controller.signal)
+    if (lease && options.guardedWork) await waitForMailboxGuard(lease.check(tx), controller.signal)
     if (options.authorizeCommit) await waitForMailboxGuard(options.authorizeCommit(tx), controller.signal)
     check()
     // No awaited host work between the final check and dispatching COMMIT.

@@ -14,7 +14,6 @@ import { isOpenUI } from '@/lib/openui-lang'
 import { makeSnapshot } from '@/lib/agent-kit/definition'
 import { builtinAgentDefinition } from '@/lib/agent-kit/builtin'
 import { executionInstructions } from '@/lib/agent-kit/execution-instructions'
-import { coordinatorSystemPrompt } from '../../packages/daemon/src/coordinator/contract'
 import { COORDINATOR_INSTRUCTIONS } from './instructions'
 import { coordinatorPresentation, personalCoordinatorInstructions, withCoordinatorPresentation } from './native-prompt'
 
@@ -70,8 +69,6 @@ test('every Coordinator path carries the generated presentation block exactly on
   }
   for (const [name, instructions] of Object.entries(paths)) {
     assert.equal(occurrences(instructions), 1, name)
-    // The daemon's codex and claude harnesses wrap the host instructions without dropping them.
-    assert.equal(occurrences(coordinatorSystemPrompt(instructions)), 1, `${name} via daemon`)
   }
 })
 

@@ -116,6 +116,8 @@ Project、Thread 和 Run 的预算管理只查询 APP `resource_access_policies`
 
 ## 账单管理 API 与客户端合同
 
+管理读取中的 `usage.daily` 从同一批 `hosted_usage` 收据按 UTC 入账日期汇总。当前月每个日期分别返回确认费用、待结算预留（微美元）和未知费用调用数。没有收据的日期为零。组织沿用指定付款工作区，工作区沿用产生用量的范围；个人外部订阅费用继续单列未知。旧服务可省略这个字段。
+
 Web、Desktop 与 iOS 复用以下接口和 `lib/billing/management-contract.ts` 的纯 JSON 数据类型。官方 Web/Desktop 界面继续使用既有 Billing slot；iOS 使用既有 Settings 入口及原生表单组件，不另设一套计费域模型。
 
 | 接口 | GET | POST |

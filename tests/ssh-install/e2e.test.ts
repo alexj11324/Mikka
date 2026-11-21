@@ -12,6 +12,16 @@ import { join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { SshInstaller, runProcess } from '../../apps/desktop/src/main/ssh-install'
 
+// The fixture speaks the device session protocol (decision 2026-11-17-2215):
+// a gateway ticket, one WebSocket that answers pings and pushes `work`, and
+// reports instead of a heartbeat. The daemon sends nothing on a timer.
+const rootRequire = createRequire(import.meta.url)
+type FixtureSocket = { readonly OPEN: number; readyState: number; send(data: string): void; terminate(): void; on(event: 'message', listener: (data: unknown) => void): void }
+type FixtureSocketServer = { clients: Set<FixtureSocket>; close(): void; emit(event: 'connection', socket: FixtureSocket, request: unknown): boolean
+  on(event: 'connection', listener: (socket: FixtureSocket) => void): void
+  handleUpgrade(request: unknown, socket: unknown, head: Buffer, done: (socket: FixtureSocket) => void): void }
+const { WebSocketServer } = createRequire(createRequire(rootRequire.resolve('nitro/package.json')).resolve('crossws/adapters/node'))('ws') as { WebSocketServer: new (options: { noServer: true }) => FixtureSocketServer }
+
 // The runner starts a disposable SSH/systemd container and copies the packed daemon to /tmp/mikka.tgz.
 test('real SSH install → systemd → automatic npm update → opt-out/failure → commands → uninstall', { timeout: 480_000 }, async () => {
   const container = process.env.MIKKA_SSH_TEST_CONTAINER
@@ -20,7 +30,7 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
   const key = join(home, 'id_ed25519')
   const deviceId = randomUUID(), workspaceId = randomUUID()
   const credential = `orv_${'t'.repeat(43)}`
-  let enrollments = 0, registrations = 0, heartbeats = 0
+  let enrollments = 0, registrations = 0, reports = 0, tickets = 0, commandReads = 0, deviceRequests = 0
   let reportedVersion = '', latestVersion = '1.0.0', registryQueries = 0, downloads = 0, failedDownloads = 0, pollsAskingForReleases = 0
   let updateFailure: unknown = null
   // The server names the release; the daemon never asks the registry which one is latest.
@@ -34,6 +44,10 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
   let removed = false, revoked = false
   const acked = new Set<string>()
   let tunnel: ChildProcess | undefined
+  const sockets = new WebSocketServer({ noServer: true })
+  sockets.on('connection', socket => socket.on('message', data => { if (String(data) === 'ping') socket.send('pong') }))
+  // Signal work to every open device socket, as the gateway does after a server write.
+  const push = () => { for (const socket of sockets.clients) if (socket.readyState === socket.OPEN) socket.send('work') }
   const server = createServer(async (request, response) => {
     let raw = ''
     for await (const chunk of request) raw += chunk
@@ -60,27 +74,36 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     }
     if (route.endsWith('/enroll')) { enrollments++; response.end(JSON.stringify({ credential })); return }
     if (request.headers.authorization !== `Bearer ${credential}`) { response.writeHead(401).end('{}'); return }
-    if (revoked || (removed && !route.endsWith('/heartbeat'))) { response.writeHead(401).end('{}'); return }
+    deviceRequests++
+    // A removed device's credential reaches only its report, which carries the uninstall.
+    if (revoked || (removed && !route.endsWith('/report'))) { response.writeHead(401).end('{}'); return }
+    if (route.endsWith('/gateway')) {
+      tickets++
+      response.end(JSON.stringify({ url: 'ws://127.0.0.1:34991/socket', protocol: `mikka-ticket-1-${'0'.repeat(64)}` })); return
+    }
     if (route.endsWith('/register')) {
       assert.equal(body.deviceType, 'server'); registrations++; reportedVersion = body.daemonVersion
       response.end(JSON.stringify({ deviceId, workspaceId })); return
     }
-    if (route.endsWith('/heartbeat')) {
-      heartbeats++
-      if (command) console.log(JSON.stringify({ heartbeat: heartbeats, command: command.kind, acknowledged: (body.completedDeviceCommands ?? []).includes(command.id) }))
+    if (route.endsWith('/report')) {
+      reports++
+      if (command) console.log(JSON.stringify({ report: reports, command: command.kind, acknowledged: (body.completedDeviceCommands ?? []).includes(command.id) }))
       for (const id of body.completedDeviceCommands ?? []) acked.add(id)
       if (body.updateFailure !== undefined) updateFailure = body.updateFailure
       if (command?.kind === 'uninstall' && acked.has(command.id)) revoked = true
-      response.end(JSON.stringify({ leases: {}, deviceCommands: command && !acked.has(command.id) ? [command] : [], daemonVersions: daemonVersions() })); return
+      response.end(JSON.stringify({ deviceCommands: command && !acked.has(command.id) ? [command] : [], daemonVersions: daemonVersions() })); return
     }
     if (route.endsWith('/repos')) { response.end('{"repos":[]}'); return }
     if (route.includes('/runs?')) { response.end('{"runIds":[]}'); return }
     if (route.includes('/fs/requests')) { setTimeout(() => response.end('{"requests":[]}'), 500); return }
+    if (route.includes('/commands/ack')) { response.end('{}'); return }
     if (route.includes('/commands')) {
-      // A daemon that sends the newest release it knows reads the releases from this answer.
+      // Read once per push or socket open, never polled. A daemon that sends
+      // the newest release it knows reads the releases from this answer.
+      commandReads++
       const known = new URL(route, 'http://fixture').searchParams.get('daemonLatest')
       if (known) pollsAskingForReleases++
-      setTimeout(() => response.end(JSON.stringify({ commands: [], ...(known ? { daemonVersions: daemonVersions() } : {}) })), 500); return
+      response.end(JSON.stringify({ commands: [], deviceCommands: command && !acked.has(command.id) ? [command] : [], ...(known ? { daemonVersions: daemonVersions() } : {}) })); return
     }
     response.writeHead(404).end('{}')
   })
@@ -90,6 +113,10 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     await runProcess('docker', ['exec', '-i', container, 'sh', '-c', 'mkdir -p /root/.ssh; chmod 700 /root/.ssh; cat > /root/.ssh/authorized_keys; chmod 600 /root/.ssh/authorized_keys'], pubkey)
     const config = join(home, 'config')
     await writeFile(config, `Host fixture\n HostName 127.0.0.1\n User root\n Port 22491\n IdentityFile ${key}\n IdentitiesOnly yes\n`)
+    server.on('upgrade', (request, socket, head) => {
+      if (request.url !== '/socket') { socket.destroy(); return }
+      sockets.handleUpgrade(request, socket, head, client => sockets.emit('connection', client, request))
+    })
     server.listen(0, '0.0.0.0')
     await once(server, 'listening')
     const port = (server.address() as { port: number }).port
@@ -135,7 +162,8 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     assert.equal(installer.state()?.status, 'online', JSON.stringify(installer.state()))
     assert.equal(installer.state()?.deviceId, deviceId)
     assert.equal(enrollments, 1)
-    assert.ok(registrations >= 1 && heartbeats >= 1)
+    assert.ok(registrations >= 1 && tickets >= 1 && reports >= 1)
+    const ticketsBeforeReinstall = tickets
     const pidBefore = await runProcess('docker', ['exec', container, 'systemctl', '--user', '--machine=root@.host', 'show', 'mikka-daemon.service', '--property=MainPID', '--value'])
     // Reinstallation must replace an already-running service, including its server flags.
     await runProcess('ssh', ['-F', config, '-oBatchMode=yes', '-oStrictHostKeyChecking=yes', `-oUserKnownHostsFile=${join(home, '.ssh/known_hosts')}`, 'fixture', "mikka daemon service install --server 'http://127.0.0.1:34991/mikka' --device-type server"])
@@ -147,15 +175,23 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     const savedDevice = await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/device.json'])
     const savedUnit = await runProcess('docker', ['exec', container, 'cat', '/root/.config/systemd/user/mikka-daemon.service'])
     assert.equal(reportedVersion, '1.0.0')
+    // The reinstalled daemon opens its own session, reports and reads once.
     // Already the release the server names: no registry read, no install.
-    const heartbeatsAtStart = heartbeats
-    await waitUntil(() => heartbeats >= heartbeatsAtStart + 2 && pollsAskingForReleases > 0, 40_000)
+    await waitUntil(() => tickets > ticketsBeforeReinstall && pollsAskingForReleases > 0, 60_000)
+    // Its startup reports (a harness or model change found after start) end
+    // once it settles. From then on an idle session sends nothing on a
+    // timer: no report, no read and no ticket without a push.
+    await settled(() => deviceRequests, 10_000, 120_000)
+    const idleRequests = deviceRequests, idleCounts = { reports, commandReads, tickets }
+    await new Promise(resolve => setTimeout(resolve, 30_000))
+    assert.deepEqual({ requests: deviceRequests, reports, commandReads, tickets }, { requests: idleRequests, ...idleCounts }, 'an idle device makes no requests')
     assert.equal(registryQueries, 0, 'the daemon never asks the registry on its own')
     assert.equal(downloads, 0)
-    // The server names 1.0.1 on its heartbeat and commands poll answers; the idle daemon installs exactly that version.
+    // The server names 1.0.1 and pushes; the idle daemon reads it and installs exactly that version.
     latestVersion = '1.0.1'
-    const registrationsBeforeUpdate = registrations, heartbeatsBeforeUpdate = heartbeats
-    await waitUntil(() => reportedVersion === '1.0.1' && registrations > registrationsBeforeUpdate && heartbeats > heartbeatsBeforeUpdate, 120_000)
+    const registrationsBeforeUpdate = registrations, reportsBeforeUpdate = reports
+    push()
+    await waitUntil(() => reportedVersion === '1.0.1' && registrations > registrationsBeforeUpdate && reports > reportsBeforeUpdate, 120_000)
     assert.ok(registryQueries > 0 && downloads > 0, 'npm installs the named version from the registry')
     const updatedPid = await pid()
     assert.notEqual(updatedPid, reinstalledPid)
@@ -163,15 +199,16 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     assert.ok(await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/device.json']) === savedDevice, 'automatic update must preserve device identity/configuration')
     assert.equal(await runProcess('docker', ['exec', container, 'cat', '/root/.config/systemd/user/mikka-daemon.service']), savedUnit)
     assert.equal(enrollments, 1)
-    const queriesAfterUpdate = registryQueries, downloadsAfterUpdate = downloads, heartbeatAfterUpdate = heartbeats
-    await waitUntil(() => heartbeats >= heartbeatAfterUpdate + 2, 40_000)
+    const queriesAfterUpdate = registryQueries, downloadsAfterUpdate = downloads, readsAfterUpdate = commandReads
+    await waitUntil(() => commandReads > readsAfterUpdate || (push(), false), 40_000)
     assert.equal(registryQueries, queriesAfterUpdate, 'an up-to-date daemon reads nothing from the registry after its restart')
     assert.equal(downloads, downloadsAfterUpdate)
 
     await ssh("mikka daemon service install --server 'http://127.0.0.1:34991/mikka' --device-type server --no-auto-update")
-    const disabledPid = await pid(), queriesBeforeOptOut = registryQueries, heartbeatBeforeOptOut = heartbeats
+    const disabledPid = await pid(), queriesBeforeOptOut = registryQueries, readsBeforeOptOut = commandReads
     latestVersion = '1.0.2'
-    await waitUntil(() => heartbeats >= heartbeatBeforeOptOut + 2, 40_000)
+    await waitUntil(() => commandReads > readsBeforeOptOut || (push(), false), 40_000)
+    await new Promise(resolve => setTimeout(resolve, 5_000))
     assert.equal(registryQueries, queriesBeforeOptOut, 'opt-out must not query npm when the server names a newer release')
     assert.equal(failedDownloads, 0)
     assert.equal(await pid(), disabledPid, 'opt-out must not install/restart')
@@ -180,24 +217,27 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     await ssh("mikka daemon service install --server 'http://127.0.0.1:34991/mikka' --device-type server")
     const failedPid = await pid()
     await waitUntil(() => failedDownloads > 0, 45_000)
-    const heartbeatBeforeFailure = heartbeats
-    await waitUntil(() => heartbeats >= heartbeatBeforeFailure + 2, 40_000)
+    await waitUntil(() => updateFailure !== null, 40_000)
     assert.equal(await pid(), failedPid, 'failed npm install must not restart the service')
     assert.equal(reportedVersion, '1.0.1')
     assert.ok(await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/device.json']) === savedDevice, 'failed update must preserve device identity/configuration')
     const failedAttempt = JSON.parse(await runProcess('docker', ['exec', container, 'cat', '/root/.config/Mikka/auto-update.json']))
     assert.deepEqual({ version: failedAttempt.failure?.version, code: failedAttempt.failure?.code }, { version: '1.0.2', code: 'install_failed' })
     assert.ok(failedAttempt.failure.at > Date.now() - 120_000)
-    assert.deepEqual({ ...(updateFailure as object), at: undefined }, { version: '1.0.2', code: 'install_failed', at: undefined }, 'the failure is reported on the heartbeat')
-    const queriesAfterFailure = registryQueries, failuresAfterFailure = failedDownloads, heartbeatAfterFailure = heartbeats
-    await waitUntil(() => heartbeats >= heartbeatAfterFailure + 2, 40_000)
+    assert.deepEqual({ ...(updateFailure as object), at: undefined }, { version: '1.0.2', code: 'install_failed', at: undefined }, 'the failure is reported once, on a report')
+    const queriesAfterFailure = registryQueries, failuresAfterFailure = failedDownloads, readsAfterFailure = commandReads
+    await waitUntil(() => commandReads > readsAfterFailure || (push(), false), 40_000)
+    await new Promise(resolve => setTimeout(resolve, 5_000))
     assert.equal(registryQueries, queriesAfterFailure, 'a failed version backs off although the server keeps naming it')
     assert.equal(failedDownloads, failuresAfterFailure)
     assert.equal(await pid(), failedPid)
-    console.log(JSON.stringify({ automaticUpdate: { from: '1.0.0', to: reportedVersion, previousPid: reinstalledPid.trim(), updatedPid: updatedPid.trim(), failedPid: failedPid.trim(), enrollments, registrations, heartbeats, pollsAskingForReleases, registryQueries, downloads, failedDownloads } }))
+    console.log(JSON.stringify({ automaticUpdate: { from: '1.0.0', to: reportedVersion, previousPid: reinstalledPid.trim(), updatedPid: updatedPid.trim(), failedPid: failedPid.trim(), enrollments, registrations, tickets, reports, commandReads, pollsAskingForReleases, registryQueries, downloads, failedDownloads } }))
+    // The server pushes after it queues a device command, as enqueueDeviceCommand does.
     command = { id: randomUUID(), kind: 'redetect' }
+    push()
     await waitUntil(() => acked.has(command!.id), 45_000)
     command = { id: randomUUID(), kind: 'restart' }
+    push()
     await waitUntil(() => acked.has(command!.id), 60_000)
     const pidAfter = await runProcess('docker', ['exec', container, 'systemctl', '--user', '--machine=root@.host', 'show', 'mikka-daemon.service', '--property=MainPID', '--value'])
     assert.notEqual(failedPid, pidAfter)
@@ -205,6 +245,7 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     await runProcess('docker', ['exec', container, 'sh', '-c', 'mkdir -p /root/keep-repository /root/.config/Mikka/worktrees; echo keep > /root/keep-repository/file; echo keep > /root/.config/Mikka/worktrees/keep'])
     removed = true
     command = { id: randomUUID(), kind: 'uninstall' }
+    push()
     await waitUntil(() => acked.has(command!.id), 45_000)
     assert.equal(revoked, true)
     const daemonPid = Number(pidAfter.trim())
@@ -220,10 +261,21 @@ test('real SSH install → systemd → automatic npm update → opt-out/failure 
     await runProcess('docker', ['exec', container, 'sh', '-c', 'test ! -e /root/.config/Mikka/daemon.secret; command -v mikka; test "$(cat /root/keep-repository/file)" = keep; test "$(cat /root/.config/Mikka/worktrees/keep)" = keep'])
   } finally {
     tunnel?.kill()
-    server.closeAllConnections(); server.close()
+    for (const socket of sockets.clients) socket.terminate()
+    sockets.close(); server.closeAllConnections(); server.close()
     await rm(home, { recursive: true, force: true })
   }
 })
+/** Waits until the value has not changed for `quiet` milliseconds. */
+async function settled(value: () => number, quiet: number, timeout: number) {
+  const deadline = Date.now() + timeout
+  let last = value(), since = Date.now()
+  while (Date.now() - since < quiet) {
+    if (Date.now() > deadline) throw new Error('SSH acceptance did not settle')
+    await new Promise(resolve => setTimeout(resolve, 200))
+    if (value() !== last) { last = value(); since = Date.now() }
+  }
+}
 async function waitUntil(check: () => boolean | Promise<boolean>, timeout: number) {
   const deadline = Date.now() + timeout
   while (!await check()) {

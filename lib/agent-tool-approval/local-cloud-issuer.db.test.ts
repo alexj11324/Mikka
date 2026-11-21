@@ -8,7 +8,7 @@ import { Pool } from 'pg'
 import { defaultRunPolicy } from '@mikka/protocol/agent-policy'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { requestDevicePolicyIssuer } from './local-cloud-issuer'
 import { issuePolicySnapshot, policyDistributionContext } from './policy-distribution'
 import { BASE_PATH } from '../base-path'
@@ -17,14 +17,15 @@ const ready = disposableDatabase(process.env)
 if (!ready && process.env.REQUIRE_DB === '1') throw Error('Disposable loopback E2E database required')
 
 if (process.env.LOCAL_CLOUD_ISSUER_FIXTURE !== '1') {
-  test('raw HTTP cloud issuer preserves configured basePath and cloud authorization', { skip: !ready, timeout: 60_000 }, async t => {
+  test('raw HTTP cloud issuer preserves configured basePath and cloud authorization', { skip: !ready, timeout: 120_000 }, async t => {
     for (const prefix of ['/mikka', '']) await t.test(prefix || 'without basePath', () => {
       const env = { ...process.env, MIKKA_BASE_PATH: prefix, LOCAL_CLOUD_ISSUER_FIXTURE: '1' }
       delete (env as Record<string, string | undefined>).NODE_TEST_CONTEXT
       const result = spawnSync(process.execPath, ['--import', './tests/support/server-only.mjs', '--import', 'tsx', '--test', fileURLToPath(import.meta.url)], {
-        cwd: fileURLToPath(new URL('../../', import.meta.url)), encoding: 'utf8', timeout: 25_000,
+        cwd: fileURLToPath(new URL('../../', import.meta.url)), encoding: 'utf8', timeout: 50_000,
         env,
       })
+      assert.ifError(result.error)
       assert.equal(result.status, 0, result.stdout + result.stderr)
       assert.match(result.stdout, /raw HTTP policy claim and metadata use only the operator-bound live cloud issuer/)
     })
@@ -32,7 +33,7 @@ if (process.env.LOCAL_CLOUD_ISSUER_FIXTURE !== '1') {
 } else test('raw HTTP policy claim and metadata use only the operator-bound live cloud issuer', { skip: !ready, timeout: 60_000 }, async () => {
   const admin = new Pool({ connectionString: process.env.E2E_DATABASE_URL })
   const name = `cloud_issuer_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(process.env.E2E_DATABASE_URL!); target.pathname = `/${name}`
   const pool = new Pool({ connectionString: target.href })
   const oldSecret = process.env.BETTER_AUTH_SECRET

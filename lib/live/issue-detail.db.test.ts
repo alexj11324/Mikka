@@ -5,7 +5,8 @@ import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
+import { seedTeam } from '../../tests/support/workspace-admin-db'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { issueMemberTargets, issueRelationTargets } from './issue-detail'
@@ -20,9 +21,9 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('issue members and relations keys reach only the task audience, after the actual writer commits', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const nextServer = await import('next/server')
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
-  mock.module('next/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
+  const nextServer = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
   // The same writers refresh lists and documents; lists.db.test.ts and panels.db.test.ts cover those keys.
   for (const file of ['./lists.ts']) {
     const actual = await import(file)
@@ -44,7 +45,7 @@ test('issue members and relations keys reach only the task audience, after the a
   })
   const admin = new Pool({ connectionString: url, max: 1 })
   const name = `issue_detail_live_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(url!); target.pathname = `/${name}`
   const database = new Pool({ connectionString: target.toString(), max: 6 })
   observePoolCommits(database)
@@ -75,7 +76,10 @@ test('issue members and relations keys reach only the task audience, after the a
       const id = randomUUID()
       await database.query(`INSERT INTO issues(id,"userId",title,content,status,priority,scope,"workspaceId") VALUES ($1,'owner','Fixture',$2,'todo','normal',$3,$4)`,
         [id, JSON.stringify({ type: 'doc', attrs: { mikka: metadata }, content: [] }), workspace ? 'workspace' : 'personal', workspace ?? home])
-      if (workspace) await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, randomUUID(), workspace])
+      if (workspace) {
+        const grouping = await seedTeam(database, workspace, 'owner')
+        await database.query(`INSERT INTO mikka_team_issues("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,'owner')`, [id, grouping.id, workspace])
+      }
       return id
     }
     const parent = await issue(team), unrelated = await issue(team)

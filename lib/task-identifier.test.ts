@@ -37,3 +37,10 @@ test('a workspace task without a local team keeps its owner number', () => {
   assert.equal(taskIdentifier({ scope: 'workspace', number: 12, personalPrefix: 'MINE', team: { key: 'AL', number: 4 } }), 'AL-4')
   assert.equal(taskIdentifier({ scope: 'workspace', number: 12, personalPrefix: 'MINE', team: null }), 'MINE-12')
 })
+
+test('an issued identifier survives team moves, team renames and prefix changes', () => {
+  for (const scope of ['workspace', 'personal'] as const) {
+    assert.equal(taskIdentifier({ scope, issuedIdentifier: 'OLD-19', number: 7, personalPrefix: 'NEWP', team: { key: 'NEWTEAM', number: 4 } }), 'OLD-19')
+    assert.equal(taskIdentifier({ scope, issuedIdentifier: 'OLD-19' }), 'OLD-19')
+  }
+})

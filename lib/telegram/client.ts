@@ -1,14 +1,11 @@
 import 'server-only'
 
 import { Chat } from 'chat'
-import type { PoolClient } from 'pg'
-import { createTelegramState } from './state'
+import { createPostgresState } from '@chat-adapter/state-pg'
 import { createTelegramAdapter } from '@chat-adapter/telegram'
 import { pool } from '@/lib/db'
 import { createTelegramLogger } from './logger'
-import { splitTelegramText } from './messages'
 
-const telegramState = createTelegramState(pool)
 let bot: Chat | undefined
 
 function configuration() {
@@ -31,7 +28,7 @@ export function getTelegramClient() {
     bot = new Chat({
       userName: config.userName,
       adapters: { telegram },
-      state: telegramState.adapter,
+      state: createPostgresState({ client: pool, autoCreateSchema: false, keyPrefix: 'mikka' }),
       concurrency: 'queue',
       logger: createTelegramLogger(),
     })
@@ -39,10 +36,8 @@ export function getTelegramClient() {
   return bot
 }
 
-export async function postTelegramText(threadId: string, text: string, transaction?: PoolClient): Promise<void> {
-  if (transaction) return telegramState.withClient(transaction, () => postTelegramText(threadId, text))
+export async function postTelegramText(threadId: string, chunk: string): Promise<void> {
   const client = getTelegramClient()
   await client.initialize()
-  const thread = client.thread(threadId)
-  for (const chunk of splitTelegramText(text)) await thread.post(chunk)
+  await client.thread(threadId).post(chunk)
 }

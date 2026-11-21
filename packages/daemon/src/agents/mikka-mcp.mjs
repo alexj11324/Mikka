@@ -26,6 +26,7 @@ const value = flag => { const i = process.argv.indexOf(flag); return i > 0 ? pro
 const values = flag => process.argv.flatMap((arg, i) => arg === flag && process.argv[i + 1] ? [process.argv[i + 1]] : [])
 const backend = createMikkaMcpBackend({
   handoffFile, capturesDir: values('--captures')[0] ?? null, captureRoots: values('--capture-root'),
+  profileSkillsDir: value('--profile-skills') ?? null,
   factoryVerify: value('--factory-verify') === undefined ? null : JSON.parse(value('--factory-verify')),
   artifactRoot: value('--factory-artifacts'), repositoryRoot: value('--repository-selection'),
   decisionUrl: process.env.MIKKA_DECISION_MCP_URL, decisionToken: process.env.MIKKA_DECISION_MCP_TOKEN,

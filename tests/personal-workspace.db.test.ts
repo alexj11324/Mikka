@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
-import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace, useUpFreeMessages } from './support/workspace-admin-db'
+import { dbUrl, seedAgent, seedRun, seedUser, seedWorkspace } from './support/workspace-admin-db'
 
 const uuidFrom = (seed: string) => {
   const hash = createHash('sha256').update(seed).digest('hex')
@@ -102,7 +102,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.equal(ids[0], uuidFrom(`orvilo-default:${racer}`), 'a new user keeps the sign-up id')
   })
 
-  await t.test('a card verified on a workspace that became a team keeps working: the fresh personal workspace is verified too', async () => {
+  await t.test('no trial: a verified card funds nothing, and every unfunded workspace is refused for points', async () => {
     const { ensurePersonalWorkspace } = await import('../lib/personal-workspace')
     const { canUseMikkaPaid, hostedUsage } = await import('../lib/abuse/runtime')
     const { executionWorkspace } = await import('../lib/execution-settings')
@@ -110,83 +110,95 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     const team = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
     await hostedUsage.verify(team.id, 'cus_synthetic_team', `card_${randomUUID()}`)
     const personal = await ensurePersonalWorkspace({ id: owner, email: `${owner}@example.invalid`, name: 'verified' }, 'zh-CN')
-    // Decision 2026-10-31-2225: verification is per person, and a new personal workspace starts like a new sign-up.
-    const balance = await canUseMikkaPaid(personal)
-    assert.equal(balance.verified, true)
-    assert.ok(balance.free > 0, 'the free allowance')
-    // Triage keeps running where it ran before: the team, with its verified card.
+    // Decision 2026-11-15-1900: no trial and no card allowance; Mikka 额度 comes from a plan or a top-up.
+    await assert.rejects(canUseMikkaPaid(personal), { code: 'points_exhausted' })
     assert.equal(await executionWorkspace(owner, null), team.id)
-    assert.equal((await canUseMikkaPaid(team.id)).verified, true)
-    // Someone who never verified is told so, never silently stopped.
+    await assert.rejects(canUseMikkaPaid(team.id), { code: 'points_exhausted' })
     const stranger = await seedUser(pool, 'unverified')
     const theirs = await ensurePersonalWorkspace({ id: stranger, email: `${stranger}@example.invalid`, name: 'unverified' }, 'zh-CN')
-    // A new sign-up's first messages are free (TRIAL_MESSAGES); past them, a card.
-    assert.equal(((await canUseMikkaPaid(theirs)) as { trialLeft?: number }).trialLeft, 20)
-    await useUpFreeMessages(pool, theirs, stranger)
-    await assert.rejects(canUseMikkaPaid(theirs), { code: 'verification_required' })
-    // A peer's verification on a team they do not own does not verify their personal workspace.
-    const peerPersonal = await ensurePersonalWorkspace({ id: peer, email: `${peer}@example.invalid`, name: 'peer' }, 'zh-CN')
-    await useUpFreeMessages(pool, peerPersonal, peer)
-    await assert.rejects(canUseMikkaPaid(peerPersonal), { code: 'verification_required' })
+    await assert.rejects(canUseMikkaPaid(theirs), { code: 'points_exhausted' })
+    // A top-up funds it at once.
+    await pool.query(`INSERT INTO workspace_credit_grants (id,"workspaceId",bucket,points,reason,"externalId") VALUES ($1,$2,'purchased',100,'pack',$3)`, [randomUUID(), theirs, `points-${randomUUID()}`])
+    assert.equal((await canUseMikkaPaid(theirs)).purchased, 1_000_000)
   })
 
-  await t.test('sharing is the member\'s own opt-in; the admin has one switch, audited, and none in a personal workspace', async () => {
+  await t.test('the admin has one switch over shared API keys, audited, and none in a personal workspace', async () => {
     const policy = await import('../lib/personal-policy-server')
     const { WorkspaceError } = await import('../lib/workspace-access')
     const rejects = (promise: Promise<unknown>, code: string) => assert.rejects(promise, (error: unknown) => error instanceof WorkspaceError && error.code === code)
     const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member')
     const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
-    assert.deepEqual(await policy.getSubscriptionShare(member, team.id), { personal: false, shared: false, allowOthers: false, allowed: true, available: [], own: [] }, 'not shared until the member chooses')
-    assert.deepEqual(await policy.setOwnSubscriptionShare(member, team.id, { shared: true }), { personal: false, shared: true, allowOthers: false, allowed: true, available: [], own: [] })
-    assert.deepEqual(await policy.getSubscriptionShare(admin, team.id), { personal: false, shared: false, allowOthers: false, allowed: true, available: [], own: [] }, 'one member sharing shares nothing of anyone else')
     assert.deepEqual(await policy.getMemberSubscriptionPolicy(member, team.id), { allowed: true, canEdit: false })
     await rejects(policy.setMemberSubscriptionPolicy({ id: member, name: 'Mia' }, team.id, false), 'workspaceAccessDenied')
     assert.deepEqual(await policy.setMemberSubscriptionPolicy({ id: admin, name: 'Alex' }, team.id, false), { allowed: false, canEdit: true })
     await policy.setMemberSubscriptionPolicy({ id: admin, name: 'Alex' }, team.id, false)
     assert.deepEqual((await pool.query(`select metadata from workspace_audit_events where "workspaceId"=$1 and metadata->>'integration'='personal_subscriptions'`, [team.id])).rows, [{ metadata: { integration: 'personal_subscriptions', capability: 'use', from: 'allow', to: 'deny' } }], 'audited once')
-    assert.deepEqual(await policy.getSubscriptionShare(member, team.id), { personal: false, shared: true, allowOthers: false, allowed: false, available: [], own: [] })
-    await rejects(policy.setOwnSubscriptionShare(admin, team.id, { shared: true }), 'workspaceAccessDenied')
-    await policy.setMemberSubscriptionPolicy({ id: admin, name: 'Alex' }, team.id, true)
-    // 分享给团队成员: the admin sees the member's subscription is available, never the credential.
-    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,"secretName","secretDigest","providerSubject") VALUES ($1,$2,$3,'claude','connected',$5,$4,'synthetic-subject')`, [randomUUID(), member, team.id, 'a'.repeat(64), `synthetic-${randomUUID()}`])
-    assert.deepEqual((await policy.setOwnSubscriptionShare(member, team.id, { shared: true, allowOthers: true })).allowOthers, true)
-    assert.deepEqual((await policy.getSubscriptionShare(admin, team.id)).available, [{ name: member, provider: 'claude' }])
-    assert.deepEqual((await policy.setOwnSubscriptionShare(member, team.id, { shared: true, allowOthers: false })).allowOthers, false)
-    assert.deepEqual((await policy.getSubscriptionShare(admin, team.id)).available, [])
     const { ensurePersonalWorkspace } = await import('../lib/personal-workspace')
     const personal = await ensurePersonalWorkspace({ id: member, email: `${member}@example.invalid`, name: 'member' }, 'zh-CN')
-    assert.deepEqual(await policy.getSubscriptionShare(member, personal), { personal: true, shared: true, allowOthers: false, allowed: true, available: [], own: [] })
-    assert.equal((await pool.query('select count(*)::int as n from workspace_subscription_shares where "ownerId"=$1 and "workspaceId"=$2', [member, personal])).rows[0].n, 1, 'a personal workspace uses its owner\'s subscriptions without a share step')
     assert.equal((await policy.getMemberSubscriptionPolicy(member, personal)).canEdit, false)
     await rejects(policy.setMemberSubscriptionPolicy({ id: member, name: 'Mia' }, personal, false), 'validationGeneric')
   })
 
-  await t.test('leaving a team removes the subscription share and pauses the bots there until an admin takes one over', async () => {
+  await t.test('leaving a team pauses the bots there until an admin takes one over', async () => {
     const members = await import('../lib/workspace-admin/members')
-    const { setSubscriptionShare } = await import('../lib/personal-policy')
-    const subscriptionShared = async (_: unknown, ownerId: string, workspaceId: string) => Boolean((await pool.query('SELECT 1 FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [ownerId, workspaceId])).rowCount)
     const { executionWorkspace } = await import('../lib/execution-settings')
     const admin = await seedUser(pool, 'admin'), leaver = await seedUser(pool, 'leaver')
     const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: leaver, role: 'member' }])
     const other = await seedWorkspace(pool, leaver, [{ userId: leaver, role: 'admin' }])
     const bot = randomUUID(), elsewhere = randomUUID()
     await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,$4),($5,$2,$6,$4)', [bot, leaver, team.id, 'Helper', elsewhere, other.id])
-    await setSubscriptionShare(pool, leaver, team.id, true)
-    await setSubscriptionShare(pool, leaver, other.id, true)
     assert.equal(await executionWorkspace(leaver, bot), team.id)
     await members.removeMember(admin, team.id, leaver)
-    assert.equal(await subscriptionShared(pool, leaver, team.id), false, 'the share leaves with them, at once')
-    assert.equal(await subscriptionShared(pool, leaver, other.id), true, 'their other workspaces are untouched')
     assert.ok((await pool.query('SELECT "archivedAt" FROM bots WHERE id=$1', [bot])).rows[0].archivedAt, 'their bot there is paused')
     assert.equal((await pool.query('SELECT "archivedAt" FROM bots WHERE id=$1', [elsewhere])).rows[0].archivedAt, null)
     await assert.rejects(executionWorkspace(leaver, bot), { code: 'botNotFound' }, 'a paused bot runs nothing')
     assert.deepEqual((await members.archivedBots(admin, team.id)).map(row => row.id), [bot])
-    await assert.rejects(members.archivedBots(leaver, team.id))
+    await assert.rejects(members.archivedBots(leaver, team.id), { code: 'workspaceAccessDenied' })
+    await assert.rejects(members.takeOverBot(leaver, team.id, bot), { code: 'workspaceAccessDenied' })
+    const takeoverAudits = async () => (await pool.query(`SELECT count(*)::int AS n FROM workspace_audit_outbox WHERE "workspaceId"=$1 AND payload->>'action'='bot.taken_over' AND payload->>'targetId'=$2`, [team.id, bot])).rows[0].n
+    const conflicting = randomUUID()
+    await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,$4)', [conflicting, admin, team.id, 'Helper'])
+    await assert.rejects(members.takeOverBot(admin, team.id, bot), { code: 'botTransferNameConflict' })
+    assert.equal(await takeoverAudits(), 0, 'a failed transfer rolls back its audit')
+    await pool.query('DELETE FROM bots WHERE id=$1', [conflicting])
     assert.deepEqual(await members.takeOverBot(admin, team.id, bot), { bots: 1 })
-    assert.equal(Number((await pool.query(`SELECT count(*) FROM workspace_audit_outbox WHERE "workspaceId"=$1 AND payload->>'action'='bot.taken_over' AND payload->>'targetId'=$2`, [team.id, bot])).rows[0].count), 1, '接管 is in the activity log')
     assert.deepEqual((await pool.query('SELECT "ownerId","archivedAt" FROM bots WHERE id=$1', [bot])).rows[0], { ownerId: admin, archivedAt: null }, 'it now runs on the admin\'s own resources')
     assert.equal(await executionWorkspace(admin, bot), team.id)
-    await assert.rejects(members.takeOverBot(admin, team.id, bot), (error: unknown) => (error as { code?: string }).code === 'botNotFound', 'only a paused bot can be taken over')
+    await assert.rejects(members.takeOverBot(admin, team.id, bot), { code: 'botNotFound' }, 'only a paused bot can be taken over')
+    assert.equal(await takeoverAudits(), 1, 'one audit for the completed transfer, including after a retry')
+  })
+
+  await t.test('the archived bot directory and takeover keep the administrator transaction through the APP read and commit', async t => {
+    const { archivedBots, takeOverBot } = await import('../lib/workspace-admin/members')
+    const { withDatabaseClient } = await import('../lib/db')
+    const { workspaceTransactionKey } = await import('../lib/workspace-db')
+    const admin = await seedUser(pool, 'archive-admin')
+    const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
+    const bot = randomUUID()
+    await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name,"archivedAt") VALUES ($1,$2,$3,$4,now())', [bot, admin, team.id, 'Archived'])
+    const client = await appPool.connect()
+    const query = client.query
+    const reads: Array<object | null> = []
+    const commits: Array<object | null> = []
+    const observed = t.mock.method(client, 'query', (...args: unknown[]) => {
+      const statement = typeof args[0] === 'string' ? args[0] : (args[0] as { text: string }).text
+      if (/from "bots"/i.test(statement)) reads.push(workspaceTransactionKey())
+      if (/^commit$/i.test(statement)) commits.push(workspaceTransactionKey())
+      return Reflect.apply(query, client, args)
+    })
+    try {
+      assert.deepEqual((await withDatabaseClient(client, () => archivedBots(admin, team.id))).map(row => row.id), [bot])
+      assert.equal(reads.length, 1)
+      assert.ok(reads[0], 'the directory reads under its active Workspace transaction')
+      reads.length = 0
+      assert.deepEqual(await withDatabaseClient(client, () => takeOverBot(admin, team.id, bot)), { bots: 1 })
+      assert.ok(reads[0], 'the takeover reads the archived bot under the administrator lock')
+      assert.equal(commits.length, 1)
+      assert.equal(commits[0], reads[0], 'the same Workspace transaction stays active through APP commit')
+    } finally {
+      observed.mock.restore()
+      client.release()
+    }
   })
 
   await t.test('withdrawing a credential stops the runs using it at once; credential access then refuses them', async () => {
@@ -209,26 +221,13 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     }
     // The predicate every credential access and renewal applies (subscription-access-snapshot, subscription-service).
     const usable = async (run: string) => Boolean((await pool.query(`SELECT 1 FROM agent_runs WHERE id=$1 AND status IN ('preparing','running','paused','waiting_input') AND "leaseExpiresAt">now() AND "stopRequestedAt" IS NULL`, [run])).rowCount)
-    await policy.setOwnSubscriptionShare(owner, team.id, { shared: true, allowOthers: true })
-    const peersRun = await runOn(peer), ownRun = await runOn(owner)
-    assert.equal(await usable(peersRun), true)
-    await policy.setOwnSubscriptionShare(owner, team.id, { shared: true, allowOthers: false })
-    assert.equal(await usable(peersRun), false, '分享给团队成员 off: the other member\'s run stops and its credential is refused')
-    assert.ok((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [peersRun])).rows[0].stopRequestedAt)
-    assert.equal(await usable(ownRun), true, 'the owner\'s own run keeps going')
-    // Decision 2026-11-01-2240: un-sharing and the admin switch govern other members' use only.
-    const peersSecond = await runOn(peer)
-    await pool.query(`UPDATE agent_runs SET status='paused' WHERE id=$1`, [peersSecond])
-    await policy.setOwnSubscriptionShare(owner, team.id, { shared: false })
-    assert.equal(await usable(ownRun), true, 'un-sharing never stops the owner\'s own run')
-    assert.equal(await usable(peersSecond), false, 'un-sharing stops a paused run before it can resume on the withdrawn credential')
-    await policy.setOwnSubscriptionShare(owner, team.id, { shared: true, allowOthers: true })
-    const peersThird = await runOn(peer)
+    // A subscription serves its owner only (decision 2026-11-17): only the owner's own run holds it.
+    const ownRun = await runOn(owner)
+    assert.equal(await usable(ownRun), true)
     await policy.setMemberSubscriptionPolicy({ id: admin, name: 'Admin' }, team.id, false)
-    assert.equal(await usable(peersThird), false, 'the admin switch off stops another member\'s run on it')
-    assert.equal(await usable(ownRun), true, 'the admin switch off never stops the owner\'s own run')
+    assert.equal(await usable(ownRun), true, 'the admin switch never stops the owner\'s own run')
     await policy.setMemberSubscriptionPolicy({ id: admin, name: 'Admin' }, team.id, true)
-    const beforeLeaving = await runOn(peer)
+    const beforeLeaving = await runOn(owner)
     await members.removeMember(admin, team.id, owner)
     assert.equal(await usable(beforeLeaving), false, 'leaving stops what ran on their subscription')
     const afterDisconnect = await runOn(owner)
@@ -237,36 +236,22 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     await assert.rejects(stopRunsUsingSubscriptions(pool, { ownerId: owner }), /workspace or a connection/, 'never everything at once')
   })
 
-  await t.test('every model call re-checks a shared subscription: another member\'s bot stops when the owner un-shares or leaves', async () => {
+  await t.test('every model call checks the subscription is the bot owner\'s own', async () => {
     const { authorizeSubscriptionUse } = await import('../lib/subscription-runtime')
-    const { setSubscriptionShare } = await import('../lib/personal-policy')
     const members = await import('../lib/workspace-admin/members')
     const admin = await seedUser(pool, 'admin'), owner = await seedUser(pool, 'owner'), peer = await seedUser(pool, 'peer')
     const team = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: owner, role: 'member' }, { userId: peer, role: 'member' }])
     const ownBot = randomUUID(), peerBot = randomUUID()
     await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,$4),($5,$6,$3,$4)', [ownBot, owner, team.id, 'Bot', peerBot, peer])
-    // Decision 2026-11-01-2240: the owner's own bot needs no share step.
     await authorizeSubscriptionUse(owner, team.id, ownBot)
-    await assert.rejects(authorizeSubscriptionUse(owner, team.id, peerBot), { code: 'account_unavailable' }, 'not shared: own bots only')
-    await setSubscriptionShare(pool, owner, team.id, true)
-    await authorizeSubscriptionUse(owner, team.id, ownBot)
-    await assert.rejects(authorizeSubscriptionUse(owner, team.id, peerBot), { code: 'account_unavailable' }, 'shared without 分享给团队成员: own bots only')
-    await setSubscriptionShare(pool, owner, team.id, true, true)
-    await authorizeSubscriptionUse(owner, team.id, peerBot)
-    await pool.query('INSERT INTO workspace_personal_policies ("workspaceId",subscriptions) VALUES ($1,false)', [team.id])
-    await assert.rejects(authorizeSubscriptionUse(owner, team.id, peerBot), { code: 'account_unavailable' }, 'the admin block stops the other member\'s bot')
-    await authorizeSubscriptionUse(owner, team.id, ownBot)
-    await pool.query('DELETE FROM workspace_personal_policies WHERE "workspaceId"=$1', [team.id])
-    await authorizeSubscriptionUse(owner, team.id, peerBot)
-    // The owner leaves mid-flight: the peer's next model call is refused, no fallback.
+    await assert.rejects(authorizeSubscriptionUse(owner, team.id, peerBot), { code: 'account_unavailable' }, 'a teammate\'s bot never uses it')
+    // The owner leaves: even their own bot there is refused.
     await members.removeMember(admin, team.id, owner)
-    await assert.rejects(authorizeSubscriptionUse(owner, team.id, peerBot))
-    assert.equal((await pool.query('SELECT count(*)::int AS n FROM workspace_subscription_shares WHERE "ownerId"=$1 AND "workspaceId"=$2', [owner, team.id])).rows[0].n, 0)
+    await assert.rejects(authorizeSubscriptionUse(owner, team.id, ownBot))
   })
 
-  await t.test('a subscription connected in the personal workspace answers its owner\'s chats in a team; a teammate\'s only once shared', async () => {
+  await t.test('a subscription connected in the personal workspace answers its owner\'s chats in a team; never a teammate\'s', async () => {
     const { authorizeSubscriptionUse } = await import('../lib/subscription-runtime')
-    const { setSubscriptionShare } = await import('../lib/personal-policy')
     const { SubscriptionService } = await import('../lib/subscription-service')
     const { SubscriptionRepository } = await import('../lib/subscription-repository')
     const { ExecutionSettings } = await import('../lib/execution-settings')
@@ -292,11 +277,7 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     const use = (consumerId: string, bindingId: string) => ({ ownerId: owner, workspaceId: team.id, consumerId, bindingId, execution: 'model' as const })
     const allowed = await service.check(use(ownBot, ownBinding))
     assert.equal(allowed.connection.workspaceId, personal, 'the owner\'s own bot in the team uses the personal subscription')
-    await assert.rejects(service.check(use(peerBot, peerBinding)), { code: 'account_unavailable' }, 'a teammate\'s bot: not shared')
-    await setSubscriptionShare(pool, owner, team.id, true, true)
-    await service.check(use(peerBot, peerBinding))
-    await setSubscriptionShare(pool, owner, team.id, false)
-    await assert.rejects(service.check(use(peerBot, peerBinding)), { code: 'account_unavailable' }, 'un-sharing stops it at once')
+    await assert.rejects(service.check(use(peerBot, peerBinding)), { code: 'account_unavailable' }, 'a teammate\'s bot never uses it')
     await service.check(use(ownBot, ownBinding))
 
     // Without a PostHog project, shipped subscription routes are available.
@@ -373,8 +354,10 @@ test('personal workspaces', { skip: !dbUrl }, async t => {
     assert.equal(await coordinatorEnabled(owner, bot), false, 'a known exhausted selected model remains unavailable')
     await pool.query('UPDATE byos_connections SET quota=$2 WHERE id=$1', [connection, JSON.stringify(quota(0.2, 120_000))])
     assert.equal(await coordinatorEnabled(owner, bot), true, 'a stale official allowance can queue its normal authoritative execution check')
-    await settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, HOSTED_CHOICE)
-    assert.equal(await coordinatorEnabled(owner, bot), false, 'explicit Mikka default does not silently spend an available subscription')
+    // 「Mikka 默认」 is gone (decision 2026-11-15-1900), and with no server model Mikka 额度 offers nothing here.
+    await assert.rejects(settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, HOSTED_CHOICE), { code: 'executionModelUnknown' })
+    await assert.rejects(settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, 'credits:deepseek/deepseek-v4.1-flash'), { code: 'executionModelUnknown' })
+    assert.equal(await coordinatorEnabled(owner, bot), true, 'the chosen subscription stays chosen')
     await settings.setBotModel({ ownerId: owner, workspaceId: workspace.id }, bot, binding)
     await pool.query('UPDATE bots SET "archivedAt"=now() WHERE id=$1', [bot])
     assert.equal(await coordinatorEnabled(owner, bot), false, 'an archived bot remains disabled')

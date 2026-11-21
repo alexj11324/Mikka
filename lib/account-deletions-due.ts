@@ -1,5 +1,14 @@
 import type { Pool } from 'pg'
 
+// A frozen account's original deletion job owns these keys and their grant deadlines.
+export function chatStorageCleanupOwner(table: 'chat_attachments' | 'chat_attachment_retirements') {
+  return `NOT EXISTS (SELECT 1 FROM account_deletion_guards g
+    JOIN account_deletion_jobs j ON j.id=g."jobId" AND j."subjectUserId"=g."subjectId"
+    WHERE g."subjectId"=${table}."userId" AND j.stage NOT IN ('completed','cancelled'))`
+}
+const availableDraft = chatStorageCleanupOwner('chat_attachments')
+const availableRetirement = chatStorageCleanupOwner('chat_attachment_retirements')
+
 /**
  * Each persisted due time of account-deletion work, as rows of `at` (#1371), matching what
  * sweepAccountDeletions and cleanupChatFiles select:
@@ -15,9 +24,9 @@ export const ACCOUNT_DELETIONS_DUE_SQL = `SELECT min(CASE WHEN "blockedReasons" 
       WHEN "blockedReasons" = '[]'::jsonb THEN "updatedAt" ELSE "updatedAt" + interval '1 hour' END) AS at
     FROM account_deletion_jobs WHERE stage NOT IN ('completed','cancelled')
   UNION ALL SELECT min(greatest(coalesce("removedAt", "createdAt" + interval '1 day' + interval '1 millisecond'),
-      coalesce("uploadExpiresAt" + interval '1 millisecond', '-infinity'))) FROM chat_attachments WHERE "usedAt" IS NULL
-  UNION ALL SELECT min("uploadExpiresAt") + interval '1 millisecond' FROM chat_attachments WHERE "uploadKey" IS NOT NULL
-  UNION ALL SELECT min("notBefore") FROM chat_attachment_retirements`
+      coalesce("uploadExpiresAt" + interval '1 millisecond', '-infinity'))) FROM chat_attachments WHERE "usedAt" IS NULL AND ${availableDraft}
+  UNION ALL SELECT min("uploadExpiresAt") + interval '1 millisecond' FROM chat_attachments WHERE "uploadKey" IS NOT NULL AND ${availableDraft}
+  UNION ALL SELECT min("notBefore") FROM chat_attachment_retirements WHERE ${availableRetirement}`
 
 /** The earliest account-deletion work due (epoch ms, rounded up from PostgreSQL microseconds), or null. */
 export async function nextAccountDeletionsDue(pool: Pick<Pool, 'query'>): Promise<number | null> {

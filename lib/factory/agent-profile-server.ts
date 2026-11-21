@@ -7,7 +7,7 @@ import { readAgentProfileManagement } from './agent-profile'
 import { createAgentProfileHandler } from './agent-profile-http'
 import { readOnce } from '@/lib/db/read-once'
 import { factoryWorkspaceReader } from './workspace-reader'
-import { factoryHumanWorkspaceResponse } from './workspace-http'
+import { factoryHumanMembershipResponse } from './workspace-http'
 
 const store = new AgentProfileStore(pool)
 
@@ -15,7 +15,7 @@ const store = new AgentProfileStore(pool)
  * explicit body/query workspace; a different owned tenant is not a bypass. */
 export async function agentProfileHandler(request: Request, profileId?: string): Promise<Response> {
   const session = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true } })
-  return factoryHumanWorkspaceResponse(session?.user, async () => {
+  return factoryHumanMembershipResponse(session?.user, async () => {
     const handle = createAgentProfileHandler({
       authenticate: async () => {
         if (!session) return null

@@ -15,8 +15,10 @@ const task = () => ({ id: taskId, userId: 'owner', botId: null, issueId: 'issue'
 // their closed DB projections and unrelated session/notification IO are fixtures;
 // lock waits and persisted revocation are exercised by the PostgreSQL suites.
 const dialect = new PgDialect()
+const compact = (value: string) => value.replace(/\s+/g, ' ').trim()
+const admittedLocks = ['workspace', 'member', 'workspace', 'member', 'relations', 'resources']
 const tableName = (table: Record<symbol, unknown>) => table[Object.getOwnPropertySymbols(table).find(key => key.description === 'drizzle:Name')!]
-let workspaceProbe: { memberAllowed: boolean; persistedWorkspaceId: string | null; active: boolean; locks: string[] }
+let workspaceProbe: { memberAllowed: boolean; persistedWorkspaceId: string | null; depth: number; locks: string[] }
 function workspaceSelect(columns: Record<string, unknown>) {
   let table: unknown, condition: ReturnType<PgDialect['sqlToQuery']>, organizationJoin = false
   const query = {
@@ -33,15 +35,18 @@ function workspaceSelect(columns: Record<string, unknown>) {
     },
     where(value: Parameters<PgDialect['sqlToQuery']>[0]) { condition = dialect.sqlToQuery(value); return query },
     async for(mode: string, options?: { of?: Record<symbol, unknown> }) {
-      assert.equal(workspaceProbe.active, true)
+      assert.ok(workspaceProbe.depth > 0 && workspaceProbe.depth <= 2)
       assert.equal(mode, 'share')
       if (table === 'mikka_workspaces') {
         assert.deepEqual(Object.keys(columns), ['id', 'kind', 'ownerId'])
+        assert.equal(compact(condition.sql), '"mikka_workspaces"."id" = $1')
         assert.deepEqual(condition.params, [workspaceId])
+        assert.equal(workspaceProbe.locks.length, (workspaceProbe.depth - 1) * 2)
         workspaceProbe.locks.push('workspace')
         return [{ id: workspaceId, kind: 'team', ownerId: 'owner' }]
       }
       assert.equal(table, 'mikka_workspace_members')
+      assert.equal(compact(condition.sql), '("mikka_workspace_members"."workspaceId" = $1 and "mikka_workspace_members"."userId" = $2 and "mikka_workspace_members"."status" = $3)')
       assert.deepEqual(condition.params, [workspaceId, 'owner', 'active'])
       assert.equal(workspaceProbe.locks.at(-1), 'workspace')
       if (organizationJoin) {
@@ -57,12 +62,29 @@ function workspaceSelect(columns: Record<string, unknown>) {
   }
   return query
 }
+async function workspaceExecute(statement: Parameters<PgDialect['sqlToQuery']>[0]) {
+  assert.equal(workspaceProbe.depth, 2, 'resource locks belong to the nested Workspace lease')
+  assert.equal(workspaceProbe.memberAllowed, true)
+  const query = dialect.sqlToQuery(statement)
+  if (compact(query.sql) === "select pg_advisory_xact_lock_shared(hashtextextended('mikka-team-relations',0))") {
+    assert.deepEqual(query.params, [])
+    assert.deepEqual(workspaceProbe.locks, admittedLocks.slice(0, 4))
+    workspaceProbe.locks.push('relations')
+  } else {
+    assert.equal(compact(query.sql), 'select pg_advisory_xact_lock_shared(hashtextextended($1,0))')
+    assert.deepEqual(query.params, [`project-resources:${workspaceId}`])
+    assert.deepEqual(workspaceProbe.locks, admittedLocks.slice(0, 5))
+    workspaceProbe.locks.push('resources')
+  }
+  return { rows: [], rowCount: 0 }
+}
 mock.module('../workspace-db.ts', { namedExports: {
-  workspaceDb: { select: workspaceSelect, transaction: async <T>(work: (tx: { select: typeof workspaceSelect }) => Promise<T>) => {
-    assert.equal(workspaceProbe.active, false)
-    workspaceProbe.active = true
-    try { return await work({ select: workspaceSelect }) } finally { workspaceProbe.active = false }
+  workspaceDb: { select: workspaceSelect, transaction: async <T>(work: (tx: { select: typeof workspaceSelect; execute: typeof workspaceExecute }) => Promise<T>) => {
+    assert.ok(workspaceProbe.depth < 2, 'only the owner and its Project resource lease open Workspace transactions')
+    workspaceProbe.depth++
+    try { return await work({ select: workspaceSelect, execute: workspaceExecute }) } finally { workspaceProbe.depth-- }
   } },
+  workspacePool: { query: async () => assert.fail('Replay fixture must not borrow an unrelated Workspace connection') },
 } })
 mock.module('../db/request-scope.ts', { namedExports: { inDatabaseTransaction: () => false } })
 mock.module('../db/index.ts', { namedExports: {
@@ -82,21 +104,38 @@ mock.module('./runtime.ts', { namedExports: { factoryRuntimeForBot: () => ({ sto
   },
 } }) } })
 const { continueActiveFactoryRequest } = await import('./request-epoch')
+const { requireProjectResourceLease } = await import('../project-resources/store')
 
 function fixture(allowEventWrite = false) {
-  workspaceProbe = { memberAllowed: true, persistedWorkspaceId: workspaceId, active: false, locks: [] }
+  workspaceProbe = { memberAllowed: true, persistedWorkspaceId: workspaceId, depth: 0, locks: [] }
   const writes: string[] = [], boundaries: string[] = []
-  let released = false
+  let released = false, connections = 0
   const client = {
-    async query(sql: string) {
-      if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) { boundaries.push(sql); return { rows: [] } }
-      if (sql.startsWith('SELECT e.payload')) return { rows: [{ payload: { text: 'The original accepted request' } }] }
-      if (/^INSERT|^UPDATE|^DELETE/.test(sql)) {
-        writes.push(sql)
-        if (!allowEventWrite) throw Error('Accepted owner event was incorrectly promoted to a new epoch')
+    async query(sql: string, params?: unknown[]) {
+      if (['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql)) {
+        assert.equal(params, undefined)
+        boundaries.push(sql)
         return { rows: [] }
       }
-      throw Error('Unexpected storage read')
+      if (sql.startsWith('SELECT e.payload FROM coordinator_events e WHERE e.id=$1')) {
+        assert.equal(compact(sql), `SELECT e.payload FROM coordinator_events e WHERE e.id=$1 AND e."userId"=$2 AND e."botId" IS NOT DISTINCT FROM $3::uuid AND (e."issueId" IS NULL OR e."issueId"=$4) AND e.kind='user_message' AND EXISTS(SELECT 1 FROM agent_runs r WHERE r.id=$5 AND r."userId"=$2 AND r."issueId"=$4)`)
+        assert.deepEqual(params, [sourceEventId, 'owner', null, 'issue', runId])
+        return { rows: [{ payload: { text: 'The original accepted request' } }] }
+      }
+      if (sql.startsWith('INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt","createdAt")')) {
+        assert.equal(compact(sql), `INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,tier,"deliveredAt","createdAt") SELECT $1,$2,$3,$4,'user_message',$5,$6,'background',now(),"createdAt" FROM coordinator_events WHERE id=$7 ON CONFLICT DO NOTHING`)
+        assert.ok(params)
+        assert.equal(params.length, 7)
+        assert.match(String(params[0]), /^[0-9a-f-]{36}$/)
+        assert.deepEqual(params.slice(1, 4), ['owner', null, 'issue'])
+        assert.equal(params[4], `thread-source:${params[0]}`)
+        assert.deepEqual(JSON.parse(String(params[5])), { text: 'The original accepted request', source: 'thread_continuation', previousRunId: runId, originEventId: sourceEventId, postedToChat: true })
+        assert.equal(params[6], sourceEventId)
+        writes.push(sql)
+        assert.equal(allowEventWrite, true, 'Accepted owner event must not be promoted to a new epoch')
+        return { rows: [] }
+      }
+      assert.fail('Unexpected storage query')
     },
     release() { released = true },
   }
@@ -113,13 +152,15 @@ function fixture(allowEventWrite = false) {
       return { rows: [{ workspaceId: workspaceProbe.persistedWorkspaceId }] }
     },
     async connect() {
-      assert.equal(workspaceProbe.active, true, 'APP checkout follows the real Workspace lease')
-      assert.deepEqual(workspaceProbe.locks, ['workspace', 'member'])
+      assert.equal(workspaceProbe.depth, 2, 'APP checkout follows both real Workspace and resource leases')
+      assert.deepEqual(workspaceProbe.locks, admittedLocks)
+      requireProjectResourceLease('owner', workspaceId)
+      connections++
       assert.equal(workspaceProbe.memberAllowed, true)
       return client
     },
   } as unknown as Pool
-  return { pool, writes, boundaries, released: () => released }
+  return { pool, writes, boundaries, released: () => released, connections: () => connections }
 }
 
 test('forwarding the already accepted owner event keeps the current executor and request epoch', async () => {
@@ -130,8 +171,10 @@ test('forwarding the already accepted owner event keeps the current executor and
   assert.deepEqual(f.writes, [])
   assert.deepEqual(f.boundaries, ['BEGIN', 'COMMIT'])
   assert.equal(f.released(), true)
-  assert.deepEqual(workspaceProbe.locks, ['workspace', 'member'])
-  assert.equal(workspaceProbe.active, false)
+  assert.deepEqual(workspaceProbe.locks, admittedLocks)
+  assert.equal(workspaceProbe.depth, 0)
+  assert.equal(f.connections(), 1)
+  assert.throws(() => requireProjectResourceLease('owner', workspaceId), { code: 'projectEnvironmentUnavailable' })
 })
 
 test('replaying an accepted event cannot resume a cancelled or revoked task', async () => {
@@ -140,6 +183,9 @@ test('replaying an accepted event cannot resume a cancelled or revoked task', as
     await assert.rejects(continueActiveFactoryRequest(f.pool, 'owner', runId, 'Original request', sourceEventId), { code: 'factoryStopped' })
     assert.equal(f.boundaries.at(-1), 'ROLLBACK')
     assert.equal(f.released(), true)
+    assert.equal(f.connections(), 1)
+    assert.deepEqual(workspaceProbe.locks, admittedLocks)
+    assert.equal(workspaceProbe.depth, 0)
   }
 })
 
@@ -153,6 +199,8 @@ test('an accepted event still requires persisted tenant ownership and active mem
     assert.deepEqual(f.writes, [])
     assert.deepEqual(f.boundaries, [], 'refusal happens before any APP transaction')
     assert.equal(f.released(), false)
-    assert.equal(workspaceProbe.active, false)
+    assert.equal(f.connections(), 0)
+    assert.deepEqual(workspaceProbe.locks, missing === 'tenant' ? [] : ['workspace', 'member'])
+    assert.equal(workspaceProbe.depth, 0)
   }
 })

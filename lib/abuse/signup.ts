@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
 import { APIError } from 'better-auth'
 import { auditRequestContext } from '../audit/events'
 import { localTestAccountsMode } from '@mikka/protocol/local-test-mode'
+import { runtimeResourcePath } from '../runtime-resource'
+import { deploymentStage } from '../deployment-stage.mjs'
 const domains = new Set(
   readFileSync(
-    join(process.cwd(), 'lib/abuse/data/disposable-email-domains.txt'),
+    runtimeResourcePath('lib/abuse/data/disposable-email-domains.txt'),
     'utf8',
   )
     .split(/\r?\n/)
@@ -35,9 +36,10 @@ export async function verifyTurnstile(
   env: Record<string, string | undefined> = process.env,
   fetchImpl: typeof fetch = fetch,
 ) {
+  const production = deploymentStage(env) === 'production'
   const secret = env.TURNSTILE_SECRET_KEY
   if (!secret) {
-    if (env.VERCEL_ENV === 'production') {
+    if (production) {
       console.error('signup_turnstile_not_configured')
       failure('SERVICE_UNAVAILABLE', 'SIGNUP_VERIFICATION_UNAVAILABLE')
     }
@@ -62,7 +64,7 @@ export async function verifyTurnstile(
     if (!response.ok || result.success !== true)
       failure('BAD_REQUEST', 'TURNSTILE_INVALID')
     if (
-      env.VERCEL_ENV === 'production' &&
+      production &&
       !(
         result.hostname === 'aspectlylabs.com' ||
         result.hostname?.endsWith('.aspectlylabs.com')

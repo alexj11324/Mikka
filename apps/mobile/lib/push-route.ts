@@ -30,3 +30,13 @@ export function pushTarget(data: unknown): string {
   if (run) return `/thread/${run}`
   return chat
 }
+
+/** Resolve a task link against its own activity. Null means its anchor is absent. */
+export function taskLinkAttempt(
+  taskId: string,
+  attempt: string | undefined,
+  detail: { task: { id: string }; activity: readonly { kind: string; runId?: string }[] } | null | undefined,
+): string | null | undefined {
+  if (!attempt || detail?.task.id !== taskId) return undefined
+  return detail.activity.some(item => item.kind === 'attempt' && item.runId === attempt) ? attempt : null
+}

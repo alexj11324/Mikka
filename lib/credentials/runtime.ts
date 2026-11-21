@@ -11,6 +11,7 @@ import { credentialKms } from './kms'
 import { isCloudEdition } from '@/lib/edition'
 import { CredentialStore, type BrowserTarget } from './store'
 import { credentialVaultEnabled } from './feature'
+import { credentialRuntimeEnvironment } from './runtime-identity'
 
 export const credentialStore = new CredentialStore(pool, credentialKms('app'))
 export async function credentialActor(request: Request) {
@@ -66,15 +67,16 @@ export async function executeCredentialLease(lease: string, origin: string, scop
     if (result.status !== 'guarded') notifySubagentEvents(scope)
     return result
   }
-  const broker = new URL(process.env.CREDENTIAL_BROKER_URL ?? '')
-  if (broker.protocol !== 'https:' || !broker.hostname.endsWith('.vercel.app') || broker.pathname !== '/' || broker.username || broker.password || broker.search || broker.hash) throw new CredentialError()
+  const cloudflare = credentialRuntimeEnvironment()
+  const broker = new URL(cloudflare ? 'https://broker.internal' : process.env.CREDENTIAL_BROKER_URL ?? '')
+  if (!cloudflare && (broker.protocol !== 'https:' || !broker.hostname.endsWith('.vercel.app') || broker.pathname !== '/' || broker.username || broker.password || broker.search || broker.hash)) throw new CredentialError()
   let dispatched = false, responseReceived = false
   try {
-    const identity = await getVercelOidcToken()
+    const identity = cloudflare ? null : await getVercelOidcToken()
     dispatched = true
     const response = await fetch(new URL('/api/fill', broker), { method: 'POST', headers: {
-      'Content-Type': 'application/json', Authorization: `Bearer ${identity}`,
-      ...(process.env.CREDENTIAL_BROKER_PREVIEW_BYPASS ? { 'x-vercel-protection-bypass': process.env.CREDENTIAL_BROKER_PREVIEW_BYPASS } : {}),
+      'Content-Type': 'application/json', ...(identity ? { Authorization: `Bearer ${identity}` } : {}),
+      ...(!cloudflare && process.env.CREDENTIAL_BROKER_PREVIEW_BYPASS ? { 'x-vercel-protection-bypass': process.env.CREDENTIAL_BROKER_PREVIEW_BYPASS } : {}),
     }, body: JSON.stringify({ lease }), redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(40_000) })
     responseReceived = true
     if (!response.ok) {

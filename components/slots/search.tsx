@@ -1,6 +1,6 @@
-// The default search slot (docs/ui-overlay.md): none. ⌘K draws GlobalSearch's own palette
-// (components/nav/global-search.tsx); a layer that draws its own exports a component here.
-import type { ComponentType } from 'react'
 import type { SearchPaletteProps } from './search-contract'
 
-export const SearchPalette: ComponentType<SearchPaletteProps> | null = null
+/** Public build-time contract. The official renderer links the provider. */
+export function SearchPalette(_props: SearchPaletteProps): never {
+  throw new Error('UI_SLOT_REQUIRES_OFFICIAL_CLIENT: search')
+}

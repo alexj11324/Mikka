@@ -107,6 +107,9 @@ const run={ownerId:owner,botId:null,workspaceId:null,runId}
  const botService=createApprovedWrites(scopedPool,provider,action,{modelRun:{...botScope,runId:botRun},guard:membership,guardForRun:()=>membership})
  await assert.rejects(botService.proposeFromRun(input,randomUUID()),/writeDenied/);assert.equal(writes,4)
  await settings.setWorkspace(botScope,{[action]:'allow'},'1')
+ // A Bot head deny is ignored: the workspace's allow is the whole decision.
+ await scopedPool.query('update agent_kit_heads set external_write_permissions=$1 where owner_id=$2 and bot_key=$3',[{ [action]: 'deny' },owner,botId])
+ assert.equal((await botService.proposeFromRun(input,randomUUID())).status,'done');assert.equal(writes,5)
  let release!:()=>void, entered!:()=>void
  const started=new Promise<void>(resolve=>{entered=resolve}), proceed=new Promise<void>(resolve=>{release=resolve})
  const slowProvider:WriteProvider={...provider,execute:async ({beforeSend})=>{await beforeSend();entered();await proceed;writes++;return {providerObjectId:'slow',evidenceDigest:'b'.repeat(64)}}}
@@ -116,7 +119,7 @@ const run={ownerId:owner,botId:null,workspaceId:null,runId}
  const change=settings.setWorkspace(botScope,{[action]:'deny'},'2').then(value=>{workspaceRevoked=true;return value})
  await new Promise(resolve=>setTimeout(resolve,100));assert.equal(workspaceRevoked,false)
  release();assert.equal((await effect).status,'done');assert.equal((await change).version,'3')
- await assert.rejects(botService.proposeFromRun(input,randomUUID()),/writeDenied/);assert.equal(writes,5)
+ await assert.rejects(botService.proposeFromRun(input,randomUUID()),/writeDenied/);assert.equal(writes,6)
  console.log('isolated PG/HTTP: deny zero writes; allow once without pending; ask one decision; replay no resend; revoked denied')
 } finally { await pool?.end(); await admin.end() }
 })

@@ -12,6 +12,7 @@ The key is sent only to the E2B API (by the SDK, and in the X-API-Key header of
 the publish call); it is never printed, logged or written to disk.
 """
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -48,10 +49,53 @@ KINDS = {
     'claude': {'base': 'claude', 'harnesses': ()},
     'codex': {'base': 'codex', 'harnesses': ()},
 }
-ANONYMOUS_WORKER_READY = ("test -s /home/user/.mikka/preloaded.pid && "
-                          "read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid && "
-                          "kill -0 \"$mikka_preloaded_pid\" && "
-                          "tr '\\0' '\\n' < \"/proc/$mikka_preloaded_pid/cmdline\" | grep -Fxq -- '--wait-bootstrap'")
+ANONYMOUS_WORKER_CHECKS = (
+    ('pid_file', 'test -s /home/user/.mikka/preloaded.pid'),
+    ('pid_read', 'read -r mikka_preloaded_pid < /home/user/.mikka/preloaded.pid'),
+    ('pid_alive', 'kill -0 "$mikka_preloaded_pid"'),
+    ('worker_waiting', "tr '\\0' '\\n' < \"/proc/$mikka_preloaded_pid/cmdline\" | grep -Fxq -- '--wait-bootstrap'"),
+)
+ANONYMOUS_WORKER_READY = ' && '.join(command for _phase, command in ANONYMOUS_WORKER_CHECKS)
+PREBUILT_START_PHASES = frozenset(('entry', 'preconditions_verified', 'guard_prepare', 'guard_prepared',
+                                 'control_install', 'control_installed', 'worker_exec'))
+PREBUILT_READY_PHASES = frozenset((*[phase for phase, _command in ANONYMOUS_WORKER_CHECKS],
+                                 'ingress_ready', 'control_fence', 'bootstrap_absent', 'device_absent',
+                                 'viewer_key_absent', 'viewer_unauthorized', 'official_files'))
+
+
+# The fence check ships inside the ready command itself, from this builder's
+# source. It never depends on the worker version the template installs.
+FENCE_CHECK = ROOT / 'packages/daemon/scripts/workspace-control-check.py'
+
+
+def fence_check_command():
+    code = base64.b64encode(FENCE_CHECK.read_bytes()).decode()
+    return f"runuser -u user -- python3 -I -c 'import base64;exec(compile(base64.b64decode(\"{code}\"),\"workspace-control-check\",\"exec\"))' >/dev/null"
+
+
+def prebuilt_ready_command(kind):
+    """Preserve every original predicate/order/status and the provider deadline.
+
+    No probe or retry is added. One closed failure line distinguishes a normal
+    first PID-file race from a failing guest check after envd starts the shell.
+    """
+    checks = [*ANONYMOUS_WORKER_CHECKS,
+              ('ingress_ready', 'python3 /opt/mikka/runtime/ingress-v1/guard.py ready "$mikka_preloaded_pid" > /opt/mikka/ingress-ready.json'),
+              # The daemon's user must be able to take the execution fence, or every run would fail at claim.
+              ('control_fence', fence_check_command()),
+              ('bootstrap_absent', 'test ! -e /home/user/.mikka/bootstrap.json'),
+              ('device_absent', 'test ! -e /home/user/.mikka/worker/device.json')]
+    if kind == 'desktop':
+        checks.extend((('viewer_key_absent', 'test ! -e /run/mikka-viewer/key'),
+                       ('viewer_unauthorized', 'test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401')))
+    checks.append(('official_files', f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind}'
+                   ' > /opt/mikka/official-files-ready.json'))
+    command = ' && '.join(f'mikka_ready_phase={phase} && {predicate}' for phase, predicate in checks)
+    return (command + '; mikka_ready_status=$?; '
+            'if [ "$mikka_ready_status" -ne 0 ]; then '
+            'printf "mikka-prebuilt-ready-failed %s %s\\n" "$mikka_ready_phase" "$mikka_ready_status" >&2; fi; '
+            'exit "$mikka_ready_status"')
+
 # One deadline includes reading/verifying selected native CLI bytes and the
 # real anonymous catalogue exchange. Never warm files in a separate command.
 # The standalone official-instance installer has no snapshot receipt. Its
@@ -305,17 +349,10 @@ def build(name, ref='HEAD', api_key=None, on_build_logs=None, kind='desktop', cp
             template = template.copy(runtime_file, f'/opt/mikka/{runtime_file}')
         template = (template
                     .run_cmd(f'python3 /opt/mikka/official-files.py capture /opt/mikka/official-files-before.json --kind {kind} --cli-manifest /opt/mikka/original-cli.json', user='root')
-                    .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind}', user='root')
+                    .run_cmd(f'bash /opt/mikka/instance-bootstrap.sh {sha} {worker_sha} {kind} prebuild', user='root')
                     .run_cmd(NPM_RUNTIME_CHECK, user='user')
                     .run_cmd('python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --receipt /opt/mikka/official-files-conservation.json', user='root'))
-        ready = (ANONYMOUS_WORKER_READY + ' && '
-                 'test ! -e /home/user/.mikka/bootstrap.json && '
-                 'test ! -e /home/user/.mikka/worker/device.json')
-        if kind == 'desktop':
-            ready += (' && test ! -e /run/mikka-viewer/key && '
-                      'test "$(curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:6080/vnc)" = 401')
-        ready += (f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind}'
-                  ' > /opt/mikka/official-files-ready.json')
+        ready = prebuilt_ready_command(kind)
         # E2B's template builder freezes the initialized process. New instances
         # resume the already imported worker and receive a fresh normal handoff.
         template = template.set_user('root').set_start_cmd('bash /opt/mikka/start-prebuilt.sh', ready)
@@ -347,14 +384,20 @@ def assert_new_template(name, api_key):
         raise
     raise ValueError('template_name_already_exists')
 
+def runtime_source(environ=os.environ):
+    """The commit being published: the Cloudflare-served product, or this run's own commit."""
+    return environ.get('MIKKA_RUNTIME_SOURCE') or environ.get('GITHUB_SHA', '')
+
 def release_metadata(environ=os.environ):
     """Attach only public workflow identity so a cancelled job is recoverable."""
     identity = {'application': 'mikka-template-release'}
-    if (environ.get('GITHUB_REPOSITORY') == 'alexj11324/Mikka'
-            and re.fullmatch(r'[a-f0-9]{40}', environ.get('GITHUB_SHA', ''))
+    if ((environ.get('GITHUB_REPOSITORY'), environ.get('GITHUB_REPOSITORY_OWNER_ID')) in (
+            ('alexj11324/Mikka', '183887963'), ('aspectly-labs/Mikka', '359279274'))
+            and environ.get('GITHUB_REPOSITORY_ID') == '1427517699'
+            and re.fullmatch(r'[a-f0-9]{40}', runtime_source(environ))
             and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ID', ''))
             and re.fullmatch(r'[1-9][0-9]*', environ.get('GITHUB_RUN_ATTEMPT', ''))):
-        identity.update(sourceCommit=environ['GITHUB_SHA'], runId=environ['GITHUB_RUN_ID'], runAttempt=environ['GITHUB_RUN_ATTEMPT'])
+        identity.update(sourceCommit=runtime_source(environ), runId=environ['GITHUB_RUN_ID'], runAttempt=environ['GITHUB_RUN_ATTEMPT'])
     return identity
 
 
@@ -576,8 +619,22 @@ def probe_models(template_id, kind, api_key, source_commit, worker_sha, sandbox_
             failure.add_note('model_probe_cleanup_failed')
 
 
+CONSERVATION_RECEIPT_MAX_BYTES = 1024 * 1024
 CONSERVATION_DIAGNOSTIC_MAX_BYTES = 262144
 CONSERVATION_DIAGNOSTIC_MAX_CHANGES = 512
+
+
+def fresh_conservation_command(kind):
+    """Keep the fresh-create predicates, order and exit status; name a failure."""
+    if kind not in KINDS:
+        raise ValueError('e2b_finalization_policy_invalid')
+    checks = [*ANONYMOUS_WORKER_CHECKS, ('official_files',
+        f'python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json')]
+    command = ' && '.join(f'mikka_conservation_check={phase} && {predicate}' for phase, predicate in checks)
+    return (command + '; mikka_conservation_status=$?; '
+            'if [ "$mikka_conservation_status" -ne 0 ]; then '
+            'printf "mikka-conservation-check-failed %s %s\\n" "$mikka_conservation_check" "$mikka_conservation_status" >&2; fi; '
+            'exit "$mikka_conservation_status"')
 
 
 def conservation_diagnostic(error, kind, stage):
@@ -596,6 +653,13 @@ def conservation_diagnostic(error, kind, stage):
         return detail
     if len(stderr) > CONSERVATION_DIAGNOSTIC_MAX_BYTES or len(stderr.encode('utf-8', errors='replace')) > CONSERVATION_DIAGNOSTIC_MAX_BYTES:
         return {**detail, 'code': 'conservation_diagnostic_too_large'}
+    checks = []
+    for line in stderr.splitlines():
+        match = re.fullmatch(r'mikka-conservation-check-failed (pid_file|pid_read|pid_alive|worker_waiting|official_files) ([1-9][0-9]{0,2})', line)
+        if match and 1 <= int(match[2]) <= 255:
+            checks.append((match[1], int(match[2])))
+    if len(checks) == 1 and type(exit_code) is int and checks[0][1] == exit_code:
+        detail['check'] = checks[0][0]
     kinds = {'file', 'link', 'directory', 'special'}
     fields = {'kind', 'sha256', 'mode', 'uid', 'gid', 'target', 'type', 'device'}
     def path(value, absolute=False):
@@ -638,7 +702,7 @@ def conservation_diagnostic(error, kind, stage):
     return detail
 
 
-def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
+def probe_conservation(template_id, api_key, kind, sandbox_factory=None, *, on_diagnostic=None):
     """Check the final image on a disposable instance, never a timed instance.
 
     E2B also performs provider setup after its start/ready command. Keep the
@@ -656,6 +720,7 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
         began = now
     stage('create')
     phase = 'preload_receipts'
+    failure = None
     try:
         conservation = json.loads(sandbox.files.read('/opt/mikka/official-files-conservation.json', user='root', request_timeout=30))
         conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/official-files-ready.json', user='root', request_timeout=30))
@@ -664,25 +729,47 @@ def probe_conservation(template_id, api_key, kind, sandbox_factory=None):
         guard = official_files_guard()
         guard.validate_receipt(conservation, kind)
         phase = 'fresh_scan'
-        result = sandbox.commands.run(ANONYMOUS_WORKER_READY + f' && python3 /opt/mikka/official-files.py verify /opt/mikka/official-files-before.json --e2b-finalization {kind} --receipt /opt/mikka/fresh-conservation.json >/dev/null',
+        result = sandbox.commands.run(fresh_conservation_command(kind),
                                       user='root', timeout=300, request_timeout=310)
         if result.exit_code != 0:
             raise RuntimeError('official_conservation_missing')
         stage('fresh_scan')
         phase = 'fresh_receipt'
         conservation['preloadFinalization'] = conservation['finalization']
-        conservation['finalization'] = json.loads(sandbox.files.read('/opt/mikka/fresh-conservation.json', user='root', request_timeout=30))
+        # The verifier closes its exclusive receipt file before emitting this
+        # same JSON. Consume the completed command's output, without a second
+        # file-transfer request after the successful scan.
+        stdout = result.stdout
+        try:
+            if not isinstance(stdout, str) or len(stdout.encode('utf-8')) > CONSERVATION_RECEIPT_MAX_BYTES:
+                raise ValueError('official_conservation_invalid')
+            conservation['finalization'] = json.loads(stdout)
+        except (ValueError, TypeError, UnicodeError, RecursionError) as error:
+            raise ValueError('official_conservation_invalid') from error
         stage('fresh_receipt')
         phase = 'fresh_validation'
         return guard.validate_receipt(conservation, kind)
     except Exception as error:
+        failure = error
         # Emit before finally destroys the disposable instance. Never print
         # SDK stdout/stderr or exception messages; keep the original failure.
-        print('mikka-conservation-failed ' + json.dumps(conservation_diagnostic(error, kind, phase), separators=(',', ':')),
+        detail = conservation_diagnostic(error, kind, phase)
+        if on_diagnostic is not None:
+            try:
+                on_diagnostic(detail)
+            except BaseException:
+                # Observation cannot replace the original failure or its cleanup.
+                error.add_note('conservation_diagnostic_callback_failed')
+        print('mikka-conservation-failed ' + json.dumps(detail, separators=(',', ':')),
               file=sys.stderr, flush=True)
         raise
     finally:
-        sandbox.kill()
+        try:
+            sandbox.kill()
+        except Exception:
+            if failure is None:
+                raise
+            failure.add_note('conservation_probe_cleanup_failed')
 
 
 def observed_mcp_business_evidence(value, run_hash, harness):
@@ -819,7 +906,11 @@ def observed_bootstrap_adoption(value, run_id_hash, harness):
 
 
 def verify_release_evidence(report):
-    """Publishing cannot substitute a model-list probe for subscription execution."""
+    """Publish only built candidates of this source with their conservation receipts.
+
+    E2B runs on the user's own key: the release keeps build-time checks (the
+    template builds, both CLIs start, the fence opens) and no subscription run.
+    """
     if not re.fullmatch(r'[a-f0-9]{40}', report.get('sourceCommit', '')) or not re.fullmatch(r'[a-f0-9]{40}', report.get('workerSha', '')):
         raise ValueError('release_source_invalid')
     for kind in KINDS:
@@ -833,34 +924,6 @@ def verify_release_evidence(report):
             official_files_guard().validate_receipt(proof, kind)
         except (ValueError, KeyError, TypeError):
             raise ValueError(f'release_conservation_invalid {kind}') from None
-    subscriptions = report.get('subscriptionAcceptance', {})
-    for kind, harness, model in [('claude', 'claude_code', 'claude-haiku-5-5'), ('codex', 'codex', 'gpt-6-luna')]:
-        row = subscriptions.get(kind, {})
-        ack, authorization, tool = row.get('agentAcceptance', {}), row.get('runtimeAuthorization', {}), row.get('toolEvidence')
-        if (row.get('status') != 'passed' or row.get('templateId') != report['templates'][kind]['templateId']
-                or row.get('sourceCommit') != report['sourceCommit'] or row.get('workerSha') != report['workerSha']
-                or row.get('harness') != harness or row.get('model') != model
-                or row.get('credentialRoute') != 'subscription' or row.get('replyVerified') is not True
-                or row.get('replyVerifiedAfterTool') is not True or not isinstance(tool, dict)
-                or set(tool) != {'toolCallHash', 'outcome'} or tool.get('outcome') != 'ok'
-                or not isinstance(tool.get('toolCallHash'), str) or not re.fullmatch(r'[a-f0-9]{16}', tool['toolCallHash'])
-                or not re.fullmatch(r'[a-f0-9]{64}', row.get('officialBinarySha256', ''))
-                or not isinstance(row.get('officialCliVersion'), str) or not row['officialCliVersion']
-                or not row.get('runId') or not row.get('deviceId')
-                or ack.get('harness') != harness or ack.get('runIdHash') != hashlib.sha256(row['runId'].encode()).hexdigest()[:16]
-                or ack.get('kind') != ('claude_user_ack' if harness == 'claude_code' else 'codex_turn_start_ack')
-                or type(ack.get('at')) is not int or ack['at'] <= 0
-                or type(ack.get('ms')) not in (int, float) or not math.isfinite(ack['ms']) or ack['ms'] < 0
-                or authorization.get('source') != 'http_server_link' or authorization.get('complete') is not True
-                or authorization.get('scope') != 'daemon_http_server_link_and_task_fetch'
-                or authorization.get('truncated') is not False or type(authorization.get('extraRemoteCalls')) is not int or authorization['extraRemoteCalls'] != 0
-                or authorization.get('hostAuthorizationComplete') is not True or authorization.get('allFirstPartyHttpComplete') is not False
-                or authorization.get('basis') != 'host_authorization_census_and_closed_mcp_business_paths'
-                or type(authorization.get('observedProviderEvents')) is not int or authorization['observedProviderEvents'] < 1
-                or authorization.get('officialDelivery') != 'best_effort_not_a_complete_call_count'
-                or not observed_mcp_business_evidence(authorization.get('mcpHttpTiming'), ack.get('runIdHash'), harness)
-                or not observed_bootstrap_adoption(row.get('bootstrapAcceptance'), ack.get('runIdHash'), harness)):
-            raise ValueError(f'release_subscription_acceptance_missing {kind}')
     return report
 
 def publish(template_id, build_id, api_key, opener=urllib.request.urlopen):
@@ -882,7 +945,7 @@ def main(argv=None):
     parser.add_argument('--name', help='Prefix for the new versioned template names (<prefix>-<kind>); do not reuse a production alias')
     parser.add_argument('--kind', action='append', choices=sorted(KINDS), help='Template to build; repeat for several (default: all)')
     parser.add_argument('--source-ref', default='HEAD', help='Git commit to package; defaults to HEAD')
-    parser.add_argument('--publish-verified', type=Path, help='Publish only a release report that includes conservation and both real subscription passes')
+    parser.add_argument('--publish-verified', type=Path, help='Publish only a release report of this source with both templates\' conservation receipts')
     parser.add_argument('--json', action='store_true', help='Print one JSON object on stdout; build logs go to stderr')
     parser.add_argument('--worker-hash', action='store_true', help='Only print the worker hash of --source-ref; builds nothing')
     args = parser.parse_args(argv)

@@ -20,12 +20,12 @@ export const modelRoutingEvidenceSchema = z.discriminatedUnion('version', [
 
 const reference = z.string().min(1).max(200)
 const resource = z.object({
-  kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'mcp']),
+  kind: z.enum(['device', 'api_key', 'subscription', 'e2b', 'cloudflare_sponsored', 'mcp']),
   id: reference, ownerId: reference, access: z.enum(['owner', 'workspace_share']),
   revision: z.string().max(200).optional(),
 })
 const account = z.object({
-  kind: z.enum(['api_key', 'subscription', 'native_login', 'local_device', 'e2b']),
+  kind: z.enum(['api_key', 'subscription', 'native_login', 'local_device', 'e2b', 'cloudflare_sponsored']),
   ownerId: reference, resourceId: reference,
   amount: z.enum(['provider_unknown', 'metered', 'not_applicable']),
 })
@@ -35,6 +35,16 @@ const identity = z.object({
   resourceBindings: z.array(resource), billingAccount: z.object({ model: account, runtime: account }),
   personalResourcePolicy: z.literal('requester_only'),
 })
+const profileSkill = z.object({
+  id: z.string().min(1).max(160), name: z.string().min(1).max(80),
+  version: z.number().int().positive().nullable().optional(), digest: z.string().max(64).nullable().optional(),
+  source: z.enum(['official', 'personal', 'workspace', 'repository']),
+})
+const loadedProfileSkill = z.object({
+  id: z.string().min(1).max(160), name: z.string().min(1).max(80),
+  source: z.enum(['official', 'personal', 'workspace', 'repository']),
+  digest: z.string().max(64), loadedAt: z.iso.datetime(),
+})
 const evidence = z.object({ run: z.object({
   id: z.uuid(), harness: z.string().max(200).nullable(), model: z.string().max(200).nullable(),
   credentialType: z.enum(['subscription', 'api_key', 'unknown']),
@@ -42,6 +52,22 @@ const evidence = z.object({ run: z.object({
   executionIdentity: identity.nullable(),
   labels: executionIdentityLabelsSchema.nullable().optional().catch(null),
   modelRouting: modelRoutingEvidenceSchema.nullable().optional().catch(null),
+  /** The task followed the dispatching chat's model rather than one someone named. */
+  modelFollowed: z.boolean().nullable().optional().catch(null),
+  // What this run's prompt carried of its workspace skills: the bodies it
+  // inlined, and the ones it only named because the section would not hold
+  // them whole. Separate from `configuredSkills`/`loadedSkills` below, which
+  // describe Profile Skills the agent fetches on demand instead.
+  skillPrompt: z.object({
+    budgetChars: z.number().int().nonnegative(),
+    usedChars: z.number().int().nonnegative(),
+    inlined: z.array(z.string().max(80)),
+    deferred: z.array(z.string().max(80)),
+  }).nullable().optional().catch(null),
+  /** Frozen selected Skills, without their bodies. */
+  configuredSkills: z.array(profileSkill).max(24).nullable().optional().catch(null),
+  /** Daemon receipted loads only; absent on a run that loaded none or predates this field. */
+  loadedSkills: z.array(loadedProfileSkill).max(24).nullable().optional().catch(null),
   agentProfile: z.object({
     profileId: z.string().min(1).max(200), name: z.string().max(80), version: z.number().int().positive(), digest: z.string().max(200),
     source: z.enum(['explicit', 'decision', 'default']), reason: z.string().max(4000),

@@ -9,7 +9,7 @@ import { issues } from '../lib/db/schema'
 import { idempotentIssueMutation } from '../lib/mcp/issue-mutation'
 import { actAs } from '../lib/acting-user'
 import { createCoordinatorRegistry } from '../workflows/coordinator/tools'
-import { takeInbox, failTurn, retryFailedTurn, releaseLease } from '../lib/coordinator/store'
+import { takeInbox, failTurn, retryFailedTurn, releaseLease } from '@/tests/support/legacy-coordinator-store'
 import { seedCoordinator } from './support/coordinator-bot'
 import { overrideDeploymentSwitch } from '../lib/deployment-switches'
 async function main() {

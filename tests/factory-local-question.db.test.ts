@@ -61,8 +61,8 @@ test('a local Factory question preserves the original Profile, worker definition
   const model = 'gpt-6-luna'
   const harnesses = [{ harness: 'codex', installed: true, subscriptionBroker: true,
     models: [model] }]
-  await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses)
-    VALUES ($1,$2,'Local question fixture','local','laptop',true,now(),$3)`, [deviceId, owner, JSON.stringify(harnesses)])
+  await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt")
+    VALUES ($1,$2,'Local question fixture','local','laptop',true,now(),$3,now())`, [deviceId, owner, JSON.stringify(harnesses)])
   await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name)
     VALUES ($1,$2,$3,'codex','Local question worker')`, [agentId, owner, deviceId])
   await pool.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject","modelCatalog",quota)
@@ -184,6 +184,9 @@ test('a local Factory question preserves the original Profile, worker definition
     }
   })
   await pool.query('UPDATE agents SET instructions=$2 WHERE id=$1', [agentId, 'New guidance for future tasks only.'])
+  // The answered question resumes the paused run's entry verbatim.
+  const questionOriginRef = { kind: 'slack', teamId: 'T1', channelId: 'C1', threadTs: '1.2' }
+  await pool.query(`UPDATE agent_runs SET origin='slack',"originRef"=$2 WHERE id=$1`, [initial.runId, JSON.stringify(questionOriginRef)])
   const requestId = randomUUID()
   const [accepted, concurrent] = await Promise.all([
     sendThreadMessage(owner, initial.runId, text, human, requestId),
@@ -195,6 +198,8 @@ test('a local Factory question preserves the original Profile, worker definition
   assert.ok(answered.continuationRunId)
   const next = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [answered.continuationRunId])).rows[0]
   assert.equal(next.status, 'queued')
+  assert.equal(next.origin, 'slack', 'the question continuation copies the origin run’s entry')
+  assert.deepEqual(next.originRef, questionOriginRef)
   for (const field of ['agentId', 'deviceId', 'deviceRepoId', 'baseBranch', 'botId'])
     assert.equal(next[field], original[field], field)
   assert.equal(next.agentDefinition.definitionDigest, original.agentDefinition.definitionDigest)

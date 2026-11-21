@@ -4,7 +4,10 @@ import { StyleSheet, TextInput, View } from 'react-native'
 import { Avatar, Row, SettingsPage } from '@/components/settings'
 import { Text } from '@/components/Text'
 import { Group } from '@/components/ui'
+import { api, apiConnection } from '@/lib/api'
 import { authClient } from '@/lib/auth'
+import { apiCache } from '@/lib/api-cache'
+import { saveProfileName } from '@/lib/profile-name'
 import { useSettings } from '@/lib/settings'
 import { colors, font } from '@/lib/theme'
 import { openAccountDeletion } from '@/lib/web'
@@ -13,6 +16,7 @@ import { mobileMessages as messages } from '@/lib/messages'
 /** 个人资料: photo and name; email read-only (Comma iOS Profile, Claude). The name saves when the field is left. */
 export default function ProfileScreen() {
   const { data, setData } = useSettings()
+  const { refetch } = authClient.useSession()
   const [name, setName] = useState(data?.user.name ?? '')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
@@ -26,10 +30,14 @@ export default function ProfileScreen() {
     if (next === data.user.name) { dirty.current = false; setName(next); setProblem(null); return }
     saving.current = true; setBusy(true); setProblem(null)
     try {
-      const result = await authClient.updateUser({ name: next })
-      if (result.error) throw new Error('name_save_failed')
-      setData(current => current && { ...current, user: { ...current.user, name: next } })
-      dirty.current = false; setName(next)
+      const connection = apiConnection()
+      const context = apiCache.context()
+      const saved = await saveProfileName(next, (path, init) => api(path, init, connection))
+      apiCache.commit(context, () => {
+        setData(current => current && { ...current, user: { ...current.user, name: saved } })
+        dirty.current = false; setName(saved)
+        void refetch({ query: { disableCookieCache: true } })
+      })
     } catch { setProblem('名字未保存，修改已保留。') }
     finally { saving.current = false; setBusy(false) }
   }

@@ -24,22 +24,34 @@ const safeError = error => /^startup_logs_[a-z0-9_]+$/.test(error?.message ?? ''
 const trace = value => ({ ...(/^[a-f0-9]{32}$/.test(value.traceId ?? '') ? { traceId: value.traceId } : {}),
   ...(/^[a-f0-9]{16}$/.test(value.spanId ?? '') ? { spanId: value.spanId } : {}) })
 
-export function sanitizeTimingLog(value, { hashes, workflows }) {
+function sanitizeDispatchTiming(value) {
+  if (value.boundary !== undefined && value.boundary !== 'dispatch_run_entry') return null
+  if (!(value.workflowRunId === null || /^wrun_[A-Za-z0-9]+$/.test(value.workflowRunId ?? ''))
+    || !bounds(value) || !ms(value.totalMs) || typeof value.failed !== 'boolean'
+    || !(value.attempt === null || integer(value.attempt)) || !(value.stepId === null || /^[A-Za-z0-9_-]{1,150}$/.test(value.stepId ?? ''))
+    || !Array.isArray(value.phases) || value.phases.length > 128 || !integer(value.github?.requests) || !ms(value.github?.ms)) return null
+  const phases = []
+  for (const phase of value.phases) {
+    if (!DISPATCH.has(phase?.phase) || !ms(phase.ms)) return null
+    phases.push({ phase: phase.phase, ms: phase.ms })
+  }
+  return { msg: value.msg, workflowRunId: value.workflowRunId, stepId: value.stepId, attempt: value.attempt,
+    ...(value.boundary === 'dispatch_run_entry' ? { boundary: value.boundary } : {}),
+    startedAt: value.startedAt, endedAt: value.endedAt, totalMs: value.totalMs, failed: value.failed, phases,
+    github: { requests: value.github.requests, ms: value.github.ms } }
+}
+
+export function sanitizeTimingLog(value, { hashes, workflows, ownedIntervals = [] }) {
   if (!value || typeof value !== 'object') return null
   if (value.msg === 'dispatch_timing') {
-    if (value.boundary !== undefined && value.boundary !== 'dispatch_run_entry') return null
-    if (!workflows.has(value.workflowRunId) || !bounds(value) || !ms(value.totalMs) || typeof value.failed !== 'boolean'
-      || !(value.attempt === null || integer(value.attempt)) || !(value.stepId === null || /^[A-Za-z0-9_-]{1,150}$/.test(value.stepId ?? ''))
-      || !Array.isArray(value.phases) || value.phases.length > 128 || !integer(value.github?.requests) || !ms(value.github?.ms)) return null
-    const phases = []
-    for (const phase of value.phases) {
-      if (!DISPATCH.has(phase?.phase) || !ms(phase.ms)) return null
-      phases.push({ phase: phase.phase, ms: phase.ms })
-    }
-    return { msg: value.msg, workflowRunId: value.workflowRunId, stepId: value.stepId, attempt: value.attempt,
-      ...(value.boundary === 'dispatch_run_entry' ? { boundary: value.boundary } : {}),
-      startedAt: value.startedAt, endedAt: value.endedAt, totalMs: value.totalMs, failed: value.failed, phases,
-      github: { requests: value.github.requests, ms: value.github.ms } }
+    const clean = sanitizeDispatchTiming(value)
+    if (!clean) return null
+    if (clean.workflowRunId === null) {
+      if (clean.failed || clean.boundary !== 'dispatch_run_entry' || !ownedIntervals.some(interval =>
+        interval?.msg === 'cloud_startup_timing' && interval.stage === 'cloud.thread.ensure' && hashes.has(interval.runIdHash)
+        && bounds(interval) && interval.startedAt >= clean.startedAt && interval.endedAt <= clean.endedAt)) return null
+    } else if (!workflows.has(clean.workflowRunId)) return null
+    return clean
   }
   if (!hashes.has(value.runIdHash)) return null
   if (value.msg === 'subscription_native_timing') {
@@ -203,9 +215,10 @@ export function markdown(report) {
  * query with pagination, no periodic polling or production state mutation. */
 export async function collectProductionTimings(report, { token, deploymentId, fetchImpl = fetch, now = Date.now, read: providedRead } = {}) {
   const collection = report.serverLogCollection = { status: 'running', source: 'vercel_observability', records: 0, rawEvents: 0, invalid: 0, truncated: 0 }
-  const logs = [], seen = new Set()
+  const logs = [], pendingDispatch = [], seen = new Set()
   const hashes = new Set(report.samples.map(sample => sample.runIdHash).filter(value => /^[a-f0-9]{16}$/.test(value ?? '')))
   const workflows = new Set(report.samples.map(sample => sample.workflowRunId).filter(value => /^wrun_[A-Za-z0-9]+$/.test(value ?? '')))
+  const nativeHashes = new Set(report.samples.filter(sample => sample.eveSessionId).map(sample => sample.runIdHash).filter(value => hashes.has(value)))
   try {
     if (!token || (!hashes.size && !workflows.size)) fail('scope_missing')
     let read = providedRead
@@ -232,7 +245,7 @@ export async function collectProductionTimings(report, { token, deploymentId, fe
     for (let page = 0; page < 10; page++) {
       const response = await read('/v1/observability/events', { event: 'vercel.log', scope: { ownerId: TEAM, projectIds: [PROJECT] },
         timeRange: { start: collection.windowStart, end: collection.windowEnd }, select: ['deploymentId', 'environment', 'message', 'truncated'],
-        order: 'desc', limit: 1000, filter: `deploymentId:"${deploymentId}" AND environment:production AND (${matching}) AND (dispatch_timing OR cloud_startup_timing OR subscription_native_timing)`,
+        order: 'desc', limit: 1000, filter: `deploymentId:"${deploymentId}" AND environment:production AND (dispatch_timing OR ((${matching}) AND (cloud_startup_timing OR subscription_native_timing)))`,
         ...(cursor ? { cursor } : {}) })
       if (!Array.isArray(response.events) || typeof response.pagination?.hasMore !== 'boolean') fail('response_invalid')
       if (response.meta?.excludedIntervals?.length) fail('intervals_excluded')
@@ -243,10 +256,13 @@ export async function collectProductionTimings(report, { token, deploymentId, fe
         for (const line of (typeof event.message === 'string' ? event.message : '').split('\n')) {
           let raw
           try { raw = JSON.parse(line) } catch { collection.invalid++; continue }
-          const clean = sanitizeTimingLog(raw, { hashes, workflows })
+          // Product-host dispatch has no Workflow identity. Keep only closed
+          // numeric candidates until all pages provide the owned server spans.
+          const pending = raw?.msg === 'dispatch_timing' && raw.workflowRunId === null
+          const clean = pending ? sanitizeDispatchTiming(raw) : sanitizeTimingLog(raw, { hashes, workflows })
           if (!clean) { collection.invalid++; continue }
           const key = JSON.stringify(clean)
-          if (!seen.has(key)) { seen.add(key); logs.push(clean) }
+          if (!seen.has(key)) { seen.add(key); (pending ? pendingDispatch : logs).push(clean) }
         }
       }
       if (!response.pagination.hasMore) { collection.status = collection.truncated || collection.invalid ? 'partial' : 'query_complete'; break }
@@ -255,6 +271,13 @@ export async function collectProductionTimings(report, { token, deploymentId, fe
       cursors.add(next); cursor = next
     }
   } catch (error) { collection.status = 'failed'; collection.error = /^vercel_api_(?:http_[1-5][0-9]{2}|network_unavailable|response_invalid)$/.test(error?.message ?? '') ? error.message : safeError(error) }
+  const ownedIntervals = logs.filter(log => log.msg === 'cloud_startup_timing' && log.stage === 'cloud.thread.ensure' && nativeHashes.has(log.runIdHash))
+  for (const candidate of pendingDispatch) {
+    const clean = sanitizeTimingLog(candidate, { hashes: nativeHashes, workflows, ownedIntervals })
+    if (clean) logs.push(clean)
+    else collection.invalid++
+  }
+  if (collection.status === 'query_complete' && collection.invalid) collection.status = 'partial'
   collection.records = logs.length
   collection.coverage = 'completed_log_query_is_not_proof_of_zero_native_calls'
   report.serverTimingLogs = logs

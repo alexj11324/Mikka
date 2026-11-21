@@ -5,7 +5,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import type { LiveInvalidation } from './events'
@@ -20,8 +20,8 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('group chat keys reach only current members, after the actual writer commits', { skip: !url, timeout: 180_000 }, async t => {
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const nextServer = await import('next/server')
-  mock.module('next/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
+  const nextServer = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...nextServer, after: (work: () => Promise<void>) => { pending.push(work) } } })
   const channelScopes = new Map<string, LiveScope>(), unexpected: string[] = []
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'
@@ -41,7 +41,7 @@ test('group chat keys reach only current members, after the actual writer commit
   })
   const admin = new Pool({ connectionString: url, max: 1 })
   const name = `group_live_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(url!); target.pathname = `/${name}`
   const database = new Pool({ connectionString: target.toString(), max: 6 })
   observePoolCommits(database)
@@ -98,6 +98,18 @@ test('group chat keys reach only current members, after the actual writer commit
       sent.length = 0
       assert.equal((await scope.run(() => handleGroup(database, directory, { ...base, method: 'POST', resource: 'read', body: JSON.stringify({ messageId }) }))).status, 200)
       await drain(); assert.deepEqual(sent, [], 'a read receipt changes the list row, not the group page')
+    })
+
+    await t.test('marking unread wakes only the reader whose open transcript needs the new revision', async () => {
+      const { setGroupPreference } = await import('../chat-preferences')
+      sent.length = 0
+      assert.equal(await scope.run(() => setGroupPreference('owner', groupId, { markedUnread: true })), 'ok')
+      await drain()
+      assert.deepEqual(delivered(), [{ scope: { ownerId: 'owner', workspaceId: team }, events: key }])
+      sent.length = 0
+      assert.equal(await scope.run(() => setGroupPreference('outsider', groupId, { markedUnread: true })), 'notFound')
+      await drain()
+      assert.deepEqual(delivered(), [])
     })
 
     await t.test('a rejected write sends nothing', async () => {

@@ -6,6 +6,16 @@ export function isComponentLibrarySource(file, policy) {
   return policy.componentRoots.some(root => file.startsWith(root))
 }
 
+// `Link`, `Script` and `dynamic` are the browser leaf this repository owns
+// (`ui-policy.json` frameworkShims, docs/design/decisions/2026-11-18-1500-retire-next-dependency.md).
+// A framework shim has to call the JSX factory and create elements by hand, which is exactly
+// what these two rules forbid in business code; every other rule still applies to them.
+const FRAMEWORK_SHIM_RULES = new Set(['components/no-element-factory', 'components/no-custom-implementation'])
+export function exemptFrameworkShims(file, diagnostics, policy) {
+  const roots = policy.frameworkShims?.paths ?? []
+  return roots.some(root => file === root || (root.endsWith('/') && file.startsWith(root))) ? diagnostics.filter(d => !FRAMEWORK_SHIM_RULES.has(d.rule)) : diagnostics
+}
+
 // Paid blocks keep their native colours and type (docs/design/decisions/2026-11-09-0050-paid-blocks-as-shipped.md):
 // files under ui-policy.json asShipped.public drop only these two rules.
 const AS_SHIPPED_RULES = new Set(['style/semantic-colors', 'typography/preset-only'])
@@ -104,11 +114,13 @@ export const HORIZONTAL_RULE_EXEMPT_FILES = ['components/chat/unread-divider.tsx
 // Files another open change owns; each fixes its own lines and then drops its entry here.
 // plugins-skills-view: the Plugins/Skills session moves its skill search to SearchInput.
 // secrets-settings: PR #557 rewrites the E2B section, whose loading rows need `bare`.
-export const UI_SWEEP_PENDING = new Map([
-  ['components/plugins/plugins-skills-view.tsx', 'style/search-input'],
-  ['components/settings/secrets-settings.tsx', 'style/nested-frame'],
-])
+export const UI_SWEEP_PENDING = new Map()
 const ISSUE_PAGE_RULES = ['components/workspace/issue-detail-header.tsx', 'components/workspace/issue-activity.tsx', 'components/workspace/issue-thread-panel.tsx', 'components/slots/thread-header.tsx']
+// 2026-11-18-1900: Mikka's own UI draws affectUI's Hugeicons family through `policy.glyphLibrary`. A task's status icon
+// keeps lucide (2026-11-13-1405), in these three files only, so the status glyph is never drawn by another family.
+const ICON_SETS = ['lucide-react', '@remixicon/react', '@hugeicons/react', '@hugeicons/core-free-icons']
+const STATUS_ICON_FILES = new Set(['components/icons/index.tsx', 'components/workspace/task-state-icon.tsx', 'components/workspace/status-icons.tsx', 'components/workspace/issue-properties.ts'])
+const isIconSource = (from, policy) => from === policy.iconLibrary || from === policy.glyphLibrary
 
 export function auditSource(file, text, policy) {
   const ruleExempt = HORIZONTAL_RULE_EXEMPT_FILES.includes(file)
@@ -138,11 +150,15 @@ export function auditSource(file, text, policy) {
       }
       // next/font/local 的字体文件与 CSS 变量在调用处对照 typography.localFonts 校验。
       if (/^(?:@base-ui\/|@radix-ui\/|radix-ui$|react\/jsx-runtime|react\/jsx-dev-runtime)/.test(from)) add(node, 'components/no-primitive-bypass', '业务代码只组合已下载组件，不直接使用底层 primitives 或 JSX runtime。')
-      if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && from !== policy.iconLibrary) add(node, 'icons/library', `仅使用配置的 ${policy.iconLibrary}。`)
+      if (/^(?:@tabler\/icons|@heroicons\/|react-icons\/|@phosphor-icons\/)/.test(from) && !isIconSource(from, policy)) add(node, 'icons/library', `仅使用 ${policy.iconLibrary}，Mikka 自己的界面用 ${policy.glyphLibrary}（2026-11-18-1900）。`)
+      // 2026-11-18-1900: Mikka 自己的界面只画一套图标。任务状态图标（含它们的颜色和形状）继续是 lucide。
+      if (!isIconSource(from, policy) && ICON_SETS.includes(from) && !STATUS_ICON_FILES.has(file)) add(node, 'icons/glyph-set', `Mikka 自己的图标来自 ${policy.glyphLibrary}；${from} 只留给任务状态图标（2026-11-18-1900）。`)
       // R-71 (unslop): no sparkle for "AI"; thinking is Brain, a bot is Bot.
       // R-52 (Alex 2026-11-04): a circle is a task, a bubble is a thread; the thread's icon never borrows a circle.
       if (from === policy.iconLibrary && file === 'components/workspace/thread-status-icon.tsx') for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Circle|LoaderCircle|Hand)/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/thread-not-circle', '线程用对话气泡加状态色点，不用圆圈图标；圆圈只表示任务（R-52）。')
-      if (from === policy.iconLibrary) for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Sparkles?|WandSparkles)(?:Icon)?$/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/no-sparkle', 'AI 不用闪光图标（R-71）：思考用 Brain，Bot 用 Bot。')
+      if (isIconSource(from, policy)) for (const spec of clause?.namedBindings?.elements ?? []) if (/^(?:Sparkles?|WandSparkles)(?:Icon)?$/.test(spec.propertyName?.text ?? spec.name.text)) add(spec, 'icons/no-sparkle', 'AI 不用闪光图标（R-71）：思考用 Brain，Bot 用 Bot。')
+      // 优先级是低中高一道上楼梯的柱子，由 Mikka 自己画；等高 tally 条在 2026-11-18 被 Alex 否掉（R-71a）。
+      if (file === 'components/icons/index.tsx') for (const spec of clause?.namedBindings?.elements ?? []) if (/^Tally\d/.test(spec.name.text)) add(spec, 'icons/priority-bars', '优先级用自绘的上楼梯柱子（SignalLow/SignalMedium/SignalHigh），不用等高的 tally 条。')
     }
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
       const entries = variables.get(node.name.text) ?? []
@@ -250,7 +266,7 @@ export function auditSource(file, text, policy) {
     element.children.forEach(walk)
     return found
   }
-  const searchIcon = o => ['Search', 'SearchIcon'].includes(o.tagName.getText(source)) && imports.get(o.tagName.getText(source))?.from === policy.iconLibrary
+  const searchIcon = o => ['Search', 'SearchIcon'].includes(o.tagName.getText(source)) && isIconSource(imports.get(o.tagName.getText(source))?.from, policy)
   const hasSearchIcon = nodes => {
     let found = false
     const walk = n => { const o = opening(n); if (o && searchIcon(o)) found = true; if (!found) ts.forEachChild(n, walk) }
@@ -288,7 +304,8 @@ export function auditSource(file, text, policy) {
     }
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const raw = node.tagName.getText(source), name = canonical(node), parents = ancestors(node)
-      const frameworkShell = ['app/layout.tsx', 'app/[locale]/layout.tsx'].includes(file) && ['html', 'body'].includes(raw)
+      // No Next layout renders the document any more: apps/frontend/index.html
+      // owns <html>/<body>, so no source file is exempt as a framework shell.
       // Base UI 的 render prop 指定宿主元素（样式与行为由外层组件提供）：
       // 那里的自闭合标签是组合 API，不是手写的控件。
       const renderHost = ts.isJsxSelfClosingElement(node) && (() => {
@@ -299,7 +316,7 @@ export function auditSource(file, text, policy) {
         return false
       })()
       const replacement = RAW_ELEMENTS[raw]
-      if (!frameworkShell && !renderHost && replacement) add(node, 'components/no-handwritten-ui', `手写 <${raw}>；改用 ${replacement}。`)
+      if (!renderHost && replacement) add(node, 'components/no-handwritten-ui', `手写 <${raw}>；改用 ${replacement}。`)
       if (ts.isIdentifier(node.tagName)) {
         const value = resolve(node.tagName)
         if (value.strings.some(tag => RAW_ELEMENTS[tag])) add(node, 'components/no-handwritten-ui', '不允许用大写变量包装 HTML 标签绕过限制。')
@@ -309,8 +326,8 @@ export function auditSource(file, text, policy) {
       if (classAttr?.initializer) {
         const expression = ts.isJsxExpression(classAttr.initializer) ? classAttr.initializer.expression : classAttr.initializer
         const classes = resolve(expression)
-        if (!frameworkShell && !classes.known) add(classAttr, 'style/static-layout-only', 'className 必须可静态检查，动态组合请使用 cn() 和明确的布局常量。')
-        if (!frameworkShell && expression && (ts.isTemplateExpression(expression) || ts.isConditionalExpression(expression))) add(classAttr, 'style/use-cn', '条件 className 使用 cn()，不拼接模板或直接使用三元表达式。')
+        if (!classes.known) add(classAttr, 'style/static-layout-only', 'className 必须可静态检查，动态组合请使用 cn() 和明确的布局常量。')
+        if (expression && (ts.isTemplateExpression(expression) || ts.isConditionalExpression(expression))) add(classAttr, 'style/use-cn', '条件 className 使用 cn()，不拼接模板或直接使用三元表达式。')
         for (const value of classes.strings) {
           const tokens = splitUtilities(value)
           if (tokens.includes('overflow-hidden') && tokens.includes('text-ellipsis') && tokens.includes('whitespace-nowrap')) add(classAttr, 'style/truncate', '使用 truncate 简写。')
@@ -338,13 +355,13 @@ export function auditSource(file, text, policy) {
             if (overlays.test(name) && /^-?z-/.test(base)) add(classAttr, 'style/overlay-stacking', '浮层组件自行管理层叠，不指定 z-index。')
             if (base.startsWith('w-') && bases.includes(`h-${base.slice(2)}`)) add(classAttr, 'style/size-shorthand', `相同宽高使用 size-${base.slice(2)}。`)
           }
-          const icon = imports.get(raw)?.from === policy.iconLibrary
+          const icon = isIconSource(imports.get(raw)?.from, policy)
           const hostEntry = imports.get(parents[0] ?? '')
           const hostIsLibrary = !!hostEntry && /^@\/components\/(?:ui|reui)\//.test(hostEntry.from)
           if (icon && hostIsLibrary && bases.some(b => /^(?:size|w|h)-/.test(b))) add(classAttr, 'icons/no-size-override', '组件内部的图标由组件决定尺寸。')
         }
       }
-      const icon = imports.get(raw)?.from === policy.iconLibrary
+      const icon = isIconSource(imports.get(raw)?.from, policy)
       // Icon-only buttons (size="icon*") have no text to sit beside, so inline-start/end would only add padding.
       const iconOnlyButton = () => {
         for (let up = node.parent; up; up = up.parent) {

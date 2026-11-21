@@ -3,18 +3,22 @@ import { and, eq } from 'drizzle-orm'
 import { z } from 'zod'
 import { systemActor } from '@/lib/activity-actor'
 import { db } from '@/lib/db'
-import { bots, coordinatorEvents, issues } from '@/lib/db/schema'
+import { bots, coordinatorEvents } from '@/lib/db/schema'
 import { FactoryError } from '@/lib/factory/contract'
 import { issueForUser } from '@/lib/issue-access'
 import { createIssueForUserInTransaction } from '@/lib/issue-create'
+import { dispatchTaskIntent } from '@/lib/task-create-command'
+import { attachInitialProject, insertExplicitTask, reconcileInitialProject } from '../task-create-scope'
+import { withTaskCreationReceipt } from '@/lib/task-creation-receipt'
 import { taskTitleInputSchema } from '@/lib/task-title-input'
-import { compactTaskTitle } from '@/lib/short-title'
+import { backlogTaskDraft } from '@/lib/task-create-form'
+import { requestIssueInput } from './issue-input'
 import { withTaskWorkspace } from '@/lib/task-workspace'
 
-const inputSchema = z.object({ sourceEventId: z.uuid(), title: z.string().trim().min(1).max(200) }).strict()
+const inputSchema = requestIssueInput.extend({ confirmAccess: z.boolean().optional() })
 
 /** The authenticated request is also the idempotency record for issue creation. */
-export async function createIssueFromRequest(userId: string, input: { sourceEventId: string; title: string }) {
+export async function createIssueFromRequest(userId: string, input: z.input<typeof inputSchema>) {
   const parsed = inputSchema.safeParse(input)
   if (!parsed.success) throw new FactoryError('factoryInvalid')
   // A host-stored Bot is the event's tenant authority. Legacy events without
@@ -33,23 +37,37 @@ export async function createIssueFromRequest(userId: string, input: { sourceEven
     )).for('update')
     const event = row?.event
     if (!event || typeof event.payload.text !== 'string' || !event.payload.text.trim()) throw new FactoryError('factoryHumanRequired')
+    const command = dispatchTaskIntent.optional().parse(event.payload.taskCommand)
+    const confirmAccess = parsed.data.confirmAccess === true
+    const actor = systemActor('coordinator')
+    if ((command?.teamId || command?.projectId) && !event.payload.humanSessionId) throw new FactoryError('factoryHumanRequired')
     if (event.issueId) {
       const issue = await issueForUser(userId, event.issueId, false, tx)
       if (!issue || issue.workspaceId !== source.workspaceId) throw new FactoryError('factoryNotFound')
+      if (command?.projectId) await reconcileInitialProject(tx, userId, source.workspaceId!, issue.id, command.projectId, actor, confirmAccess)
       return { issueId: issue.id, title: issue.title }
     }
     // A title the person typed in the task form wins over the model's: it is stored on the user's own event.
     const typed = taskTitleInputSchema.safeParse(event.payload.taskTitle)
-    const issue = await createIssueForUserInTransaction(tx, userId, {
-      title: typed.success ? typed.data : parsed.data.title,
-      content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: event.payload.text }] }] },
-      status: 'todo',
-      priority: 'normal',
-    }, systemActor('coordinator'), { workspaceId: source.workspaceId })
-    if (!issue) throw new FactoryError('factoryInvalid')
-    // Preserve the person's full title; its derived navigation label obeys the shared compact-title limit.
-    if (typed.success) await tx.update(issues).set({ shortTitle: compactTaskTitle({ title: typed.data }), shortTitleFrom: typed.data }).where(eq(issues.id, issue.id))
-    await tx.update(coordinatorEvents).set({ issueId: issue.id }).where(eq(coordinatorEvents.id, event.id))
-    return { issueId: issue.id, title: issue.title }
+    const title = typed.success ? typed.data : parsed.data.title
+    // The event retains the execution request verbatim. Only the person's explicit form description or the model's brief belongs on the task.
+    const fields = backlogTaskDraft(title, command?.description ?? parsed.data.summary ?? '')
+    const requestId = command ? z.uuid().parse(event.payload.taskCreationRequestId) : undefined
+    const create = async () => {
+      let created
+      if (command && requestId) {
+        created = await insertExplicitTask(tx, userId, source.workspaceId!, requestId, fields, actor, command.teamId)
+        if (command.projectId) await attachInitialProject(tx, userId, source.workspaceId!, created.taskId, command.projectId, actor, confirmAccess)
+      } else {
+        const issue = await createIssueForUserInTransaction(tx, userId, fields, systemActor('coordinator'), { workspaceId: source.workspaceId! })
+        if (!issue?.identifier) throw new FactoryError('factoryInvalid')
+        created = { taskId: issue.id, identifier: issue.identifier }
+      }
+      return created
+    }
+    const receipt = command ? await withTaskCreationReceipt(tx, userId, source.workspaceId!,
+      requestId!, { ...command, sourceEventId: event.id, botId: event.botId }, create) : await create()
+    await tx.update(coordinatorEvents).set({ issueId: receipt.taskId }).where(eq(coordinatorEvents.id, event.id))
+    return { issueId: receipt.taskId, title }
   }))
 }

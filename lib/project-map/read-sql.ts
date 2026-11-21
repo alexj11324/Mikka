@@ -5,7 +5,7 @@ import { compactMapRowsSql } from './read-transport'
 // These remain the full logical projections. Their original object sizes, not
 // any transport encoding, enforce the cumulative metadata budget in PostgreSQL.
 const projections = [
-  `SELECT id,left(title,200) AS title,status,"createdAt", COALESCE(content->'attrs'->'mikka'->'blockedByIds',content->'attrs'->'orvilo'->'blockedByIds','[]'::jsonb) AS "blockedByIds" FROM issues WHERE id=ANY($1::uuid[]) ORDER BY id LIMIT 101`,
+  `SELECT id,left(title,200) AS title,status,"createdAt", COALESCE(content->'attrs'->'mikka'->'blockedByIds',content->'attrs'->'orvilo'->'blockedByIds','[]'::jsonb) AS "blockedByIds" FROM issues WHERE id=ANY($1::uuid[]) ORDER BY id LIMIT $4`,
   `SELECT r.id,r."issueId",r.status,CASE WHEN r.status IN ('succeeded','failed','stopped') THEN r.outcome ELSE NULL END AS outcome,r."createdAt",r."finishedAt",
       r."retryOf",r."continuesRunId",r."threadReplacedBy",COALESCE(r."agentDefinition"->>'harness',a.harness) AS harness,CASE WHEN r."userId"=$2 THEN COALESCE(r."agentDefinition"->>'model',r."agentDefinition"->'subscription'->>'modelId',r."agentDefinition"->'apiKey'->>'model') ELSE NULL END AS "modelId",r."userId"=$2 AS owned
     FROM agent_runs r JOIN agents a ON a.id=r."agentId"
@@ -69,7 +69,7 @@ export function mapFactsSql(compact = true) {
   const order = ['id', '"createdAt",id', 'id', '"createdAt",id', '"createdAt",id', '"createdAt","versionId"', '"runId"', '"recordedAt",id', 'id', 'id']
   return `WITH
     ${projections.map((projection, index) => {
-      const guard = index === 3 ? `initial_guard AS MATERIALIZED (SELECT ${count(names[0], 100)} AND ${count(names[1], MAP_NODE_LIMIT)}
+      const guard = index === 3 ? `initial_guard AS MATERIALIZED (SELECT ${count(names[0], MAP_NODE_LIMIT)} AND ${count(names[1], MAP_NODE_LIMIT)}
         AND ${count(names[2], MAP_NODE_LIMIT)} AND ${stage(first)} <= $8 AS allowed),`
         : index === 8 ? `related_guard AS MATERIALIZED (SELECT (SELECT allowed FROM initial_guard)
           AND ${related.map(index => count(names[index], MAP_NODE_LIMIT)).join(' AND ')} AND ${stage([...first, ...related])} <= $8 AS allowed),`

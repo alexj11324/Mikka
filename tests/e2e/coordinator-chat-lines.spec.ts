@@ -25,7 +25,10 @@ test('runtime events read as lines in the person\'s language, with the thread as
     const { rows: [user] } = await pool.query<{ id: string }>('SELECT id FROM "user" WHERE email = $1', [email])
     const agentId = randomUUID()
     await pool.query('INSERT INTO agents (id, "userId", harness, name) VALUES ($1, $2, $3, $4)', [agentId, user.id, 'codex', 'Coordinator'])
-    await pool.query('INSERT INTO agent_runs (id, "userId", "agentId", status, prompt) VALUES ($1, $2, $3, $4, $5)', [runId, user.id, agentId, 'waiting_input', '改用 msw 还是只改这两个测试'])
+    // The recorded task range is the only thing allowed to name a thread (lib/run-bot-name.ts); without it the
+    // citation falls back to the agent name and the waiting sentence could not name the task it links.
+    await pool.query('INSERT INTO agent_runs (id, "userId", "agentId", status, prompt, "promptTaskStart", "promptTaskLength") VALUES ($1, $2, $3, $4, $5, 0, char_length($5))',
+      [runId, user.id, agentId, 'waiting_input', '改用 msw 还是只改这两个测试'])
     // What the server stores for each event (eventPrompt + sourcedEventMessage): the model's text and its kind.
     const events = [
       { kind: 'run_question', text: `[Event] The agent in run ${runId} asks the person: msw or just these two tests?\nCheck the current run state and existing task facts first. Never invent their permission. send_to_run does not itself prove the run resumed.` },
@@ -39,9 +42,14 @@ test('runtime events read as lines in the person\'s language, with the thread as
     }
   } finally { await pool.end() }
   await page.reload()
-  const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
-  await expect(chat.locator('[data-event-line="runQuestion"]')).toContainText('改用 msw 还是只改这两个测试')
-  await expect(chat.locator('[data-event-line="runQuestion"]')).toContainText('在等你回答')
+  const chat = page.getByRole('region', { name: 'Coordinator 线程', exact: true })
+  // A question is a live state above the composer, not a stored event row (decision 2026-11-10); the thread stays an
+  // inline link inside one sentence. The sentence lives in the composer column, outside the transcript region the
+  // `chat` locator names, so it is read from the surface that holds both.
+  const waiting = page.locator('[data-slot="waiting-questions"]')
+  await expect(waiting).toContainText('在等你回答')
+  await expect(waiting).toContainText('改用 msw 还是只改这两个测试')
+  await expect(chat.locator('[data-event-line="runQuestion"]')).toHaveCount(0)
   await expect(chat.locator('[data-event-line="issueStatus"]')).toHaveText('「登录页在 Safari 17 上白屏」 改为评审中')
   await expect(chat.locator('[data-event-line="runRetried"]')).toContainText('换了一台机器继续')
   for (const leak of ['[Event]', 'asks the person', 'send_to_run', runId, issueId]) await expect(chat.getByText(leak, { exact: false })).toHaveCount(0)
@@ -71,7 +79,7 @@ test('a failed reply says 回复失败 with 重试, never the step error; later 
   // 重新发送 retries in place (Alex, 2026-11-02): one message stays, the attempt that failed and its line go,
   // now and after a reload; a failure of the new attempt shows only under it.
   await past.getByRole('button', { name: '重新发送', exact: true }).click()
-  const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+  const chat = page.getByRole('region', { name: 'Coordinator 线程', exact: true })
   await expect(chat.getByText('帮我看看 CI 为什么红了', { exact: true })).toHaveCount(1)
   await expect(chat.locator('[data-message-failure]')).toHaveCount(0)
   await attachLightDark(page, testInfo, 'chat-failed-resent')
@@ -92,7 +100,7 @@ test('a cold start shows the shapes of the chat and the thread list, never 还�
   })
   try {
     await page.reload()
-    const chat = page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+    const chat = page.getByRole('region', { name: 'Coordinator 线程', exact: true })
     await expect(chat.getByRole('status', { name: '加载中…', exact: true })).toBeVisible()
     await expect(page.getByText('还没有线程', { exact: true })).toHaveCount(0)
     await attachLightDark(page, testInfo, 'chat-cold-start')

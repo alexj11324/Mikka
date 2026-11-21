@@ -1,12 +1,11 @@
 import { factoryHumanWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { humanSessionHeaders } from '@/lib/desktop-rpc/handler';
-import { NextResponse } from 'next/server';
+import { NextResponse } from '@/lib/server-runtime/server';
 import { z } from 'zod';
 import { auth } from '@/lib/api-auth';
 import { pool } from '@/lib/db';
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from '@/lib/factory/runtime';
 import { handleFactoryQuestion } from '@/lib/factory/questions/http';
-export const dynamic = 'force-dynamic';
 async function handle(request: Request,{params}:{params:Promise<{questionId:string}>}) {
   if (!factoryLifecycleEnabled()) return NextResponse.json({error:'factoryLifecycleUnavailable'},{status:404});
   const sessionHeaders=request.headers.has('authorization')?humanSessionHeaders(request):request.headers;

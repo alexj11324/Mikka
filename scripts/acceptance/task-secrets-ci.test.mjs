@@ -16,6 +16,7 @@ import { archiveReport, artifactRedirect, assertArtifactIdentity, assertDriverAt
 
 const SHA = 'a'.repeat(40), WORKER = 'b'.repeat(40), OTHER = 'c'.repeat(40)
 const TOKEN = 'synthetic-private-github-token', API = `https://api.github.com/repos/${REPOSITORY}`
+const MAIN_API = 'https://api.github.com/repositories/1427517699'
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const workflow = { id: 456, name: RELEASE_NAME, path: RELEASE_WORKFLOW, state: 'active' }
 const started = new Date(Date.now() - 60_000).toISOString()
@@ -25,6 +26,7 @@ const run = { id: 123, run_attempt: 2, workflow_id: workflow.id, name: RELEASE_N
 const expected = { sourceCommit: SHA, runId: run.id, runAttempt: run.run_attempt, workflowId: workflow.id, event: run.event }
 const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY,
   GITHUB_REF: 'refs/heads/main', GITHUB_SHA: SHA, GITHUB_RUN_ID: '990', GITHUB_RUN_ATTEMPT: '1', GITHUB_TOKEN: TOKEN,
+  TASK_SECRETS_JOB_ID: '991', TASK_SECRETS_JOB_STARTED_AT: started, TASK_SECRETS_JOB_START_SOURCE: 'github_actions_job.started_at',
   APPLICATION_SHA: SHA, EXPECTED_SOURCE_SHA: SHA, EXPECTED_UPSTREAM_RUN_ID: '123', EXPECTED_UPSTREAM_RUN_ATTEMPT: '2',
   EXPECTED_WORKER_SHA: WORKER, EXPECTED_WORKER_SOURCE_SHA: SHA, EXPECTED_CLAUDE_TEMPLATE: 'candidate-claude', EXPECTED_CODEX_TEMPLATE: 'candidate-codex' })
 const event = () => ({ workflow_run: structuredClone(run) })
@@ -165,7 +167,7 @@ function reader(fixture, mutate = () => {}) {
     calls.push(url); mutate(fixture, calls)
     assert.equal(options.headers.authorization, `Bearer ${TOKEN}`); assert.equal(options.redirect, 'error')
     const data = { [`${API}/actions/workflows/e2b-official-runtime.yml`]: fixture.workflow, [`${API}/actions/runs/123`]: fixture.run,
-      [`${API}/git/ref/heads/main`]: fixture.main, [`${API}/actions/runs/123/attempts/2/jobs?per_page=100`]: fixture.jobs,
+      [`${MAIN_API}/git/ref/heads/main`]: fixture.main, [`${API}/actions/runs/123/attempts/2/jobs?per_page=100`]: fixture.jobs,
       [`${API}/actions/runs/123/artifacts?per_page=100`]: fixture.listing, [`${API}/actions/artifacts/321`]: fixture.artifact }
     assert.ok(Object.hasOwn(data, url), 'only fixed read-only GitHub routes are used')
     return Response.json(data[url])
@@ -220,6 +222,24 @@ test('the actual pre-checkout script permits current official release or exact m
   assert.equal(manual.status, 0, manual.stderr); assert.equal(manual.output, `source-sha=${SHA}\n`)
 })
 
+test('Cloudflare-triggered runtime metadata retains all pre-checkout identity checks', t => {
+  const automatic = mutate => metadataFixture(t, value => {
+    value.event.workflow_run.event = 'workflow_run'; value.run.event = 'workflow_run'
+    mutate?.(value)
+  })
+  const result = automatic()
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(result.output, `source-sha=${SHA}\nupstream-run-id=123\nupstream-run-attempt=2\n`)
+  for (const mutate of [value => { value.event.workflow_run.head_repository.full_name = 'fork/Mikka' },
+    value => { value.workflow.path = '.github/workflows/other.yml' }, value => { value.run.event = 'push' },
+    value => { value.run.run_attempt++ }, value => { value.main.object.sha = OTHER },
+    value => { value.environment.GITHUB_RUN_ATTEMPT = '3' }]) {
+    const refused = automatic(mutate)
+    assert.equal(refused.status, 1); assert.equal(refused.output, '')
+    assert.equal(refused.stderr.trim(), 'task_secret_source_refused')
+  }
+})
+
 test('the actual pre-checkout script refuses fork, PR, wrong workflow/attempt/source and exhausted receiver retry', t => {
   for (const mutate of [value => { value.environment.GITHUB_REPOSITORY = 'fork/Mikka' },
     value => { value.environment.GITHUB_EVENT_NAME = 'pull_request_target' }, value => { value.environment.GITHUB_REF = 'refs/heads/other' },
@@ -244,12 +264,17 @@ test('every OIDC read is directly preceded by source/attempt/public-build attest
   assert.doesNotMatch(workflowText, /actions: write|contents: write|pull-requests: write|issues: write|workflow_dispatch:\s+workflows/)
   const steps = workflowText.slice(workflowText.indexOf('  acceptance:')).split('\n  factory:')[0].split('      - name:')
   const credentials = steps.map((step, index) => ({ step, index })).filter(({ step }) => step.includes('Infisical/secrets-action'))
-  assert.equal(credentials.length, 3)
+  assert.equal(credentials.length, 4)
   for (const { step, index } of credentials) {
     assert.match(steps[index - 1], /Recheck main, upstream attempt and public build immediately before/)
     assert.match(step, /identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac/)
     assert.match(step, /recursive: false/); assert.match(step, /include-imports: false/)
   }
+  const database = credentials.find(({ step }) => step.includes('secret-name: MIKKA_DATABASE_URL'))
+  assert.ok(database)
+  assert.match(database.step, /^\s*if: env\.ACCEPTANCE_MODE == 'execute' && env\.PRODUCTION_CANARY == 'true'\s*$/m)
+  assert.match(steps[database.index - 1], /^\s*if: env\.ACCEPTANCE_MODE == 'execute' && env\.PRODUCTION_CANARY == 'true'\s*$/m)
+  assert.match(workflowText, /PRODUCTION_CANARY: \$\{\{ github.event_name == 'workflow_dispatch' && inputs.production_canary && 'true' \|\| 'false' \}\}/)
   assert.match(workflowText, /group: production-smoke-owner-acceptance/)
   assert.ok(!JSON.stringify(safeCIFailure(Error('PRIVATE_SECRET_URL'))).includes('PRIVATE'))
 })
@@ -332,7 +357,7 @@ test('real CI CLI binds artifact bytes then refuses changed source/attempt/publi
   t.after(() => rmSync(directory, { recursive: true, force: true }))
   mkdirSync(root); mkdirSync(temp)
   for (const file of ['scripts/acceptance/task-secrets-ci.mjs', 'scripts/acceptance/thread-lifecycle-ci.mjs',
-    'scripts/release/web-deploy.mjs', 'scripts/vercel-ignore-build.mjs', 'scripts/ci-docs-only.mjs',
+    'scripts/release/web-deploy.mjs', 'scripts/cloudflare-source.mjs', 'scripts/ci-docs-only.mjs',
     'scripts/e2b/runtime-report.mjs', 'scripts/e2b/build-template.py']) {
     const target = join(root, file); mkdirSync(dirname(target), { recursive: true }); copyFileSync(new URL('../../' + file, import.meta.url), target)
   }
@@ -354,7 +379,7 @@ test('real CI CLI binds artifact bytes then refuses changed source/attempt/publi
     + `if((o.method??'GET')!=='GET')throw Error('write_refused');if(url==='https://productionresultssa12.blob.core.windows.net/result'){if(o.headers)throw Error('token_forwarded');return new Response(Buffer.from(f.archive,'base64'))}\n`
     + `if(url==='https://app.aspectlylabs.com/mikka/api/version')return Response.json({build:f.publicBuild});if(o.headers.authorization!=='Bearer ${TOKEN}')throw Error('token_missing');\n`
     + `if(url==='${API}/actions/artifacts/321/zip')return new Response(null,{status:302,headers:{location:'https://productionresultssa12.blob.core.windows.net/result'}});\n`
-    + `const routes={'${API}/actions/workflows/e2b-official-runtime.yml':f.workflow,'${API}/actions/runs/123':f.run,'${API}/git/ref/heads/main':f.main,'${API}/actions/runs/123/attempts/2/jobs?per_page=100':f.jobs,'${API}/actions/runs/123/artifacts?per_page=100':f.listing,'${API}/actions/artifacts/321':f.artifact};if(!Object.hasOwn(routes,url))throw Error('route_refused');return Response.json(routes[url])};\n`)
+    + `const routes={'${API}/actions/workflows/e2b-official-runtime.yml':f.workflow,'${API}/actions/runs/123':f.run,'${MAIN_API}/git/ref/heads/main':f.main,'${API}/actions/runs/123/attempts/2/jobs?per_page=100':f.jobs,'${API}/actions/runs/123/artifacts?per_page=100':f.listing,'${API}/actions/artifacts/321':f.artifact};if(!Object.hasOwn(routes,url))throw Error('route_refused');return Response.json(routes[url])};\n`)
   const cliEnv = { PATH: process.env.PATH, ...env(), GITHUB_SHA: source, APPLICATION_SHA: source, EXPECTED_SOURCE_SHA: source,
     EXPECTED_WORKER_SHA: worker, EXPECTED_WORKER_SOURCE_SHA: source, RUNNER_TEMP: temp, FIXTURE_PATH: fixturePath,
     GITHUB_EVENT_PATH: eventPath, GITHUB_OUTPUT: output, GITHUB_ENV: environment }

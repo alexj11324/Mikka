@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 // Alex 2026-11-08: no drag on a message (swipe-to-quote and the swipe-left times are gone), and the left-edge swipe in a
 // bot chat must go back to the bot list. The edge swipe is the native stack's; nothing on a chat screen may take it.
-const root = new URL('..', import.meta.url).pathname
+// fileURLToPath, not URL#pathname: the latter keeps %20 in a path with a space, so the reads fail there.
+const root = fileURLToPath(new URL('..', import.meta.url))
 const read = (path: string) => readFileSync(join(root, path), 'utf8')
 const files = (dir: string): string[] => readdirSync(join(root, dir)).flatMap(name => {
   const path = join(dir, name)

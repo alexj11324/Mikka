@@ -3,9 +3,10 @@ name: Workspace governance acceptance
 # Run the existing non-model Item 11 on GitHub's exact merge candidate.
 # acceptance.mjs intentionally refuses CI: this workflow uses its exported
 # business case and the existing isolated test-account bootstrap, with CI intact.
+# Pull-request and merge-group acceptance uses the trusted CI selection.
+# Keep exact-main postmerge acceptance independent of CI's release queue.
 on:
-  pull_request:
-  merge_group:
+  workflow_call:
   push:
     branches: [main]
 
@@ -50,7 +51,6 @@ jobs:
       MIKKA_DEV_SKIP_DAEMON: '1'
       MIKKA_DEV_SKIP_MODEL_SETUP: '1'
       MIKKA_DEV_SKIP_ENV_FILES: '1'
-      NEXT_TELEMETRY_DISABLED: '1'
       NODE_OPTIONS: --max-old-space-size=2048
       SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
       MIKKA_SIGNUP_IP_HOURLY: '1000'
@@ -73,13 +73,14 @@ jobs:
           import { appendFileSync } from 'node:fs'
           import { randomBytes } from 'node:crypto'
           import { assertDevLocal } from './scripts/dev-local/guard.mjs'
+          import { actionsMikkaRepository } from './scripts/cloudflare-source.mjs'
           
           assert.equal(process.platform, 'linux')
           assert.equal(Number(process.versions.node.split('.')[0]), 24)
           assert.equal(process.env.CI, 'true')
           assert.equal(process.env.GITHUB_ACTIONS, 'true')
           assert.equal(process.env.RUNNER_ENVIRONMENT, 'github-hosted')
-          assert.equal(process.env.GITHUB_REPOSITORY, 'alexj11324/Mikka')
+          assert.ok(actionsMikkaRepository(process.env))
           assert.ok(['pull_request', 'merge_group', 'push'].includes(process.env.GITHUB_EVENT_NAME))
           if (process.env.GITHUB_EVENT_NAME === 'pull_request') {
             assert.match(process.env.GITHUB_REF, /^refs\/pull\/[0-9]+\/merge$/)
@@ -233,7 +234,27 @@ jobs:
             await writeFile(join(privateDirectory, 'runtime-private.log'), output, { mode: 0o600 })
             report.finishedAt = new Date().toISOString()
             if (failure) {
-              report.failure = { stage, kind: failure?.name === 'AssertionError' ? 'assertion' : 'runtime',
+              // Only fixed harness codes can enter the public artifact. Driver errors,
+              // response bodies, session values and arbitrary error messages stay private.
+              const leaseCodes = new Set([
+                'DEPLOYMENT_ATTESTATION_REJECTED', 'DEPLOYMENT_IDENTITY_MISMATCH', 'DEPLOYMENT_IDENTITY_UNAVAILABLE',
+                'DATABASE_ATTESTATION_UNAVAILABLE', 'DATABASE_IDENTITY_MISMATCH', 'DATABASE_IDENTITY_UNAVAILABLE',
+                'ACCOUNT_PROVISIONING_NOT_AUTHORIZED', 'ACCOUNT_LOGIN_FAILED', 'ACCOUNT_INITIALIZATION_FAILED',
+                'ACCOUNT_IDENTITY_UNVERIFIED', 'ACCOUNT_IDENTITY_MISMATCH', 'ACCOUNT_SESSION_INVALID',
+                'ACCOUNT_POOL_DATABASE_ERROR', 'TEST_ACCOUNT_SESSION_FAILED', 'PRIVATE_DIRECTORY_UNSAFE',
+                'LEASE_ALREADY_COMPLETED', 'LEASE_ALREADY_ATTACHED', 'POOL_EXHAUSTED', 'LEASE_LOST',
+              ])
+              // Startup errors stay on the private runner. Preserve only fixed classifications.
+              const startup = /\[dev\] Startup failed\s*\{[^}]{0,260}code:\s*['"](API_DEV_(?:STARTUP_TIMEOUT|WORKER_INIT_FAILED|STARTUP_RESPONSE_INVALID|LOCAL_WORLD_REQUIRED|START_FAILED)|API_CONFIG_NOT_LOADED|EVE_SERVICE_(?:START_FAILED|START_TIMEOUT|EXITED|STORAGE_MISMATCH))['"]/.exec(output)
+              const staleRoutes = output.includes('[dev] Route manifest is out of date:')
+              const init = /\[dev\] Worker initialization failed \{"phase":"(?:initial-start|hot-replacement|unavailable)","reason":"(module-missing|export-missing|module-syntax|listen-address-in-use|listen-access-denied|listen-address-unavailable|listen-path-too-long|listen-path-missing|entry-handler-missing|unavailable)"/.exec(output)
+              report.failure = { stage,
+                ...(stage === 'runtime-ready' && (startup || staleRoutes) ? { code: startup?.[1] ?? 'API_DEV_ROUTES_STALE' } : {}),
+                ...(stage === 'runtime-ready' && init ? { workerReason: init[1] } : {}), ...(stage === 'account-lease' && leaseCodes.has(failure?.code) ? { code: failure.code } : {}),
+                ...(stage === 'account-lease' && failure?.code === 'DEPLOYMENT_ATTESTATION_REJECTED'
+                  && Number.isInteger(failure.httpStatus) && failure.httpStatus >= 100 && failure.httpStatus <= 599
+                  ? { httpStatus: failure.httpStatus } : {}),
+                kind: failure?.name === 'AssertionError' ? 'assertion' : 'runtime',
                 ...(failure?.name === 'AssertionError' ? {
                   assertion: String(failure.message).split('\n')[0].slice(0, 240),
                   ...(typeof failure.actual === 'number' || typeof failure.actual === 'boolean' ? { actual: failure.actual } : {}),

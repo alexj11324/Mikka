@@ -1,11 +1,11 @@
 'use client'
 
 import { useId, useState, type ReactNode } from 'react'
-import { Box, Users, UserRound, CalendarDays, CalendarCheck, Tag, GitBranch, Plus, type LucideIcon } from 'lucide-react'
+import { Box, Users, UserRound, CalendarDays, CalendarCheck, Tag, GitBranch, Plus, type IconGlyph } from '@/components/icons'
 import { parseISO } from 'date-fns'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { cn } from '@/lib/utils'
-import { hasDependencyCycle, type ProjectChanges, type ProjectDraft } from '@/lib/project-input'
+import { hasDependencyCycle, projectPeople, type ProjectChanges, type ProjectDraft } from '@/lib/project-input'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -15,9 +15,10 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { PROJECT_HEALTH, PROJECT_PRIORITIES, PROJECT_STATUSES, type Project, type ProjectControlField } from './project-properties'
 
 import { statusTone, statusDots, statusTones, type StatusTone } from '@/lib/status-appearance'
+import type { WorkspaceSettings } from '@/lib/workspace-access'
 import { BadgeButton } from '@/components/reui/badge'
 
-type Choice = { value: string; label: string; icon?: LucideIcon; description?: string; tone?: StatusTone }
+type Choice = { value: string; label: string; icon?: IconGlyph; description?: string; tone?: StatusTone }
 export function ProjectPicker({ label, title, children, choices, selected, onChange, multiple = false, onCreate, createDisabled = false, disabled, plain = false, tone, dotOnly = false }: { dotOnly?: boolean; tone?: StatusTone; label: string; title: string; children: ReactNode; choices: Choice[]; selected: string[]; onChange: (value: string) => void; multiple?: boolean; onCreate?: (value: string) => void; createDisabled?: boolean; disabled?: boolean; plain?: boolean }) {
   const t = useTranslations('Projects')
   const common = useTranslations('Common')
@@ -46,7 +47,7 @@ export function ProjectPicker({ label, title, children, choices, selected, onCha
   </Popover>
 }
 
-function ProjectDatePicker({ label, value, onChange, disabled, plain, min, max, icon: Icon }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; plain?: boolean; min?: string; max?: string; icon: LucideIcon }) {
+function ProjectDatePicker({ label, value, onChange, disabled, plain, min, max, icon: Icon }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean; plain?: boolean; min?: string; max?: string; icon: IconGlyph }) {
   const t = useTranslations('Projects')
   const common = useTranslations('Common')
   const format = useFormatter()
@@ -63,11 +64,27 @@ function ProjectDatePicker({ label, value, onChange, disabled, plain, min, max, 
   </Popover>
 }
 
-type ControlValue = { status: string; priority: string; lead: string; startDate: string; targetDate: string; properties: ProjectDraft['properties'] }
-export function ProjectPropertyControl({ field, value, onChange, userName, projects = [], projectId, disabled, plain }: { field: ProjectControlField; value: ControlValue; onChange: (changes: ProjectChanges) => void; userName: string; projects?: Project[]; projectId?: string; disabled?: boolean; plain?: boolean }) {
+type DirectoryMember = Pick<WorkspaceSettings['members'][number], 'userId' | 'name' | 'email' | 'status'>
+export function projectDirectory(workspace: { workspace: { id: string }; members: DirectoryMember[] } | undefined) {
+  if (!workspace) return undefined
+  const choices = workspace.members.map(member => ({
+    value: member.userId, label: member.name || member.email, icon: UserRound, status: member.status,
+  }))
+  return { workspaceId: workspace.workspace.id, byId: new Map(choices.map(choice => [choice.value, choice])), active: choices.filter(choice => choice.status === 'active') }
+}
+export type ProjectDirectory = ReturnType<typeof projectDirectory>
+
+type ControlValue = Pick<ProjectDraft, 'lead' | 'startDate' | 'targetDate' | 'properties' | 'leadUserId' | 'memberIds'> & {
+  status: string; priority: string; userId?: string; workspaceId?: string; canEditProperties?: boolean; archivedAt?: Project['archivedAt']
+}
+
+export function ProjectPropertyControl({ field, value, onChange, directory, projects = [], projectId, disabled, plain }: {
+  field: ProjectControlField; value: ControlValue; onChange: (changes: ProjectChanges) => void;
+  directory: ProjectDirectory; projects?: Project[]; projectId?: string; disabled?: boolean; plain?: boolean
+}) {
   const t = useTranslations('Projects')
   const format = useFormatter()
-  const shared = { disabled, plain }
+  const shared = { disabled: disabled || value.canEditProperties === false || Boolean(value.archivedAt), plain }
   const label = (group: string, item: string) => t.has(`${group}.${item}` as never) ? t(`${group}.${item}` as never) : item
   const properties = value.properties
   const updateProperties = (changes: Partial<ProjectDraft['properties']>) => onChange({ properties: { ...properties, ...changes } })
@@ -86,9 +103,28 @@ export function ProjectPropertyControl({ field, value, onChange, userName, proje
     const priorityLabel = label('priority', priority.value)
     return <ProjectPicker {...shared} tone={statusTone(priority.value)} title={t('fields.priority')} label={t('controls.priorityValue', { value: priorityLabel })} choices={PROJECT_PRIORITIES.map(item => ({ ...item, tone: statusTone(item.value), label: label('priority', item.value) }))} selected={[value.priority]} onChange={priority => onChange({ priority: priority as ProjectDraft['priority'] })}><priority.icon data-icon="inline-start" /><span className="truncate">{priorityLabel}</span></ProjectPicker>
   }
-  if (field === 'lead') return <ProjectPicker {...shared} title={t('fields.lead')} label={t('controls.leadValue', { value: value.lead ? userName : t('controls.leadUnset') })} choices={[{ value: '', label: t('controls.leadNone'), icon: UserRound }, { value: 'me', label: userName, icon: UserRound, description: t('controls.currentAccount') }]} selected={[value.lead]} onChange={lead => onChange({ lead: lead as '' | 'me' })}><UserRound data-icon="inline-start" /><span className="truncate">{value.lead ? userName : t('fields.lead')}</span></ProjectPicker>
+  if (field === 'lead' || field === 'members') {
+    const roster = directory?.workspaceId === value.workspaceId ? directory : undefined
+    const { leadUserId, memberIds } = projectPeople(value, value.userId ?? '')
+    const name = (id: string) => {
+      if (!roster) return t('controls.directoryUnavailable')
+      const person = roster.byId.get(id)
+      return person?.status === 'active' ? person.label : person ? t('controls.inactivePerson', { name: person.label }) : t('controls.unavailablePerson')
+    }
+    const peopleProps = { ...shared, disabled: shared.disabled || !roster || (!!projectId && value.canEditProperties !== true) }
+    const active = roster?.active ?? []
+    if (field === 'lead') {
+      const shown = leadUserId ? name(leadUserId) : t('controls.leadUnset')
+      return <ProjectPicker {...peopleProps} title={t('fields.lead')} label={t('controls.leadValue', { value: shown })}
+        choices={[{ value: '', label: t('controls.leadNone'), icon: UserRound }, ...active]} selected={leadUserId ? [leadUserId] : ['']}
+        onChange={id => onChange({ leadUserId: id || null })}><UserRound data-icon="inline-start" /><span className="truncate">{leadUserId ? shown : t('fields.lead')}</span></ProjectPicker>
+    }
+    const unavailable = memberIds.filter(id => roster?.byId.get(id)?.status !== 'active').map(id => ({ value: id, label: name(id), icon: UserRound }))
+    return <ProjectPicker {...peopleProps} title={t('fields.members')} label={t('fields.members')} multiple choices={[...active, ...unavailable]} selected={memberIds}
+      onChange={id => onChange({ memberIds: memberIds.includes(id) ? memberIds.filter(memberId => memberId !== id) : [...memberIds, id] })}>
+      <Users data-icon="inline-start" /><span className="truncate">{memberIds.length ? format.list(memberIds.map(name), { type: 'conjunction' }) : t('fields.members')}</span></ProjectPicker>
+  }
   if (field === 'startDate' || field === 'targetDate') return <ProjectDatePicker {...shared} label={field === 'startDate' ? t('fields.startDate') : t('fields.targetDate')} icon={field === 'startDate' ? CalendarDays : CalendarCheck} value={value[field]} min={field === 'targetDate' ? value.startDate : undefined} max={field === 'startDate' ? value.targetDate : undefined} onChange={date => onChange({ [field]: date })} />
-  if (field === 'members') return <ProjectPicker {...shared} title={t('fields.members')} label={t('fields.members')} multiple choices={[{ value: 'me', label: userName, icon: UserRound, description: t('controls.memberCurrentAccount') }]} selected={properties.members} onChange={() => updateProperties({ members: properties.members.length ? [] : ['me'] })}><Users data-icon="inline-start" />{properties.members.length ? `${userName}` : t('fields.members')}</ProjectPicker>
   if (field === 'labels') {
     const labels = [...new Set([...projects.flatMap(item => item.properties.labels), ...properties.labels])]
     const toggle = (label: string) => updateProperties({ labels: properties.labels.includes(label) ? properties.labels.filter(item => item !== label) : [...properties.labels, label] })

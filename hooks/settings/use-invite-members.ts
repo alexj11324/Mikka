@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { createWorkspaceInvitation } from '@/app/actions/workspace'
 import {
   InvitationCsvError,
@@ -12,15 +12,15 @@ import {
   validateInvitationEmails,
 } from '@/lib/invitation-csv'
 import { useActionError } from '@/lib/use-action-error'
-import { publicAppOrigin } from '@/lib/platform/public-origin'
-import { withBasePath } from '@/lib/base-path'
+import { publicServiceLink } from '@/lib/platform/public-origin'
 
 export type InviteLink = { email: string; url: string }
+/** An address of the batch that got no link, and why (ALE-28). */
+export type InviteSkip = { email: string; reason: 'alreadyMember' | 'duplicate' }
 
 /**
- * 邀请成员 as data, for a UI layer that draws its own invite (slot `settings-members`): the same
- * emails, CSV import, role, invite links and copy as InviteMembersDialog. Nothing is emailed; the
- * links are handed over by hand and last 7 days.
+ * The settings-members slot uses this hook to import recipients, choose their role, and create
+ * invitation links. The issuer shares the links directly, and they expire after seven days.
  */
 export function useInviteMembers(workspaceId: string | undefined, onCreated: () => Promise<unknown>) {
   const t = useTranslations('Invite')
@@ -34,6 +34,7 @@ export function useInviteMembers(workspaceId: string | undefined, onCreated: () 
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [links, setLinks] = useState<InviteLink[]>([])
+  const [skipped, setSkipped] = useState<InviteSkip[]>([])
   const recipients = invitationEmails(emails)
   const busy = pending || importing
 
@@ -82,12 +83,17 @@ export function useInviteMembers(workspaceId: string | undefined, onCreated: () 
 
   function clearImport() { setEmailsValue(''); setFileName(''); setNotice(''); setError('') }
 
-  async function create(list: string[], asRole: 'member' | 'admin') {
+  /** `replacing`: a renewal of one address, which keeps the batch it came from. */
+  async function create(list: string[], asRole: 'member' | 'admin', replacing = false) {
     if (!workspaceId) return null
     const result = await createWorkspaceInvitation({ workspaceId, emails: list, role: asRole })
     if (!result.ok) { setError(translateError(result.error)); return null }
-    const created = result.data.map(link => ({ email: link.email, url: new URL(withBasePath(link.path), publicAppOrigin()).href }))
-    setLinks(created)
+    const created = result.data.map(link => ({ email: link.email, url: publicServiceLink(link.path) }))
+    if (!replacing) {
+      setLinks(created)
+      // One answer per address: a batch that skipped some still returns its links.
+      setSkipped((result.outcomes ?? []).flatMap(outcome => outcome.created ? [] : [{ email: outcome.email, reason: outcome.reason }]))
+    }
     try { await onCreated() } catch { setNotice(t('refreshFailed')) }
     return created
   }
@@ -107,7 +113,7 @@ export function useInviteMembers(workspaceId: string | undefined, onCreated: () 
   async function renew(email: string, asRole: 'member' | 'admin') {
     if (busy) return null
     setError(''); setNotice(''); setPending(true)
-    try { return await create([email], asRole) } catch { setError(t('errors.createFailed')); return null } finally { setPending(false) }
+    try { return await create([email], asRole, true) } catch { setError(t('errors.createFailed')); return null } finally { setPending(false) }
   }
 
   async function copy(url: string) {
@@ -117,10 +123,10 @@ export function useInviteMembers(workspaceId: string | undefined, onCreated: () 
   /** Back to an empty form once the links were handed out; a half-typed form is kept. */
   function reset() {
     setError(''); setNotice('')
-    if (links.length) { setLinks([]); setEmailsValue(''); setFileName(''); setRole('member') }
+    if (links.length || skipped.length) { setLinks([]); setSkipped([]); setEmailsValue(''); setFileName(''); setRole('member') }
   }
 
-  return { emails, setEmails, recipients, role, setRole, pending, importing, busy, fileName, error, notice, links, importFile, clearImport, submit, renew, copy, reset }
+  return { emails, setEmails, recipients, role, setRole, pending, importing, busy, fileName, error, notice, links, skipped, importFile, clearImport, submit, renew, copy, reset }
 }
 
 export type InviteMembers = ReturnType<typeof useInviteMembers>

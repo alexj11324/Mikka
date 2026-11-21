@@ -5,6 +5,7 @@ import React, { act, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
 import messages from '../messages/en.json'
+import { Input } from '../components/ui/input'
 import { Textarea } from '../components/ui/textarea'
 
 // Exercise the real read owners and Sonner action buttons. The only reads are
@@ -30,53 +31,56 @@ const detail = { ...artifact, latestVersion: 1, runId: null, issueId: null, live
 const thread = { id: 'run', issueId: 'issue', status: 'succeeded', outcome: null, question: null, continuation: null, stopping: false, ownedByCurrentUser: true, createdAt: new Date(0), finishedAt: new Date(0), latestRunId: 'run', prompt: 'Fixture thread', stopRequestedAt: null, replyAvailable: true, retryAvailable: true, quota: null, feedbackEligible: false, detail: { name: 'Fixture thread', agentName: 'Claude Code', harness: 'claude_code', summary: null } }
 stub('app/actions/artifacts.ts', {
   listArtifacts: () => read('library', [artifact]), getArtifact: () => read('detail', detail),
-  getArtifactText: () => read('text', 'Retained document body.'), listRunArtifacts: async () => [],
+  getArtifactText: () => read('text', 'Retained document body.'), listRunArtifacts: async () => [], listTaskArtifacts: async () => [],
 })
 stub('app/actions/agents.ts', {
+  pollTaskDetail: async () => { throw Object.assign(new Error('older server'), { code: 'desktop_rpc_action_unknown', status: 404 }) },
+  getThreadReplyVersions: async () => [],
+  createThreadReplyVersion: async () => { throw new Error('This read test must not start a new version') },
   listAgents: async () => [],
   findThreadIssue: () => read('lookup', { issueId: 'issue' }),
   getIssueThread: () => read('thread', { thread, chunks: [{ chunk: { type: 'text-delta', id: 'reply', delta: 'Retained reply.' }, at: new Date(0) }], messages: [], chunksAppend: false }),
   getThreadChanges: async () => ({ state: 'none' }), getThreadInstructions: async () => '',
-  getThreadMachine: async () => null, getThreadName: async () => null,
+  getThreadMachine: async () => null, getThreadName: async () => null, getThreadContinuationModels: async () => null,
   listIssueThreads: async () => [], pollIssueThreads: async () => [],
   retryQuotaPausedRun: async () => null, resumeQuotaPausedRunOnApiKey: async () => null,
   sendIssueThreadReply: async () => { throw new Error('This read test must not send') }, stopRun: async () => ({}),
 })
-stub('hooks/use-live-key.tsx', { useLiveKey: Empty, useLiveKeys: Empty, watchPageVisibility: () => () => {} })
+stub('hooks/use-live-key.tsx', { useLiveKey: Empty, useLiveKeys: Empty, useLiveScope: () => null, watchPageVisibility: () => () => {} })
 stub('components/artifacts/artifact-card.tsx', { ArtifactKindIcon: Empty, ArtifactAuthorAvatar: Empty })
 stub('components/artifacts/artifact-share.tsx', { ArtifactShare: Empty })
 stub('components/artifacts/selection-actions.tsx', { SelectionActions: Empty })
-stub('components/ui/dialog.tsx', { Dialog: Pass, DialogContent: ({ children }: { children?: ReactNode }) => <div role="dialog">{children}</div>, DialogTitle: Pass, DialogDescription: Pass, DialogHeader: Pass })
+stub('components/ui/dialog.tsx', { Dialog: Pass, DialogContent: ({ children }: { children?: ReactNode }) => <div role="dialog">{children}</div>, DialogTitle: Pass, DialogDescription: Pass, DialogHeader: Pass, DialogTrigger: Pass })
 stub('components/workspace/factory-acceptance.tsx', { useAcceptanceTasks: () => ({ tasks: [], allTasks: [] }), useThreadAcceptance: () => null, AcceptanceStateBadge: Empty, FactoryAcceptance: Empty, FactoryAcceptancePanel: Empty })
 stub('components/workspace/factory-acceptance-pane.tsx', { FactoryAcceptancePane: Empty })
 stub('components/workspace/thread-changes.tsx', { ThreadChangesPane: Empty, ChangesTabLabel: Empty })
 stub('components/workspace/self-improvement.tsx', { ThreadFeedback: Empty })
-stub('components/workspace/thread-run-place.tsx', { ThreadRunPlace: Empty })
+stub('components/workspace/thread-run-place.tsx', { ThreadRunPlace: Empty, MachineDetails: Empty, MachineIcon: Empty, useMachineName: () => '' })
 stub('components/workspace/thread-execution-identity.tsx', { ThreadExecutionIdentity: Empty })
-stub('components/workspace/artifact-review.tsx', { ThreadArtifactButton: Empty, ThreadArtifactCards: Empty })
+stub('components/workspace/artifact-review.tsx', { ThreadArtifactChips: Empty })
 stub('components/workspace/thread-quota.tsx', { ThreadModelFallbackNotice: Empty, ThreadQuotaPausedCard: Empty, ThreadQuotaSwitchLine: Empty })
 stub('components/computer/computer-card.tsx', { ComputerCard: Empty })
-stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }) })
+stub('components/workspace/issue-threads.tsx', { harnessLabel: () => 'Agent', threadTopologyKey: (id: string) => ['issue-thread-topology', id], IssueThreads: Empty, ThreadEventRow: Empty, useIssueThreads: () => ({ data: [] }), useAgentActivity: () => ({ rows: [], error: null }), useTaskWork: () => ({ work: null, threads: [], failed: null }) })
 stub('components/nav/context-panel.tsx', { PANEL_WIDTH: { storageKey: 'fixture-panel-width', min: 320, max: 'half', initial: 360, edge: 'start' } })
 stub('components/coordinator/chat-composer.tsx', { ChatComposer: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => <Textarea value={value} onChange={event => onChange(event.target.value)} /> })
-mock.module('next/dynamic', { defaultExport: () => Empty })
+mock.module('@/lib/client-runtime/dynamic', { defaultExport: () => Empty })
 
 const issue = { id: 'issue', userId: 'owner', title: 'Retained task', content: { type: 'doc', content: [] }, status: 'review', priority: 'normal', revision: 1, identifier: 'FIX-1', metadata: {}, createdAt: new Date(0), updatedAt: new Date(0) }
 stub('app/actions/issues.ts', { pollIssue: () => read('task', { viewerId: 'owner', version: '1', issue }), pollIssueVersionSummaries: async () => ({ viewerId: 'owner', snapshot: { version: '1', items: [] } }), listIssueVersions: async () => [], saveIssue: async () => { throw new Error('This read test must not save') } })
 stub('app/actions/issue-operations.ts', { getDeletedIssue: async () => null, listIssueConnections: async () => [], setIssueDeleted: async () => { throw new Error('This read test must not delete') } })
 stub('components/workspace/issue-editor.tsx', { createDocumentSeed: () => null, IssueEditor: Empty })
-stub('components/workspace/issue-detail-header.tsx', { IssueDetailHeader: Empty })
-stub('components/workspace/issue-detail-actions.tsx', { IssueDetailActions: Empty })
-for (const [file, name] of [['issue-description-history', 'IssueDescriptionHistory'], ['issue-relations', 'IssueRelations'], ['issue-members', 'IssueMembers'], ['issue-detail-properties', 'IssueDetailProperties'], ['issue-activity-feed', 'IssueActivityFeed']]) stub(`components/workspace/${file}.tsx`, { [name]: Empty })
+for (const [file, name] of [['issue-description-history', 'IssueDescriptionHistory'], ['issue-relations', 'IssueRelations'], ['issue-members', 'IssueMembers'], ['issue-activity-feed', 'IssueActivityFeed']]) stub(`components/workspace/${file}.tsx`, { [name]: Empty })
 const groupMessages = await import('../lib/group-messages')
 stub('lib/group-messages.ts', { ...groupMessages, fetchGroupMessages: () => read('group', { messages: [{ id: 'message', conversationId: 'group', position: '1', authorType: 'user', authorId: 'owner', body: 'Retained group message', mentions: [], replyToId: null, createdAt: '2026-11-07T00:00:00Z' }], nextBefore: null }) })
-stub('app/actions/link-preview.ts', { getLinkPreview: async () => null })
+stub('app/actions/link-preview.ts', { getLinkPreview: async () => null, getLinkPreviews: async () => ({}) })
 stub('components/nav/conversation-pill.tsx', { ConversationPill: Empty })
 stub('components/nav/group-avatar.tsx', { GroupAvatar: Empty, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: [] }) })
 stub('components/nav/letter-avatar.tsx', { LetterAvatar: Empty })
-stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Empty })
+stub('components/nav/bot-avatar.tsx', { BotAvatar: Empty, CoordinatorAvatar: Empty, COORDINATOR_AVATAR: { color: 'encre', shape: 'cercle', coordinator: true } })
 // The task page's layer frame (docs/ui-overlay.md task-detail); this test reads through the open-source layout.
-stub('components/workspace/task-detail-frame.tsx', { FramedTask: Empty })
+stub('components/workspace/task-detail-frame.tsx', { FramedTask: ({ titleField }: import('../components/workspace/task-detail-frame').FramedTaskProps) => <Input id="task-title" value={titleField.value} readOnly /> })
+stub('components/slots/task-conversation.tsx', { TaskConversation: ({ issueId, runId }: { issueId: string; runId: string }) => <ol data-task-conversation={issueId}><li>{runId}</li></ol> })
+stub('components/slots/thread.tsx', { ThreadScreen: ({ entries }: import('../components/slots/thread-contract').ThreadScreenProps) => <ol>{entries?.map(entry => <li key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, index) => part.kind === 'text' ? <span key={index}>{part.node}</span> : null)}</li>)}</ol> })
 stub('components/workspace/message-reactions.tsx', { MessageReactions: Empty, useMessageReactions: () => ({}) })
 
 const Workspace = () => <main data-fixture-workspace="">Retained workspace</main>
@@ -94,17 +98,17 @@ stub('components/theme-provider.tsx', { ThemeProvider: Pass })
 stub('components/swr-defaults.tsx', { SWRDefaults: Pass })
 stub('components/blocks/auth-19/components/auth.tsx', { Auth: Pass })
 stub('components/blocks/auth-19/components/auth-card.tsx', { AuthCard: Pass })
-stub('components/workspace/workspace-loading.tsx', { WorkspaceLoading: Empty })
+stub('components/workspace/workspace-loading.tsx', { WorkspaceLoading: Empty, TaskPageLoading: Empty })
 stub('components/workspace/create-workspace-form.tsx', { CreateWorkspaceForm: Empty })
-stub('components/workspace/invitation-card.tsx', { InvitationCard: Empty })
+stub('components/workspace/invitation-card.tsx', { InvitationCard: Empty, OrganizationInvitationCard: Empty })
 stub('components/device-authorization.tsx', { DeviceAuthorization: Empty })
-mock.module(at('app/[locale]/not-found.tsx'), { defaultExport: Empty })
+mock.module(at('components/app-shell/not-found.tsx'), { defaultExport: Empty })
 
 const browser = new Window({ url: 'https://fixture.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
 let SWRConfig: typeof import('swr')['SWRConfig'], useSWRConfig: typeof import('swr')['useSWRConfig'], serialize: typeof import('swr')['unstable_serialize']
 let Toaster: typeof import('sonner')['Toaster'], toast: typeof import('sonner')['toast']
-let IntlProvider: typeof import('next-intl')['NextIntlClientProvider']
+let IntlProvider: typeof import('@/lib/intl/i18n-client')['NextIntlClientProvider']
 let ArtifactLibrary: typeof import('../components/artifacts/artifact-library')['ArtifactLibrary']
 let ArtifactViewer: typeof import('../components/artifacts/artifact-viewer')['ArtifactViewer']
 let IssueThreadPanel: typeof import('../components/workspace/issue-thread-panel')['IssueThreadPanel']
@@ -131,7 +135,7 @@ before(async () => {
   ;({ createRoot } = await import('react-dom/client'))
   ;({ SWRConfig, useSWRConfig, unstable_serialize: serialize } = await import('swr'))
   ;({ Toaster, toast } = await import('sonner'))
-  ;({ NextIntlClientProvider: IntlProvider } = await import('next-intl'))
+  ;({ NextIntlClientProvider: IntlProvider } = await import('@/lib/intl/i18n-client'))
   ;({ ArtifactLibrary } = await import('../components/artifacts/artifact-library'))
   ;({ ArtifactViewer } = await import('../components/artifacts/artifact-viewer'))
   ;({ IssueThreadPanel } = await import('../components/workspace/issue-thread-panel'))
@@ -184,6 +188,10 @@ for (const item of cases) test(`${item.name}: a failed Retry stays available, th
   const notice = () => [...container.querySelectorAll('[data-sonner-toast]')].find(element => element.textContent?.includes(item.title))
   const retry = () => notice()?.querySelector<HTMLButtonElement>('button[data-action]')
   await until(() => !!retry(), 'The actual Sonner Retry button must appear')
+  if (isApp) {
+    assert.equal(notice()?.getAttribute('data-y-position'), 'top', 'The persistent connection alert stays clear of the composer')
+    assert.ok(notice()?.querySelector('button[data-close-button]'), 'Other controls under a persistent alert can be uncovered')
+  }
   const before = reads.get(item.read)!
   await act(async () => retry()!.click())
   await until(() => reads.get(item.read) === before + 1, 'Retry must perform the next read')

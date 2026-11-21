@@ -1,9 +1,6 @@
 name: Issue 1225 model provider acceptance
 # Paid acceptance is authorized by these two merged issue PRs only.
 on:
-  workflow_run:
-    workflows: [Web deploy]
-    types: [completed]
   workflow_dispatch:
     inputs:
       mode:
@@ -24,7 +21,7 @@ concurrency:
   queue: max
 jobs:
   acceptance:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == 'alexj11324/Mikka' && (contains(github.event.workflow_run.head_commit.message, '(#1232)') || contains(github.event.workflow_run.pull_requests.*.number, 1232) || contains(github.event.workflow_run.head_commit.message, '(#1249)') || contains(github.event.workflow_run.pull_requests.*.number, 1249))))
+    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 55
     permissions:
@@ -55,15 +52,8 @@ jobs:
           const valid = (pr, number) => pr.number === number && pr.merged === true && pr.base?.ref === 'main'
             && pr.base?.repo?.full_name === repository && /^[a-f0-9]{40}$/.test(pr.merge_commit_sha ?? '')
             && /(?:refs?|fix(?:es)?|clos(?:e[sd]?|ing)|resolv(?:e[sd]?|ing))\s+(?:https:\/\/github\.com\/alexj11324\/Mikka\/issues\/)?#?1225\b/i.test(pr.body ?? '')
-          const run = event.workflow_run
-          const guard = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
-            ? [feature, acceptance].find(pr => pr.number === Number(event.inputs?.guard_pr ?? 1249))
-            : [feature, acceptance].find(pr => pr.merge_commit_sha === run?.head_sha
-              && (run.head_commit?.message?.includes(`(#${pr.number})`) || run.pull_requests?.some(item => item.number === pr.number)))
+          const guard = [feature, acceptance].find(pr => pr.number === Number(event.inputs?.guard_pr ?? 1249))
           const trigger = process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
-            || (process.env.GITHUB_EVENT_NAME === 'workflow_run' && run?.name === 'Web deploy' && run.event === 'push'
-              && run.status === 'completed' && run.conclusion === 'success' && run.head_branch === 'main'
-              && run.head_repository?.full_name === repository)
           if (!valid(feature, 1232) || !valid(acceptance, 1249) || !guard || !trigger) {
             appendFileSync(process.env.GITHUB_OUTPUT, 'eligible=false\n')
             console.log('merge_scope_rejected: no authorized issue deployment; no acceptance or smoke secret read.')
@@ -87,7 +77,7 @@ jobs:
         run: |
           node --test scripts/acceptance/model-provider-fallback.test.mjs
           node scripts/assert-test-model.mjs deepseek-flash
-      - name: Bind the actual production descendant and its successful Web deploy
+      - name: Bind the actual production descendant
         id: application
         if: steps.merge.outputs.eligible == 'true'
         env:
@@ -113,8 +103,8 @@ jobs:
             if (guard.driverRevision !== process.env.EXPECTED_DRIVER_SHA) throw new AcceptanceError('merge_changed')
             const bound = await resolveAcceptanceDeployment({ guard, githubToken: process.env.GH_TOKEN })
             writeFileSync('model-provider-fallback-report/attestation.json', JSON.stringify({ issue: 1225, ...bound, status: 'awaiting_runtime' }, null, 2) + '\n')
-            appendFileSync(process.env.GITHUB_OUTPUT, `sha=${bound.revision}\nfeature-sha=${bound.featureMergeSha}\nguard-pr=${bound.guardPullRequest}\nguard-sha=${bound.guardMergeSha}\nweb-run-id=${bound.webDeployRunId}\n`)
-            console.log(`Feature merge ${bound.featureMergeSha}; application ${bound.revision}; guard PR #${bound.guardPullRequest}; Web deploy ${bound.webDeployRunId}.`)
+            appendFileSync(process.env.GITHUB_OUTPUT, `sha=${bound.revision}\nfeature-sha=${bound.featureMergeSha}\nguard-pr=${bound.guardPullRequest}\nguard-sha=${bound.guardMergeSha}\n`)
+            console.log(`Feature merge ${bound.featureMergeSha}; application ${bound.revision}; guard PR #${bound.guardPullRequest}.`)
           } catch (error) {
             const failure = publicFailure(error)
             writeFileSync('model-provider-fallback-report/attestation.json', JSON.stringify({ issue: 1225, ...failure }, null, 2) + '\n')
@@ -186,7 +176,6 @@ jobs:
           MIKKA_ACCEPTANCE_GUARD_PR: ${{ steps.application.outputs.guard-pr }}
           MIKKA_ACCEPTANCE_GUARD_MERGE_SHA: ${{ steps.application.outputs.guard-sha }}
           MIKKA_ACCEPTANCE_DRIVER_SHA: ${{ steps.merge.outputs.driver-sha }}
-          MIKKA_WEB_DEPLOY_RUN_ID: ${{ steps.application.outputs.web-run-id }}
           MIKKA_WORKER_RELEASE_PROOF: ${{ steps.worker.outputs.proof }}
           MIKKA_WORKER_RELEASE_SHA: ${{ steps.worker.outputs.sha }}
           MIKKA_WORKER_RELEASE_RUN_ID: ${{ steps.worker.outputs.run-id }}

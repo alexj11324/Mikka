@@ -13,7 +13,7 @@ import { workerDefinitionDigest } from './agent-kit/worker-digest'
 import { digest } from './agent-kit/definition'
 import { executionIdentitySchema, freezeExecutionIdentity, type ExecutionIdentity } from './execution-identity'
 import { entryKey, type OrderEntry, type SkippedEntry } from './model-order-plan'
-import { credentialStates, dispatchOrder, orderCandidates, readOrder } from './model-order'
+import { credentialStates, orderCandidates, readOrder } from './model-order'
 import { bindAgentToConnection, modelUnavailableCard, resolveModelDispatch, type ModelDispatch } from './model-dispatch'
 import type { ModelRoutingSnapshot } from './model-routing'
 import { modelFallbackRecordSchema, type ModelFallbackChoice, type ModelFallbackRecord } from './run-model-fallback-view'
@@ -24,9 +24,12 @@ import { providerContinuationPrompt } from './run-retry'
 import { recordCoordinatorEvent } from './coordinator-event-store'
 import { runFinishedEvent } from './coordinator-events'
 import { defaultAgentCopy } from './agent-copy'
+import { profileFixedModel, profileHarness } from './factory/agent-profile-definition'
 import { ActionFailureError } from './action-error'
 import { ComputerError } from './computer/store'
 import { runChanged } from './live/panels'
+import { resolveRunOrigin } from './run-origin'
+import { assertRunProjectResources, isProjectExecutionRefusal, withRunProjectExecution, withRunProjectResources } from './project-resources/run-lease'
 
 type Run = typeof agentRuns.$inferSelect
 type Query = Pick<Pool | PoolClient, 'query'>
@@ -35,6 +38,10 @@ type Continuation = { runId: string; previousRunId: string; deviceId: string; cl
 // JSONB cannot store NUL separators used by the in-memory dispatch key.
 const attemptKey = (entry: OrderEntry) => encodeURIComponent(entryKey(entry))
 const choice = (entry: OrderEntry): ModelFallbackChoice => ({ harness: entry.harness, model: entry.model, source: entry.source.kind })
+/** A thread keeps one Agent for life (decision 2026-11-17-1800): its Profile's,
+ * else its dispatch entry's, else the run's own. A retry never takes the other. */
+const threadHarness = (run: Run): OrderEntry['harness'] => profileHarness(run.agentDefinition?.agentProfile)
+  ?? run.agentDefinition?.modelDispatch?.entry?.harness ?? (run.agentDefinition?.harness === 'codex' ? 'codex' : 'claude_code')
 const record = (run: Run): ModelFallbackRecord | undefined => {
   const value = modelFallbackRecordSchema.safeParse((run.report as Record<string, unknown> | null)?.modelFallback)
   return value.success ? value.data : undefined
@@ -141,7 +148,7 @@ async function fallbackScope(query: Query, run: Run): Promise<Scope> {
   return { ownerId: run.userId, workspaceId: scope?.workspaceId ?? await (await import('./execution-settings')).executionWorkspace(run.userId, run.botId), botId: scope?.botId ?? run.botId }
 }
 
-async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[], smartRouting: boolean): Promise<Set<string>> {
+async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[]): Promise<Set<string>> {
   // A bounded recursive chain is owner/task scoped and contains only earlier
   // provider continuations; old tasks cannot exhaust this task's order.
   const { rows } = await query.query<{ report: unknown; entry: OrderEntry | null }>(`WITH RECURSIVE chain AS (
@@ -158,9 +165,9 @@ async function attemptedEntries(query: Query, run: Run, entries: OrderEntry[], s
   }
   const current = run.agentDefinition?.modelDispatch?.entry
   const index = current ? entries.findIndex(entry => attemptKey(entry) === attemptKey(current)) : -1
-  // Difficulty routing may deliberately start later in the preference list.
-  // Earlier, stronger entries have not been attempted by that run.
-  if (!smartRouting || !run.agentDefinition?.modelDispatch?.routing)
+  // A run frozen by the retired difficulty routing may have started later in
+  // the preference list. Earlier, stronger entries have not been attempted.
+  if (!run.agentDefinition?.modelDispatch?.routing)
     for (const entry of entries.slice(0, index + 1)) attempted.add(attemptKey(entry))
   return attempted
 }
@@ -175,7 +182,9 @@ function reasonLine(reason: string): string {
 }
 
 async function unavailableRecord(pool: Pool, scope: Scope, run: Run, attempted: Set<string>, skipped: SkippedEntry[] = [], ownerPinned = false): Promise<ModelFallbackRecord> {
-  const candidates = await orderCandidates(pool, scope), { entries } = await readOrder(pool, scope, candidates)
+  const candidates = await orderCandidates(pool, scope), harness = threadHarness(run)
+  // Only this thread's own Agent's list: the other Agent is never offered as a way out.
+  const entries = (await readOrder(pool, scope, candidates)).entries.filter(entry => entry.harness === harness)
   const states = await credentialStates(pool, scope, entries, candidates, undefined, { probe: false })
   const receipt = record(run) ?? pendingProviderFallback(run, providerFailureSchema.parse(run.report?.providerFailure))
   const picked = ownerPinned || run.agentDefinition?.modelDispatch?.mode !== 'preference'
@@ -202,6 +211,9 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
   routing?: ModelRoutingSnapshot;
   subscriptionBindingId?: string; cloud: boolean; botId: string | null; workspaceId: string;
 }): Promise<Continuation | null> {
+  if (!original.workspaceId) throw new ActionFailureError('executionAccountUnavailable')
+  const { withProjectResourceLease } = await import('./project-resources/store')
+  return withProjectResourceLease(original.userId, original.workspaceId, async () => {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
@@ -217,7 +229,9 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
     if (!source || source.stopReason !== 'provider_failure' || source.status !== 'failed') { await client.query('COMMIT'); return null }
     const prior = record(source)
     if (prior?.state !== 'pending') {
-      const next = prior?.retryRunId ? await readSource(client, source.userId, prior.retryRunId) : null
+      // A resource refusal racing another completed handoff cannot authorize
+      // launching that child. Keep the committed receipt without rewriting it.
+      const next = receipt.state !== 'stopped' && prior?.retryRunId ? await readSource(client, source.userId, prior.retryRunId) : null
       await client.query('COMMIT')
       return next?.deviceId && next.status === 'queued' && !next.stopRequestedAt && await providerContinuationLaunchMatches(client, source, next)
         ? { runId: next.id, previousRunId: source.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
@@ -245,8 +259,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
       if (target && source.agentDefinition && source.issueId) {
         const policyCeiling = await providerContinuationPolicy(client, source.userId, source.id)
         const { routing: _previousRouting, ...dispatch } = source.agentDefinition.modelDispatch!
-        const modelDispatch = { ...dispatch, mode: 'preference' as const, entry: target.entry,
-          ...(target.routing ? { routing: target.routing } : {}) }
+        const modelDispatch = { ...dispatch, mode: 'preference' as const, entry: target.entry }
         const selection = { model: target.model, modelDispatch, ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
           ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
         let runId: string
@@ -257,8 +270,12 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
             ...selection, botId: target.botId, issueId: source.issueId, agentId: target.agentId, deviceRepoId: target.deviceRepoId,
             title: issue.title, body: tiptapToText(issue.content), readOnly: source.agentDefinition.readOnly,
             withoutBot: source.botId === null, idempotencyKey: `provider:${source.id}`,
+            frozenSourceRunId: source.id,
             allowLocalRecovery: source.agentDefinition.allowLocalRecovery,
             sourceEventId: source.agentDefinition.repositoryAdmission?.requestEventId,
+            // The fallback continues the failed source's entry; a legacy run
+            // is recorded as the host's automatic recovery, never guessed as web.
+            ...resolveRunOrigin({ sourceRun: source, defaultOrigin: source.source === 'mcp' ? 'api' : 'automation' }),
           }, client)
           runId = queued.runId
         } else {
@@ -267,6 +284,14 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
         }
         const queued = await readSource(client, source.userId, runId)
         if (!queued?.agentDefinition) throw new ActionFailureError('runInvalid')
+        const { assertRunProjectExecution } = await import('./project-resources/run-lease')
+        if (queued.agentDefinition.projectExecution) assertRunProjectExecution(source, source.agentDefinition.projectExecution, queued.agentDefinition.projectExecution)
+        else if (source.agentDefinition.projectExecution) throw new ActionFailureError('projectEnvironmentUnavailable')
+        // Admission checks the frozen Project target. Independent Factory
+        // checks execute a candidate SHA instead; restore that exact checkout
+        // below before this transaction publishes the continuation.
+        const resourceBaseBranch = source.agentDefinition.projectExecution ? source.agentDefinition.projectExecution.baseBranch : source.baseBranch
+        if (queued.baseBranch !== resourceBaseBranch) throw new ActionFailureError('projectRepositoryDenied')
         const copied = providerContinuationPrompt(source)
         const { prompt } = copied
         const definition = providerContinuationDefinition(source.agentDefinition, queued.agentDefinition, prompt, policyCeiling)
@@ -298,6 +323,7 @@ async function settle(pool: Pool, original: Run, receipt: ModelFallbackRecord, t
     await client.query('COMMIT')
     return continuation
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  })
 }
 
 /** The existing dispatcher retains all owner, workspace, location and device
@@ -308,24 +334,48 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   const initial = record(source)
   if (!initial) return null
   if (source.stopRequestedAt) return initial.state === 'pending' ? settle(pool, source, initial) : null
-  if (initial.state === 'switched' && initial.retryRunId) {
-    const next = await readSource(pool, userId, initial.retryRunId)
-    return next?.deviceId && !next.stopRequestedAt && next.status === 'queued' && await providerContinuationLaunchMatches(pool, source, next)
-      ? { runId: next.id, previousRunId: source.id, deviceId: next.deviceId, cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId: next.agentDefinition?.executionIdentity?.workspaceId ?? '' } : null
+  if (initial.state !== 'pending' && initial.state !== 'switched') return null
+  const workspaceId = source.workspaceId
+  if (!workspaceId) throw new ActionFailureError('executionAccountUnavailable')
+  try {
+    const { withProjectResourceLease } = await import('./project-resources/store')
+    return await withProjectResourceLease(userId, workspaceId, async () => {
+      if (initial.state === 'switched') {
+        const next = initial.retryRunId ? await readSource(pool, userId, initial.retryRunId) : null
+        if (!next?.deviceId || next.workspaceId !== workspaceId || next.stopRequestedAt || next.status !== 'queued' ||
+          !await providerContinuationLaunchMatches(pool, source, next)) return null
+        await assertRunProjectResources(pool, next)
+        return { runId: next.id, previousRunId: source.id, deviceId: next.deviceId,
+          cloud: next.agentDefinition?.executionIdentity?.billingAccount.runtime.kind === 'e2b', workspaceId }
+      }
+      // Refuse an obsolete source before choosing credentials or preparing a
+      // runtime. The same lease pins resources through the handoff's commit.
+      await assertRunProjectResources(pool, source)
+      return recoverAuthorizedProviderFailure(pool, source, initial)
+    })
+  } catch (error) {
+    if (!isProjectExecutionRefusal(error)) throw error
+    if (initial.state === 'switched') return null // The already committed handoff remains historical fact.
+    // Completion and worker-token revocation have already committed. Reuse
+    // the terminal intent receipt so replay cannot keep preparing runtimes.
+    return settle(pool, source, { ...initial, state: 'stopped', reasons: [{ choice: initial.from, reason: error.code }] })
   }
-  if (initial.state !== 'pending') return null
-  // The order dispatch tried (优先使用的 Agent's list first, decision 2026-11-05-0400), so what came before this run is what was tried.
-  const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope)
-  const { autoModelRouting } = stored
-  const attempted = await attemptedEntries(pool, source, dispatchOrder(stored.entries, stored.preferredHarness), autoModelRouting)
+}
+
+async function recoverAuthorizedProviderFailure(pool: Pool, source: Run, initial: ModelFallbackRecord): Promise<Continuation | null> {
+  const userId = source.userId
+  // The thread's own Agent's list, in order: what came before this run is what was tried.
+  // The other Agent's list is never a fallback (decision 2026-11-17-1800).
+  const scope = await fallbackScope(pool, source), stored = await readOrder(pool, scope), harness = threadHarness(source)
+  const attempted = await attemptedEntries(pool, source, stored.entries.filter(entry => entry.harness === harness))
   // The Owner requested these checks on their original subscription/model.
   // Keep the historical preference snapshot intact; the host receipt pins
   // this round before any alternate model selection or runtime preparation.
   if (await (await import('./factory/candidate-recheck')).candidateRecheckPinsRun(pool, userId, source.id))
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [], true))
-  if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || source.agentDefinition?.agentProfile?.definition.model.mode === 'fixed')
+  if (source.agentDefinition?.modelDispatch?.mode !== 'preference' || source.questionContinuation || profileFixedModel(source.agentDefinition?.agentProfile) !== undefined)
     return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
-  const { rows: [origin] } = await pool.query<{ kind: string; remoteUrl: string | null }>(`SELECT d.kind,repo."remoteUrl" FROM devices d
+  const { rows: [origin] } = await pool.query<{ kind: string; repoPath: string | null; remoteUrl: string | null }>(`SELECT d.kind,repo."repoPath",repo."remoteUrl" FROM devices d
     LEFT JOIN device_repos repo ON repo.id=$3 AND repo."userId"=$2 WHERE d.id=$1 AND d."ownerId"=$2`, [source.deviceId, source.userId, source.deviceRepoId])
   if (!origin) return settle(pool, source, await unavailableRecord(pool, scope, source, attempted))
   const location = origin.kind === 'cloud' && !source.agentDefinition.allowLocalRecovery ? 'cloud' : source.agentDefinition.modelDispatch.location
@@ -337,12 +387,21 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
   const skipped: SkippedEntry[] = []
   for (let index = 0; index <= stored.entries.length; index++) {
     const selected: ModelDispatch = await resolveModelDispatch(pool, scope, null, location, source.agentDefinition.pinnedDeviceId ?? ((monitor || checkpointUnavailable) && origin.kind === 'local' ? source.deviceId ?? undefined : undefined),
-      { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop',
-        ...(autoModelRouting && source.agentDefinition.modelDispatch.routing ? { routing: { issueId: source.issueId ?? undefined,
-          previous: source.agentDefinition.modelDispatch.routing, escalate: true, effort: source.agentDefinition.agentProfile?.effort } } : {}),
-        ...(source.agentDefinition.agentProfile?.definition.harness && source.agentDefinition.agentProfile.definition.harness !== 'auto' ? { harness: source.agentDefinition.agentProfile.definition.harness } : {}) })
+      { excludeEntryKeys: [...attempted].map(key => decodeURIComponent(key)), cloudPurpose: origin.remoteUrl ? 'task' : 'desktop', harness })
     if (selected.kind === 'none') return settle(pool, source, await unavailableRecord(pool, scope, source, attempted, [...skipped, ...selected.skipped ?? []]))
     attempted.add(attemptKey(selected.entry))
+    try {
+      // A compatible source does not authorize another runtime or harness.
+      // Check each target before creating a repo, Bot or cloud preparation;
+      // the outer resource lease keeps this decision valid through admission.
+      await withRunProjectExecution({ userId, workspaceId: source.workspaceId!, issueId: source.issueId!,
+        repositoryKey: origin.remoteUrl ? origin.repoPath : null, baseBranch: source.baseBranch,
+        runtime: selected.kind === 'device' ? 'local' : 'cloud', harness: selected.entry.harness }, source.agentDefinition.projectExecution, async () => undefined)
+    } catch (error) {
+      if (!isProjectExecutionRefusal(error)) throw error
+      skipped.push({ entry: selected.entry, block: { usable: false, reason: 'noDevice' } })
+      continue
+    }
     let target: Parameters<typeof settle>[3]
     try { if (selected.kind === 'device' && origin.remoteUrl) {
       const repo = await (await import('./device-repositories')).ensureDeviceRepository(userId, selected.deviceId, origin.remoteUrl)
@@ -370,7 +429,6 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
           if (!current) { skipped.push({ entry: selected.entry, block: { usable: false, reason: 'noDevice' } }); continue }
           const repoId = origin.remoteUrl ? (await (await import('./device-repositories')).ensureDeviceRepository(userId, current.deviceId, origin.remoteUrl)).id : current.repoId
           target = { agentId: ready.agentId, deviceId: current.deviceId, deviceRepoId: repoId, model: selected.model, entry: selected.entry,
-            ...(selected.routing ? { routing: selected.routing } : {}),
             ...(binding ? { subscriptionBindingId: binding } : {}), cloud: true, botId, workspaceId: scope.workspaceId }
         }
       }
@@ -402,9 +460,20 @@ export async function recoverProviderFailure(pool: Pool, userId: string, runId: 
  * do the next run's database work and retry a retained-machine wake. */
 export async function launchProviderContinuation(userId: string, continuation: Continuation | null) {
   if (!continuation) return
-  if (continuation.cloud) {
-    const [{ start }, { factoryCloudStageHandoff }] = await Promise.all([import('workflow/api'), import('@/workflows/factory-stage/workflow')])
-    await start(factoryCloudStageHandoff, [{ userId, workspaceId: continuation.workspaceId }, continuation.previousRunId, continuation.runId, true])
+  const { pool } = await import('./db')
+  const source = await readSource(pool, userId, continuation.previousRunId)
+  const next = await readSource(pool, userId, continuation.runId)
+  if (!source || !next || next.workspaceId !== continuation.workspaceId || next.status !== 'queued' || next.stopRequestedAt ||
+    next.deviceId !== continuation.deviceId || !await providerContinuationLaunchMatches(pool, source, next)) return
+  try {
+    await withRunProjectResources(pool, next, async () => {
+      if (continuation.cloud) {
+        const [{ start }, { factoryCloudStageHandoff }] = await Promise.all([import('workflow/api'), import('@/workflows/factory-stage/workflow')])
+        await start(factoryCloudStageHandoff, [{ userId, workspaceId: continuation.workspaceId }, continuation.previousRunId, continuation.runId, true])
+      }
+      else (await import('./device-gateway-notify')).notifyDeviceWork(continuation.deviceId)
+    })
+  } catch (error) {
+    if (!isProjectExecutionRefusal(error)) throw error
   }
-  else (await import('./device-gateway-notify')).notifyDeviceWork(continuation.deviceId)
 }

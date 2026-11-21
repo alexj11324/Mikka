@@ -11,7 +11,8 @@ import { hostedBinaries } from '../src/hosted-binaries'
 import { startAnonymousCodex } from '../src/anonymous-codex-spare'
 import { startAnonymousClaude } from '../src/anonymous-claude-spare'
 
-const root = '/home/user/.mikka'
+const cloudflareTask = process.argv.includes('--cloudflare-task')
+const root = cloudflareTask ? '/home/node/.mikka' : '/home/user/.mikka'
 let anonymousAttempted = false
 async function accept(preloadedModels?: HostedModelProbe) {
   const config = consumeCloudBootstrap(`${root}/bootstrap.json`)
@@ -40,17 +41,30 @@ async function accept(preloadedModels?: HostedModelProbe) {
     }
     // Only the desktop template carries a desktop and its driver; a task machine
     // (E2B's claude or codex template) has neither.
-    const computer = existsSync('/opt/mikka/computer/cua-driver') ? ['--e2b-computer'] : []
+    const computer = !cloudflareTask && existsSync('/opt/mikka/computer/cua-driver') ? ['--e2b-computer'] : []
     // Diagnostics are opt-in per assignment. A trusted operator can authorize a
     // bounded Bot/repository window through the existing claim response.
+    const host = cloudflareTask ? [] : ['--e2b-container-runtime']
+    let announced = false
+    const taskRegistered = () => {
+      if (!announced) {
+        announced = true
+        process.stdout.write('mikka-task-worker-registered\n')
+      }
+    }
     let code: number | null
-    try { code = await runCli(['daemon', '--data-dir', dataDir, '--server', config.server, '--hosted-subscriptions', '--e2b-container-runtime', ...computer], undefined, { protectionBypass: config.protectionBypass, preloadedModels, initialRunId: config.initialRunId, collectCliTiming: config.collectCliTiming, anonymousClaudeCandidate, anonymousCodexCandidate }) }
+    try { code = await runCli(['daemon', '--data-dir', dataDir, '--server', config.server, '--hosted-subscriptions', ...host, ...computer], undefined, { ...(cloudflareTask ? { taskRegistered } : {}), protectionBypass: config.protectionBypass, preloadedModels, initialRunId: config.initialRunId, collectCliTiming: config.collectCliTiming, anonymousClaudeCandidate, anonymousCodexCandidate }) }
     catch (error) { await Promise.all([anonymousClaudeCandidate?.close(), anonymousCodexCandidate?.close()]); throw error }
     if (code !== null && code !== 0) { await Promise.all([anonymousClaudeCandidate?.close(), anonymousCodexCandidate?.close()]); throw new Error('Cloud worker failed') }
   })
 }
 const failed = () => { process.stderr.write('Cloud worker unavailable\n'); process.exit(1) }
-if (process.argv.includes('--probe-models')) {
+if (cloudflareTask) {
+  void import('../src/cloudflare-task-handoff').then(async ({ receiveTaskHandoff }) => {
+    await receiveTaskHandoff(root, process.stdin)
+    return accept()
+  }).catch(failed)
+} else if (process.argv.includes('--probe-models')) {
   void import('../src/cloud-model-probe').then(async ({ probeHostedModels }) => {
     process.stdout.write(JSON.stringify(await probeHostedModels()) + '\n')
   }).catch(failed)

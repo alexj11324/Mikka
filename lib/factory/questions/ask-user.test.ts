@@ -47,3 +47,14 @@ test("POST answer accepts an optional option value but submits only the readable
   assert.equal(seen.length, 2);
   assert.ok(seen.every((b) => !Object.hasOwn(b as object, "value") && (b as { text: string }).text === "REST"));
 });
+
+test("a confirmed human answer survives a collection reload, exposing only its masked text", () => {
+  const answer = { source: "human", userId: "private-actor", input: { answerId: "ack", text: "Keep ENV_TOKEN=sample-value", internal: "unpublished" } };
+  const row = { ...base, kind: "decision", status: "resuming", answerId: "ack", continuationRunId: "resume", answerSource: "human", answer };
+  assert.equal(toAskUserQuestion(row).recordedAnswer, "Keep ENV_TOKEN=[REDACTED]");
+  for (const override of [
+    { answerId: "different" }, { continuationRunId: null }, { answerSource: "orchestrator" },
+    { answer: { ...answer, source: "human_event" } }, { answer: null },
+  ]) assert.equal(toAskUserQuestion({ ...row, ...override }).recordedAnswer, undefined);
+  assert.doesNotMatch(JSON.stringify(toAskUserQuestion(row)), /private-actor|unpublished|sample-value/);
+});

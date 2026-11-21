@@ -2,21 +2,30 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import { issues } from '@/lib/db/schema'
-import { canEditIssueRelation, encodeCursor, escapeLike, existingRelation, idIn, parseSearchParams, parseSearchQuery, relationClosureQuery, RELATION_DEPTH_LIMIT, SearchInputError } from '@/lib/issue-search'
+import { encodeCursor, escapeLike, existingRelation, idIn, parseSearchParams, parseSearchQuery, relationClosureQuery, RELATION_DEPTH_LIMIT, SearchInputError } from '@/lib/issue-search'
 
 const A = '00000000-0000-4000-8000-00000000000a', B = '00000000-0000-4000-8000-00000000000b'
 const rejects = (fn: () => unknown, code: string) => assert.throws(fn, (error: unknown) => error instanceof SearchInputError && error.code === code)
 
-test('q: empty is recent, identifiers are exact numbers', () => {
+test('a full recorded pull-request URL selects its normalized identity', () => {
+  assert.deepEqual(parseSearchQuery('https://github.com/Example/Repo/pull/12/'), {
+    kind: 'pull', url: 'https://github.com/example/repo/pull/12',
+  })
+  assert.equal(parseSearchQuery('https://github.com/Example/Repo/issues/12').kind, 'title')
+  rejects(() => parseSearchQuery('https://github.com/example/' + 'x'.repeat(180) + '/pull/12'), 'searchQueryTooLong')
+})
+
+test('q: numeric counters and issued identifiers retain distinct namespaces', () => {
   assert.deepEqual(parseSearchQuery(''), { kind: 'recent' })
   assert.deepEqual(parseSearchQuery('   '), { kind: 'recent' })
   assert.deepEqual(parseSearchQuery(null), { kind: 'recent' })
-  assert.deepEqual(parseSearchQuery('ORV-123'), { kind: 'number', number: 123 })
-  assert.deepEqual(parseSearchQuery('mik-7'), { kind: 'number', number: 7 })
+  assert.deepEqual(parseSearchQuery('ORV-123'), { kind: 'identifier', identifier: 'ORV-123' })
+  assert.deepEqual(parseSearchQuery('mik-7'), { kind: 'identifier', identifier: 'MIK-7' })
   assert.deepEqual(parseSearchQuery('42'), { kind: 'number', number: 42 })
   assert.deepEqual(parseSearchQuery('5'), { kind: 'number', number: 5 })
   assert.deepEqual(parseSearchQuery('ORV-0'), { kind: 'title', text: 'ORV-0' })
-  assert.deepEqual(parseSearchQuery('ABC-12'), { kind: 'title', text: 'ABC-12' })
+  assert.deepEqual(parseSearchQuery('ABC-12'), { kind: 'identifier', identifier: 'ABC-12' })
+  assert.deepEqual(parseSearchQuery('WABC123DEF456-9007199254740991'), { kind: 'identifier', identifier: 'WABC123DEF456-9007199254740991' })
 })
 
 test('q: one CJK character searches, one ASCII character is rejected', () => {
@@ -59,13 +68,6 @@ test('existingRelation reports every kind and prefers relationKind', () => {
   assert.equal(existingRelation(plain, { id: B, metadata: { relatedIds: [A] } }), 'related')
   assert.equal(existingRelation({ ...plain, metadata: { duplicateOfId: B } }, { id: B, metadata: {} }), 'duplicate')
   assert.equal(existingRelation(plain, { id: B, metadata: {} }), null)
-})
-
-test('canEditIssueRelation: owner always, others need both memberships', () => {
-  assert.equal(canEditIssueRelation({ actorId: 'o', ownerId: 'o', currentId: A, targetId: B, memberIssueIds: [] }), true)
-  assert.equal(canEditIssueRelation({ actorId: 'm', ownerId: 'o', currentId: A, targetId: B, memberIssueIds: [A, B] }), true)
-  assert.equal(canEditIssueRelation({ actorId: 'm', ownerId: 'o', currentId: A, targetId: B, memberIssueIds: [A] }), false)
-  assert.equal(canEditIssueRelation({ actorId: 'm', ownerId: 'o', currentId: A, targetId: null, memberIssueIds: [A] }), true)
 })
 
 test('id lists bind as one = ANY array parameter, whatever the size', () => {

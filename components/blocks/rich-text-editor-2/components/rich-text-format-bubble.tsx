@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useRef } from "react"
 import type { EditorState } from "@tiptap/pm/state"
 import { isTextSelection, type Editor } from "@tiptap/react"
 import { BubbleMenu } from "@tiptap/react/menus"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 import { RichTextBubbleBar, setRichTextBubble } from "./rich-text-bubble-bar"
 import {

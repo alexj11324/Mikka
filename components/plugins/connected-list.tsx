@@ -1,8 +1,8 @@
 'use client'
 
 import type { SWRResponse } from 'swr'
-import { useTranslations } from 'next-intl'
-import { Puzzle } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { Puzzle } from '@/components/icons'
 import { workspaceLink } from '@/components/workspace/workspace-navigation'
 import { Link } from '@/i18n/navigation'
 import { ConnectedAppRow, ConnectedAppsStatus, OWN_APPS, PluginRow, useAppInfo, type OwnAppId } from '@/components/plugins/connected-apps'
@@ -45,6 +45,7 @@ export function ConnectedList({ apps, ownRead, href, onOpen, workspaceId, worksp
       </EmptyHeader>
       <Button variant="secondary" size="sm" nativeButton={false} render={<Link href={workspaceLink({ section: 'plugins' })} />}>{t('openStore')}</Button>
     </Empty>
+    {workspaceId && <McpConnections workspaceId={workspaceId} workspaceName={workspaceName} read={mcp} />}
   </div>
   return <div className="flex flex-col gap-4">
     <ConnectedAppsStatus apps={apps} />

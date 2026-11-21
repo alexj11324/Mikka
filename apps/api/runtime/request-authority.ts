@@ -65,19 +65,26 @@ function withConfiguredAuthority(fetch: Handler, configuration: Configuration, a
     // Nitro's private serverFetch can call the app without a Node ingress.
     // Actual external Vercel requests always arrive through toNodeHandler.
     if (!node) return fetch(request)
+    const http2 = node.req.httpVersionMajor === 2
     const raw = node.req.rawHeaders
     if (!Array.isArray(raw) || raw.length % 2) return rejected()
     const critical = new Map<string, string>()
     for (let index = 0; index < raw.length; index += 2) {
       const name = raw[index]?.toLowerCase(), value = raw[index + 1]
-      if (!['host', 'x-forwarded-host', 'x-forwarded-proto', 'forwarded'].includes(name)) continue
+      if (!(http2 && name === ':authority') && !['host', 'x-forwarded-host', 'x-forwarded-proto', 'forwarded'].includes(name)) continue
       // Vercel's documented carrier is X-Forwarded-*. Reject a competing RFC
       // Forwarded authority instead of interpreting an arbitrary proxy chain.
       if (critical.has(name) || typeof value !== 'string' || name === 'forwarded') return rejected()
       critical.set(name, value)
     }
-    const host = critical.get('host')
-    if (!host || (host !== legacy && !origins.has(host)) || request.headers.get('host') !== host
+    // HTTP/2 carries the authority in a pseudo-header that Fetch Headers omits.
+    // Both protocol versions still select from the configured origins only.
+    const hostHeader = critical.get('host')
+    const authority = http2 ? critical.get(':authority') : undefined
+    const host = authority ?? hostHeader
+    if (!host || (host !== legacy && !origins.has(host))
+      || (hostHeader !== undefined && (hostHeader !== host || request.headers.get('host') !== hostHeader))
+      || (authority !== undefined && node.req.headers[':authority'] !== authority)
       || (critical.has('x-forwarded-host') && critical.get('x-forwarded-host') !== host)
       || (critical.has('x-forwarded-proto') && critical.get('x-forwarded-proto') !== (host === legacy ? 'https' : new URL(origins.get(host)!).protocol.slice(0, -1)))) return rejected()
     const target = node.req.url

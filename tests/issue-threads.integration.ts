@@ -2,7 +2,6 @@ import { seedFixtureWorkspace } from './helpers/task-workspace'
 import assert from 'node:assert/strict'
 import { createHmac, randomUUID } from 'node:crypto'
 import test, { mock } from 'node:test'
-import { draftMode } from 'next/headers'
 import { Pool } from 'pg'
 
 // Explicitly refuse business databases. This executes the real server action and real SQL.
@@ -18,8 +17,8 @@ const removedAgent = randomUUID()
 // Supply the Next request boundary only; authentication still reads a real DB session.
 let requestHeaders = new Headers()
 let selectedWorkspace: string | undefined
-mock.module('next/headers', { namedExports: { cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }), draftMode, headers: async () => requestHeaders } })
-mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
+mock.module('@/lib/server-runtime/headers', { namedExports: { cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' && selectedWorkspace ? { value: selectedWorkspace } : undefined }), headers: async () => requestHeaders } })
+mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((code: string) => code, { has: () => true }) } })
 const bot = randomUUID()
 const excessRuns = Array.from({ length: 21 }, () => randomUUID())
 test('real actions keep thread content with its owner; current members see only whose threads exist and their status', async () => {

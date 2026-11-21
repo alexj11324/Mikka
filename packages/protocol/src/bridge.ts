@@ -194,6 +194,17 @@ export const pickRepoResult = z.discriminatedUnion("status", [
 ])
 export type PickRepoResult = z.infer<typeof pickRepoResult>
 
+/**
+ * What this computer's official CLIs are signed in with (as Capy's desktop
+ * reads it): `claude auth status --json` and `codex login status`. Only the
+ * login kind and plan name, never a credential.
+ */
+export const agentLoginKind = z.enum(["missing", "signed-out", "api-key", "subscription", "unknown"])
+export const agentLogin = z.object({ login: agentLoginKind, plan: z.string().max(60).nullable() })
+export const agentLogins = z.object({ claudeCode: agentLogin, codex: agentLogin })
+export type AgentLogin = z.infer<typeof agentLogin>
+export type AgentLogins = z.infer<typeof agentLogins>
+
 /** The `target` of an install on this computer (添加这台电脑) rather than over SSH. */
 export const LOCAL_TARGET = "this-computer"
 /** The `target` while 重新连接 restarts this computer's daemon. */
@@ -347,6 +358,8 @@ export interface MikkaBridge {
     link(workspaceId: string): Promise<LocalDevice>
     /** Native folder picker; main checks the folder is in a git repo. */
     pickRepo(): Promise<PickRepoResult>
+    /** Claude Code / Codex sign-in on this computer and the plan, for 已检测到. Optional on older shells. */
+    agentLogins?(): Promise<AgentLogins>
   }
   /** Subscription numbers from the local daemon. Never a vendor credential. */
   quota: {

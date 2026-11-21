@@ -28,6 +28,12 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     const renamed = await general.updateWorkspaceGeneral(admin, ws.id, { name: 'Renamed', icon: png })
     assert.equal(renamed.name, 'Renamed')
     assert.equal(renamed.icon, png)
+    const storedVersion = async () => (await pool.query<{ version: string }>(
+      'SELECT xmin::text AS version FROM mikka_workspaces WHERE id=$1', [ws.id],
+    )).rows[0].version
+    const version = await storedVersion()
+    assert.deepEqual(await general.updateWorkspaceGeneral(admin, ws.id, { name: ' Renamed ', icon: png, slug: ws.slug }), renamed)
+    assert.equal(await storedVersion(), version, 'replaying the same profile keeps the existing Workspace row')
     await rejects(general.updateWorkspaceGeneral(admin, ws.id, { icon: 'data:image/svg+xml;base64,PHN2Zz4=' }), 'workspaceIconInvalid')
     await rejects(general.updateWorkspaceGeneral(admin, ws.id, { slug: other.slug }), 'workspaceSlugTaken')
     const newSlug = `moved-${randomUUID().slice(0, 8)}`
@@ -110,7 +116,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     assert.equal(await count(pool, 'mikka_workspaces where id=$1', [ws.id]), 1)
   })
 
-  await t.test('deleteWorkspaceData: name check, full cleanup, other workspace untouched, personal data kept', async () => {
+  await t.test('deleteWorkspaceData: name check, Factory decision cleanup, other workspace untouched, personal data kept', async () => {
     const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member')
     const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }], 'Doomed')
     const keep = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }], 'Keep')
@@ -121,6 +127,20 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
       const team = await seedTeam(pool, workspaceId, admin)
       const issue = await seedTeamIssue(pool, workspaceId, team.id, admin)
       const project = await seedProject(pool, admin, [{ teamId: team.id, workspaceId }])
+      await pool.query('update agent_runs set "issueId"=$2 where id=$1', [run, issue])
+      const factoryTask = randomUUID(), attempt = randomUUID(), decision = randomUUID()
+      const client = await pool.connect()
+      try {
+        await client.query('BEGIN')
+        await client.query(`insert into factory_tasks (id,"userId","workspaceId","issueId","botId","sourceEventId",route,stage,status,"attemptId",reason)
+          values ($1,$2,$3,$4,$5,$6,'{}','execute','passed',$7,'fixture')`, [factoryTask, member, workspaceId, issue, bot, randomUUID(), attempt])
+        await client.query(`insert into factory_attempts (id,"taskId",stage,ordinal,position,status,"runId",reason)
+          values ($1,$2,'execute',1,1,'passed',$3,'fixture')`, [attempt, factoryTask, run])
+        await client.query('COMMIT')
+      } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+      await pool.query(`insert into project_decisions (id,"workspaceId","projectId","ownerId","issueId","factoryTaskId","runId",kind,title,summary,reason,provenance,"captureMode","decidedBy","recordedBy","occurredAt","idempotencyKey","payloadHash")
+        values ($1::uuid,$2,$3,$4,$5,$6,$7,'confirm','Decision','','Fixture','recorded','human_marked','{}','{}',now(),$1::text,'fixture')`,
+      [decision, workspaceId, project, member, issue, factoryTask, run])
       await pool.query(`insert into conversations (id,"workspaceId",kind,title,"createdBy") values ($1,$2,'group','G',$3)`, [randomUUID(), workspaceId, admin])
       await pool.query(`insert into mikka_workspace_invitations (id,"workspaceId","userId",email,role,"tokenHash","expiresAt") values ($1,$2,$3,$4,'member',$5,now()+interval '1 day')`, [randomUUID(), workspaceId, admin, `${randomUUID()}@example.invalid`, randomUUID()])
       await pool.query(`insert into byos_connections (id,"ownerId","workspaceId",provider) values ($1,$2,$3,'codex')`, [randomUUID(), member, workspaceId])
@@ -141,13 +161,13 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
         ['insert into hosted_verifications ("workspaceId") values ($1)', [workspaceId]],
         ['insert into hosted_card_claims (fingerprint,"workspaceId") values ($1,$2)', [randomUUID(), workspaceId]],
         [`insert into execution_rules (id,"ownerId","workspaceId",place,harness,model,position) values ($1,$2,$3,'local','codex','gpt',0)`, [randomUUID(), member, workspaceId]],
-        [`insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,'cli',$4,'abcd')`, [randomUUID(), member, workspaceId, randomUUID().replaceAll('-', '').repeat(2)]],
+        [`insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,'cli',$4,'abcd',ARRAY['legacy:full']::text[])`, [randomUUID(), member, workspaceId, randomUUID().replaceAll('-', '').repeat(2)]],
         [`insert into bot_model_choices ("ownerId","workspaceId","botKey") values ($1,$2,'k')`, [member, workspaceId]],
         // A run outside any bot that names the workspace's mailbox, without ON DELETE CASCADE.
         [`insert into session_mailboxes (id,"userId","workspaceId",kind,"sessionKey") values ($1,$2,$3,'run',$4)`, [mailbox, member, workspaceId, randomUUID()]],
         [`insert into agent_runs (id,"userId","agentId","mailboxId",status) values ($1,$2,$3,$4,'succeeded')`, [randomUUID(), member, agent, mailbox]],
       ] as const) await pool.query(text, [...values])
-      return { bot, run, team, issue, project, mailbox, agent }
+      return { bot, run, team, issue, project, factoryTask, decision, mailbox, agent }
     }
     // Every main-database table keyed by a workspace, except those that stay on purpose (lib/workspace-rows.ts).
     const { KEPT_WITH_WORKSPACE, WORKSPACE_COLUMNS } = await import('../lib/workspace-rows')
@@ -188,10 +208,10 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     const result = await general.deleteWorkspaceData(admin, ws.id, ' Doomed ')
     assert.deepEqual(result.deleted, { bots: 1, threads: 1, tasks: 1, projects: 1, teams: 1, invitations: 1, members: 2 })
     assert.equal(result.nextWorkspaceId, keep.id)
-    for (const [table, id] of [['mikka_workspaces where id=$1', ws.id], ['mikka_workspace_members where "workspaceId"=$1', ws.id], ['mikka_teams where "workspaceId"=$1', ws.id], ['bots where id=$1', doomed.bot], ['agent_runs where id=$1', doomed.run], ['issues where id=$1', doomed.issue], ['workspace_projects where id=$1', doomed.project], ['conversations where "workspaceId"=$1', ws.id], ['workspace_settings where "workspaceId"=$1', ws.id], ['workspace_billing where "workspaceId"=$1', ws.id], ['mikka_workspace_invitations where "workspaceId"=$1', ws.id]] as const) {
+    for (const [table, id] of [['mikka_workspaces where id=$1', ws.id], ['mikka_workspace_members where "workspaceId"=$1', ws.id], ['mikka_teams where "workspaceId"=$1', ws.id], ['bots where id=$1', doomed.bot], ['agent_runs where id=$1', doomed.run], ['issues where id=$1', doomed.issue], ['workspace_projects where id=$1', doomed.project], ['factory_tasks where id=$1', doomed.factoryTask], ['project_decisions where id=$1', doomed.decision], ['conversations where "workspaceId"=$1', ws.id], ['workspace_settings where "workspaceId"=$1', ws.id], ['workspace_billing where "workspaceId"=$1', ws.id], ['mikka_workspace_invitations where "workspaceId"=$1', ws.id]] as const) {
       assert.equal(await count(pool, table, [id]), 0, table)
     }
-    for (const [table, id] of [['mikka_workspaces where id=$1', keep.id], ['mikka_workspace_members where "workspaceId"=$1', keep.id], ['bots where id=$1', kept.bot], ['agent_runs where id=$1', kept.run], ['issues where id=$1', kept.issue], ['workspace_projects where id=$1', kept.project], ['conversations where "workspaceId"=$1', keep.id], ['mikka_teams where id=$1', kept.team.id], ['workspace_settings where "workspaceId"=$1', keep.id], ['mikka_workspace_invitations where "workspaceId"=$1', keep.id]] as const) {
+    for (const [table, id] of [['mikka_workspaces where id=$1', keep.id], ['mikka_workspace_members where "workspaceId"=$1', keep.id], ['bots where id=$1', kept.bot], ['agent_runs where id=$1', kept.run], ['issues where id=$1', kept.issue], ['workspace_projects where id=$1', kept.project], ['factory_tasks where id=$1', kept.factoryTask], ['project_decisions where id=$1', kept.decision], ['conversations where "workspaceId"=$1', keep.id], ['mikka_teams where id=$1', kept.team.id], ['workspace_settings where "workspaceId"=$1', keep.id], ['mikka_workspace_invitations where "workspaceId"=$1', keep.id]] as const) {
       assert.ok(await count(pool, table, [id]) >= 1, `kept: ${table}`)
     }
     assert.equal(await count(pool, 'mikka_workspace_members where "workspaceId"=$1', [keep.id]), 2)
@@ -348,7 +368,7 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
     assert.equal(await count(pool, 'agents where "userId"=$1 and lower(name)=lower($2)', [target, `Cloud codex ${bot}`]), 0, 'the old agent gives up the runtime name, so the bot can come back to its owner')
   })
 
-  await t.test('team deletion: impact counts, name check, scoped delete', async () => {
+  await t.test('team deletion: accurate impact, nonempty hard-delete refusal, explicit grouping removal', async () => {
     const admin = await seedUser(pool, 'admin'), member = await seedUser(pool, 'member')
     const ws = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }, { userId: member, role: 'member' }])
     const other = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
@@ -364,13 +384,16 @@ test('workspace settings backend', { skip: !dbUrl }, async t => {
 
     await rejects(teamAdmin.teamDeletionImpact(member, team.id), 'workspaceAccessDenied')
     await rejects(teamAdmin.teamDeletionImpact(admin, randomUUID()), 'teamNotFound')
-    assert.deepEqual(await teamAdmin.teamDeletionImpact(admin, team.id), { teamId: team.id, name: 'Platform', tasks: 2, projects: 1 })
+    assert.deepEqual(await teamAdmin.teamDeletionImpact(admin, team.id), { teamId: team.id, name: 'Platform', tasks: 2, projects: 2, runs: 0, pullRequests: 0, archivedAt: null, canDelete: false, recovery: 'restore_archive' })
     await rejects(teamAdmin.deleteTeamData(member, team.id, 'Platform'), 'workspaceAccessDenied')
     await rejects(teamAdmin.deleteTeamData(admin, team.id, 'platform'), 'teamDeleteNameMismatch')
-    assert.deepEqual(await teamAdmin.deleteTeamData(admin, team.id, 'Platform'), { deleted: { tasks: 2, projects: 1 } })
+    await rejects(teamAdmin.deleteTeamData(admin, team.id, 'Platform'), 'teamDeleteReferenced')
+    assert.equal(await count(pool, 'mikka_teams where id=$1', [team.id]), 1, 'a legacy hard-delete request is refused, not reinterpreted')
+    const removed = await teamAdmin.removeTeamGroupingData(admin, team.id, 'Platform')
+    assert.deepEqual(removed.removed, { teamId: team.id, tasks: 2, projects: 2 })
     assert.equal(await count(pool, 'mikka_teams where id=$1', [team.id]), 0)
-    assert.equal(await count(pool, 'issues where id = any($1)', [tasks]), 0)
-    assert.equal(await count(pool, 'workspace_projects where id=$1', [own]), 0)
+    assert.equal(await count(pool, 'issues where id = any($1)', [tasks]), 2)
+    assert.equal(await count(pool, 'workspace_projects where id=$1', [own]), 1, 'Project belongs to its Workspace without a Team')
     assert.equal(await count(pool, 'workspace_projects where id=$1', [shared]), 1, 'a shared project stays with the other team')
     assert.equal(await count(pool, 'mikka_team_projects where "projectId"=$1', [shared]), 1)
     assert.equal(await count(pool, 'issues where id = any($1)', [[siblingTask, foreignTask]]), 2)

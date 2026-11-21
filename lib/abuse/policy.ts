@@ -1,15 +1,9 @@
 import { CodedError, type CodedErrorOptions } from '@mikka/protocol/coded-error'
-/** USD accounting uses integer microdollars; the one-off allowance is fixed. */
+/** USD accounting uses integer microdollars. The one-off card allowance is no longer
+ * granted (decision 2026-11-15-1900); its size stays for reading old grants and history. */
 export const FREE_ALLOWANCE_MICRO_USD = 1_000_000
-/**
- * A workspace with no verified card and no purchased points may still use
- * Mikka 默认 for its first this-many messages (Alex, 2026-11-02): the turns
- * answering them are admitted and paid by the platform, under its daily cap.
- * Counted from the messages sent there, so it is given once per workspace.
- */
-export const TRIAL_MESSAGES = 20
 export const MICRO_USD_PER_POINT = 10_000 // Billing conversion: 100 points = USD 1.
-export const HOSTED_CALL_TIMEOUT_MS = 60_000
+export const HOSTED_CALL_TIMEOUT_MS = 120_000
 /**
  * Estimated maximum cost one hosted call holds while in flight. Output is capped
  * at 4,096 tokens (model.ts); USD 0.10 covers that at USD 15 per million output
@@ -50,20 +44,6 @@ export function abuseLimits(
     firstUseHourly: positive(env.MIKKA_FREE_MODEL_FIRST_USE_HOURLY, 50),
   }
 }
-/** Gateway returns billed cost as USD in providerMetadata.gateway.cost. */
-export function gatewayCost(metadata: unknown): number | null {
-  const value = (metadata as { gateway?: { cost?: unknown } } | undefined)
-    ?.gateway?.cost
-  if ((typeof value !== 'number' && typeof value !== 'string') || value === '')
-    return null
-  const cost = Number(value)
-  return Number.isFinite(cost) &&
-    cost >= 0 &&
-    Number.isSafeInteger(Math.ceil(cost * 1e6))
-    ? Math.ceil(cost * 1e6)
-    : null
-}
-
 export function abuseAlertKinds(
   spent: number,
   firstUses: number,
@@ -74,10 +54,4 @@ export function abuseAlertKinds(
     ...(spent >= limits.dailyMicroUsd ? ['full'] : []),
     ...(firstUses > limits.firstUseHourly ? ['signup_spike'] : []),
   ]
-}
-
-export function gatewayGenerationId(metadata: unknown): string | undefined {
-  const id = (metadata as { gateway?: { generationId?: unknown } } | undefined)
-    ?.gateway?.generationId
-  return typeof id === 'string' && id.length <= 200 ? id : undefined
 }

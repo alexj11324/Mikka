@@ -36,7 +36,7 @@ env:
 
 jobs:
   publish:
-    if: github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main'
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -62,6 +62,13 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: node --test packages/daemon/test/release.node-test.mjs
       - run: pnpm --filter @mikka/daemon typecheck
+      - name: Ensure FFmpeg for daemon recording regressions
+        run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo "$(command -v node)" scripts/ci/apt-mirrors.mjs
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 update
+            sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 install -y ffmpeg
+          fi
       - run: pnpm --filter @mikka/daemon test
       - run: pnpm --filter @mikka/daemon build
         id: daemon-package

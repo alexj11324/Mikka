@@ -1,11 +1,11 @@
 'use server'
 
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { createShare, listArtifacts as listOwnArtifacts, listRunArtifacts as listOwnRunArtifacts, readArtifact, readArtifactContent, reportIssueKey, revokeShares, type ArtifactDetail, type ArtifactListItem } from '@/lib/artifacts/store'
+import { createShare, listArtifacts as listOwnArtifacts, listRunArtifacts as listOwnRunArtifacts, listTaskArtifacts as listOwnTaskArtifacts, readArtifact, readArtifactContent, reportIssueKey, revokeShares, type ArtifactDetail, type ArtifactListItem } from '@/lib/artifacts/store'
 import type { ListLiveRead } from '@/lib/live/list-read'
 import { loadWorkspaceContext } from '@/lib/workspace-access'
 import { tokenWorkspace } from '@/lib/tokens/principal'
@@ -28,6 +28,13 @@ export async function listRunArtifacts(runId: string): Promise<ArtifactListItem[
   const reader = await getReader()
   const parsed = z.uuid().safeParse(runId)
   return parsed.success ? listOwnRunArtifacts(reader, parsed.data) : []
+}
+
+/** The current reader's admitted documents for one task, across its runs. */
+export async function listTaskArtifacts(issueId: string): Promise<ArtifactListItem[]> {
+  const reader = await getReader()
+  const parsed = z.uuid().safeParse(issueId)
+  return parsed.success ? listOwnTaskArtifacts(reader, parsed.data) : []
 }
 
 /** One of the person's artifacts with its versions, or null. */

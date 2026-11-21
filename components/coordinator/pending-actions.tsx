@@ -2,8 +2,8 @@
 
 import { useState, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
-import { Blocks, CalendarClock, Mail } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { Blocks, CalendarClock, Mail } from '@/components/icons'
 import { toast } from 'sonner'
 import { decidePendingAction } from '@/app/actions/pending-actions'
 import { Button } from '@/components/ui/button'

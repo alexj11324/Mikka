@@ -5,6 +5,10 @@ import { readFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 
 export const REVIEWED_HELPER = 'scripts/dev-local/worker-mailbox-acceptance.mjs'
+// `next.config.mjs` left the repository with the Next page layer. It stays in
+// the scope because recorded source fingerprints cover artifacts from before
+// that removal: git omits a path an artifact lacks, so dropping it here would
+// silently change every historical fingerprint this verifies.
 const paths = ['app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml', 'next.config.mjs']
 const sha256 = value => createHash('sha256').update(value).digest('hex')
 

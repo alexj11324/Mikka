@@ -7,31 +7,38 @@
 
 # Mikka
 
-**让 AI Agent 在你的电脑与云端协同工作。**
+### 为大事而生的 AI lead。
 
-Mikka 为 Claude Code、Codex 和受支持的 Cursor 运行环境组织工作：Bot 负责协调任务，Agent 负责执行。
+从本地到云端，所有 Agent 协作如一。
 
-[访问 Mikka](https://app.aspectlylabs.com/mikka) · [文档](https://aspectlylabs.com/mikka/docs) · [快速入门](https://aspectlylabs.com/mikka/docs/quickstart)
+[Mikka 官网](https://aspectlylabs.com/mikka) · [打开应用](https://app.aspectlylabs.com/mikka) · [文档](https://aspectlylabs.com/mikka/docs) · [快速入门](https://aspectlylabs.com/mikka/docs/quickstart) · [定价](https://aspectlylabs.com/pricing)
 
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+[![LINUX DO](https://img.shields.io/badge/LINUX%20DO-Community-FFB003)](https://linux.do)
 
 [English](README.md) · **简体中文**
 
 </div>
 
+Mikka 把 Claude Code 和 Codex 跑在隔离的云端机器上，与你自己电脑上的 Agent 连成一体，并把所有会话收进与 Coordinator 的同一个聊天里。Bot 负责协调 Claude Code、Codex 和受支持的 Cursor 运行环境的工作，Agent 负责执行。
+
 向 Bot 描述一个任务，Mikka 就能将编码工作派发给运行在 Mac、Linux 设备、SSH 服务器或符合条件的云端沙盒中的 Agent，并把进度、提问和结果汇总到同一个地方。你可以通过网页、macOS 或 iOS App 使用 Mikka。
 
 ## 开始使用
 
-**Mikka Cloud（早期体验）。** [打开应用](https://app.aspectlylabs.com/mikka)。如需获取使用资格，可发送邮件至 [mikka@aspectlylabs.com](mailto:mikka@aspectlylabs.com)，再按照[快速入门指南](https://aspectlylabs.com/mikka/docs/quickstart)操作。
+**Mikka Cloud。** [打开应用](https://app.aspectlylabs.com/mikka)，直接注册账号即可开始使用 Mikka。具体步骤参见[快速入门指南](https://aspectlylabs.com/mikka/docs/quickstart)。
 
-**自托管服务器。** 你可以使用 Docker 和 PostgreSQL 在自己的 Linux 主机上运行 Mikka。按照[自托管指南](docs/self-hosting.md)配置所需信息，下载匹配版本的 Compose 文件，然后启动服务器：
+**社区自托管。** 自托管由社区维护。你可以使用 Docker 和 PostgreSQL 在自己的 Linux 主机上运行 Mikka。数据库可以选择 Compose 自带的 PostgreSQL，也可以使用托管 PostgreSQL（**[推荐 Neon](docs/self-hosting.md#managed-postgresql-neon-recommended)**，但不强制）。按照[自托管指南](docs/self-hosting.md)下载匹配版本的 Compose 文件，并配置必要的私有凭证。
+
+使用自带 PostgreSQL：
 
 ```sh
 docker compose up -d --wait
 ```
 
-Compose 部署会启动 Mikka 服务端和 PostgreSQL，**不会同时安装一份独立的官方界面**。请使用官方客户端连接你的服务器。选择自托管之前，请先阅读[客户端与源码范围](#客户端与源码范围)。
+使用 Neon：在私有 `.env` 中配置 pooled / direct 两条数据库连接 URL，然后运行 `docker compose -f docker-compose.neon.yml up -d --wait`。该模式不会启动本地 PostgreSQL 容器。
+
+自托管部署**不会同时安装一份独立的官方界面**。请使用官方客户端连接你的服务器。选择自托管之前，请先阅读[客户端与源码范围](#客户端与源码范围)。
 
 **已经在使用 Claude Code？** 可以将 Mikka 作为 MCP Server 接入：
 
@@ -47,7 +54,8 @@ claude mcp add --transport http mikka https://app.aspectlylabs.com/mikka/api/mcp
 - **在你的环境中执行。** 通过 Mikka Daemon 连接自己的电脑和 SSH 服务器，也可以使用已配置的云端执行环境。符合条件的并行任务使用独立的 Git Worktree 或任务沙盒。
 - **让工作可追踪、可审阅。** 查看任务进度、回答 Agent 的问题、检查运行结果，并通过 Factory 的检查与验收流程审阅符合条件的 Pull Request。
 - **提供云端桌面。** 在已正确配置的 Mikka Cloud 账号中，Bot 可以使用可实时查看、接管并交还控制权的云端桌面。直接使用 E2B 时，需要桌面所有者自己的 Key。
-- **连接现有工具。** 通过 MCP 在 Claude Code 或 Codex 中操作 Mikka，也可以通过 Telegram 和 Slack 联系 Mikka。已连接应用中的操作遵循相应权限与审批策略。
+- **连接现有工具。** 通过 MCP 在 Claude Code 或 Codex 中操作 Mikka，也可以通过 Telegram 和 Slack 联系 Mikka。已连接应用中的操作遵循工作区为每个应用设置的访问档位。
+- **在工作区统一授权。** 工作区是唯一的授权层：管理员可以允许、禁用或将每个 MCP server 设为只读，并允许每台设备。Bot 没有自己的权限设置，没有 allow/ask/deny 层，也没有逐动作审批。
 - **使用你已有的订阅（Bring your own subscriptions）。** 可将现有 Claude 或 ChatGPT/Codex 订阅用于受支持的编码 Agent；适用场景下也支持模型 API Key。
 - **支持个人与团队协作。** 通过个人和团队工作区组织任务、Bot 与活动，并控制已连接资源的访问权限。
 
@@ -71,7 +79,7 @@ Bot、Agent、任务、线程与运行的术语定义，请参见[术语表](doc
 
 Mikka 的官方网页、macOS 和 iOS 客户端使用同一套产品界面，可以连接 Mikka Cloud 或自托管服务器。
 
-本公开仓库包含服务端、Daemon、原生移动端源码以及大部分网页 UI 代码。**官方网页与桌面构建还使用了未在此公开的私有 UI 组件**，因此仅使用公开源码构建，**无法得到完整的官方网页或桌面界面**。仓库仍保留一个可通过开关启用的旧版内置工作区界面，但它不是第二套受支持的产品设计。
+本公开仓库包含服务端、Daemon、原生移动端源码以及大部分网页 UI 代码。**官方网页与桌面构建还使用了未在此公开的私有 UI 组件**，因此仅使用公开源码构建，**无法得到完整的官方网页或桌面界面**。自托管镜像提供服务器状态、登录和授权页面。在官方客户端的服务器名称旁选择「更改」，输入自托管状态页显示的 HTTPS 地址，即可连接。
 
 [UI 源码边界](docs/ui-overlay.md)和[自托管指南](docs/self-hosting.md)说明了可以构建、部署和连接的内容。源码实现情况与生产环境可用性需按照[验收规范](docs/acceptance.md)分别核验。
 
@@ -106,10 +114,28 @@ Aspectly Labs 同时提供商业许可，联系邮箱为 [legal@aspectlylabs.com
 
 <p>
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
-    <img src="docs/assets/openai-mark-light.svg" alt="OpenAI 标识" width="28" height="28">
-  </picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openai-mark-dark.svg">
+      <img src="docs/assets/openai-mark-light.svg" alt="OpenAI 标志" width="32" height="32">
+    </picture>
   <strong>OpenAI · Codex for Open Source</strong>
 </p>
 
-Mikka 的维护者通过 [Codex for Open Source](https://openai.com/form/codex-for-oss/) 计划获得了六个月的 ChatGPT Pro 使用资格。Mikka 是独立开源项目，与 OpenAI 不存在隶属或官方背书关系。OpenAI 名称及标识均为 OpenAI 的商标。
+Mikka 的开发得到了 [Codex for Open Source](https://openai.com/form/codex-for-oss/) 计划的支持。
+
+<a href="https://neon.com">
+  <img src="docs/assets/neon-logo.svg" alt="Neon" width="160">
+</a>
+
+感谢 [Neon](https://neon.com) 通过 Neon Open Source Program 为 Mikka 提供支持。
+
+## 许可证
+
+Mikka 的版权归 Aspectly Labs 所有（© 2026），采用 [AGPL-3.0-only](LICENSE) 协议开源。第三方组件遵循各自的许可证，详见 [`packages/daemon/THIRD_PARTY_NOTICES.md`](packages/daemon/THIRD_PARTY_NOTICES.md)。
+
+如需不受 AGPL 义务约束的商业许可，请联系 Aspectly Labs：[legal@aspectlylabs.com](mailto:legal@aspectlylabs.com)。
+
+如果你将修改后的 Mikka 作为网络服务提供给他人使用，AGPL 要求你向这些用户提供所部署版本的源代码。
+
+## 参与贡献
+
+欢迎参与贡献，请先阅读 [`CONTRIBUTING.md`](CONTRIBUTING.md)。贡献者保留其作品的版权，并按 [AGPL-3.0-only](LICENSE) 授权；提交贡献即同意 Aspectly Labs 可以按其他条款（包括商业许可）提供这些贡献。无需另行签署任何文件，完整条款见 [`CONTRIBUTING.md`](CONTRIBUTING.md#license)。

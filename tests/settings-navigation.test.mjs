@@ -1,8 +1,22 @@
 import { strict as assert } from 'node:assert'
 import { test } from 'node:test'
-import { isLocalSettingsNavigation, pushSettingsHistory } from '../lib/settings-navigation.ts'
+import { isLocalSettingsNavigation, pushSettingsHistory, rememberWorkspaceBeforeSwitch } from '../lib/settings-navigation.ts'
 
 const url = path => new URL(path, 'https://mikka.example')
+
+test('switching a workspace pins an initially implicit Task entry without losing its origin mark', t => {
+  const state = { mikkaEntry: { index: 2 } }
+  const location = { href: url('/mikka/en?issue=task-a#comment').href }
+  const writes = []
+  const history = { state, replaceState(next, _title, href) { writes.push(next); location.href = href.toString() } }
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'window')
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { history, location } })
+  t.after(() => { if (previous) Object.defineProperty(globalThis, 'window', previous); else delete globalThis.window })
+  rememberWorkspaceBeforeSwitch('workspace-a')
+  assert.equal(location.href, url('/mikka/en?issue=task-a&workspace=workspace-a#comment').href)
+  rememberWorkspaceBeforeSwitch('workspace-b')
+  assert.deepEqual(writes, [state], 'an explicit destination remains unchanged')
+})
 
 test('设置页面间与团队子页使用即时导航', () => {
   for (const [from, to, workspace] of [

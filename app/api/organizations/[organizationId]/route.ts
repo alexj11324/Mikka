@@ -1,8 +1,9 @@
 import { freshSessionRoute } from '@/lib/fresh-session'
-import { organizationSummary, renameOrganization, archiveOrganization } from '@/lib/governance/organizations'
+import { organizationSummary, renameOrganization, updateOrganizationProfile, archiveOrganization } from '@/lib/governance/organizations'
 import { governanceJson, governanceResponse } from '@/lib/governance/http'
 import { organizationSession } from '@/lib/enterprise/http'
-export const runtime = 'nodejs'
+import { WORKSPACE_ICON_MAX_BYTES } from '@/lib/workspace-admin/icon'
+
 type Context = { params: Promise<{ organizationId: string }> }
 
 export const GET = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
@@ -10,10 +11,16 @@ export const GET = freshSessionRoute(async (request: Request, context: Context) 
   const session = await organizationSession(request, organizationId)
   return organizationSummary(organizationId, session.user.id)
 }))
-export const PATCH = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
+export const PUT = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
   const { organizationId } = await context.params
   const session = await organizationSession(request, organizationId)
   return renameOrganization(organizationId, session.user.id, await governanceJson(request))
+}))
+export const PATCH = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
+  const { organizationId } = await context.params
+  const session = await organizationSession(request, organizationId)
+  const maxBytes = Math.ceil(WORKSPACE_ICON_MAX_BYTES / 3) * 4 + 2048
+  return updateOrganizationProfile(organizationId, session.user.id, await governanceJson(request, maxBytes))
 }))
 export const DELETE = freshSessionRoute(async (request: Request, context: Context) => governanceResponse(async () => {
   const { organizationId } = await context.params

@@ -1,35 +1,16 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import test from 'node:test'
-import { build } from 'vite'
 import postcss from 'postcss'
-import { applicationPlugin, repository } from './application-plugin.mjs'
+import { repository } from './application-plugin.mjs'
+import { compileApplication as compile } from './application-test-build.mjs'
 import { sharedStylePlugins } from './shared-styles.mjs'
 
 let sequence = 0
-async function compile(source, target = 'web') {
-  const directory = await mkdtemp(join(tmpdir(), 'mikka-vite-contract-'))
-  const entry = join(directory, 'contract.ts')
-  await writeFile(entry, source)
-  const plugin = await applicationPlugin(target)
-  try {
-    const output = await build({
-      configFile: false, root: repository, publicDir: false, envDir: false, envPrefix: [], logLevel: 'silent',
-      plugins: [plugin],
-      define: { 'process.env.NODE_ENV': '"production"', 'process.env.MIKKA_BASE_PATH': '"/mikka"', 'process.env': '{}' },
-      build: { write: false, minify: false, target: 'es2023', rolldownOptions: { input: entry, preserveEntrySignatures: 'strict' } },
-    })
-    const entryChunk = output.output.find(chunk => chunk.type === 'chunk' && chunk.isEntry)
-    assert.ok(entryChunk)
-    return { code: entryChunk.code, inventory: plugin.api.inventory() }
-  } finally { await rm(directory, { recursive: true, force: true }) }
-}
-
 test('the actual Vite graph preserves action arity and the web/native transport separation', async () => {
-  const source = 'export { listProjects } from "@/app/actions/projects"; export { getArtifact } from "@/app/actions/artifacts"; export { startCardVerification, startPointsPurchase } from "@/lib/billing/verification-client";'
+  const source = 'export { listProjects, listWorkspaceProjects } from "@/app/actions/projects"; export { getArtifact } from "@/app/actions/artifacts"; export { startCardVerification, startPointsPurchase } from "@/lib/billing/verification-client";'
   const windowBefore = globalThis.window
   const fetchBefore = globalThis.fetch
   const workspace = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
@@ -45,11 +26,13 @@ test('the actual Vite graph preserves action arity and the web/native transport 
       globalThis.fetch = async (url, options) => { requests.push({ url, options }); return Response.json({ version: 1, ok: true, result: null }) }
       const actions = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}#vite-contract-${++sequence}`)
       await actions.listProjects('ignored SWR key')
+      await actions.listWorkspaceProjects(workspace, 'ignored SWR key')
       await actions.getArtifact('artifact-id', 'ignored extra argument')
       await actions.startCardVerification(workspace)
       await actions.startPointsPurchase(workspace, 25)
       assert.deepEqual(requests.map(request => JSON.parse(request.options.body)), [
         { version: 1, action: 'projects.listProjects', args: [] },
+        { version: 1, action: 'projects.listWorkspaceProjects', args: [workspace] },
         { version: 1, action: 'artifacts.getArtifact', args: ['artifact-id'] },
         { version: 1, action: 'billing.startCardVerification', args: [workspace] },
         { version: 1, action: 'billing.startPointsPurchase', args: [workspace, 25] },
@@ -67,6 +50,11 @@ test('actual Vite resolution rejects server runtime and unregistered action cons
     'import "next/headers"',
     'import "server-only"',
     'import "@/lib/auth"',
+    // Server translations read the request scope and ship both message catalogs;
+    // a component that needs them must import the client entry instead. This
+    // names a value and calls it, so the bundler cannot drop the import before
+    // resolution.
+    'import { getTranslations } from "@/lib/intl/i18n-server"; export const read = () => getTranslations("Common")',
   ]) await assert.rejects(compile(source), /FRONTEND_SERVER_(?:IMPORT|MODULE)/)
   await assert.rejects(compile('export { shareCapture } from "@/app/actions/captures"'), /FRONTEND_ACTION_NOT_ALLOWED: captures.shareCapture/)
 })
@@ -100,4 +88,45 @@ test('Vite uses the same existing Lightning CSS color space and neutral mixing a
   // Cartesian mixing keeps the primary blue on the neutral sidebar ground.
   assert.match(declarations.get(':root/--sidebar-primary-soft'), /color-mix\(in oklab,\s*var\(--sidebar-primary\)\s*15%,\s*var\(--sidebar\)\)/)
   assert.match(declarations.get('.dark/--sidebar-primary-soft'), /color-mix\(in oklab,\s*var\(--sidebar-primary\)\s*40%,\s*var\(--sidebar\)\)/)
+})
+
+test('official Web and Desktop require the registered providers and link their mounted and lazy exports', async t => {
+  const { UI_SLOTS, UI_SLOT_EXPORTS, PUBLIC_CONTRACT_SLOTS } = await import('../../../lib/ui-overlay.mjs')
+  const dir = await mkdtemp(join(repository, '.hosted-test-'))
+  t.after(() => rm(dir, { recursive: true, force: true }))
+  await mkdir(join(dir, 'slots'))
+  async function writeProvider(name) {
+    const exports = UI_SLOT_EXPORTS[name].map(value => `export const ${value} = true`)
+    await writeFile(join(dir, 'slots', name + '.tsx'), exports.join('\n'))
+  }
+  for (const name of UI_SLOTS) await writeProvider(name)
+  const before = { MIKKA_UI_OVERLAY_DIR: process.env.MIKKA_UI_OVERLAY_DIR, MIKKA_UI_OVERLAY_SHA: process.env.MIKKA_UI_OVERLAY_SHA }
+  process.env.MIKKA_UI_OVERLAY_DIR = dir
+  process.env.MIKKA_UI_OVERLAY_SHA = 'a'.repeat(40)
+  t.after(() => {
+    for (const [key, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  })
+  const consumer = 'import * as slot from "@ui-slot/task-detail"; export const detail = slot.TaskDetailFrame ?? "alternate"'
+  await writeFile(join(dir, 'slots/task-detail.tsx'), 'export {}')
+  for (const target of ['web', 'desktop']) await assert.rejects(compile(consumer, target), /MISSING_EXPORT|not exported/)
+  await writeFile(join(dir, 'slots/task-detail.tsx'), 'export const TaskDetailFrame = "official"')
+  for (const target of ['web', 'desktop']) assert.match((await compile(consumer, target)).code, /official/)
+
+  const entry = 'import "mikka:frontend-runtime"; export const ready = true'
+  const platformRuntime = ['apps/frontend/src/web/runtime.ts', 'apps/desktop/src/renderer/installed-startup.ts'].map(file => resolve(repository, file))
+  for (const name of PUBLIC_CONTRACT_SLOTS) {
+    await rm(join(dir, 'slots', name + '.tsx'))
+    for (const target of ['web', 'desktop']) {
+      await assert.rejects(compile(entry, target, platformRuntime), { message: 'UI_OVERLAY_SLOT_REQUIRED: ' + name })
+    }
+    await writeProvider(name)
+  }
+  const unusedProvider = join(dir, 'slots/settings-usage.tsx')
+  await writeFile(unusedProvider, 'export type UsagePage = string')
+  for (const target of ['web', 'desktop']) await assert.rejects(compile(entry, target, platformRuntime), /MISSING_EXPORT|not exported/)
+  await writeFile(unusedProvider, 'globalThis.unusedProviderSideEffect = 1; export const UsagePage = "unusedProviderValue"')
+  for (const target of ['web', 'desktop']) assert.doesNotMatch((await compile(entry, target, platformRuntime)).code, /unusedProviderSideEffect|unusedProviderValue/)
 })

@@ -1,6 +1,6 @@
-// Messages and stops from people reach running agents (ADR 0018): the
-// daemon long-polls the server's commands, hands messages to the session,
-// acks them, and cancels runs a person stopped.
+// Messages and stops from people reach running agents (ADR 0018): on each
+// gateway push the daemon reads the server's commands once, hands messages to
+// the session, acks them, and cancels runs a person stopped.
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -28,12 +28,10 @@ async function setup(
     dataDir: tempDir(),
     flavor: "dev",
     agentSandbox: null,
-    link: { ...link, heartbeat: (...args) => rejection?.value ? Promise.reject(new SessionRejectedError()) : link.heartbeat(...args) },
+    link: { ...link, fetchCommands: (...args) => rejection?.value ? Promise.reject(new SessionRejectedError()) : link.fetchCommands(...args) },
     credential: "cred-1",
     harnesses: [{ harness: "mock", installed: true, version: "test" }],
     mockSpeed: 2,
-    heartbeatMs: 50,
-    commandsWaitSeconds: 1,
   }).start()
   daemons.push(daemon)
   await daemon.syncWithServer()
@@ -78,15 +76,20 @@ it('uninstall waits for active threads, persists and sends its receipt, removes 
     exit: () => { events.push('exit') },
   }))
   const { server, daemon } = await setup(link => {
-    const heartbeat = link.heartbeat.bind(link)
-    link.heartbeat = async (id, report) => {
-      const result = await heartbeat(id, report)
-      if (report.completedDeviceCommands?.includes(commandId)) {
+    const report = link.report.bind(link)
+    link.report = async (id, sent) => {
+      const result = await report(id, sent)
+      if (sent.completedDeviceCommands?.includes(commandId)) {
         expect(JSON.parse(readFileSync(current!.paths.device, 'utf8')).completedDeviceCommands).toContain(commandId)
         events.push('ack')
-        return result
       }
-      return removing ? { ...result, deviceCommands: [{ id: commandId, kind: 'uninstall' }] } : result
+      return result
+    }
+    // A person asked to remove the device: the next commands read names the uninstall.
+    const read = link.fetchCommands.bind(link)
+    link.fetchCommands = async (id, wait, options) => {
+      if (removing) options?.onUpdates?.({ deviceCommands: [{ id: commandId, kind: 'uninstall' }] })
+      return read(id, wait, options)
     }
   })
   current = daemon
@@ -114,10 +117,10 @@ it("redetect refreshes harnesses through the shared device command channel", asy
   let pending=true
   const reports: {completedDeviceCommands?:string[];harnesses:{version:string|null}[]}[]=[]
   await setup(link=>{
-    const heartbeat=link.heartbeat.bind(link)
-    link.heartbeat=async(deviceId,status)=>{
-      reports.push(status)
-      const result=await heartbeat(deviceId,status)
+    const report=link.report.bind(link)
+    link.report=async(deviceId,sent)=>{
+      reports.push(sent as typeof reports[number])
+      const result=await report(deviceId,sent)
       if(pending){pending=false;return {...result,deviceCommands:[{id:commandId,kind:'redetect'}]}}
       return result
     }
@@ -152,7 +155,7 @@ describe("run commands", () => {
       text(server.chunksFor(runId)).includes("Noted: use pnpm")
     )
 
-    // Acked: the next long-poll no longer hands it out.
+    // Acked: the next read no longer hands it out.
     const pending = await server.link().fetchCommands(DEVICE, 0)
     expect(pending).toEqual([])
   })
@@ -210,7 +213,7 @@ describe("run commands", () => {
     const sentAt = Date.now()
     const messageId = server.sendInput(other, "use pnpm")
     await waitFor(() => server.inputs.get(messageId)?.deliveredAt)
-    // The stop still pending on the server must not hold up the poll.
+    // The stop still pending on the server must not hold up the next read.
     expect(server.inputs.get(messageId)!.deliveredAt! - sentAt).toBeLessThan(
       500
     )
@@ -233,15 +236,13 @@ describe("run commands", () => {
       },
       credential: "cred-1",
       harnesses: [{ harness: "mock", installed: true, version: "test" }],
-      heartbeatMs: 60_000,
-      commandsWaitSeconds: 1,
     }).start()
     daemons.push(daemon)
     await Promise.all([daemon.syncWithServer(), daemon.syncWithServer()])
     expect(registrations).toBe(1)
   })
 
-  it("ignores commands for runs it does not have, and keeps polling after a network cut", async () => {
+  it("ignores commands for runs it does not have, and keeps reading after a network cut", async () => {
     const { server, daemon } = await setup()
     server.online = false
     await new Promise((resolve) => setTimeout(resolve, 300))

@@ -176,7 +176,7 @@ function installLifecyclePresence(t, install, inputs = {}, inherited = '') {
 }
 
 test('shared install defaults to no credential and overrides ambient legacy tokens in real lifecycle scripts', async t => {
-  const caller = sharedStep(readYaml('.github/workflows/self-hosted-image.yml').jobs.image)
+  const caller = sharedStep(readYaml('.github/workflows/ci-dependencies.yml').jobs['desktop-dependencies'])
   assert.ok(caller)
   assert.equal(caller.with?.['ffmpeg-github-token'], undefined)
   for (const inherited of ['', syntheticToken]) {
@@ -203,11 +203,10 @@ test('the actual composite input and all workflow opt-ins preserve the process c
   for (const name of readdirSync(join(scopeRoot, '.github/workflows')).filter(name => /\.ya?ml$/.test(name))) {
     assertCredentialScopes(readYaml('.github/workflows/' + name))
   }
-  const image = readYaml('.github/workflows/self-hosted-image.yml').jobs.image
-  const build = image.steps.find(step => step.name === 'Build the public standalone application')
-  assert.equal(build.env?.FFMPEG_GITHUB_TOKEN, undefined)
-  assert.doesNotMatch(build.run, /--secret\s+[^\n]*ffmpeg_github_token/)
+
 })
+
+
 
 test('credential opt-ins honor job overrides and reject unknown or API-write permissions', async t => {
   for (const [name, workflowPermissions, jobPermissions, allowed] of [
@@ -233,19 +232,19 @@ test('credential opt-ins honor job overrides and reject unknown or API-write per
   }
 })
 
-test('the actual Apple direct install passes its read-only token to real lifecycle scripts', t => {
+test('the actual Desktop runtime install passes its read-only token to real lifecycle scripts', t => {
   const workflow = readYaml('.github/workflows/desktop.yml')
-  const native = workflow.jobs['native-arm64']
+  const native = workflow.jobs.smoke
   assert.ok(apiReadOnly(native.permissions ?? workflow.permissions))
   const installs = native.steps.filter(step => step.run === 'pnpm install --frozen-lockfile')
   assert.equal(installs.length, 1)
   assert.equal(installLifecyclePresence(t, installs[0]), true)
 })
 
-test('all three desktop direct installs explicitly opt in under API-read-only permissions', () => {
+test('both desktop direct installs explicitly opt in under API-read-only permissions', () => {
   const workflow = readYaml('.github/workflows/desktop.yml')
   assertCredentialScopes(workflow)
-  for (const name of ['checks', 'smoke', 'native-arm64']) {
+  for (const name of ['checks', 'smoke']) {
     const job = workflow.jobs[name]
     assert.ok(apiReadOnly(job.permissions ?? workflow.permissions), name)
     const installs = job.steps.filter(step => step.run === 'pnpm install --frozen-lockfile')

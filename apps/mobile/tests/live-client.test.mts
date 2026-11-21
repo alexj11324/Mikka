@@ -197,6 +197,7 @@ test('screens listen to the keys the web uses, on the right channel', () => {
   // 受阻 follows the person's runs too, on their home channel (lib/task-blocked.ts).
   assert.deepEqual(tasksLive(home, team).refs.map(ref => `${ref.kind}:${ref.id}`), [`issue_list:${team}`, `issue_list:${home}`, `task_run_list:${home}`])
   assert.deepEqual(tasksLive(home, home).refs.map(ref => `${ref.kind}:${ref.id}`), [`issue_list:${home}`, `task_run_list:${home}`], 'one issue key when the open workspace is the home')
+  assert.deepEqual(tasksLive(home, team, [bot]).refs.at(-1), { kind: 'factory_issue', id: bot, scope: team })
   const offline = threadsLive({ threads: [], devices: [{ id: bot, name: 'Mac', kind: 'laptop', online: false }] }, home)
   assert.deepEqual(offline.refs.map(ref => `${ref.kind}:${ref.scope}`), [`thread_list:${home}`, `device_list:${home}`])
   assert.equal(offline.presence, undefined)
@@ -204,7 +205,7 @@ test('screens listen to the keys the web uses, on the right channel', () => {
   assert.deepEqual(online.refs, offline.refs, 'presence metadata does not replace the home subscription')
   assert.equal(online.presence, null, 'an online machine keeps the channel\'s existing minute fallback until covered')
   assert.deepEqual(botPageLive(null, bot, home, team).refs, [
-    { kind: 'thread_list', id: home, scope: home }, { kind: 'bot_chat', id: bot, scope: home }, { kind: 'bot_list', id: team, scope: team },
+    { kind: 'thread_list', id: team, scope: team }, { kind: 'bot_chat', id: bot, scope: home }, { kind: 'bot_list', id: team, scope: team },
   ])
   const thread = threadLive({ live: { runs: [{ id: bot, workspaceId: team }] } } as never, bot)
   assert.deepEqual(thread.refs, [{ kind: 'thread', id: bot, scope: team }, { kind: 'run', id: bot, scope: team }])

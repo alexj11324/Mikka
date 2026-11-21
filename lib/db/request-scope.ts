@@ -8,6 +8,7 @@ import { sampleClient } from './egress-sample'
 import { samplePoolTransport } from './transport-sample'
 import { manageDatabasePool } from './pool-lifecycle'
 import { COMMIT_EXECUTOR, observePoolCommits } from './commit-effects'
+import { withIndependentTransactionBoundary } from './transaction-boundary'
 
 const defaultConnectionString = mikkaDatabaseURL(process.env)
 
@@ -32,6 +33,11 @@ const requestDatabase = new AsyncLocalStorage<{ pool: Pool; db: typeof defaultDa
 type Transaction = Parameters<Parameters<typeof defaultDatabase.transaction>[0]>[0]
 const heldClient = new AsyncLocalStorage<PoolClient>()
 const transactionDatabase = new AsyncLocalStorage<Transaction | NodePgDatabase<typeof schema>>()
+
+/** The actual request-routed pool identity, before per-statement authority wrappers. */
+export function currentDatabasePool(): Pool {
+  return requestDatabase.getStore()?.pool ?? defaultPool
+}
 
 export const pool = new Proxy(defaultPool, {
   get(target, property) {
@@ -76,9 +82,10 @@ export function inDatabaseTransaction() {
   return Boolean(heldClient.getStore() || transactionDatabase.getStore())
 }
 
-/** After-commit work must not retain a client that its owner has returned to the pool. */
+/** Independent work keeps request routing and identity, but never borrows its
+ * owner's APP client, Workspace transaction or derived transaction leases. */
 export function withoutDatabaseClient<T>(callback: () => T): T {
-  return heldClient.exit(() => transactionDatabase.exit(callback))
+  return heldClient.exit(() => transactionDatabase.exit(() => withIndependentTransactionBoundary(callback)))
 }
 
 /** A single read whose statement checks the daemon's credential itself (device-scope.ts `readUnderAuthority`). */

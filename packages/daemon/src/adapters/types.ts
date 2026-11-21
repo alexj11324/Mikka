@@ -19,7 +19,7 @@ import type {
 
 import type { ToolApprovalGate } from "../agents/tool-approval"
 import type { RunChunk } from "../chunks"
-import type { SkillAssignmentReceipt } from '@mikka/protocol/skill'
+import type { ProfileRunSkill, SkillAssignmentReceipt } from '@mikka/protocol/skill'
 import type { Logger } from "../log"
 import type { RunMailbox } from '../run-mailbox'
 import type { QuotaSignal } from '../runs/quota-exhausted'
@@ -52,7 +52,7 @@ export interface ExitEvent {
 export type AgentReport = Partial<
   Pick<
     HandoffReport,
-    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch" | "verificationCommand" | "repositorySelection" | "reviewVerdict"
+    "summary" | "openQuestions" | "nextStep" | "blockedOn" | "plan" | "criteria" | "question" | "previewDatabaseBranch" | "verificationCommand" | "repositorySelection" | "reviewVerdict" | "visualEvidence"
   >
 >
 
@@ -131,6 +131,11 @@ export interface SessionOptions {
    */
   skills?: readonly RunSkill[]
   skillReceipt?: SkillAssignmentReceipt
+  /** Frozen Profile capabilities; only metadata enters the brief and the
+   * pinned bodies are served by the `load_skill` Mikka tool. */
+  profileSkills?: readonly ProfileRunSkill[]
+  /** Repository Skill names the daemon pins from its own checkout. */
+  repositorySkills?: readonly string[]
   /** Persist an authentic root-session protocol observation before more output is processed. */
   onRuntimeModel?: (sessionId: string, model: string) => void
   /** Mock harness only: fixture to replay. */
@@ -171,7 +176,7 @@ export interface AgentSession {
   /** Single-consumer stream; ends after the `exit` event. */
   events(): AsyncIterable<AgentEvent>
   /** User message / interjection. */
-  send(text: string): Promise<void>
+  send(text: string, mode?: "steer"): Promise<void>
   cancel(): Promise<void>
   /**
    * Optional: the daemon stops consuming this session without ending it

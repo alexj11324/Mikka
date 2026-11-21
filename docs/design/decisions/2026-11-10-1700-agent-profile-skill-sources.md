@@ -1,0 +1,12 @@
+# Agent Profile Skills: sources, pinned versions and on-demand loading
+
+- Date: 2026-11-10
+- Source: Alex, issue [#1584](https://github.com/alexj11324/Mikka/issues/1584) (2026-11-06): "把 Mikka 的 Factory Agent Profiles 从仅配置 Harness / Model / Prompt 的对象升级为真正可复用的 Coding Agent 能力配置"; the unified Skill catalogue and real on-demand loading are the required first slice.
+- Rule: —
+- Replaces: —
+
+A Factory Profile selects Skills from one resolver with four closed sources: reviewed official text, the owner's personal installations, an owner's explicit team-workspace share, and repository skills declared by name. Official ids are immutable. A saved Profile pins the resolved envelope (name, description, version, digest, body) in its immutable row; current source authorization is rechecked at save, dispatch and the first claim of a new selection; a resumed native session keeps its admitted role. Disabling, uninstalling, unsharing or losing workspace membership therefore blocks new runs without rewriting the frozen Profile or any historical run. Changing the reference set is what re-resolves content.
+
+The run brief carries only a Skill's id, name and purpose plus the `load_skill` instruction. The daemon receives the pinned bodies at claim, pins declared repository skills from its own authorized checkout, and writes only `profile-skills/manifest.json` under the run directory. The shared `mikka` MCP server serves one body per `load_skill` call after verifying its SHA-256 and records a write-once receipt; this is the same path for official Claude Code and Codex on a local daemon or a cloud task machine, without a new agent loop, server round-trip per tool call or per-run polling. The run identity dialog shows configured Skills separately from receipted loads. Counts and sizes stay bounded: a Profile and a run each carry at most 12 Skills, a body is at most 20,000 characters (20,000 UTF-8 bytes wherever the daemon reads it), and the run manifest is 2..512 KiB with at most 24 Skills.
+
+Repository Skill content is untrusted project guidance: it is read as bounded Markdown from the standard `.claude/skills/<name>/SKILL.md` and `.agents/skills/<name>/SKILL.md` paths, refuses symlinks, hard links, traversal and oversized files, and never executes scripts, hooks or installers. Workspace skill shares reuse the personal-plugin owner/member model and the organization's sharing policy; the body is never auto-shared outside an explicit grant. Skill selection grants no tool, credential, account or service permission.

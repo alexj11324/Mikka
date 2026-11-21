@@ -41,3 +41,23 @@ test('a poll with no local edits sends the version it holds, not the document', 
   assert.equal(calls.at(-1)?.known, 'b'.repeat(32))
   sync.destroy()
 })
+
+test('discussion acknowledgement follows the original Yjs write through a failed save and retry', async () => {
+  const { DocumentSync } = await load()
+  const sync = new DocumentSync('issue-1', seed)
+  answer = () => ({ update: Buffer.from(seed).toString('base64'), version: 'a'.repeat(32) })
+  await sync.exchange()
+  const observed: string[] = []
+  sync.doc.getMap('threads').set('discussion-1', 'reply')
+  sync.afterAcknowledged(() => observed.push('first reply'))
+  answer = () => { throw new Error('temporary failure') }
+  await assert.rejects(sync.flush(), /temporary failure/)
+  assert.equal(observed.length, 0)
+  sync.doc.getMap('threads').set('discussion-2', 'another reply')
+  sync.afterAcknowledged(() => observed.push('second reply'))
+  answer = () => ({ version: 'b'.repeat(32) })
+  await sync.flush()
+  await sync.exchange()
+  assert.deepEqual(observed, ['first reply', 'second reply'])
+  sync.destroy()
+})

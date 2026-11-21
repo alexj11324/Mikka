@@ -23,6 +23,7 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
   const { enterprisePrincipal } = await import('../lib/enterprise/principal')
   const { visibleRuns } = await import('../lib/agent-runs')
   const { citationSources } = await import('../lib/coordinator/store')
+  const { registeredTask } = await import('./helpers/registered-task')
 
   const tag = randomUUID().slice(0, 8)
   const owner = `narrow-owner-${tag}`, member = `narrow-member-${tag}`, removed = `narrow-removed-${tag}`, foreign = `narrow-foreign-${tag}`
@@ -40,14 +41,15 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
     for (const [w, u, status] of [[workspace, owner, 'active'], [workspace, member, 'active'], [workspace, removed, 'active'], [otherWorkspace, foreign, 'active'],[ownerPersonal,owner,'active'],[memberPersonal,member,'active']]) {
       await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',$4)', [w, u, `${u}@example.invalid`, status])
     }
-    for (const [id, w, u] of [[team, workspace, owner], [secondTeam, workspace, owner], [foreignTeam, otherWorkspace, foreign]]) {
-      await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Narrow\',$4)', [id, w, u, `N${id.slice(0, 3).toUpperCase()}`])
+    for (const [id, w, u, identifier] of [[team, workspace, owner, 'NTEAM'], [secondTeam, workspace, owner, 'NSECOND'], [foreignTeam, otherWorkspace, foreign, 'NFOREIGN']]) {
+      await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Narrow\',$4)', [id, w, u, identifier])
     }
     const issueRows: [string, string, string, string][] = [
       [issue.shared, owner, 'workspace',workspace], [issue.secondTeam, owner, 'workspace',workspace], [issue.personal, owner, 'personal',ownerPersonal],
       [issue.unlinked, owner, 'workspace',workspace], [issue.foreign, foreign, 'workspace',otherWorkspace], [issue.ownPersonal, member, 'personal',memberPersonal],
     ]
-    for (const [id, u, scope, tenant] of issueRows) await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId") values ($1,$2,$5,$3,\'doing\',\'normal\',$4,$6)', [id, u, doc(), scope, id,tenant])
+    for (const [id, u, scope, tenant] of issueRows) await registeredTask(pool, u, tenant, id, client =>
+      client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId") values ($1,$2,$5,$3,\'doing\',\'normal\',$4,$6)', [id, u, doc(), scope, id,tenant]))
     for (const [id, t, w, u] of [[issue.shared, team, workspace, owner], [issue.secondTeam, secondTeam, workspace, owner], [issue.personal, team, workspace, owner], [issue.foreign, foreignTeam, otherWorkspace, foreign]]) {
       await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [id, t, w, u])
     }
@@ -92,7 +94,8 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
     try {
       // A historical/foreign Team link cannot replace the persisted task
       // tenant or bypass the batch reader's independent token mismatch fence.
-      await pool.query('update mikka_team_issues set "workspaceId"=$2 where "issueId"=$1', [issue.shared, otherWorkspace])
+      assert.equal((await pool.query('update mikka_team_issues set "teamId"=$2,"workspaceId"=$3 where "issueId"=$1',
+        [issue.shared, foreignTeam, otherWorkspace])).rowCount, 1)
       const defaults = await issuesForUser(pinned, [issue.shared], false, db, { withoutBody: true })
       assert.equal(defaults.has(issue.shared), false)
       assert.equal((await batch()).has(issue.shared), false, 'omitting grouping links must still read the exact token/link mismatch')
@@ -101,7 +104,8 @@ test('reading only the asked-about tasks\' team links gives exactly the full rea
       assert.ok(run?.kind === 'run')
       assert.equal(run.issue, null, 'the optimized run citation retains the same task denial')
     } finally {
-      await pool.query('update mikka_team_issues set "workspaceId"=$2 where "issueId"=$1', [issue.shared, workspace])
+      assert.equal((await pool.query('update mikka_team_issues set "teamId"=$2,"workspaceId"=$3 where "issueId"=$1',
+        [issue.shared, team, workspace])).rowCount, 1)
     }
     assert.equal((await batch()).has(issue.shared), true, 'another operation sees the restored current link')
     assert.deepEqual(await visibleWith(member, [issue.shared, issue.secondTeam, issue.foreign, issue.personal, issue.unlinked], true), [issue.secondTeam, issue.shared, issue.unlinked].sort(), 'a teammate sees every task in the tenant, including tasks without a Team')

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { before, beforeEach, mock, test } from 'node:test'
+import { and, eq, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import type { Pool } from 'pg'
 import { issueVisibilityPredicate } from '../lib/issue-visibility-policy'
@@ -28,7 +29,8 @@ const client = { query: async (config: { text: string; rowMode?: string }, param
   const text = config.text.replace(/\s+/g, ' ').trim()
   if (text.includes('select distinct on ("agent_runs"."issueId")')) {
     if (!taskRows) return { rows: [] }
-    const base = [ISSUE, RUN, 'Fixture issue', 'Codex', 'running', null, null]
+    // …, issueTitle, the conversation's stored title (none) and the opening of what it was asked, agentName, …
+    const base = [ISSUE, RUN, 'Fixture issue', null, '', 'Codex', 'running', null, null]
     if (text.includes('"latest_task_runs"')) {
       return { rows: [[...base, EXPIRY, ['codex'], ...Object.values(look)],
         [ISSUE.replace(/1$/, '4'), RUN.replace(/2$/, '5'), ...base.slice(2), EXPIRY, ['codex'], null, null, null, null]] }
@@ -40,15 +42,18 @@ const client = { query: async (config: { text: string; rowMode?: string }, param
   if (text.includes('string_agg(md5(to_jsonb(snapshot)::text)')) return { rows: [{ version: SIGNATURE, expiresAt: expiry }] }
   if (text.startsWith('select min(')) return { rows: [[expiry]] }
   if (text.includes('md5(to_jsonb(thread_list_expiry)::text)')) return { rows: threadRows ? [[RUN, ROW_SIGNATURE]] : [] }
-  if (text.includes('"thread_list_expiry"')) return { rows: [[RUN, null, 'Fixture agent', ISSUE, 'Fixture task', 'running',
-    '2099-01-01T00:00:00.000Z', '2099-01-02T00:00:00.000Z', 'Fixture reply', null, null, null, null, null, false, 'codex', null, null]] }
+  if (text.includes('"thread_list_expiry"')) return { rows: [[true, RUN, null, 'Fixture agent', ISSUE, 'Fixture task', null, 'running',
+    '2099-01-01T00:00:00.000Z', '2099-01-02T00:00:00.000Z', 'Fixture reply', null, null, null, null, null, false, 'merged', 'codex', null, null]] }
   throw Error('Unexpected fixture query')
 } }
 const database = drizzle(client as unknown as Pool)
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 let actions: typeof import('../app/actions/task-runs')
+let stateQueries: typeof import('../lib/task-state-query')
+let taskQueries: typeof import('../lib/task-block-runs')
+let schema: typeof import('../lib/db/schema')
 before(async () => {
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers() } })
   stub('../lib/auth.ts', { auth: { api: { getSession: async () => { order.push('auth'); return viewer ? { user: { id: viewer } } : null } } } })
   stub('../lib/workspace-access.ts', { loadWorkspaceContext: async (requested: string | undefined, user: { id: string }) => {
     assert.equal(requested, undefined); assert.equal(user.id, viewer)
@@ -61,7 +66,11 @@ before(async () => {
   } })
   stub('../lib/db/index.ts', { db: database })
   stub('../lib/db/request-scope.ts', { inDatabaseTransaction: () => false })
-  stub('../lib/device-presence.ts', { deviceOnlineStates: async () => new Map() })
+  stub('../lib/device-presence.ts', {
+    deviceOnlineStates: () => new Map(),
+    deviceSessionOpen: sql<boolean>`("devices"."sessionOpenedAt" IS NOT NULL AND ("devices"."sessionClosedAt" IS NULL OR "devices"."sessionClosedAt" < "devices"."sessionOpenedAt"))`,
+    deviceSessionOpenSql: (alias = 'd') => `(${alias}."sessionOpenedAt" IS NOT NULL AND (${alias}."sessionClosedAt" IS NULL OR ${alias}."sessionClosedAt" < ${alias}."sessionOpenedAt"))`,
+  })
   stub('../lib/db/egress-sample.ts', { withDatabaseOperation: async (_route: string, work: () => unknown) => work() })
   stub('../lib/live/revision-read.ts', { beginWorkspaceListRead: async (owner: string, workspaceId: string) => {
     assert.equal(owner, viewer); assert.equal(workspaceId, WORKSPACE)
@@ -72,6 +81,9 @@ before(async () => {
   } })
   stub('../lib/live/presence-read.ts', { withDevicePresence: (live: unknown) => live })
   actions = await import('../app/actions/task-runs')
+  stateQueries = await import('../lib/task-state-query')
+  taskQueries = await import('../lib/task-block-runs')
+  schema = await import('../lib/db/schema')
 })
 beforeEach(() => {
   viewer = OWNER; taskRows = true; threadRows = false; expiry = EXPIRY
@@ -106,7 +118,7 @@ test('task runs fetch owner bot looks with the bounded latest issue rows in one 
   assert.match(text, /"issues"\."workspaceId" in \(\$\d+\)/)
   assert.ok(params.includes('bound'))
   assert.equal(params.filter(value => value === WORKSPACE).length, 3, 'run, task and bot all use the selected tenant')
-  assert.match(text, /and "agent_runs"\."issueId" is not null and "agent_runs"\."createdAt" > now\(\) - interval '30 days'\)/)
+  assert.match(text, /and "agent_runs"\."issueId" is not null and "agent_runs"\."createdAt" > now\(\) - interval '720 hours'\)/)
   assert.deepEqual(workspaceReads, [OWNER])
   const binding = text.indexOf('from computer_run_bindings crb'), direct = text.indexOf('from bots b where b.id="agent_runs"."botId"')
   const runtime = text.indexOf('from bot_cloud_runtimes bcr')
@@ -131,8 +143,8 @@ test('an unchanged thread list reads its exact fingerprint and expiry in one agg
   assert.equal(queries.length, 1, 'expiry must share the fingerprint snapshot and statement')
   assert.deepEqual(order, ['auth', 'revision', 'query'])
   assert.match(queries[0].text, /md5\(coalesce\(string_agg\(md5\(to_jsonb\(snapshot\)::text\), ',' order by md5\(to_jsonb\(snapshot\)::text\)\), ''\)\)/)
-  assert.match(queries[0].text, /min\(snapshot\."createdAt"\)\+interval '30 days'/)
-  assert.match(queries[0].text, /"agent_runs"\."createdAt" > now\(\) - interval '30 days'/)
+  assert.match(queries[0].text, /min\(snapshot\."createdAt"\)\+interval '720 hours'/)
+  assert.match(queries[0].text, /"agent_runs"\."createdAt" > now\(\) - interval '720 hours'/)
   assert.ok(queries[0].params.includes(OWNER) && queries[0].params.includes(200))
   assert.deepEqual(liveReads, [{ owner: OWNER, expiries: [EXPIRY] }])
 })
@@ -144,9 +156,11 @@ test('changed thread rows keep their manifest, owner hash and ordered data read 
   assert.equal(queries.length, 3, 'one aggregate, one manifest, one changed-row query')
   assert.equal(result.snapshot.items?.length, 1)
   assert.equal(result.snapshot.items?.[0].id, RUN)
+  assert.equal(result.snapshot.items?.[0].unread, true)
   assert.equal(result.snapshot.items?.[0].createdAt, '2099-01-01T00:00:00.000Z')
   assert.equal(result.snapshot.items?.[0].failureDetails, null)
   assert.equal(result.snapshot.items?.[0].harness, 'codex')
+  assert.equal(result.snapshot.items?.[0].pullState, 'merged')
   assert.deepEqual(result.snapshot.positions, [{ id: RUN, version: createHash('sha256').update(`${OWNER}:${ROW_SIGNATURE}`).digest('hex').slice(0, 32) }])
   assert.ok(queries[0].text.includes('string_agg('))
   assert.ok(queries[1].text.includes('md5(to_jsonb(thread_list_expiry)::text)'))
@@ -172,4 +186,45 @@ test('authentication failures still precede every revision or main-database read
   assert.deepEqual(workspaceReads, [])
   assert.deepEqual(queries, [])
   assert.deepEqual(liveReads, [])
+})
+
+test('shared run facts correlate to the outer Run in both single-table and joined reads', () => {
+  const { agentRuns, agents } = schema
+  for (const joined of [false, true]) {
+    const query = database.select(stateQueries.taskStateRunColumns).from(agentRuns).$dynamic()
+    if (joined) query.innerJoin(agents, eq(agents.id, agentRuns.agentId))
+    const { sql: text, params } = query.where(and(eq(agentRuns.userId, OWNER), eq(agentRuns.workspaceId, WORKSPACE))).toSQL()
+    for (const alias of ['p', 'a', 'v']) {
+      assert.ok(text.includes(`${alias}."runId"="agent_runs"."id"`), `${alias} must not capture its own id (${joined ? 'joined' : 'single-table'})`)
+      assert.ok(text.includes(`${alias}."userId"="agent_runs"."userId"`), `${alias} must retain the outer owner`)
+    }
+    assert.ok(text.includes('"agent_runs"."status" in (\'preparing\',\'running\',\'waiting_input\',\'finishing\')'))
+    assert.ok(text.includes('"agent_runs"."stopRequestedAt" is null'))
+    // One presence fact, read from the device session (decision 2026-11-17-2215).
+    assert.equal(text.match(/d\.id="agent_runs"\."deviceId"/g)?.length, 1, 'the presence fact uses the actual Run device')
+    assert.equal(text.match(/d\."ownerId"="agent_runs"\."userId"/g)?.length, 1, 'the presence fact retains the outer owner')
+    assert.equal(text.match(/"agent_runs"\."status"='queued'/g)?.length, 1)
+    assert.ok(text.includes('d."sessionOpenedAt" IS NOT NULL'), 'presence is the open device session')
+    assert.equal(text.includes('"lastSeenAt"<now()'), false, 'no heartbeat window')
+    assert.match(text, /where \("agent_runs"\."userId" = \$\d+ and "agent_runs"\."workspaceId" = \$\d+\)/)
+    assert.ok(params.includes(OWNER) && params.includes(WORKSPACE), 'actor and Workspace remain parameterized')
+    assert.ok(!text.includes(OWNER) && !text.includes(WORKSPACE))
+  }
+  assert.equal(queries.length, 0, 'query construction does not execute or add a read')
+})
+
+test('task schedules correlate to the outer Task and Workspace without capturing the schedule id', () => {
+  const { issues, agents } = schema
+  for (const joined of [false, true]) {
+    const query = database.select({ id: issues.id, schedule: taskQueries.taskSchedule(issues.id, OWNER, WORKSPACE) }).from(issues).$dynamic()
+    if (joined) query.leftJoin(agents, eq(agents.userId, issues.userId))
+    const { sql: text, params } = query.where(eq(issues.id, ISSUE)).toSQL()
+    assert.ok(text.includes('s.definition->\'task\'->>\'issueId\'="issues"."id"::text'), `schedule must use the outer Task (${joined ? 'joined' : 'single-table'})`)
+    assert.ok(text.includes('s.workspace_id="issues"."workspaceId"'), 'schedule tenant must match the actual Task')
+    assert.match(text, /s\.owner_id=\$\d+/)
+    assert.match(text, /s\.workspace_id=\$\d+::uuid/)
+    assert.deepEqual(params, [OWNER, WORKSPACE, ISSUE])
+    assert.ok(!text.includes(OWNER) && !text.includes(WORKSPACE) && !text.includes(ISSUE))
+  }
+  assert.equal(queries.length, 0, 'schedule decoration stays in its existing query')
 })

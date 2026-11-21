@@ -2,14 +2,13 @@ import 'server-only'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { pool } from '@/lib/db'
+import { DEVICE_DESCRIPTION_MAX, DEVICE_NAME_MAX } from './device-name'
 import { deviceIsOnline } from '@/lib/device-presence'
 import { notifyDeviceWork } from '@/lib/device-gateway-notify'
-import { DEVICE_WORK_CHANNEL, notifyChannel } from '@/lib/db/listen'
 import { DEVICE_UNINSTALL_GRACE_MS, enqueueDeviceCommand } from '@/lib/device-management'
 import { ownerListChanged } from '@/lib/live/lists'
 
-/** Same limit as a device token's name (createDeviceToken). */
-export const DEVICE_NAME_MAX = 60
+export { DEVICE_NAME_MAX } from './device-name'
 
 /** Run states where the daemon may still be working on the device. */
 const LIVE_RUN_STATUSES = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing'] as const
@@ -28,6 +27,14 @@ function deviceId(id: unknown): string {
   return parsed.data
 }
 
+export async function setOwnedDeviceEnabled(userId: string, id: string, enabled: boolean): Promise<{ success: true }> {
+  const changed = await pool.query(`UPDATE devices SET enabled=$3,"updatedAt"=now()
+    WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL`, [id, userId, enabled])
+  if (!changed.rowCount) throw new ActionFailureError('deviceNotFound')
+  await ownerListChanged(pool, userId, ['thread_list', 'device_list'])
+  return { success: true }
+}
+
 /**
  * Renames one of the person's local devices. The name is locked, so the
  * daemon's next register keeps it instead of its hostname.
@@ -40,6 +47,26 @@ export async function renameOwnedDevice(userId: string, id: unknown, name: unkno
   if (!rows[0]) throw new ActionFailureError('deviceNotFound')
   await ownerListChanged(pool, userId, ['thread_list', 'device_list'])
   return { id: rows[0].id, name: rows[0].name }
+}
+
+/** A private note on an owned local device. Daemon registration does not write this field. */
+export async function setOwnedDeviceDescription(userId: string, id: unknown, description: unknown): Promise<{ id: string; description: string | null }> {
+  const target = deviceId(id)
+  const parsed = z.string().trim().max(DEVICE_DESCRIPTION_MAX).safeParse(description)
+  if (!parsed.success || parsed.data.includes('\0')) throw new ActionFailureError('agentInvalidInput')
+  // Lock the owned row before comparing so a concurrent save or removal has one order.
+  const { rows: [row] } = await pool.query<{ id: string; changed: boolean }>(
+    `WITH owned AS (
+       SELECT id, description FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE
+     ), changed AS (
+       UPDATE devices SET description=$3, "updatedAt"=now() FROM owned
+       WHERE devices.id=owned.id AND owned.description IS DISTINCT FROM $3 RETURNING devices.id
+     ) SELECT owned.id, EXISTS(SELECT 1 FROM changed) AS changed FROM owned`,
+    [target, userId, parsed.data || null],
+  )
+  if (!row) throw new ActionFailureError('deviceNotFound')
+  if (row.changed) await ownerListChanged(pool, userId, ['device_list'])
+  return { id: row.id, description: parsed.data || null }
 }
 
 /**
@@ -59,12 +86,12 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     await client.query(`SELECT id FROM agents WHERE "deviceId"=$1 AND "userId"=$2 FOR UPDATE`, [target, userId])
     // Run admission reads this row FOR SHARE and requires enabled, so no run
     // can be admitted between the check below and the commit.
-    const device = await client.query(`SELECT id,"lastSeenAt" FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE`, [target, userId])
+    const device = await client.query(`SELECT id,"sessionOpenedAt","sessionClosedAt" FROM devices WHERE id=$1 AND "ownerId"=$2 AND kind='local' AND "removedAt" IS NULL FOR UPDATE`, [target, userId])
     if (!device.rowCount) throw new ActionFailureError('deviceNotFound')
     const live = await client.query(`SELECT 1 FROM agent_runs WHERE "deviceId"=$1 AND status = ANY($2::text[]) LIMIT 1`, [target, [...LIVE_RUN_STATUSES]])
     if (live.rowCount) throw new ActionFailureError('deviceHasActiveRuns')
     const row = device.rows[0]
-    const online = await deviceIsOnline(row)
+    const online = deviceIsOnline(row)
     if (online) await enqueueDeviceCommand(userId, target, 'uninstall', client, { notify: false })
     const revoked = await client.query(`WITH changed AS (
       UPDATE device_tokens SET "revokedAt"=CASE WHEN $3::boolean THEN NULL ELSE now() END,
@@ -80,8 +107,6 @@ export async function removeOwnedDevice(userId: string, id: unknown): Promise<{ 
     ) SELECT id FROM changed`, [target, userId, Boolean(online), new Date(Date.now() + DEVICE_UNINSTALL_GRACE_MS)])
     await client.query(`UPDATE agents SET "deviceId"=NULL,"updatedAt"=now() WHERE "deviceId"=$1 AND "userId"=$2`, [target, userId])
     await client.query(`UPDATE devices SET "removedAt"=now(),enabled=false,"updatedAt"=now() WHERE id=$1`, [target])
-    // A commands long poll for this device re-checks on COMMIT (lib/db/listen.ts).
-    await notifyChannel(client, DEVICE_WORK_CHANNEL, [target])
     await ownerListChanged(client, userId, ['thread_list', 'device_list'])
     await client.query('COMMIT')
     if (online) notifyDeviceWork(target)

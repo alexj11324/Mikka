@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict'
+import { createRequire } from 'node:module'
 import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act, createElement, useEffect, type ReactNode } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+import { CHAT_FILE_MAX_BYTES } from '@mikka/protocol/chat-attachments'
+
+// TSX components load Lucide's require export; keep native SVG outside this DOM behavior fixture.
+const require = createRequire(import.meta.url)
 
 const view = ({ children }: { children?: ReactNode }) => createElement('div', null, children)
 const text = ({ children }: { children?: ReactNode }) => createElement('span', null, children)
@@ -17,7 +22,7 @@ mock.module('react-native', { namedExports: {
     return createElement('button', { disabled, onClick: onPress }, children)
   },
 } })
-mock.module('lucide-react-native', { namedExports: { Camera: () => null, FileText: () => null, Image: () => null } })
+mock.module(require.resolve('lucide-react-native'), { namedExports: { Camera: () => null, FileText: () => null, Image: () => null } })
 mock.module('expo-clipboard', { namedExports: { ClipboardPasteButton: () => null, isPasteButtonAvailable: false } })
 mock.module(new URL('../components/Symbol.tsx', import.meta.url).href, { namedExports: { Symbol: () => null } })
 mock.module(new URL('../components/Text.tsx', import.meta.url).href, { namedExports: { Text: text } })
@@ -103,4 +108,26 @@ test('Web has an explicit close action and a later picker completion cannot navi
   assert.equal(backCalls, 1)
   await act(async () => finish())
   assert.equal(backCalls, 1)
+})
+
+test('the chat file picker returns the local rejection reason, an uploadable file, or cancellation', async t => {
+  let asset: { name: string; size: number; uri: string } | null = null
+  t.mock.module('expo-document-picker', { namedExports: { getDocumentAsync: async () => ({ canceled: !asset, assets: asset ? [asset] : [] }) } })
+  for (const name of ['expo-file-system', 'expo-file-system/legacy', 'expo-image-manipulator', 'expo-image-picker', 'expo/fetch']) {
+    t.mock.module(name, { namedExports: {} })
+  }
+  t.mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: {} })
+  const { pickChatFile } = await import('../lib/attachments.ts')
+  const choose = (name: string, size: number) => {
+    asset = { name, size, uri: `file:///fixture/${name}` }
+    return pickChatFile()
+  }
+  assert.equal(await pickChatFile(), null)
+  assert.equal(await choose('archive.bin', 8), 'unsupported')
+  assert.equal(await choose('report.pdf', 0), 'unreadable')
+  assert.equal(await choose('report.pdf', CHAT_FILE_MAX_BYTES + 1), 'tooLarge')
+  const valid = await choose('report.pdf', CHAT_FILE_MAX_BYTES)
+  assert.ok(valid && typeof valid === 'object')
+  assert.equal(valid.state, 'uploading')
+  assert.equal(valid.size, CHAT_FILE_MAX_BYTES)
 })

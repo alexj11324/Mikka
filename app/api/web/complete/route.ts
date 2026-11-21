@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto'
 import { webAuthHeaders } from '@/lib/web-connection/auth-server'
 
-export const dynamic = 'force-dynamic'
 // No interpolated input, cookies, bearer, or session lookup. Fragments never reach the server.
 const handoffScript = `(() => {
   const fragment = location.hash;

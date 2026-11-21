@@ -23,6 +23,7 @@ const workspaceDatabaseTables = ([...Object.values(workspaceSchema), ...Object.v
 
 /** Tables keyed by a workspace whose rows stay when it is deleted, and why. */
 export const KEPT_WITH_WORKSPACE = new Map<string, string>([
+  ['coding_review_sessions', 'revoked capability close target; removed only after gateway close or VM-gone acknowledgement'],
   // The workspace database (lib/workspace-db.ts) is cleaned in its own transaction; a test or preview database holds both.
   ...[...workspaceDatabaseTables, 'account_deletion_workspace_guards', 'hosted_legacy_workspaces', 'workspace_audit_exports']
     .map(table => [table, 'workspace database'] as [string, string]),

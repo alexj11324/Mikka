@@ -1,0 +1,321 @@
+{
+  "version": 1,
+  "scope": "official-only E2B provider CA control; no Mikka install, no model or CLI calls; metadata only",
+  "repository": "alexj11324/Mikka",
+  "control": {
+    "runId": 43921160007,
+    "runAttempt": 1,
+    "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/43921160007",
+    "workflow": ".github/workflows/e2b-ca-control.yml",
+    "opsCommit": "5b4e9cf2f3ebb7ad0a487444ab99db5d4920f764",
+    "sdk": "e2b==2.62.0",
+    "roots": [
+      "/usr/local/share/ca-certificates",
+      "/etc/ssl/certs"
+    ],
+    "phases": [
+      "build",
+      "ready",
+      "fresh"
+    ]
+  },
+  "artifact": {
+    "artifactId": 14253647447,
+    "bytes": 93389,
+    "sha256": "96f5d24fb83d06b22f13708a4cb91a1b12e1f83bdaacc713791b338a8b5dfed5",
+    "retentionDays": 90
+  },
+  "trigger": {
+    "releaseRun": "https://github.com/alexj11324/Mikka/actions/runs/43914220258",
+    "refused": "official_files_changed /usr/local/share/ca-certificates/e2b-3d5bef21...crt mode 420->511"
+  },
+  "kinds": {
+    "claude": {
+      "status": "observed",
+      "cleanup": {
+        "sandbox": "killed",
+        "template": "deleted"
+      },
+      "templateBuiltAndDeleted": true,
+      "providerEntries": {
+        "build": [
+          {
+            "path": "/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt",
+            "kind": "file",
+            "mode": 420,
+            "sha256": "34f1c066215fbeecc940f855a6771eaa2173a14e1258a9d3bb950841a4b1b522"
+          },
+          {
+            "path": "/etc/ssl/certs/1560546e.0",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "03a85c9a87a2f3eb805d41ca3069cb627c631a972dc0dfa78de4e8328ce670de"
+          },
+          {
+            "path": "/etc/ssl/certs/e2b-ab125125078e2d7e0f3c2e594c3d765935a063c9ab029c62cd3746db78e142e8.pem",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "03a85c9a87a2f3eb805d41ca3069cb627c631a972dc0dfa78de4e8328ce670de"
+          }
+        ],
+        "ready": [
+          {
+            "path": "/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "34f1c066215fbeecc940f855a6771eaa2173a14e1258a9d3bb950841a4b1b522"
+          },
+          {
+            "path": "/etc/ssl/certs/1560546e.0",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "03a85c9a87a2f3eb805d41ca3069cb627c631a972dc0dfa78de4e8328ce670de"
+          },
+          {
+            "path": "/etc/ssl/certs/e2b-ab125125078e2d7e0f3c2e594c3d765935a063c9ab029c62cd3746db78e142e8.pem",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "03a85c9a87a2f3eb805d41ca3069cb627c631a972dc0dfa78de4e8328ce670de"
+          }
+        ],
+        "fresh": [
+          {
+            "path": "/usr/local/share/ca-certificates/e2b-4d2e797d1d1a5697c32dbbf88a29cccdf1e38f357a85394156e0f46f2c58ff67.crt",
+            "kind": "file",
+            "mode": 420,
+            "sha256": "2db1ca926047460dfbdb49fb1091354686c15c1ae96407a9bdb582783b2df3ad"
+          },
+          {
+            "path": "/etc/ssl/certs/1560546e.0",
+            "kind": "link",
+            "mode": 511,
+            "target": "e2b-ab125125078e2d7e0f3c2e594c3d765935a063c9ab029c62cd3746db78e142e8.pem"
+          },
+          {
+            "path": "/etc/ssl/certs/1560546e.1",
+            "kind": "link",
+            "mode": 511,
+            "target": "e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.pem"
+          },
+          {
+            "path": "/etc/ssl/certs/e2b-ab125125078e2d7e0f3c2e594c3d765935a063c9ab029c62cd3746db78e142e8.pem",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "03a85c9a87a2f3eb805d41ca3069cb627c631a972dc0dfa78de4e8328ce670de"
+          },
+          {
+            "path": "/etc/ssl/certs/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.pem",
+            "kind": "link",
+            "mode": 511,
+            "target": "/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt"
+          }
+        ]
+      },
+      "readyChanges": [
+        {
+          "phase": "ready",
+          "path": "/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt",
+          "fields": [
+            "mode"
+          ],
+          "before": {
+            "mode": 420
+          },
+          "after": {
+            "mode": 511
+          }
+        }
+      ],
+      "freshChangesOutsideRotatingNames": 241,
+      "freshChangesOutsideRotatingNamesCoveredByExistingRelinkPolicy": true
+    },
+    "codex": {
+      "status": "observed",
+      "cleanup": {
+        "sandbox": "killed",
+        "template": "deleted"
+      },
+      "templateBuiltAndDeleted": true,
+      "providerEntries": {
+        "build": [
+          {
+            "path": "/usr/local/share/ca-certificates/e2b-64b11aac5ee6accf4bbae2ef8644947c33dcd558c2e8570c9d58c4a4b7842ca7.crt",
+            "kind": "file",
+            "mode": 420,
+            "sha256": "7621a384e8c24379b275966f9e6a8ea69bf917f517d89b88fdbf2ba90c36a15a"
+          },
+          {
+            "path": "/etc/ssl/certs/1560546e.0",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "5bb5e952f9dfd0ae95f668d5132c0858eee8d8a867726fe0a9772fafa174bb55"
+          },
+          {
+            "path": "/etc/ssl/certs/e2b-807372a03397a58aca960405e8f3bac5b43e8ecc495b1c1388bc6721460983d7.pem",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "5bb5e952f9dfd0ae95f668d5132c0858eee8d8a867726fe0a9772fafa174bb55"
+          }
+        ],
+        "ready": [
+          {
+            "path": "/usr/local/share/ca-certificates/e2b-64b11aac5ee6accf4bbae2ef8644947c33dcd558c2e8570c9d58c4a4b7842ca7.crt",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "7621a384e8c24379b275966f9e6a8ea69bf917f517d89b88fdbf2ba90c36a15a"
+          },
+          {
+            "path": "/etc/ssl/certs/1560546e.0",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "5bb5e952f9dfd0ae95f668d5132c0858eee8d8a867726fe0a9772fafa174bb55"
+          },
+          {
+            "path": "/etc/ssl/certs/e2b-807372a03397a58aca960405e8f3bac5b43e8ecc495b1c1388bc6721460983d7.pem",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "5bb5e952f9dfd0ae95f668d5132c0858eee8d8a867726fe0a9772fafa174bb55"
+          }
+        ],
+        "fresh": [
+          {
+            "path": "/usr/local/share/ca-certificates/e2b-2a3bba3574c6ce8dae323078d065bcef43cb1221c1a3b8c8de0b51997a38ddb9.crt",
+            "kind": "file",
+            "mode": 420,
+            "sha256": "41e1dbab9377f210d7b6520f4d7da4c4d2440e65f3a5d665fc06bd4b079eaa25"
+          },
+          {
+            "path": "/etc/ssl/certs/1560546e.0",
+            "kind": "link",
+            "mode": 511,
+            "target": "e2b-64b11aac5ee6accf4bbae2ef8644947c33dcd558c2e8570c9d58c4a4b7842ca7.pem"
+          },
+          {
+            "path": "/etc/ssl/certs/1560546e.1",
+            "kind": "link",
+            "mode": 511,
+            "target": "e2b-807372a03397a58aca960405e8f3bac5b43e8ecc495b1c1388bc6721460983d7.pem"
+          },
+          {
+            "path": "/etc/ssl/certs/e2b-64b11aac5ee6accf4bbae2ef8644947c33dcd558c2e8570c9d58c4a4b7842ca7.pem",
+            "kind": "link",
+            "mode": 511,
+            "target": "/usr/local/share/ca-certificates/e2b-64b11aac5ee6accf4bbae2ef8644947c33dcd558c2e8570c9d58c4a4b7842ca7.crt"
+          },
+          {
+            "path": "/etc/ssl/certs/e2b-807372a03397a58aca960405e8f3bac5b43e8ecc495b1c1388bc6721460983d7.pem",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "5bb5e952f9dfd0ae95f668d5132c0858eee8d8a867726fe0a9772fafa174bb55"
+          }
+        ]
+      },
+      "readyChanges": [
+        {
+          "phase": "ready",
+          "path": "/usr/local/share/ca-certificates/e2b-64b11aac5ee6accf4bbae2ef8644947c33dcd558c2e8570c9d58c4a4b7842ca7.crt",
+          "fields": [
+            "mode"
+          ],
+          "before": {
+            "mode": 420
+          },
+          "after": {
+            "mode": 511
+          }
+        }
+      ],
+      "freshChangesOutsideRotatingNames": 297,
+      "freshChangesOutsideRotatingNamesCoveredByExistingRelinkPolicy": true
+    },
+    "desktop": {
+      "status": "observed",
+      "cleanup": {
+        "sandbox": "killed",
+        "template": "deleted"
+      },
+      "templateBuiltAndDeleted": true,
+      "providerEntries": {
+        "build": [
+          {
+            "path": "/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt",
+            "kind": "file",
+            "mode": 420,
+            "sha256": "34f1c066215fbeecc940f855a6771eaa2173a14e1258a9d3bb950841a4b1b522"
+          }
+        ],
+        "ready": [
+          {
+            "path": "/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt",
+            "kind": "file",
+            "mode": 511,
+            "sha256": "34f1c066215fbeecc940f855a6771eaa2173a14e1258a9d3bb950841a4b1b522"
+          }
+        ],
+        "fresh": [
+          {
+            "path": "/usr/local/share/ca-certificates/e2b-e1b4a0a705d48bd4e62f1666f65ae6e2c8e35b48aa0861143510cd6abbe87207.crt",
+            "kind": "file",
+            "mode": 420,
+            "sha256": "4ca4c1a7d24be55bfebf9630a1bd11a99de72ac027c6e6ca6d240a2907dd9303"
+          },
+          {
+            "path": "/etc/ssl/certs/1560546e.0",
+            "kind": "link",
+            "mode": 511,
+            "target": "e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.pem"
+          },
+          {
+            "path": "/etc/ssl/certs/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.pem",
+            "kind": "link",
+            "mode": 511,
+            "target": "/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt"
+          }
+        ]
+      },
+      "readyChanges": [
+        {
+          "phase": "ready",
+          "path": "/usr/local/share/ca-certificates/e2b-db7fc94a8da18b7124e1cffc506e989c8d59787215333e78a4ca1851b7e4daf5.crt",
+          "fields": [
+            "mode"
+          ],
+          "before": {
+            "mode": 420
+          },
+          "after": {
+            "mode": 511
+          }
+        }
+      ],
+      "freshChangesOutsideRotatingNames": 242,
+      "freshChangesOutsideRotatingNamesCoveredByExistingRelinkPolicy": true
+    }
+  },
+  "replay": "The observations replayed through official-files.py rules: with the rotating names excluded, ready and fresh refuse nothing for claude, codex and desktop; without it, each kind refuses the rotating .crt (ready mode, fresh removal) and claude/codex the 1560546e.0 provider-root relink.",
+  "policyConclusion": "Exclude exactly the rotating provider CA names (pattern in e2b-finalization-files.json rotatingProviderCertificates, including the fixed-name provider root e2b-ca.crt and its e2b-ca.pem alias) from the protected manifest; every other entry, all public CA files and their measured relinks, stays protected.",
+  "validation": [
+    {
+      "runId": 43922227579,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/43922227579",
+      "sourceCommit": "9e316caa5091fa0372e20277a85f14cf36d8318f",
+      "results": {
+        "codex": "ready and fresh-create conservation passed",
+        "claude": "ready passed; fresh_scan official_files_removed /usr/local/share/ca-certificates/e2b-ca.crt (provider root written during the build, replaced per create)",
+        "desktop": "start guard_prepare failed: workspace-ingress backend (nft >= 1.0.6 required); unrelated to CA conservation"
+      },
+      "cleanup": "all three private candidates deleted; no publication"
+    },
+    {
+      "runId": 43923511902,
+      "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/43923511902",
+      "sourceCommit": "1bbf7f2955febbbb21d05ccd3ae48f1cf413e1d2",
+      "results": {
+        "codex": "ready and fresh-create conservation passed",
+        "claude": "ready passed; fresh_scan conservation_failed: the measured providerRoot relink of /etc/ssl/certs/e2b-ca.pem resolves to the replaced e2b-ca.crt and dangles",
+        "desktop": "start guard_prepare failed: workspace-ingress backend (unrelated)"
+      },
+      "cleanup": "all three private candidates deleted; no publication"
+    }
+  ]
+}

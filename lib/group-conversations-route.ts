@@ -1,6 +1,6 @@
 import { hostedBillingScope } from '@/lib/abuse/context'
 import { groupDirectory } from '@/lib/group-conversations-directory'
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { groupsWithPendingTurns, hasPendingGroupTurn, processGroupTurn } from '@/lib/coordinator/group-turns'
 import { groupRuntime } from '@/lib/coordinator/group-runtime'
@@ -80,9 +80,11 @@ export async function respondGroup(request: Request, resource: GroupRequest['res
 /** Runs a group's pending turns one after another until none is left or the deadline nears. */
 export async function drainGroupTurns(conversationId: string, deadline: number) {
   try {
+    let workspaceId: string | undefined
     while (Date.now() < deadline - 20000) {
-      const row = (await pool.query('SELECT "workspaceId" FROM conversations WHERE id=$1',[conversationId])).rows[0]
-      if (!row || !await hostedBillingScope.run({workspaceId:row.workspaceId},()=>processGroupTurn(pool, conversationId, groupRuntime, deadline))) break
+      // Each claimed message binds its own payer. The group stays in the same workspace.
+      workspaceId ??= (await pool.query('SELECT "workspaceId" FROM conversations WHERE id=$1', [conversationId])).rows[0]?.workspaceId
+      if (!workspaceId || !await hostedBillingScope.run({ workspaceId }, () => processGroupTurn(pool, conversationId, groupRuntime, deadline))) break
     }
     await reconcileGroupTaskReports(conversationId)
   } catch { console.error('Group turn failed; retained in group_turns without automatic replay') }

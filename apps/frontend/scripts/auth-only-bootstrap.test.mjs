@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'esbuild'
+import { applicationPlugin } from './application-plugin.mjs'
 import { Window } from 'happy-dom'
 import { act, createElement } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -20,7 +21,7 @@ const handoff = '/mikka/en/sign-in?desktop=1&desktop_state=abcdefghijklmnop&desk
 const stateAccess = 'globalThis[Symbol.for("mikka.test.auth-only-bootstrap")]'
 const wrapper = '({ children }) => children'
 const fixtureModules = new Map([
-  ['next-intl', `export const NextIntlClientProvider = ${wrapper}; export const useTranslations = () => value => value; export const useLocale = () => 'en';`],
+  ['@/lib/intl/i18n-client', `export const NextIntlClientProvider = ${wrapper}; export const IntlProvider = ${wrapper}; export const useTranslations = () => value => value; export const useLocale = () => 'en';`],
   ['lucide-react', 'export const ArrowLeft = () => null;'],
   ['sonner', 'export const toast = { error() {}, dismiss() {} };'],
   ['@/messages/en.json', 'export default {};'], ['@/messages/zh-CN.json', 'export default {};'],
@@ -32,10 +33,10 @@ const fixtureModules = new Map([
   ['@/components/blocks/auth-19/components/auth-card', `export const AuthCard = ${wrapper};`],
   ['@/components/workspace/workspace-loading', 'import { createElement } from "react"; export const WorkspaceLoading = () => createElement("div", { "data-loading": true });'],
   ['@/components/workspace/create-workspace-form', 'export const CreateWorkspaceForm = () => null;'],
-  ['@/components/workspace/invitation-card', 'export const InvitationCard = () => null;'],
+  ['@/components/workspace/invitation-card', `import { createElement } from 'react'; export const InvitationCard = () => createElement('div', { 'data-workspace-invitation': true }); export const OrganizationInvitationCard = () => createElement('div', { 'data-organization-invitation': true });`],
   ['@/components/device-authorization', 'export const DeviceAuthorization = () => null;'],
   ['@/components/plugins/github-settings', 'export const GitHubSettings = () => null;'],
-  ['@/app/[locale]/not-found', 'export default () => null;'],
+  ['@/components/app-shell/not-found', 'export default () => null;'],
   ['@/components/auth-form', `import { createElement } from 'react'; import { useSWRConfig } from 'swr'; export const AuthForm = props => { ${stateAccess}.authCache = useSWRConfig().cache; return createElement('div', { 'data-auth': true, 'data-owner': props.signedInAs?.name ?? 'signed-out', 'data-handoff': Boolean(props.desktopFlow), 'data-email-enabled': props.emailEnabled }); };`],
   ['@/components/auth/forgot-password-form', 'export const ForgotPasswordForm = () => null;'],
   ['@/components/auth/reset-password-form', 'export const ResetPasswordForm = () => null;'],
@@ -48,6 +49,7 @@ const fixtureModules = new Map([
   ['@/lib/auth-client', `export const authClient = { $store: { atoms: { session: { subscribe: listener => ${stateAccess}.subscribe(listener) } } } }; export const cloudAuthClient = authClient;`],
   ['@/lib/swr/persistent-cache', `export const clearPersistentReadCaches = async () => { ${stateAccess}.cacheClears++; };`],
 ])
+const application = await applicationPlugin('web')
 const compiled = await build({
   absWorkingDir: repository,
   stdin: { contents: 'export { App } from "./app"; export { navigate, installNavigation, refresh } from "./location"; export { getClientConfiguration } from "./client-configuration"; export { getTransportState } from "./transport-state";', resolveDir: renderer, sourcefile: 'auth-only-contract.ts', loader: 'ts' },
@@ -56,6 +58,9 @@ const compiled = await build({
   define: { 'process.env.NODE_ENV': '"test"', 'process.env.MIKKA_BASE_PATH': '"/mikka"', 'process.env': '{}' },
   plugins: [{ name: 'auth-only-public-boundaries', setup(builder) {
     builder.onResolve({ filter: /^(?:react(?:\/.*)?|swr)$/ }, args => ({ path: require.resolve(args.path), external: true }))
+    // Use the same client-side RPC modules as a production Web build.
+    builder.onResolve({ filter: /^@\/app\/actions\/[\w-]+$/ }, async args => ({ path: await application.resolveId(args.path), namespace: 'web-action' }))
+    builder.onLoad({ filter: /.*/, namespace: 'web-action' }, async args => ({ contents: await application.load(args.path), resolveDir: repository }))
     builder.onResolve({ filter: /^mikka:platform$/ }, () => ({ path: resolve(web, 'platform.tsx') }))
     builder.onResolve({ filter: /.*/ }, args => fixtureModules.has(args.path) ? { path: args.path, namespace: 'auth-fixture' } : undefined)
     builder.onResolve({ filter: /^(?:\.\/|\.\.\/).*rpc$/ }, args => {
@@ -139,6 +144,63 @@ test('a server authentication document preserves the PKCE identity-only boundary
   assert.equal(f.state.githubMounts, 0)
 })
 
+for (const [kind, prefix, card] of [
+  ['Organization', '/organization-invite/', '[data-organization-invitation]'],
+  ['Workspace', '/invite/', '[data-workspace-invitation]'],
+]) {
+  const invitation = prefix + 'b'.repeat(64)
+  test(kind + ' invitations reach the account handoff even when workspace bootstrap is unavailable', async t => {
+    const path = '/mikka/en' + invitation
+    for (const [label, serverDocument] of [['official Web', undefined], ['Server-only', 'authentication']]) {
+      await t.test(label, async t => {
+        const f = await fixture(t, { path, serverDocument,
+          fetch: request => request.action === 'desktop.bootstrap' ? new Response('', { status: 503 }) : undefined })
+        assert.ok(f.container.querySelector(card))
+        assert.equal(f.state.workspaceMounts, 0)
+        assert.equal(f.state.githubMounts, 0)
+        assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), ['desktop.session'])
+        assert.equal(f.state.requests.filter(item => item.path === '/mikka/api/desktop/config').length, 1)
+      })
+    }
+  })
+
+  test('a signed-out account can sign in or register and return to its ' + kind + ' invitation during a workspace outage', async t => {
+    for (const mode of ['sign-in', 'sign-up']) {
+      await t.test(mode, async t => {
+        let signedIn = false
+        const f = await fixture(t, { path: `/mikka/en${invitation}`, fetch: request => {
+          if (request.action === 'desktop.bootstrap') return new Response('', { status: 503 })
+          if (request.action === 'desktop.session' && !signedIn) return packet(null)
+        } })
+        assert.ok(f.container.querySelector(card))
+        await f.navigate(`/mikka/en/${mode}?next=${encodeURIComponent(invitation)}`)
+        assert.equal(f.container.querySelector('[data-auth]')?.getAttribute('data-owner'), 'signed-out')
+        signedIn = true
+        await f.owner(session('invited-member', 'new-session'))
+        await f.settle()
+        assert.equal(f.window.location.pathname, `/mikka/en${invitation}`)
+        assert.ok(f.container.querySelector(card))
+        assert.equal(f.state.workspaceMounts, 0)
+        assert.equal(f.state.requests.filter(item => item.action === 'desktop.bootstrap').length, 0)
+      })
+    }
+  })
+}
+
+test('ordinary and ambiguous sign-in returns keep the existing workspace bootstrap', async t => {
+  const next = encodeURIComponent(`/organization-invite/${'b'.repeat(64)}`)
+  for (const [label, search] of [['settings', '?next=%2Fsettings'], ['duplicate next', `?next=${next}&next=${next}`],
+    ['separate account flow', `?next=${next}&addAccount=1`], ['short invitation', '?next=%2Forganization-invite%2Fabc'],
+    ['malformed Workspace invitation', '?next=%2Finvite%2Fabc'],
+    ['ambiguous Workspace invitation', `?next=%2Finvite%2F${'a'.repeat(64)}&addAccount=1`]]) {
+    await t.test(label, async t => {
+      const f = await fixture(t, { path: `/mikka/en/sign-in${search}`, fetch: request =>
+        request.action === 'desktop.bootstrap' ? new Response('', { status: 503 }) : undefined })
+      assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), ['desktop.bootstrap'])
+    })
+  }
+})
+
 test('a signed-in server GitHub document renders only its handoff before and after intent cleanup', async t => {
   const path = '/mikka/en?section=plugins&app=github'
   const f = await fixture(t, { path: `${path}&intent=ghi_${'a'.repeat(43)}`, serverDocument: 'github' })
@@ -168,6 +230,30 @@ test('the official app without a server document marker keeps its normal workspa
   assert.ok(f.container.querySelector('[data-workspace]'))
   assert.equal(f.state.workspaceMounts, 1)
   assert.equal(f.state.githubMounts, 0)
+})
+
+test('Back to a different workspace waits for the authorized switch and never mounts a refused workspace', async t => {
+  const workspace = 'bf0f49e9-60ef-42a2-9e46-519b6010d7ef'
+  for (const accepted of [true, false]) await t.test(accepted ? 'active membership' : 'suspended membership', async t => {
+    let selected = false
+    const switching = deferred()
+    const f = await fixture(t, { path: '/mikka/en?workspace=' + workspace, fetch: (request, state) => {
+      if (request.action === 'desktop.bootstrap') return packet({ ...fullBootstrap(state.identity), requestedWorkspaceSelected: selected })
+      assert.equal(request.action, 'workspace.switchWorkspace')
+      assert.deepEqual(request.args, [workspace])
+      return switching.promise
+    } })
+    assert.equal(f.state.workspaceMounts, 0, 'the old workspace stays unmounted while selection is pending')
+    await act(async () => {
+      selected = accepted
+      switching.resolve(packet(accepted ? { ok: true } : { ok: false, error: 'Membership suspended' }))
+    })
+    assert.equal(f.state.workspaceMounts, accepted ? 1 : 0)
+    assert.deepEqual(f.state.requests.filter(item => item.action).map(item => item.action), accepted
+      ? ['desktop.bootstrap', 'workspace.switchWorkspace', 'desktop.bootstrap']
+      : ['desktop.bootstrap', 'workspace.switchWorkspace'])
+    if (!accepted) assert.match(f.container.textContent, /Common.retry/)
+  })
 })
 
 test('leaving PKCE with the same null workspace selector requires fresh bootstrap before any workspace mounts', async t => {

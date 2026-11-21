@@ -28,7 +28,7 @@ const noCredentials = values => new Proxy(values, { get(target, key) {
 } })
 const attestation = () => ({ purpose: 'production-readiness', status: 'partial', repository: REPOSITORY,
   applicationSha: APP, driverRevision: APP, mode: 'readonly', metadataReadAuthorized: true, executionReady: false,
-  webDeployRunId: 10, runtime: { status: 'unproven', code: 'release_missing', sourceCommit: null, workerSha: null },
+  runtime: { status: 'unproven', code: 'release_missing', sourceCommit: null, workerSha: null },
   checkedAt: new Date(NOW).toISOString() })
 const json = (value, status = 200, headers = {}) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json', ...headers } })
 const flight = value => new Response(`0:{"a":"$@1"}\n1:${JSON.stringify(value)}\n`, { headers: { 'content-type': 'text/x-component' } })
@@ -134,10 +134,10 @@ function fixture(options = {}) {
   return { calls, actions, run: args => runProductionReadCache({ env: env(), event: event(), attestation: attestation(), fetchImpl, now: options.now ?? (() => NOW), ...args }) }
 }
 
-test('manual triggers require main and the same application and driver SHA', () => {
+test('manual triggers require main', () => {
   assert.deepEqual(productionGuard(env(), event()), { applicationSha: APP, driverRevision: APP, mode: 'readonly' })
   for (const change of [{ GITHUB_EVENT_NAME: 'push' }, { GITHUB_REF: 'refs/heads/acceptance/proactive-1157-1163' },
-    { GITHUB_EVENT_NAME: 'pull_request' }, { GITHUB_REPOSITORY: 'foreign/repo' }, { GITHUB_SHA: OTHER }])
+    { GITHUB_EVENT_NAME: 'pull_request' }, { GITHUB_REPOSITORY: 'foreign/repo' }])
     assert.throws(() => productionGuard({ ...env(), ...change }, event()), /trigger_rejected/)
   assert.throws(() => productionGuard(env(), { ...event(), repository: { full_name: 'foreign/repo' } }), /trigger_rejected/)
   assert.throws(() => productionGuard(env(), { ...event(), inputs: { application_sha: APP, mode: 'active' } }), /trigger_rejected/)
@@ -145,7 +145,7 @@ test('manual triggers require main and the same application and driver SHA', () 
 
 test('workflow_run accepts only the real successful same-repository main push Web deploy event', () => {
   assert.deepEqual(productionGuard(automaticEnv(), automaticEvent()), {
-    applicationSha: APP, driverRevision: APP, mode: 'readonly', trigger: 'workflow_run', webDeployRunId: 10,
+    applicationSha: APP, driverRevision: APP, mode: 'readonly', trigger: 'workflow_run',
   })
   for (const patch of [{ id: -1 }, { id: 11 }, { name: 'Other deploy' }, { path: '.github/workflows/untrusted.yml' },
     { url: 'https://api.github.com/repos/foreign/repo/actions/runs/10' }, { event: 'pull_request' }, { event: 'workflow_dispatch' },
@@ -167,9 +167,8 @@ function automaticProof(options = {}) {
     assert.equal(init.method, 'GET'); assert.equal(init.redirect, 'error')
     if (url.origin === 'https://api.github.com') {
       assert.equal(init.headers.authorization, 'Bearer SYNTHETIC-GH-TOKEN')
-      if (url.pathname.endsWith('/issues/1372')) return json({ ...issue(), ...options.issue })
-      assert.equal(url.toString(), `${repositoryApi}/actions/runs/10`, 'recheck the exact triggering run')
-      return json({ ...webRelease(), ...options.run })
+      assert.ok(url.pathname.endsWith('/issues/1372'))
+      return json({ ...issue(), ...options.issue })
     }
     assert.equal(url.toString(), `${ORIGIN}/mikka/api/version`)
     assert.equal(init.headers.authorization, undefined)
@@ -178,30 +177,25 @@ function automaticProof(options = {}) {
   return { calls, attest: () => attestProductionReadCache({ env: noCredentials(automaticEnv()), event: automaticEvent(), fetchImpl, now: () => NOW }) }
 }
 
-test('automatic proof checks the open issue, exact GitHub run and both public build pins before credentials', async () => {
+test('automatic proof checks the open issue and the live public build before credentials', async () => {
   const f = automaticProof(), proof = await f.attest()
   assert.equal(proof.status, 'ready'); assert.equal(proof.purpose, 'production-read-cache')
   assert.equal(proof.metadataReadAuthorized, true); assert.equal(proof.readable, true)
-  assert.equal(proof.webDeployRunId, 10); assert.equal(proof.issueNumber, 1372); assert.equal(proof.issueState, 'open')
-  assert.deepEqual(f.calls, [`${repositoryApi}/issues/1372`, `${ORIGIN}/mikka/api/version`,
-    `${repositoryApi}/actions/runs/10`, `${ORIGIN}/mikka/api/version`])
+  assert.equal(proof.issueNumber, 1372); assert.equal(proof.issueState, 'open')
+  assert.deepEqual(f.calls, [`${repositoryApi}/issues/1372`, `${ORIGIN}/mikka/api/version`])
   assert.deepEqual(productionOutcome(proof, true), { readable: true, exitCode: 0 })
   const accepted = await fixture().run({ env: automaticEnv(), event: automaticEvent(), attestation: proof })
   assert.equal(accepted.status, 'pass'); assert.equal(accepted.sessionClosed, true)
   assert.equal(accepted.trigger, 'workflow_run')
 })
 
-test('an event alone cannot authorize secrets when the run API, issue identity or production SHA disagrees', async () => {
-  for (const patch of [{ id: 11 }, { path: '.github/workflows/untrusted.yml' }, { event: 'pull_request' }, { event: 'workflow_dispatch' },
-    { repository: { full_name: 'foreign/repo' } }, { head_repository: { full_name: 'foreign/repo' } },
-    { head_branch: 'feature' }, { head_sha: OTHER }, { status: 'in_progress' }, { conclusion: 'failure' }])
-    await assert.rejects(automaticProof({ run: patch }).attest(), /web_deploy/)
+test('an event alone cannot authorize secrets when the issue identity or production SHA disagrees', async () => {
   for (const patch of [{ number: 999 }, { url: `${repositoryApi}/issues/999` }, { repository_url: 'https://api.github.com/repos/foreign/repo' },
     { pull_request: { url: 'https://api.github.com/pulls/1372' } }, { state: 'unknown' }])
     await assert.rejects(automaticProof({ issue: patch }).attest(), /issue_proof/)
-  for (const buildChangeAt of [1, 2]) await assert.rejects(automaticProof({ buildChangeAt }).attest(), /build_mismatch/)
+  for (const buildChangeAt of [1]) await assert.rejects(automaticProof({ buildChangeAt }).attest(), /build_mismatch/)
   const proof = await automaticProof().attest()
-  for (const attestation of [{ ...proof, webDeployRunId: 11 }, { ...proof, issueNumber: 999 }, { ...proof, issueState: 'closed' },
+  for (const attestation of [{ ...proof, issueNumber: 999 }, { ...proof, issueState: 'closed' },
     { ...proof, trigger: 'workflow_dispatch' }, { ...proof, purpose: 'production-readiness' }])
     await assert.rejects(runProductionReadCache({ env: noCredentials(automaticEnv()), event: automaticEvent(), attestation,
       now: () => NOW, fetchImpl: () => assert.fail('application read before proof') }), /attestation_required/)
@@ -218,7 +212,7 @@ test('closed issue skips automatically with readable=false and exit zero without
   assert.deepEqual(productionOutcome({ status: 'blocked' }, true), { readable: false, exitCode: 1 })
 })
 
-test('the existing Web deploy proof runs before smoke credentials and binds both public version observations', async () => {
+test('the live version check runs before smoke credentials and binds both public version observations', async () => {
   const guarded = new Proxy(env(), { get(target, key) { if (String(key).startsWith('SMOKE_')) assert.fail('credentials read before proof'); return target[key] } })
   const calls = []
   const actual = await attestProductionReadCache({ env: guarded, event: event(), now: () => NOW, fetchImpl: async (input, init) => {
@@ -239,7 +233,7 @@ test('the existing Web deploy proof runs before smoke credentials and binds both
 test('wrong or stale proof fails before credentials or application requests', async () => {
   const guarded = new Proxy(env(), { get(target, key) { if (String(key).startsWith('SMOKE_')) assert.fail('credentials read'); return target[key] } })
   for (const patch of [{ purpose: 'other' }, { applicationSha: OTHER }, { driverRevision: OTHER }, { repository: 'foreign/repo' },
-    { mode: 'active' }, { webDeployRunId: 0 }, { executionReady: true }, { metadataReadAuthorized: false },
+    { mode: 'active' }, { executionReady: true }, { metadataReadAuthorized: false },
     { checkedAt: new Date(NOW - 300001).toISOString() }, { checkedAt: new Date(NOW + 1).toISOString() }])
     await assert.rejects(runProductionReadCache({ env: guarded, event: event(), attestation: { ...attestation(), ...patch },
       now: () => NOW, fetchImpl: () => assert.fail('network before proof') }), /attestation_required/)
@@ -551,8 +545,7 @@ function migrationProof(options = {}) {
         repository_url: repositoryApi, state: 'open', ...options.issue })
       if (url.pathname.endsWith('/git/ref/heads/main')) return json({ ref: 'refs/heads/main', object: { type: 'commit',
         sha: ++mainReads === options.mainChangesAt ? OTHER : APP } })
-      assert.equal(url.toString(), repositoryApi + '/actions/runs/10')
-      return json({ ...webRelease(), ...options.run })
+      assert.fail('unexpected GitHub read ' + url)
     }
     assert.equal(url.toString(), ORIGIN + '/mikka/api/version')
     assert.equal(init.headers.authorization, undefined)
@@ -587,11 +580,11 @@ test('1415 closed means no credentials, production calls or standing extra work'
   assert.deepEqual(productionOutcome(result), { readable: false, exitCode: 0 })
 })
 
-test('migration cannot adapt manual events or reuse another issue, stale main, foreign run or deployment proof', async () => {
+test('migration cannot adapt manual events or reuse another issue, stale main or a stale build', async () => {
   await assert.rejects(attestProductionReadCache({ env: noCredentials(env()), event: event(), issueNumber: 1415,
     fetchImpl: () => assert.fail('manual mutation mode reached the network') }), /trigger_rejected/)
   for (const patch of [{ wrongBuild: true }, { mainChangesAt: 1 }, { mainChangesAt: 2 },
-    { run: { head_sha: OTHER } }, { issue: { number: 1372 } }, { issue: { pull_request: {} } }])
+    { issue: { number: 1372 } }, { issue: { pull_request: {} } }])
     await assert.rejects(migrationProof(patch).attest())
   const proof = await migrationProof().attest()
   for (const patch of [{ issueNumber: 1372 }, { purpose: 'production-read-cache' }, { applicationSha: OTHER },
@@ -607,16 +600,13 @@ test('deployed target mode separates the actual dispatch driver from the applica
   const environment = { ...env(), GITHUB_SHA: OTHER, GITHUB_REPOSITORY_OWNER: 'alexj11324',
     GITHUB_RUN_ID: '7001', GITHUB_RUN_ATTEMPT: '2',
     GITHUB_WORKFLOW_REF: REPOSITORY + '/.github/workflows/issue1415-deployed-production.yml@refs/heads/main',
-    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP,
-    WEB_DEPLOY_RUN_ID: '81', VERCEL_DEPLOYMENT_ID: 'dpl_SyntheticDeployed1415' }
+    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP }
   const payload = { repository: { full_name: REPOSITORY, owner: { login: 'alexj11324' } },
-    inputs: { application_sha: APP, web_run_id: '81', deployment_id: 'dpl_SyntheticDeployed1415' } }
+    inputs: { application_sha: APP } }
   const guard = productionGuard(environment, payload)
   assert.equal(guard.targetMode, 'deployed-target')
   assert.equal(guard.applicationSha, APP); assert.equal(guard.driverRevision, OTHER)
   assert.equal(guard.driverRunId, 7001); assert.equal(guard.driverRunAttempt, 2)
-  assert.equal(guard.webDeployRunId, 81); assert.equal(guard.deploymentId, payload.inputs.deployment_id)
-  assert.throws(() => productionGuard({ ...environment, MIKKA_ACCEPTANCE_TARGET_MODE: '' }, payload))
 })
 
 
@@ -624,10 +614,9 @@ test('new deployed mode authorizes only the 1415 attestation and never reopens r
   const environment = { ...env(), GITHUB_SHA: OTHER, GITHUB_REPOSITORY_OWNER: 'alexj11324',
     GITHUB_RUN_ID: '7001', GITHUB_RUN_ATTEMPT: '2',
     GITHUB_WORKFLOW_REF: REPOSITORY + '/.github/workflows/issue1415-deployed-production.yml@refs/heads/main',
-    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP,
-    WEB_DEPLOY_RUN_ID: '81', VERCEL_DEPLOYMENT_ID: 'dpl_SyntheticDeployed1415' }
+    MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target', APPLICATION_SHA: APP }
   const payload = { repository: { full_name: REPOSITORY, owner: { login: 'alexj11324' } },
-    inputs: { application_sha: APP, web_run_id: '81', deployment_id: 'dpl_SyntheticDeployed1415' } }
+    inputs: { application_sha: APP } }
   const options = { env: noCredentials(environment), event: payload,
     fetchImpl: () => assert.fail('out-of-scope mode reached the network') }
   await assert.rejects(attestProductionReadCache(options), /trigger_rejected/)

@@ -16,17 +16,6 @@ export function relationIds(content: unknown): string[] {
   return [metadata.parentId, metadata.duplicateOfId, ...metadata.blockedByIds, ...metadata.relatedIds].filter((id): id is string => typeof id === 'string' && LIVE_ID.test(id))
 }
 
-function merge(targets: readonly Target[]): Target[] {
-  const merged = new Map<string, Target>()
-  for (const value of targets) {
-    const key = JSON.stringify(value.scope)
-    const current = merged.get(key) ?? { scope: value.scope, events: [] }
-    for (const event of value.events) if (!current.events.some(known => known.kind === event.kind && known.id === event.id)) current.events.push(event)
-    merged.set(key, current)
-  }
-  return [...merged.values()]
-}
-
 /** Who sees an issue's members: the issue body's audience, re-checked when sent. */
 export async function issueMemberTargets(database: Database, workspaceDatabase: Database, issueId: string): Promise<Target[]> {
   const { documentLiveTargets } = await import('./panels')
@@ -49,12 +38,8 @@ export async function issueRelationTargets(database: Database, workspaceDatabase
          OR m.metadata->'blockedByIds' ?| $2::text[] OR m.metadata->'relatedIds' ?| $2::text[])
      LIMIT ${MAX_CONNECTED}`, [owners, ids]) : { rows: [] }
   const affected = [...new Set([...ids, ...rows.flatMap(row => relationIds(row.content)), ...naming.map(row => row.id)])].slice(0, MAX_CONNECTED)
-  const { documentLiveTargets } = await import('./panels')
-  const targets: Target[] = []
-  for (const id of affected) {
-    for (const target of await documentLiveTargets(database, workspaceDatabase, id)) targets.push({ scope: target.scope, events: [{ kind: 'issue_relations', id }] })
-  }
-  return merge(targets)
+  const { issueAudienceTargets } = await import('./panels')
+  return issueAudienceTargets(database, workspaceDatabase, affected, 'issue_relations')
 }
 
 async function changed(executor: object, key: string, resolve: (database: Database, workspaceDatabase: Database) => Promise<Target[]>) {

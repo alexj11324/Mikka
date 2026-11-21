@@ -63,9 +63,21 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     assert.ok('id' in legacy)
     const assigned = await updateIssue(stranger, { issueId: legacy.id, assigneeAgentId: legacyAgent }, agentActor(legacyAgent))
     assert.ok('id' in assigned, 'the pre-existing MCP agent assignment remains accepted')
-    assert.equal(assigned.assignee, 'Legacy fixture')
+    assert.equal(assigned.assignee, null)
+    assert.equal(assigned.delegate?.name, 'Legacy fixture')
     assert.ok('id' in await updateIssue(stranger, { issueId: legacy.id, assigneeAgentId: null }, actor), 'the pre-existing MCP agent field remains accepted')
-    assert.deepEqual(await createIssue(stranger, { title: 'Ambiguous', assigneeAgentId: null, assigneeUserId: stranger }, actor), { error: 'validationGeneric' })
+    const mixedContract = { title: 'Mixed API contracts', assigneeAgentId: null, assigneeUserId: stranger }
+    const legacyState = async () => ({
+      issues: (await pool.query('SELECT id,revision,content FROM issues WHERE "userId"=$1 ORDER BY id', [stranger])).rows,
+      versions: (await pool.query('SELECT id FROM issue_versions WHERE "userId"=$1 ORDER BY id', [stranger])).rows,
+      receipts: (await pool.query('SELECT "toolCallId" FROM issue_tool_calls WHERE "userId"=$1 ORDER BY "toolCallId"', [stranger])).rows,
+      number: (await pool.query('SELECT "lastIssueNumber" FROM "user" WHERE id=$1', [stranger])).rows,
+    })
+    const beforeInvalidContract = await legacyState()
+    // The legacy MCP path has no human-assignee field or durable call receipt.
+    // Its gate must run before attempting any multi-action mutation.
+    assert.deepEqual(await createIssue(stranger, mixedContract, actor), { error: 'issueToolsDisabled' })
+    assert.deepEqual(await legacyState(), beforeInvalidContract)
     assert.deepEqual(await createIssue(stranger, { title: 'Queued step after shutdown' }, actor, `disabled-${randomUUID()}`), { error: 'issueToolsDisabled' })
     assert.equal((await pool.query('SELECT count(*)::int AS n FROM issue_tool_calls WHERE "userId"=$1', [stranger])).rows[0].n, 0, 'disabled rollout preserves legacy MCP behavior without a receipt dependency')
     for (let retry = 0; retry < 2; retry++) {
@@ -75,6 +87,10 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
       assert.equal(await count('issue_tool_calls'), 0)
     }
     overrideDeploymentSwitch('issueTools', true)
+    // The enabled, durable Coordinator path does validate its strict input;
+    // it rejects legacy MCP fields without writing a task, receipt or number.
+    assert.deepEqual(await createIssue(stranger, mixedContract, actor, `mixed-contract-${randomUUID()}`), { error: 'validationGeneric' })
+    assert.deepEqual(await legacyState(), beforeInvalidContract)
     // The actual registered Workflow tool invokes its scoped step and shared
     // actions. No test-only issue writer stands in for the Coordinator.
     const tools = createCoordinatorRegistry(owner, coordinator, undefined, { coordinator: true })
@@ -171,6 +187,18 @@ test('actual issue actions commit one issue per tool call, roll back partial wri
     await updateIssue(owner, { issueId: id, title: 'Later user request' }, actor, `later-${randomUUID()}`)
     assert.deepEqual(await updateIssue(owner, { issueId: id, title: 'Updated title', status: 'doing' }, actor, updateCall), changed)
     assert.equal((await pool.query('select title from issues where id=$1', [id])).rows[0].title, 'Later user request')
+    const { collectIssueEffects } = await import('../lib/issue-effects')
+    const effects: Parameters<typeof collectIssueEffects>[0] = []
+    const completed = await collectIssueEffects(effects, () => updateIssue(owner, { issueId: id, status: 'done' }, actor))
+    assert.ok('id' in completed)
+    const statusEvents = await pool.query('SELECT kind,"botId" FROM coordinator_events WHERE "userId"=$1 AND "issueId"=$2 AND kind=$3', [owner, id, 'issue_done'])
+    assert.deepEqual(statusEvents.rows, [{ kind: 'issue_done', botId: coordinator }])
+    assert.deepEqual(effects.filter(effect => effect.kind === 'wake'), [], 'the committed Coordinator event already wakes its owner')
+    // Pre-existing tool receipts may still have a pending wake from an earlier deployment.
+    await pool.query('UPDATE issue_tool_calls SET effects=$3::jsonb WHERE "userId"=$1 AND "toolCallId"=$2', [owner, updateCall, JSON.stringify([{ kind: 'wake', userId: owner }])])
+    assert.deepEqual(await updateIssue(owner, { issueId: id, title: 'Updated title', status: 'doing' }, actor, updateCall), changed)
+    const replayedWake = await pool.query('SELECT effects FROM issue_tool_calls WHERE "userId"=$1 AND "toolCallId"=$2', [owner, updateCall])
+    assert.deepEqual(replayedWake.rows, [{ effects: [] }], 'the existing receipt replays and clears its wake')
     assert.deepEqual(await updateIssue(stranger, { issueId: id, title: 'Unauthorized' }, actor, `foreign-${randomUUID()}`), { error: 'issueNotFound' })
     assert.ok('id' in await createIssue(stranger, { title: 'Separate owner' }, actor, callId), 'same tool call id is scoped to owner')
     // MCP writes name the Coordinator by its old system actor; the registered tools write as its bot row.

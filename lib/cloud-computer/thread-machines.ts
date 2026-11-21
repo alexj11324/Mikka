@@ -1,6 +1,6 @@
-import { anonymousCodexStartupHint } from '../computer/codex-startup-hint'
-import { anonymousClaudeStartupHint, firstAnonymousClaudeTask } from '../computer/claude-startup-hint'
+import { anonymousStartupHint, firstAnonymousTask } from '../computer/anonymous-startup-hint'
 import { runChanged } from '../live/panels'
+import { connectForCommitEffects } from '../db/commit-effects'
 import { taskActivityChanged } from '../factory/activity-live'
 import { recordCancelledThreadSessionEnd } from './thread-machine-sessions'
 import { cloudStartupSpan, cloudStartupPhases, cloudStartupRunAttributes } from '@/lib/computer/startup-tracing'
@@ -30,14 +30,24 @@ import { armDueTimerAfterCommit, armDueTimerSoon } from '@/lib/due-timer'
 import { afterDatabaseCommit } from '@/lib/db/commit-effects'
 import { logThreadLifecycle } from './thread-lifecycle-log'
 import { secretMaskerFor } from '@/lib/secrets/runtime'
+import { credentialScrubCommand } from '../../packages/daemon/src/credential-globs'
+import { threadLifecycleProvider, threadSnapshotName, threadSnapshotsEnabled } from './thread-lifecycle-provider'
 import { readWorkerTail, saveWorkerTail, workerCommand, logRuntimeRefreshFailure, type RuntimeRefreshPhase } from './thread-worker-logs'
 import { registrationCommand, quoteShell, REGISTRATION_WAITING, REGISTRATION_COMPLETE, REGISTRATION_LEGACY } from '@/lib/computer/registration-command'
 import { openWorkerBootstrapBroker, type WorkerBootstrapBroker } from '@/lib/computer/bootstrap-broker'
 import { finishThreadRegistration, prepareThreadRegistration } from './thread-registration'
+import { hostedSnapshot } from './sponsored-task'
+
+// Load the native Cloudflare transport only for an explicitly sponsored machine.
+async function releaseOwnedCloudflareTaskMachine(...args:Parameters<typeof import('../eve/cloudflare-task-bridge').releaseOwnedCloudflareTaskMachine>) {
+  return (await import('../eve/cloudflare-task-bridge')).releaseOwnedCloudflareTaskMachine(...args)
+}
 import { factoryEventId } from '../factory/event-id'
 import { questionFingerprint } from '../factory/questions/contract'
 import { unclaimedPlanQuestionContinuation } from '../factory/questions/execution-continuation'
 import type { FactoryTask } from '../factory/store'
+import type { agentRuns } from '../db/schema'
+import { assertRunProjectResources, isProjectExecutionRefusal, withRunProjectResources } from '../project-resources/run-lease'
 /** A thread machine runs on its owner's own E2B key (orchestration § 2); this module only acts for that owner. */
 async function options(ownerId: string) {
   return { apiKey: await e2bApiKey(ownerId, 'Cloud runtime unavailable'), proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
@@ -47,7 +57,7 @@ export async function recordThreadSandbox(pool: Pick<Pool, 'query'>, runId: stri
   // The history INSERT checks its run FK. Acquire that parent lock before the
   // machine, matching park/ensure even when this is one autocommitted query.
   const recorded = Boolean((await pool.query(`WITH parent AS MATERIALIZED (SELECT id FROM agent_runs WHERE id=$1 FOR KEY SHARE)
-    UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp())
+    UPDATE thread_machines m SET "sandboxId"=$2,"runningSince"=COALESCE(m."runningSince",clock_timestamp()),"restoreStartedAt"=NULL
     FROM parent WHERE m."runId"=parent.id AND m."workerLeaseId"=$3 AND m.state<>'ended' RETURNING m."runId"`, [runId, sandboxId, leaseId])).rowCount)
   if (recorded) taskActivityChanged(pool, runId)
   return recorded
@@ -72,7 +82,7 @@ export class RetainedTaskMachineUnavailable extends ComputerError {
 }
 
 type FailedThreadStart = Readonly<{ userId: string; workspaceId: string; runId: string; leaseId: string }>
-export type ThreadMachineFence = Readonly<{ epoch: number; sandboxId: string | null; requireClosedTask?: boolean; requireArchived?: boolean; suspendAfterStop?: boolean }>
+export type ThreadMachineFence = Readonly<{ epoch: number; sandboxId: string | null; requireClosedTask?: boolean; requireArchived?: boolean; suspendAfterStop?: boolean; revokeReview?: boolean }>
 // Only this module can attest the lease that actually failed. Keep the proof
 // off the original error: callers retain ComputerError semantics, and neither
 // public error fields nor serialized/replayed errors can authorize cleanup.
@@ -87,11 +97,209 @@ export function threadMachineStartFailure(error: unknown): FailedThreadStart | n
  * With a lease, only that lease's row is reset.
  */
 async function replaceGoneSandbox(query: Pick<Pool, 'query'>, runId: string, template: string, leaseId?: string) {
-  const replaced = (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,"snapshotId"=$4,"templateKind"=$5,state='starting',
+  const replaced = (await query.query(`UPDATE thread_machines SET "sandboxId"=NULL,"operationId"=$2,"snapshotId"=$4,"templateKind"=$5,state='starting',"restoreStartedAt"=NULL,
       "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL
     WHERE "runId"=$1 AND state<>'ended' AND ($3::uuid IS NULL OR "workerLeaseId"=$3) RETURNING *`, [runId, randomUUID(), leaseId ?? null, template, cloudTemplateOrigin(template)?.kind ?? null])).rows[0]
   if (replaced) taskActivityChanged(query, runId)
   return replaced
+}
+
+type ThreadSnapshotRow = {
+  sandboxId: string; epoch: number; issueId: string | null
+  snapshotState: string; snapshotOperationId: string | null; filesystemSnapshotId: string | null
+}
+
+/** An owner-created snapshot can be gone (retention, another key management
+ * action) or invalid; only those answers justify falling back to the template.
+ * A lost response must reconcile through the persisted operation instead. */
+function snapshotUnusable(error: unknown) {
+  if (sandboxGone(error)) return true
+  const status = error && typeof error === 'object' ? (error as { status?: unknown; statusCode?: unknown }).status ?? (error as { statusCode?: unknown }).statusCode : undefined
+  return status === 400 || status === 422
+}
+
+/** Delete snapshots this run superseded. A failure keeps the old reference so
+ * account cleanup can retry it; a not-found result is already gone. */
+async function releaseSupersededThreadSnapshots(client: Pick<PoolClient, 'query'>, actor: Actor, issueId: string | null,
+  runId: string, keepSnapshotId: string) {
+  if (!issueId) return
+  const rows = (await client.query<{ runId: string; filesystemSnapshotId: string }>(`SELECT "runId","filesystemSnapshotId" FROM thread_machines
+    WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "issueId"=$3 AND "runId"<>$4
+      AND "filesystemSnapshotId" IS NOT NULL AND "filesystemSnapshotId"<>$5`, [actor.userId, actor.workspaceId, issueId, runId, keepSnapshotId])).rows
+  for (const row of rows) {
+    try {
+      await threadLifecycleProvider.deleteSnapshot(row.filesystemSnapshotId, actor.userId)
+      await client.query(`UPDATE thread_machines SET "filesystemSnapshotId"=NULL,"snapshotOperationId"=NULL,"snapshotTakenAt"=NULL,"snapshotState"='none'
+        WHERE "runId"=$1 AND "filesystemSnapshotId"=$2`, [row.runId, row.filesystemSnapshotId])
+    } catch { /* account cleanup retries a superseded snapshot */ }
+  }
+}
+
+/** Adopt one exact per-run image and supersede older task images. */
+async function adoptThreadSnapshot(client: Pick<PoolClient, 'query'>, actor: Actor, runId: string, machine: ThreadSnapshotRow, snapshotId: string) {
+  const updated = await client.query(`UPDATE thread_machines SET "filesystemSnapshotId"=$3,"snapshotTakenAt"=now(),"snapshotState"='ready'
+    WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$4 AND "snapshotState" IN ('none','creating') AND state<>'ended'
+    RETURNING "runId"`, [runId, machine.epoch, snapshotId, machine.sandboxId])
+  if (!updated.rowCount) return false
+  await releaseSupersededThreadSnapshots(client, actor, machine.issueId, runId, snapshotId)
+  return true
+}
+
+async function markThreadSnapshotFailed(client: Pick<PoolClient, 'query'>, runId: string, machine: ThreadSnapshotRow) {
+  await client.query(`UPDATE thread_machines SET "snapshotState"='failed'
+    WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$3 AND "snapshotState" IN ('none','creating') AND state<>'ended'`,
+  [runId, machine.epoch, machine.sandboxId])
+}
+
+/** A snapshot whose create response was lost may exist under this run's exact
+ * name. One match is adopted, zero or several are a recorded failure; a failed
+ * listing leaves `creating` so a later pass reconciles instead of taking a
+ * second snapshot. DB state, never provider metadata, remains the source. */
+async function reconcileCreatingSnapshot(client: Pick<PoolClient, 'query'>, actor: Actor, runId: string, machine: ThreadSnapshotRow) {
+  let found
+  try { found = await threadLifecycleProvider.listSnapshots(machine.sandboxId, actor.userId, threadSnapshotName(runId)) }
+  catch { return false }
+  if (found.length === 1) return adoptThreadSnapshot(client, actor, runId, machine, found[0].snapshotId)
+  await markThreadSnapshotFailed(client, runId, machine)
+  return true
+}
+
+/** Retirement is the end of the task's VM and its snapshots. A snapshot still
+ * referenced by another row of the same task is kept for that row; otherwise
+ * an acknowledged delete clears this row. A failed delete keeps the reference
+ * so account cleanup can retry it. */
+async function releaseEndedThreadSnapshot(pool: Pool, actor: Actor, runId: string, snapshotId: string) {
+  const shared = await pool.query(`SELECT 1 FROM thread_machines
+    WHERE "ownerId"=$1 AND "workspaceId"=$2 AND "filesystemSnapshotId"=$3 AND "runId"<>$4 LIMIT 1`,
+  [actor.userId, actor.workspaceId, snapshotId, runId])
+  if (!shared.rowCount) {
+    try { await threadLifecycleProvider.deleteSnapshot(snapshotId, actor.userId) }
+    catch { return }
+  }
+  await pool.query(`UPDATE thread_machines SET "filesystemSnapshotId"=NULL,"snapshotOperationId"=NULL,"snapshotTakenAt"=NULL,"snapshotState"='none'
+    WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "filesystemSnapshotId"=$4`,
+  [runId, actor.userId, actor.workspaceId, snapshotId])
+}
+
+/** Snapshot the task's filesystem only after its native process exited and the
+ * credential paths are removed. A failure never fails the pause: the next run
+ * takes a new snapshot. `creating` is persisted before provider I/O so a lost
+ * ACK is reconciled, not repeated. */
+async function takeThreadSnapshot(client: PoolClient, actor: Actor, runId: string, machine: ThreadSnapshotRow) {
+  if (machine.snapshotState === 'creating') { await reconcileCreatingSnapshot(client, actor, runId, machine); return }
+  if (machine.snapshotState !== 'none' && machine.snapshotState !== 'failed') return
+  // A park transaction can roll back after the provider created the image
+  // (a pause failure). The exact per-run name recovers that image instead of
+  // taking a second one. A failed listing proceeds; storage cannot block pause.
+  if (machine.snapshotState === 'none') {
+    const existing = await threadLifecycleProvider.listSnapshots(machine.sandboxId, actor.userId, threadSnapshotName(runId)).catch(() => null)
+    if (existing) {
+      if (existing.length === 1) { await adoptThreadSnapshot(client, actor, runId, machine, existing[0].snapshotId); return }
+      if (existing.length > 1) { await markThreadSnapshotFailed(client, runId, machine); return }
+    }
+  }
+  // Connecting would resume a provider-paused VM. Leave the snapshot to the
+  // next run, which resumes it and parks again.
+  const observed = await threadLifecycleProvider.info(machine.sandboxId, actor.userId).catch(() => null)
+  if (!observed || observed.state !== 'running') return
+  try {
+    const sandbox = await threadMachineProvider.connect(machine.sandboxId, actor.workspaceId)
+    const scrubbed = await sandbox.commands.run(credentialScrubCommand(), { user: 'root', timeoutMs: 20_000 })
+    if (scrubbed.exitCode !== 0) throw new Error('Thread credential scrub failed')
+  } catch {
+    // Never snapshot a filesystem that may still hold a credential.
+    await markThreadSnapshotFailed(client, runId, machine)
+    return
+  }
+  const operationId = randomUUID()
+  const staleSnapshotId = machine.filesystemSnapshotId
+  const intent = await client.query(`UPDATE thread_machines SET "snapshotOperationId"=$3,"snapshotState"='creating'
+    WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$4 AND "snapshotState" IN ('none','failed') AND state<>'ended' RETURNING "runId"`,
+  [runId, machine.epoch, operationId, machine.sandboxId])
+  if (!intent.rowCount) return
+  try {
+    const created = await threadLifecycleProvider.createSnapshot(machine.sandboxId, actor.userId, threadSnapshotName(runId))
+    const updated = await client.query(`UPDATE thread_machines SET "filesystemSnapshotId"=$3,"snapshotTakenAt"=now(),"snapshotState"='ready'
+      WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$4 AND "snapshotOperationId"=$5 AND state<>'ended' RETURNING "runId"`,
+    [runId, machine.epoch, created.snapshotId, machine.sandboxId, operationId])
+    if (updated.rowCount) {
+      // A stale image from before a restore is replaced by this newer one.
+      if (staleSnapshotId && staleSnapshotId !== created.snapshotId) {
+        try { await threadLifecycleProvider.deleteSnapshot(staleSnapshotId, actor.userId) } catch { /* no newer authority remains */ }
+      }
+      await releaseSupersededThreadSnapshots(client, actor, machine.issueId, runId, created.snapshotId)
+    }
+  } catch {
+    await reconcileCreatingSnapshot(client, actor, runId, machine)
+  }
+}
+
+/** Record an unusable snapshot and delete it best-effort, then let the caller
+ * rebuild from the official template. The row keeps `unavailable` so no later
+ * wake retries a snapshot E2B already rejected. */
+async function releaseUnusableSnapshot(pool: Pool, actor: Actor, runId: string, epoch: number, operationId: string) {
+  const row = (await pool.query<{ filesystemSnapshotId: string | null }>(`UPDATE thread_machines SET "snapshotState"='unavailable',"restoreStartedAt"=NULL
+    WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND "operationId"=$5 AND state='restore'
+    RETURNING "filesystemSnapshotId"`, [runId, actor.userId, actor.workspaceId, epoch, operationId])).rows[0]
+  if (!row?.filesystemSnapshotId) return
+  try {
+    await threadLifecycleProvider.deleteSnapshot(row.filesystemSnapshotId, actor.userId)
+    await pool.query(`UPDATE thread_machines SET "filesystemSnapshotId"=NULL,"snapshotOperationId"=NULL,"snapshotTakenAt"=NULL
+      WHERE "runId"=$1 AND "filesystemSnapshotId"=$2`, [runId, row.filesystemSnapshotId])
+  } catch { /* account cleanup retries an unusable snapshot */ }
+}
+
+/** One transition into `restore`: epoch + operation fence, the same task,
+ * owner, workspace, repository and template kind, and a queued unstopped run.
+ * Returns null when any guard no longer holds; the caller may then fall back
+ * to the official template. A snapshot never crosses tasks. */
+export async function restoreThreadMachineFromSnapshot(pool: Pool, actor: Actor, runId: string, leaseId: string,
+  expected: { sandboxId: string | null; kind?: string | null }, template: string, provider: Pick<typeof threadMachineProvider, 'create'>) {
+  const client = await connectForCommitEffects(pool)
+  let transition: Record<string, any> | undefined
+  try {
+    await client.query('BEGIN')
+    const run = (await client.query(`SELECT r.*,b."workspaceId",repo."repoPath",repo."remoteUrl"
+      FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+      JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
+      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
+    const machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE', [runId, actor.userId, actor.workspaceId])).rows[0]
+    const machineRepo = machine?.repoId
+      ? (await client.query('SELECT "repoPath","remoteUrl" FROM device_repos WHERE id=$1 AND "userId"=$2', [machine.repoId, actor.userId])).rows[0]
+      : null
+    const kind = expected.kind ?? cloudTemplateOrigin(template)?.kind ?? template
+    const eligible = Boolean(run && machine && machine.state !== 'ended' && machine.workerLeaseId === leaseId &&
+      machine.snapshotState === 'ready' && typeof machine.filesystemSnapshotId === 'string' && machine.filesystemSnapshotId &&
+      threadSnapshotsEnabled() && run.status === 'queued' && !run.stopRequestedAt &&
+      (!run.leaseExpiresAt || new Date(run.leaseExpiresAt).getTime() <= Date.now()) &&
+      machine.sandboxId === expected.sandboxId && (machine.issueId ?? null) === (run.issueId ?? null) &&
+      threadMachineTemplateKind(machine) === kind && machineRepo &&
+      machineRepo.repoPath === run.repoPath && machineRepo.remoteUrl === run.remoteUrl)
+    if (!eligible) { await client.query('COMMIT'); return null }
+    transition = (await client.query(`UPDATE thread_machines SET state='restore',epoch=epoch+1,"sandboxId"=NULL,"operationId"=$4,
+        "workerLeaseId"=$5,"workerLeaseUntil"=now()+interval '15 minutes',"restoreStartedAt"=now(),"lifecycleAt"=now()+interval '2 minutes',
+        "computeSeconds"="computeSeconds"+COALESCE(GREATEST(0,EXTRACT(EPOCH FROM (clock_timestamp()-"runningSince")))::bigint,0),"runningSince"=NULL,
+        lifecycle=(lifecycle-'pausedAt')||jsonb_build_object('phase','restore_requested','owner','run-recovery','failures',0)
+      WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND "workerLeaseId"=$5 AND state<>'ended'
+        AND "sandboxId" IS NOT DISTINCT FROM $6::text AND "snapshotState"='ready' AND "filesystemSnapshotId"=$7
+      RETURNING *`, [runId, actor.userId, actor.workspaceId, randomUUID(), leaseId, expected.sandboxId, machine.filesystemSnapshotId])).rows[0]
+    await client.query('COMMIT')
+  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  if (!transition) return null
+  const metadata = { application: 'mikka-thread', workspaceId: actor.workspaceId, runId, operationId: transition.operationId }
+  try {
+    const sandbox = await threadLifecycleProvider.createFromSnapshot(transition.filesystemSnapshotId, transition.operationId, metadata, actor.userId)
+    return { sandbox, machine: transition }
+  } catch (error) {
+    if (!snapshotUnusable(error)) throw error
+    await releaseUnusableSnapshot(pool, actor, runId, transition.epoch, transition.operationId)
+    const replaced = await replaceGoneSandbox(pool, runId, template, leaseId)
+    // error-cause: the unusable snapshot is already recorded; this new error reports that the lease moved away
+    if (!replaced) throw new ComputerError(409, 'Thread provisioning cancelled')
+    const fallback = { application: 'mikka-thread', workspaceId: actor.workspaceId, runId, operationId: replaced.operationId }
+    const sandbox = await provider.create(replaced.snapshotId, replaced.operationId, fallback, actor.userId)
+    return { sandbox, machine: replaced }
+  }
 }
 
 // Prepare the owner's key before a stop holds an APP client. The existing key
@@ -149,18 +357,30 @@ async function endStopRequestedRun(client: PoolClient, actor: Actor, runId: stri
  * provider work. A never-claimed continuation may still own its task's native
  * history, so checking only the current run's status is not enough to kill. */
 async function canAcknowledgeQueuedThreadStop(client: PoolClient, actor: Actor, run: Record<string, any>, machine: Record<string, any> | undefined) {
-  if (run.status !== 'queued' || !run.stopRequestedAt || run.startedAt != null || run.sessionId != null ||
+  if (run.workspaceId !== actor.workspaceId || run.status !== 'queued' || !run.stopRequestedAt || run.startedAt != null || run.sessionId != null ||
     run.deviceTokenId != null || run.leaseExpiresAt != null || run.questionContinuation != null) return false
-  if (machine && (machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
-    machine.state === 'ended' || machine.botId !== run.runtimeBotId || machine.issueId !== run.issueId ||
+  const legacyMachine = machine?.issueId === null
+  if (machine && (machine.runId !== run.id || machine.ownerId !== actor.userId || machine.workspaceId !== actor.workspaceId ||
+    machine.state === 'ended' || machine.botId !== run.runtimeBotId || (!legacyMachine && machine.issueId !== run.issueId) ||
     machine.workerLeaseId || (machine.workerLeaseUntil && new Date(machine.workerLeaseUntil).getTime() > Date.now()) ||
     machine.lifecycle?.requiresNativeExit === true)) return false
+  if (machine && legacyMachine) {
+    // The task-machine migration added a nullable column without backfilling
+    // old machines. A verified never-claimed binding may still be stopped;
+    // this does not assign a Task or authorize a wake, adoption or credential.
+    if (!machine.deviceId || !machine.repoId || machine.deviceId !== run.deviceId || machine.repoId !== run.deviceRepoId) return false
+    const target = await client.query(`SELECT 1 FROM devices d
+      JOIN device_repos repo ON repo."deviceId"=d.id AND repo."userId"=d."ownerId"
+      WHERE d.id=$1 AND d."ownerId"=$2 AND d.kind='cloud' AND repo.id=$3 FOR SHARE OF d,repo`,
+    [machine.deviceId, actor.userId, machine.repoId])
+    if (!target.rowCount) return false
+  }
   const native = await client.query(`SELECT 1 FROM byos_native_runs WHERE "runId"=$1
     UNION ALL SELECT 1 FROM agent_runs source WHERE source.id<>$1
-      AND source."userId"=$2 AND source."issueId" IS NOT DISTINCT FROM $3::uuid
+      AND ($5::boolean OR (source."userId"=$2 AND source."issueId" IS NOT DISTINCT FROM $3::uuid))
       AND source."deviceId"=$4 AND (source."sessionId" IS NOT NULL OR source."startedAt" IS NOT NULL
         OR source."deviceTokenId" IS NOT NULL OR EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=source.id))
-    LIMIT 1`, [run.id, actor.userId, run.issueId, machine?.deviceId ?? null])
+    LIMIT 1`, [run.id, actor.userId, run.issueId, machine?.deviceId ?? null, legacyMachine])
   return native.rowCount === 0
 }
 
@@ -172,27 +392,33 @@ async function canAcknowledgeQueuedThreadStop(client: PoolClient, actor: Actor, 
 export async function acknowledgeQueuedThreadStop(pool: Pool, actor: Actor, runId: string, provider: Pick<typeof threadMachineProvider, 'kill' | 'prepareKill'> = threadMachineProvider): Promise<boolean> {
   // This read releases its pool client before credential preparation. It is
   // only a preflight: every authority/native check is repeated under locks.
-  const candidate = await pool.query(`SELECT 1 FROM agent_runs r
+  const candidate = await pool.query(`SELECT m."snapshotId",m."operationId" FROM agent_runs r
     JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
     JOIN thread_machines m ON m."runId"=r.id AND m."ownerId"=r."userId" AND m."workspaceId"=b."workspaceId"
-    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r.status='queued' AND r."stopRequestedAt" IS NOT NULL
+    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId" AND r.status='queued' AND r."stopRequestedAt" IS NOT NULL
       AND r."startedAt" IS NULL AND r."sessionId" IS NULL AND r."deviceTokenId" IS NULL AND r."leaseExpiresAt" IS NULL AND r."questionContinuation" IS NULL
-      AND m."sandboxId" IS NOT NULL AND m.state<>'ended' AND m."botId"=b."botId" AND m."issueId" IS NOT DISTINCT FROM r."issueId"
+      AND m."sandboxId" IS NOT NULL AND m.state<>'ended' AND m."botId"=b."botId"
+      AND ((m."issueId" IS NOT NULL AND m."issueId"=r."issueId") OR (m."issueId" IS NULL
+        AND m."deviceId"=r."deviceId" AND m."repoId"=r."deviceRepoId"
+        AND EXISTS(SELECT 1 FROM devices d JOIN device_repos repo ON repo."deviceId"=d.id AND repo."userId"=d."ownerId"
+          WHERE d.id=m."deviceId" AND d."ownerId"=r."userId" AND d.kind='cloud' AND repo.id=m."repoId")))
       AND m."workerLeaseId" IS NULL AND (m."workerLeaseUntil" IS NULL OR m."workerLeaseUntil"<=now())
+      AND m.lifecycle->>'requiresNativeExit' IS DISTINCT FROM 'true'
       AND NOT EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=r.id)
       AND NOT EXISTS(SELECT 1 FROM agent_runs source WHERE source.id<>r.id
-        AND source."userId"=r."userId" AND source."issueId" IS NOT DISTINCT FROM r."issueId" AND source."deviceId"=m."deviceId"
+        AND (m."issueId" IS NULL OR (source."userId"=r."userId" AND source."issueId" IS NOT DISTINCT FROM r."issueId")) AND source."deviceId"=m."deviceId"
         AND (source."sessionId" IS NOT NULL OR source."startedAt" IS NOT NULL OR source."deviceTokenId" IS NOT NULL
           OR EXISTS(SELECT 1 FROM byos_native_runs n WHERE n."runId"=source.id)))`, [runId, actor.userId, actor.workspaceId])
   if (!candidate.rowCount) return false
-  const kill = provider.prepareKill ? await provider.prepareKill(actor.userId) : (sandboxId: string) => provider.kill(sandboxId, actor.userId)
-  const client = await pool.connect()
+  const sponsored = candidate.rows[0]?.snapshotId === hostedSnapshot
+  const kill = sponsored ? undefined : provider.prepareKill ? await provider.prepareKill(actor.userId) : (sandboxId: string) => provider.kill(sandboxId, actor.userId)
+  const client = await connectForCommitEffects(pool)
   try {
     await client.query('BEGIN')
     await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`thread-machine:${runId}`])
     const run = (await client.query(`SELECT r.*,b."botId" AS "runtimeBotId"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
-      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
+      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId" FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run) { await client.query('ROLLBACK'); return false }
     const machine = (await client.query(`SELECT * FROM thread_machines
       WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
@@ -205,7 +431,9 @@ export async function acknowledgeQueuedThreadStop(pool: Pool, actor: Actor, runI
     }
     // The persisted stop blocks claims; these same run/machine locks fence
     // adoption and provisioning. No nested transaction or Run write is used.
-    await kill(machine.sandboxId)
+    if (machine.snapshotId === hostedSnapshot && sponsored) await releaseOwnedCloudflareTaskMachine(client,actor,runId,machine.operationId)
+    else if (machine.snapshotId !== hostedSnapshot && kill) await kill(machine.sandboxId)
+    else { await client.query('ROLLBACK'); return false }
     await endStopRequestedRun(client, actor, runId, machine.sandboxId)
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
   await afterRunEnded(actor.userId, runId)
@@ -230,6 +458,12 @@ const unconfirmedNativeExitSql = `((m.lifecycle->>'requiresNativeExit' IS NOT DI
  * and the new run's lock.
  */
 async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string, run: { issueId: string; runtimeBotId: string; repoPath: string; remoteUrl: string | null }, template: string | null) {
+  // New-run admission revokes the previous run's review capability. Its VM
+  // cannot change hands until the root gateways close PTY/HTTP/WS and ACK.
+  const pendingReview = await client.query(`SELECT 1 FROM coding_review_sessions s
+    WHERE s."taskId"=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3 AND s."runId"<>$4 LIMIT 1`,
+  [run.issueId, actor.userId, actor.workspaceId, runId])
+  if (pendingReview.rowCount) throw new RetainedTaskMachineUnavailable()
   // The run's bot runtime is recorded on the new row; the old row's bot does not have to match.
   // A repository task's machine holds only its harness's CLI. Keep the same
   // harness's VM across additive releases; its private worker upgrades below.
@@ -238,14 +472,14 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
   // lifecycle parks the VM. Use the same locked handoff as adjacent stages;
   // a terminal status without native exit never authorizes this transfer.
   const { rows: [running] } = await client.query(`SELECT m."runId" FROM thread_machines m
-    WHERE m."ownerId"=$1 AND m."workspaceId"=$2 AND m."issueId"=$3 AND m."runId"<>$4
+    WHERE m."snapshotId"<>'cloudflare-task-v1' AND m."ownerId"=$1 AND m."workspaceId"=$2 AND m."issueId"=$3 AND m."runId"<>$4
       AND m.state='running' AND m."sandboxId" IS NOT NULL
     ORDER BY m."lastActiveAt" DESC LIMIT 1`, [actor.userId, actor.workspaceId, run.issueId, runId])
   if (running) await retainThreadMachineForHandoffLocked(client, actor, running.runId, runId)
   const previous = (await client.query(`SELECT m.* FROM thread_machines m
       JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
       JOIN device_repos repo ON repo.id=m."repoId" AND repo."userId"=m."ownerId"
-    WHERE m."ownerId"=$1 AND m."workspaceId"=$2 AND m."issueId"=$3 AND m."runId"<>$4
+    WHERE m."snapshotId"<>'cloudflare-task-v1' AND m."ownerId"=$1 AND m."workspaceId"=$2 AND m."issueId"=$3 AND m."runId"<>$4
       AND (m.state='paused' OR (m.state='running' AND m.lifecycle->>'phase'='handoff' AND m.lifecycle->>'handoffRunId'=$4::text
         AND (r."leaseExpiresAt" IS NULL OR r."leaseExpiresAt"<=now())
         AND COALESCE((m.lifecycle->>'reconcileUntil')::double precision,0)<=extract(epoch FROM clock_timestamp())*1000))
@@ -258,7 +492,7 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
   if (!previous) {
     const busy = await client.query(`SELECT 1 FROM thread_machines m JOIN agent_runs r ON r.id=m."runId" AND r."userId"=m."ownerId"
       JOIN device_repos repo ON repo.id=m."repoId" AND repo."userId"=m."ownerId"
-      WHERE m."ownerId"=$1 AND m."workspaceId"=$2 AND m."issueId"=$3 AND m."runId"<>$4 AND m.state='paused'
+      WHERE m."snapshotId"<>'cloudflare-task-v1' AND m."ownerId"=$1 AND m."workspaceId"=$2 AND m."issueId"=$3 AND m."runId"<>$4 AND m.state='paused'
         AND m."sandboxId" IS NOT NULL AND (m."workerLeaseUntil">now() OR r.status NOT IN ('succeeded','failed','stopped','cancelled')
           OR ${unconfirmedNativeExitSql})
         AND repo."repoPath"=$5 AND repo."remoteUrl" IS NOT DISTINCT FROM $6
@@ -272,10 +506,15 @@ async function adoptTaskMachine(client: PoolClient, actor: Actor, runId: string,
     WHERE "runId"=$1 RETURNING lifecycle->>'transferredAt' AS "transferredAt"`, [previous.runId])
   taskActivityChanged(client, previous.runId)
   taskActivityChanged(client, runId)
-  return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId","templateKind",epoch,"runningSince")
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$12,$8,$9,$10,$11,$13,CASE WHEN $12='running' THEN $14::timestamptz ELSE NULL END)
-    ON CONFLICT ("runId") DO UPDATE SET "issueId"=EXCLUDED."issueId","snapshotId"=EXCLUDED."snapshotId","templateKind"=EXCLUDED."templateKind",state=EXCLUDED.state,"sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId","repoId"=EXCLUDED."repoId",epoch=EXCLUDED.epoch,"runningSince"=EXCLUDED."runningSince","lifecycleAt"=now(),lifecycle='{}'::jsonb
-    RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId, previous.snapshotId, randomUUID(), previous.sandboxId, previous.deviceId, previous.repoId, threadMachineTemplateKind(previous), previous.state, previous.epoch + 1, transfer.transferredAt])).rows[0]
+  // A snapshot whose create response was lost is named after the previous run
+  // and cannot be reconciled by this row. Transfer only a settled reference.
+  const snapshot = previous.snapshotState === 'creating'
+    ? { state: 'none', operationId: null, takenAt: null }
+    : { state: previous.snapshotState, operationId: previous.snapshotOperationId, takenAt: previous.snapshotTakenAt }
+  return (await client.query(`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","issueId","snapshotId","operationId",state,"sandboxId","deviceId","repoId","templateKind",epoch,"runningSince","filesystemSnapshotId","snapshotOperationId","snapshotTakenAt","snapshotState")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$12,$8,$9,$10,$11,$13,CASE WHEN $12='running' THEN $14::timestamptz ELSE NULL END,$15,$16,$17,$18)
+    ON CONFLICT ("runId") DO UPDATE SET "issueId"=EXCLUDED."issueId","snapshotId"=EXCLUDED."snapshotId","templateKind"=EXCLUDED."templateKind",state=EXCLUDED.state,"sandboxId"=EXCLUDED."sandboxId","deviceId"=EXCLUDED."deviceId","repoId"=EXCLUDED."repoId",epoch=EXCLUDED.epoch,"runningSince"=EXCLUDED."runningSince","filesystemSnapshotId"=EXCLUDED."filesystemSnapshotId","snapshotOperationId"=EXCLUDED."snapshotOperationId","snapshotTakenAt"=EXCLUDED."snapshotTakenAt","snapshotState"=EXCLUDED."snapshotState","lifecycleAt"=now(),lifecycle='{}'::jsonb
+    RETURNING *`, [runId, actor.workspaceId, actor.userId, run.runtimeBotId, run.issueId, previous.snapshotId, randomUUID(), previous.sandboxId, previous.deviceId, previous.repoId, threadMachineTemplateKind(previous), previous.state, previous.epoch + 1, transfer.transferredAt, previous.filesystemSnapshotId, snapshot.operationId, snapshot.takenAt, snapshot.state])).rows[0]
 }
 
 /** An already admitted next run gets a short transfer window.
@@ -294,12 +533,17 @@ async function retainThreadMachineForHandoffLocked(client: PoolClient, actor: Ac
       FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId, nextRunId])
     if (!run) return false
     const { rows: [machine] } = await client.query(`SELECT * FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3
-      AND state='running' AND "sandboxId" IS NOT NULL AND ("workerLeaseUntil" IS NULL OR "workerLeaseUntil"<=now())
+      AND "snapshotId"<>'cloudflare-task-v1' AND state='running' AND "sandboxId" IS NOT NULL AND ("workerLeaseUntil" IS NULL OR "workerLeaseUntil"<=now())
       AND COALESCE(lifecycle->>'phase','') IN ('','created','resumed','active','handoff')
       AND COALESCE((lifecycle->>'reconcileUntil')::double precision,0)<=extract(epoch FROM clock_timestamp())*1000
       AND (lifecycle->>'phase' IS DISTINCT FROM 'handoff' OR lifecycle->>'handoffRunId'=$4::text)
       FOR UPDATE`, [runId, actor.userId, actor.workspaceId, nextRunId])
     if (!machine) return false
+    const reviews = await client.query('SELECT 1 FROM coding_review_sessions WHERE "runId"=$1 LIMIT 1', [runId])
+    if (reviews.rowCount) {
+      await (await import('../coding-workspace/review-sessions')).fenceReviewSessions(client, { runIds: [runId] }, 'machine_changed')
+      return false
+    }
     const { rows: [placement] } = await client.query(`SELECT source."repoPath" AS "sourcePath",source."remoteUrl" AS "sourceRemote",
       target."repoPath" AS "targetPath",target."remoteUrl" AS "targetRemote",COALESCE(n."agentDefinition"->>'harness',a.harness) AS harness
       FROM agent_runs n JOIN agents a ON a.id=n."agentId" AND a."userId"=n."userId"
@@ -319,14 +563,14 @@ async function retainThreadMachineForHandoffLocked(client: PoolClient, actor: Ac
     return true
 }
 
-export async function retainThreadMachineForHandoff(pool: Pool, actor: Actor, runId: string, nextRunId: string): Promise<boolean> {
-  const client = await pool.connect()
+export async function retainThreadMachineForHandoff(pool: Pool, actor: Actor, runId: string, nextRunId: string, existing?: PoolClient): Promise<boolean> {
+  const client = existing ?? await connectForCommitEffects(pool)
   try {
-    await client.query('BEGIN')
+    if (!existing) await client.query('BEGIN')
     const retained = await retainThreadMachineForHandoffLocked(client, actor, runId, nextRunId)
-    await client.query('COMMIT')
+    if (!existing) await client.query('COMMIT')
     return retained
-  } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+  } catch (error) { if (!existing) await client.query('ROLLBACK'); throw error } finally { if (!existing) client.release() }
 }
 
 /**
@@ -343,14 +587,32 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
   // Keep the uploaded run/checkpoint evidence and any previously saved tail.
   readTail: (sandboxId: string) => Promise<string | null> = async () => null,
   existing?: PoolClient, expectedFence?: ThreadMachineFence) {
-  const client = existing ?? await pool.connect()
+  const client = existing ?? await connectForCommitEffects(pool)
   let intent: { sandboxId: string; epoch: number; failures: number } | undefined
   const locked = async () => {
     const run = (await client.query('SELECT status,"leaseExpiresAt","stopRequestedAt","stopReason","startedAt","sessionId","deviceTokenId","pauseReason",report FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
-    const machine = (await client.query(`SELECT "sandboxId","deviceId","issueId","computeSeconds",state,epoch,"workerLeaseUntil",lifecycle FROM thread_machines
+    const machine = (await client.query(`SELECT "sandboxId","snapshotId","operationId","deviceId","issueId","computeSeconds","runningSince",state,epoch,"workerLeaseUntil",lifecycle,"snapshotState","snapshotOperationId","filesystemSnapshotId" FROM thread_machines
       WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE`, [runId, actor.userId, actor.workspaceId])).rows[0]
-    if (!machine?.sandboxId || machine.state === 'ended') return null
-    if (expectedFence && (machine.epoch !== expectedFence.epoch || machine.sandboxId !== expectedFence.sandboxId)) return null
+    if (!machine?.sandboxId || machine.state === 'ended' ||
+      (expectedFence && (machine.epoch !== expectedFence.epoch || machine.sandboxId !== expectedFence.sandboxId))) {
+      // Recovery ignores stale observations. A person's pause must acknowledge the binding it actually parked.
+      if (expectedFence?.revokeReview) throw new ComputerError(409, 'Thread machine changed before it could be paused')
+      return null
+    }
+    if (expectedFence?.revokeReview) await (await import('../coding-workspace/review-sessions'))
+      .fenceReviewSessions(client, { runIds: [runId] }, 'machine_changed')
+    else if (['succeeded', 'failed'].includes(run?.status) && !run.stopRequestedAt && run.stopReason !== 'device_lost'
+      && run.report?.safePoint?.session === 'exited') {
+      const held = (await client.query<{ until: Date | null }>(`SELECT max(s."expiresAt") AS until FROM coding_review_sessions s
+        JOIN issues i ON i.id=s."taskId" WHERE s."runId"=$1 AND s."ownerId"=$2 AND s."workspaceId"=$3
+          AND s."sandboxId"=$4 AND s."machineEpoch"=$5 AND s."machineOperationId"=$6
+          AND s."revokedAt" IS NULL AND s."expiresAt">clock_timestamp()
+          AND i."ownershipState"='bound' AND i."workspaceId"=s."workspaceId"
+          AND i.status NOT IN ('done','canceled','duplicate')
+          AND coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' IS NULL`,
+      [runId, actor.userId, actor.workspaceId, machine.sandboxId, machine.epoch, machine.operationId])).rows[0]?.until
+      if (held) return { ...machine, reviewHeldUntil: held.getTime() }
+    }
     // A status alone is not a safe point. A live claim or bootstrap remains
     // responsible for commands and checkpoint upload until it acknowledges end.
     const terminal = ['succeeded', 'failed', 'stopped', 'cancelled'].includes(run?.status)
@@ -369,13 +631,22 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
     if (!existing) await client.query('BEGIN')
     let machine = await locked()
     if (!machine) { if (!existing) await client.query('COMMIT'); return }
+    if (machine.reviewHeldUntil) { if (!existing) await client.query('COMMIT'); return { reviewHeldUntil: machine.reviewHeldUntil } }
     intent = { sandboxId: machine.sandboxId, epoch: machine.epoch, failures: Number(machine.lifecycle?.failures) || 0 }
+    // A previous attempt may have created the snapshot before its response was
+    // lost. Reconcile even on an already paused row, without connecting.
+    if (machine.snapshotId !== hostedSnapshot && threadSnapshotsEnabled() && machine.snapshotState === 'creating' && !machine.requiresNativeExit)
+      await reconcileCreatingSnapshot(client, actor, runId, machine)
     if (machine.state !== 'paused') {
       await client.query(`UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object('phase','pause_requested','owner','run-recovery')
           ||CASE WHEN $3::boolean THEN '{"requiresNativeExit":true}'::jsonb ELSE '{}'::jsonb END,
         "lifecycleAt"=now()+interval '30 seconds' WHERE "runId"=$1 AND epoch=$2`, [runId, intent.epoch, machine.requiresNativeExit])
       armDueTimerAfterCommit(client, 'run-recovery')
       if (!existing) {
+        // The image must never capture a live worker credential. Revoke this
+        // stage's token before the snapshot exists; a resumed machine mints a
+        // new one during registration. The parked write repeats it idempotently.
+        await client.query('UPDATE device_tokens SET "revokedAt"=COALESCE("revokedAt",now()) WHERE "boundDeviceId"=$1', [machine.deviceId])
         // Commit the intent before provider I/O, then recheck the same owner.
         // A crash after E2B pauses is reconciled by the durable timer.
         await client.query('COMMIT')
@@ -385,11 +656,25 @@ export async function parkThreadMachine(pool: Pool, actor: Actor, runId: string,
         if (!machine || machine.sandboxId !== intent.sandboxId || machine.epoch !== intent.epoch) {
           await client.query('COMMIT'); return
         }
+        if (machine.reviewHeldUntil) { await client.query('COMMIT'); return { reviewHeldUntil: machine.reviewHeldUntil } }
       }
       if (machine.state !== 'paused') {
-        const tail = await readTail(machine.sandboxId)
+        const tail = machine.snapshotId === hostedSnapshot ? null : await readTail(machine.sandboxId)
         if (tail) await saveWorkerTail(client, runId, tail, await secretMaskerFor({ workspaceId: actor.workspaceId, ownerId: actor.userId })).catch(() => undefined)
-        await pause(machine.sandboxId)
+        // Snapshot before pausing. E2B pauses the sandbox while it creates the
+        // image; the pause below is then idempotent. Never snapshot a machine
+        // whose native process has not acknowledged exit, and never inside a
+        // caller-owned transaction (the image can take longer than its budget).
+        if (machine.snapshotId !== hostedSnapshot && !existing && threadSnapshotsEnabled() && !machine.requiresNativeExit)
+          await takeThreadSnapshot(client, actor, runId, machine)
+        if (machine.snapshotId === hostedSnapshot) {
+          const checkpoint = await releaseOwnedCloudflareTaskMachine(client, actor, runId, machine.operationId)
+          if (checkpoint && checkpoint.instanceId === machine.sandboxId)
+            await client.query(`UPDATE thread_machines SET lifecycle=lifecycle||jsonb_build_object('sponsoredPreparedCheckpoint',$4::jsonb)
+              WHERE "runId"=$1 AND epoch=$2 AND "sandboxId"=$3 AND "operationId"=$5`,
+            [runId, machine.epoch, machine.sandboxId, JSON.stringify(checkpoint), machine.operationId])
+        }
+        else await pause(machine.sandboxId)
       }
     }
     // An already paused provider/row still needs token revocation after a lost
@@ -454,7 +739,7 @@ const threadDesktop = { startDesktop, syncDesktopLease }
  * No person can watch or take over a thread desktop (decision 1050): the lease is never controlled. */
 async function startThreadDesktop(pool: Pool, actor: Actor, runId: string, leaseId: string, sandbox: Sandbox, runtime: typeof threadDesktop, budget?: RuntimeBudget) {
   await runtime.startDesktop(sandbox, 1, true, budget)
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   try {
     await client.query('BEGIN')
     await client.query("SET LOCAL lock_timeout = '5s'")
@@ -472,13 +757,13 @@ type QuestionRuntimeUpgrade = { taskId: string; attemptId: string; requestEpoch:
 
 /** Maintenance uses the existing answer/recovery receipt for every stage. Lock
  * the task/question before the run, matching answer, claim and cancellation. */
-async function lockQuestionRuntimeUpgrade(tx: PoolClient, actor: Actor, runId: string, questionId: string, expected?: QuestionRuntimeUpgrade): Promise<QuestionRuntimeUpgrade> {
+export async function lockQuestionRuntimeUpgrade(tx: PoolClient, actor: Actor, runId: string, questionId: string, expected?: QuestionRuntimeUpgrade): Promise<QuestionRuntimeUpgrade> {
   const unavailable = (): never => { throw new ComputerError(409, 'Original question runtime is no longer current') }
   const { rows: [identity] } = await tx.query('SELECT "taskId" FROM factory_questions WHERE id=$1 AND "userId"=$2 AND "continuationRunId"=$3', [questionId, actor.userId, runId])
   if (!identity) return unavailable()
   const { rows: [task] } = await tx.query('SELECT * FROM factory_tasks WHERE id=$1 AND "userId"=$2 FOR UPDATE', [identity.taskId, actor.userId])
   if (!task || task.status !== 'running') return unavailable()
-  const { rows } = await tx.query(`SELECT to_jsonb(q) AS question,to_jsonb(r) AS run,to_jsonb(origin) AS origin,e."eventId",e.request,e.result
+  const { rows } = await tx.query(`SELECT to_jsonb(q) AS question,to_jsonb(r) AS run,to_jsonb(origin.*) AS origin,e."eventId",e.request,e.result
     FROM factory_questions q
     JOIN factory_attempts a ON a.id=$4 AND a."taskId"=q."taskId" AND a.stage=$5 AND a.status='running'
     JOIN agent_runs r ON r.id=a."runId" AND r.id=q."continuationRunId" AND r."userId"=q."userId" AND r."issueId"=q."issueId"
@@ -574,19 +859,40 @@ async function lockUnclaimedQuestionRuntimeRecovery(client: PoolClient, actor: A
 /** The queued run is moved to a dedicated device before any worker can claim
  * it. Bot workers are denied these runs by claimCloudRun. */
 export async function ensureThreadMachine(...args: Parameters<typeof ensureThreadMachineInternal>) {
-  try {
-    return await cloudStartupSpan('cloud.thread.ensure', cloudStartupRunAttributes(args[2]), () => ensureThreadMachineInternal(...args))
-  } finally {
-    // Every admitted wake, including resume/replay/retained-stage adoption,
-    // leaves the existing durable timer responsible if its request disappears.
-    // The provisioning transaction already stored a deadline before E2B I/O.
-    const [pool, actor, runId] = args
-    await pool.query(`UPDATE thread_machines SET "lifecycleAt"=now()
-      WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3
-        AND (state<>'ended' OR "sandboxId" IS NOT NULL OR "workerLeaseUntil" IS NOT NULL)`, [runId, actor.userId, actor.workspaceId])
-      .catch(() => { /* The previous durable deadline and recovery sweep remain. */ })
-    armDueTimerSoon('run-recovery')
-  }
+  const [pool, actor, runId] = args
+  z.uuid().parse(runId)
+  const { rows: [run] } = await pool.query<typeof agentRuns.$inferSelect>(`SELECT r.* FROM agent_runs r
+    JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
+    WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId"`, [runId, actor.userId, actor.workspaceId])
+  if (!run) throw new ComputerError(404, 'Thread unavailable')
+  // Admission precedes even retained-machine connect/refresh. A refusal must
+  // not acquire provisioning custody, rewrite its timer, or disturb an old VM.
+  return withRunProjectResources(pool, run, async () => {
+    let resourceRefused = false
+    try {
+      return await cloudStartupSpan('cloud.thread.ensure', cloudStartupRunAttributes(args[2]), async () => {
+        if (run.agentDefinition?.taskMachine) {
+          if (args[5]) throw new ComputerError(409,'Cloudflare task images are release-bound')
+          return (await import('./sponsored-lifecycle')).ensureSponsoredTaskMachine(pool,actor,runId)
+        }
+        return ensureThreadMachineInternal(...args)
+      })
+    } catch (error) {
+      resourceRefused = isProjectExecutionRefusal(error)
+      throw error
+    } finally {
+      // Every admitted wake, including resume/replay/retained-stage adoption,
+      // leaves the existing durable timer responsible if its request disappears.
+      // The provisioning transaction already stored a deadline before E2B I/O.
+      if (!resourceRefused) {
+        await pool.query(`UPDATE thread_machines SET "lifecycleAt"=now()
+          WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3
+            AND (state<>'ended' OR "sandboxId" IS NOT NULL OR "workerLeaseUntil" IS NOT NULL)`, [runId, actor.userId, actor.workspaceId])
+          .catch(() => { /* The previous durable deadline and recovery sweep remain. */ })
+        armDueTimerSoon('run-recovery')
+      }
+    }
+  })
 }
 
 async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: string, provider: typeof threadMachineProvider & { state?: (sandboxId: string, ownerId: string, budget?: RuntimeBudget) => Promise<string> } = threadMachineProvider, desktop = threadDesktop, refreshRuntime = false) {
@@ -598,7 +904,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     return remaining
   }
   let refreshBudget = refreshDeadline ? budgetUntil(refreshDeadline) : undefined
-  const client = await pool.connect()
+  const client = await connectForCommitEffects(pool)
   const leaseId = randomUUID()
   const timings = cloudStartupPhases(cloudStartupRunAttributes(runId))
   let refreshPhase: RuntimeRefreshPhase = timings.next('admission')
@@ -627,13 +933,16 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`computer-policy:${actor.workspaceId}`])
       unclaimedQuestionRecovery = await lockUnclaimedQuestionRuntimeRecovery(client, actor, runId)
     }
-    const run = (await client.query(`SELECT r.*${refreshRuntime ? ',r."stopRequestedAt"::text AS "registrationStopRequestedAt"' : ''},COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand"
+    const run = (await client.query(`SELECT r.*${refreshRuntime ? ',r."stopRequestedAt"::text AS "registrationStopRequestedAt"' : ''},r."baseBranch" AS "runBaseBranch",COALESCE(r."agentDefinition"->>'harness',agent.harness) AS "runHarness",b."workspaceId",b."botId" AS "runtimeBotId",repo."repoPath",repo."remoteUrl",repo."baseBranch",repo."verifyCommand"
       FROM agent_runs r JOIN computer_run_bindings b ON b."runId"=r.id AND b."ownerId"=r."userId"
       LEFT JOIN agents agent ON agent.id=r."agentId"
       JOIN device_repos repo ON repo.id=r."deviceRepoId" AND repo."userId"=r."userId"
       JOIN cloud_machines m ON m."workspaceId"=b."workspaceId" AND m."ownerId"=b."ownerId"
-      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 FOR UPDATE OF r`, [runId, actor.userId, actor.workspaceId])).rows[0]
+      WHERE r.id=$1 AND r."userId"=$2 AND b."workspaceId"=$3 AND r."workspaceId"=b."workspaceId" FOR UPDATE OF r FOR SHARE OF repo`, [runId, actor.userId, actor.workspaceId])).rows[0]
     if (!run || !(refreshRuntime ? ['succeeded','failed','stopped','cancelled'] : ['queued', 'preparing', 'running', 'waiting_input']).includes(run.status)) throw new ComputerError(404, 'Thread unavailable')
+    // The public preflight can precede a placement change. Recheck the locked
+    // Run/target on this APP executor, borrowing its already-held WS lease.
+    await assertRunProjectResources(client, { ...run, baseBranch: run.runBaseBranch })
     return await withRunSpan('cloud.thread.provision', { ...cloudStartupRunAttributes(runId), 'mikka.run_id': runId }, async () => {
     if (!refreshRuntime) {
       refreshPhase = timings.next('execution_identity')
@@ -645,6 +954,7 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     const repositoryTask = Boolean(run.remoteUrl)
     const freshTemplate = () => repositoryTask ? taskTemplate(run.runHarness) : computerTemplate()
     let machine = (await client.query('SELECT * FROM thread_machines WHERE "runId"=$1 FOR UPDATE', [runId])).rows[0]
+    if (machine?.snapshotId === hostedSnapshot || run.agentDefinition?.taskMachine) throw new ComputerError(409,'Task machine provider changed')
     // Stop check 1 shares the explicit Stop path's native-history and lease
     // fence. A never-started bootstrap can end; an adopted task's filesystem
     // remains available even when this particular queued run never claimed.
@@ -801,15 +1111,40 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
       throw error
     }) : null
     if (exactQuestionMachine && (!connected || connected.sandboxId !== machine.sandboxId)) throw new ComputerError(409, 'Original question machine unavailable')
-    if (retainedSandboxId && (!connected || connected.sandboxId !== retainedSandboxId)) throw new ComputerError(409, 'Retained task machine unavailable')
     if (refreshRuntime && !connected) throw new ComputerError(409, 'Original task machine unavailable')
-    if (machine.sandboxId && !connected) {
-      // The sandbox is gone at the provider: recreate this thread from its official template.
+    // A resumed or adopted VM now holds newer state than its parked image. Mark
+    // the image stale so the next park takes a fresh one; keep the reference
+    // for cleanup. The image still serves a restore if the VM disappears before
+    // this connection succeeded.
+    if (connected && !refreshRuntime && !exactQuestionMachine && machine.snapshotState === 'ready')
+      await pool.query(`UPDATE thread_machines SET "snapshotState"='failed'
+        WHERE "runId"=$1 AND "sandboxId"=$2 AND "snapshotState"='ready' AND state<>'ended'`, [runId, machine.sandboxId])
+    // The provider lost this task's VM. Prefer its own filesystem snapshot over
+    // the official template; the restore helper re-fences the same task, owner,
+    // workspace, repository and template kind before any provider I/O.
+    const restoreCandidate = machine.snapshotId !== hostedSnapshot && !refreshRuntime && !exactQuestionMachine && threadSnapshotsEnabled() &&
+      machine.snapshotState === 'ready' && Boolean(machine.filesystemSnapshotId) &&
+      (machine.sandboxId ? !connected : ['restore', 'error'].includes(machine.state))
+    let restored: Awaited<ReturnType<typeof restoreThreadMachineFromSnapshot>> = null
+    if (restoreCandidate) {
+      refreshDeadline = Date.now() + 240_000
+      refreshBudget = budgetUntil(refreshDeadline)
+      const restoreTemplate = freshTemplate()
+      const restoreKind = cloudTemplateOrigin(restoreTemplate)?.kind
+        ?? (run.remoteUrl ? (run.runHarness === 'claude_code' ? 'claude' : 'codex') : 'desktop')
+      restored = await restoreThreadMachineFromSnapshot(pool, actor, runId, leaseId,
+        { sandboxId: machine.sandboxId ?? null, kind: restoreKind }, restoreTemplate, provider)
+    }
+    if (retainedSandboxId && (!connected || connected.sandboxId !== retainedSandboxId) && !restored)
+      throw new ComputerError(409, 'Retained task machine unavailable')
+    if (machine.sandboxId && !connected && !restored) {
+      // No usable snapshot: recreate this thread from its official template.
       machine = await replaceGoneSandbox(pool, runId, freshTemplate(), leaseId)
       if (!machine) throw new ComputerError(409, 'Thread provisioning cancelled')
     }
-    const anonymousFreshMachine = !connected && !machine.sandboxId && !machine.deviceId && ['claude', 'codex'].includes(cloudTemplateOrigin(machine.snapshotId)?.kind ?? '')
-    const sandbox = connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId, operationId: machine.operationId }, actor.userId)
+    if (restored) machine = restored.machine
+    const anonymousFreshMachine = !connected && !restored && !machine.sandboxId && !machine.deviceId && ['claude', 'codex'].includes(cloudTemplateOrigin(machine.snapshotId)?.kind ?? '')
+    const sandbox = restored?.sandbox ?? connected ?? await provider.create(machine.snapshotId, machine.operationId, { application: 'mikka-thread', workspaceId: actor.workspaceId, runId, operationId: machine.operationId }, actor.userId)
     connected = null
     refreshPhase = timings.next('record_sandbox')
     const recorded = await recordThreadSandbox(pool, runId, sandbox.sandboxId, leaseId)
@@ -825,6 +1160,18 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
         }
       }
       throw new ComputerError(409, 'Thread provisioning cancelled')
+    }
+    if (restored) {
+      // The restored VM now holds the task's state; keep the retained-runtime
+      // upgrade/failure paths fenced on this exact sandbox.
+      machine.sandboxId = sandbox.sandboxId
+      retainedSandboxId = sandbox.sandboxId
+      // The source image is the state this VM started from, not its future
+      // state. Mark it stale so the next park takes a fresh image and only
+      // then deletes this one; the reference stays for cleanup if the row is
+      // ended first.
+      await pool.query(`UPDATE thread_machines SET "snapshotState"='failed'
+        WHERE "runId"=$1 AND "sandboxId"=$2 AND state<>'ended'`, [runId, sandbox.sandboxId])
     }
     refreshPhase = timings.next('post_connect_admission')
     // Stop check 2: a stop may have landed while the first transaction was committed and the
@@ -1027,10 +1374,11 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     let definition = current.agentDefinition
     const admission = definition?.repositoryAdmission
     if (current.status === 'queued' && admission) {
-      if (!matchesRepositoryAdmission(admission, {
+      if ((admission.workspaceId != null && (admission.workspaceId !== current.workspaceId || current.workspaceId !== actor.workspaceId)) ||
+        !matchesRepositoryAdmission(admission, {
         userId: actor.userId, issueId: current.issueId, deviceId: current.deviceId, agentId: current.agentId,
         remoteKey: run.repoPath, remoteUrl: run.remoteUrl, targetBranch: admission.targetBranch,
-        ...(current.botId ? { workspaceId: actor.workspaceId } : {}),
+        workspaceId: admission.workspaceId,
         workspaceLinked: admission.workspaceLinked, requestEventId: admission.requestEventId,
       })) throw new ComputerError(409, 'Repository authority unavailable')
       // Host-owned relocation changes the executor, never the admitted repository or branch.
@@ -1061,15 +1409,15 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     // and rollback. This optional locator binds to the same one-use bytes; it
     // carries no assignment or usable credential. String multipart is one RPC.
     const initialRun = refreshRuntime ? '' : JSON.stringify({ version: 1, runId, bootstrapSha256: createHash('sha256').update(bootstrap).digest('hex') })
-    const anonymousClaude = anonymousClaudeStartupHint({
-      freshTask: firstAnonymousClaudeTask({ created: anonymousFreshMachine, refresh: refreshRuntime, retained: Boolean(retainedSandboxId), question: exactQuestionMachine }, current),
+    const hint = anonymousStartupHint({
+      freshTask: firstAnonymousTask({ created: anonymousFreshMachine, refresh: refreshRuntime, retained: Boolean(retainedSandboxId), question: exactQuestionMachine }, current),
       runId, bootstrap, kind: current.kind, repository: run.repoPath, definition, userId: actor.userId, botId: current.botId,
     })
-    const anonymousCodex = anonymousCodexStartupHint({
-      freshTask: firstAnonymousClaudeTask({ created: anonymousFreshMachine, refresh: refreshRuntime, retained: Boolean(retainedSandboxId), question: exactQuestionMachine }, current),
-      runId, bootstrap, kind: current.kind, repository: run.repoPath, definition, userId: actor.userId, botId: current.botId,
-    })
-    const uploads = [{ path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun }, { path: `${handoff}.claude`, data: anonymousClaude }, { path: `${handoff}.codex`, data: anonymousCodex }]
+    const uploads = [
+      { path: handoff, data: bootstrap }, { path: `${handoff}.run`, data: initialRun },
+      { path: `${handoff}.claude`, data: definition?.harness === 'claude_code' ? hint : '' },
+      { path: `${handoff}.codex`, data: definition?.harness === 'codex' ? hint : '' },
+    ]
     if (workerBroker?.active) workerBroker.assertAwaitingUpload()
     await sandbox.files.write(uploads, { user: 'root', useOctetStream: false, ...runtimeRequestOptions(refreshBudget) })
     // The foreground command must finish the atomic publication before waking
@@ -1144,6 +1492,9 @@ async function ensureThreadMachineInternal(pool: Pool, actor: Actor, runId: stri
     // Abort this lease's unpublished broker before start-failure recovery.
     // Preserve the primary admission/upload/registration failure if transport cleanup also fails.
     await workerBroker?.close().catch(() => undefined)
+    // A placement change can invalidate the locked target after preflight.
+    // No provisioning lease was acquired, so there is nothing to clean up.
+    if (isProjectExecutionRefusal(error) && !reservedStartLease) throw error
     if (runtimeRollback) {
       try { await runtimeRollback() } catch (rollbackError) { logRuntimeRefreshFailure(runId, 'rollback', rollbackError) }
     }
@@ -1169,9 +1520,13 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
   if (action === 'end') {
     // Fence provisioning and revoke any existing token before provider I/O.
     // Retain the sandbox ID so a failed or lost kill response can be retried.
-    const client = await pool.connect()
+    const client = await connectForCommitEffects(pool)
     let sandboxId: string | null
+    let filesystemSnapshotId: string | null = null
     let creationPending: boolean
+    let hosted: boolean
+    let operationId: string | null
+    let wasPaused: boolean
     let epoch: number
     try {
       await client.query('BEGIN')
@@ -1181,7 +1536,7 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
         ? (await client.query('SELECT status,content FROM issues WHERE id=$1 FOR SHARE', [machine.issueId])).rows[0]
         : undefined
       const lockedRun = (await client.query('SELECT status,report FROM agent_runs WHERE id=$1 AND "userId"=$2 FOR UPDATE', [runId, actor.userId])).rows[0]
-      const locked = (await client.query('SELECT "sandboxId","deviceId","workerLeaseId","workerLeaseUntil",epoch,state FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE', [runId, actor.userId, actor.workspaceId])).rows[0]
+      const locked = (await client.query('SELECT "sandboxId","deviceId","operationId","snapshotId","workerLeaseId","workerLeaseUntil",epoch,state,"filesystemSnapshotId" FROM thread_machines WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 FOR UPDATE', [runId, actor.userId, actor.workspaceId])).rows[0]
       if (!locked) throw new ComputerError(404, 'Thread unavailable')
       if (expectedFence && (locked.epoch !== expectedFence.epoch || locked.sandboxId !== expectedFence.sandboxId)) {
         await client.query('COMMIT')
@@ -1204,7 +1559,11 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
         }
       }
       sandboxId = locked.sandboxId
+      filesystemSnapshotId = locked.filesystemSnapshotId
       epoch = locked.epoch
+      hosted = locked.snapshotId === hostedSnapshot
+      operationId = locked.operationId
+      wasPaused = locked.state === 'paused'
       creationPending = !sandboxId && Boolean(locked.workerLeaseId || locked.workerLeaseUntil)
       const stopped = await client.query(`UPDATE agent_runs SET status='stopped',"stopRequestedAt"=COALESCE("stopRequestedAt",now()),"finishedAt"=COALESCE("finishedAt",now())
         WHERE id=$1 AND "userId"=$2 AND status NOT IN ('succeeded','failed','stopped','cancelled') RETURNING id`, [runId, actor.userId])
@@ -1227,26 +1586,30 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
     // This is a terminal write outside the daemon completion path: finalize a
     // bound Factory task after commit. Flag-gated, idempotent, never throws.
     await afterRunEnded(actor.userId, runId)
-    if (creationPending) throw new ComputerError(409, 'Thread creation cleanup pending')
+    if (creationPending && !hosted) throw new ComputerError(409, 'Thread creation cleanup pending')
     // Run end has fenced new captures. Preserve existing recordings before
     // destroying the dedicated filesystem that still holds their bytes.
     const { screenCaptures } = await import('@/lib/captures/screen')
-    await screenCaptures.stopRunRecordings([runId])
+    if (!hosted) await screenCaptures.stopRunRecordings([runId])
     // A running machine's last output is kept before the kill (a parked one kept it when it paused).
     // Best effort and bounded: reading never blocks the kill.
-    if (sandboxId && machine.state !== 'paused') await keepTailBeforeKill(pool, actor, runId, sandboxId)
+    if (sandboxId && !wasPaused && !hosted) await keepTailBeforeKill(pool, actor, runId, sandboxId)
     try {
-      if (sandboxId) await threadMachineProvider.kill(sandboxId, actor.userId).catch(error => { if (!sandboxGone(error)) throw error })
-      const retired = await pool.query(`UPDATE thread_machines SET "sandboxId"=NULL,"lifecycleAt"=NULL,
+      if (hosted && operationId && (sandboxId || creationPending)) await releaseOwnedCloudflareTaskMachine(pool,actor,runId,operationId)
+      else if (!hosted && sandboxId) await threadMachineProvider.kill(sandboxId, actor.userId).catch(error => { if (!sandboxGone(error)) throw error })
+      const retired = await pool.query(`UPDATE thread_machines SET "sandboxId"=NULL,"workerLeaseUntil"=NULL,"lifecycleAt"=NULL,
         lifecycle=(lifecycle-'reconcileId'-'reconcileUntil')||jsonb_build_object('phase','retired','owner','run-recovery','failures',0)
         WHERE "runId"=$1 AND "ownerId"=$2 AND "workspaceId"=$3 AND epoch=$4 AND state='ended'
           AND "sandboxId" IS NOT DISTINCT FROM $5::text RETURNING "computeSeconds"`, [runId, actor.userId, actor.workspaceId, epoch, sandboxId])
       if (retired.rowCount) taskActivityChanged(pool, runId)
       if (retired.rowCount) logThreadLifecycle({ runId, issueId: machine.issueId, sandboxId, epoch }, { phase: 'retired', provider: sandboxId ? 'kill_ack' : 'not_observed', deadline: null, computeSeconds: retired.rows[0].computeSeconds })
+      // The VM is gone; a task-owned snapshot has no remaining reader once the
+      // task is closed or the run is ended.
+      if (retired.rowCount && filesystemSnapshotId) await releaseEndedThreadSnapshot(pool, actor, runId, filesystemSnapshotId)
     } catch (error) {
       await pool.query(`UPDATE thread_machines SET "lifecycleAt"=now()+interval '30 seconds',
         lifecycle=lifecycle||jsonb_build_object('phase','retire_failed','owner','run-recovery')
-        WHERE "runId"=$1 AND "sandboxId"=$2 AND epoch=$3 AND state='ended'`, [runId, sandboxId, epoch])
+        WHERE "runId"=$1 AND "sandboxId" IS NOT DISTINCT FROM $2::text AND epoch=$3 AND state='ended'`, [runId, sandboxId, epoch])
         .catch(() => { /* The committed retirement intent survives a lost DB response. */ })
       armDueTimerSoon('run-recovery')
       throw error
@@ -1256,7 +1619,8 @@ export async function threadMachineAction(pool: Pool, actor: Actor, runId: strin
   if (action === 'resume') return ensureThreadMachine(pool, actor, runId)
   if (!machine.sandboxId) throw new ComputerError(409, 'Thread machine has not started')
   if (action === 'pause') {
-    await parkThreadMachine(pool, actor, runId, undefined, undefined, undefined, expectedFence)
+    await parkThreadMachine(pool, actor, runId, undefined, undefined, undefined, { ...expectedFence,
+      epoch: expectedFence?.epoch ?? machine.epoch, sandboxId: expectedFence?.sandboxId ?? machine.sandboxId, revokeReview: true })
   }
   return { runId, state: action === 'pause' ? 'paused' : machine.state }
 }

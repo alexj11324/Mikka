@@ -11,7 +11,7 @@
 // `-- migrate: no-transaction` for one standalone statement.
 import { readdirSync, readFileSync } from 'node:fs'
 import { Pool } from 'pg'
-import { directDatabaseURL } from './postgres-connection.mjs'
+import { sessionDatabaseURL } from './postgres-connection.mjs'
 import { alreadyApplied, orderMigrations } from './migration-order.mjs'
 import { applyMigration, planMigration } from './migration-steps.mjs'
 import { migrationTargets } from './migration-targets.mjs'
@@ -59,7 +59,7 @@ try {
   // Validate both targets' complete scope history before applying pending DDL.
   // Commits remain per file/connection, not distributed across targets.
   for (const [target, pending] of byTarget) {
-    const pool = new Pool({ connectionString: directDatabaseURL(targets[target]), max: 1, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 20_000 })
+    const pool = new Pool({ connectionString: sessionDatabaseURL(targets[target], env), max: 1, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 20_000 })
     pool.on?.('error', () => console.warn('migration_idle_connection_lost'))
     const state = { target, pending, pool }
     states.push(state)
@@ -97,10 +97,25 @@ try {
     const { backfillTaskWorkspaces } = await import('./task-workspace-backfill.mjs')
     const ownership = await backfillTaskWorkspaces(application, workspace)
     console.log(`migrate: task workspace ownership bound=${ownership.bound} pending=${ownership.pending}`)
+    if (files.includes('20261111030001_task_identity.sql') && files.includes('20261111030002_task_identity_aliases.sql')) {
+      const { backfillTaskIdentifiers } = await import('./task-identity-backfill.mjs')
+      const identifiers = await backfillTaskIdentifiers(application, workspace)
+      console.log(`migrate: stable task identifiers issued=${identifiers.issued}`)
+    }
+    if (files.includes('20261111030000_project_v2.sql')) {
+      const { backfillProjectV2 } = await import('./project-v2-backfill.mjs')
+      const projects = await backfillProjectV2(application, workspace)
+      console.log(`migrate: projects bound=${projects.projectsBound} tasks=${projects.projectTasksBound} pending=${projects.projectsPending}`)
+    }
   }
   if (application && workspace && files.includes('20261110150005_resource_acl.sql')) {
     const { backfillProjectResourceAccess } = await import('./resource-acl-backfill.mjs')
     const access = await backfillProjectResourceAccess(application, workspace)
     console.log(`migrate: project ACL registered=${access.registered} quarantined=${access.quarantined} tasksBound=${access.tasksBound}`)
+  }
+  if (application && workspace && files.includes('20261120044916_bot_settings.sql')) {
+    const { backfillBotEnvironments } = await import('./bot-environment-backfill.mjs')
+    const moved = await backfillBotEnvironments(application, workspace)
+    console.log(`migrate: bot environments bound=${moved.bound} created=${moved.created} skipped=${moved.skipped}`)
   }
 } finally { await Promise.all(states.map(({ pool }) => pool.end())) }

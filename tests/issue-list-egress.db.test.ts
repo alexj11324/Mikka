@@ -7,6 +7,7 @@ import type { JSONContent } from '@tiptap/core'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { measured, readMetrics } from './helpers/read-metrics'
 import { mergeList } from '../lib/list-poll'
+import { desktopActionSchemas } from '../lib/desktop-rpc/schemas'
 
 // Only a disposable loopback *_e2e database is admissible; required in CI.
 const required = process.env.REQUIRE_DB === '1'
@@ -123,12 +124,22 @@ test('the task list and a task\'s relations read metadata and checklist counts, 
     assert.equal(promotion.error, 'teamIssueAccessDenied', 'team promotion cannot move a task to another workspace')
     assert.equal((await pool.query('select "workspaceId" from issues where id=$1', [ids[1]])).rows[0].workspaceId, personalWorkspace)
     assert.equal((await pool.query('select count(*)::int n from team_issue_promotion_receipts where "requestId"=$1', [requestId])).rows[0].n, 0)
-    const createdShared = await withActivitySession(owner, () => saveIssue({ title: 'Shared list task', content: content(30), status: 'todo', priority: 'normal' }), workspaceId)
+    const wire = desktopActionSchemas['issues.saveIssue']
+    const payload = { workspaceId, title: 'Shared list task', content: content(30), status: 'todo', priority: 'normal' }
+    assert.equal(wire.safeParse([{ ...payload, workspaceId: 'invalid' }]).success, false)
+    assert.equal(wire.safeParse([{ ...payload, userId: owner }]).success, false)
+    assert.deepEqual(wire.parse([payload]), [payload])
+    const createdShared = await withActivitySession(owner, () => saveIssue(payload), workspaceId)
     assert.ok('issue' in createdShared && createdShared.issue)
+    assert.equal(createdShared.issue.workspaceId, workspaceId)
     const shared = await withActivitySession(peer, () => actAs(peer, () => pollIssues()), workspaceId)
     assert.deepEqual(shared.items?.map(row => row.id), [createdShared.issue.id])
     assert.equal(shared.items?.length, 1)
     await pool.query('update mikka_workspace_members set status=$3 where "workspaceId"=$1 and "userId"=$2', [workspaceId, peer, 'suspended'])
+    const revokedInput = { ...payload, title: 'Revoked writer task' }
+    assert.deepEqual(wire.parse([revokedInput]), [revokedInput])
+    await assert.rejects(() => withActivitySession(peer, () => saveIssue(revokedInput), workspaceId), { message: 'workspaceAccessDenied' })
+    assert.equal((await pool.query('SELECT id FROM issues WHERE "userId"=$1 AND title=$2', [peer, revokedInput.title])).rowCount, 0)
     const revoked = await withActivitySession(peer, () => actAs(peer, () => pollIssues(shared.version, shared.positions)), workspaceId)
     assert.deepEqual(revoked.items, [], 'revocation clears the formerly shared row')
     assert.deepEqual(mergeList(shared.items!, revoked), [], 'the authoritative manifest removes the revoked cached task')
@@ -208,32 +219,33 @@ test('workspace task polls keep permission reads bounded and recheck the next re
     const full = await measured(() => inWorkspace(workspaces[0], () => pollIssues()))
     assert.deepEqual(full.value.items?.map(row => row.id).sort(), [...firstWorkspace, unlinked].sort())
     assert.ok(full.value.items?.filter(row => firstWorkspace.includes(row.id)).every(row => teams.slice(0, 2).includes(row.teamId!)))
-    assert.match(full.value.items?.find(row => row.id === unlinked)?.identifier ?? '', /^SCOP-[1-9][0-9]*$/, 'an unlinked workspace task keeps its owner number')
+    const issuedUnlinked = (await pool.query('select "issuedIdentifier" from issues where id=$1', [unlinked])).rows[0].issuedIdentifier
+    assert.match(issuedUnlinked, /^W[0-9A-F]{12}-[1-9][0-9]*$/, 'an ungrouped shared Task has a Workspace-issued identity')
+    assert.equal(full.value.items?.find(row => row.id === unlinked)?.identifier, issuedUnlinked)
     const quiet = await measured(() => inWorkspace(workspaces[0], () => pollIssues(full.value.version)))
     assert.ok('unchanged' in quiet.value && quiet.value.unchanged)
     assert.equal(quiet.value.items, undefined)
     t.diagnostic(JSON.stringify({ linkedTasks: 80, fullWorkspaceListBytes: full.bytes, unchangedWorkspaceListBytes: quiet.bytes }))
 
-    // The task documents stay unchanged when a team key changes. Both the
-    // overall cursor and each affected row must depend on the current key.
+    // Team keys are aliases. Renaming a grouping cannot change already issued
+    // Task identities or resend otherwise unchanged list rows.
     await pool.query('update mikka_teams set identifier=$2 where id=$1', [teams[0], 'RENAMED'])
     const renamed = await measured(() => inWorkspace(workspaces[0], () => pollIssues(full.value.version, full.value.positions)))
-    assert.notEqual(renamed.value.version, full.value.version)
-    assert.deepEqual(renamed.value.items?.map(row => row.id).sort(), firstWorkspace.filter((_, index) => index % 2 === 0).sort(), 'only the renamed team\'s task projections are sent')
-    assert.ok(renamed.value.items?.every(row => /^RENAMED-[1-9][0-9]*$/.test(row.identifier ?? '')))
-    assert.deepEqual(mergeList(full.value.items!, renamed.value), (await inWorkspace(workspaces[0], () => pollIssues())).items)
+    assert.equal(renamed.value.version, full.value.version)
+    assert.ok('unchanged' in renamed.value && renamed.value.unchanged)
+    assert.deepEqual((await inWorkspace(workspaces[0], () => pollIssues())).items, full.value.items)
     await pool.query('update mikka_teams set identifier=$2 where id=$1', [teams[0], 'EG0'])
 
-    // A removed and re-added team link gets a new number, even for the same
-    // team. Its row cursor cannot depend on teamId alone.
+    // A re-created Team relation gets a new historical alias number. The
+    // canonical Task identity and current grouping remain the same.
     const changedNumberId = firstWorkspace[0]
     const oldNumber = (await pool.query('select number from mikka_team_issues where "issueId"=$1', [changedNumberId])).rows[0].number
     await pool.query('delete from mikka_team_issues where "issueId"=$1', [changedNumberId])
     await pool.query('insert into mikka_team_issues("issueId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [changedNumberId, teams[0], workspaces[0], owner])
+    assert.notEqual((await pool.query('select number from mikka_team_issues where "issueId"=$1', [changedNumberId])).rows[0].number, oldNumber)
     const renumbered = await inWorkspace(workspaces[0], () => pollIssues(full.value.version, full.value.positions))
-    assert.deepEqual(renumbered.items?.map(row => row.id), [changedNumberId])
-    assert.notEqual(renumbered.items?.[0].identifier, full.value.items?.find(row => row.id === changedNumberId)?.identifier)
-    await pool.query('update mikka_team_issues set number=$2 where "issueId"=$1', [changedNumberId, oldNumber])
+    assert.ok('unchanged' in renumbered && renumbered.unchanged)
+    assert.equal((await inWorkspace(workspaces[0], () => pollIssues())).items?.find(row => row.id === changedNumberId)?.identifier, full.value.items?.find(row => row.id === changedNumberId)?.identifier)
     t.diagnostic(JSON.stringify({ event: 'task_number_list_measurement', cold: readMetrics(full), unchanged: readMetrics(quiet), teamRename: readMetrics(renamed) }))
 
     const switched = await inWorkspace(workspaces[1], () => pollIssues(full.value.version))

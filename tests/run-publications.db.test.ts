@@ -1,8 +1,8 @@
 import { seedFixtureWorkspace } from './helpers/task-workspace'
 // Next captures AsyncLocalStorage when its work stores are first imported.
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import type { RunCompleteRequest } from '@mikka/protocol/run'
 import type { RunFailure } from '@mikka/protocol/run-failure'
@@ -90,7 +90,12 @@ test('run result publication commits one owner-scoped result through retries and
     await pool.query('insert into devices (id,"ownerId",name,kind,harnesses) values ($1,$2,\'Publication CI computer\',\'local\',$3)', [row.deviceId, row.userId, JSON.stringify([{ harness: 'codex', installed: true }])])
     await pool.query('insert into agents (id,"userId","deviceId",harness,name) values ($1,$2,$3,\'codex\',$4)', [row.agentId, row.userId, row.deviceId, `codex ${row.deviceId}`])
     await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,null)', [row.repoId, row.deviceId, row.userId, row.remoteKey, row.remoteUrl])
-    await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$5,\'Fix redirect\',$3,\'todo\',\'normal\',$4)', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal', row.workspaceId])
+    const { rows: [createdTask] } = await pool.query('insert into issues (id,"userId","workspaceId",title,content,status,priority,scope) values ($1,$2,$5,\'Fix redirect\',$3,\'todo\',\'normal\',$4) returning "issuedIdentifier"', [row.issueId, row.userId, JSON.stringify({ type: 'doc', attrs: { mikka: { number } }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Original task body' }] }] }), options.scope ?? 'personal', row.workspaceId])
+    if (options.scope === 'workspace') {
+      assert.equal(createdTask.issuedIdentifier, `W${row.workspaceId.replaceAll('-', '').slice(0, 12).toUpperCase()}-1`)
+      row.identifier = createdTask.issuedIdentifier
+      row.branch = `mikka/${row.identifier.toLowerCase()}`
+    }
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId","deviceRepoId",status,kind,"baseBranch",prompt) values ($1,$2,$3,$4,$5,$6,\'running\',\'implement\',null,\'Fix redirect\')', [row.runId, row.userId, row.issueId, row.agentId, row.deviceId, row.repoId])
     await pool.query('insert into run_tokens (id,"runId","userId","tokenHash","expiresAt") values ($1,$2,$3,$4,now()+interval \'1 hour\')', [randomUUID(), row.runId, row.userId, `synthetic-${randomUUID()}`])
     if (options.approved) await admit(row)
@@ -168,22 +173,16 @@ test('run result publication commits one owner-scoped result through retries and
     await t.test('device completion and server terminal transitions persist diagnostics under their existing fences', async () => {
       const { completeRunForDevice } = await import('../lib/run-completion')
       const { failRunForDaemonUpgrade } = await import('../lib/run-leases')
-      const { AfterContext } = await import('next/dist/server/after/after-context')
-      const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
-      const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
-      const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
-      const { NextRequest } = await import('next/server')
-      // Like issue-scope-detachment.db.test.ts, supply Next's real request
-      // lifecycle and drain after() work without replacing any database writer.
+      const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
+      const { NextRequest } = await import('../lib/server-runtime/server')
+      // Like issue-scope-detachment.db.test.ts, run the real request scope and
+      // drain its after queue without replacing any database writer.
       async function failFromRequest(...args: Parameters<typeof failRunForDaemonUpgrade>) {
-        const waits: Promise<unknown>[] = [], errors: unknown[] = [], closes: Array<() => void> = []
-        const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: close => { closes.push(close) }, onTaskError: error => { errors.push(error) } })
-        const request = new NextRequest(`http://127.0.0.1/mikka/v1/runs/${args[0]}/complete`)
-        const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
-        return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
+        const scope = createRequestScope(new NextRequest(`http://127.0.0.1/mikka/v1/runs/${args[0]}/complete`))
+        return runRequestScope(scope, async () => {
           try { return await failRunForDaemonUpgrade(...args) }
-          finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
-        }))
+          finally { await scope.after.finish() }
+        })
       }
       const f = await fixture()
       const stranger = await fixture()
@@ -203,25 +202,25 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal(await failFromRequest(queued.runId, queued.deviceId, queued.userId), false)
     })
 
-    await t.test('an unlinked workspace task publishes with its owner number without changing scope', async () => {
+    await t.test('an unlinked workspace task publishes its immutable Workspace identifier without changing scope', async () => {
       const { admitCloudPush } = await import('../lib/computer/cloud-push')
       const { workspacePool } = await import('../lib/workspace-db')
+      const { seedTeam } = await import('./support/workspace-admin-db')
       const f = await fixture({ approved: true, prefix: 'MINE', number: 12, scope: 'workspace' })
       const linked = await fixture({ approved: true, prefix: 'OTHR', number: 18, scope: 'workspace' })
-      const workspaceId = linked.workspaceId, teamId = randomUUID()
-      await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Publication budget CI\',\'PUBREAD\')', [teamId, workspaceId, linked.userId])
-      const { rows: [link] } = await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4) returning number', [linked.issueId, teamId, workspaceId, linked.userId])
-      linked.identifier = `PUBREAD-${link.number}`
-      linked.branch = `mikka/pubread-${link.number}`
-      await admit(linked)
+      const workspaceId = linked.workspaceId
+      const { id: teamId } = await seedTeam(workspacePool, workspaceId, linked.userId, 'Publication budget CI')
+      await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [linked.issueId, teamId, workspaceId, linked.userId])
       const client = await pool.connect()
-      const cloudAdmission = (row = f) => admitCloudPush(client, { userId: row.userId, issueId: row.issueId, agentId: row.agentId, deviceId: row.deviceId, deviceRepoId: row.repoId, now: new Date() })
+      // The internal helper is measured after the caller's admission. Grouping
+      // cannot change a previously issued identifier or its repository branch.
+      const cloudAdmission = (row = f) => admitCloudPush(client, { userId: row.userId, issueId: row.issueId, agentId: row.agentId, deviceId: row.deviceId, deviceRepoId: row.repoId, workspaceId: row.workspaceId, now: new Date() })
       try {
         await client.query('BEGIN')
         const admitted = await measured(() => cloudAdmission())
         const linkedCloud = await measured(() => cloudAdmission(linked))
         assert.ok(admitted.value, 'a task without a local team still gets a publication receipt')
-        assert.equal(admitted.value.publication.identifier, 'MINE-12')
+        assert.equal(admitted.value.publication.identifier, f.identifier)
         assert.equal(admitted.value.publication.branch, f.branch)
         assert.equal(admitted.value.publication.remoteUrl, f.remoteUrl)
         assert.equal(linkedCloud.value?.publication.identifier, linked.identifier)
@@ -236,18 +235,20 @@ test('run result publication commits one owner-scoped result through retries and
         await client.query('BEGIN')
         const frozen = await measured(() => cloudAdmission())
         assert.equal(frozen.value?.publication.branch, f.branch, 'a later prefix edit does not move the existing PR branch')
-        assert.equal(frozen.value?.publication.identifier, 'MINE-12')
-        assert.ok(frozen.statements < admitted.statements, 'a frozen identifier and branch skip the helper lookup')
+        assert.equal(frozen.value?.publication.identifier, f.identifier)
+        assert.equal(frozen.statements, admitted.statements, 'both paths reuse the selected immutable identifier without a helper query')
         await client.query('COMMIT')
         await pool.query('update run_publications set identifier=null where "runId"=$1', [f.runId])
         await client.query('BEGIN')
         const repaired = await cloudAdmission()
-        assert.equal(repaired?.publication.identifier, 'NEXT-12', 'a null frozen identifier still resolves its current owner prefix')
+        assert.equal(repaired?.publication.identifier, f.identifier, 'a null receipt identifier reuses the original issued identity')
         assert.equal(repaired?.publication.branch, f.branch, 'filling an identifier does not replace the frozen branch')
         await client.query('COMMIT')
         await pool.query('update run_publications set identifier=$2 where "runId"=$1', [f.runId, f.identifier])
         assert.equal((await task(f)).scope, 'workspace')
         assert.equal((await task(f)).userId, f.userId)
+        assert.equal((await task(f)).issuedIdentifier, f.identifier)
+        assert.equal((await task(linked)).issuedIdentifier, linked.identifier)
         assert.equal((await workspacePool.query('select count(*)::int n from mikka_team_issues where "issueId"=$1', [f.issueId])).rows[0].n, 0, 'naming does not assign a team or change access')
         console.log('Publication identifier read budget:', JSON.stringify({
           cloud: { unlinked: admitted.statements, linked: linkedCloud.statements, frozen: frozen.statements, resultBytes: admitted.resultBytes },
@@ -263,27 +264,27 @@ test('run result publication commits one owner-scoped result through retries and
     await t.test('identifier transport stays observable for empty and short tasks across team states', async t => {
       const { admitCloudPush } = await import('../lib/computer/cloud-push')
       const { workspacePool } = await import('../lib/workspace-db')
+      const { withTaskWorkspace } = await import('../lib/task-workspace')
+      const { withRunWorkspace } = await import('../lib/run-completion')
+      const { ActionFailureError } = await import('../lib/action-error')
+      const { seedTeam } = await import('./support/workspace-admin-db')
       const { searchIssues, parseSearchParams } = await import('../lib/issue-search')
       const { listArtifacts } = await import('../lib/artifacts/store')
-      const { withRunWorkspace } = await import('../lib/run-completion')
       const samples: Array<{ body: string; teamState: string; search: ReturnType<typeof readMetrics>; artifacts: ReturnType<typeof readMetrics>; cloud: ReturnType<typeof readMetrics>; publication: ReturnType<typeof readMetrics>; frozen: ReturnType<typeof readMetrics> }> = []
       for (const body of ['empty', 'short'] as const) for (const teamState of ['linked', 'unlinked', 'revoked-owner'] as const) {
         const f = await fixture({ approved: true, prefix: 'MTRX', number: 12, scope: 'workspace' })
-        const workspaceId = f.workspaceId, teamId = randomUUID()
+        const workspaceId = f.workspaceId
         await pool.query('update issues set content=$2 where id=$1', [f.issueId, JSON.stringify({ type: 'doc', attrs: { mikka: { number: 12 } }, content: body === 'empty' ? [] : [{ type: 'paragraph', content: [{ type: 'text', text: 'Short task body' }] }] })])
         if (teamState !== 'unlinked') {
-          await workspacePool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Identifier transport CI\',\'MTRTEAM\')', [teamId, workspaceId, f.userId])
-          const { rows: [link] } = await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4) returning number', [f.issueId, teamId, workspaceId, f.userId])
-          f.identifier = `MTRTEAM-${link.number}`
-          f.branch = `mikka/mtrteam-${link.number}`
-          await admit(f)
+          const { id: teamId } = await seedTeam(workspacePool, workspaceId, f.userId, 'Identifier transport CI')
+          await workspacePool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)', [f.issueId, teamId, workspaceId, f.userId])
         }
         const artifactId = randomUUID()
-        await pool.query('insert into artifacts (id,"userId",kind,title,"issueId","latestVersion") values ($1,$2,\'markdown\',\'Transport fixture\',$3,1)', [artifactId, f.userId, f.issueId])
+        await pool.query('insert into artifacts (id,"userId","workspaceId",kind,title,"issueId","latestVersion") values ($1,$2,$4,\'markdown\',\'Transport fixture\',$3,1)', [artifactId, f.userId, f.issueId, workspaceId])
         await pool.query('insert into artifact_versions (id,"artifactId",version,"storageKey","inlineContent",sha256,size,"authorName") values ($1,$2,1,$3,\'fixture\',\'fixture\',7,\'CI\')', [randomUUID(), artifactId, `ci/identifier-transport/${artifactId}.md`])
         if (teamState === 'revoked-owner') {
-          // Freeze an authorized receipt first; it must not authorize later
-          // reads or publication after current workspace membership is lost.
+          // Preserve a real pre-revocation receipt. Neither cached naming nor
+          // authorship authorizes new admission or publication after suspension.
           await prepareRunPublication(assignment(f), f.remoteUrl)
           await workspacePool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2', [workspaceId, f.userId])
         }
@@ -292,39 +293,42 @@ test('run result publication commits one owner-scoped result through retries and
         await listArtifacts(f.userId)
         const searched = await measured(search)
         const artifacts = await measured(() => listArtifacts(f.userId))
-        const client = await pool.connect()
-        const cloud = () => admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, now: new Date() })
-        try {
-          if (teamState === 'revoked-owner') {
-            const savedReceipt = await receipt(f)
-            let helperReached = false
-            // Cloud's naming helper runs only inside a workspace-authorized
-            // queue operation. Exercise that real membership gate as well as
-            // the standalone publication boundary, including a frozen receipt.
-            const gatedCloud = () => withRunWorkspace(f.userId, workspaceId, () => {
-              helperReached = true
-              return cloud()
-            })
-            const admitted = await measured(gatedCloud)
-            const prepared = await measured(async () => {
-              await assert.rejects(() => prepareRunPublication(assignment(f), f.remoteUrl),
-                (error: unknown) => error instanceof PublicationError && error.code === 'issue_unavailable')
-              return { error: 'issue_unavailable' }
-            })
-            const frozen = await measured(gatedCloud)
-            const sample = { body, teamState, search: readMetrics(searched), artifacts: readMetrics(artifacts), cloud: readMetrics(admitted), publication: readMetrics(prepared), frozen: readMetrics(frozen) }
-            samples.push(sample)
-            t.diagnostic(JSON.stringify({ event: 'identifier_transport_matrix', ...sample }))
-            assert.deepEqual(searched.value.items, [])
-            assert.deepEqual(artifacts.value, [])
-            assert.equal(admitted.value, null)
-            assert.equal(frozen.value, null)
-            assert.equal(helperReached, false, 'revoked membership cannot reach cloud admission')
-            assert.deepEqual(await receipt(f), savedReceipt, 'revocation leaves the old receipt unchanged')
-            assert.deepEqual(await counts(f), { versions: 0, events: 0 })
-            assert.doesNotMatch(JSON.stringify([searched.value, artifacts.value]), /MTRTEAM-|prefixInput|__mikkaIdentifierPrefix|@example\.invalid/)
-            continue
+        if (teamState === 'revoked-owner') {
+          const before = { task: await task(f), receipt: await receipt(f), counts: await counts(f) }
+          let admissions = 0
+          const cloudAdmission = async () => {
+            admissions++
+            const client = await pool.connect()
+            try {
+              await client.query('BEGIN')
+              return await admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, workspaceId, now: new Date() })
+            } finally { await client.query('ROLLBACK'); client.release() }
           }
+          const guardedCloud = () => withTaskWorkspace(f.userId, workspaceId, cloudAdmission)
+          assert.equal(await withRunWorkspace(f.userId, workspaceId, cloudAdmission), null, 'the normal Run boundary denies revoked membership before APP admission')
+          const deniedCloud = async () => {
+            await assert.rejects(guardedCloud, error => error instanceof ActionFailureError && error.code === 'workspaceAccessDenied')
+            return { error: 'workspaceAccessDenied' }
+          }
+          const admitted = await measured(deniedCloud)
+          const prepared = await measured(async () => {
+            await assert.rejects(() => prepareRunPublication(assignment(f), f.remoteUrl), error => error instanceof PublicationError && error.code === 'issue_unavailable')
+            return { error: 'issue_unavailable' }
+          })
+          const frozen = await measured(deniedCloud)
+          const sample = { body, teamState, search: readMetrics(searched), artifacts: readMetrics(artifacts), cloud: readMetrics(admitted), publication: readMetrics(prepared), frozen: readMetrics(frozen) }
+          samples.push(sample)
+          t.diagnostic(JSON.stringify({ event: 'identifier_transport_matrix', ...sample }))
+          assert.deepEqual(searched.value.items, [])
+          assert.deepEqual(artifacts.value, [])
+          assert.equal(admissions, 0, 'current Workspace denial occurs before the APP admission transaction')
+          assert.deepEqual({ task: await task(f), receipt: await receipt(f), counts: await counts(f) }, before, 'denial does not rewrite the Task, its frozen publication or history')
+          assert.doesNotMatch(JSON.stringify([searched.value, artifacts.value]), /prefixInput|__mikkaIdentifierPrefix|@example\.invalid/)
+          continue
+        }
+        const client = await pool.connect()
+        const cloud = () => admitCloudPush(client, { userId: f.userId, issueId: f.issueId, agentId: f.agentId, deviceId: f.deviceId, deviceRepoId: f.repoId, workspaceId, now: new Date() })
+        try {
           await client.query('BEGIN')
           const admitted = await measured(cloud)
           await client.query('COMMIT')
@@ -377,6 +381,94 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal((await event(f)).payload.summary, report.summary)
       assert.equal((await counts(f)).events, 1)
       assert.equal(await receipt(f), undefined)
+    })
+
+    for (const outcome of ['ready', 'failed'] as const) await t.test(`completion waits for its recording to become ${outcome} before the Factory evidence gate`, async () => {
+      const captures = await import('../lib/captures/store')
+      const { screenCaptures } = await import('../lib/captures/screen')
+      const { createFactoryStore } = await import('../lib/factory/store')
+      const f = await fixture({ approved: true }), stranger = await fixture()
+      const sessionId = randomUUID(), entered = deferred(), release = deferred()
+      await pool.query('UPDATE agent_runs SET "sessionId"=$2,"startedAt"=clock_timestamp() WHERE id=$1', [f.runId, sessionId])
+      await prepareRunPublication(assignment(f), f.remoteUrl)
+      const slot = await captures.openRecording({ userId: f.userId, runId: f.runId, issueId: f.issueId, botId: null },
+        { title: 'Synthetic completion-order recording', display: 1, stopsAt: new Date(Date.now() + 60_000) })
+      assert.ok(slot)
+      await captures.markRecordingStarted(slot.id)
+      const bytes = await readFile(new URL('./fixtures/factory-visual-evidence.mp4', import.meta.url))
+      const originalStop = screenCaptures.stopRunRecordings
+      let stops = 0, pending: ReturnType<typeof persistRunCompletion> | undefined
+      screenCaptures.stopRunRecordings = async runIds => {
+        assert.deepEqual(runIds, [f.runId])
+        stops++
+        const recording = await captures.currentRecording(f.runId)
+        assert.ok(recording)
+        const result = await captures.withRecordingFinalization(recording, async current => {
+          entered.resolve()
+          await release.promise
+          if (outcome === 'failed') throw new Error('Synthetic recording finalization failure')
+          return captures.finishRecording(current, { bytes, durationMs: 200, steps: [] })
+        })
+        assert.equal('error' in result, outcome === 'failed')
+      }
+      try {
+        assert.equal(await persistRunCompletion(stranger.userId, f.runId, completion(f)), null)
+        assert.equal(await persistRunCompletion(f.userId, f.runId, completion(f), stranger.deviceId), null)
+        assert.equal(stops, 0, 'wrong owner or device cannot stop the recording')
+        pending = persistRunCompletion(f.userId, f.runId, completion(f), f.deviceId)
+        await Promise.race([entered.promise, pending.then(() => { throw new Error('Completion escaped before recording finalization') })])
+        assert.deepEqual((await pool.query('SELECT status,report,"finishedAt" FROM agent_runs WHERE id=$1', [f.runId])).rows[0],
+          { status: 'running', report: null, finishedAt: null })
+        assert.deepEqual(await counts(f), { versions: 0, events: 0 }, 'terminal effects do not race an unfinished recording')
+        assert.equal((await receipt(f)).status, 'assigned')
+        assert.equal((await pool.query('SELECT "revokedAt" FROM run_tokens WHERE "runId"=$1', [f.runId])).rows.every(row => row.revokedAt === null), true)
+        release.resolve()
+        assert.equal((await pending)?.publicationPending, true)
+        assert.equal(stops, 1)
+      } finally {
+        release.resolve()
+        try { await pending } finally { screenCaptures.stopRunRecordings = originalStop }
+      }
+      const saved = (await pool.query(`SELECT c.status,c."updatedAt"<=r."finishedAt" AS "finishedBeforeRun"
+        FROM run_captures c JOIN agent_runs r ON r.id=c."runId" WHERE c.id=$1`, [slot.id])).rows[0]
+      assert.deepEqual(saved, { status: outcome, finishedBeforeRun: true })
+      const stored = await captures.readCapture(f.userId, slot.id)
+      if (outcome === 'ready') { assert.ok(stored); assert.deepEqual(Buffer.from(stored.bytes), bytes) }
+      else assert.equal(stored, null, 'failed finalization is never a readable visual capture')
+
+      // Bind the terminal producer to a real Factory candidate after completion,
+      // as the publication fixtures below do. This keeps the test free of queue
+      // adapters while exercising the production transactional evidence gate.
+      const taskId = randomUUID(), attemptId = randomUUID(), candidateId = randomUUID(), sourceEventId = randomUUID()
+      const environment = `device:${f.deviceId}`
+      const tx = await pool.connect()
+      try {
+        await tx.query('BEGIN')
+        await tx.query(`INSERT INTO coordinator_events(id,"userId","issueId",kind,"dedupeKey",payload)
+          VALUES($1::uuid,$2,$3,'user_message',$1::text,'{"text":"Synthetic recording-order task"}')`, [sourceEventId, f.userId, f.issueId])
+        await tx.query(`INSERT INTO factory_tasks(id,"userId","workspaceId","issueId","sourceEventId",route,stage,status,"attemptId",reason)
+          VALUES($1,$2,$3,$4,$5,'{"flowVersion":2}','execute','running',$6,'Recording-order fixture')`,
+          [taskId, f.userId, f.workspaceId, f.issueId, sourceEventId, attemptId])
+        await tx.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId")
+          VALUES($1,$2,$3,$4,$5,$6,$7)`, [candidateId, taskId, 'a'.repeat(40), f.remoteKey, environment, `issue:${f.issueId}`, f.runId])
+        await tx.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"candidateId","runId","sessionId",reason)
+          VALUES($1,$2,'execute',1,1,'running',$3,$4,$5,'Recording-order fixture')`, [attemptId, taskId, candidateId, f.runId, sessionId])
+        await tx.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1', [taskId, candidateId])
+        await tx.query('COMMIT')
+      } catch (error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+      const store = createFactoryStore(pool, async (userId, issueId, client) =>
+        (await client.query('SELECT id FROM issues WHERE id=$1 AND "userId"=$2', [issueId, userId])).rowCount === 1, null, {})
+      const before = await store.read(f.userId, taskId)
+      const result = await store.apply(f.userId, { taskId, revision: before.task.revision }, randomUUID(), {
+        action: 'finish', status: 'passed', reason: 'Evaluate persisted producer after recording finalization',
+        evidence: [{ artifact: `run-report:${f.runId}`, kind: 'report', runId: f.runId, sessionId, candidateId,
+          sha: 'a'.repeat(40), environment, recordedAt: new Date().toISOString() }], output: { runId: f.runId },
+      })
+      assert.equal(result.task.stage, 'execute')
+      assert.equal(result.task.status, outcome === 'ready' ? 'passed' : 'blocked')
+      assert.equal(result.refusal?.code, outcome === 'failed' ? 'factory_visual_evidence_required' : undefined)
+      assert.equal((await store.read(f.userId, taskId)).task.status, result.task.status, 'the gate outcome commits durably')
+      assert.equal(result.attempts.some(attempt => attempt.stage === 'approval'), false)
     })
 
     await t.test('concurrent completions and workers create one PR, one history row, and one chat event', async () => {
@@ -436,6 +528,70 @@ test('run result publication commits one owner-scoped result through retries and
       assert.equal((await event(f)).payload.summary, 'Verified redirect fix')
       assert.deepEqual(await counts(f), { versions: 1, events: 1 })
       assert.equal(opened, 1)
+    })
+
+    await t.test('Factory publication requires and preserves the exact public capture receipt acknowledged by GitHub', async () => {
+      const savedOrigin = process.env.BETTER_AUTH_URL
+      process.env.BETTER_AUTH_URL = 'https://publication.example.invalid'
+      try {
+        const videoBytes=await readFile(new URL('./fixtures/factory-visual-evidence.mp4',import.meta.url))
+        // Install completed host bindings after terminal persistence to isolate
+        // publication from the separately tested completion/review reconciler.
+        const ready = async (safe: boolean) => {
+          const f = await fixture({approved:true}), captureId=randomUUID()
+          const taskId=randomUUID(), candidateId=randomUUID(), attemptId=randomUUID()
+          const result=completion(f)
+          if (safe) result.report!.visualEvidence=[{captureId,publicSafe:true}]
+          await prepareRunPublication(assignment(f),f.remoteUrl)
+          assert.equal((await persistRunCompletion(f.userId,f.runId,result))?.publicationPending,true)
+          const bytes=videoBytes // Playable fixture media, not an observation of a live task.
+          const tx=await pool.connect()
+          try {
+            await tx.query('BEGIN')
+            await tx.query(`INSERT INTO factory_tasks(id,"userId","issueId","sourceEventId",route,stage,status,"attemptId",reason) VALUES($1,$2,$3,$4,'{"flowVersion":2}','execute','passed',$5,'Completed execution')`,[taskId,f.userId,f.issueId,randomUUID(),attemptId])
+            await tx.query(`INSERT INTO factory_candidates(id,"taskId",sha,repository,environment,scope,"runId") VALUES($1,$2,$3,$4,'fixture','fixture',$5)`,[candidateId,taskId,'a'.repeat(40),f.remoteKey,f.runId])
+            await tx.query(`INSERT INTO factory_attempts(id,"taskId",stage,ordinal,position,status,"candidateId","runId",reason) VALUES($1,$2,'execute',1,1,'passed',$3,$4,'Completed execution')`,[attemptId,taskId,candidateId,f.runId])
+            await tx.query('UPDATE factory_tasks SET "candidateId"=$2 WHERE id=$1',[taskId,candidateId])
+            await tx.query(`INSERT INTO run_captures(id,"userId","runId","issueId",kind,"contentType",source,status,title,"storageKey","inlineContent",size,sha256,"durationMs")
+              VALUES($1,$2,$3,$4,'video','video/mp4','local','ready','Terminal request',$5,$6,$7,$8,200)`,
+            [captureId,f.userId,f.runId,f.issueId,`fixture/${captureId}.mp4`,bytes,bytes.length,createHash('sha256').update(bytes).digest('hex')])
+            await tx.query('COMMIT')
+          } catch(error) { await tx.query('ROLLBACK'); throw error } finally { tx.release() }
+          return {...f,captureId,taskId,candidateId}
+        }
+        const noConsent=await ready(false)
+        assert.deepEqual(await publishRunResult(noConsent.runId,async()=>{throw new Error('Private evidence must not reach GitHub')}),{done:true})
+        assert.equal((await receipt(noConsent)).errorCode,'factory_public_evidence_required')
+        assert.equal((await receipt(noConsent)).status,'blocked')
+        assert.equal((await pool.query('SELECT count(*) FROM run_capture_shares WHERE "captureId"=$1',[noConsent.captureId])).rows[0].count,'0')
+
+        const good=await ready(true)
+        let digest='', publicUrl='', writes=0
+        assert.deepEqual(await publishRunResult(good.runId,async input=>{
+          assert.equal(input.visualEvidence?.candidateId,good.candidateId)
+          assert.equal(input.visualEvidence?.runId,good.runId)
+          assert.equal(input.visualEvidence?.captures[0].captureId,good.captureId)
+          digest=input.visualEvidence!.digest
+          publicUrl=input.visualEvidence!.captures[0].url
+          assert.match(publicUrl,/^https:\/\/publication\.example\.invalid\/(?:[\w-]+\/)*api\/captures\/shared\/mkc_/)
+          return input.withWrite!(async()=>{writes++;return {...prFor(good),evidenceDigest:digest}})
+        }),{done:true})
+        assert.equal(writes,1)
+        assert.equal((await receipt(good)).status,'published')
+        assert.equal((await receipt(good)).pullRequest.evidenceDigest,digest)
+        const saved=(await pool.query(`SELECT result FROM factory_events WHERE "taskId"=$1 AND request->>'kind'='pr_visual_evidence'`,[good.taskId])).rows[0].result
+        assert.equal(saved.captures[0].url,publicUrl)
+        assert.equal(saved.digest,digest)
+        assert.deepEqual(await publishRunResult(good.runId,async()=>{throw new Error('Published replay must not open another PR')}),{done:true})
+
+        const unacknowledged=await ready(true)
+        assert.deepEqual(await publishRunResult(unacknowledged.runId,async()=>prFor(unacknowledged)),{done:true})
+        assert.equal((await receipt(unacknowledged)).status,'blocked')
+        assert.equal((await receipt(unacknowledged)).errorCode,'factory_public_evidence_required')
+        assert.equal((await receipt(unacknowledged)).pullRequest,null)
+      } finally {
+        if (savedOrigin===undefined) delete process.env.BETTER_AUTH_URL; else process.env.BETTER_AUTH_URL=savedOrigin
+      }
     })
 
     await t.test('unverified submissions request a draft and report their real verification state', async () => {
@@ -770,8 +926,7 @@ test('run result publication commits one owner-scoped result through retries and
     })
 
     await t.test('Plugins › GitHub settings gate nothing: a stored deny or ask still opens the pull request with no card', async () => {
-      const { readGitHubPermissions, setGitHubPermissions } = await import('../lib/github/plugin-permissions')
-      // The runs here name no bot; they are the personal workspace's Coordinator's, whose settings these are.
+      // The runs here name no bot; they are the personal workspace's Coordinator's.
       const home = async (userId: string) => (await (await import('../lib/coordinator/coordinator-bot')).coordinatorBot(userId, null)).workspaceId
       const ready = async () => {
         const f = await fixture({ approved: true })
@@ -781,11 +936,12 @@ test('run result publication commits one owner-scoped result through retries and
       }
       const cards = async (f: Fixture) => (await pool.query(`select id from pending_actions where "userId"=$1`, [f.userId])).rows
 
-      // The stored values stay readable and writable (history), and gate nothing.
+      // A legacy per-Bot deny and a workspace deny are both ignored.
       const denied = await ready()
-      await setGitHubPermissions(pool, denied.userId, await home(denied.userId), { version: '0:0', pullRequest: 'deny' })
-      assert.equal((await readGitHubPermissions(pool, denied.userId, await home(denied.userId))).pullRequest, 'deny')
+      await pool.query(`update agent_kit_heads set external_write_permissions=jsonb_set(coalesce(external_write_permissions,'{}'::jsonb),'{github_pull_request}','"deny"') where owner_id=$1`, [denied.userId])
       await pool.query(`update agent_kit_heads set cli_run_policy=jsonb_set(coalesce(cli_run_policy,'{}'::jsonb),'{permissions}','{"git_push":"deny"}') where owner_id=$1`, [denied.userId])
+      await pool.query(`insert into workspace_computer_policies ("workspaceId",permission,external_write_permissions,external_write_policy_version) values ($1,'allow','{"github":"deny"}',1)
+        on conflict ("workspaceId") do update set external_write_permissions=excluded.external_write_permissions`, [await home(denied.userId)])
       let opened = 0
       assert.deepEqual(await publishRunResult(denied.runId, async () => { opened++; return prFor(denied) }), { done: true })
       assert.equal(opened, 1)
@@ -793,7 +949,6 @@ test('run result publication commits one owner-scoped result through retries and
       assert.deepEqual(await cards(denied), [])
 
       const legacy = await ready()
-      await setGitHubPermissions(pool, legacy.userId, await home(legacy.userId), { version: '0:0', pullRequest: 'allow' })
       await pool.query(`update agent_kit_heads set external_write_permissions=jsonb_set(coalesce(external_write_permissions,'{}'::jsonb),'{github_pull_request}','"ask"') where owner_id=$1`, [legacy.userId])
       assert.deepEqual(await publishRunResult(legacy.runId, async () => prFor(legacy)), { done: true })
       assert.equal((await receipt(legacy)).status, 'published')
@@ -805,5 +960,8 @@ test('run result publication commits one owner-scoped result through retries and
     await pool.end()
     const workspacePool = (globalThis as { workspacePool?: { end(): Promise<void> } }).workspacePool
     if (workspacePool) await workspacePool.end()
+    // Community live notifications can open a dedicated LISTEN connection outside both pools.
+    const { builtinGateway } = await import('../lib/builtin-gateway/runtime')
+    await builtinGateway()?.stop()
   }
 })

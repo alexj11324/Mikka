@@ -3,8 +3,6 @@ import { z } from 'zod'
 import { auth } from '@/lib/auth'
 import { WorkspaceError } from '@/lib/workspace-access'
 import { auditRetentionInput, configureAuditRetention, readAuditRetention } from '@/lib/audit/retention'
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 type Context = { params: Promise<{ workspaceId: string }> }
 const headers = { 'cache-control': 'private, no-store' }
 async function access(request: Request, context: Context) {

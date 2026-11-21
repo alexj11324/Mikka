@@ -7,7 +7,6 @@ import { workspacePool } from '@/lib/workspace-db'
 import { discoverRunWorktree } from '@/lib/coding-workspace/identity'
 import { workspaceErrorStatus, workspaceSessionStillValid } from '@/lib/coding-workspace/http'
 
-export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 
 export async function GET(request: Request, context: { params: Promise<{ runId: string }> }) {

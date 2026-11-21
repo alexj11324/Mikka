@@ -8,13 +8,6 @@ import { safeErrorAttributes } from '@mikka/protocol/tracing'
 // (which the db_sample log line also reads) remains.
 
 export type JobKind = 'background' | 'workflow' | 'cron'
-export type JobOptions = {
-  /**
-   * A deferred operation has its own lifetime and route label. Its parent may
-   * already have ended; W3C ancestry still joins the same end-to-end trace.
-   */
-  detach?: boolean
-}
 
 const isThenable = (value: unknown): value is PromiseLike<unknown> => typeof (value as { then?: unknown } | null)?.then === 'function'
 
@@ -28,7 +21,7 @@ const isThenable = (value: unknown): value is PromiseLike<unknown> => typeof (va
  * with no valid context creates a root. Its independent route label keeps
  * database attribution correct without splitting the run into several traces.
  */
-export function runJob<T>(route: string, kind: JobKind, work: () => T, _options: JobOptions = {}): T {
+export function runJob<T>(route: string, kind: JobKind, work: () => T): T {
   let span: Span | undefined
   let scope = context.active()
   try {

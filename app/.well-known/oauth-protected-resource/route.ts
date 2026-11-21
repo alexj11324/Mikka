@@ -6,7 +6,7 @@ import { appOrigin, MCP_SCOPE } from '@/lib/mcp/resource'
  * RFC 9728 metadata for the MCP server at /api/mcp: which authorization
  * server signs agents in. The MCP server's 401 points here; the RFC's
  * root path (/.well-known/oauth-protected-resource/mikka/api/mcp) is
- * redirected here in next.config.mjs.
+ * redirected here by apps/api/runtime/http-policy.mjs.
  */
 export function GET(request: Request) {
   const origin = appOrigin ?? getPublicOrigin(request)

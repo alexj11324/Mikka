@@ -1,7 +1,7 @@
 'use server'
 
 import { withFreshSession } from '@/lib/fresh-session'
-import { cookies, headers } from 'next/headers'
+import { cookies, headers } from '@/lib/server-runtime/headers'
 import type { ActionResult } from '@/lib/action-result'
 import { auditRequestContext } from '@/lib/audit/record'
 import { workspaceAction } from '@/lib/workspace-admin/action'

@@ -4,6 +4,7 @@ import { link, mkdir, readFile, unlink, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Pool } from 'pg'
+import { sessionDatabaseURL } from './postgres-connection.mjs'
 
 const generatedKeys = ['BETTER_AUTH_SECRET', 'WORKSPACE_SECRETS_KEY', 'CREDENTIAL_MASTER_KEY', 'DEVICE_GATEWAY_PUSH_SECRET', 'CRON_SECRET']
 
@@ -47,7 +48,6 @@ export function selfHostedEnvironment(env, root) {
   env.DATABASE_URL ||= env.MIKKA_DATABASE_URL
   if (!env.MIKKA_DATABASE_URL || !env.DATABASE_URL) throw new Error('SELF_HOSTED_DATABASE_REQUIRED')
   env.WORKFLOW_TARGET_WORLD ||= 'local'
-  if (env.WORKFLOW_TARGET_WORLD !== 'local') throw new Error('SELF_HOSTED_LOCAL_WORKFLOW_REQUIRED')
   env.MIKKA_DATA_DIR ||= join(root, 'data')
   env.WORKFLOW_LOCAL_DATA_DIR ||= join(env.MIKKA_DATA_DIR, 'workflow')
   // Nitro mounts the SDK consumers at the origin root, outside /mikka.
@@ -56,10 +56,18 @@ export function selfHostedEnvironment(env, root) {
   return env
 }
 
+/** Startup's cross-replica migration advisory lock owns a PostgreSQL session.
+ * PgBouncer transaction pooling cannot preserve that session; use the
+ * explicitly configured unpooled endpoint, or Neon's verified direct host.
+ * Do not mutate the pooled URL used by normal application queries. */
+export function migrationLockConnectionString(env) {
+  return sessionDatabaseURL(env.MIKKA_DATABASE_URL, env)
+}
+
 async function migrate(root, env) {
   // One startup owns DDL, including the two logical databases, while another
   // replica waits. The lock belongs to this connection and dies with it.
-  const pool = new Pool({ connectionString: env.MIKKA_DATABASE_URL, max: 1, connectionTimeoutMillis: 10_000 })
+  const pool = new Pool({ connectionString: migrationLockConnectionString(env), max: 1, connectionTimeoutMillis: 10_000 })
   const connection = await pool.connect()
   try {
     await connection.query("SET lock_timeout = '120s'")
@@ -78,7 +86,7 @@ async function migrate(root, env) {
 }
 
 export async function startSelfHosted(root = process.cwd(), env = process.env) {
-  if (!process.version.startsWith('v24.')) throw new Error('SELF_HOSTED_NODE24_REQUIRED')
+  if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('SELF_HOSTED_NODE22_REQUIRED')
   selfHostedEnvironment(env, root)
   await installationSecrets(env.MIKKA_DATA_DIR, env)
   await mkdir(env.WORKFLOW_LOCAL_DATA_DIR, { recursive: true, mode: 0o700 })

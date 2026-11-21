@@ -6,7 +6,7 @@ import { pageNeedsRefresh } from '@/lib/app-build'
 import { PersistentReadCache, waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import { isAutoRetryable, MAX_READ_RETRIES, retryRead } from '@/lib/swr/retry'
 import { liveKeyConnection } from '@/lib/swr/live-focus'
-import { acceptSWRRead, failSWRRead, observeSWRRead } from '@/lib/swr/read-observer'
+import { acceptSWRRead, failSWRRead, isSnapshotReadFetcher, observeSWRRead } from '@/lib/swr/read-observer'
 
 /** Data younger than this is fresh: focus leaves it alone. A hook may set a longer `focusThrottleInterval`. */
 export const FRESH_FOR_MS = 5 * 60_000
@@ -34,9 +34,10 @@ export const staleOnFocus: Middleware = useSWRNext => (key, fetcher, config) => 
   const cache = (config as { cache?: { get(key: string): { data?: unknown; error?: unknown } | undefined } }).cache
   const resumeAfterHydration = Boolean(fetcher) && config.revalidateOnMount !== false
   const stamped = fetcher && id && cache
-    ? (...args: unknown[]) => observeSWRRead(cache, id, async () => {
+    ? (...args: unknown[]) => observeSWRRead(cache, id, async withDispatch => {
       await waitForCacheHydration(cache)
-      const result = await (fetcher as (...input: unknown[]) => unknown)(...args)
+      const run = () => (fetcher as (...input: unknown[]) => unknown)(...args)
+      const result = await (isSnapshotReadFetcher(fetcher) ? withDispatch(run) : run())
       stamps(cache).set(id, Date.now())
       return result
     })

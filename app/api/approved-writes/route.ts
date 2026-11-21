@@ -2,8 +2,6 @@ import { createPersonalWriteRoute } from '@/lib/operations/write-route'
 
 import { personalWritesEnabled } from '@/lib/operations/write-feature'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 
 /** Public availability only. Never initializes auth, database or provider services. */
 export function GET() {

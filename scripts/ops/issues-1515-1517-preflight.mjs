@@ -1,3 +1,4 @@
+import { readRendererActions } from '../../lib/renderer-actions.mjs'
 import { createRequire } from 'node:module'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -88,7 +89,7 @@ try {
       const response=await request('/api/auth/get-session');const session=await response.json()
       report.account={status:response.status===200 && session?.user?.email?.toLowerCase()===email.toLowerCase()?'verified':'identity_mismatch'}
       if(report.account.status==='verified') {
-        const manifestResponse=await request('/renderer-manifest.json'),manifest=await manifestResponse.json()
+        const manifestResponse=await readRendererActions(request),manifest=await manifestResponse.json()
         if(!manifestResponse.ok || manifest.version!==1 || manifest.target!=='web' || !Array.isArray(manifest.usedActions)) throw Error('published_rpc_manifest_invalid')
         if(!manifest.usedActions.includes('workspace.switchWorkspace')) throw Error('published_workspace_switch_unavailable')
         const before=await teamJson('/mikka/api/workspace')

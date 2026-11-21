@@ -1,0 +1,12 @@
+{
+  "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "codeTree": "297bb45ee8e60d4e6a29735e5e8e1fceae9d3741",
+  "generatedAt": "2026-11-09T15:40:37.484Z",
+  "boundary": "Curated exact GET media plus four-stage terminal keyframes and independent registration witness. No environment descriptors, auth state, raw server logs, raw video or oversize source.",
+  "textPrivacyCheck": {
+    "textFiles": 32,
+    "knownPrivateValuesChecked": 3,
+    "result": "passed"
+  },
+  "visualReview": "Pending direct frame review; isolated Xvfb shows only scrubbed command output already covered by the text privacy check."
+}

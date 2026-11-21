@@ -2,8 +2,6 @@ import 'server-only'
 import { createHash } from 'node:crypto'
 import { and, eq, sql } from 'drizzle-orm'
 import { workspaceDb } from '@/lib/workspace-db'
-import { pool } from '@/lib/db'
-import { setSubscriptionShare } from '@/lib/personal-policy'
 import { workspaces, workspaceMembers } from '@/lib/db/workspace-schema'
 import { defaultWorkspaceName, type WorkspaceLocale } from '@/lib/workspace-name'
 
@@ -26,15 +24,6 @@ export async function ensurePersonalWorkspace(user: { id: string; email: string;
     await tx.insert(workspaceMembers).values({ workspaceId: id, userId: user.id, email: user.email.toLowerCase(), name: user.name, role: 'admin' }).onConflictDoNothing()
     return id
   })
-  await ensurePersonalShare(user.id, id)
   return id
 }
 
-const shared = new Set<string>()
-/** A personal workspace uses its owner's subscriptions without a share step (decision 2026-10-31-2225). */
-export async function ensurePersonalShare(userId: string, workspaceId: string) {
-  const key = `${userId}:${workspaceId}`
-  if (shared.has(key)) return
-  await setSubscriptionShare(pool, userId, workspaceId, true)
-  shared.add(key)
-}

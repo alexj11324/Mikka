@@ -3,7 +3,9 @@
 Mikka uses pinned Nx Core 24.0.5, Node 24 and pnpm 10.34.3. Nx Cloud and remote
 caching are disabled. The initial implementation does not cache test results:
 real PostgreSQL, credentials, subscriptions, migrations and release acceptance
-must execute. Existing main-only pnpm-store writes are unchanged.
+must execute. Installed dependencies use exact, platform-bound caches with a
+pnpm-store fallback; only main pushes and manual main runs write them. See
+[dependency reuse and scheduling](1765-optimizations.md).
 
 ## Projects and dependencies
 
@@ -25,8 +27,8 @@ imports, so deleting a test cannot remove its enrollment requirement.
 
 | Change | Selection / reason |
 | --- | --- |
-| Mobile-only | Mobile consumers, source policies/typechecks; no unrelated DB, daemon, image or native desktop |
-| Web components/hooks | Import and source-contract consumers plus source policies; no unrelated DB/image |
+| Mobile-only | Mobile consumers, source policies/typechecks; no unrelated DB, daemon or native desktop |
+| Web components/hooks | Import and source-contract consumers plus source policies; no unrelated DB |
 | Daemon | Package and imported consumers, daemon tests, required downstream contracts |
 | API/Factory/Coordinator | Reverse source closure and mapped DB suites; server path without DB proof runs all DB |
 | Protocol/shared, migrations, DB core, permissions, auth | Full validation |
@@ -48,10 +50,21 @@ imports in those scanners. The source job still runs the existing whole-reposito
 frontend source tests; this is deliberate retained coverage, not a performance
 claim.
 
+Site search runs the full root typecheck once through its existing `pnpm build`,
+before compiled HTTP acceptance. Its earlier preparation step retains generated
+route verification and lint. The same build/typecheck remains required on a
+standalone dispatch. Both PostgreSQL 17 services, Better Auth, authorization and
+HTTP assertions retain their independent runtime coverage. The separate Source
+checks job still owns unconditional repository-wide static validation; results
+from a different runner image or Node patch are not treated as identical-input
+cache hits. See the [recorded before sample](2984-site-search-checks.json).
+
 ## Trust and database boundaries
 
-All four consumers (`ui-policy`, `desktop`, `analytics-ssr`, `self-hosted-image`)
-call `ci-selection.yml`. It fetches main and loads `bootstrap.sh` from there.
+CI calls `ci-selection.yml` once, then passes `selected: true` to each selected
+Desktop, Analytics or Image reusable workflow. Those calls skip their duplicate
+selector job. Independent dispatches and Image pushes still call the selector.
+It fetches main and loads `bootstrap.sh` from there.
 The bootstrap archives the immutable PR base (or merge-group base / previous main
 commit) only after proving it belongs to main history; otherwise it uses current
 main policy and forces full validation. An unmerged target branch cannot provide
@@ -60,6 +73,24 @@ The trusted selector parses candidate files as data. It never imports a candidat
 plugin or executes candidate configuration. Forks use the same path without
 secrets. The tested checkout remains GitHub's synthetic merge candidate; the
 classification diff uses the PR base/head SHAs. Unsupported events/ranges run all.
+
+A frozen dependency branch can retain an older command inventory after main's
+registry changes. In the unmerged-base fallback, a candidate with main's complete
+registry keeps the normal main-policy path. For a different registry, the current
+trusted selector proves a unique common ancestor in the fetched main history and
+reads that ancestor's registry as JSON. The base and tested checkout must retain
+its complete CI configuration, manifests, runner and plugin bytes. Test paths and
+Git modes must match, including TypeScript type tests and Go tests; working files
+must match the committed checkout. Existing self-hosted dependency declarations
+cannot be changed or removed; appended declarations still pass the normal
+self-hosted acceptance checks. Same-name test bodies can change as part of the
+reviewed backport. The proof preserves task names, commands, kinds and environments,
+and selects every task in that registry with full validation of all other lanes
+and the entire candidate DB inventory. It never executes the ancestor's selector,
+trusts a branch-name allowlist, drops unknown tasks or converts a failed proof to
+a partial selection. The selection report records the policy, ancestor and registry
+blob identities. The original runner still rejects unknown tasks.
+
 When introducing the selector on a base that predates it, inventory is validated
 with the old trusted runner and every lane runs in full. Candidate shadow reports
 have no job outputs and cannot authorize skips.
@@ -78,7 +109,7 @@ Required status names remain `UI policy (strict)`, `Production build and browser
 interactions`, `Browser tests (before merge)` and external GitGuardian. Gates
 check each selected lane must succeed and each unselected lane must be skipped;
 failure, timeout, cancellation, missing output or unexpected skip cannot pass.
-Selected Docker, Desktop and Analytics PR workflows are reusable jobs of CI and their actual conclusions feed `UI policy (strict)`. They no longer also start a duplicate standalone PR run. Main keeps the existing independent image publication and release entrypoints. No workflow-level path filter is added to required workflows. Main concurrency,
+Selected Analytics runs as a reusable CI job, and its conclusion feeds `UI policy (strict)`. Desktop keeps its separate acceptance workflow. No workflow-level path filter is added to required workflows. Main concurrency,
 OIDC, daemon/Desktop exact-source CI gates, E2B release pairs and publication
 checks are unchanged. Existing browser-gate remains a compatibility status only;
 this change adds no browser tests.
@@ -98,7 +129,20 @@ CI_TIMINGS_FILE=/tmp/timings.json node scripts/ci/timings.mjs RUN_ID_1 RUN_ID_2
 ```
 
 CI prints areas, reasons, Nx affected projects/commands, suites and shard matrix.
-The stable gates record the final selected-job conclusion plus actual completed job durations from one read-only Actions API request. The timing summary labels partial runner consumption while other gates/jobs are still running; API failures explicitly leave timing unavailable, without replacing enforcement. Job/step timestamps
+The stable gates record the final selected-job conclusion plus completed job
+durations from read-only Actions metadata. Each gate reads its own
+`GITHUB_RUN_ATTEMPT`; the collector reads the latest attempt and paginates that
+attempt's jobs. Both use the attempt endpoint's `created_at` for elapsed and
+initial queue time. The receipt keeps the original run's `run_created_at` and
+`run_lifetime_seconds` separately, including earlier attempts and time before a
+retry. Per-job queue time starts at that job's `created_at`, excluding dependency
+wait. A successful job retained by a failed-job retry keeps its original
+timestamps and `retained_seconds`, with zero new execution and no new queue time.
+Only jobs executed in the measured attempt contribute to runner-minutes.
+
+The timing summary labels partial runner consumption while other gates/jobs are
+still running; API failures explicitly leave timing unavailable, without
+replacing enforcement. Job/step timestamps
 are available through the timing collector; [#1699's evidence](1699-results.md)
 separates waiting from runner consumption. `workflow_dispatch` and Monday 03:23
 UTC run the full CI even without source changes.

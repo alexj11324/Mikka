@@ -6,7 +6,10 @@ const CODES = new Set(['missing', 'missing_field', 'invalid', 'already_exists', 
 /** Preserve GitHub's bounded validation fields, never response text or values. */
 export function githubEvidenceFailure(body, headers) {
   const message = typeof body?.message === 'string' ? body.message : ''
-  const category = /(?:secondary |API )?rate limit|spammed/i.test(message) ? 'rate_limited'
+  const referenceExists = /^Reference already exists\.?$/i.test(message) || (Array.isArray(body?.errors) && body.errors.some(
+    error => error?.resource === 'Reference' && error.field === 'ref' && error.code === 'already_exists'))
+  const category = referenceExists ? 'reference_exists'
+    : /(?:secondary |API )?rate limit|spammed/i.test(message) ? 'rate_limited'
     : /^Validation Failed\b/i.test(message) ? 'validation_failed'
       : /(?:tree|commit|blob|object).*(?:not found|does not exist)/i.test(message) ? 'object_missing'
         : /(?:author|committer).*(?:invalid|missing)/i.test(message) ? 'identity_invalid' : 'unknown'

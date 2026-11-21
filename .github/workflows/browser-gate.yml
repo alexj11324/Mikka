@@ -7,9 +7,16 @@ name: Browser gate
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
+
+# Keep each pull request or merge group independent; cancel obsolete runs only.
+concurrency:
+  group: browser-gate-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   browser-e2e:

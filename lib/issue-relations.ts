@@ -1,4 +1,25 @@
 import type { JSONContent } from '@tiptap/core'
+import type { IssueMetadata } from './issue-metadata'
+
+export type TaskRelationKind = 'child' | 'parent' | 'blockedBy' | 'blocks' | 'duplicate' | 'related'
+type RelationTask = { id: string; status: string; metadata: Pick<IssueMetadata, 'parentId' | 'duplicateOfId' | 'blockedByIds' | 'relatedIds'> }
+export const closedRelationStatus = (status: string) => ['done', 'canceled', 'duplicate'].includes(status)
+
+/** Group an already authorized relation for display. A resolved block remains a related task. */
+export function taskRelationKinds(task: RelationTask, row: RelationTask): TaskRelationKind[] {
+  const kinds: TaskRelationKind[] = []
+  if (task.id === row.id) return kinds
+  if (row.metadata.parentId === task.id) kinds.push('child')
+  if (task.metadata.parentId === row.id) kinds.push('parent')
+  if (task.metadata.duplicateOfId === row.id) kinds.push('duplicate')
+  const blockedBy = task.metadata.blockedByIds.includes(row.id)
+  const blocks = row.metadata.blockedByIds.includes(task.id)
+  if (blockedBy && !closedRelationStatus(row.status)) kinds.push('blockedBy')
+  if (blocks && !closedRelationStatus(task.status)) kinds.push('blocks')
+  if (task.metadata.relatedIds.includes(row.id) || row.metadata.relatedIds.includes(task.id)
+    || (blockedBy && closedRelationStatus(row.status)) || (blocks && closedRelationStatus(task.status))) kinds.push('related')
+  return kinds
+}
 
 export function createsIssueCycle(id: string, targets: string[], graph: Map<string, string[]>) {
   const seen = new Set<string>()

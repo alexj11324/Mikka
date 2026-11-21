@@ -1,5 +1,4 @@
-// What 设置 › 连接's list receives (docs/ui-overlay.md), and what an app's own page (`&app=`, the optional
-// AppPage, on 插件 and 设置 › 连接) receives. The page reads and acts through useConnectedAppPage, useGitHubPlugin
+// The official Connections list and the app page shared by Plugins and Settings. The page reads and acts through useConnectedAppPage, useGitHubPlugin
 // (with useGitHubAppSetup and useRepositoryVerification), useLinearPlugin and useTelegramPlugin.
 import type { ConnectedApps } from '@/components/plugins/connected-apps'
 import type { OwnAppsRead } from '@/components/plugins/connected-list'

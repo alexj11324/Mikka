@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import { ARTIFACT_CLEANUP_SQL, ORDINARY_CLEANUP_SQL } from './subscription-cleanup-sql.mjs'
 
 // These are reservations that have never acquired an account. Every credential
 // reference (including staging) and every binding is evidence to preserve it.
@@ -18,6 +19,7 @@ const EXPIRABLE_CONNECTION_SQL = `c."removedAt" IS NULL AND (
           AND connected.provider=c.provider
           AND connected.state='connected' AND connected."removedAt" IS NULL
           AND connected."updatedAt">c."updatedAt"))))
+  AND ${ORDINARY_CLEANUP_SQL}
   AND NOT EXISTS (SELECT 1 FROM byos_oauth_attempts attempt WHERE attempt."connectionId"=c.id
     AND attempt."consumedAt" IS NULL AND attempt."expiresAt">now())
   AND NOT EXISTS (SELECT 1 FROM byos_enrollment_transfers transfer
@@ -60,7 +62,13 @@ export async function expireSubscriptionAcquisitions(pool: Pick<Pool, 'query'>, 
 }
 
 /** Secret artifacts and enrollment sources the cleanup worker still has to delete (connectionId, last attempt). */
-export const CLEANUP_DUE_SQL = `select a."connectionId",a."deletingAt" as attempted from byos_secret_artifacts a join byos_connections c on c.id=a."connectionId" where a."deletedAt" is null and (a."publishedAt" is not null or a."notBefore"<=now()) and a.name not in (coalesce(c."secretName",''),coalesce(c."accessSecretName",''),coalesce(c."stagedSecretName",''),coalesce(c."stagedAccessName",'')) union all select a."connectionId",a."lastAttemptAt" from byos_enrollment_sources a join byos_enrollment_transfers t on t."enrollmentId"=a."enrollmentId" join byos_connections c on c.id=a."connectionId" where a."deletedAt" is null and (t."canonicalPublishedAt" is not null or t."boundAt" is not null or c.epoch>t.epoch)`
+export const CLEANUP_DUE_SQL = `SELECT a."connectionId",a."deletingAt" AS attempted
+  ${ARTIFACT_CLEANUP_SQL}
+  UNION ALL SELECT a."connectionId",a."lastAttemptAt"
+  FROM byos_enrollment_sources a JOIN byos_enrollment_transfers t ON t."enrollmentId"=a."enrollmentId"
+    JOIN byos_connections c ON c.id=a."connectionId"
+  WHERE a."deletedAt" IS NULL AND (t."canonicalPublishedAt" IS NOT NULL OR t."boundAt" IS NOT NULL OR c.epoch>t.epoch)
+    AND ${ORDINARY_CLEANUP_SQL}`
 
 /** One statement: whether the hourly cleanup has anything to do (#1371): an abandoned sign-in that
  * expireSubscriptionAcquisitions would expire, or an artifact still to delete. An idle hour costs only this. */

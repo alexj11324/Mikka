@@ -4,8 +4,7 @@
 # Also a symlink of that name (a link is not a directory, so the slash form misses it).
 node_modules
 
-# next.js
-/.next/
+# build output
 /.output/
 /apps/frontend/dist/
 /apps/api/generated/spa.ts
@@ -37,7 +36,6 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
 # browser test artifacts
 /playwright-report/
@@ -77,3 +75,20 @@ next-env.d.ts
 
 # Nx Core local graph/task state
 .nx/
+
+# eve compiler, durable local storage and standalone service output.
+/apps/eve/.eve/
+/apps/eve/.output/
+/apps/eve/.vercel/
+
+# Temporary standalone typecheck inputs and compiler artifacts.
+/.cache/typecheck/
+
+# Native Eve session data for the default self-hosted service.
+/.cache/eve-workflow/
+
+# Cloudflare build receipts and release artifacts.
+/.cloudflare-ci/
+/.mikka-cloud/
+/.mikka-web/
+/.cloudflare-marketing/

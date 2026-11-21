@@ -10,7 +10,7 @@ import { createFactoryApprovals, deferPublication, markPublicationSucceeded, res
 import { handleFactoryApproval } from './approval-http';
 import { PublicationDeferred } from './publication-operation';
 import { FactoryError } from './approval-contract';
-import { dropTestDatabase } from '../../tests/support/drop-test-database';
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database';
 
 const base = process.env.E2E_DATABASE_URL;
 const required = process.env.REQUIRE_DB === '1' || (process.env.CI === 'true' && process.env.GITHUB_ACTIONS === 'true');
@@ -26,7 +26,7 @@ test('B2/B4: failed publications are terminal and a superseded candidate invalid
   const admin = guarded(base!);
   const name = `fac_x_${randomUUID().replaceAll('-', '')}_e2e`;
   const adminPool = new Pool({ connectionString: admin.toString(), max: 1 });
-  await adminPool.query(`CREATE DATABASE ${name} TEMPLATE template0`);
+  await createTestDatabase(adminPool, name, 'template0');
   const target = new URL(admin.toString()); target.pathname = `/${name}`; guarded(target.toString());
   const pool = new Pool({ connectionString: target.toString(), max: 4 });
   try {
@@ -39,7 +39,7 @@ test('B2/B4: failed publications are terminal and a superseded candidate invalid
     const [deviceId, agentId, issueId, taskId, implAttempt, reviewAttempt, verifyAttempt, implRun, reviewRun, candidateId, approvalId] = Array.from({ length: 11 }, () => randomUUID());
     const sha = 'b'.repeat(40);
     await pool.query(`INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ('owner','O','o@example.invalid',true,now(),now()),('other','X','x@example.invalid',true,now(),now())`);
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,harnesses,"lastSeenAt") VALUES ($1,'owner','Mac','[]',now())`, [deviceId]);
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,harnesses,"lastSeenAt","sessionOpenedAt") VALUES ($1,'owner','Mac','[]',now(),now())`, [deviceId]);
     await pool.query(`INSERT INTO agents (id,"userId",name,harness) VALUES ($1,'owner','Coder','codex')`, [agentId]);
     await pool.query(`INSERT INTO issues (id,"userId",title,content,status,priority,"workspaceId","ownershipState") VALUES ($1,'owner','Fixture','{}','todo','normal',$2,'bound')`, [issueId, await seedFixtureWorkspace(pool, 'owner')]);
     const sourceEventId = randomUUID();

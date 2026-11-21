@@ -20,6 +20,8 @@ export interface MikkaMcpContext {
   handoffFile: string
   capturesDir?: string | null
   captureRoots?: string[]
+  /** The run's pinned Profile Skills manifest, written by the daemon. */
+  profileSkillsDir?: string | null
   repositoryRoot?: string | null
   artifactRoot?: string | null
   factoryVerify?: Record<string, unknown> | null
@@ -37,6 +39,8 @@ export interface MikkaMcpProfile {
   captures?: boolean
   factoryVerify?: boolean
   artifactInspection?: boolean
+  /** Advertise `load_skill`; the bound context must carry profileSkillsDir. */
+  profileSkills?: boolean
 }
 export interface MikkaMcpAuthority {
   signal: AbortSignal

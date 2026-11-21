@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { chatHistoryPath, chatUpdatePath, groupPagePath, mergeChatHistory, mergeChatRead, mergeGroupHistory, mergeGroupRead, olderThrough, type ChatRead, type GroupRead } from '../features/chat/model/chat-pages.ts'
+import { chatHistoryPath, chatUpdatePath, groupPagePath, mergeChatHistory, mergeChatRead, mergeGroupHistory, mergeGroupRead, olderThrough, personalReadback, type ChatRead, type GroupRead } from '../features/chat/model/chat-pages.ts'
 import type { ChatItem, GroupMessage } from '../lib/types.ts'
 
 const item = (position: number, extra: Partial<ChatItem> = {}): ChatItem => ({ id: `m${position}`, position, from: position % 2 ? 'person' : 'coordinator', text: `#${position}`, threads: [], artifacts: [], createdAt: '2026-11-05T00:00:00Z', ...extra })
@@ -59,6 +59,16 @@ const message = (position: number): GroupMessage => ({ id: `g${position}`, conve
 const page = (positions: number[], extra: Partial<GroupRead> = {}): GroupRead => ({ messages: positions.map(message), nextBefore: null, agentStatus: null, routingError: null, ...extra })
 const desc = (from: number, to: number) => range(from, to).reverse()
 
+test('a manual read revision survives an empty named chat and advances without another message', () => {
+  const empty = mergeGroupRead(null, page([], { readRevision: 0 }))
+  assert.equal(empty.readRevision, 0)
+  const first = mergeGroupRead(empty, page([1], { appended: true, readRevision: 1 }))
+  const revised = mergeGroupRead(first, page([], { unchanged: true, readRevision: 2 }))
+  assert.equal(revised.messages[0]?.id, 'g1')
+  assert.equal(revised.readRevision, 2)
+  assert.equal(mergeGroupRead(null, page([])).readRevision, undefined)
+})
+
 test('a group push reads only after its newest message; history reads before', () => {
   assert.equal(groupPagePath('c', null), '/api/conversations/c/messages?limit=50')
   assert.equal(groupPagePath('c', page(desc(1, 50))), '/api/conversations/c/messages?limit=50&after=50')
@@ -82,4 +92,13 @@ test('a group read: unchanged keeps the messages, appended goes in front, a full
   const older = mergeGroupHistory(page(desc(51, 100), { nextBefore: '51' }), page(desc(1, 51), { nextBefore: null }))
   assert.equal(older.messages.length, 100)
   assert.equal(older.nextBefore, null)
+})
+
+
+test('a fresh legacy snapshot takes over acknowledged sends without guessing from message text', () => {
+  const twice = chat([], { items: [item(1, {text:'OK'}), item(3, {text:'OK'})] })
+  assert.deepEqual(personalReadback(twice, ['confirmed-before-this-GET']).acknowledgedBeforeRead, ['confirmed-before-this-GET'])
+  assert.deepEqual(personalReadback(twice, []).acknowledgedBeforeRead, [])
+  assert.equal(personalReadback({ ...twice, submissionIds:true }, ['receipt']).acknowledgedBeforeRead, undefined)
+  assert.equal(personalReadback(chat([], {items:[item(1,{ submissionId:'older-modern-receipt' })]}), ['receipt']).submissionIds, true)
 })

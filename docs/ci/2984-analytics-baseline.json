@@ -1,0 +1,74 @@
+{
+  "scope": "Two completed public CI attempts with the selected Analytics lane; not a project-wide estimate.",
+  "sourceBase": "c5a5871d3e4c471005c3f4f02eaadae6db27b052",
+  "denominator": 2,
+  "method": "GitHub job.created_at to started_at is allocation queue; started_at to completed_at is execution. Compare the real Analytics job with its separately allocated status summarizer. Other parallel work can remain on the run critical path.",
+  "records": [
+    {
+      "repository": "alexj11324/Mikka",
+      "runId": 44806487898,
+      "attempt": 1,
+      "headSha": "b18c324643b6a42553b8fddf30b82e2c19b65616",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44806487898",
+      "createdAt": "2026-11-20T19:54:30Z",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 136536943779,
+          "name": "analytics-checks / Analytics SSR (full)",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/44806487898/job/136536943779",
+          "createdAt": "2026-11-20T20:04:26Z",
+          "startedAt": "2026-11-20T20:16:02Z",
+          "completedAt": "2026-11-20T20:23:09Z",
+          "conclusion": "success",
+          "queueSeconds": 696,
+          "executionSeconds": 427
+        },
+        {
+          "id": 136546783894,
+          "name": "analytics-checks / analytics-ssr",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/44806487898/job/136546783894",
+          "createdAt": "2026-11-20T20:23:09Z",
+          "startedAt": "2026-11-20T20:32:53Z",
+          "completedAt": "2026-11-20T20:32:56Z",
+          "conclusion": "success",
+          "queueSeconds": 584,
+          "executionSeconds": 3
+        }
+      ]
+    },
+    {
+      "repository": "alexj11324/Mikka",
+      "runId": 44799819020,
+      "attempt": 1,
+      "headSha": "0cf4150b501cbe704c4c92d7a8bc6f1332718613",
+      "url": "https://github.com/alexj11324/Mikka/actions/runs/44799819020",
+      "createdAt": "2026-11-20T19:11:29Z",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "id": 136509712717,
+          "name": "analytics-checks / Analytics SSR (full)",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/44799819020/job/136509712717",
+          "createdAt": "2026-11-20T19:13:20Z",
+          "startedAt": "2026-11-20T19:14:59Z",
+          "completedAt": "2026-11-20T19:22:35Z",
+          "conclusion": "success",
+          "queueSeconds": 99,
+          "executionSeconds": 456
+        },
+        {
+          "id": 136514627881,
+          "name": "analytics-checks / analytics-ssr",
+          "url": "https://github.com/alexj11324/Mikka/actions/runs/44799819020/job/136514627881",
+          "createdAt": "2026-11-20T19:22:35Z",
+          "startedAt": "2026-11-20T19:30:40Z",
+          "completedAt": "2026-11-20T19:30:44Z",
+          "conclusion": "success",
+          "queueSeconds": 485,
+          "executionSeconds": 4
+        }
+      ]
+    }
+  ]
+}

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test, { before } from 'node:test'
 import { basePath } from './base-path-config.mjs'
 
-// Runs with next.config's real basePath, as the browser bundle does. Every fetch
+// Runs with the app's real basePath, as the browser bundle does. Every fetch
 // below is a mock standing in for #310's route: these tests cover the client's
 // handling of that contract, not the deployed endpoint.
 process.env.MIKKA_BASE_PATH = basePath
@@ -67,6 +67,8 @@ test('(mock fetch) a second 403 and other errors surface as codes', async () => 
     [Response.json({ error: 'authRequired' }, { status: 401 }), 'authRequired', 401],
     [Response.json({ error: 'searchQueryTooShort' }, { status: 400 }), 'searchInvalidParam', 400],
     [Response.json({ error: 'searchFailed' }, { status: 500 }), 'searchFailed', 500],
+    [new Response('Sign in', { status: 401 }), 'authRequired', 401],
+    [new Response('Forbidden', { status: 403 }), 'searchAccessDenied', 403],
     [new Response('<html>Not found</html>', { status: 404 }), 'searchUnavailable', 404],
     [Response.json({ error: 'something new' }, { status: 418 }), 'searchUnavailable', 418],
     [new TypeError('offline'), 'searchUnavailable', 0],

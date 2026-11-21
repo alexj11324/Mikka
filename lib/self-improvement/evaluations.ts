@@ -27,6 +27,8 @@ type Authorize = (userId: string, issueId: string, tx: PoolClient) => Promise<bo
 export type BenchmarkSourceRun = CurrentSkillRun & { userId: string; deviceId: string; report: { sourceCommit?: string }; harness: string }
 export type EvaluationDependencies = {
   authorize: Authorize
+  /** Production acquires tenant/resource authority before benchmark APP locks. */
+  withQueueWorkspace?: <T>(userId: string, id: string, training: boolean, work: () => Promise<T>) => Promise<T>
   assess?: RegisteredSkillEvaluator
   queue: QueueFactoryRun
   lockQueuePolicy?: (tx: PoolClient, userId: string, sourceRunId: string) => Promise<void>
@@ -200,6 +202,7 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
     assertBenchmarkExecution({...actual,observedModel:expected.model},expected)
   }
   async function dispatchNext(userId: string,id: string,training = false) {
+    const dispatch = async () => {
     let wakeRun: string | undefined
     const dispatched = await transaction(async tx => {
       const {rows:[hint]}=await tx.query<Pick<Instance,'sourceRunId'|'issueId'>>(training
@@ -237,6 +240,8 @@ export function createSkillEvaluations(pool: Pool, dependencies: EvaluationDepen
     })
     if (wakeRun) await notifyQueuedLocalRun(pool, userId, wakeRun)
     return dispatched
+    }
+    return dependencies.withQueueWorkspace ? dependencies.withQueueWorkspace(userId, id, training, dispatch) : dispatch()
   }
   async function comparisonState(tx:PoolClient,userId:string,evaluationId:string):Promise<ComparisonState> {
       await lockEvaluationTask(tx,userId,evaluationId)

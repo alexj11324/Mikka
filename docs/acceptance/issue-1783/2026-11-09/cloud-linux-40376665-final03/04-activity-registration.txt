@@ -1,0 +1,48 @@
+Mikka issue #1783 | Real capture upload, versioned reports and activity GET readback
+Revision: 40376665ac416ce2228c08b60d7ea8cee97a3de6
+Started: 2026-11-09T15:39:04.678Z
+Cloud Linux / real isolated PostgreSQL / synthetic fixtures
+No live model or external GitHub acceptance is claimed.
+
+
+[1/1] $ /usr/local/bin/node --import ./scripts/server-test.mjs --import tsx /vercel/validation/issue-1783-harness/register-readback.mjs /vercel/Mikka /vercel/validation/issue-1783-2026-11-09-40376665ac41-final-03 40376665ac416ce2228c08b60d7ea8cee97a3de6
+PASS Own disposable PostgreSQL 17 database
+PASS Real local Vite/Nitro application attests exact code SHA
+PASS Normal device grant, session approval, token exchange and registration
+Fixture task bbbc1fe2-2945-4be1-ae3d-d6747b752fd4 / run e41c6f27-d045-46fa-bb10-a60b43cc3661
+PASS capture begin/PUT/complete: 01-postgresql-gates.mp4 (3034543 bytes)
+PASS capture begin/PUT/complete: 01-postgresql-gates-result.png (327149 bytes)
+PASS capture begin/PUT/complete: 02-real-http.mp4 (399219 bytes)
+PASS capture begin/PUT/complete: 02-real-http-result.png (609102 bytes)
+PASS capture begin/PUT/complete: 03-cli-daemon-ffmpeg.mp4 (1987184 bytes)
+PASS capture begin/PUT/complete: 03-cli-daemon-ffmpeg-result.png (784213 bytes)
+PASS All three real recordings and three key screenshots completed through HTTP
+PASS Real MCP submits two immutable detailed report versions
+PASS First document bytes remain unchanged after version 2
+PASS Real MCP submits an immutable screenshot index with three same-origin images and recordings
+PASS Existing syncFactoryPresentation generates acceptance Artifact
+PASS Unchanged presentation preserves immutable acceptance version
+PASS Activity returns all same-run image/video evidence
+PASS Activity returns generated immutable acceptance report
+PASS Activity returns both detailed report versions
+PASS Activity returns the immutable screenshot index document
+PASS activity GET + SHA-256 + decode: 01-postgresql-gates.mp4
+PASS activity GET + SHA-256 + decode: 01-postgresql-gates-result.png
+PASS activity GET + SHA-256 + decode: 02-real-http.mp4
+PASS activity GET + SHA-256 + decode: 02-real-http-result.png
+PASS activity GET + SHA-256 + decode: 03-cli-daemon-ffmpeg.mp4
+PASS activity GET + SHA-256 + decode: 03-cli-daemon-ffmpeg-result.png
+PASS immutable document v1: GET + SHA-256
+PASS immutable document v2: GET + SHA-256
+PASS immutable document v1: GET + SHA-256
+PASS immutable acceptance v1: GET + SHA-256
+PASS Every downloaded image/video decoded successfully
+PASS Public JSON and Markdown pass known credential/cookie audit
+PASS activity registration/readback; captures=6; documents=4; checks=15; cleanup=complete
+
+Command exit: 0; PASS
+
+Real capture upload, versioned reports and activity GET readback
+Revision: 40376665ac416ce2228c08b60d7ea8cee97a3de6
+RESULT: PASS | commands 1/1
+Finished: 2026-11-09T15:39:55.263Z

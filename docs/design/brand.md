@@ -10,17 +10,22 @@ mark goes, how big it is, and what color it takes.
 | --- | --- |
 | `public/brand/mikka-icon-light.svg` | Black mark for light backgrounds, 1024×1024 with padding. |
 | `public/brand/mikka-icon-dark.svg` | White mark for dark backgrounds, 1024×1024 with padding. |
-| `app/icon.svg` | Browser tab icon. The viewBox is cropped to the dots and follows the system color scheme. |
-| `app/apple-icon.png` | iOS home-screen icon. |
+| `public/brand/mikka-app-icon-{48,96,192}.png` | Approved black app icon for browser tabs, matching the website. |
+| `public/favicon.ico` | Browser fallback, with 16px, 32px and 48px sizes. |
+| `public/apple-icon.png` | 180px home-screen icon, matching the website. |
 
-The `public/brand` files leave a wide margin around the dots, so a 28px
+The `public/brand/mikka-icon-*.svg` files leave a wide margin around the dots, so a 28px
 `<img>` shows a mark only about 16px tall. In product UI, inline the SVG with
-its viewBox cropped to the dots (`19.2 19.2 61.6 61.6`, as in `app/icon.svg`).
+its viewBox cropped to the dots (`19.2 19.2 61.6 61.6`, as in `components/brand/mikka-mark.tsx`).
 Then the size you set is the size people see.
+
+Browser and home-screen icons use the approved black PNG artwork in both
+themes ([decision](decisions/2026-11-12-0449-browser-app-icon.md)). Vite copies
+these files from `public/`; the app shell declares them under `/mikka/`.
 
 ## Color
 
-- Solid dots use `fill="currentColor"`, so the mark takes the text color
+- In product UI, solid dots use `fill="currentColor"`, so the mark takes the text color
   and switches with the light/dark theme on its own. Don't ship two images
   swapped with `dark:hidden`.
 - Ghost dots are the same color at 10% opacity.
@@ -39,7 +44,7 @@ size and placement win ([2026-11-09-0050](decisions/2026-11-09-0050-paid-blocks-
 | Sign-in / sign-up (`auth-logo.tsx`) | 24px | Mark plus "Mikka" in `text-lg font-semibold`, gap 10px (`gap-2.5`). |
 | Native sign-in (`SignIn.tsx`) | 56pt | Dot-grid mark above the existing 30pt "Mikka" wordmark, gap 12pt. |
 | Onboarding welcome | 56px | Mark only, centered above the "欢迎来到 Mikka" title. |
-| Browser tab | 16 / 32px | `app/icon.svg`. |
+| Browser tab | 16 / 32 / 48px | ICO fallback and PNG sizes 48, 96 and 192px. |
 
 Below 16px the ghost dots blur into a grey square, so drop them and draw only
 the solid dots.

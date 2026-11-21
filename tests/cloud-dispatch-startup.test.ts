@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict'
 import { before, beforeEach, mock, test } from 'node:test'
+import { EventEmitter } from 'node:events'
+import * as databaseScope from '../lib/db/request-scope'
 import { ComputerError } from '../lib/computer/store'
 import { ActionFailureError } from '../lib/action-error'
 import * as profileDefinitions from '../lib/factory/agent-profile-definition'
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { context, propagation, SpanStatusCode, trace } from '@opentelemetry/api'
+import { InMemorySpanExporter } from '@opentelemetry/sdk-trace-base'
+import { InMemoryLogRecordExporter } from '@opentelemetry/sdk-logs'
+import { createTracerProvider, SafeExporter } from '../lib/tracing/node'
+import { createLogProvider } from '../lib/tracing/logs'
 
 const owner = 'synthetic-owner', botId = '10000000-0000-4000-8000-000000000001'
 const issueId = '10000000-0000-4000-8000-000000000002', runId = '10000000-0000-4000-8000-000000000003'
@@ -28,23 +38,28 @@ const selectedProfiles: (string | undefined)[] = []
 const selectedLocations: (string | undefined)[] = []
 let preferLocal = false
 const hostSourceQueries: string[] = []
+const profileSourceQueries: string[] = []
 type RequestSource = { userId: string; botId: string; issueId: string | null; kind: string; deliveredAt: Date | null; payload: Record<string, unknown> }
 let requestSource: RequestSource | null = null
-let modelResolutions = 0, bindingSelections = 0, credentialReads = 0
+let modelResolutions = 0, bindingSelections = 0, credentialReads = 0, factoryReadCalls = 0
 const queued = new Map<string, Record<string, unknown>>()
 const subscription = { id: bindingId, consumerId: agentId, ownerId: owner, workspaceId, connectionId: 'connection', connectionRevision: 3, route: 'codex_cli', modelId: model }
 const stub = (path: string, exports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports: exports })
 const unused = () => { throw new Error('Unexpected side effect in startup fixture') }
 const target = () => ({ workspaceId, agentId: replaceAgent && awake ? 'different-agent' : agentId, repoId, deviceId })
 async function query(sql: string, values: unknown[] = []) {
-  if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [], rowCount: 0 }
+  if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql === 'BEGIN ISOLATION LEVEL REPEATABLE READ' || sql.startsWith('SELECT pg_advisory_xact_lock')) return { rows: [], rowCount: 0 }
   if (sql.includes('FROM workspace_computer_policies')) return { rows: permission === undefined ? [] : [{ permission }], rowCount: 1 }
   if (sql.includes('FROM suggestion_executions')) return { rows: [], rowCount: Number(suggestionAllowed) }
   if (sql.startsWith('SELECT "agentDefinition"')) return { rows: [{ agentDefinition: { model, subscription: { bindingId } } }], rowCount: 1 }
   if (sql.includes('FROM coordinator_events')) {
-    if (sql.startsWith('SELECT payload')) {
+    // Profile selection now joins the creation receipt in the same source read.
+    // Its qualified payload projection is separate from destination admission.
+    if (sql.startsWith('SELECT payload') || sql.startsWith('SELECT e.payload,c."taskId" AS "commandIssueId" FROM coordinator_events e')) {
+      profileSourceQueries.push(sql)
+      assert.deepEqual(values, [sourceEventId, owner, botId, workspaceId])
       const ownSource = requestSource?.userId === values[1] && requestSource?.botId === values[2] && requestSource?.kind === 'user_message'
-      return { rows: ownSource ? [{ payload: requestSource!.payload }] : [], rowCount: Number(ownSource) }
+      return { rows: ownSource ? [{ payload: requestSource!.payload, commandIssueId: null }] : [], rowCount: Number(ownSource) }
     }
     hostSourceQueries.push(sql)
     const projected = requestSource && sql.includes('"hasTaskDestination"')
@@ -55,11 +70,20 @@ async function query(sql: string, values: unknown[] = []) {
   }
   if (sql.includes('EXISTS (SELECT 1 FROM computer_run_bindings')) return { rows: [{ cloud: true }], rowCount: 1 }
   if (sql.includes('FROM agent_runs')) return { rows: previous ? [{ ...previous, remoteUrl: null, harness: 'codex', cloudWorkspaceId: workspaceId, cloudBotId: botId }] : [], rowCount: Number(Boolean(previous)) }
-  if (sql.includes('FROM factory_tasks')) return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) }
+  if (sql.includes('FROM factory_tasks')) { factoryReadCalls++; return { rows: pendingSpec ? [{ stage: 'spec', status: 'pending' }] : [], rowCount: Number(pendingSpec) } }
+  // The dispatching chat saved no model, so the task keeps its own placement (decision 2026-11-15-1630).
+  if (sql.includes('FROM bot_model_choices')) return { rows: [], rowCount: 0 }
   if (sql.includes('FROM bots') || sql.includes('FROM bot_cloud_runtimes')) return { rows: present && values[0] === botId && values[1] === owner ? [target()] : [], rowCount: Number(present) }
   throw new Error(`Unexpected query in startup fixture: ${sql}`)
 }
 const pool = { query, connect: async () => ({ query, release() {} }) }
+const applicationPool = { options: {}, end: async () => undefined }
+stub('../lib/db/request-scope.ts', { ...databaseScope, currentDatabasePool: () => applicationPool })
+class TaskLockPool extends EventEmitter {
+  connect() { return pool.connect() }
+  end() { return Promise.resolve() }
+}
+mock.module('pg', { defaultExport: { Pool: TaskLockPool }, namedExports: { Pool: TaskLockPool, Client: unused, escapeLiteral: unused } })
 stub('../lib/auth.ts', { auth: { api: {} } })
 stub('../lib/cloud-computer-flag.ts', { cloudComputerRunsEnabled: () => true, cloudComputerTasksEnabled: () => true, byosEnabled: () => true, byosEnrollmentEnabled: () => true })
 stub('../lib/db/index.ts', { db: { execute: async () => { calls.push('link-continuation'); return { rows: [], rowCount: 1 } } }, pool, withDatabaseClient: unused, withDatabaseTransaction: unused })
@@ -158,6 +182,8 @@ stub('../lib/run-leases.ts', { failUnclaimedCloudStart: async (actor: unknown, i
 } })
 mock.module('workflow/api', { namedExports: { start: async () => { calls.push('lifecycle'); if (failure === 'lifecycle') throw new Error('Synthetic workflow launch failure'); return { runId: 'workflow' } } } })
 stub('../workflows/thread-machine/workflow.ts', { threadMachineLifecycle: async () => {} })
+let followedModel: { harness: 'codex' | 'claude_code'; model: string } | null = null
+stub('../lib/main-thread-model.ts', { mainThreadModel: async () => followedModel })
 let dispatch: typeof import('../workflows/coordinator/steps')['dispatchComputerTask']
 let dispatchThread: typeof import('../workflows/coordinator/steps')['dispatchComputerThread']
 let dispatchRun: typeof import('../workflows/coordinator/steps')['dispatchRun']
@@ -166,14 +192,14 @@ beforeEach(() => {
   calls.length = 0; failure = null; queueFailure = null; settledStartup = true; present = workspaceAllowed = issueAllowed = suggestionAllowed = true
   permission = undefined; awake = credentialAvailable = true; switchedCredential = moveDevice = replaceAgent = revokeDuringWake = revokeWorkspaceDuringWake = false
   selectedSource = 'subscription'; selectedHarness = 'codex'; selectedModel = model; deviceId = 'device'; repoId = 'repo'
-  previous = null; pendingSpec = false; requestSource = null; preferLocal = false
-  selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = 0; queued.clear()
+  previous = null; pendingSpec = false; requestSource = null; preferLocal = false; followedModel = null
+  selectedStages.length = selectedProfiles.length = selectedLocations.length = hostSourceQueries.length = profileSourceQueries.length = 0; modelResolutions = bindingSelections = credentialReads = factoryReadCalls = 0; queued.clear()
 })
 
 const cloudTaskSource = (): RequestSource => ({ userId: owner, botId, issueId, kind: 'user_message', deliveredAt: new Date(),
   payload: { taskDestination: { kind: 'cloud' }, profileId } })
 const dispatchRepository = (target?: 'cloud', eventId: string | undefined = sourceEventId) => dispatchRun(owner,
-  { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', ...(target ? { target } : {}) }, undefined, botId, undefined, eventId)
+  { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', model: { harness: 'codex' }, ...(target ? { target } : {}) }, undefined, botId, undefined, eventId)
 
 for (const target of ['cloud', undefined] as const) test(`a bound task-form source keeps the selected cloud placement with ${target ?? 'omitted'} model target`, async () => {
   requestSource = cloudTaskSource()
@@ -186,6 +212,7 @@ for (const target of ['cloud', undefined] as const) test(`a bound task-form sour
   assert.equal(input?.factoryBotId, botId)
   assert.equal((input?.modelDispatch as { location?: string })?.location, 'cloud')
   assert.equal(input?.allowLocalRecovery, undefined, 'a fixed cloud destination never grants local fallback')
+  assert.equal(profileSourceQueries.length, 1, 'Profile and receipt selection retain one authenticated source read')
   assert.equal(hostSourceQueries.length, 1, 'source admission retains one database read')
   assert.match(hostSourceQueries[0], /payload\s*\?\s*'taskDestination'/)
   assert.match(hostSourceQueries[0], /payload->'taskDestination'/)
@@ -221,6 +248,20 @@ test('ordinary existing-issue chat retains automatic placement and its selected 
   const input = queued.get('coordinator:rule:cloud-form-call')
   assert.equal((input?.modelDispatch as { location?: string })?.location, undefined)
   assert.equal(input?.allowLocalRecovery, true)
+})
+
+test('a new thread without an Agent is refused with agentRequired; the chat\'s own model is never a default', async () => {
+  // Decision 2026-11-17-1800 (superseding 2026-11-15-1630's 「跟随主线程」): every dispatch names its Agent.
+  requestSource = { ...cloudTaskSource(), issueId: null, payload: {} }
+  followedModel = { harness: 'codex', model }
+  assert.deepEqual(await dispatchRun(owner, { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call' }, undefined, botId, undefined, sourceEventId),
+    { error: 'agentRequired', issueId })
+  assert.equal(queued.size, 0)
+  assert.deepEqual(calls, [], 'nothing is prepared or queued')
+  assert.deepEqual(await dispatchThread(owner, { botId, issueId }, 'no-agent-call'), { error: 'agentRequired', issueId })
+  assert.equal(queued.size, 0)
+  assert.ok('runId' in await dispatchRun(owner, { issueId, repo: 'owner/repository', requestKey: 'cloud-form-call', model: { harness: 'codex', model } }, undefined, botId, undefined, sourceEventId))
+  assert.equal((queued.get('coordinator:rule:cloud-form-call')?.modelDispatch as { followed?: true })?.followed, undefined)
 })
 
 test('a cloud task-form choice overrides local preferences before selection when the model omits target', async () => {
@@ -331,6 +372,49 @@ for (const refusal of ['owner', 'runtime', 'workspace', 'issue', 'policy', 'sugg
   assert.deepEqual(calls, [], 'authorization precedes provider I/O')
   assert.equal(queued.size, 0)
 })
+
+
+test('both actual Factory read tools return their refusal unchanged while an owned child keeps ERROR', async () => {
+  const require = createRequire(import.meta.url), workflowRequire = createRequire(require.resolve('workflow'))
+  const official = await import(pathToFileURL(join(dirname(workflowRequire.resolve('@workflow/core')), 'telemetry.js')).href)
+  const sdk = await import('../workflows/coordinator/steps'), factory = await import('../workflows/coordinator/factory-steps')
+  const memory = new InMemorySpanExporter(), logMemory = new InMemoryLogRecordExporter()
+  const logs = createLogProvider({ endpoint: 'https://unused.test/i/v1/traces', token: 'unused', environment: 'dev', exporter: logMemory })
+  const provider = createTracerProvider({ exporter: new SafeExporter(memory), sampleRate: 1, environment: 'dev', logger: logs.getLogger('test'), serverless: false })
+  provider.register()
+  try {
+    const observations: { children: number; statuses: number[]; codes: unknown[]; errorLogs: number }[] = []
+    for (const read of [
+      () => sdk.readFactoryTask(owner, issueId, undefined, botId),
+      () => factory.getFactoryTask(owner, { taskId: issueId }),
+    ]) {
+      memory.reset(); logMemory.reset()
+      const result = await official.trace('step.execute readFactoryTask fixture', (step: { setAttribute(key: string, value: string): void }) => {
+        step.setAttribute('workflow.run.id', 'wrun_factory_refusal_fixture')
+        return read()
+      })
+      assert.deepEqual(result, { error: 'factoryNotFound' })
+      await provider.forceFlush(); await logs.forceFlush()
+      const spans = memory.getFinishedSpans(), children = spans.filter(span => span.name === 'coordinator.tool')
+      const parent = spans.find(span => span.name === 'step.execute')!
+      assert.equal(parent.status.code, SpanStatusCode.OK, 'the SDK legitimately persists the returned result; child ERROR must survive that')
+      assert.ok(children.every(span => span.parentSpanContext?.spanId === parent.spanContext().spanId && span.spanContext().traceId === parent.spanContext().traceId))
+      const failures = logMemory.getFinishedLogRecords().filter(record => record.body === 'mikka.stage.failed' && record.attributes['mikka.stage'] === 'coordinator.tool')
+      assert.ok(failures.every(record => children.some(span => span.spanContext().spanId === record.spanContext?.spanId && span.spanContext().traceId === record.spanContext?.traceId)))
+      assert.doesNotMatch(JSON.stringify(spans.map(span => ({ attributes: span.attributes, status: span.status, events: span.events }))), new RegExp(owner + '|' + issueId + '|' + botId))
+      observations.push({ children: children.length, statuses: children.map(span => span.status.code), codes: children.map(span => span.attributes['mikka.error.code']), errorLogs: failures.length })
+    }
+    assert.equal(factoryReadCalls, 2, 'each real store read executes its one existing mocked SELECT; no extra read is added')
+    assert.deepEqual(calls, [])
+    assert.equal(modelResolutions, 0); assert.equal(credentialReads, 0); assert.equal(queued.size, 0)
+    assert.ok(observations.every(item => item.children === 1), 'each actual asToolResult must own the failing operation span')
+    assert.ok(observations.every(item => item.statuses[0] === SpanStatusCode.ERROR && item.codes[0] === 'factoryNotFound' && item.errorLogs === 1))
+  } finally {
+    await provider.shutdown(); await logs.shutdown()
+    trace.disable(); context.disable(); propagation.disable()
+  }
+})
+
 
 test('preparation permits authorized quota fallback and leaves the original selection for queue-time validation', async () => {
   awake = false; switchedCredential = true

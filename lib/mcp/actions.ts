@@ -19,7 +19,7 @@ import { editMemory } from '@/lib/coordinator/store'
 import { chatBotId } from '@/lib/coordinator/coordinator-bot'
 import { db } from '@/lib/db'
 import { agentRuns, agents, coordinatorSessions, devices, issueMembers, issues, runChunks, teamIssuePromotions } from '@/lib/db/schema'
-import { deviceOnlineStates } from '@/lib/device-presence'
+import { deviceIsOnline } from '@/lib/device-presence'
 import type { IssueLabel } from '@/lib/issue-metadata'
 import { readIssueMetadata } from '@/lib/issue-metadata'
 import { issueAttrsContent } from '@/lib/issue-summary-columns'
@@ -36,7 +36,7 @@ import { tokenWorkspace } from '@/lib/tokens/principal'
 // agent gets exactly the validation and access checks the person gets in the
 // UI. A failed action comes back as `{ error }` with the action's code.
 
-type Failure = { error: string }
+type Failure = { error: string; params?: Record<string, string | number>; confirmable?: true }
 
 function scopedUser(userId: string) {
   const workspaceId = taskReaderScope(userId).workspaceId
@@ -53,9 +53,13 @@ async function taskActor(userId: string, actor?: ActivityActor) {
   throw new ActionFailureError('workspaceAccessDenied')
 }
 
-/** Throws a failed action's code so a chain of actions stops at the first failure. */
+/** Throws a failed action's code so a chain of actions stops at the first failure,
+ * keeping the params and confirmation flag the caller needs to replay it. */
 function unwrap<T extends object>(result: T): Exclude<T, { error: string }> {
-  if ('error' in result && typeof result.error === 'string') throw new ActionFailureError(result.error as never)
+  if ('error' in result && typeof result.error === 'string') {
+    const failure = result as { error: string; params?: Record<string, string | number>; confirmable?: true }
+    throw new ActionFailureError(failure.error as never, failure.params, failure.confirmable)
+  }
   return result as Exclude<T, { error: string }>
 }
 
@@ -63,7 +67,10 @@ async function attempt<T>(fn: () => Promise<T>): Promise<T | Failure> {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof ActionFailureError || error instanceof FactoryError || error instanceof AgentProfileError) return { error: error.code }
+    // A confirmation request is an answer the caller replays with confirmAccess,
+    // so it carries that flag rather than reading as a plain failure (ALE-26).
+    if (error instanceof ActionFailureError) return { error: error.code, ...(error.params ? { params: error.params } : {}), ...(error.confirmable ? { confirmable: error.confirmable } : {}) }
+    if (error instanceof FactoryError || error instanceof AgentProfileError) return { error: error.code }
     if (error instanceof AgentProfileAdmissionError) return { error: 'agentProfileUnavailable' }
     throw error
   }
@@ -92,6 +99,8 @@ interface IssueChanges {
   status?: string
   priority?: string
   projectId?: string | null
+  /** Replays a project move the server refused as confirmable (ALE-26). */
+  confirmAccess?: boolean
   labels?: string[]
   assigneeUserId?: string | null
   assigneeAgentId?: string | null
@@ -115,16 +124,16 @@ async function applyChanges(userId: string, issueId: string, changes: IssueChang
     patch.labels = changes.labels.map(name => known.get(name.toLowerCase()) ?? { name, color: 'gray' })
   }
   if (changes.assigneeUserId !== undefined) patch.assignee = changes.assigneeUserId ? { kind: 'member', id: changes.assigneeUserId } : null
-  if (changes.assigneeAgentId !== undefined) patch.assignee = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
+  if (changes.assigneeAgentId !== undefined) patch.delegate = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
   if (Object.keys(patch).length) issue = unwrap(await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch })).issue
-  if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId })).issue
+  if (changes.projectId !== undefined) issue = unwrap(await moveIssueToProject({ issueId: issue.id, revision: issue.revision, projectId: changes.projectId, confirmAccess: changes.confirmAccess })).issue
   return issue
 }
 
-function issueResult(issue: { id: string; title: string; status: string; priority: string; revision: number; content: Parameters<typeof readIssueMetadata>[0] }) {
-  const metadata = readIssueMetadata(issue.content)
+function issueResult(issue: { id: string; title: string; status: string; priority: string; revision: number; content: Parameters<typeof readIssueMetadata>[0]; metadata?: ReturnType<typeof readIssueMetadata>; projectId?: string | null; identifier?: string | null }) {
+  const metadata = issue.metadata ?? readIssueMetadata(issue.content)
   return {
-    id: issue.id, number: metadata.number ?? null, title: issue.title, status: issue.status, priority: issue.priority,
+    id: issue.id, identifier: issue.identifier ?? null, projectId: issue.projectId ?? null, delegate: metadata.delegate, number: metadata.number ?? null, title: issue.title, status: issue.status, priority: issue.priority,
     project: metadata.project, labels: metadata.labels.map(label => label.name), assignee: metadata.assignee?.name ?? null,
   }
 }
@@ -133,7 +142,6 @@ function issueResult(issue: { id: string; title: string; status: string; priorit
  * application's idempotent creation commits, with its own durable receipt. */
 export async function createIssue(userId: string, input: IssueChanges & { title: string; body?: string; teamId?: string }, actor?: ActivityActor, toolCallId?: string, taskEvent?: { eventId: string; botId: string | null }, teamId?: string, chatRequest?: { eventId: string; botId: string | null }) {
   return attempt(async () => actAs(await taskActor(userId, actor), async () => {
-    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
     // The legacy MCP contract has no human-assignee field. Do not introduce a
     // multi-action write without the durable transaction and access checks.
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
@@ -149,7 +157,8 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
     if (!parsed.success) return { error: 'validationGeneric' }
     const { idempotentIssueMutation, IssueToolCallConflict } = await import('./issue-mutation')
     try {
-      const created = await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent, chatRequest ? { ...chatRequest, teamId: teamId ?? parsed.data.teamId ?? null } : undefined)
+      const created = await idempotentIssueMutation(userId, 'create_issue', toolCallId, parsed.data, mutate, taskEvent, chatRequest ? { ...chatRequest, teamId: teamId ?? parsed.data.teamId ?? null } : undefined,
+        async id => issueResult(unwrap(await getIssue(id)).issue))
       if (!teamId) return created
       const requestId = requestIdFor(userId, toolCallId)
       const [prior] = await db.select().from(teamIssuePromotions).where(eq(teamIssuePromotions.requestId, requestId)).limit(1)
@@ -165,7 +174,6 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
 
 export async function updateIssue(userId: string, input: IssueChanges & { issueId: string }, actor?: ActivityActor, toolCallId?: string) {
   return attempt(async () => actAs(await taskActor(userId, actor), async () => {
-    if (input.assigneeUserId !== undefined && input.assigneeAgentId !== undefined) return { error: 'validationGeneric' }
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     const { issueId, ...changes } = input
     const mutate = async () => issueResult(await applyChanges(userId, issueId, changes))
@@ -205,13 +213,12 @@ export async function searchIssues(userId: string, input: { query: string; statu
 }
 
 export async function listAgents(userId: string) {
-  const rows = await db.select({ id: agents.id, harness: agents.harness, deviceId: devices.id, deviceName: devices.name, enabled: devices.enabled, lastSeenAt: devices.lastSeenAt, harnesses: devices.harnesses })
+  const rows = await db.select({ id: agents.id, harness: agents.harness, deviceId: devices.id, deviceName: devices.name, enabled: devices.enabled, sessionOpenedAt: devices.sessionOpenedAt, sessionClosedAt: devices.sessionClosedAt, harnesses: devices.harnesses })
     .from(agents).innerJoin(devices, eq(devices.id, agents.deviceId))
     .where(and(eq(agents.userId, userId), eq(devices.ownerId, userId), eq(devices.kind, 'local'))).orderBy(asc(devices.name), asc(agents.harness))
-  const presence = await deviceOnlineStates(rows.map(row => ({ id: row.deviceId, lastSeenAt: row.lastSeenAt })))
   return rows.filter(row => localExecutionHarnesses(row.harnesses).includes(row.harness)).map(row => ({
     id: row.id, harness: row.harness, deviceId: row.deviceId, device: row.deviceName,
-    deviceOnline: Boolean(row.enabled && presence.get(row.deviceId)),
+    deviceOnline: Boolean(row.enabled && deviceIsOnline(row)),
   }))
 }
 
@@ -231,7 +238,7 @@ export async function dispatchRun(userId: string, input: { issueId: string; agen
   const { dispatchToTask } = await import('@/lib/thread-dispatch')
   return attempt(async () => dispatchToTask(userId, input.issueId, {
     note: input.note,
-    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, issue.workspaceId), undefined, undefined, 'mcp')) }),
+    start: async (previous, note) => ({ status: 'queued' as const, ...(await queueTaskRun(userId, { ...input, ...(previous ? { agentId: previous.agentId, repo: previous.remoteUrl ?? input.repo, threadRunId: previous.id } : {}), note, ...await mcpRunModel(userId, input, previous), ...(previous?.readOnly ? { readOnly: true } : {}), ...(previous && input.requestKey ? { requestKey: `thread:${previous.id}:${input.requestKey}`.slice(0, 200) } : {}) }, await chatBotId(userId, null, issue.workspaceId), undefined, undefined, { source: 'mcp', origin: 'api', originRef: { kind: 'api' } })) }),
   }))
 }
 
@@ -252,7 +259,7 @@ async function mcpRunModel(userId: string, input: { issueId: string; agentId: st
     { ownerId: userId, workspaceId: await executionWorkspace(userId, botId), botId },
     { issueId: input.issueId, stage: 'execute', location: 'local', agentId: agent.id, deviceId: agent.deviceId, asked: { harness: agent.harness } })
   if (target.kind !== 'device' || target.agentId !== agent.id) throw new ActionFailureError('runModelMissing')
-  return { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+  return { model: target.model, agentProfile, modelDispatch: { mode: selectionMode ?? 'preference', location: 'local' as const, entry: target.entry },
     ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
     ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
 }
@@ -262,14 +269,18 @@ export async function sendToRun(userId: string, input: { runId: string; text: st
 }
 
 export async function stopRun(userId: string, runId: string) {
-  const [run] = await db.select({ id: agentRuns.id }).from(agentRuns).where(and(eq(agentRuns.id, runId), eq(agentRuns.userId, userId))).limit(1)
-  if (!run) return { error: 'runNotFound' }
   return attempt(async () => ({ stopRequested: true, ...(await requestRunStop(userId, runId)) }))
 }
 
 /** A page of the run's event stream, by sequence number. */
 export async function getRunEvents(userId: string, input: { runId: string; after?: number; limit?: number }) {
-  const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status }).from(agentRuns).where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId))).limit(1)
+  if (!taskReaderScope(userId).workspaceId) throw new ActionFailureError('workspaceAccessDenied')
+  const { runVisibilityPredicate } = await import('@/lib/agent-runs')
+  const visible = await runVisibilityPredicate(userId)
+  // Run metadata may be shared with a teammate. Raw events are owner-only.
+  const [run] = await db.select({ id: agentRuns.id, status: agentRuns.status }).from(agentRuns)
+    .leftJoin(issues, eq(issues.id, agentRuns.issueId))
+    .where(and(eq(agentRuns.id, input.runId), eq(agentRuns.userId, userId), visible)).limit(1)
   if (!run) return null
   const limit = input.limit ?? 50
   const rows = await db.select({ seq: runChunks.seq, chunk: runChunks.chunk, createdAt: runChunks.createdAt }).from(runChunks)
@@ -285,7 +296,7 @@ export async function getRunEvents(userId: string, input: { runId: string; after
 
 export async function listProjects(userId: string) {
   return actAs(scopedUser(userId), async () => (await readProjects()).map(project => ({
-    id: project.id, name: project.name, summary: project.summary, status: project.status, priority: project.priority,
+    id: project.id, workspaceId: project.workspaceId, createdBy: project.createdBy, leadUserId: project.leadUserId, memberIds: project.properties.members, name: project.name, summary: project.summary, status: project.status, priority: project.priority,
     startDate: project.startDate || null, targetDate: project.targetDate || null, issueIds: project.issueIds,
   })))
 }

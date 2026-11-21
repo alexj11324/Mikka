@@ -5,7 +5,7 @@ import test from 'node:test'
 import { Pool } from 'pg'
 import { sql } from 'drizzle-orm'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { applyMigration, planMigration } from '../scripts/migration-steps.mjs'
 import { scopeMigrationBeforeCommit } from '../scripts/scope-migration-history.mjs'
@@ -22,8 +22,8 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
   const admin = new Pool({ connectionString: url, max: 1 })
   const appUrl = new URL(url!), wsUrl = new URL(url!)
   appUrl.pathname = `/${appName}`; wsUrl.pathname = `/${wsName}`
-  await admin.query(`create database "${appName}" template template0`)
-  await admin.query(`create database "${wsName}" template template0`)
+  await createTestDatabase(admin, appName, 'template0')
+  await createTestDatabase(admin, wsName, 'template0')
   const app = new Pool({ connectionString: appUrl.toString(), max: 6 })
   const ws = new Pool({ connectionString: wsUrl.toString(), max: 5 })
   const previous = { app: process.env.MIKKA_DATABASE_URL, ws: process.env.DATABASE_URL }
@@ -73,6 +73,10 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
     await ws.query('insert into mikka_team_projects("projectId","teamId","workspaceId","userId") values($1,$2,$3,$4)', [project, team, alpha, owner])
     const before = (await app.query('select id,content,"scopeVersion" from issues where id=$1', [task])).rows[0]
     await migrate(files.filter(file => file >= boundary))
+    // Production runs the canonical Project backfill before the ACL backfill;
+    // the legacy project must acquire its Workspace and Task relation first.
+    const { backfillProjectV2 } = await import('../scripts/project-v2-backfill.mjs')
+    await backfillProjectV2(app, ws)
     const backfill = await backfillProjectResourceAccess(app, ws)
     assert.deepEqual(backfill, { registered: 1, quarantined: 0, tasksBound: 1 })
     assert.deepEqual(await backfillProjectResourceAccess(app, ws), { registered: 0, quarantined: 0, tasksBound: 0 })
@@ -90,6 +94,82 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
       (await app.query('select mikka_resource_acl_allowed($1,$2,$3,$4,$5,$6) as allowed', [subjectKind, subject, tenant, kind, id, action])).rows[0].allowed
     const policy = async (kind: string, id: string) => (await app.query('select * from resource_access_policies where kind=$1 and id=$2', [kind, id])).rows[0]
 
+    await t.test('personal organization visibility governs only new Projects and rejects a stale creation scope across split stores', async () => {
+      const { registerProjectAccess } = await import('../lib/resource-access/projects')
+      const { organizationId } = (await ws.query('select "organizationId" from mikka_organization_workspaces where "workspaceId"=$1', [alpha])).rows[0]
+      const fresh = async (actor: string, tenant: string, expected?: Parameters<typeof registerProjectAccess>[3]) => {
+        const id = randomUUID()
+        await registerProjectAccess(actor, id, tenant, expected)
+        const { rows } = await app.query("select visibility from resource_access_policies where kind='project' and id=$1", [id])
+        return rows[0].visibility
+      }
+      assert.equal(await fresh(owner, alpha), 'shared')
+      await ws.query('insert into mikka_organization_member_project_defaults("organizationId","userId",visibility) values($1,$2,$3)', [organizationId, owner, 'private'])
+      try {
+        assert.equal(await fresh(owner, alpha, { organizationId, visibility: 'private' }), 'private')
+        await assert.rejects(fresh(owner, alpha, { organizationId, visibility: 'shared' }), /projectVisibilityChanged/)
+        assert.equal(await fresh(member, alpha), 'shared')
+        assert.equal(await fresh(owner, beta), 'shared')
+        assert.equal(await fresh(owner, personal), 'private')
+        assert.equal((await ws.query("select to_regclass('resource_access_policies') as relation")).rows[0].relation, null)
+        assert.equal((await app.query("select to_regclass('mikka_organization_member_project_defaults') as relation")).rows[0].relation, null)
+      } finally {
+        await ws.query('delete from mikka_organization_member_project_defaults where "organizationId"=$1 and "userId"=$2', [organizationId, owner])
+      }
+    })
+
+    await t.test('personal selected Project is scoped to the member and visible Workspace without changing content access or sharing defaults', async () => {
+      const { personalProjectSelectionFor } = await import('../lib/resource-access/personal-project-selection')
+      const read = (reader: string, workspaceId = alpha) => personalProjectSelectionFor({ id: reader }, workspaceId)
+      const initial = await read(owner)
+      assert.ok(initial.organizationId)
+      assert.ok(initial.projects.some(item => item.id === project))
+      const change = { readerId: owner, organizationId: initial.organizationId, projectId: project, expectedRevision: 0 }
+      try {
+        assert.equal((await personalProjectSelectionFor({ id: owner }, alpha, change)).revision, 1)
+        assert.equal((await personalProjectSelectionFor({ id: owner }, alpha, change)).revision, 1)
+        assert.equal((await read(owner)).projectId, project)
+        assert.equal((await read(member)).projectId, null)
+        assert.equal((await read(owner, beta)).projectId, null)
+        assert.equal((await read(owner, personal)).organizationId, null)
+        await assert.rejects(personalProjectSelectionFor({ id: member }, alpha, change), /governance_denied/)
+        await assert.rejects(personalProjectSelectionFor({ id: owner }, alpha, { ...change, projectId: null }), /governance_denied/)
+        const sibling = randomUUID()
+        await ws.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Sibling Workspace','team')`, [sibling, owner])
+        await ws.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role,status) values($1,$2,$2,$2,'admin','active')`, [sibling, owner])
+        await ws.query('insert into mikka_organization_workspaces("workspaceId","organizationId") values($1,$2)', [sibling, initial.organizationId])
+        const hidden = await read(owner, sibling)
+        assert.deepEqual([hidden.projectId, hidden.revision], [null, 1])
+        await assert.rejects(personalProjectSelectionFor({ id: owner }, sibling, { ...change, projectId: null }), /governance_denied/)
+        const clear = { ...change, projectId: null, expectedRevision: hidden.revision }
+        const cleared = await personalProjectSelectionFor({ id: owner }, sibling, clear)
+        assert.deepEqual([cleared.projectId, cleared.revision], [null, 2])
+        assert.equal((await read(owner)).projectId, null)
+        assert.equal((await personalProjectSelectionFor({ id: owner }, sibling, clear)).revision, 2)
+        await ws.query('delete from mikka_workspaces where id=$1', [sibling])
+        assert.equal((await ws.query('select visibility from mikka_organization_member_project_defaults where "organizationId"=$1 and "userId"=$2', [initial.organizationId, owner])).rows[0].visibility, 'shared')
+      } finally {
+        await ws.query('delete from mikka_organization_member_project_defaults where "organizationId"=$1 and "userId"=$2', [initial.organizationId, owner])
+      }
+    })
+
+    await t.test('repeated Task follow and unfollow commands each write one revision and old toggle callers remain supported', async () => {
+      const { actAs } = await import('../lib/acting-user')
+      const { toggleIssuePreference } = await import('../app/actions/issue-operations')
+      const setFollow = (enabled?: boolean) => actAs({ id: owner, [tokenWorkspace]: alpha },
+        () => toggleIssuePreference({ id: task, kind: 'subscribe', enabled }))
+      const initialRevision = (await app.query('select revision from issues where id=$1', [task])).rows[0].revision
+      for (const [enabled, expected, delta] of [
+        [true, true, 1], [true, true, 1], [false, false, 2], [false, false, 2],
+        [undefined, true, 3], [undefined, false, 4],
+      ] as const) {
+        const result = await setFollow(enabled)
+        assert.ok('issue' in result && result.issue)
+        assert.equal(result.issue.metadata.subscriberUserIds.includes(owner), expected)
+        assert.equal(result.issue.revision, initialRevision + delta)
+      }
+    })
+
     await t.test('legacy shared Tasks stay shared; old run/chat/bot/artifact stay private; unknown remains quarantined', async () => {
       assert.equal((await issueForUser(member, task))?.id, task)
       assert.equal(await issueForUser(stranger, task), null)
@@ -103,6 +183,26 @@ test('resource ACL: real split PostgreSQL migrations, fresh grants and concurren
       }
       assert.equal(await issueForUser({ id: owner, [tokenWorkspace]: beta }, task), null)
       await assert.rejects(requireResourceAccess(stranger, reference('task', task)), { code: 'issueNotFound' })
+    })
+
+    await t.test('a Task member can mute and unmute their own notifications without changing another member', async () => {
+      const { actAs } = await import('../lib/acting-user')
+      const { setMemberSubscribed } = await import('../app/actions/collaboration')
+      await app.query('insert into issue_members("issueId","userId","memberId") values($1,$2,$3),($1,$2,$4)',
+        [task, owner, member, manager])
+      const set = (target: string, subscribed: boolean) => actAs({ id: member, [tokenWorkspace]: alpha },
+        () => setMemberSubscribed(task, target, subscribed))
+      try {
+        assert.deepEqual(await set(member, false), { success: true })
+        assert.deepEqual(await set(member, false), { success: true })
+        assert.equal((await set(manager, false)).error, 'memberOwnerOnly')
+        const { rows } = await app.query('select "memberId",subscribed from issue_members where "issueId"=$1', [task])
+        assert.equal(rows.find(row => row.memberId === member)?.subscribed, false)
+        assert.equal(rows.find(row => row.memberId === manager)?.subscribed, true)
+        assert.deepEqual(await set(member, true), { success: true })
+      } finally {
+        await app.query('delete from issue_members where "issueId"=$1 and "memberId"=any($2::text[])', [task, [member, manager]])
+      }
     })
 
     await t.test('one SQL action contract; ownership and management do not authorize personal credentials, machines or billing', async () => {

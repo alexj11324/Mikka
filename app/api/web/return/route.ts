@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { and, eq, gt, isNull } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
@@ -11,7 +11,6 @@ import { officialWebCallback } from '@/lib/web-connection/policy'
 import { webAuthSignInPath } from '@/lib/web-connection/auth'
 import { webAuthConfirmedNavigation, webAuthHeaders, webAuthStateHash } from '@/lib/web-connection/auth-server'
 
-export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const state = desktopAuthState(url.searchParams.get('state'))

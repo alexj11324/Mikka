@@ -33,7 +33,7 @@ const mutate = async (value?: (current: State) => State) => {
 }
 const translate = (key: string) => key
 const mutateCached = async () => undefined
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'time' }) } })
 mock.module('swr', { defaultExport: (key: readonly string[] | null) => ({ data: useSyncExternalStore(subscribe, key?.[0] === 'settings:subscriptions' ? snapshot : emptyUsage), mutate }), namedExports: {
   unstable_serialize: (key: unknown) => JSON.stringify(key), useSWRConfig: () => ({ mutate: mutateCached }),
 } })
@@ -86,6 +86,8 @@ after(() => browser.close())
 const render = async () => { await act(async () => root.render(<SubscriptionSettings workspaceId={workspaceId} />)) }
 const button = (label: string) => [...container.querySelectorAll('button')].find(item => item.textContent?.trim() === label)
 const click = async (label: string) => { const target = button(label); assert.ok(target, label); await act(async () => target.click()) }
+/** A Claude attempt comes back by itself (the list resumes it); a device code is shown again on 继续. */
+const resume = async () => { if (button('resume')) await click('resume') }
 const remount = async () => { await act(async () => root.unmount()); root = createRoot(container); data = server; await render() }
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -93,19 +95,62 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-for (const provider of ['codex', 'claude'] as const) test(`${provider}: leaving and returning continues the same server attempt`, async () => {
-  seed(provider)
+test('codex: leaving and returning continues the same server attempt', async () => {
+  seed('codex')
   await render()
   assert.ok(container.textContent?.includes('unfinished'))
   await click('resume')
   assert.deepEqual(requests.map(item => item.body), [{ action: 'resume', connectionId }])
-  if (provider === 'codex') assert.ok(container.textContent?.includes('ABCD-EFGH'))
-  else assert.deepEqual([...container.querySelectorAll('ol li')].map(item => item.textContent), ['callbackStepOpen', 'callbackStepCopy', 'callbackStepPaste'])
+  assert.ok(container.textContent?.includes('ABCD-EFGH'))
   await remount()
   assert.ok(button('resume'))
   await click('resume')
   assert.deepEqual(requests.map(item => item.body), [{ action: 'resume', connectionId }, { action: 'resume', connectionId }])
   assert.equal(server.connections.length, 1)
+})
+
+// iPhone Safari reloads the tab left for Claude's page: the paste field must still be there (production, 2026-11-18).
+test('claude: a reloaded page keeps the paste field of the same server attempt', async () => {
+  seed('claude')
+  await render()
+  assert.deepEqual([...container.querySelectorAll('ol li')].map(item => item.textContent), ['callbackStepOpen', 'callbackStepCopy', 'callbackStepPaste'])
+  await remount()
+  assert.ok(container.querySelector('form input'))
+  assert.equal(button('resume'), undefined)
+  assert.equal(requests.length, 0, 'the list already resumed it for this session')
+  respond = async body => { server = { ...server, connections: [{ ...server.connections[0], state: 'connected', activeAttempt: null }] }; return { body: body.action === 'callback' ? { state: 'connected' } : attempt } }
+  const input = container.querySelector('form input') as HTMLInputElement
+  await act(async () => { Object.getOwnPropertyDescriptor(browser.HTMLInputElement.prototype, 'value')!.set!.call(input, 'code-x#' + attempt.state); input.dispatchEvent(new browser.Event('input', { bubbles: true }) as unknown as Event) })
+  await act(async () => (container.querySelector('form') as HTMLFormElement).requestSubmit())
+  assert.deepEqual(requests.map(item => item.body), [{ action: 'callback', connectionId, state: attempt.state, callbackUrl: 'code-x#' + attempt.state }])
+})
+
+test('claude on the web: one step, the code page, and 粘贴 from the clipboard', async () => {
+  seed('claude')
+  attempt = { ...attempt, authorizationUrl: attempt.authorizationUrl.replace('http%3A%2F%2Flocalhost%3A54545%2Fcallback', 'https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback') }
+  server = { ...server, connections: [{ ...server.connections[0], activeAttempt: attempt }] }; data = server
+  await render()
+  assert.ok(container.textContent?.includes('codeStep'))
+  assert.equal(container.querySelector('ol'), null)
+  const original = Object.getOwnPropertyDescriptor(browser.navigator, 'clipboard')
+  Object.defineProperty(browser.navigator, 'clipboard', { configurable: true, value: { readText: async () => ' pasted-code#' + attempt.state + ' ' } })
+  try {
+    await click('paste')
+    assert.equal((container.querySelector('form input') as HTMLInputElement).value, 'pasted-code#' + attempt.state)
+  } finally {
+    if (original) Object.defineProperty(browser.navigator, 'clipboard', original)
+    else Reflect.deleteProperty(browser.navigator, 'clipboard')
+  }
+})
+
+test('Claude asks for the code page where nothing catches localhost; Codex keeps its device code', async () => {
+  server = { ...server, connections: [] }; data = server
+  respond = async () => ({ body: { error: 'subscription_unavailable' }, status: 409 })
+  await render()
+  const [codex, claude] = [...container.querySelectorAll('button')].filter(item => item.textContent?.trim() === 'connect')
+  await act(async () => codex.click())
+  await act(async () => claude.click())
+  assert.deepEqual(requests.map(item => item.body), [{ action: 'connect', workspaceId, provider: 'codex' }, { action: 'connect', workspaceId, provider: 'claude', redirect: 'code' }])
 })
 
 test('Cancel disconnects the current server revision and removes its resume entry', async () => {
@@ -151,7 +196,7 @@ test('a lost start response retries the pending connection discovered by the nex
 for (const provider of ['codex', 'claude'] as const) test(`${provider}: the deadline ends the ceremony and offers reconnect`, async () => {
   mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() })
   seed(provider, 10_000)
-  await render(); await click('resume')
+  await render(); await resume()
   await act(async () => { mock.timers.tick(10_000) })
   assert.ok(container.textContent?.includes('signInExpired'))
   assert.ok(button('reconnect'))
@@ -197,7 +242,7 @@ test('leaving during an in-flight poll cannot display a stale error or cancel th
 
 test('a live completion in another page closes the obsolete ceremony', async () => {
   seed('claude')
-  await render(); await click('resume')
+  await render(); await resume()
   server = { ...server, connections: [{ ...server.connections[0], state: 'connected', revision: 4, activeAttempt: null }] }
   await act(async () => publish())
   assert.equal(container.querySelector('form'), null)
@@ -206,13 +251,13 @@ test('a live completion in another page closes the obsolete ceremony', async () 
 
 test('a live cancellation in another page closes an observed Claude ceremony', async () => {
   seed('claude')
-  await render(); await click('resume')
+  await render(); await resume()
   assert.ok(container.querySelector('form'))
   server = { ...server, connections: [] }
   await act(async () => publish())
   assert.equal(container.querySelector('form'), null)
   assert.ok(!container.textContent?.includes('connecting'))
-  assert.deepEqual(requests.map(item => item.body.action), ['resume'])
+  assert.deepEqual(requests.map(item => item.body.action), [])
 })
 
 test('a fresh start survives the old empty list until its current revision has been observed', async () => {
@@ -249,7 +294,7 @@ test('a stale poll followed by a connected list clears its obsolete error and re
 test('a connected list clears the deadline error even after the local attempt has ended', async () => {
   mock.timers.enable({ apis: ['Date', 'setTimeout'], now: Date.now() })
   seed('claude', 10_000)
-  await render(); await click('resume')
+  await render(); await resume()
   server = { ...server, connections: [{ ...server.connections[0], state: 'connected', activeAttempt: null }] }
   await act(async () => { mock.timers.tick(10_000) })
   assert.equal(container.querySelector('[role="alert"]'), null)
@@ -267,4 +312,34 @@ test('a late resume refusal cannot put retry back beside an already connected ro
   assert.equal(container.querySelector('[role="alert"]'), null)
   assert.equal(button('retry'), undefined)
   assert.equal(button('reconnect'), undefined)
+})
+
+test('copying a device sign-in code reports denial and allows a confirmed retry', async () => {
+  await render()
+  await click('resume')
+  const copyButton = () => container.querySelector<HTMLButtonElement>('button[aria-label="copy"]')
+  const original = Object.getOwnPropertyDescriptor(browser.navigator, 'clipboard')
+  const written: string[] = []
+  let denied = true
+  Object.defineProperty(browser.navigator, 'clipboard', { configurable: true, value: {
+    async writeText(value: string) {
+      if (denied) throw new Error('Clipboard denied')
+      written.push(value)
+    },
+  } })
+  try {
+    const trigger = copyButton()
+    assert.ok(trigger)
+    await act(async () => trigger.click())
+    assert.equal(container.querySelector('[role="alert"]')?.textContent, 'copyFailed')
+    assert.equal(container.querySelector('button[aria-label="copied"]'), null)
+    denied = false
+    await act(async () => trigger.click())
+    assert.deepEqual(written, ['ABCD-EFGH'])
+    assert.ok(container.querySelector('button[aria-label="copied"]'))
+    assert.equal(container.querySelector('[role="alert"]'), null)
+  } finally {
+    if (original) Object.defineProperty(browser.navigator, 'clipboard', original)
+    else Reflect.deleteProperty(browser.navigator, 'clipboard')
+  }
 })

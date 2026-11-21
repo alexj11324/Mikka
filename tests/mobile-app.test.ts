@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { delivered, inFlight, marked, outgoingKey, queued } from '../apps/mobile/lib/outbox'
+import { outgoingKey, personalMessage, submissionBody, type Outgoing } from '../apps/mobile/lib/outbox'
 import { pushTarget } from '../apps/mobile/lib/push-route'
 
 const BOT = '12345678-1234-1234-1234-123456789abc'
@@ -26,26 +26,50 @@ test('ids that are not uuids are ignored', () => {
   assert.equal(pushTarget({ botId: '../settings', pendingActionId: 'x', runId: 42 }), '/bots/coordinator')
 })
 
-test('a failed message stays with its words until it is delivered', () => {
-  const a = outgoingKey()
-  const b = outgoingKey()
-  assert.notEqual(a, b)
-  let list = queued(queued([], a, '你好'), b, '在吗')
-  assert.equal(inFlight(list), true)
-  list = marked(marked(list, a, 'failed'), b, 'failed')
-  assert.deepEqual(list.map(item => [item.text, item.state]), [['你好', 'failed'], ['在吗', 'failed']])
-  assert.equal(inFlight(list), false)
-  list = delivered(marked(list, a, 'sending'), a)
-  assert.deepEqual(list.map(item => item.text), ['在吗'])
-})
-
-test('a message with photos keeps them while it goes and after it fails', () => {
-  const key = outgoingKey()
+test('a failed message stays with its words and photos until authorized readback', async () => {
+  const { Window } = await import('happy-dom')
+  const browser = new Window()
+  Object.assign(globalThis, { window: browser, document: browser.document, IS_REACT_ACT_ENVIRONMENT: true })
+  const { act, createElement, useState } = await import('react')
+  const { createRoot } = await import('react-dom/client')
+  const { useChatDeliveryState } = await import('../lib/hooks/chat-delivery-state')
+  let delivery!: ReturnType<typeof useChatDeliveryState<Outgoing>>
+  function Probe() {
+    const [messages, setMessages] = useState<Outgoing[]>([])
+    delivery = useChatDeliveryState(messages, setMessages, 'unconfirmed')
+    return null
+  }
+  const root = createRoot(document.body)
+  const scope = { botId: null, chatKey: 'coordinator', context: 1 }
   const photo = { uri: 'file:///photo.jpg', dataUrl: 'data:image/jpeg;base64,/9j/' }
-  let list = queued([], key, '', [photo])
-  list = marked(list, key, 'failed')
-  assert.deepEqual(list[0].images, [photo])
-  assert.equal(list[0].text, '')
+  const first = personalMessage(outgoingKey(), '你好', [], scope)
+  const second = personalMessage(outgoingKey(), '', [photo], scope)
+  assert.notEqual(first.id, second.id)
+  try {
+    await act(async () => { root.render(createElement(Probe)) })
+    await act(async () => {
+      assert.equal(delivery.begin(first), true)
+      assert.equal(delivery.begin(second), true)
+    })
+    assert.deepEqual(delivery.rows.map(row => row.phase), ['sending', 'sending'])
+    await act(async () => {
+      delivery.finish(first.id, { error: 'offline' })
+      delivery.finish(second.id, { error: 'offline' })
+    })
+    assert.deepEqual(delivery.rows.map(row => [row.text, row.phase]), [['你好', 'failed'], ['', 'failed']])
+    assert.deepEqual(delivery.rows[1].images, [photo])
+    assert.deepEqual(submissionBody(delivery.rows[1]).images, [{ dataUrl: photo.dataUrl }])
+    await act(async () => {
+      assert.equal(delivery.begin(first), true)
+      delivery.finish(first.id, { storedId: first.id })
+    })
+    assert.deepEqual(delivery.rows.map(row => row.phase), ['accepted', 'failed'])
+    await act(async () => { delivery.setRows(current => current.filter(row => row.storedId !== first.id)) })
+    assert.deepEqual(delivery.rows.map(row => row.id), [second.id])
+  } finally {
+    await act(async () => { root.unmount() })
+    await browser.happyDOM.close()
+  }
 })
 
 test('a sent message that quotes another shows the quote apart from its words', async () => {

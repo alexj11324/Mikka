@@ -1,6 +1,6 @@
 import 'server-only'
+import type { SubscriptionModelRequestPolicy } from './subscription-service-tier'
 import { deploymentSwitch } from '@/lib/deployment-switches'
-import { othersMayUse } from './personal-policy'
 import { z } from 'zod'
 import { retainEnrollmentSourcesForAcceptance } from './subscription-enrollment-policy'
 import { SubscriptionRefusal, type SubscriptionRoute } from '@mikka/protocol/subscription'
@@ -9,7 +9,7 @@ import { and, eq } from 'drizzle-orm'
 import { workspaces, workspaceMembers } from './db/workspace-schema'
 import { WorkspaceError } from './workspace-error'
 import { pool } from './db'
-import { captureDatabaseQuery } from './db/commit-effects'
+import { captureDatabaseQuery, connectForCommitEffects } from './db/commit-effects'
 import { byosEnabled, byosEnrollmentEnabled } from './cloud-computer-flag'
 import { subscriptionRouteReady } from './subscription-routes'
 import { SubscriptionRepository } from './subscription-repository'
@@ -18,6 +18,7 @@ import { SubscriptionWorkerClient } from '../packages/daemon/src/subscription-wo
 import { infisicalWorkloadToken } from './infisical-workload'
 import { AccessProjectionMissing, authorizedAccessName, subscriptionAccessSnapshot } from './subscription-access-snapshot'
 import { join } from 'node:path'
+import { sessionDatabaseURL } from '../scripts/postgres-connection.mjs'
 
 export async function authorizeSubscriptionWorkspace(userId: string, workspaceId: string, borrowerId?: string) {
   z.uuid().parse(workspaceId)
@@ -29,27 +30,38 @@ export async function authorizeSubscriptionWorkspace(userId: string, workspaceId
     .where(and(eq(workspaces.id, workspaceId), eq(workspaceMembers.userId, userId), eq(workspaceMembers.status, 'active')))
     .for('share').limit(1)
   if (!row) throw new WorkspaceError('workspaceAccessDenied')
-  if (borrowerId && borrowerId !== userId && !(await othersMayUse(pool, userId, workspaceId))) throw new SubscriptionRefusal('account_unavailable')
+  // A subscription serves its owner only (decision 2026-11-17).
+  if (borrowerId && borrowerId !== userId) throw new SubscriptionRefusal('account_unavailable')
 }
-/** A subscription runs its owner's own bots in every workspace the owner belongs to (decision 2026-11-01-2240);
- * another member's bot only while the owner shares it there with 分享给团队成员 and the admin allows it. */
+/** A subscription runs its owner's own bots in every workspace the owner belongs to (decision 2026-11-01-2240),
+ * and never another member's bot (decision 2026-11-17). */
 export async function authorizeSubscriptionUse(userId: string, workspaceId: string, consumerId?: string) {
   await authorizeSubscriptionWorkspace(userId, workspaceId)
-  // Another member's bot needs 分享给团队成员 on, checked on every call: un-sharing or leaving stops it at once.
   if (consumerId && z.uuid().safeParse(consumerId).success) {
     const { rows: [bot] } = await pool.query<{ ownerId: string | null }>('SELECT "ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2', [consumerId, workspaceId])
     // A bot awaiting takeover (null owner) runs on nobody's subscription.
-    if (bot && (bot.ownerId === null || (bot.ownerId !== userId && !(await othersMayUse(pool, userId, workspaceId))))) throw new SubscriptionRefusal('account_unavailable')
+    if (bot && bot.ownerId !== userId) throw new SubscriptionRefusal('account_unavailable')
   }
 }
-export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean } = {}): SubscriptionService {
+export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, options: { exportAccessLease?: boolean; accountDeletionGrant?: string; modelRequestPolicy?: SubscriptionModelRequestPolicy } = {}): SubscriptionService {
   if (!byosEnabled() && !(custodyOnly && byosEnrollmentEnabled())) throw new SubscriptionRefusal('backend_unavailable')
   const binary = process.env.MIKKA_BYOS_WORKER_BINARY ?? join(process.cwd(), 'packages/subscription-worker/bin/mikka-subscription-worker')
   // pool is request-scoped; never send a preview worker to the production DB.
-  const databaseUrl = pool.options.connectionString
+  let databaseUrl = pool.options.connectionString
+  if (options.accountDeletionGrant !== undefined) {
+    if (!custodyOnly || nativeBroker || !databaseUrl || !z.uuid().safeParse(options.accountDeletionGrant).success) throw new SubscriptionRefusal('backend_unavailable')
+    // pgx passes this private setting on the original child stdin. Use the
+    // existing direct endpoint resolver so transaction pooling cannot leak it.
+    const target = new URL(sessionDatabaseURL(databaseUrl))
+    target.searchParams.set('mikka.byos_cleanup_grant', options.accountDeletionGrant)
+    databaseUrl = target.href
+  }
   // Capture the proxy's bound query while still in this request's DB scope;
   // later stream/tool callbacks must keep that same pool as the Go worker.
-  const database = captureDatabaseQuery(pool)
+  // 连接 reserves its sign-in in a short transaction (SubscriptionRepository.acquire),
+  // so the repository needs a checkout as well as the bound query. Without
+  // connect every new sign-in was refused as backend_unavailable.
+  const database = Object.assign(captureDatabaseQuery(pool), { connect: () => connectForCommitEffects(pool) })
   const infisicalOrigin = process.env.MIKKA_BYOS_INFISICAL_ORIGIN
   const project = process.env.MIKKA_BYOS_INFISICAL_PROJECT
   const environment = process.env.MIKKA_BYOS_INFISICAL_ENVIRONMENT
@@ -100,5 +112,5 @@ export function subscriptionRuntime(nativeBroker = false, custodyOnly = false, o
     // The private device route also requires a server allow-list and the hosted
     // runner capability. This never enables raw nativeAuth credential export.
     nativeIsolation: nativeBroker ? 'verified_runtime' : 'none'
-  }, undefined, authorizeSubscriptionUse, undefined, authorizeSubscriptionWorkspace)
+  }, undefined, authorizeSubscriptionUse, undefined, authorizeSubscriptionWorkspace, options.modelRequestPolicy)
 }

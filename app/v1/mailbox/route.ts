@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { verifyRunToken, workerRun } from '@/lib/mcp/worker'
 import { personalMailboxEnabled, personalWorkerMailbox } from '@/lib/personal-mailbox-runtime'
 import { withMailboxDiagnostics } from '@/lib/mailbox-diagnostics'

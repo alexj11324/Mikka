@@ -4,9 +4,11 @@ import { Pool, type PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { pool, withDatabaseClient } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
+import { observePoolCommits, withoutCommitEffectsForRestore } from '@/lib/db/commit-effects'
 import { artifactStorage, deleteArtifactObject } from '@/lib/artifacts/storage'
+import { DRIVE_STORAGE_PREFIX, driveStorageKey } from '@/lib/drive/blobs'
 import { auditDigest } from '@/lib/audit/integrity'
-import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, freezeTaskRetention, planWorkspaces, type Plan } from './delete'
+import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, freezeProjectRetention, freezeTaskRetention, planWorkspaces, type Plan } from './delete'
 import type { AccountCleanupReport } from './cleanup-result'
 import { cleanupAccountConnections } from './external-cleanup'
 import { AccountDeletionBusy, AccountDeletionLockLost, acquireAccountDeletionLock } from './deletion-lock'
@@ -30,7 +32,11 @@ export interface AccountDeletionOptions {
   /** Restore-only preservation decision from the independently retained current journal. */
   replayPlan?: Plan
 }
-const targets = (o: AccountDeletionOptions) => ({ main: o.mainPool ?? pool, workspace: o.workspacePool ?? workspacePool })
+const targets = (o: AccountDeletionOptions) => {
+  if (o.mainPool) observePoolCommits(o.mainPool)
+  if (o.workspacePool) observePoolCommits(o.workspacePool)
+  return { main: o.mainPool ?? pool, workspace: o.workspacePool ?? workspacePool }
+}
 const hashEmail = (email: string) => createHash('sha256').update(email.trim().toLowerCase()).digest('hex')
 const lockKey = (subject: string) => `mikka-account-write:${subject}`
 
@@ -113,7 +119,7 @@ async function prepare(job: AccountDeletionJob, options: AccountDeletionOptions,
     // This canonical guard and the Organization owner check commit together.
     // A refused request removes its guard while still holding the Org row.
     await guard(client, job.subjectUserId, job.id, job.requestedAt)
-    let planned: Plan | PreparationRefusal = await planWorkspaces(drizzle(client), job.subjectUserId, main)
+    let planned: Plan | PreparationRefusal = await planWorkspaces(drizzle(client), job.subjectUserId)
     if (!('soleAdminOf' in planned)) {
       try { await lockAccountOrganizationOwnership(drizzle(client), job.subjectUserId) }
       catch (error) {
@@ -168,7 +174,11 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       await lease.query('UPDATE account_deletion_jobs SET stage=\'external_pending\',"updatedAt"=now() WHERE id=$1', [id])
       let report: AccountCleanupReport
       try {
-        const result = await withDatabaseClient(lease, () => (options.externalCleanup ?? cleanupAccountConnections)(job.subjectUserId, main))
+        // The plan frozen in prepare() names the workspaces that go, so their paid plans are
+        // cancelled here, before any row this job removes can make the charge unreachable.
+        const result = await withDatabaseClient(lease, () => options.externalCleanup
+          ? options.externalCleanup(job.subjectUserId, main)
+          : cleanupAccountConnections(job.subjectUserId, main, { id, client: lease }, job.plan?.solo ?? []))
         report = Array.isArray(result) ? { blockedReasons: result, warnings: [] } : result
       } catch { report = { blockedReasons: ['external_cleanup_failed'], warnings: [] } }
       assertHeld()
@@ -183,7 +193,7 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       assertHeld()
       const frozen = await transaction(workspace, async client => {
         assertHeld()
-        const plan = options.replayPlan ?? await planWorkspaces(drizzle(client), job.subjectUserId, main)
+        const plan = options.replayPlan ?? await planWorkspaces(drizzle(client), job.subjectUserId)
         await lockAccountOrganizationOwnership(drizzle(client), job.subjectUserId)
         if (!('soleAdminOf' in plan) && plan.solo.length) await client.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") SELECT unnest($1::uuid[]),$2 ON CONFLICT DO NOTHING', [plan.solo, id])
         assertHeld()
@@ -205,8 +215,9 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       assertHeld()
       await transaction(workspace, async workspaceClient => {
         assertHeld()
-        const checked = await planWorkspaces(drizzle(workspaceClient), job.subjectUserId, main)
+        const checked = await planWorkspaces(drizzle(workspaceClient), job.subjectUserId)
         if (!options.replayPlan && ('soleAdminOf' in checked || auditDigest(checked) !== auditDigest(frozen))) throw new Error('accountDeletionWorkspaceChanged')
+        const projectRetained = await freezeProjectRetention(drizzle(workspaceClient), job.subjectUserId, frozen)
         // Existing order is Workspace -> Organization -> APP. Keep the Org
         // ownership decision locked until the APP deletion has committed.
         await lockAccountOrganizationOwnership(drizzle(workspaceClient), job.subjectUserId)
@@ -214,14 +225,16 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
         assertHeld()
         const retained = await transaction(main, async client => {
           assertHeld()
-          const retained = await freezeTaskRetention(client, job.subjectUserId, frozen)
+          const retained = await freezeTaskRetention(client, job.subjectUserId, projectRetained)
           const objects = await accountStorageKeys(client, job.subjectUserId, retained)
           const notBefore = !options.deleteObject && artifactStorage() === 'inline' ? (options.now?.() ?? new Date()) : objects.notBefore
           assertHeld()
-          await deleteMainAccountData(client, job.subjectUserId, retained)
+          // Capture the object handoff before DELETE triggers run. Both the receipt and
+          // the row removals still become visible together at the existing APP commit.
           await client.query('UPDATE account_deletion_jobs SET stage=\'main_deleted\',plan=$4,"pendingObjects"=$2,"storageNotBefore"=$3,"blockedReasons"=\'[]\',"updatedAt"=now() WHERE id=$1',
             [id, JSON.stringify(objects.keys), notBefore, JSON.stringify(retained)])
           assertHeld()
+          await deleteMainAccountData(client, job.subjectUserId, retained)
           return retained
         })
         assertHeld()
@@ -234,13 +247,15 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
     }
     if (job.stage === 'main_deleted') {
       assertHeld()
-      await transaction(workspace, async client => {
+      const retained = await transaction(workspace, async client => {
         assertHeld()
         await guard(client, job.subjectUserId, id, job.requestedAt)
-        await deleteWorkspaceData(drizzle(client), job.subjectUserId, job.subjectEmailHash, job.plan!)
+        const retained = await freezeProjectRetention(drizzle(client), job.subjectUserId, job.plan!)
+        await deleteWorkspaceData(drizzle(client), job.subjectUserId, job.subjectEmailHash, retained)
         assertHeld()
+        return retained
       })
-      await lease.query('UPDATE account_deletion_jobs SET stage=\'workspace_deleted\',"updatedAt"=now() WHERE id=$1', [id])
+      await lease.query('UPDATE account_deletion_jobs SET stage=\'workspace_deleted\',plan=$2,"updatedAt"=now() WHERE id=$1', [id, JSON.stringify(retained)])
       job = await load(lease, id)
     }
     if (job.stage === 'workspace_deleted' || job.stage === 'storage_pending') {
@@ -252,7 +267,12 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       const remove = options.deleteObject ?? (async (key: string) => { if (artifactStorage() === 'r2') await deleteArtifactObject(key) })
       for (const key of job.pendingObjects) {
         assertHeld()
-        try { await remove(key) }
+        // Older jobs could have captured another owner's Drive object. Its
+        // canonical storage key still identifies the owner after the APP sweep.
+        const digest = key.slice(-64)
+        const owned = !key.startsWith(DRIVE_STORAGE_PREFIX)
+          || (/^[a-f0-9]{64}$/.test(digest) && key === driveStorageKey(job.subjectUserId, digest))
+        try { if (owned) await remove(key) }
         catch {
           await lease.query('UPDATE account_deletion_jobs SET stage=\'storage_pending\',"blockedReasons"=\'["object_cleanup_failed"]\',"updatedAt"=now() WHERE id=$1', [id])
           return await load(lease, id)
@@ -328,6 +348,8 @@ export async function applyAccountDeletionManifest(manifest: AccountDeletionMani
       // Preserve that frozen decision without expanding the source solo deletion set.
       const retained: Plan = { ...source.plan!, keptIssueIds: [...new Set([
         ...source.plan!.keptIssueIds, ...(existing?.plan?.keptIssueIds ?? []),
+      ])].sort(), keptProjectIds: [...new Set([
+        ...(source.plan!.keptProjectIds ?? []), ...(existing?.plan?.keptProjectIds ?? []),
       ])].sort() }
       await guard(client, source.subjectUserId, source.id, new Date(source.requestedAt))
       // A retry must preserve the pending object list after its DB pointers have already gone.
@@ -342,7 +364,12 @@ export async function applyAccountDeletionManifest(manifest: AccountDeletionMani
       return retained
     })
     // Managed custody cleanup completed in the current journal; its warnings preserve upstream exceptions. Restore replays only local deletion against explicit isolated targets.
-    await resumeAccountDeletion(source.id, { ...options, externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }), replayPlan })
+    await withoutCommitEffectsForRestore([options.mainPool, options.workspacePool], () => resumeAccountDeletion(source.id, {
+      ...options,
+      externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }),
+      deleteObject: options.deleteObject ?? (async () => { throw new Error('accountDeletionRestoreObjectTargetRequired') }),
+      replayPlan,
+    }))
   }
   const remaining = (await options.mainPool.query('SELECT id FROM account_deletion_jobs WHERE id=ANY($1::uuid[]) AND stage<>\'completed\'', [[...ids]])).rows
   if (remaining.length) throw new Error('accountDeletionRestoreCleanupPending')

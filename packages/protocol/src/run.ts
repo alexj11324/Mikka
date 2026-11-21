@@ -7,6 +7,7 @@
 // the daemon builds `RunReport`s with it, the server validates them with it,
 // and `agent_run.report` stores exactly this shape.
 import { z } from "zod"
+import { profileSkillRunReportSchema } from "./skill"
 import { providerFailureSchema } from "./provider-failure"
 import { runFailureSchema } from "./run-failure"
 
@@ -117,6 +118,23 @@ export const runSkillMount = z.object({
 }).strict()
 export type RunSkillMount = z.infer<typeof runSkillMount>
 
+/**
+ * What one run's prompt carried of its skills. The daemon derives it from the
+ * same plan it built the skills section with, so the app can say which skills
+ * the agent was given in full and which it had to open a file to read.
+ */
+export const runSkillPrompt = z.object({
+  /** The character budget the bodies were measured against. */
+  budgetChars: z.number().int().nonnegative(),
+  /** Characters of bodies the inlined skills carried. */
+  usedChars: z.number().int().nonnegative(),
+  /** Skills whose whole body the prompt carried. */
+  inlined: z.array(z.string().min(1).max(80)).max(20),
+  /** Skills the prompt named by description only, in the order given. */
+  deferred: z.array(z.string().min(1).max(80)).max(20),
+}).strict()
+export type RunSkillPrompt = z.infer<typeof runSkillPrompt>
+
 export const CRITERION_STATUSES = ["passed", "failed", "unverified"] as const
 export const criterionStatus = z.enum(CRITERION_STATUSES)
 export type CriterionStatus = z.infer<typeof criterionStatus>
@@ -163,6 +181,8 @@ export const runSafePoint = z.object({
  * the files changed in the worktree and its own verify result, so an agent
  * cannot report its own verify as passed.
  */
+export const runVisualEvidence = z.array(z.object({ captureId: z.uuid(), publicSafe: z.literal(true) }).strict()).max(40)
+
 export const runReport = z.object({
   repositorySelection: runRepositorySelection.optional(),
   /** Worktree base journaled before the adapter started; never agent-supplied. */
@@ -170,6 +190,21 @@ export const runReport = z.object({
   /** Daemon-created local snapshot of a non-repository delivery; never a published code candidate. */
   deliverableCommit: z.string().regex(/^[a-f0-9]{40}$/).optional(),
   skillMount: runSkillMount.optional(),
+  /**
+   * Which of the run's skills its prompt carried in full, and which it listed
+   * by description only because their bodies did not fit the prompt budget.
+   * The daemon sets this from the same plan it built the prompt with; the app
+   * shows the deferred ones, so a body the agent had to go read is visible
+   * rather than silently missing.
+   *
+   * Distinct from `profileSkills` below: that reports Profile Skills the agent
+   * loads on demand through `load_skill`, this reports the workspace skills
+   * this prompt inlined or deferred.
+   */
+  skillPrompt: runSkillPrompt.optional(),
+  /** Profile Skills the run selected and the ones its agent actually loaded
+   * through `load_skill`. Daemon-authored; assigned is never loaded. */
+  profileSkills: profileSkillRunReportSchema.optional(),
   execution: runExecution.optional(),
   runtime: runRuntime.optional(),
   /** What was done, in a few sentences. Empty when the run crashed early. */
@@ -216,6 +251,10 @@ export const runReport = z.object({
   previewDatabaseBranch: z.string().trim().min(1).max(500).optional(),
   /** Acceptance criteria the agent checked, with evidence. */
   criteria: z.array(runCriterion).max(200).optional(),
+  /** Captures from this run whose full visible content was checked for public sharing.
+   * This is an explicit content review, not an automatic pixel-redaction claim.
+   * The server resolves capture ownership and creates the existing share URL. */
+  visualEvidence: runVisualEvidence.optional(),
   /** A review completes once; this verdict never changes daemon-owned verification. */
   reviewVerdict: reviewVerdict.optional(),
   /**

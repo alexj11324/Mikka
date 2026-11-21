@@ -12,15 +12,15 @@ test('MCP permission grants require the existing human session boundary', { skip
   const home = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
   const team = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: peer, role: 'member' }])
   const nativeToken = randomBytes(32).toString('base64url')
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
   mock.module('@/lib/auth', { namedExports: {
     MOBILE_APP_ORIGIN: 'mikka://',
     auth: { api: { getSession: async ({ headers }: { headers: Headers }) => headers.get('cookie') === 'human-fixture' || headers.get('authorization') === `Bearer ${nativeToken}` ? {
       user: { id: owner, name: 'Fixture', email: `${owner}@example.invalid`, image: null }, session: { id: 'synthetic-human-session' },
     } : null } },
   } })
-  const { createPersonalAccessToken } = await import('../tokens/store')
-  const token = await createPersonalAccessToken(owner, home.id, { name: 'Confined fixture token' })
+  const { createLegacyPersonalAccessToken } = await import('../tokens/store')
+  const token = await createLegacyPersonalAccessToken(owner, home.id, { name: 'Confined fixture token' })
   const { personalPlugins, workspaceMcp } = await import('./runtime')
   const server = await personalPlugins.createMcp(owner, { name: 'Private fixture', url: 'https://mcp.example.invalid/', transport: 'http', enabled: true })
   const route = await import('../../app/api/integrations/mcp/shares/route')

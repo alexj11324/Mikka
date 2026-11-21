@@ -6,7 +6,7 @@ import { Pool } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { eq } from 'drizzle-orm'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import * as workspaceSchema from '../lib/db/workspace-schema'
 import { workspaceEntitlements } from '../lib/db/team-entitlements-schema'
 import { activeHumanSeats, assertActiveHumanAdmission, lockWorkspaceEntitlements } from '../lib/governance/entitlements'
@@ -24,7 +24,7 @@ if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 test('real PostgreSQL serializes seats across acceptance and restoration', { skip: !url, timeout: 120_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const name = `governance_seats_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(url!); target.pathname = `/${name}`
   const pool = new Pool({ connectionString: target.toString(), max: 10 })
   const quotaPool = new Pool({ connectionString: target.toString(), max: 5 })
@@ -32,7 +32,8 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
   try {
     await pool.query(`CREATE TABLE mikka_workspaces (id uuid PRIMARY KEY,"userId" text NOT NULL,name varchar(120) NOT NULL,slug varchar(64) UNIQUE,icon text,kind text NOT NULL DEFAULT 'team',"createdAt" timestamptz NOT NULL DEFAULT now());
       CREATE TABLE mikka_workspace_members ("workspaceId" uuid NOT NULL,"userId" text NOT NULL,name text NOT NULL,email text NOT NULL,role text NOT NULL,status text NOT NULL DEFAULT 'active',"createdAt" timestamptz NOT NULL DEFAULT now(),PRIMARY KEY("workspaceId","userId"));
-      CREATE TABLE mikka_workspace_invitations (id uuid PRIMARY KEY,"workspaceId" uuid NOT NULL,"userId" text NOT NULL,email text NOT NULL,role text NOT NULL,"tokenHash" text NOT NULL UNIQUE,status text NOT NULL DEFAULT 'pending',"expiresAt" timestamptz NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now(),UNIQUE("workspaceId",email));`)
+      CREATE TABLE mikka_workspace_invitations (id uuid PRIMARY KEY,"workspaceId" uuid NOT NULL,"userId" text NOT NULL,email text NOT NULL,role text NOT NULL,"tokenHash" text NOT NULL UNIQUE,status text NOT NULL DEFAULT 'pending',"expiresAt" timestamptz NOT NULL,"createdAt" timestamptz NOT NULL DEFAULT now(),UNIQUE("workspaceId",email));
+      CREATE TABLE workspace_projects (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid,"leadUserId" text,"archivedAt" timestamptz);`)
     const { planWorkspaces } = await import('../lib/account/delete')
     const legacyPersonal = randomUUID()
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,'legacy-owner','Legacy','personal');`, [legacyPersonal])
@@ -177,6 +178,10 @@ test('real PostgreSQL serializes seats across acceptance and restoration', { ski
           "generationId" text,"createdAt" timestamptz default now(),"settledAt" timestamptz);`)
       await pool.query(await readFile(new URL('../drizzle/20261110150010_plan_credit_usage.sql', import.meta.url), 'utf8'))
       await pool.query(await readFile(new URL('../drizzle/20261110150011_resource_budgets.sql', import.meta.url), 'utf8'))
+      // The fixture above hand-lists the columns it needs; this settlement path
+      // also writes the cache breakdown, so the migration that adds those two
+      // columns has to run too rather than being restated by hand.
+      await pool.query(await readFile(new URL('../drizzle/20261111060000_hosted_usage_token_breakdown.sql', import.meta.url), 'utf8'))
       const id = await workspace(1)
       await db.insert(workspaceEntitlements).values({ workspaceId: id, plan: 'pro', source: 'cloud', seatLimit: 20 })
       await pool.query('insert into hosted_verifications values($1)', [id])

@@ -1,0 +1,14 @@
+{
+  "name": "@mikka/eve",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "eve build",
+    "start": "eve start --host 127.0.0.1 --port 3002",
+    "dev": "eve dev --no-ui --host 127.0.0.1 --port 3002"
+  },
+  "dependencies": {
+    "@workflow/world-postgres": "5.2.0",
+    "eve": "1.0.0-rc.9"
+  }
+}

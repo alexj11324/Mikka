@@ -10,7 +10,7 @@ import { PgDialect, PgTable, getTableConfig } from 'drizzle-orm/pg-core'
 import * as workspaceSchema from '../lib/db/workspace-schema'
 import * as teamSchema from '../lib/db/team-schema'
 import * as projectSchema from '../lib/db/project-schema'
-import { dropTestDatabase, endPoolsAndWait } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase, endPoolsAndWait } from './support/drop-test-database'
 
 const mainURL = process.env.E2E_DATABASE_URL
 function isolated(value: string) {
@@ -52,7 +52,7 @@ test('workspace mutations retain and idempotently deliver audit intent across tw
   const previousWorkspace = process.env.DATABASE_URL
   const allocated = !process.env.AUDIT_WORKSPACE_DATABASE_URL
   const target = new URL(mainURL!), databaseName = `audit_delivery_${randomUUID().replaceAll('-', '')}_e2e`
-  if (allocated) { await main.query(`CREATE DATABASE "${databaseName}"`); target.pathname = `/${databaseName}` }
+  if (allocated) { await createTestDatabase(main, databaseName); target.pathname = `/${databaseName}` }
   const workspaceURL = process.env.AUDIT_WORKSPACE_DATABASE_URL ?? target.href
   isolated(workspaceURL)
   assert.notEqual(new URL(workspaceURL).pathname, new URL(mainURL!).pathname)
@@ -62,8 +62,8 @@ test('workspace mutations retain and idempotently deliver audit intent across tw
   let user = actor
   const translate = Object.assign((key: string) => key, { has: () => true })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => user } })
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set() {}, delete() {} }) } })
-  mock.module('next-intl/server', { namedExports: { getTranslations: async () => translate, getLocale: async () => 'en' } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set() {}, delete() {} }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => translate, getLocale: async () => 'en' } })
   await prepareWorkspace(workspace)
   const [{ deliverWorkspaceAudits, enqueueWorkspaceAudit }, actions, general, members, { workspaceDb, workspacePool }, { pool }] = await Promise.all([
     import('../lib/audit/delivery'), import('../app/actions/workspace'), import('../lib/workspace-admin/general'), import('../lib/workspace-admin/members'), import('../lib/workspace-db'), import('../lib/db'),

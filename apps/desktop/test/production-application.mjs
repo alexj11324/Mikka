@@ -1,13 +1,9 @@
-import { lstat, readFile, realpath } from 'node:fs/promises'
-import { resolve, sep } from 'node:path'
+import { realpath } from 'node:fs/promises'
+import { resolve } from 'node:path'
 import { readCompiledBuild } from '../../../scripts/start-app.mjs'
 
 const revision = /^[a-f0-9]{40}$/
 const fail = code => { throw new Error(code) }
-
-async function exists(path) {
-  try { await lstat(path); return true } catch (error) { if (error.code === 'ENOENT') return false; throw error }
-}
 
 /** Each independent listener is a real same-origin application. Keep the
  * descriptor/DB/lease environment unchanged; only its public auth/RPC origin
@@ -28,18 +24,11 @@ export async function productionApplication(directory, { expectedRevision, hostn
     || !Number.isSafeInteger(port) || port < 1 || port > 65535) fail('DESKTOP_TEST_SERVER_ADDRESS_INVALID')
   const root = await realpath(directory)
   const prefix = preload ? ['--require', resolve(preload)] : []
-  if (await exists(resolve(root, '.output/mikka-build.json'))) {
-    const built = await readCompiledBuild(root, { expectedRevision })
-    return { kind: 'nitro', revision: built.revision, appBuild: built.appBuild,
-      args: [...prefix, resolve(root, 'scripts/start-app.mjs'), '--hostname', hostname, '--port', String(port)] }
-  }
-  const path = resolve(root, '.next/required-server-files.json')
-  const info = await lstat(path)
-  if (!info.isFile() || info.isSymbolicLink() || !(await realpath(path)).startsWith(`${root}${sep}`)) fail('DESKTOP_TEST_COMPILED_FILE_INVALID')
-  const built = JSON.parse(await readFile(path, 'utf8'))
-  if (built.config?.env?.MIKKA_TEST_BUILD_SHA !== expectedRevision) fail('DESKTOP_TEST_COMPILED_REVISION_MISMATCH')
-  return { kind: 'next', revision: expectedRevision,
-    args: [...prefix, resolve(root, 'node_modules/next/dist/bin/next'), 'start', '--hostname', hostname, '--port', String(port)] }
+  // The application is always the compiled Nitro build; there is no Next
+  // server to start, so a directory without it fails closed.
+  const built = await readCompiledBuild(root, { expectedRevision })
+  return { kind: 'nitro', revision: built.revision, appBuild: built.appBuild,
+    args: [...prefix, resolve(root, 'scripts/start-app.mjs'), '--hostname', hostname, '--port', String(port)] }
 }
 
 /** Stop only a child created by the calling harness. Completion means its exit

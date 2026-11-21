@@ -17,6 +17,8 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 - [Dependency-aware CI](ci/incremental.md) explains affected checks, fallback
   coverage and required gates.
 - [Workflow reference](../.github/workflows/README.md) maps CI and release jobs.
+- [Test ownership and CI cost](ci/test-ownership.md) explains regression
+  ownership, consolidation evidence and CI performance measurements.
 
 ## Understand the product and design
 
@@ -25,9 +27,9 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 - [Glossary](design/glossary.md) defines bots, chats, threads and Agents.
 - [Rules](design/rules.md), [components](design/components.md) and
   [copy](design/copy.md) guide product and UI changes.
-- [Decision records](design/decisions/README.md) explain how to record or
-  supersede a decision. [Earlier decisions](design/decisions.md) remain frozen
-  history with the authority described by that guide.
+- [Effective design and product rules](design/README.md) are read first. Dated
+  [decision records](design/decisions/README.md) explain provenance; superseded
+  entries and the [legacy decision log](design/decisions.md) are not active instructions.
 - [Feature specification template](design/spec-template.md) supplies the
   structure for a feature specification.
 - [Execution rules](execution-rules.md) describe model and machine selection.
@@ -35,7 +37,8 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 
 ## Connect and run Mikka
 
-- [Self-hosting](self-hosting.md) deploys the public server and connects clients.
+- [Community self-hosting](self-hosting.md) deploys the public server and connects clients.
+- [Existing self-hosted releases and upgrades](self-hosted-updates.md) covers published images, backups, migration gates and signed release notifications.
 - [Self-hosted model credentials](self-hosting-byok.md),
   [realtime](self-hosting-realtime.md) and
   [GitHub cloud connection](self-hosting-github-cloud.md) cover their setup.
@@ -51,19 +54,36 @@ for the part of Mikka you are changing. Development and acceptance rules live in
 - [Isolated test accounts](test-accounts.md) describes the loopback account pool
   and its application, database and lease boundaries.
 - [UI review checklist](review-checklist.md) applies before presenting UI.
+- [Current build source of truth](operations/build-source-of-truth.md) separates public-root official builds, private UI Overlay, Cloudflare CI and the transitional OCI publisher.
 - [Shared web and desktop runtime](operations/web-runtime.md) documents build
   outputs, startup and rollback.
-- [Web deployment](operations/web-deploy.md) covers production publication.
-- [Production smoke](production-smoke.md) describes the automatic deployed check.
+- [Hosted operations](operations/README.md) directs authorized operators to the private deployment and credential runbooks.
+- [Web deployment](operations/web-deploy.md) and [production smoke](production-smoke.md) retain links to their private operating guides.
 - [Tracing](operations/tracing.md) locates requests and database queries.
-- [Infisical Cloud](infisical-cloud.md) describes existing credential delivery.
+- [Hosted credential operations](infisical-cloud.md) points to the private operating guide.
 
 - [Inbox API](inbox-api.md) defines pending, snoozed and completed items, actions, permissions and live refresh.
 
+## Historical media and large evidence
+
+Keep current design decisions, product contracts, operating guides, and active
+acceptance evidence in their authoritative locations. A completed task's dated
+research screenshots or very large raw evidence payloads may be moved out of
+the working tree **only after** confirming its current file references, linking
+back to an immutable commit containing the original bytes, and preserving the
+summary, version binding, checksums and recovery instructions.
+
+For future large visual evidence, prefer a durable artifact location with a
+known retention policy and link it from the PR/issue and the concise repository
+receipt. Do not use expiring CI artifacts as the sole archival copy. Never
+delete active issue evidence, executable fixtures, decision records or release
+proof just because a file looks old or unreferenced. Removing a tracked file
+reduces the present checkout, **not** the repository's existing Git history;
+do not rewrite shared history to reduce size.
+
 ## Update documentation
 
-[2026-11-08 全仓审校记录](audits/2026-11-08-documentation-refresh.md)列出本次覆盖的
-每一份文档、修改范围和验证边界。
+Dated audits and screenshot snapshots are not a second source of operating instructions. Consult live code, accepted current rules and the active release owner first; use Git history only when investigating old evidence.
 
 Use [`update-docs`](../.claude/skills/update-docs/SKILL.md) to discover affected
 pages and [`technical-documentation`](../.claude/skills/technical-documentation/SKILL.md)

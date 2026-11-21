@@ -1,3 +1,15 @@
+export const ACCEPTANCE_REPLAY_MARKER = '__mikkaAcceptanceReplayUntil'
+
+/** An owned document may explicitly admit automation during bounded acceptance.
+ * This qualifies initialization only; closing the context ends the SDK instance. */
+export function acceptanceReplayOptIn(target: object, now = Date.now()): boolean {
+  try {
+    const deadline = Object.getOwnPropertyDescriptor(target, ACCEPTANCE_REPLAY_MARKER)?.value
+    return typeof deadline === 'number' && Number.isSafeInteger(deadline)
+      && deadline > now && deadline <= now + 600_000
+  } catch { return false }
+}
+
 type ReplayClient = {
   onSessionId(callback: (sessionId: string) => void): () => void
   sessionRecordingStarted(): boolean

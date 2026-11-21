@@ -10,21 +10,30 @@ services:
       - "127.0.0.1:${MIKKA_PORT:-3000}:3000"
     environment:
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
-      MIKKA_COMMUNITY_UI: ${MIKKA_COMMUNITY_UI:-0}
       MIKKA_DATABASE_URL: postgres://mikka:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/mikka
       DATABASE_URL: postgres://mikka:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/mikka
       MIKKA_EMAIL_FROM: ${MIKKA_EMAIL_FROM:-}
       SMTP_URL: ${SMTP_URL:-}
       RESEND_API_KEY: ${RESEND_API_KEY:-}
-      MIKKA_DEFAULT_MODEL_BASE_URL: ${MIKKA_DEFAULT_MODEL_BASE_URL:-}
-      MIKKA_DEFAULT_MODEL_API_KEY: ${MIKKA_DEFAULT_MODEL_API_KEY:-}
-      MIKKA_DEFAULT_MODEL_ID: ${MIKKA_DEFAULT_MODEL_ID:-}
+      MIKKA_LITELLM_URL: ${MIKKA_LITELLM_URL:-http://litellm:4000}
+      MIKKA_LITELLM_MASTER_KEY: ${MIKKA_LITELLM_MASTER_KEY:?Set MIKKA_LITELLM_MASTER_KEY in .env}
     volumes:
       - app-data:/data
     depends_on:
+      litellm:
+        condition: service_started
       postgres:
         condition: service_healthy
     stop_grace_period: 60s
+  # Mandatory model egress. Upstream credentials stay in this service.
+  litellm:
+    build: ./deploy/litellm
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LITELLM_MASTER_KEY: ${MIKKA_LITELLM_MASTER_KEY:?Set MIKKA_LITELLM_MASTER_KEY in .env}
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped

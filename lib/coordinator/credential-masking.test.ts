@@ -38,8 +38,8 @@ stub('../artifacts/store.ts', { artifactSummaries: () => {} })
 stub('./wake.ts', { coordinatorEnabled: () => false, wakeCoordinator: async () => {} })
 stub('../live/coordinator-session.ts', { coordinatorSessionChanged: async () => {}, coordinatorSessionScope: async () => null })
 
-let store: typeof import('./store')
-before(async () => { store = await import('./store') })
+let store: typeof import('@/tests/support/legacy-coordinator-store')
+before(async () => { store = await import('@/tests/support/legacy-coordinator-store') })
 
 test('assistant text, tool results and the stored warning are saved with GitHub tokens masked', async () => {
   inserted.length = 0; updates.length = 0

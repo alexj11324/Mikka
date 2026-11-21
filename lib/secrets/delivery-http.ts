@@ -70,7 +70,7 @@ export function createSecretDeliveryHandler(dependencies: {
     // Match delegated prefixes case-insensitively as an additional guard. A
     // valid-looking opaque device token still fails the real session lookup,
     // with its ambient cookie removed by humanSessionHeaders.
-    if (/^Bearer\s+(?:mkp_|mka_|mkr_)/i.test(request.headers.get('authorization') ?? '')) return reply({ error: 'authRequired' }, 401)
+    if (/^Bearer\s+(?:mkp_|mka_|mkr_|mksvc_)/i.test(request.headers.get('authorization') ?? '')) return reply({ error: 'authRequired' }, 401)
     const sessionHeaders = humanSessionHeaders(request)
     if (!sessionHeaders) return reply({ error: 'authRequired' }, 401)
     try {

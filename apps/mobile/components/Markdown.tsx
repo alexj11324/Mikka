@@ -91,7 +91,8 @@ function parseBlocks(text: string): Block[] {
   return blocks
 }
 
-const INLINE = /\[\[(issue|run):([0-9a-f-]{36})\]\]|\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?。，；：！？])/gi
+// A backslash quotes ASCII punctuation in Markdown, including literal brackets in a Task mention name.
+const INLINE = /\[\[(issue|run):([0-9a-f-]{36})\]\]|\*\*([^*]+)\*\*|`([^`]+)`|\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)|(https?:\/\/[^\s<>()]+[^\s<>().,;:!?。，；：！？])|\\([!-/:-@\[-`{-~])/gi
 
 function inline(text: string, sources: Record<string, CitationSource>, onOpen: ((source: CitationSource) => void) | undefined, color: string, hidden: Set<string>): ReactNode[] {
   const parts: ReactNode[] = []
@@ -108,6 +109,7 @@ function inline(text: string, sources: Record<string, CitationSource>, onOpen: (
       } else if (source) parts.push(<MentionChip key={key++} source={source} onPress={() => onOpen?.(source)} />)
     } else if (match[3]) parts.push(<Text key={key++} style={{ fontWeight: '600', color }}>{match[3]}</Text>)
     else if (match[4]) parts.push(<Text key={key++} style={styles.code}>{match[4]}</Text>)
+    else if (match[8]) parts.push(match[8])
     else {
       const url = match[6] ?? match[7]
       parts.push(<Text key={key++} style={styles.link} onPress={() => void Linking.openURL(url)}>{match[5] ?? url}</Text>)

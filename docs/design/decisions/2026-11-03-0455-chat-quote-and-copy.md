@@ -4,6 +4,7 @@
 - Source: Alex accepted the Figma page 902:2 「待 Alex 确认 · 聊天引用与复制（2026-11-03）」 in file `zPe5LKycb2XuT1ivCLRw07` on 2026-11-03, relayed by the Coordinator session of the chat-components batch. Each frame shows light (left) and dark (right).
 - Rule: —
 - Replaces: —
+- Amended by: [2026-11-10-2002-chat-reply-actions-and-waiting](2026-11-10-2002-chat-reply-actions-and-waiting.md) (a reply's actions are always visible, not hover-only)
 
 Accepted frames:
 

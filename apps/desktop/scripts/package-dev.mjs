@@ -28,7 +28,9 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const cwd = fileURLToPath(new URL('..', import.meta.url))
   const env = devPackageEnvironment(process.env)
   const buildArgs = ['node_modules/electron-builder/cli.js', '--config', `electron-builder.${variant}.yml`, '--mac', '--arm64', '--publish', 'never', ...(variant === 'acceptance' ? ['--dir'] : [])]
-  for (const command of [['scripts/build.mjs'], buildArgs]) {
+  const renderer = ['scripts/build.mjs']
+  if (variant === 'acceptance' && !env.MIKKA_UI_OVERLAY_DIR && !env.MIKKA_UI_OVERLAY_SHA) renderer.push('--public-test-fixture')
+  for (const command of [renderer, buildArgs]) {
     const result = spawnSync(process.execPath, command, { cwd, env, stdio: 'inherit' })
     if (result.error) throw new Error('Mikka Dev packaging could not start', { cause: result.error })
     if (result.status !== 0) process.exit(result.status ?? 1)

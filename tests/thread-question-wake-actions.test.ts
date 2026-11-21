@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { before, beforeEach, mock, test } from 'node:test'
+import { afterEach, before, beforeEach, mock, test } from 'node:test'
 import { z } from 'zod'
 import { PgDialect } from 'drizzle-orm/pg-core'
 import type { SQL } from 'drizzle-orm'
@@ -21,6 +21,8 @@ let currentStatus = 'queued', selectedRun = CHILD, hostError: Error | null = nul
 let memberIds: string[] = [], factoryEnabled = true
 let questionState: 'resuming' | 'waiting' | null = 'resuming', wakeFailure: typeof failure | null = failure
 const wakes: unknown[][] = [], reads: unknown[][] = [], ordinary: unknown[][] = []
+const revisionFailures: unknown[] = []
+afterEach(() => assert.deepEqual(revisionFailures.splice(0), [], 'Live revision SQL cannot fail silently in the wake fixture'))
 const pool = { query: async () => ({ rows: [], rowCount: 0 }) }
 const fixtureRun = () => ({ id: selectedRun, issueId: ISSUE, userId: OWNER, workspaceId: WORKSPACE,
   status: selectedRun === ORIGIN ? 'stopped' : currentStatus, prompt: 'Fixture task', sessionId: null,
@@ -37,7 +39,7 @@ function selection(rows: unknown[]) {
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 let actions: typeof import('../app/actions/agents')
 before(async () => {
-  mock.module('next/headers', { namedExports: { headers: async () => requestHeaders } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => requestHeaders } })
   stub('../lib/auth.ts', { auth: { api: { getSession: async () => ({ user: { id: viewer }, session: { id: 'fixture-human-session' } }) } } })
   stub('../lib/db/index.ts', { pool, db: { select: (fields: Record<string, unknown>) => {
     if ('prompt' in fields) return selection([fixtureRun()])
@@ -47,6 +49,19 @@ before(async () => {
     }
     return selection('id' in fields ? memberIds.map(id => ({ id })) : [])
   } } })
+  stub('../lib/db/request-scope.ts', {
+    inDatabaseTransaction: () => false,
+    withoutDatabaseClient: (work: () => unknown) => work(),
+    pool: { async query(sql: string, params: [string[], string[]]) {
+      try {
+        assert.equal(sql.replace(/\s+/g, ' ').trim(), 'SELECT r.kind, r.id::text AS id, r.revision FROM live_revisions r JOIN unnest($1::text[], $2::uuid[]) AS t(k, i) ON r.kind = t.k AND r.id = t.i')
+        assert.deepEqual(params[0], ['run', 'thread'])
+        assert.equal(params[1].length, 2); assert.equal(params[1][0], params[1][1])
+        return { rows: params[0].flatMap((kind, index) => [ORIGIN, CHILD].includes(params[1][index])
+          ? [{ kind, id: params[1][index], revision: '7' }] : []) }
+      } catch (error) { revisionFailures.push(error); throw error }
+    } },
+  })
   stub('../lib/workspace-db.ts', { workspaceDb: { select: () => ({ from: (table: unknown) => {
     assert.equal(table, workspaceMembers)
     return { where: (condition: SQL) => {
@@ -57,10 +72,15 @@ before(async () => {
   } }) }, workspacePool: pool })
   stub('../lib/workspace-access.ts', { loadWorkspaceContext: () => assert.fail('workspace selection outside task-bound wake fixture') })
   stub('../lib/deployment-switches.ts', { deploymentSwitch: () => factoryEnabled })
-  stub('../lib/issue-access.ts', { requireIssueAccess: async () => ({ issue: { id: ISSUE, userId: OWNER, workspaceId: WORKSPACE }, user: { id: viewer } }) })
+  stub('../lib/issue-access.ts', { requireIssueAccessWithoutBody: async () => ({ issue: { id: ISSUE, userId: OWNER, workspaceId: WORKSPACE }, user: { id: viewer } }) })
   stub('../lib/device-link.ts', { issueDeviceToken: () => assert.fail('no device token') })
   stub('../lib/device-presence.ts', { deviceOnlineStates: () => assert.fail('no device selection') })
-  stub('../lib/device-removal.ts', { removeOwnedDevice: () => assert.fail('no device removal'), renameOwnedDevice: () => assert.fail('no rename') })
+  stub('../lib/device-removal.ts', {
+    removeOwnedDevice: () => assert.fail('no device removal'),
+    renameOwnedDevice: () => assert.fail('no rename'),
+    setOwnedDeviceDescription: () => assert.fail('no device description change'),
+    setOwnedDeviceEnabled: () => assert.fail('no device scheduling change'),
+  })
   stub('../lib/device-management.ts', { enqueueDeviceCommand: () => assert.fail('no device command') })
   stub('../lib/ssh.ts', { listSshHosts: () => [] })
   stub('../lib/coordinator/store.ts', { citationSources: () => ({}) })
@@ -123,6 +143,7 @@ test('a stale generation refused by the host never falls through to ordinary dis
 test('the owner detail reads only the current queued question child failure, preserving its queued state', async () => {
   selectedRun = ORIGIN
   const detail = await actions.getIssueThread(ISSUE, ORIGIN)
+  assert.deepEqual(detail.live?.revisions, { [`run:${ORIGIN}`]: 7, [`thread:${ORIGIN}`]: 7 })
   assert.deepEqual(reads, [[pool, OWNER, CHILD]])
   assert.deepEqual(detail.thread.questionWake, failure)
   assert.equal(detail.thread.retryAvailable, true, 'the host-confirmed queued wake keeps its explicit Retry')

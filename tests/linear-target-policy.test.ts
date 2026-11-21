@@ -8,7 +8,8 @@ function reader(rows:unknown[][]) {
   let index=0, writes=0
   const executor={
     select() {
-      const result=rows[index++] ?? []
+      assert.ok(index<rows.length,'unexpected publication read')
+      const result=rows[index++]
       const chain={from:()=>chain,innerJoin:()=>chain,where:()=>chain,for:async()=>result,limit:async()=>result}
       return chain
     },

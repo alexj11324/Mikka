@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { MetadataRequest } from './issue-metadata-controls'
 import useSWR from 'swr'
-import { Check, CircleUserRound, Send, UserRound } from 'lucide-react'
+import { Check, CircleUserRound, Send, UserRound } from '@/components/icons'
 import { getIssuePropertyOptions } from '@/app/actions/issue-metadata'
 import type { IssueMetadata } from '@/lib/issue-metadata'
 import { Button } from '@/components/ui/button'

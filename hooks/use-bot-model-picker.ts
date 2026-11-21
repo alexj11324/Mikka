@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useEffect, useRef, useState } from 'react'
+import useSWR, { useSWRConfig } from 'swr'
+import { toast } from 'sonner'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { chooseBotModel, getBotModelMenu, refreshBotModelMenuAction } from '@/app/actions/execution-settings'
-import { HOSTED_CHOICE, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
+import { previewBotModelChoice } from '@/lib/bot-model-optimistic'
+import { withChosenModel, type BotModelCurrent, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'
+import { modelVendorName } from '@/components/labels/model-vendor-mark'
 
 export type ModelPickerT = ReturnType<typeof useTranslations<'Coordinator.modelPicker'>>
 
@@ -22,11 +25,11 @@ function providerName(provider: string | undefined) {
   return provider === 'claude' ? 'Claude' : 'ChatGPT'
 }
 
-/** A menu group's heading: Mikka, the subscription's plan, or the key it bills. */
+/** A menu group's heading: Mikka 额度, the subscription's plan, or the key it bills. */
 export function modelGroupHeading(t: ModelPickerT, group: BotModelMenuGroup) {
   const credential = group.credentialLabel ? ` · ${group.credentialLabel}` : ''
   switch (group.kind) {
-    case 'hosted': return 'Mikka'
+    case 'hosted': return t('creditsGroup')
     // The plan names it (Claude Max, ChatGPT Pro): everything but a share is the person's own (decision 2026-10-31-2330).
     case 'subscription': return `${group.plan ? `${providerName(group.provider)} ${group.plan}` : providerName(group.provider)}${credential}`
     case 'apiKey': return `${t('apiKey')}${credential}`
@@ -37,24 +40,64 @@ export function modelGroupHeading(t: ModelPickerT, group: BotModelMenuGroup) {
 /** What sits at the right of an item: who pays for it. A subscription item has none. */
 export function modelGroupTag(t: ModelPickerT, group: BotModelMenuGroup) {
   switch (group.kind) {
-    // The points it can spend in this chat's workspace, not the person's elsewhere (decision 2026-11-02-1450).
-    case 'hosted': return group.hostedSource === 'cloud' ? t('cloudCredits') : group.hostedSource === 'self-hosted' ? t('ownProvider') : group.trialLeft !== undefined ? t('trialLeft', { count: group.trialLeft }) : group.points === undefined ? t('credits') : t('points', { points: group.points })
+    // The picker shows no balance (decision 2026-11-15-1900); each Mikka 额度 row carries its own list price.
+    case 'hosted': return group.hostedSource === 'cloud' ? t('cloudCredits') : group.hostedSource === 'self-hosted' ? t('ownProvider') : null
     case 'apiKey': return t('metered')
     case 'shared': return group.owner ? t('sharedKey', { name: group.owner }) : null
     default: return null
   }
 }
 
-export type ChipModel = Pick<BotModelMenuOption, 'id' | 'modelId' | 'provider'>
+/** A Mikka 额度 row's list price, USD per million tokens in and out: 「$3 / $15」. */
+export function modelPriceTag(option: Pick<BotModelMenuOption, 'price'>) {
+  if (!option.price) return null
+  const usd = (value: number) => `$${Number(value.toFixed(value < 1 ? 3 : 2))}`
+  return `${usd(option.price.input)} / ${usd(option.price.output)}`
+}
 
-/** Where this browser keeps the model a chat's chip showed last; someone else's bot or a failed menu clears it. */
-const lastChipKey = (botId: string | null) => `mikka:model-chip:${botId ?? 'coordinator'}`
+const SERVICE_NAMES: Record<string, string> = { claude: 'Claude', codex: 'ChatGPT' }
 
-function readChip(value: string | null): ChipModel | null {
+/**
+ * What pays for a model, in one line (decision 2026-11-15-1900): 用你的 Claude 订阅,
+ * 用 DeepSeek API Key（尾号 1234），不扣 Mikka 额度, 用 Mikka 额度，按厂商原价.
+ * `current` adds a used-up subscription's state.
+ */
+export function modelSourceLabel(t: ModelPickerT, group: Pick<BotModelMenuGroup, 'kind' | 'provider' | 'owner' | 'credentialLabel' | 'hostedSource'>,
+  option: Pick<BotModelMenuOption, 'provider' | 'modelId'>, current?: Pick<BotModelCurrent, 'availability' | 'quota'>): string {
+  const service = SERVICE_NAMES[group.provider ?? option.provider] ?? providerName(group.provider ?? option.provider)
+  const vendor = option.provider && option.provider !== 'custom' ? modelVendorName(`${option.provider}/model`) : ''
+  switch (group.kind) {
+    case 'hosted': return group.hostedSource === 'self-hosted' ? t('source.ownProvider') : t('source.credits')
+    case 'subscription': {
+      if (current?.availability === 'exhausted' && current.quota) return current.quota.resetsAt
+        ? t('source.usedUntil', { service, time: new Date(current.quota.resetsAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) })
+        : t('source.usedUp', { service })
+      return t('source.subscription', { service })
+    }
+    case 'apiKey': {
+      const last4 = /····(\S+)$/.exec(group.credentialLabel ?? '')?.[1]
+      const name = vendor || group.credentialLabel || t('apiKey')
+      return last4 ? t('source.apiKey', { vendor: name, last4 }) : t('source.apiKeyPlain', { vendor: name })
+    }
+    case 'shared': return t('source.sharedKey', { name: group.owner ?? '', vendor: vendor || t('apiKey') })
+  }
+}
+
+export type ChipModel = Pick<BotModelMenuOption, 'id' | 'modelId' | 'provider'> & Partial<Pick<BotModelMenuOption, 'name'>>
+
+/** A scope is available only on the active authenticated cache. The ordinary memory cache has none. */
+function chipNamespace(cache: object): string | null {
+  return 'namespace' in cache && typeof cache.namespace === 'string' && 'isEnabled' in cache && cache.isEnabled
+    ? cache.namespace : null
+}
+
+function readChip(value: string | null, namespace: string): ChipModel | null {
   try {
     const chip: unknown = value ? JSON.parse(value) : null
     if (!chip || typeof chip !== 'object') return null
-    const { id, modelId, provider } = chip as Record<string, unknown>
+    const stored = chip as Record<string, unknown>
+    if (stored.namespace !== namespace) return null
+    const { id, modelId, provider } = stored
     return typeof id === 'string' && typeof modelId === 'string' && typeof provider === 'string' ? { id, modelId, provider } : null
   } catch { return null }
 }
@@ -62,17 +105,26 @@ function readChip(value: string | null): ChipModel | null {
 /**
  * Everything a bot's model chip does, for the model-picker slot to draw
  * (docs/ui-overlay.md, decision 2026-10-31-2330): the menu of what this person
- * can use here, the saved choice per bot, refresh on open, and the chip it
+ * can use here, the saved choice per bot, explicit refresh, and the chip it
  * showed last while the menu loads. A run already going keeps its model.
  */
-export function useBotModelPicker(botId: string | null) {
+export function useBotModelPicker(botId: string | null, thread?: import('@/components/slots/model-picker-contract').BotModelPickerProps['thread']) {
   const t = useTranslations('Coordinator.modelPicker')
-  const menu = useSWR<BotModelMenu>(botModelMenuKey(botId), () => getBotModelMenu(botId))
+  const scope = thread?.scope ?? botId
+  const menu = useSWR<BotModelMenu | null>(thread ? ['thread-continuation-models', thread.scope] : botModelMenuKey(botId),
+    () => thread ? thread.load() : getBotModelMenu(botId), { shouldRetryOnError: false })
   const [failed, setFailed] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshFailed, setRefreshFailed] = useState(false)
   const [open, setOpenState] = useState(false)
-  const [last, setLast] = useState<ChipModel | null>(null)
+  const { cache } = useSWRConfig()
+  const namespace = chipNamespace(cache)
+  const chipKey = `mikka:model-chip:${botId ?? 'coordinator'}`
+  const [last, setLast] = useState<{ key: string; namespace: string; chip: ChipModel } | null>(null)
+  const [saving, setSaving] = useState(false)
+  const pendingSave = useRef<Promise<boolean> | null>(null)
+  const latestMenu = useRef(menu.data)
+  latestMenu.current = menu.data
 
   /** 刷新模型列表: the menu keeps what it shows until the new list arrives, and stays open. */
   async function refresh() {
@@ -80,60 +132,123 @@ export function useBotModelPicker(botId: string | null) {
     setRefreshing(true)
     setRefreshFailed(false)
     try {
-      await menu.mutate(() => refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
+      // A manual catalogue refresh must not race an in-flight model save.
+      if (pendingSave.current) await pendingSave.current
+      await menu.mutate(() => thread ? thread.load() : refreshBotModelMenuAction(botId), { populateCache: true, revalidate: false })
     } catch { setRefreshFailed(true) } finally { setRefreshing(false) }
   }
 
   useEffect(() => {
-    const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === (botId ?? 'coordinator')) { setOpenState(true); void refresh() } }
+    if (thread) return
+    const listener = (event: Event) => { if ((event as CustomEvent<string>).detail === (botId ?? 'coordinator')) setOpenState(true) }
     window.addEventListener(OPEN_EVENT, listener)
     return () => window.removeEventListener(OPEN_EVENT, listener)
   })
 
-  const shown = menu.data?.current
+  // The menu this bot showed last stays on screen while a read is under way, so the chip never drops out and comes
+  // back. Another bot's menu is never held over: its chip waits for its own.
+  const held = useRef<{ botId: string | null; namespace: string | null; menu: BotModelMenu } | null>(null)
+  if (menu.data) held.current = { botId: scope, namespace, menu: menu.data }
+  const loaded = thread ? menu.data : menu.data ?? (!menu.error && held.current?.botId === scope && held.current.namespace === namespace ? held.current.menu : undefined)
+  const data = loaded && thread?.selected ? withChosenModel(loaded, thread.selected) ?? loaded : loaded
+  const shown = data?.current
   useEffect(() => {
-    const key = lastChipKey(botId)
+    if (thread || !namespace) return
     try {
-      if (shown) window.localStorage.setItem(key, JSON.stringify({ id: shown.id, modelId: shown.modelId, provider: shown.provider }))
-      else if (menu.error) window.localStorage.removeItem(key)
-      else setLast(readChip(window.localStorage.getItem(key)))
+      if (shown && !(saving && shown.availability === 'checking')) window.localStorage.setItem(chipKey, JSON.stringify({ namespace, id: shown.id, modelId: shown.modelId, provider: shown.provider }))
+      else if (menu.error) window.localStorage.removeItem(chipKey)
+      else {
+        const chip = readChip(window.localStorage.getItem(chipKey), namespace)
+        setLast(chip ? { key: chipKey, namespace, chip } : null)
+      }
     } catch { /* storage unavailable: the chip waits for the menu */ }
-  }, [botId, shown, menu.error])
+  }, [chipKey, namespace, shown, menu.error, saving, thread])
 
-  async function choose(id: string) {
-    const current = menu.data?.current
-    if (!current || (id === current.id && current.chosen)) return
-    setFailed(false)
-    try {
-      // A pick that is not saved comes back as `{ error }`: failing here rolls the chip back and shows 未保存.
-      await menu.mutate(async () => {
-        const { error, ...saved } = await chooseBotModel(botId, id)
-        if (error) throw new Error(error)
-        return saved as BotModelMenu
-      }, { rollbackOnError: true, populateCache: true, revalidate: false })
-    } catch { setFailed(true) }
+  function choose(id: string): Promise<boolean> {
+    if (thread) {
+      if (!data || !withChosenModel(data, id)) return Promise.resolve(false)
+      thread.choose(id)
+      return Promise.resolve(true)
+    }
+    // A previous save must settle before another write; otherwise late server
+    // responses can overwrite the model the user picked most recently.
+    const previous = pendingSave.current
+    const work = (async () => {
+      if (previous) await previous
+      const confirmed = latestMenu.current
+      const current = confirmed?.current
+      if (!current || (id === current.id && current.chosen)) return Boolean(current)
+      const optimistic = previewBotModelChoice(confirmed, id)
+      if (!optimistic) return false
+      setFailed(false)
+      setSaving(true)
+      try {
+        // The preview is visible at the click. It is marked "checking" until
+        // the authoritative server result arrives; failures roll it back.
+        await menu.mutate(async () => {
+          const { error, ...saved } = await chooseBotModel(botId, id)
+          if (error) throw new Error(error)
+          latestMenu.current = saved as BotModelMenu
+          return saved as BotModelMenu
+        }, { optimisticData: optimistic, rollbackOnError: true, populateCache: true, revalidate: false })
+        return true
+      } catch {
+        latestMenu.current = confirmed
+        setFailed(true)
+        toast.error(t('notSaved'))
+        return false
+      }
+    })()
+    pendingSave.current = work
+    void work.finally(() => {
+      if (pendingSave.current === work) {
+        pendingSave.current = null
+        setSaving(false)
+      }
+    })
+    return work
   }
 
-  /** What a person reads for an option: the hosted model's name, or the provider's id (callers format it). */
-  const optionName = (option: ChipModel) => option.id === HOSTED_CHOICE ? t('hosted') : option.modelId || t('unknownModel')
+  async function waitForSave(): Promise<boolean> {
+    let work = pendingSave.current
+    while (work) {
+      const saved = await work
+      const next = pendingSave.current
+      if (!next || next === work) return saved
+      work = next
+    }
+    return true
+  }
 
-  const current = menu.data?.current
+  /** What a person reads for an option: the catalogue's name on Mikka 额度, else the provider's id (callers format it); 选择模型 when nothing is chosen. */
+  const optionName = (option: ChipModel) => !option.id ? t('choose') : option.name || option.modelId || t('unknownModel')
+
+  const current = data?.current
+  const currentGroup = current && data ? data.groups.find(group => group.options.some(option => option.id === current.id)) : undefined
+  /** The chip's source line: what the next message runs on. */
+  const sourceLabel = current && current.kind !== 'none'
+    ? modelSourceLabel(t, currentGroup ?? { kind: current.kind, provider: current.provider, credentialLabel: current.credentialLabel, hostedSource: current.hostedSource }, current, current)
+    : null
   const checking = current?.availability === 'checking'
   const chipLabel = current ? [optionName(current), current.fallback ? t('fallback') : null, checking ? t('checking') : null].filter(Boolean).join(' · ') : null
 
   return {
     t,
     /** The menu, once it has arrived; until then `last` is the chip's look only, not a control. */
-    menu: menu.data,
+    menu: data,
     /** Someone else's bot, or the menu failed: no chip at all. */
     error: !!menu.error,
-    last: menu.data || menu.error ? null : last,
+    last: !thread && !data && !menu.error && last?.key === chipKey && last.namespace === namespace ? last.chip : null,
     open,
-    /** Opening the menu refreshes it. */
-    setOpen(next: boolean) { setOpenState(next); if (next) void refresh() },
+    /** Opening uses the cached menu; catalogue refresh is explicit. */
+    // Model catalogue refresh is explicit; opening a cached menu must not
+    // start an up-to-eight-second subscription discovery on the click path.
+    setOpen(next: boolean) { setOpenState(next) },
     choose,
-    /** Choosing the item that is already current only saves when it was not chosen yet (it was the default). */
-    chooseItem(id: string) { if (current && id === current.id && !current.chosen) void choose(id) },
+    saving,
+    waitForSave,
+    /** Queue current-item clicks too: an earlier queued choice may still replace the preview. */
+    chooseItem(id: string) { if (current && id === current.id) void choose(id) },
     refresh,
     refreshing,
     refreshFailed,
@@ -142,7 +257,12 @@ export function useBotModelPicker(botId: string | null) {
     checking,
     unavailable: !!current && !current.available && !checking,
     chipLabel,
+    sourceLabel,
     optionName,
+    source: (group: BotModelMenuGroup, option: BotModelMenuOption) => modelSourceLabel(t, group, option),
+    price: modelPriceTag,
+    /** Nothing is chosen: the chip asks for a model. */
+    unchosen: current?.kind === 'none',
     heading: (group: BotModelMenuGroup) => modelGroupHeading(t, group),
     tag: (group: BotModelMenuGroup) => modelGroupTag(t, group),
   }

@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
-import { ArrowLeft, ArrowRight, ArrowUp, RotateCw, SquareDashedMousePointer, X } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { ArrowLeft, ArrowRight, ArrowUp, RotateCw, SquareDashedMousePointer, X } from '@/components/icons'
 import { ELEMENT_ROLES, FRAME_SCRIPT, type ElementRole, type FromFrame, type ToFrame } from '@mikka/protocol/artifact-frame'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,9 @@ import { NOTE_MAX, elementLabel, normalizeAddress, pageLabel, type BrowserNote }
 import { cn } from '@/lib/utils'
 import { useBrowserNotes } from './browser-notes'
 import { ResizablePane } from '@/components/ui/resizable-pane'
+import { browserAddressRequest, consumeBrowserAddress, serverBrowserAddressRequest, subscribeBrowserAddress } from '@/lib/browser/navigation'
+
+export { openBrowserAddress, browserAddressRequest, browserAddressVersion, subscribeBrowserAddress } from '@/lib/browser/navigation'
 
 const STORAGE_KEY = 'mikka:browser-url'
 const PICKER_FLAG = '__mikkaPicker'
@@ -62,13 +65,14 @@ const LOCATION_SCRIPT = `(${locationScript.toString()})()`
  * the person drag a box over the frame instead: the note carries the URL and
  * that box, nothing read from the page.
  */
-/** `openAt`: a page asked for from outside (the review page's 预览), with the width it asks for; a width the person chose wins.
- * `inTab`: drawn as a tab of the conversation's work area (FRAME_OWNS_PANEL), filling it, with no edge of its own. */
-export function BrowserPane({ onClose, openAt = null, inTab = false }: { onClose: () => void; openAt?: { url: string; width?: number; id: number } | null; inTab?: boolean }) {
+/** `inTab`: drawn as a tab of the conversation's work area (FRAME_OWNS_PANEL), filling it, with no edge of its own. */
+export function BrowserPane({ onClose, inTab = false }: { onClose: () => void; inTab?: boolean }) {
   const t = useTranslations('Browser')
   const tCommon = useTranslations('Common')
   const tRoles = useTranslations('Artifact.roles')
   const notes = useBrowserNotes()
+  const requestedAddress = useSyncExternalStore(subscribeBrowserAddress, browserAddressRequest, serverBrowserAddressRequest)
+  const initializedAddress = useRef(false)
   const frameRef = useRef<HTMLIFrameElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const addressRef = useRef<HTMLInputElement>(null)
@@ -121,25 +125,21 @@ export function BrowserPane({ onClose, openAt = null, inTab = false }: { onClose
     remember(href)
   }
 
-  // Asked for a page (the review page's 预览): it opens there, each time it is asked.
-  const opened = useRef<number | null>(null)
+  // An explicit request takes the normal navigation path; otherwise reopening restores the last page.
   useEffect(() => {
-    if (!openAt || opened.current === openAt.id) return
-    const src = normalizeAddress(openAt.url, window.location.origin)
-    if (!src) return
-    opened.current = openAt.id
-    load(src, true)
-  }, [openAt])
-
-  // Reopening the browser comes back to the last page, unless it was asked for one.
-  useEffect(() => {
-    if (opened.current !== null) return
+    if (requestedAddress && consumeBrowserAddress(requestedAddress)) {
+      initializedAddress.current = true
+      load(requestedAddress.href, true)
+      return
+    }
+    if (initializedAddress.current) return
+    initializedAddress.current = true
     let saved: string | null = null
     try { saved = window.localStorage.getItem(STORAGE_KEY) } catch { /* storage unavailable */ }
     const src = saved ? normalizeAddress(saved, window.location.origin) : null
     if (src) load(src, true)
     else addressRef.current?.focus()
-  }, [])
+  }, [requestedAddress])
 
   function go(step: -1 | 1) {
     const index = history.index + step
@@ -304,5 +304,5 @@ export function BrowserPane({ onClose, openAt = null, inTab = false }: { onClose
     </div>
   </>
   if (inTab) return <section aria-label={t('label')} data-slot="browser-pane" className="flex size-full min-h-0 flex-col bg-background">{content}</section>
-  return <ResizablePane render="aside" aria-label={t('label')} data-slot="browser-pane" storageKey="mikka:browser-width" defaultWidth={openAt?.width ?? 560} min={360} max="half" edge="start" label={tCommon('resize.browser')} className="flex min-h-0 shrink-0 flex-col border-l bg-background">{content}</ResizablePane>
+  return <ResizablePane render="aside" aria-label={t('label')} data-slot="browser-pane" storageKey="mikka:browser-width" defaultWidth={560} min={360} max="half" edge="start" label={tCommon('resize.browser')} className="flex min-h-0 shrink-0 flex-col border-l bg-background">{content}</ResizablePane>
 }

@@ -11,6 +11,7 @@ import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { enterprisePrincipal } from './principal'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../db/commit-effects'
 import { betterAuth } from 'better-auth'
 import { createAuthMiddleware } from 'better-auth/api'
 import { assertE2eTarget } from '../../tests/helpers/e2e-target.mjs'
@@ -44,10 +45,11 @@ class Cookies {
 
 test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revocation', { skip: !target, timeout: 120_000 }, async t => {
   const pool = new Pool({ connectionString: target, max: 4 })
+  observePoolCommits(pool)
   // Native HTTP uses the production API request adapters, as the mobile DB fixture does.
   const requestContext = await import('../../apps/api/src/context')
-  t.mock.module('next/headers', { namedExports: await import('../../apps/api/compat/headers') })
-  t.mock.module('next-intl/server', { namedExports: await import('../../apps/api/compat/intl') })
+  t.mock.module('@/lib/server-runtime/headers', { namedExports: await import('../../lib/server-runtime/headers') })
+  t.mock.module('@/lib/intl/i18n-server', { namedExports: await import('../../lib/intl/i18n-server') })
   async function withMobileRequest<T>(request: Request, work: () => Promise<T>) {
     const scope = requestContext.createRequestScope(request)
     try { return await requestContext.runRequestScope(scope, work) }
@@ -232,6 +234,12 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       else if (url.pathname === '/api/web/return') response = await (await import('../../app/api/web/return/route')).GET(request)
       else if (url.pathname === '/api/web/exchange') response = await (await import('../../app/api/web/exchange/route')).POST(request)
       else if (url.pathname === '/api/live/ticket') response = await (await import('../../app/api/live/ticket/route')).GET(request)
+      else if (/^\/api\/organizations\/[^/]+\/(?:members|audit-log)$/.test(url.pathname)) {
+        const [, , , organization, resource] = url.pathname.split('/')
+        const route = resource === 'members' ? await import('../../app/api/organizations/[organizationId]/members/route') : await import('../../app/api/organizations/[organizationId]/audit-log/route')
+        const handle = (route as unknown as Record<string, ((request: Request, context: { params: Promise<{ organizationId: string }> }) => Promise<Response>) | undefined>)[request.method]
+        response = handle ? await handle(request, { params: Promise.resolve({ organizationId: organization }) }) : new Response(null, { status: 405 })
+      }
       else if (url.pathname === '/api/enterprise/logout-target') response = await (await import('../../app/api/enterprise/logout-target/route')).GET(request)
       else if (url.pathname === '/api/account/deletion') response = await (await import('../../app/api/account/deletion/route')).POST(request)
       else if (url.pathname === '/api/mobile/push-tokens') {
@@ -277,6 +285,8 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     wantLogoutRequestSigned: true, wantLogoutResponseSigned: true })
   t.after(async () => {
     await Promise.all([close(appServer), close(idpServer)])
+    const { builtinGateway } = await import('../builtin-gateway/runtime')
+    await builtinGateway()?.stop()
     await pool.end()
     const [{ pool: appPool }, { workspacePool }] = await Promise.all([import('../db'), import('../workspace-db')])
     await Promise.all([appPool.end(), workspacePool.end()])
@@ -576,7 +586,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const workspaceId = randomUUID(), patId = randomUUID(), pat = `mkp_${randomBytes(32).toString('base64url')}`
     await pool.query('insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,\'Logout target PAT fixture\',\'team\')', [workspaceId, userId])
     await pool.query('insert into mikka_workspace_members("workspaceId","userId",name,email,role,status) values($1,$2,\'Directory user\',$3,\'member\',\'active\')', [workspaceId, userId, email])
-    await pool.query('insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint) values($1,$2,$3,\'Logout target fixture\',$4,\'test\')', [patId, userId, workspaceId, identityTokenHash(pat)])
+    await pool.query('insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint,scopes) values($1,$2,$3,\'Logout target fixture\',$4,\'test\',ARRAY[\'legacy:full\']::text[])', [patId, userId, workspaceId, identityTokenHash(pat)])
     try {
       await assertLogoutTarget(await logoutTargetFor(ordinary.token), null)
       await assertLogoutTarget(await logoutTarget({ authorization: `Bearer ${ordinary.token}`, cookie }), null)
@@ -947,6 +957,183 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.equal((await pool.query('select count(*) from session where id=$1', [signedIn.session.id])).rows[0].count, '0')
     assert.equal((await session(oidcCookies))?.user.id, userId, 'SAML logout leaves the independent OIDC session intact')
   })
+  await t.test('native SAML logout form preserves origin and callback fences and completes signed one-use SLO', async () => {
+    const login = await samlLogin(), signedIn = await session(login.jar)
+    assert.ok(signedIn)
+    const startForm = (origin: string | null = appOrigin, callbackURL = `${appOrigin}/signed-out`, logoutProvider = samlProviderId) => {
+      const headers = new Headers({ 'content-type': 'application/x-www-form-urlencoded', cookie: login.jar.header() })
+      if (origin !== null) headers.set('origin', origin)
+      return fetch(`${appOrigin}/api/auth/sso/saml2/logout/${logoutProvider}`, {
+        method: 'POST', headers, body: new URLSearchParams({ callbackURL }), redirect: 'manual',
+      })
+    }
+    for (const [origin, callbackURL, logoutProvider] of [
+      ['https://foreign.example.invalid', `${appOrigin}/signed-out`, samlProviderId],
+      [appOrigin, 'https://foreign.example.invalid/signed-out', samlProviderId],
+      [null, `${appOrigin}/signed-out`, samlProviderId],
+      [appOrigin, `${appOrigin}/signed-out`, otherProviderId],
+    ] as const) {
+      const denied = await startForm(origin, callbackURL, logoutProvider)
+      assert.equal(denied.status, 403, await denied.clone().text())
+      if (origin === null) assert.equal((await denied.clone().json()).code, 'MISSING_OR_NULL_ORIGIN')
+      if (logoutProvider === otherProviderId) assert.equal((await denied.clone().json()).code, 'ENTERPRISE_LOGOUT_SESSION_MISMATCH')
+      login.jar.take(denied)
+      assert.equal((await session(login.jar))?.session.id, signedIn.session.id, 'a rejected form cannot revoke or clear the current session')
+    }
+    const originalCookie = login.jar.header()
+    const start = await startForm()
+    assert.equal(start.status, 302, await start.clone().text())
+    login.jar.take(start)
+    assert.equal(await session(login.jar), null, 'the accepted native form revokes its initiating session before navigation')
+    assert.equal((await pool.query('select count(*) from session where id=$1', [signedIn.session.id])).rows[0].count, '0', 'the initiating session is deleted before any request to the IdP')
+    const replayedSession = await fetch(`${appOrigin}/api/auth/get-session`, { headers: { cookie: originalCookie }, redirect: 'manual' })
+    assert.equal(replayedSession.status, 200)
+    assert.equal((await replayedSession.json()) === null, true, 'the original cookie cannot authenticate before navigation to the IdP')
+    const nativeRequest = new URL(start.headers.get('location')!)
+    const requestId = /\bID="([^"]+)"/.exec(inflateRawSync(Buffer.from(nativeRequest.searchParams.get('SAMLRequest')!, 'base64')).toString())?.[1]
+    assert.ok(requestId)
+    assert.ok(nativeRequest.searchParams.get('Signature'), 'the original native handler still signs the IdP redirect')
+    const idpReply = await fetch(nativeRequest)
+    assert.equal(idpReply.status, 200, await idpReply.clone().text())
+    const payload = await idpReply.json() as { SAMLResponse: string; RelayState: string }
+    const finish = () => fetch(`${appOrigin}/api/auth/sso/saml2/sp/slo/${samlProviderId}`, { method: 'POST', headers: {
+      origin: idpOrigin, 'content-type': 'application/x-www-form-urlencoded',
+    }, body: new URLSearchParams(payload), redirect: 'manual' })
+    const returned = await finish()
+    assert.equal(returned.status, 302, await returned.clone().text())
+    assert.equal(returned.headers.get('location'), `${appOrigin}/signed-out`)
+    assert.equal((await pool.query('select count(*) from verification where identifier=$1', [`saml-logout-request:${requestId}`])).rows[0].count, '0')
+    assert.equal((await finish()).status, 400, 'the form-started signed callback is still one-use')
+    assert.equal((await pool.query('select count(*) from session where id=$1', [signedIn.session.id])).rows[0].count, '0')
+    assert.equal((await session(oidcCookies))?.user.id, userId, 'the independent OIDC session is untouched')
+  })
+  await t.test('the account-menu sign-out client follows OIDC RP logout and the native SAML form (#1669)', async () => {
+    const { readLogoutTarget, enterpriseSignOutStep } = await import('./logout-client')
+    // A browser on the app origin: its cookie jar, Origin on writes, redirects left to the page (never read as JSON).
+    const browser = (jar: Cookies) => async (path: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers); headers.set('cookie', jar.header())
+      if ((init?.method ?? 'GET') !== 'GET') headers.set('origin', appOrigin)
+      const response = await fetch(new URL(path, appOrigin), { ...init, headers, redirect: 'manual' }); jar.take(response); return response
+    }
+    // This fixture serves the app's own routes with the application's cookie (the auth fixture signs its own); in the product they are one cookie.
+    const applicationBrowser = async (sessionId: string) => {
+      const token = (await pool.query('select token from session where id=$1', [sessionId])).rows[0].token as string
+      const cookie = await applicationCookie(token)
+      return (path: string, init?: RequestInit) => fetch(new URL(path, appOrigin), { ...init, headers: { ...init?.headers as Record<string, string>, cookie }, redirect: 'manual' })
+    }
+    const oidc = await oidcLogin()
+    const oidcSession = await session(oidc.jar)
+    assert.ok(oidcSession)
+    const oidcTarget = await readLogoutTarget(await applicationBrowser(oidcSession.session.id))
+    assert.deepEqual(oidcTarget, { providerId, protocol: 'oidc' })
+    const step = await enterpriseSignOutStep(oidcTarget!, { origin: appOrigin, fetch: browser(oidc.jar) })
+    assert.equal(step.kind, 'navigate')
+    if (step.kind !== 'navigate') return
+    assert.equal(step.upstream, 'requested')
+    assert.equal(new URL(step.url).searchParams.get('post_logout_redirect_uri'), `${appOrigin}/api/auth/sso/oidc/logout/callback/${providerId}`)
+    assert.equal(await session(oidc.jar), null, 'the local session is revoked before the browser leaves for the IdP')
+
+    const saml = await samlLogin()
+    const samlSession = await session(saml.jar)
+    assert.ok(samlSession)
+    const samlTarget = await readLogoutTarget(await applicationBrowser(samlSession.session.id))
+    assert.deepEqual(samlTarget, { providerId: samlProviderId, protocol: 'saml' })
+    const form = await enterpriseSignOutStep(samlTarget!, { origin: appOrigin })
+    assert.equal(form.kind, 'form')
+    if (form.kind !== 'form') return
+    // Exactly what the page's form submission sends: urlencoded fields, its Origin and the cookie.
+    const submit = (fields: Record<string, string>, options: { origin?: string; cookie?: string; action?: string } = {}) => fetch(new URL(options.action ?? form.action, appOrigin), {
+      method: 'POST', redirect: 'manual', body: new URLSearchParams(fields),
+      headers: { 'content-type': 'application/x-www-form-urlencoded', origin: options.origin ?? appOrigin, ...(options.cookie === '' ? {} : { cookie: options.cookie ?? saml.jar.header() }) },
+    })
+    for (const [why, response] of [
+      ['a foreign Origin', await submit(form.fields, { origin: 'https://foreign.example.invalid' })],
+      ['a foreign return URL', await submit({ callbackURL: 'https://foreign.example.invalid/sign-in' })],
+      ['no session', await submit(form.fields, { cookie: '' })],
+      ['another provider', await submit(form.fields, { action: `/api/auth/sso/saml2/logout/${otherProviderId}` })],
+    ] as const) {
+      assert.ok(response.status >= 400 && response.status < 500, `${why}: ${response.status} ${await response.clone().text()}`)
+      saml.jar.take(response)
+      assert.equal((await session(saml.jar))?.session.id, samlSession.session.id, `${why} revokes nothing`)
+    }
+    // #1747 landed as #1750: the native form is accepted, revokes the local session
+    // before the browser leaves for the IdP, and answers with the redirect the page follows.
+    const submitted = await submit(form.fields)
+    assert.equal(submitted.status, 302, await submitted.clone().text())
+    saml.jar.take(submitted)
+    assert.equal(await session(saml.jar), null, 'the form revokes the local SAML session before the IdP round trip')
+    assert.equal((await session(oidcCookies))?.user.id, userId, 'neither sign-out touches the independent OIDC session')
+  })
+  await t.test('the 组织 page client adds a second Org admin, who can export audit until revoked, then is refused (#1669)', async adminTest => {
+    const { organizationApi } = await import('../../hooks/settings/use-organization')
+    const { GovernanceRequestError } = await import('../../hooks/settings/use-workspace-governance')
+    const { auth: applicationAuth } = await import('../auth')
+    const native = await applicationAuth.$context
+    const secondAdmin = `org-second-admin-${randomUUID()}`
+    await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Second admin\',$2,true,now(),now())', [secondAdmin, `${secondAdmin}@fixture.example.invalid`])
+    const ownerSession = await native.internalAdapter.createSession(adminId), adminSession = await native.internalAdapter.createSession(secondAdmin)
+    assert.ok(ownerSession); assert.ok(adminSession)
+    const original = globalThis.fetch
+    // The page's own client, exactly as it runs in the browser: same-origin relative URLs with that person's cookie.
+    const as = async <T>(token: string, work: () => Promise<T>) => {
+      const cookie = await applicationCookie(token)
+      globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, appOrigin)
+        if (url.origin !== appOrigin) return original(input, init)
+        const headers = new Headers(init?.headers); headers.set('cookie', cookie)
+        if ((init?.method ?? 'GET') !== 'GET') headers.set('origin', appOrigin)
+        return original(url, { ...init, headers, redirect: 'manual' })
+      }) as typeof fetch
+      try { return await work() } finally { globalThis.fetch = original }
+    }
+    const refused = (status: number) => (error: unknown) => error instanceof GovernanceRequestError && error.status === status
+    try {
+      await assert.rejects(as(adminSession.token, () => organizationApi.createAuditExport(organizationId, {})), refused(403), 'not yet an Org member: no audit export')
+      const added = await as(ownerSession.token, () => organizationApi.addMember(organizationId, secondAdmin, 'admin'))
+      assert.equal(added.member.role, 'admin')
+      await assert.rejects(as(adminSession.token, () => organizationApi.addMember(organizationId, randomUUID(), 'owner')), refused(403), 'an admin cannot mint an owner')
+      await adminTest.test('live organization audit pages keep microsecond ties and filter the selected organization without an export', async () => {
+        const ids = [randomUUID(), randomUUID(), randomUUID()].sort()
+        const instant = '2025-01-01T03:04:05.123456Z'
+        for (const id of ids) await pool.query(`insert into mikka_organization_audit_events
+          (id,"organizationId","actorId",action,result,"correlationId","targetId",metadata,"createdAt")
+          values ($1,$2,$3,'organization.member_changed','success',$1,$4,'{}'::jsonb,$5)`, [id, organizationId, adminId, secondAdmin, instant])
+        const filters = { from: instant, to: instant, family: 'organization', userId: secondAdmin, actor: adminId, q: 'MEMBER_CHANGED', limit: 2 }
+        const read = (extra: Parameters<typeof organizationApi.listAuditEvents>[1] = {}) =>
+          as(adminSession.token, () => organizationApi.listAuditEvents(organizationId, { ...filters, ...extra }))
+        const before = await pool.query('select count(*) from mikka_organization_audit_exports where "organizationId"=$1', [organizationId])
+        for (const order of ['asc', 'desc'] as const) {
+          const expected = order === 'asc' ? ids : [...ids].reverse()
+          const first = await read({ order })
+          assert.deepEqual(first.events.map(event => event.id), expected.slice(0, 2))
+          assert.ok(first.nextCursor)
+          const next = await read({ order, cursor: first.nextCursor })
+          assert.deepEqual(next.events.map(event => event.id), expected.slice(2))
+          assert.equal(next.nextCursor, null)
+        }
+        assert.deepEqual((await read({ q: '%' })).events, [])
+        assert.deepEqual((await read({ family: 'sso' })).events, [])
+        assert.deepEqual((await read({ userId: randomUUID() })).events, [])
+        await assert.rejects(as(adminSession.token, () => organizationApi.listAuditEvents(randomUUID())), refused(403))
+        await assert.rejects(read({ cursor: 'invalid' }), refused(400))
+        const after = await pool.query('select count(*) from mikka_organization_audit_exports where "organizationId"=$1', [organizationId])
+        assert.deepEqual(before.rows, after.rows)
+      })
+      const exported = await as(adminSession.token, () => organizationApi.createAuditExport(organizationId, {}))
+      assert.equal(exported.manifest.organizationId, organizationId)
+      assert.ok(exported.events.some(event => event.action === 'organization.member_changed' && event.targetId === secondAdmin), 'the grant is in the audit the new admin downloads')
+      const page = await as(adminSession.token, () => organizationApi.readAuditExport(organizationId, exported.manifest.id, 0, 10))
+      assert.equal(page.manifest.id, exported.manifest.id)
+      assert.deepEqual(await as(ownerSession.token, () => organizationApi.removeMember(organizationId, secondAdmin)), { removed: true })
+      await assert.rejects(as(adminSession.token, () => organizationApi.listAuditEvents(organizationId)), refused(403), 'revoked administrator loses the live list')
+      await assert.rejects(as(adminSession.token, () => organizationApi.readAuditExport(organizationId, exported.manifest.id, 0, 10)), refused(403), 'a revoked admin cannot keep reading a frozen export')
+      await assert.rejects(as(adminSession.token, () => organizationApi.createAuditExport(organizationId, {})), refused(403), 'or start a new one')
+      await assert.rejects(as(ownerSession.token, () => organizationApi.createAuditExport(randomUUID(), {})), refused(403), 'an unknown Organization is refused, not created')
+    } finally {
+      globalThis.fetch = original
+      await pool.query('delete from session where id=any($1::text[])', [[ownerSession.id, adminSession.id]])
+    }
+  })
   await t.test('SP-initiated SAML Single Logout rejects a signed response after its persistent request expires', async () => {
     const login = await samlLogin()
     const start = await fetch(`${appOrigin}/api/auth/sso/saml2/logout/${samlProviderId}`, { method: 'POST', headers: {
@@ -1075,7 +1262,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       assert.equal(personal.status, 200, 'the registered mobile detail route reads this plain session Personal task without a selection cookie')
       const personalBody = await personal.json()
       assert.equal(personalBody.task.id, personalTaskId)
-      assert.deepEqual(personalBody.live, { workspaceId: personalWorkspaceId })
+      assert.deepEqual(personalBody.live, { workspaceId: personalWorkspaceId, factoryActivityVersion: 1 })
       const workspaceCookie = `mikka-workspace=${workspaceId}`
       const cookiePersonal = await detailCall(plainToken, personalTaskId, { cookie: workspaceCookie })
       assert.equal(cookiePersonal.status, 200, 'an unrelated enforced-SSO Workspace cookie must not gate this Personal task')
@@ -1090,7 +1277,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       assert.equal(admitted.status, 200)
       const admittedBody = await admitted.json()
       assert.equal(admittedBody.task.id, organizationTaskId)
-      assert.deepEqual(admittedBody.live, { workspaceId })
+      assert.deepEqual(admittedBody.live, { workspaceId, factoryActivityVersion: 1 })
       for (const selected of [workspaceId, 'not-a-workspace', randomUUID()]) {
         const denied = await detailCall(plainToken, personalTaskId, { cookie: workspaceCookie, 'x-mikka-workspace-id': selected })
         assert.equal(denied.status, 404, 'an explicit inaccessible or invalid Workspace never falls back to the Personal task')
@@ -1180,7 +1367,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       const personal = await detailCall(owner.token, personalTaskId)
       assert.equal(personal.status, 200)
       const personalBody = await personal.json()
-      assert.equal(personalBody.task.id, personalTaskId); assert.deepEqual(personalBody.live, { workspaceId: personalWorkspaceId })
+      assert.equal(personalBody.task.id, personalTaskId); assert.deepEqual(personalBody.live, { workspaceId: personalWorkspaceId, factoryActivityVersion: 1 })
       const before = await successState(), input = { action: 'break-glass', reason }
       for (const token of [nonOwner.token, oldOwner.token]) {
         await deniedIdentity(await identityCall(token, input))
@@ -1205,7 +1392,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
       const task = await detailCall(owner.token, taskId)
       assert.equal(task.status, 200)
       const taskBody = await task.json()
-      assert.equal(taskBody.task.id, taskId); assert.deepEqual(taskBody.live, { workspaceId })
+      assert.equal(taskBody.task.id, taskId); assert.deepEqual(taskBody.live, { workspaceId, factoryActivityVersion: 1 })
       await deniedIdentity(await identityCall(otherOwnerSession.token))
       const unaffected = await detailCall(owner.token, personalTaskId)
       assert.equal(unaffected.status, 200); assert.deepEqual(await unaffected.json(), personalBody)
@@ -1657,7 +1844,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const personal = randomUUID(), patId = randomUUID()
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Creator personal','personal')`, [personal, creator.id])
     await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,$3,$4,'admin')`, [personal, creator.id, creator.name, creator.email])
-    await pool.query(`insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint) values($1,$2,$3,'Creator fixture',$4,'test')`, [patId, creator.id, personal, identityTokenHash(randomUUID())])
+    await pool.query(`insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint,scopes) values($1,$2,$3,'Creator fixture',$4,'test',ARRAY['legacy:full']::text[])`, [patId, creator.id, personal, identityTokenHash(randomUUID())])
     const refused = await fetch(`${appOrigin}/api/account/deletion`, { method: 'POST',
       headers: { origin: appOrigin, cookie: await applicationCookie(creatorSession.token), 'content-type': 'application/json' },
       body: JSON.stringify({ email: creator.email, requestId: randomUUID() }) })
@@ -1719,7 +1906,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     const personal = randomUUID(), patId = randomUUID()
     await pool.query(`insert into mikka_workspaces(id,"userId",name,kind) values($1,$2,'Directory personal','personal')`, [personal, subjectId])
     await pool.query(`insert into mikka_workspace_members("workspaceId","userId",name,email,role) values($1,$2,'Directory user',$3,'admin')`, [personal, subjectId, directoryEmail])
-    await pool.query(`insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint) values($1,$2,$3,'Directory fixture',$4,'test')`, [patId, subjectId, personal, identityTokenHash(randomUUID())])
+    await pool.query(`insert into personal_access_tokens(id,"userId","workspaceId",name,"tokenHash",hint,scopes) values($1,$2,$3,'Directory fixture',$4,'test',ARRAY['legacy:full']::text[])`, [patId, subjectId, personal, identityTokenHash(randomUUID())])
     let cleanups = 0
     const options = { mainPool: pool, workspacePool: pool, externalCleanup: async () => { cleanups++; return [] as string[] }, deleteObject: async () => { throw new Error('Unexpected directory fixture storage cleanup') } }
     const deletion = await requestAccountDeletion(subjectId, directoryEmail, randomUUID(), options)
@@ -1770,7 +1957,7 @@ test('enterprise HTTP fixture: OIDC + signed SAML + SCIM lifecycle + scoped revo
     assert.deepEqual(await phone.push(), [destination])
     assert.equal(await enterpriseWorkspaceAllowed(userId, personal, { kind: 'session', sessionId: 'wrong' }), true)
     const tokenA = randomUUID(), tokenOther = randomUUID()
-    for (const [id, workspaceId] of [[tokenA, wsA], [tokenOther, other]]) await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint) values ($1,$2,$3,\'Fixture\',$4,\'test\')', [id, userId, workspaceId, identityTokenHash(randomUUID())])
+    for (const [id, workspaceId] of [[tokenA, wsA], [tokenOther, other]]) await pool.query('insert into personal_access_tokens (id,"userId","workspaceId",name,"tokenHash",hint,scopes) values ($1,$2,$3,\'Fixture\',$4,\'test\',ARRAY[\'legacy:full\']::text[])', [id, userId, workspaceId, identityTokenHash(randomUUID())])
     const issueId = randomUUID()
     await pool.query('insert into issues(id,"userId","workspaceId",title,content,status,priority) values($1,$2,$3,\'Enterprise phone target fixture\',$4,\'todo\',\'normal\')',
       [issueId, userId, wsA, { type: 'doc' }])

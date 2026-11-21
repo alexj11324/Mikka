@@ -13,7 +13,7 @@ class MainSocket implements LiveSocket {
   onmessage: WebSocket['onmessage'] = null
   onclose: WebSocket['onclose'] = null
   onerror: WebSocket['onerror'] = null
-  readyState: number = 0
+  readyState: LiveSocket['readyState'] = 0
   private readonly stop: () => void
   constructor(private readonly id: string) {
     const host = rendererHost().live

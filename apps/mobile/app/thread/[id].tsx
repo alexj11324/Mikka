@@ -1,4 +1,8 @@
 import { useState } from 'react'
+import { useThreadReadEnd } from '@/features/chat/model/use-thread-read-end'
+import { MobileReplyVersions } from '@/features/chat/components/thread-reply-versions'
+import { useThreadDeliveryControls } from '@/features/chat/components/thread-delivery-controls'
+import { conversationAccessDenied, useConversationDelivery } from '@/features/chat/components/conversation-delivery'
 import { StyleSheet, View } from 'react-native'
 import { KeyboardChatScrollView } from 'react-native-keyboard-controller'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -11,22 +15,29 @@ import { Markdown } from '@/components/Markdown'
 import { OfflineBanner } from '@/components/OfflineBanner'
 import { Text } from '@/components/Text'
 import { NavBar, underBar } from '@/components/NavBar'
+import { mobileMessages } from '@/lib/messages'
 import { useScrolledUnderBar } from '@/components/BarBackdrop'
 import { ThreadSteps } from '@/features/tasks/components/thread-steps'
-import { Composer } from '@/features/chat/components/chat-composer'
+import { ThreadComposer } from '@/features/chat/components/thread-composer'
 import { api, ApiError } from '@/lib/api'
 import { ReadNotice } from '@/components/ReadNotice'
 import { StopFailed } from '@/components/StopFailed'
 import { ThreadQuotaPaused } from '@/components/ThreadQuotaPaused'
 import { useStop } from '@/lib/useStop'
 import { composerStops } from '@/lib/stop'
-import { threadSendErrorLine } from '@/lib/thread-send-error'
 import type { ThreadDetail } from '@/lib/types'
 import { useLiveApi } from '@/lib/useApi'
 import { threadLive } from '@/lib/live-keys'
 import { colors } from '@/lib/theme'
+import { ThreadArtifactsList, ThreadSegments } from '@/features/tasks/components/thread-artifacts'
+import { hasThreadArtifacts, threadArtifactsPath, type ThreadArtifacts, type ThreadSegment } from '@/features/tasks/model/thread-artifacts'
 
-const STATUS_WORD = { running: '运行中', waiting: '等待你', paused: '已暂停', failed: '失败', done: '完成', stopped: '已停止' } as const
+const { MobileCore, Coordinator, IssueThreads } = mobileMessages
+const STATUS_WORD = {
+  running: MobileCore.states.running, waiting: MobileCore.states.waiting,
+  paused: Coordinator.citation.runStatus.paused, failed: MobileCore.states.failed,
+  done: MobileCore.attempts.done, stopped: Coordinator.citation.runStatus.stopped,
+}
 
 /** A thread without a task, pushed from its card; a task's threads open as the task's one conversation (app/task/[id]/conversation.tsx). */
 export default function ThreadScreen() {
@@ -37,72 +48,65 @@ export default function ThreadScreen() {
   // Read again when one of its runs writes text or changes state (the web's thread and run keys); an
   // ended thread changes only when it runs again. Each read is the whole conversation.
   const { data, error, reload } = useLiveApi<ThreadDetail>(`/api/mobile/threads/${id}`, current => threadLive(current, id))
-  const [sending, setSending] = useState(false)
-  // What to say when a message was not sent: the server's reason when it gave one (threadReplaced…).
-  const [sendFailed, setSendFailed] = useState<string | null>(null)
+  const canSend = Boolean(data && data.canReply !== false && !conversationAccessDenied(error))
+  const liveRunId = data?.liveRunId ?? id
+  const controls = useThreadDeliveryControls(liveRunId, data?.issueId ?? null, canSend ? data?.delivery : undefined, reload)
+  const delivery = useConversationDelivery(canSend ? { kind: 'thread', id: liveRunId, issueId: data?.issueId ?? null, delivery: controls.mode } : null,
+    [...(data?.confirmedSubmissionIds ?? []), ...(data?.delivery?.queued.map(row => row.requestId) ?? [])], reload)
+  const readEnd = useThreadReadEnd(id, error ? undefined : data?.readReceipts, bar.onScroll)
   const thread = data?.thread
+  // 线程 | Artifact (Alex, 2026-11-15): the toggle replaces the title only once the thread produced something.
+  const artifacts = useLiveApi<ThreadArtifacts>(threadArtifactsPath(id), () => threadLive(data ?? null, id))
+  const [segment, setSegment] = useState<ThreadSegment>('thread')
+  const toggled = hasThreadArtifacts(artifacts.data)
+  const viewingArtifacts = toggled && segment === 'artifacts' && artifacts.data
   // 停止 a working thread, as on the web; a thread that ended meanwhile (409) has nothing left to stop.
-  const stopper = useStop(() => api(`/api/mobile/threads/${id}/stop`, { method: 'POST' }).catch(failure => {
+  const stopper = useStop(() => api(`/api/mobile/threads/${liveRunId}/stop`, { method: 'POST' }).catch(failure => {
     if (!(failure instanceof ApiError && failure.status === 409)) throw failure
   }), Boolean(data?.active), reload)
-
-  const send = async (text: string) => {
-    setSending(true)
-    setSendFailed(null)
-    try {
-      await api(`/api/mobile/threads/${id}`, { method: 'POST', body: { text } })
-      await reload()
-      return true
-    } catch (failure) {
-      // The composer keeps the words, so sending again is one tap.
-      setSendFailed(threadSendErrorLine(failure instanceof ApiError && failure.status < 500 ? failure.code : null))
-      return false
-    } finally {
-      setSending(false)
-    }
-  }
 
   return (
     <View style={styles.screen}>
       <NavBar
         scrolled={bar.scrolled}
         back={() => (router.canGoBack() ? router.back() : router.replace('/tasks'))}
-        titleView={thread ? (
+        titleView={thread && toggled ? <ThreadSegments value={segment} onChange={setSegment} /> : thread ? (
           <View style={styles.titleRow}>
             <StatusIcon status={thread.status} size={18} />
             <View style={{ flexShrink: 1 }}>
               <Text style={styles.title} numberOfLines={1}>{thread.name}</Text>
               <View style={styles.subtitleRow}>
                 {/* Icons only after the state: where it runs; a tap names the machine (Alex, 2026-11-06). */}
-                <Text style={styles.subtitle} numberOfLines={1}>{error ? '上次状态：' : ''}{STATUS_WORD[thread.status]}{thread.device ? ' ·' : ''}</Text>
+                <Text style={styles.subtitle} numberOfLines={1}>{error ? MobileCore.lastThreadStatus.replace('{status}', STATUS_WORD[thread.status]) : STATUS_WORD[thread.status]}{thread.device ? ' ·' : ''}</Text>
                 {thread.device ? <ThreadPlace threadId={id} kind={thread.device.kind} /> : null}
               </View>
             </View>
           </View>
         ) : undefined}
         // Stop for every live thread, also one waiting for your answer, whose composer sends (N1).
-        right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: '停止', web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
+        right={data?.active && !stopper.sending ? { icon: 'stop.fill', label: IssueThreads.stop, web: <Square size={18} color={colors.ink} fill={colors.ink} />, onPress: () => void stopper.stop() } : undefined}
       />
-      <KeyboardChatScrollView onScroll={bar.onScroll} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
+      {viewingArtifacts ? <ThreadArtifactsList data={viewingArtifacts} /> : <KeyboardChatScrollView key={id} {...readEnd} scrollEventThrottle={16} {...underBar} offset={Math.max(insets.bottom, 12) - 8} keyboardDismissMode="interactive" keyboardLiftBehavior="whenAtEnd" contentContainerStyle={styles.body}>
         {!data && !error ? <View style={{ paddingTop: 40, alignItems: 'center' }}><Spinner /></View> : null}
-        <ReadNotice error={error} hasData={Boolean(data)} label="线程" onRetry={reload} />
+        <ReadNotice error={error} hasData={Boolean(data)} label={IssueThreads.hidden} onRetry={reload} />
         {data?.items.map((item, index) => {
           switch (item.kind) {
             case 'steps':
               return <ThreadSteps key={item.id} steps={item.steps} count={item.count} live={data.active && index === data.items.length - 1} />
-            case 'agent': return <View key={item.id} style={{ marginVertical: 4 }}><BotBubble><Markdown text={item.text} /></BotBubble></View>
+            case 'agent': return <View key={item.id} style={{ marginVertical: 4 }}><BotBubble><Markdown text={item.text} /></BotBubble><MobileReplyVersions detail={data} runId={id} itemId={item.id} text={item.text} reload={reload} working={data.active} /></View>
             case 'error': return <Text key={item.id} style={styles.error}>{item.text}</Text>
-            case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} /></View>
+            case 'person': return <View key={item.id} style={{ marginVertical: 4 }}><MyBubble text={item.text} threadReferences /><MobileReplyVersions detail={data} runId={id} itemId={item.id} text={item.text} reload={reload} working={data.active} /></View>
           }
         })}
-        {sendFailed ? <Text style={styles.error}>{sendFailed}</Text> : null}
+        {delivery.bubbles}
         {data?.paused ? <ThreadQuotaPaused key={data.paused.runId} paused={data.paused} onContinued={async runId => { if (runId !== id) router.replace(`/thread/${runId}`); await reload() }} /> : null}
         {stopper.stuck ? <StopFailed busy={stopper.sending} onRetry={() => void stopper.stop()} /> : null}
         {data && !data.active && data.error && !data.items.some(item => item.kind === 'error') ? <Text style={styles.error}>{data.error}</Text> : null}
-      </KeyboardChatScrollView>
+      </KeyboardChatScrollView>}
       <OfflineBanner top={insets.top + 66} />
       {/* R-10: a thread ends in the composer, finished or not; a message to an ended thread runs it again (R-81). */}
-      {data ? <Composer placeholder="给这个线程发消息" onSend={send} disabled={sending} attach attachmentScope={{ kind: 'thread', id }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
+      {viewingArtifacts ? null : controls.controls}
+      {data && !viewingArtifacts ? <ThreadComposer detail={data} runId={liveRunId} placeholder={MobileCore.messageThread} onSend={(text, choice) => delivery.send(text, [], choice)} sendDisabled={!canSend} attach attachmentScope={{ kind: 'thread', id: liveRunId }} onStop={composerStops(data) && !stopper.sending ? () => void stopper.stop() : undefined} /> : null}
     </View>
   )
 }

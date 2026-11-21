@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import type { Pool } from 'pg'
 import { before, after as afterTests, mock, test } from 'node:test'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { suggestions, coordinatorEvents } from '../lib/db/schema'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
 import { seedFixtureWorkspace } from './helpers/task-workspace'
@@ -30,10 +30,10 @@ let release!: () => void
 let signal!: () => void
 before(async () => {
   mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () => ({ user: { id: owner, name: 'Suggestion fixture', email: `${owner}@example.invalid` }, session: { id: 'suggestion-fixture-session' } }) } } } })
-  mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
   mock.module('@/lib/coordinator/wake', { namedExports: { coordinatorEnabled: () => true, wakeCoordinator: () => { throw Error('must not invoke provider') } } })
-  mock.module('next/server', { namedExports: { after: (fn: () => unknown) => callbacks.push(fn) } })
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
+  mock.module('@/lib/server-runtime/server', { namedExports: { after: (fn: () => unknown) => callbacks.push(fn) } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: () => undefined }) } })
   ;({ db, pool } = await import('../lib/db'))
   for (const id of ['owner', 'foreign']) workspaces.set(id, await seedFixtureWorkspace(pool, id))
   ;({ claimSuggestion: claim } = await import('../lib/suggestions/store'))
@@ -48,7 +48,7 @@ before(async () => {
   await scope.run(() => pool.query(`CREATE TABLE suggestions (id uuid primary key,"botId" uuid, "userId" text not null, source text not null, "externalId" text not null, action text not null, title text not null, url text, actor text, shown boolean not null, "decidedBy" text not null, probability real, level text, "matterKey" text, "actionTitle" text, required boolean not null default false, "occurredAt" timestamptz not null, "dismissedAt" timestamptz, "createdAt" timestamptz not null default now()); CREATE TABLE coordinator_events (id uuid primary key, "userId" text not null, "botId" uuid, kind text not null, "dedupeKey" text not null unique, "issueId" uuid, "runId" uuid, payload jsonb not null CHECK (position('fail-fixture' in payload::text) = 0), tier text, "lastTriageAttemptAt" timestamptz, "triageDecision" jsonb, "deliveredAt" timestamptz, "createdAt" timestamptz not null default now())`))
   await scope.run(async () => pool.query(await readFile(new URL('../drizzle/20261031002604_coordinator_wake_recovery.sql', import.meta.url), 'utf8')))
   // The artifact list credits a run's versions to its Agent (R-78), so it reads the run tables too.
-  await scope.run(() => pool.query(`CREATE TABLE agents (id uuid primary key, "userId" text not null, harness text not null, name text not null); CREATE TABLE agent_runs (id uuid primary key, "userId" text not null, "agentId" uuid not null, "botId" uuid); CREATE TABLE bots (id uuid primary key, "ownerId" text not null, name text not null); CREATE TABLE computer_run_bindings ("runId" uuid, "botId" uuid, "ownerId" text); CREATE TABLE bot_cloud_runtimes ("agentId" uuid, "botId" uuid, "ownerId" text); CREATE TABLE coordinator_bots ("ownerId" text, "workspaceId" uuid, "botId" uuid)`))
+  await scope.run(() => pool.query(`CREATE TABLE agents (id uuid primary key, "userId" text not null, harness text not null, name text not null); CREATE TABLE agent_runs (id uuid primary key, "userId" text not null, "agentId" uuid not null, "botId" uuid, "agentDefinition" jsonb); CREATE TABLE bots (id uuid primary key, "ownerId" text not null, name text not null); CREATE TABLE computer_run_bindings ("runId" uuid, "botId" uuid, "ownerId" text); CREATE TABLE bot_cloud_runtimes ("agentId" uuid, "botId" uuid, "ownerId" text); CREATE TABLE coordinator_bots ("ownerId" text, "workspaceId" uuid, "botId" uuid)`))
   // A Factory acceptance report is an Artifact with this index row (listArtifacts reads its task).
   await scope.run(() => pool.query(`CREATE TABLE factory_acceptance_artifacts ("taskId" uuid primary key, "artifactId" uuid not null unique)`))
   await scope.run(() => pool.query(`CREATE TABLE artifacts (id uuid primary key, "userId" text not null, kind text not null, title varchar(200) not null, "runId" uuid, "issueId" uuid, "latestVersion" int not null default 1, "createdAt" timestamptz not null default now(), "updatedAt" timestamptz not null default now()); CREATE TABLE artifact_versions (id uuid primary key, "artifactId" uuid not null, version int not null, "storageKey" text not null, "inlineContent" text, sha256 text not null, size int not null, "authorName" text not null, "createdAt" timestamptz not null default now(), unique("artifactId",version))`))
@@ -90,8 +90,10 @@ check('failed insert rolls claim back; a successful send has an idempotent recei
   owner = 'foreign'; assert.deepEqual(await action(retry), { error: 'suggestionNotFound', params: undefined }); owner = 'owner'
   assert.deepEqual(await action(retry), { queued: true })
   assert.deepEqual(await action(retry), { queued: true })
+  await db.execute(sql`update coordinator_events set payload=payload-'submissionId' where payload ? 'submissionId'`)
+  assert.deepEqual(await action(retry), { queued: true }, 'an existing pre-echo receipt still recovers the same send')
   assert.equal((await db.select().from(coordinatorEvents)).length, 1)
-  assert.equal(callbacks.length, 2)
+  assert.equal(callbacks.length, 3)
 })
 
 check('two concurrent sends commit one event and both receive a receipt', async () => {

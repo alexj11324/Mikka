@@ -1,67 +1,75 @@
 import assert from 'node:assert/strict'
-import { after, mock, test } from 'node:test'
-import { Children, isValidElement, type ReactNode } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
-import { NextRequest } from 'next/server'
+import { test } from 'node:test'
+import { webAuthentication, authenticatedReturn, isDesktopHandoffPage } from '../apps/frontend/src/web/auth-routing'
+import { desktopAuthCallbackPath, desktopAuthCallbackURL } from '../lib/desktop-auth'
+import { BASE_PATH } from '../lib/base-path'
 
+// The web app renders sign-in itself (components/auth-form.tsx behind
+// apps/frontend/src/web/platform.tsx); no Next page or middleware sits in
+// front of it. This pins the desktop OAuth handoff the browser must preserve.
 const origin = 'https://app.example'
 const callback = 'http://127.0.0.1:49152/auth/callback'
 const state = 'abcdefghijklmnop1234'
-let currentSearchParams = new URLSearchParams()
-const router = { refresh: mock.fn() }
-const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
-mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
-mock.module('next/navigation', { namedExports: { redirect: (url: string) => { throw new Error(`redirect:${url}`) }, useSearchParams: () => currentSearchParams } })
-mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en', getTranslations: async () => (key: string) => key } })
-mock.module('next-intl', { namedExports: { useLocale: () => 'en', useTranslations: () => (key: string) => key } })
-stub('../i18n/navigation.ts', { getPathname: ({ href }: { href: string }) => `/en${href}`, redirect: () => { throw new Error('unexpected locale redirect') }, useRouter: () => router })
-stub('../lib/auth.ts', { auth: { api: { getSession: async () => null } }, oauthCallbackBaseURL: origin, googleEnabled: true, githubEnabled: true, githubSignInEnabled: async () => true })
-stub('../lib/email-sign-in.ts', { emailSignInEnabled: async () => false })
-stub('../lib/acceptance.ts', { isAcceptanceEnabled: () => false })
-stub('../app/actions/issues.ts', { listIssues: async () => [], saveIssue: async () => ({}) })
-stub('../components/blocks/auth-19/components/auth.tsx', { Auth: ({ children }: { children: ReactNode }) => children })
-stub('../components/ui/button.tsx', { Button: () => null })
-stub('../components/auth/turnstile.tsx', { Turnstile: () => null })
-let onGoogleSignIn: () => Promise<void>
-stub('../components/blocks/auth-19/components/sign-in-card.tsx', { SignInCard: (props: { onGoogleSignIn: () => Promise<void> }) => { onGoogleSignIn = props.onGoogleSignIn; return null } })
-const socialCalls: { provider: string; callbackURL: string }[] = []
-stub('../lib/auth-client.ts', { authClient: { signIn: { social: async (options: { provider: string; callbackURL: string }) => { socialCalls.push(options); return { data: { url: 'https://accounts.google.com/oauth' } } } } } })
 
-const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
-after(() => {
-  if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow)
-  else Reflect.deleteProperty(globalThis, 'window')
-})
+function signIn(query: Array<[string, string]> = [], path = `${BASE_PATH}/en/sign-in`) {
+  const url = new URL(`${origin}${path}`)
+  url.search = new URLSearchParams(query).toString()
+  return url
+}
 
-test('the desktop callback survives the sign-in page and Google callback', async () => {
-  const query = new URLSearchParams({ desktop: '1', desktop_state: state, desktop_next: '/', desktop_callback: callback })
-  const request = new NextRequest(`${origin}/mikka/en/sign-in?${query}`, { nextConfig: { basePath: '/mikka' } })
-  // Next versions differ in loopback normalization. The application must
-  // preserve the canonical callback through the complete OAuth handoff.
-  const { default: proxy } = await import('../proxy')
-  const response = proxy(request)
-  assert.equal(response.status, 200)
-  const localizedURL = new URL(response.headers.get('x-middleware-rewrite') ?? request.url)
-  currentSearchParams = localizedURL.searchParams
-  const { default: SignInPage } = await import('../app/[locale]/sign-in/page')
-  const { AuthForm } = await import('../components/auth-form')
-  const page = await SignInPage({ searchParams: Promise.resolve(Object.fromEntries(localizedURL.searchParams)) })
-  const form = Children.toArray(page.props.children).find(child => isValidElement(child) && child.type === AuthForm)
-  assert.ok(isValidElement<{ desktopFlow: unknown }>(form))
-  assert.deepEqual(form.props.desktopFlow, { state, next: '/', callback })
+const handoff: Array<[string, string]> = [
+  ['desktop', '1'], ['desktop_state', state], ['desktop_next', '/'], ['desktop_callback', callback],
+]
 
-  let destination: string | undefined
-  const browser = { location: { origin, href: request.url, assign: (url: string) => { destination = url } } }
-  Object.assign(browser, { self: browser, top: browser })
-  Object.defineProperty(globalThis, 'window', { configurable: true, value: browser })
-  renderToStaticMarkup(page)
-  await onGoogleSignIn()
-  assert.equal(socialCalls.length, 1)
-  assert.equal(socialCalls[0].provider, 'google')
-  const target = new URL(socialCalls[0].callbackURL)
-  const { BASE_PATH } = await import('../lib/base-path')
+test('the desktop handoff survives the sign-in page and the Google callback', () => {
+  const location = signIn(handoff)
+  const auth = webAuthentication(location)
+  // The props the sign-in page hands to AuthForm.
+  assert.deepEqual(auth.desktopFlow, { state, next: '/', callback })
+  assert.equal(auth.mode, 'sign-in')
+  assert.equal(auth.oauthResume, null)
+  assert.equal(auth.composioResume, undefined)
+  // A validated PKCE handoff reads identity only, never the workspace.
+  assert.equal(isDesktopHandoffPage(location), true)
+  // The page stays put, so the person sees which account the app receives.
+  assert.equal(authenticatedReturn(location), null)
+
+  // The callbackURL authClient.signIn.social receives: the API return path,
+  // free of the app base path that Better Auth adds itself, carrying the same
+  // state, page and loopback callback.
+  assert.equal(desktopAuthCallbackPath(state, '/', callback),
+    `/api/desktop/return?state=${state}&next=%2F&callback=${encodeURIComponent(callback)}`)
+  const target = new URL(desktopAuthCallbackURL(origin, state, '/', callback))
   assert.equal(target.pathname, `${BASE_PATH}/api/desktop/return`)
   assert.equal(target.searchParams.get('state'), state)
+  assert.equal(target.searchParams.get('next'), '/')
   assert.equal(target.searchParams.get('callback'), callback)
-  assert.equal(destination, 'https://accounts.google.com/oauth')
+})
+
+test('a refused handoff, an extra account and a web OAuth continuation are told apart', () => {
+  // The return route sends a refused handoff back with oauth=failed: show that,
+  // never redirect to it again.
+  assert.equal(webAuthentication(signIn([...handoff, ['oauth', 'failed']])).desktopRefused, true)
+  assert.equal(webAuthentication(signIn([...handoff, ['addAccount', '1']])).addAccount, true)
+
+  // A web OAuth continuation resumes the authorize endpoint, not a desktop handoff.
+  const continuation = webAuthentication(signIn([['sig', 'signed'], ['client_id', 'client'], ['scope', 'a'], ['scope', 'b'], ['exp', '123'], ['prompt', 'login']]))
+  assert.equal(continuation.desktopFlow, null)
+  assert.ok(continuation.oauthResume)
+  assert.equal(isDesktopHandoffPage(signIn([['sig', 'signed'], ['client_id', 'client']])), false)
+})
+
+test('an unvalidated or duplicated handoff never becomes a desktop flow', () => {
+  // A loopback callback off this machine is refused outright.
+  assert.equal(webAuthentication(signIn([['desktop', '1'], ['desktop_state', state], ['desktop_callback', 'https://foreign.example/auth/callback']])).desktopFlow, null)
+  // Duplicate values stay arrays rather than collapsing to the first one.
+  assert.equal(webAuthentication(signIn([...handoff, ['desktop_state', state]])).desktopFlow, null)
+  assert.equal(webAuthentication(signIn([...handoff, ['desktop_callback', callback]])).desktopFlow, null)
+  // An invalid nonce is not a handoff at all.
+  assert.equal(webAuthentication(signIn([['desktop', '1'], ['desktop_state', 'short'], ['desktop_callback', callback]])).desktopFlow, null)
+
+  // Only the sign-in page carries a handoff; sign-up is a separate page.
+  const signUp = signIn(handoff, `${BASE_PATH}/en/sign-up`)
+  assert.equal(webAuthentication(signUp).mode, 'sign-up')
+  assert.equal(isDesktopHandoffPage(signUp), false)
 })

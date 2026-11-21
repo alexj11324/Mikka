@@ -18,25 +18,21 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
-    ],
     "paths": {
       "@/*": [
         "./*"
       ],
       "@ui-slot/*": [
         "./components/slots/*"
+      ],
+      "mikka-real-react": [
+        "./node_modules/@types/react/index.d.ts"
       ]
     }
   },
   "include": [
     "**/*.ts",
-    "**/*.tsx",
-    ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    "**/*.tsx"
   ],
   "exclude": [
     "node_modules",

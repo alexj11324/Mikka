@@ -1,38 +1,30 @@
 import 'server-only'
-import type { Pool, PoolClient } from 'pg'
+import type { PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { z } from 'zod'
-import { pool } from '@/lib/db'
-import { workspacePool } from '@/lib/workspace-db'
-import { WorkspaceError } from '@/lib/workspace-access'
+import { auditDatabases, connectAuditDatabases, requireAuditAdmin } from './database'
 import { recordAudit } from './record'
 import { armDueTimerSoon } from '@/lib/due-timer'
 
 export const auditRetentionInput = z.object({ retentionDays: z.number().int().min(1).max(36500).nullable(), legalHold: z.boolean() }).strict()
 export type AuditRetentionInput = z.infer<typeof auditRetentionInput>
-type Targets = { main: Pool; workspace: Pool }
-const targets = (): Targets => ({ main: pool, workspace: workspacePool })
 interface Policy extends AuditRetentionInput { revision: number; updatedAt: Date | null }
 const retained: Policy = { retentionDays: null, legalHold: false, revision: 0, updatedAt: null }
-async function admin(tx: PoolClient, actorId: string, workspaceId: string) {
-  const row = (await tx.query<{ name: string }>(`SELECT m.name FROM mikka_workspaces w JOIN mikka_workspace_members m ON m."workspaceId"=w.id
-    WHERE w.id=$1 AND m."userId"=$2 AND m.status='active' AND m.role='admin' FOR SHARE OF w,m`, [workspaceId, actorId])).rows[0]
-  if (!row) throw new WorkspaceError('workspaceAccessDenied')
-  return row
-}
-export async function readAuditRetention(actorId: string, workspaceId: string, database = targets()): Promise<Policy> {
+
+export async function readAuditRetention(actorId: string, workspaceId: string, database = auditDatabases()): Promise<Policy> {
   const ws = await database.workspace.connect()
   try {
-    await ws.query('BEGIN'); await admin(ws, actorId, workspaceId)
+    await ws.query('BEGIN'); await requireAuditAdmin(ws, actorId, workspaceId)
     const policy = (await database.main.query<Policy>('SELECT "retentionDays","legalHold",revision,"updatedAt" FROM workspace_audit_retention WHERE "workspaceId"=$1', [workspaceId])).rows[0] ?? retained
     await ws.query('COMMIT'); return policy
   } catch (error) { await ws.query('ROLLBACK'); throw error } finally { ws.release() }
 }
 /** An explicit admin choice, never a default retention policy. Configuration and its audit share the main transaction. */
-export async function configureAuditRetention(actorId: string, workspaceId: string, input: AuditRetentionInput, database = targets()): Promise<Policy> {
-  const value = auditRetentionInput.parse(input), ws = await database.workspace.connect(), app = await database.main.connect()
+export async function configureAuditRetention(actorId: string, workspaceId: string, input: AuditRetentionInput, database = auditDatabases()): Promise<Policy> {
+  const value = auditRetentionInput.parse(input)
+  const { ws, app } = await connectAuditDatabases(database)
   try {
-    await ws.query('BEGIN'); const actor = await admin(ws, actorId, workspaceId)
+    await ws.query('BEGIN'); const actor = await requireAuditAdmin(ws, actorId, workspaceId)
     await app.query('BEGIN')
     const policy = (await app.query<Policy>(`INSERT INTO workspace_audit_retention("workspaceId","retentionDays","legalHold","configuredBy") VALUES($1,$2,$3,$4)
       ON CONFLICT("workspaceId") DO UPDATE SET "retentionDays"=excluded."retentionDays","legalHold"=excluded."legalHold","configuredBy"=excluded."configuredBy",revision=workspace_audit_retention.revision+1,"updatedAt"=now()
@@ -57,8 +49,8 @@ export async function configureAuditRetention(actorId: string, workspaceId: stri
 export const DELETED_WORKSPACE_RETENTION_DAYS = 90
 
 /** Explicitly configured event expiry, and a deleted workspace's expiry. Active export receipts and a legal hold block deletion. */
-export async function applyAuditRetention(workspaceId: string, now = new Date(), database = targets()) {
-  const ws = await database.workspace.connect(), app = await database.main.connect()
+export async function applyAuditRetention(workspaceId: string, now = new Date(), database = auditDatabases()) {
+  const { ws, app } = await connectAuditDatabases(database)
   try {
     await ws.query('BEGIN')
     // Export creation holds the shared version of this lock until its separate receipt commits.
@@ -96,7 +88,7 @@ async function expireDeletedWorkspace(app: PoolClient, ws: PoolClient, workspace
   return { deleted: removed.rowCount ?? 0, skipped: null }
 }
 
-export async function sweepAuditRetention(database = targets()) {
+export async function sweepAuditRetention(database = auditDatabases()) {
   const policies = (await database.main.query<{ workspaceId: string }>(`SELECT "workspaceId" FROM workspace_audit_retention WHERE "retentionDays" IS NOT NULL AND "legalHold"=false
     UNION SELECT d.id FROM workspace_deletions d WHERE NOT EXISTS (SELECT 1 FROM workspace_audit_retention p WHERE p."workspaceId"=d.id AND p."legalHold") ORDER BY 1`)).rows
   let deleted = 0, pending = 0

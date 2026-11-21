@@ -1,7 +1,7 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
-import { CircleAlert } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { CircleAlert } from '@/components/icons'
 import { failureMessageKey, type ChatFailure } from '@/lib/chat-failure'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -28,7 +28,7 @@ export function CloudFailureAction({ code, fallback }: { code: CloudErrorCode; f
 /**
  * Why an earlier turn did not answer this message, under it for good: the same words as the line it had when
  * it failed (Telegram and the phone read the same key, failureMessageKey), and one way on (review C5,
- * copy.md C-04): billing for Mikka 默认, subscription settings for account
+ * copy.md C-04): billing for Mikka 额度, subscription settings for account
  * recovery, model selection for a rejected choice, else 重新发送.
  */
 /** `retry`: the turn runs again (a welcome has no message of the person's to send again), so the action reads 重试. */
@@ -47,7 +47,7 @@ export function FailureReason({ failure, botId, onResend, sending = false, retry
   const resend = <Button variant="link" size="xs" className={ACTION} disabled={sending} onClick={onResend}>{retry ? common('retry') : chat('resend')}</Button>
   const action = cloudCode ? <CloudFailureAction code={cloudCode} fallback={resend} />
     : failure.kind === 'hosted' && !transient && failure.code !== 'platform_paused'
-    ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{failure.code === 'verification_required' ? refusal('verifyCard') : balance('topUp')}</Button>
+    ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('billing')} />}>{balance('topUp')}</Button>
     : recovery === 'settings'
       ? <Button variant="link" size="xs" className={ACTION} nativeButton={false} role="link" render={<Link href={settingsHref('models')} />}>{chat('subscriptionRefusal.open')}</Button>
       : recovery === 'model' || (failure.kind === 'hosted' && failure.code === 'platform_paused') || (failure.kind === 'failed' && failure.reason === 'balance')

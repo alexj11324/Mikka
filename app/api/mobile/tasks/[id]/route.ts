@@ -6,7 +6,6 @@ import { workspaceSelection } from '@/lib/workspace-selection'
 import { mobileTask } from '@/lib/mobile-tasks'
 import { ActionFailureError } from '@/lib/action-error'
 
-export const dynamic = 'force-dynamic'
 
 /** Read one task and its attempts; raw run errors remain on /api/mobile/threads/:id. */
 async function handleGET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +17,7 @@ async function handleGET(request: Request, { params }: { params: Promise<{ id: s
   try {
     const selectedWorkspaceId = workspaceSelection(request.headers).present
       ? (await loadWorkspaceContext(undefined, user)).workspace.id : undefined
-    const detail = await mobileTask(user, id.data, selectedWorkspaceId)
+    const detail = await mobileTask(user, id.data, selectedWorkspaceId, new URL(request.url).searchParams.get('work') === '1')
     return detail ? json(detail) : json({ error: 'issueNotFound' }, 404)
   } catch (error) {
     if (error instanceof WorkspaceError || (error instanceof ActionFailureError && ['issueNotFound', 'workspaceAccessDenied'].includes(error.code)))

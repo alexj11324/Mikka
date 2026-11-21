@@ -1,3 +1,4 @@
+import { submitEveMessage } from '../acceptance/eve-session.mjs'
 // HTTP + real daemon acceptance. Never import Playwright or impersonate CI.
 import assert from 'node:assert/strict'
 import { spawn, execFileSync } from 'node:child_process'
@@ -34,7 +35,7 @@ const completedItems = []
 const cleanupHooks = [], daemonDirectories = [join(directory, 'daemon')]
 let cloudRelease, cloudApiKey, pool, accounts, environment, runtime, localStackChild, secondDaemonPromise, activeStep, cleanupPromise, sourceFingerprint, serviceFailure, releaseHold, output = '', daemonCode, interrupted = false
 async function fingerprint() {
-  const paths = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml', 'next.config.mjs'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).sort()
+  const paths = execFileSync('git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', 'app', 'lib', 'packages', 'scripts', 'agents', 'drizzle', 'package.json', 'pnpm-lock.yaml'], { cwd: root, encoding: 'utf8' }).split('\0').filter(Boolean).sort()
   const hash = createHash('sha256')
   for (const path of paths) { hash.update(`${path}\0`); hash.update(await readFile(join(root, path)).catch(() => Buffer.from('[deleted]'))) }
   return hash.digest('hex')
@@ -110,11 +111,6 @@ async function command(args) {
 }
 async function json(account, path, body, method = body ? 'POST' : 'GET') {
   await assertTestModelRequest(new Request(`http://127.0.0.1${path}`, { method, ...(body ? { body: JSON.stringify(body) } : {}) }))
-  if (method === 'POST' && ['/api/coordinator/messages', '/api/mobile/chat'].includes(path)) {
-    const modelResponse = await account.request(`/api/mobile/model${body?.botId ? `?bot=${body.botId}` : ''}`)
-    assert.ok(modelResponse.ok, 'Cannot verify the test bot model before submitting a prompt')
-    assertFlashTestModel((await modelResponse.json()).current?.modelId)
-  }
   const response = await account.request(path, { method, ...(body ? { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : {}) })
   if (!response.ok) {
     const value = await response.json().catch(() => null)
@@ -126,6 +122,12 @@ async function json(account, path, body, method = body ? 'POST' : 'GET') {
   }
   return response.json()
 }
+async function sendMessage(account, text, submissionId) {
+  const modelResponse = await account.request('/api/mobile/model')
+  assert.ok(modelResponse.ok, 'Cannot verify the test bot model before submitting a prompt')
+  assertFlashTestModel((await modelResponse.json()).current?.modelId)
+  return submitEveMessage(account, null, text, submissionId, { expectedOwnerId: account.userId })
+}
 const query = async (sql, values = []) => (await pool.query(sql, values)).rows
 const run = async id => {
   const current = (await query('SELECT r.*,p.status AS publication,p."pullRequest" FROM agent_runs r LEFT JOIN run_publications p ON p."runId"=r.id WHERE r.id=$1 AND r."userId"=$2', [id, accounts.owner.userId]))[0]
@@ -135,7 +137,7 @@ const run = async id => {
 
 async function dispatch(name, text, signal) {
   const since = new Date()
-  await json(accounts.owner, '/api/coordinator/messages', { text: `${text}\n验收标记：${runId}-${name}`, submissionId: randomUUID() })
+  await sendMessage(accounts.owner, `${text}\n验收标记：${runId}-${name}`, randomUUID())
   const created = await until(signal, async () => (await query('SELECT id FROM agent_runs WHERE "userId"=$1 AND "createdAt">=$2 AND prompt LIKE $3 ORDER BY "createdAt" DESC LIMIT 1', [accounts.owner.userId, since, `%${runId}-${name}%`]))[0])
   await progress(name, 'run-created', created.id)
   return created.id
@@ -151,7 +153,7 @@ async function observations() {
 
 async function setup() {
   assertDevLocal(process.env)
-  assert.equal(Number(process.versions.node.split('.')[0]), 24, 'Use Node 24')
+  assert.ok(Number(process.versions.node.split('.')[0]) >= 22, 'Use Node 22 or newer')
   for (const name of ['CI', 'GITHUB_ACTIONS', 'RUNNER_ENVIRONMENT', 'GITHUB_RUN_ID']) assert.ok(!process.env[name], 'Local acceptance must not impersonate CI')
   await privateDirectory(directory)
   for (const name of ['BETTER_AUTH_SECRET', 'DEEPSEEK_API_KEY', 'INFISICAL_CLIENT_SECRET']) if (process.env[name]) secrets.add(process.env[name])
@@ -217,7 +219,7 @@ async function setup() {
     await recordAuthenticationSecrets([decodeURIComponent(new URL(process.env.E2E_DATABASE_URL).password)], { environment })
   }
   await new TestAccountPool(pool, environment).prepare({ pairs: 4 })
-  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, NEXT_TELEMETRY_DISABLED: '1', MIKKA_DEV_SKIP_ENV_FILES: '1', MIKKA_DEV_SKIP_MODEL_SETUP: needsModels ? '0' : '1',
+  if (!existing) localStackChild = child(process.execPath, ['scripts/dev-local.mjs'], { ...process.env, MIKKA_DEV_SKIP_ENV_FILES: '1', MIKKA_DEV_SKIP_MODEL_SETUP: needsModels ? '0' : '1',
     ...(selectedItems.some(item => ['9', '10'].includes(item)) ? { MIKKA_DEV_ACCEPTANCE_HANDOFF: '1' } : {}),
     ...(selectedItems.includes('10') ? { MIKKA_DEV_ACCEPTANCE_ONLINE_WATCHDOG: '1' } : {}), ...(!needsDaemon ? { MIKKA_DEV_SKIP_DAEMON: '1' } : {}) }, true)
   await step('server-ready', 180_000, signal => until(signal, async () => {
@@ -440,7 +442,7 @@ async function accept(device) {
     let issue = (await query('SELECT id FROM issues WHERE "userId"=$1 ORDER BY "createdAt" DESC LIMIT 1', [accounts.owner.userId]))[0]
     if (!issue) {
       const title = `Inbox ${runId}`
-      await json(accounts.owner, '/api/coordinator/messages', { text: `请只创建一个标题为“${title}”的个人任务，描述为“收件箱验收”。不要派发、不要启动线程、不要调用任何电脑。`, submissionId: randomUUID() })
+      await sendMessage(accounts.owner, `请只创建一个标题为“${title}”的个人任务，描述为“收件箱验收”。不要派发、不要启动线程、不要调用任何电脑。`, randomUUID())
       issue = await until(signal, async () => (await query('SELECT id FROM issues WHERE "userId"=$1 AND title=$2', [accounts.owner.userId, title]))[0])
     }
     // The web inbox is the subscribed task list. Exercise its real preference

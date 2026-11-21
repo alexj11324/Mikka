@@ -16,6 +16,11 @@ export function isMachinePath(pathname) {
   // Invalid encoding and encoded machine names must never receive a SPA 200.
   return path === null || /^\/(?:mikka\/)?(?:api|v1|trpc|_next|_vercel|__nextjs|\.well-known|w)(?:\/|$)/.test(path)
 }
+export function prefersServerHtml(request) {
+  return new Negotiator({ headers: { accept: request.headers.get('accept') ?? '*/*' } })
+    .mediaType(['application/json', 'text/html']) === 'text/html'
+}
+
 export function isPagePath(pathname) {
   const path = decodedPath(pathname)
   return path !== null && (path === '/mikka' || path.startsWith('/mikka/'))

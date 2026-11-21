@@ -1,4 +1,5 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
+import { addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
@@ -10,7 +11,7 @@ import { gzipSync } from 'node:zlib'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { applyApprovalMode, defaultRunPolicy } from '@mikka/protocol/agent-policy'
 
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, type FactoryQueue } from './dispatch'
@@ -40,7 +41,7 @@ const patch = Buffer.from(`diff --git a/DELIVERY.txt b/DELIVERY.txt\nnew file mo
 test('isolated PG: direct question recovery exposes historical native observations without rewriting or passing the producer', { skip: !url, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `factory_history_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!)
   target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
@@ -61,7 +62,7 @@ test('isolated PG: direct question recovery exposes historical native observatio
       await seedFixtureWorkspace(pool, 'owner', 'team', workspaceId)
       await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Synthetic legacy delivery','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`, [issueId, workspaceId])
       await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Fixture Bot')`, [botId, workspaceId])
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture cloud','cloud',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,'owner','Fixture cloud','cloud',now(),'[{"harness":"codex","installed":true}]',now())`, [deviceId])
       await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,'owner',$3,'codex',$2)`, [agentId, deviceId, `Fixture Codex ${agentId}`])
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner',$3)`, [repoId, deviceId, repoPath])
       // The database suite exercises check admission, not provider startup.
@@ -89,6 +90,7 @@ test('isolated PG: direct question recovery exposes historical native observatio
       const producerRunId = producer.runId, producerAttemptId = producer.task.attemptId
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='original-native-session',"startedAt"=now()-interval '2 hours',"finishedAt"=now()-interval '118 minutes',"worktreePath"=$2,report=$3 WHERE id=$1`,
         [producerRunId, worktreePath, JSON.stringify({ sourceCommit: base, summary: 'Original completed report remains unchanged.', verify: { status: 'not_run' } })])
+      await addFactoryVisualEvidence(pool,producerRunId)
       const clock = Date.now()
       for (const minutes of [0, 3, 8, 17]) await sweepFactoryWatchdog(pool, {
         runtime: () => ({ store, reconcile: { run: async () => { throw new Error('Synthetic historical dispatch failure') } } }),

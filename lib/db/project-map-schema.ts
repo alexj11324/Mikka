@@ -1,12 +1,13 @@
 import { pgTable, uuid, text, varchar, jsonb, timestamp, index, uniqueIndex, type AnyPgColumn } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
-import { users, issues, agentRuns, factoryTasks } from './schema.ts'
+import { issues, agentRuns, factoryTasks } from './schema.ts'
 
 /** Immutable project decisions; AI conversation bodies remain in their original Mikka tables. */
 export const projectDecisions = pgTable('project_decisions', {
   id: uuid('id').primaryKey(),
   workspaceId: uuid('workspaceId').notNull(), projectId: uuid('projectId').notNull(),
-  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** Immutable author identity; shared Project history outlives an account. */
+  ownerId: text('ownerId').notNull(),
   issueId: uuid('issueId').references(() => issues.id, { onDelete: 'set null' }),
   factoryTaskId: uuid('factoryTaskId').references(() => factoryTasks.id, { onDelete: 'set null' }),
   runId: uuid('runId').references(() => agentRuns.id, { onDelete: 'set null' }),
@@ -36,7 +37,8 @@ export const projectDecisions = pgTable('project_decisions', {
 export const projectDecisionSources = pgTable('project_decision_sources', {
   id: uuid('id').primaryKey(),
   decisionId: uuid('decisionId').notNull().references(() => projectDecisions.id, { onDelete: 'cascade' }),
-  ownerId: text('ownerId').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** The source's historical author, not an account-deletion cascade boundary. */
+  ownerId: text('ownerId').notNull(),
   workspaceId: uuid('workspaceId').notNull(),
   role: text('role').$type<'evidence' | 'branch_work' | 'stopped_at' | 'merges_from'>().notNull(),
   optionId: text('optionId'),

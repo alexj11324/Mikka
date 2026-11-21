@@ -197,12 +197,12 @@ export async function checkAnalytics({ root = process.cwd(), env = process.env }
   const build = await inspectAnalyticsBuild(root)
   const port = 3186, origin = `http://localhost:${port}`
   const serverEnv = { PATH: env.PATH, NODE_ENV: 'production', CI: 'true',
-    MIKKA_COMMUNITY_UI: env.MIKKA_COMMUNITY_UI === '1' ? '1' : '0',
+    MIKKA_EDITION: 'cloud',
     BETTER_AUTH_URL: origin, BETTER_AUTH_SECRET: 'synthetic-ssr-regression-secret-not-a-real-credential',
     E2E_DATABASE_URL: database, DATABASE_URL: database, MIKKA_DATABASE_URL: database,
     // The browser key is already proven in the compiled assets. Disabling the
     // server token prevents anonymous flag lookups from contacting PostHog.
-    NEXT_PUBLIC_POSTHOG_KEY: '', NEXT_TELEMETRY_DISABLED: '1' }
+    NEXT_PUBLIC_POSTHOG_KEY: '' }
   const child = spawn(process.execPath, ['scripts/start-app.mjs', '--hostname', 'localhost', '--port', String(port)], {
     cwd: root, env: serverEnv, stdio: ['ignore', 'pipe', 'pipe'],
   })

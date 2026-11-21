@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { DAEMON_CLIENT_ID } from '@mikka/protocol/auth'
 
 /** What the machine asking to connect says about itself: shown on /device before 允许 (RFC 8628 §5.4). */
-export type DeviceClientInfo = { device_name: string | null; device_platform: string | null; client_version: string | null }
+export type DeviceClientInfo = { device_name: string | null; device_platform: string | null; device_arch: string | null; client_version: string | null; expires_at: string | null }
 
 // Shown as plain text: no control characters, bounded. The machine reports these itself, so they identify, not prove;
 // the code the person checks against the terminal is what binds the approval to it.
@@ -12,15 +12,16 @@ const reported = (max: number) => z.string().max(max * 4).optional().transform(v
 })
 
 const daemonDeviceGrant = {
-  requestSchemaFields: { device_name: reported(255), device_platform: reported(32), client_version: reported(64) },
+  requestSchemaFields: { device_name: reported(255), device_platform: reported(32), device_arch: reported(32), client_version: reported(64) },
   deviceCodeSchemaFields: {
     deviceName: { type: 'string', required: false },
     devicePlatform: { type: 'string', required: false },
+    deviceArch: { type: 'string', required: false },
     clientVersion: { type: 'string', required: false },
   },
-  authorizeRequest: ({ request }: { request: { client_id?: string; device_name?: string | null; device_platform?: string | null; client_version?: string | null } }) =>
+  authorizeRequest: ({ request }: { request: { client_id?: string; device_name?: string | null; device_platform?: string | null; device_arch?: string | null; client_version?: string | null } }) =>
     request.client_id === DAEMON_CLIENT_ID
-      ? { clientId: DAEMON_CLIENT_ID, deviceCodeFields: { deviceName: request.device_name ?? null, devicePlatform: request.device_platform ?? null, clientVersion: request.client_version ?? null } }
+      ? { clientId: DAEMON_CLIENT_ID, deviceCodeFields: { deviceName: request.device_name ?? null, devicePlatform: request.device_platform ?? null, deviceArch: request.device_arch ?? null, clientVersion: request.client_version ?? null } }
       : undefined,
   // Only daemon codes exist here, and they are redeemed by /device/token as before.
   assertSessionRedemption: () => {},
@@ -28,7 +29,9 @@ const daemonDeviceGrant = {
   getVerificationContext: (record: Record<string, unknown>): DeviceClientInfo => ({
     device_name: typeof record.deviceName === 'string' ? record.deviceName : null,
     device_platform: typeof record.devicePlatform === 'string' ? record.devicePlatform : null,
+    device_arch: typeof record.deviceArch === 'string' ? record.deviceArch : null,
     client_version: typeof record.clientVersion === 'string' ? record.clientVersion : null,
+    expires_at: record.expiresAt instanceof Date ? record.expiresAt.toISOString() : null,
   }),
 } as const
 

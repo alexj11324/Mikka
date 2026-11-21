@@ -1,3 +1,4 @@
+import { submitEveMessage } from './acceptance/eve-session.mjs'
 // API acceptance of private chat files against an attested, runner-owned local build.
 // Uses the normal account lease and auth routes; no browser interaction tests.
 import assert from 'node:assert/strict'
@@ -29,7 +30,6 @@ const fingerprint = async () => {
       'drizzle',
       'package.json',
       'pnpm-lock.yaml',
-      'next.config.mjs',
     ],
     { encoding: 'utf8' },
   )
@@ -172,7 +172,7 @@ try {
     '\n\n对照这些资料检查实现'
   const submissionId = randomUUID()
   for (let attempt = 0; attempt < 2; attempt++)
-    await assertStatus(await owner.request('/api/coordinator/messages', json({ text, submissionId })), 202)
+    await submitEveMessage(owner, null, text, submissionId, { expectedOwnerId: owner.userId })
   assert.equal(
     (
       await database.query(

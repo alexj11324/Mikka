@@ -1,0 +1,257 @@
+{
+  "version": 1,
+  "exclude": [
+    "**/*.test.*",
+    "**/*.spec.*",
+    "cloudflare/**/test/**",
+    "packages/**/test/**",
+    "**/evals/**",
+    "**/README.md",
+    "**/vitest.config.*"
+  ],
+  "groups": {
+    "toolchain": [
+      "package.json",
+      "pnpm-lock.yaml",
+      "pnpm-workspace.yaml",
+      ".node-version",
+      "tsconfig.json",
+      "packages/config/**",
+      "patches/**",
+      "config/service-build-inputs.json",
+      "scripts/release/service-builds.mjs",
+      "scripts/release/migration-inputs.mjs",
+      "packages/*/package.json",
+      "apps/*/package.json",
+      "scripts/release/service-build-ci.mjs",
+      "scripts/cloudflare-native-oci.mjs",
+      "scripts/cloudflare-ci.mjs",
+      "scripts/cloudflare-source.mjs",
+      "lib/deployment-id.mjs",
+      ".github/workflows/cloudflare-api-image.yml",
+      ".github/actions/cloudflare-registry-credentials/**"
+    ],
+    "application": [
+      "lib/**",
+      "packages/protocol/**",
+      "messages/**",
+      "types/**",
+      "workflows/**",
+      "app/actions/**",
+      "apps/api/src/**",
+      "apps/api/runtime/http-policy.mjs",
+      "packages/daemon/src/**",
+      "agents/**",
+      "scripts/preview-database-url.mjs",
+      "scripts/postgres-connection.mjs",
+      "scripts/test-accounts/**",
+      "scripts/ops/monitor.mjs",
+      "scripts/ops/egress-monitor.mjs",
+      "tests/fixtures/group-decision-cases.json",
+      "components/workspace/workspace-navigation.ts",
+      "components/blocks/rich-text-editor-4/components/comment-mark.ts",
+      "components/blocks/rich-text-editor-4/components/rich-text-comments.ts",
+      "cloudflare/bounded-json.mjs",
+      "tests/mvp/transport.mjs",
+      "scripts/dev-local/transport.mjs",
+      "scripts/dev-local/services.mjs",
+      "scripts/ops/request-outcomes.mjs",
+      "scripts/ops/deployment-regression.mjs",
+      "scripts/ops/cloudflare-container-logs.mjs",
+      "components/blocks/rich-text-editor-4/components/rich-text-state.ts"
+    ],
+    "frontend": [
+      "app/**",
+      "apps/frontend/**",
+      "apps/desktop/src/renderer/**",
+      "apps/desktop/scripts/renderer-transforms.mjs",
+      "apps/desktop/scripts/renderer-*.mjs",
+      "components/**",
+      "hooks/**",
+      "public/**",
+      "i18n/**",
+      "postcss.config.mjs",
+      "scripts/build-installation.mjs",
+      "scripts/generate-agent-ui-prompt.mjs",
+      "instrumentation-client.ts",
+      "apps/desktop/src/startup.ts",
+      "scripts/release/hosted-ui.mjs",
+      "scripts/release/web-deploy.mjs"
+    ],
+    "runtimeResources": [
+      "packages/subscription-worker/**",
+      "packages/daemon/scripts/**",
+      "packages/daemon/src/agents/capture-video.mjs",
+      "scripts/e2b/**",
+      "scripts/build-subscription-worker.mjs",
+      "scripts/release/runtime-resources.mjs"
+    ]
+  },
+  "services": {
+    "web": {
+      "kind": "worker",
+      "groups": [
+        "toolchain",
+        "application",
+        "frontend"
+      ],
+      "paths": [
+        "cloudflare/web/**"
+      ],
+      "entrypoints": [
+        "apps/frontend/scripts/build.mjs",
+        "apps/frontend/src/web/**",
+        "cloudflare/web/**"
+      ],
+      "overlay": true
+    },
+    "api": {
+      "kind": "container",
+      "groups": [
+        "toolchain",
+        "application",
+        "frontend",
+        "runtimeResources"
+      ],
+      "paths": [
+        "apps/api/**",
+        "workflows/**",
+        "nitro.config.ts",
+        "cloudflare/api/**",
+        "scripts/build-cloudflare-world.mjs",
+        "packages/eve-cloudflare-world/**",
+        "cloudflare/litellm/request.mjs",
+        "cloudflare/bounded-json.mjs",
+        "cloudflare/task-sandbox/process-socket.mjs",
+        "cloudflare/credential-identity/transport.mjs",
+        "cloudflare/task-sandbox/grant.mjs",
+        "tests/mvp/isolated-env.mjs",
+        "scripts/dev-local/guard.mjs",
+        "scripts/test-model-policy.mjs",
+        "scripts/ops/cloudflare-capacity.mjs",
+        "scripts/ops/runtime-outcomes.mjs"
+      ],
+      "entrypoints": [
+        "apps/api/scripts/build.mjs",
+        "apps/api/nitro.config.ts",
+        "apps/api/runtime/**",
+        "app/api/**",
+        "app/actions/**",
+        "workflows/**",
+        "cloudflare/api/**"
+      ],
+      "dockerfile": "cloudflare/api/Dockerfile",
+      "repository": "mikka-api",
+      "overlay": true,
+      "requiredInputs": [
+        "scripts/e2b/*.py",
+        "scripts/e2b/*.mjs",
+        "scripts/e2b/*.sh"
+      ]
+    },
+    "eve": {
+      "kind": "container",
+      "groups": [
+        "toolchain",
+        "application",
+        "runtimeResources"
+      ],
+      "paths": [
+        "apps/eve/**",
+        "packages/eve-cloudflare-world/**",
+        "cloudflare/eve-runtime/**",
+        "scripts/build-eve.mjs",
+        "scripts/package-eve.mjs",
+        "scripts/package-cf-eve-host.mjs",
+        "scripts/build-cloudflare-world.mjs",
+        "scripts/compile-cloudflare-eve-host.sh",
+        "scripts/build-cloudflare-eve-image.sh",
+        "scripts/generate-agent-ui-prompt.mjs",
+        "cloudflare/api/ingress/services.mjs",
+        "cloudflare/litellm/request.mjs",
+        "cloudflare/api/ingress/request.mjs"
+      ],
+      "entrypoints": [
+        "apps/eve/agent/**",
+        "scripts/build-eve.mjs",
+        "scripts/package-eve.mjs",
+        "scripts/package-cf-eve-host.mjs",
+        "cloudflare/eve-runtime/src/**",
+        "cloudflare/eve-runtime/runtime/**"
+      ],
+      "dockerfile": "cloudflare/eve-runtime/Dockerfile",
+      "repository": "mikka-eve",
+      "requiredInputs": [
+        "scripts/e2b/*.py",
+        "scripts/e2b/*.mjs",
+        "scripts/e2b/*.sh"
+      ]
+    },
+    "task": {
+      "kind": "container",
+      "groups": [
+        "toolchain"
+      ],
+      "paths": [
+        "packages/protocol/**",
+        "packages/daemon/**",
+        "cloudflare/task-sandbox/**",
+        "scripts/e2b/terminal-gateway.py",
+        "scripts/e2b/preview-gateway.py",
+        "scripts/e2b/preview_firewall.py",
+        "scripts/release/verify-task-image.sh"
+      ],
+      "entrypoints": [
+        "packages/daemon/bin/cloud-worker.ts",
+        "packages/daemon/scripts/build-cloud-worker.mjs",
+        "cloudflare/task-sandbox/src/**",
+        "cloudflare/task-sandbox/runtime/**",
+        "cloudflare/task-sandbox/machine.mjs",
+        "packages/daemon/test/cloudflare-task-handoff.node-test.ts"
+      ],
+      "dockerfile": "cloudflare/task-sandbox/Dockerfile",
+      "repository": "mikka-native-task",
+      "requiredInputs": [
+        "packages/daemon/test/cloudflare-task-handoff.node-test.ts",
+        "cloudflare/task-sandbox/*.test.mjs",
+        "cloudflare/task-sandbox/*.test.py",
+        "cloudflare/task-sandbox/test/**"
+      ]
+    },
+    "world": {
+      "kind": "worker",
+      "groups": [
+        "toolchain"
+      ],
+      "paths": [
+        "packages/eve-cloudflare-world/**",
+        "scripts/build-cloudflare-world.mjs",
+        "lib/eve/session-control-delivery.mjs",
+        "lib/deployment-id.mjs"
+      ],
+      "entrypoints": [
+        "packages/eve-cloudflare-world/src/**",
+        "scripts/build-cloudflare-world.mjs"
+      ]
+    },
+    "litellm": {
+      "kind": "container",
+      "groups": [
+        "toolchain"
+      ],
+      "paths": [
+        "deploy/litellm/**",
+        "cloudflare/litellm/**",
+        "lib/model-gateway/protocol-fields.mjs"
+      ],
+      "entrypoints": [
+        "cloudflare/litellm/worker.mjs"
+      ],
+      "dockerfile": "deploy/litellm/Dockerfile",
+      "repository": "mikka-litellm"
+    }
+  },
+  "migrations": [
+    "drizzle/*.sql"
+  ]
+}

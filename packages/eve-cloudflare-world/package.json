@@ -1,0 +1,24 @@
+{
+  "name": "@mikka/eve-cloudflare-world",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@fantasticfour/world-cloudflare": "2.4.3",
+    "@workflow/errors": "5.0.5",
+    "@workflow/world": "5.1.0",
+    "cbor-x": "1.6.0",
+    "ulid": "3.0.2"
+  },
+  "scripts": {
+    "test": "vitest run --testTimeout=30000"
+  },
+  "devDependencies": {
+    "@workflow/world-local": "5.2.1",
+    "vitest": "5.0.5"
+  },
+  "exports": {
+    ".": "./src/node-world.mjs",
+    "./business": "./src/business-world.mjs",
+    "./worker": "./src/authority.mjs"
+  }
+}

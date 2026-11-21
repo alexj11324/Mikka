@@ -5,8 +5,7 @@ import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 import { resolveAgentSettings } from '@mikka/protocol/agent-policy'
 import type { WorkerDefinitionSnapshot } from '../agent-kit/worker'
-import { anonymousClaudeStartupHint } from '../computer/claude-startup-hint'
-import { anonymousCodexStartupHint } from '../computer/codex-startup-hint'
+import { anonymousStartupHint } from '../computer/anonymous-startup-hint'
 import { readRunBootstrapEvidence } from './bootstrap-evidence'
 
 const url = process.env.E2E_DATABASE_URL
@@ -54,8 +53,7 @@ test('bootstrap projection uses one read-only authorized snapshot and rejects st
       try {
         await client.query('BEGIN READ ONLY')
         const rows = await readRunBootstrapEvidence(client, owner, runId, input)
-        const builder = harness === 'codex' ? anonymousCodexStartupHint : anonymousClaudeStartupHint
-        assert.deepEqual(rows?.hint, JSON.parse(builder({ runId, bootstrap: rawBootstrap, kind: 'implement',
+        assert.deepEqual(rows?.hint, JSON.parse(anonymousStartupHint({ runId, bootstrap: rawBootstrap, kind: 'implement',
           repository: 'v2/github.com/alexj11324/mikka-handoff', userId: owner, botId, freshTask: true, diagnostics: true, definition: d })))
         assert.doesNotMatch(JSON.stringify(rows), /PRIVATE_|bindingId|shared-owner|credential|instructions/i)
       } finally { await client.query('ROLLBACK'); client.release() }

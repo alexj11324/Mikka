@@ -1,4 +1,9 @@
 import { useCallback, useSyncExternalStore } from 'react'
+import { currentAccount } from '@/lib/config'
+import { useHome } from '@/lib/home'
+import { apiCache } from '@/lib/api-cache'
+import { reviewPath } from './review-api'
+import { isMerged, usesVersionedReview, type ReviewRead } from './review'
 import { EMPTY_BATCH, type Batch } from './review'
 
 /**
@@ -33,7 +38,16 @@ export const batchKey = (taskId: string) => entry(taskId).key
 const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } }
 
 export function useBatch(taskId: string) {
-  const batch = useSyncExternalStore(subscribe, () => entry(taskId).batch, () => entry(taskId).batch)
-  const update = useCallback((next: (batch: Batch) => Batch) => setBatch(taskId, next), [taskId])
-  return [batch, update] as const
+  const home = useHome().data
+  const account = currentAccount()
+  // Draft sheets are local: use the already authorized, account-scoped Task read.
+  // A deep link without that read cannot open a previous actor’s draft.
+  const review = apiCache.get<ReviewRead>(reviewPath(taskId))
+  const historicalWriter = review?.summary.taskId === taskId && !usesVersionedReview(review.summary) && review.summary.permissions.canSend && !isMerged(review.summary)
+  const scope = home && historicalWriter && (!account.user || account.user.id === home.user.id)
+    ? JSON.stringify([account.server.url, account.id, home.user.id, home.workspace.id, taskId]) : null
+  const snapshot = () => scope ? entry(scope).batch : EMPTY_BATCH
+  const batch = useSyncExternalStore(subscribe, snapshot, snapshot)
+  const update = useCallback((next: (batch: Batch) => Batch) => { if (scope) setBatch(scope, next) }, [scope])
+  return [batch, update, scope] as const
 }

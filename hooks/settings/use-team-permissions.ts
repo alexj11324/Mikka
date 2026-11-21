@@ -10,7 +10,7 @@ import { withBasePath } from '@/lib/base-path'
 import { computerPermissions, type ComputerPermission } from '@/lib/computer/permission'
 import { settingsRead } from '@/lib/settings-read'
 import { settingsKeys } from '@/lib/swr/keys'
-import { ReadResponseError } from '@/lib/swr/retry'
+import { isAutoRetryable, ReadResponseError } from '@/lib/swr/retry'
 import { useActionError } from '@/lib/use-action-error'
 
 // 设置 › 团队权限's reads and saves (N4): 电脑操作, sharing subscriptions and API
@@ -31,8 +31,16 @@ export async function readComputerPolicy(workspaceId: string): Promise<ComputerP
   return computerStateSchema.parse(await response.json())
 }
 
+function policyReadFailure(transport: unknown, code: string | undefined, message: ReturnType<typeof useActionError>, reload: () => Promise<unknown>) {
+  if (!transport && !code) return null
+  const status = transport instanceof ReadResponseError ? transport.status : undefined
+  const reason = status === 401 ? 'authRequired' : status === 403 ? 'workspaceAccessDenied' : code
+  return { message: message(reason), retry: isAutoRetryable({ code: reason, cause: transport }) ? reload : undefined }
+}
+
 /** 电脑操作: `state` is null until read; `enabled: false` means this deployment has no cloud computer (no row). */
 export function useComputerPolicy(workspaceId: string) {
+  const actionError = useActionError()
   const policy = useSWR(computerPolicyKey(workspaceId), () => readComputerPolicy(workspaceId))
   const [pending, setPending] = useState(false)
   const [changeError, setChangeError] = useState(false)
@@ -45,7 +53,8 @@ export function useComputerPolicy(workspaceId: string) {
       await refresh()
     } catch { setChangeError(true); await refresh().catch(() => undefined) } finally { setPending(false) }
   }
-  return { state: policy.data ?? null, error: changeError || Boolean(policy.error), pending, change }
+  const failure = policyReadFailure(policy.error, undefined, actionError, refresh)
+  return { state: failure ? null : policy.data ?? null, error: changeError || Boolean(failure), readError: failure?.message, retryRead: failure?.retry, pending, change }
 }
 
 /** 订阅与 API Key: whether members may share theirs with teammates; 允许 by default (decision 2026-11-01-2240). */
@@ -54,7 +63,8 @@ export function useSharePolicy(workspaceId: string) {
   const policy = useSWR(settingsKeys.sharePolicy(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getSharePolicy>>>('share-policy', { workspace: workspaceId }))
   const [pending, setPending] = useState(false)
   const [failed, setFailed] = useState<{ access: AppAccess; message: string } | null>(null)
-  const data = policy.data && !policy.data.error ? policy.data : null
+  const failure = policyReadFailure(policy.error, policy.data?.error, actionError, () => policy.mutate())
+  const data = !failure && policy.data && !policy.data.error ? policy.data : null
   const access: AppAccess = data?.allowed === false ? 'deny' : 'allow'
 
   async function change(next: AppAccess) {
@@ -74,7 +84,7 @@ export function useSharePolicy(workspaceId: string) {
     loading: !policy.data && !policy.error,
     data, access, canEdit: data?.canEdit === true,
     /** The read failed: the words to show. */
-    error: !policy.data && !policy.error ? null : data ? null : actionError(policy.data?.error),
+    error: failure?.message ?? null, retryRead: failure?.retry,
     pending, failed, change,
     retry: () => { if (failed) void change(failed.access) },
   }
@@ -86,7 +96,8 @@ export function useAppPolicy(workspaceId: string) {
   const policy = useSWR(settingsKeys.appPolicy(workspaceId), () => settingsRead<Awaited<ReturnType<typeof getAppPolicy>>>('app-policy', { workspace: workspaceId }))
   const [pending, setPending] = useState<PolicyApp | null>(null)
   const [failed, setFailed] = useState<{ app: PolicyApp; access: AppAccess; message: string } | null>(null)
-  const data = policy.data && !policy.data.error ? policy.data : null
+  const failure = policyReadFailure(policy.error, policy.data?.error, actionError, () => policy.mutate())
+  const data = !failure && policy.data && !policy.data.error ? policy.data : null
 
   async function change(app: PolicyApp, access: AppAccess) {
     setPending(app)
@@ -105,7 +116,7 @@ export function useAppPolicy(workspaceId: string) {
   return {
     loading: !policy.data && !policy.error,
     data, apps: data?.apps ?? [], canEdit: data?.canEdit === true,
-    error: !policy.data && !policy.error ? null : data ? null : actionError(policy.data?.error),
+    error: failure?.message ?? null, retryRead: failure?.retry,
     pending, failed, change,
     retry: () => { if (failed) void change(failed.app, failed.access) },
   }

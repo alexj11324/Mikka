@@ -4,7 +4,7 @@ import { test as base, expect, type BrowserContext, type Locator, type Page } fr
 import { Pool } from 'pg'
 import { recordAuthenticationSecrets } from '../../scripts/test-accounts/session.mjs'
 
-// The app is served under next.config.mjs's basePath. page.goto('/x') resolves
+// The app is served under the base path in lib/base-path-config.mjs. page.goto('/x') resolves
 // against the origin, so app paths go through app().
 export const BASE_PATH = '/mikka'
 export function app(path: string) {
@@ -13,7 +13,7 @@ export function app(path: string) {
 }
 
 /** Buttons on the left icon rail (主页 / 建议 / 看板 / 插件 / Artifact). Phones have no rail. */
-export function rail(page: Page, name: '主页' | '建议' | '看板' | '插件' | 'Artifact') {
+export function rail(page: Page, name: '主页' | '建议' | '任务' | '插件' | 'Artifact') {
   return page.getByRole('navigation', { name: '主导航', exact: true }).getByRole('button', { name, exact: true })
 }
 

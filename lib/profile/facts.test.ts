@@ -63,7 +63,8 @@ test('repeats raise confidence and merge purchases and evidence without duplicat
 
 const now = new Date('2026-10-28T09:30:00Z')
 let next = 0
-const fact = (fields: Partial<StoredFact>): StoredFact => ({ id: `f${++next}`, kind: 'interest', subject: 's', subjectKey: `s${next}`, value: {}, confidence: 0.6, lastSeenAt: new Date('2026-10-27T00:00:00Z'), expiresAt: null, state: 'active', userEdited: false, ...fields })
+const OPTIONS = { now: new Date('2026-11-10T00:00:00Z'), timeZone: 'UTC', locale: 'en' as const }
+const fact = (fields: Partial<StoredFact>): StoredFact => ({ id: `f${++next}`, kind: 'interest', subject: 's', subjectKey: `s${next}`, repository: null, value: {}, confidence: 0.6, lastSeenAt: new Date('2026-10-27T00:00:00Z'), expiresAt: null, state: 'active', userEdited: false, ...fields })
 const order = (merchant: string, date: string) => ({ merchant, items: [], amount: 20, currency: 'USD', date })
 const old = new Date(now.getTime() - 40 * 24 * 60 * 60 * 1000)
 
@@ -191,6 +192,41 @@ test('questions go in batches of 40, at most three calls a night; the rest wait'
   assert.equal(new Set(names).size, names.length, 'question names are distinct')
   assert.equal(result.updates.length, 120)
   assert.ok(JSON.parse(consolidationInput([], now)).items.length === 0)
+})
+
+test('a slot answers per repository, so two repositories never vote on one answer', () => {
+  // ALE-68: "the test command" of two repositories that disagree are two answers,
+  // not a contradiction. Grouping them together would have expired one of them.
+  const plan = consolidationCandidates([
+    fact({ id: 'w1', kind: 'tool', subject: 'pnpm test', subjectKey: 'pnpm test', repository: 'acme/widget', value: { slot: 'test_command' } }),
+    fact({ id: 'w2', kind: 'tool', subject: 'pnpm test --watch', subjectKey: 'pnpm test --watch', repository: 'acme/widget', value: { slot: 'test_command' } }),
+    fact({ id: 'g1', kind: 'tool', subject: 'cargo test', subjectKey: 'cargo test', repository: 'acme/gadget', value: { slot: 'test_command' } }),
+  ], OPTIONS)
+  const slots = plan.items.filter(item => item.kind === 'slot')
+  assert.equal(slots.length, 1, 'the repository with two answers asks once; the lone one asks nothing')
+  // evidence is Record<string, unknown>: narrow it to the shape a slot item writes.
+  const answers = (slots[0].evidence.answers ?? []) as { repository?: string }[]
+  assert.equal(answers.length, 2)
+  assert.deepEqual(answers.map(answer => answer.repository), ['acme/widget', 'acme/widget'])
+  // A person-level answer and a repository answer are different slots too.
+  const mixed = consolidationCandidates([
+    fact({ id: 'a', kind: 'tool', subject: 'pnpm test', subjectKey: 'pnpm test', repository: null, value: { slot: 'test_command' } }),
+    fact({ id: 'b', kind: 'tool', subject: 'npm test', subjectKey: 'npm test', repository: 'acme/widget', value: { slot: 'test_command' } }),
+  ], OPTIONS)
+  assert.deepEqual(mixed.updates, [], 'nothing is expired for disagreeing across a scope boundary')
+  assert.deepEqual(mixed.items.filter(item => item.kind === 'slot'), [])
+})
+
+test('a pattern learnt from purchases stays in the repository it was seen in', () => {
+  const bought = (id: string, repository: string | null) => fact({
+    id, kind: 'interest', subject: '川菜调料', subjectKey: `调料 ${id}`, repository, confidence: 0.9,
+    value: { topic: '川菜', purchases: [{ merchant: 'Weee', items: ['花椒'], amount: 12, currency: 'USD', date: '2026-10-01T12:00:00Z' }] },
+  })
+  const plan = consolidationCandidates([bought('a', 'acme/widget'), bought('b', 'acme/widget'), bought('c', 'acme/gadget')], OPTIONS)
+  const topics = plan.items.filter(item => item.kind === 'pattern' && item.evidence.topic === '川菜')
+  assert.equal(topics.length, 1, 'only the repository with two purchases is a pattern')
+  assert.equal(topics[0].kind === 'pattern' ? topics[0].outcomes.interest.repository : null, 'acme/widget', 'the pattern keeps the repository it was learnt in')
+  assert.equal(topics[0].kind === 'pattern' ? topics[0].evidence.purchases : null, 2)
 })
 
 test('proactive deployment switches are off unless set to 1 or true', t => {

@@ -18,10 +18,14 @@ test('workspace app policy', { skip: !dbUrl }, async t => {
   const other = await seedWorkspace(pool, admin, [{ userId: admin, role: 'admin' }])
   const bot = await seedBot(pool, ws.id, member), otherBot = await seedBot(pool, other.id, admin)
 
-  await t.test('defaults to 允许; members read without edit rights and cannot write', async () => {
-    const view = await store.getAppPolicies(member, ws.id)
+  await t.test('lists every app an active member connected, live, at 允许; members read without edit rights and cannot write', async () => {
+    let asked: string[] = []
+    const view = await store.getAppPolicies(member, ws.id, async users => { asked = users; return ['hubspot', 'slack', 'github'] })
+    assert.deepEqual(asked.sort(), [admin, member].sort())
     assert.equal(view.canEdit, false)
-    assert.deepEqual(view.apps.map(item => item.access), ['allow', 'allow', 'allow', 'allow'])
+    assert.deepEqual(view.apps, [{ app: 'hubspot', access: 'allow' }, { app: 'slack', access: 'allow' }])
+    const unreadable = await store.getAppPolicies(member, ws.id, async () => { throw new Error('composio down') })
+    assert.deepEqual(unreadable, { apps: [], canEdit: false, connectedUnavailable: true })
     await rejects(store.setAppPolicy({ id: member, name: 'Mia' }, ws.id, { app: 'slack', access: 'deny' }), 'workspaceAccessDenied')
     assert.equal(await store.botMayUseApp(bot, 'slack'), true)
   })
@@ -40,5 +44,10 @@ test('workspace app policy', { skip: !dbUrl }, async t => {
     await store.setAppPolicy({ id: admin, name: 'Alex' }, ws.id, { app: 'slack', access: 'allow' })
     assert.equal(await store.botMayUseApp(bot, 'slack'), true)
     await assert.rejects(store.setAppPolicy({ id: admin, name: 'Alex' }, ws.id, { app: 'github', access: 'deny' }))
+    // Any Composio toolkit can be governed, not a fixed list: the database accepts it and the bot is refused.
+    const governed = await store.setAppPolicy({ id: admin, name: 'Alex' }, ws.id, { app: 'salesforce', access: 'deny' }, {}, new Date(), async () => ['hubspot'])
+    assert.deepEqual(governed.apps, [{ app: 'hubspot', access: 'allow' }, { app: 'salesforce', access: 'deny' }, { app: 'slack', access: 'allow' }])
+    assert.equal(await store.botMayUseApp(bot, 'salesforce'), false)
+    await assert.rejects(pool.query(`insert into workspace_app_policies ("workspaceId", app, access, "updatedBy") values ($1, 'linear', 'deny', $2)`, [ws.id, admin]))
   })
 })

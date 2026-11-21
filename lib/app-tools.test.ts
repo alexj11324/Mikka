@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { callAppTool, explicitSetting, listAppTools, toolSettingKey, type AppTool, type AppToolDeps } from './app-tools'
+import { appCallSetting, callAppTool, explicitSetting, listAppTools, toolSettingKey, type AppTool, type AppToolDeps } from './app-tools'
+import { appCallSettingKeys } from './operations/app-permission-keys'
 
 const tools: Record<string, AppTool> = {
   HUBSPOT_LIST_CONTACTS: { slug: 'HUBSPOT_LIST_CONTACTS', name: 'List contacts', tags: ['readOnlyHint'], version: '20261030_00', toolkit: { slug: 'hubspot' }, inputParameters: { type: 'object' } },
@@ -28,6 +29,16 @@ function deps(overrides: Partial<AppToolDeps> = {}) {
   return { deps: value, calls }
 }
 const call = (tool: string, toolkit = 'hubspot') => ({ toolkit, tool, arguments: { email: 'a@acme.dev' } })
+
+test('a native approval capability satisfies only Ask and cannot override a workspace Deny', async () => {
+  const asked = deps({ setting: async () => 'ask' })
+  const native = { ownerId: 'owner', botId: null, review: async () => 'allow' as const }
+  assert.equal((await callAppTool(asked.deps, call('SLACK_SEND_MESSAGE', 'slack'), native) as {status:string}).status, 'done')
+  assert.equal(asked.calls.some(value => value.startsWith('card:')), false)
+  const denied = deps({ setting: async () => 'deny' })
+  assert.deepEqual(await callAppTool(denied.deps, call('SLACK_SEND_MESSAGE', 'slack'), native), {error:'integrationActionDenied'})
+  assert.deepEqual(denied.calls, [])
+})
 
 test('a read-only tool goes to the Decisions judge too; allowed, it runs with the pinned version and no record', async () => {
   const judged: unknown[] = []
@@ -70,14 +81,78 @@ test('explicit settings win over the judgment', async () => {
   assert.deepEqual(allowed.calls, ['record:HUBSPOT_DELETE_CONTACT', 'execute:HUBSPOT_DELETE_CONTACT:20261030_00', 'end:done'])
 })
 
-test('settings: the person may allow, a workspace only narrows, deny beats ask', () => {
+test('settings: the workspace allow / ask / deny decides, deny beats ask', () => {
   assert.equal(explicitSetting(null, ['x']), null)
-  assert.equal(explicitSetting({ agent: { hubspot_create_contact: 'allow' }, workspace: null }, ['hubspot_create_contact', 'hubspot']), 'allow')
-  assert.equal(explicitSetting({ agent: {}, workspace: { hubspot: 'allow' } }, ['hubspot_create_contact', 'hubspot']), null)
-  assert.equal(explicitSetting({ agent: { hubspot_create_contact: 'allow' }, workspace: { hubspot: 'ask' } }, ['hubspot_create_contact', 'hubspot']), 'ask')
-  assert.equal(explicitSetting({ agent: { hubspot: 'ask' }, workspace: { hubspot_create_contact: 'deny' } }, ['hubspot_create_contact', 'hubspot']), 'deny')
-  assert.throws(() => explicitSetting({ agent: { hubspot: 'maybe' }, workspace: null }, ['hubspot']))
+  assert.equal(explicitSetting({ workspace: null }, ['x']), null)
+  // A workspace Allow is a real grant, not an absence that falls to the judge.
+  assert.equal(explicitSetting({ workspace: { hubspot: 'allow' } }, ['hubspot_create_contact', 'hubspot']), 'allow')
+  assert.equal(explicitSetting({ workspace: { hubspot: 'ask' } }, ['hubspot_create_contact', 'hubspot']), 'ask')
+  assert.equal(explicitSetting({ workspace: { hubspot: 'deny' } }, ['hubspot_create_contact', 'hubspot']), 'deny')
+  assert.throws(() => explicitSetting({ workspace: { hubspot: 'maybe' } }, ['hubspot']))
   assert.equal(toolSettingKey('HUBSPOT_CREATE_CONTACT'), 'hubspot_create_contact')
+})
+
+test('a workspace Allow on Slack is a real grant: the write runs without the judge', async () => {
+  let judged = 0
+  const { deps: d, calls } = deps({
+    setting: async (tool, toolkit) => appCallSetting({ workspace: { slack: 'allow' } }, tool, toolkit),
+    judge: async () => { judged++; return 'ask' },
+  })
+  const result = await callAppTool(d, call('SLACK_SEND_MESSAGE', 'slack'))
+  assert.equal((result as { status?: string }).status, 'done')
+  assert.equal(judged, 0, 'the judge runs only when nothing names the app')
+  assert.deepEqual(calls, ['record:SLACK_SEND_MESSAGE', 'execute:SLACK_SEND_MESSAGE:1', 'end:done'])
+})
+
+test('a workspace deny blocks the call; there is no Bot layer to override it', async () => {
+  const workspaceDenies = deps({ setting: async (tool, toolkit) => appCallSetting({ workspace: { slack: 'deny' } }, tool, toolkit) })
+  assert.deepEqual(await callAppTool(workspaceDenies.deps, call('SLACK_SEND_MESSAGE', 'slack')), { error: 'integrationActionDenied' })
+  const workspaceAllows = deps({ setting: async (tool, toolkit) => appCallSetting({ workspace: { slack: 'allow' } }, tool, toolkit) })
+  assert.equal((await callAppTool(workspaceAllows.deps, call('SLACK_SEND_MESSAGE', 'slack')) as { status?: string }).status, 'done')
+})
+
+test('with nothing set, the judge still decides', async () => {
+  let judged = 0
+  const { deps: d } = deps({
+    setting: async (tool, toolkit) => appCallSetting(null, tool, toolkit),
+    judge: async () => { judged++; return 'ask' },
+  })
+  assert.deepEqual(await callAppTool(d, call('SLACK_SEND_MESSAGE', 'slack')), { status: 'awaiting_approval', actionId: 'card_1' })
+  assert.equal(judged, 1)
+})
+
+test('a legacy-only deny (send_slack_message) governs call_app_tool for the same app', async () => {
+  const { deps: d, calls } = deps({
+    setting: async (tool, toolkit) => appCallSetting({ workspace: { send_slack_message: 'deny' } }, tool, toolkit),
+  })
+  assert.deepEqual(await callAppTool(d, call('SLACK_SEND_MESSAGE', 'slack')), { error: 'integrationActionDenied' })
+  assert.deepEqual(calls, [])
+  assert.deepEqual(appCallSettingKeys('slack_send_message', 'slack'), ['slack_send_message', 'slack', 'send_slack_message'])
+})
+
+test('the first-class mail and calendar writes are governed by their app key, as call_app_tool already was', () => {
+  // ALE-8: Gmail set to 不允许 blocked call_app_tool(GMAIL_*) but not the Coordinator's send_email, because these
+  // actions were missing from the workspace key map. Each now resolves its app's stored choice.
+  for (const [action, app] of [['send_email', 'gmail'], ['create_calendar_event', 'googlecalendar'], ['update_calendar_event', 'googlecalendar']] as const) {
+    assert.equal(appCallSetting({ workspace: { [app]: 'deny' } }, action, app), 'deny', action)
+    assert.equal(appCallSetting({ workspace: { [app]: 'ask' } }, action, app), 'ask', action)
+    assert.equal(appCallSetting({ workspace: { [app]: 'allow' } }, action, app), 'allow', action)
+    assert.equal(appCallSetting({ workspace: {} }, action, app), null, action)
+  }
+})
+
+test('an unreadable setting leaves the call to the judge instead of refusing it (decision 2026-11-01-1330)', async () => {
+  // The P1 note in #1880 said an unreadable layer should refuse. The ruling in
+  // lib/operations/write-judgment.ts and docs/design/decisions/2026-11-01-1330 says it names nothing, so the
+  // judge decides and its own fallback lets the call through. `deps.setting` returns null for an unreadable layer;
+  // here the judge's own answer is the last word.
+  let judged = 0
+  const allowed = deps({ setting: async () => null, judge: async () => { judged++; return 'allow' } })
+  assert.equal((await callAppTool(allowed.deps, call('SLACK_SEND_MESSAGE', 'slack')) as { status?: string }).status, 'done')
+  assert.equal(judged, 1)
+  // And a judge that asks still cards, so an unreadable layer is not a blanket allow either.
+  const asked = deps({ setting: async () => null, judge: async () => 'ask' })
+  assert.deepEqual(await callAppTool(asked.deps, call('SLACK_SEND_MESSAGE', 'slack')), { status: 'awaiting_approval', actionId: 'card_1' })
 })
 
 test('an uncertain write stays running and is not resent', async () => {

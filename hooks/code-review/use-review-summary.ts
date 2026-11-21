@@ -8,7 +8,7 @@ import { reviewKeys, useReviewLive } from './review-keys'
 /** The summary line's data (R0, R0b, R6) for a coding task; null taskId reads nothing. Refreshed by live pushes only. */
 export function useReviewSummary(taskId: string | null | undefined) {
   const key = taskId ? reviewKeys.summary(taskId) : null
-  const result = useSWR<ReviewSummary>(key, ([, id]: readonly [string, string]) => getReviewSummary(id), {
+  const result = useSWR<ReviewSummary | null>(key, ([, id]: readonly [string, string]) => getReviewSummary(id), {
     revalidateOnFocus: false, revalidateOnReconnect: true, shouldRetryOnError: false,
   })
   useReviewLive(taskId ?? null, result.data?.live?.workspaceId, key ? [unstable_serialize(key)] : [])

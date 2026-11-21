@@ -7,6 +7,7 @@ import { mock, test } from 'node:test'
 import { normalizeRepository } from '@mikka/protocol/repository'
 import { dbUrl, seedUser, seedWorkspace } from './support/workspace-admin-db'
 import { connectGitHub, githubAppStub } from './support/github-app-stub'
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from './helpers/factory-visual-evidence'
 
 mock.module(new URL('../lib/coordinator/decide.ts', import.meta.url).href, { namedExports: { invokeDecision: async () => null } })
 
@@ -52,7 +53,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     [connection, userId, ws.id, `acme-${connection}`, 'a'.repeat(64), JSON.stringify({ revision: '1', models: ['gpt-5'] }), JSON.stringify({ vendor: 'codex', source: 'official', status: 'ok', plan: 'Pro', observedAt: new Date().toISOString(), windows: [{ kind: 'five_hour', used: .1, resetsAt: null }] })])
   await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId") VALUES ($1,$2,$3,'catalogue',$4,1,'codex_cpa','gpt-5')`, [randomUUID(), userId, ws.id, connection])
   const deviceId = randomUUID()
-  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses) VALUES ($1,$2,'acme-build-01','local','server',true,now(),$3)`, [deviceId, userId, JSON.stringify(codex)])
+  await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'acme-build-01','local','server',true,now(),$3,now())`, [deviceId, userId, JSON.stringify(codex)])
   await pool.query(`INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,'codex','Codex on acme-build-01')`, [randomUUID(), userId, deviceId])
   const issueId = randomUUID()
   await pool.query(`INSERT INTO issues (id,"userId","workspaceId","ownershipState",scope,title,content,status,priority) VALUES ($1,$2,$4,'bound','workspace','Checkout rounds sales tax down on multi-item carts',$3,'todo','high')`,
@@ -62,7 +63,10 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   await pool.query(`INSERT INTO coordinator_events (id,"userId","botId",kind,"dedupeKey",payload) VALUES ($1,$2,$3,'user_message',$4,$5)`,
     [sourceEventId, userId, botId, `acme:${sourceEventId}`, JSON.stringify({ text: `Please fix the checkout tax rounding in ${REPO}.` })])
 
-  const dispatched = await steps.dispatchRun(userId, { issueId, repo: REPO, requestKey: `acme:${randomUUID()}`, sourceEventId }, undefined, botId) as unknown as { runId?: string; error?: string }
+  const dispatched = await steps.dispatchRun(userId, { model: { harness: 'codex' as const }, issueId, repo: REPO, requestKey: `acme:${randomUUID()}`, sourceEventId }, undefined, botId) as unknown as { runId?: string; error?: string }
+  assert.equal((await pool.query(`SELECT i.content->'attrs'->'mikka'->'delegate'->>'id'=r."agentId"::text AS assigned
+    FROM issues i JOIN agent_runs r ON r."issueId"=i.id WHERE r.id=$1 AND i.id=$2`,[dispatched.runId,issueId])).rows[0]?.assigned,true)
+
   const counts = (await pool.query(`SELECT
       (SELECT count(*)::int FROM factory_tasks WHERE "userId"=$1) AS tasks,
       (SELECT count(*)::int FROM factory_attempts a JOIN factory_tasks t ON t.id=a."taskId" WHERE t."userId"=$1) AS attempts,
@@ -103,7 +107,12 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
       verify: check ? { status: 'passed', command, exitCode: 0, signal: null, timedOut: false, output: 'passed' } : { status: 'not_run' },
       ...(check ? { check: { sha, readOnly: true }, criteria: [{ text: 'Tax rounds to the cent', passed: true, evidence: 'The fixture command passed.', command, exitCode: 0 }] } : { publish: { commit: sha, pushed: true, branch: 'mikka/fixture', remote: 'origin' } }),
     })])
+    if (!check) await addFactoryVisualEvidence(pool, id)
     await runtime.reconcile.run(userId, id)
+    if (!check) {
+      const { rows: [task] } = await pool.query('SELECT t.id FROM factory_tasks t JOIN factory_candidates c ON c.id=t."candidateId" WHERE c."runId"=$1', [id])
+      await addFactoryPublicationEvidence(pool, task.id)
+    }
   }
   await finish(dispatched.runId!, false)
   const current = async () => (await pool.query(`SELECT t.id,t.route,t.stage,t.status,a."runId",r.kind,r."baseBranch",r."agentDefinition" FROM factory_tasks t JOIN factory_attempts a ON a.id=t."attemptId" LEFT JOIN agent_runs r ON r.id=a."runId" WHERE t."userId"=$1`, [userId])).rows[0]
@@ -130,17 +139,17 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
   const nextRequest = randomUUID()
   await pool.query(`INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload)
     VALUES($1,$2,$3,$4,'user_message',$5,$6)`, [nextRequest, userId, botId, issueId, `continuity:${nextRequest}`, JSON.stringify({ text: 'Add a null-input regression while preserving the accepted tax fix.' })])
-  const continued = await steps.dispatchRun(userId, { issueId, note: 'Add the null-input regression.', sourceEventId: nextRequest, requestKey: `continue:${nextRequest}` }, undefined, botId) as unknown as { runId: string }
+  const continued = await steps.dispatchRun(userId, { model: { harness: 'codex' as const }, issueId, note: 'Add the null-input regression.', sourceEventId: nextRequest, requestKey: `continue:${nextRequest}` }, undefined, botId) as unknown as { runId: string }
   assert.ok(continued.runId)
   const continuedTask = (await pool.query('SELECT * FROM factory_tasks WHERE id=$1', [acceptance.id])).rows[0]
   assert.equal(continuedTask.id, acceptance.id)
   const epoch = continuedTask.sourceEventId
   const deviceB = randomUUID(), agentB = randomUUID()
   const { DAEMON_PROTOCOL_VERSION } = await import('@mikka/protocol/daemon')
-  await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"protocolVersion")
-    VALUES($1,$2,'acme-build-02','local','server',true,now(),$3,$4)`, [deviceB, userId, JSON.stringify(codex), DAEMON_PROTOCOL_VERSION])
+  await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType",enabled,"lastSeenAt",harnesses,"protocolVersion","sessionOpenedAt")
+    VALUES($1,$2,'acme-build-02','local','server',true,now(),$3,$4,now())`, [deviceB, userId, JSON.stringify(codex), DAEMON_PROTOCOL_VERSION])
   await pool.query(`INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,'codex','Codex on acme-build-02')`, [agentB, userId, deviceB])
-  await pool.query(`UPDATE devices SET "lastSeenAt"=now() WHERE id=$1`, [deviceId])
+  await pool.query(`UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1`, [deviceId])
   await pool.query(`UPDATE agent_runs SET status='running',"startedAt"=now()-interval '2 hours',"updatedAt"=now(),"leaseExpiresAt"=now()+interval '1 hour' WHERE id=$1`, [continued.runId])
   await pool.query(`UPDATE factory_tasks SET "updatedAt"='2000-01-01' WHERE id=$1`, [acceptance.id])
   await pool.query(`UPDATE factory_attempts SET "createdAt"='2000-01-01' WHERE id=$1`, [continuedTask.attemptId])
@@ -189,7 +198,7 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     const { resolveAgentProfileDispatch } = await import('../lib/factory/agent-profile')
     const { rows: [agent] } = await pool.query('SELECT id FROM agents WHERE "userId"=$1 AND "deviceId"=$2', [userId, deviceId])
     const { rows: [repo] } = await pool.query('SELECT id FROM device_repos WHERE "userId"=$1 AND "deviceId"=$2', [userId, deviceId])
-    await pool.query('UPDATE devices SET "lastSeenAt"=now() WHERE id=$1', [deviceId])
+    await pool.query('UPDATE devices SET "lastSeenAt"=now(),"sessionOpenedAt"=now(),"sessionClosedAt"=NULL WHERE id=$1', [deviceId])
     let number = 1276000
     const request = async () => {
       const issue = randomUUID(), source = randomUUID()
@@ -204,10 +213,10 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
       assert.equal(target.kind, 'device')
       if (target.kind !== 'device') throw new Error('fixtureDeviceUnavailable')
       const selection = { model: target.model, agentProfile,
-        modelDispatch: { mode: selectionMode ?? 'preference' as const, location: 'local' as const, entry: target.entry, ...(target.routing ? { routing: target.routing } : {}) },
+        modelDispatch: { mode: selectionMode ?? 'preference' as const, location: 'local' as const, entry: target.entry },
         ...(target.subscriptionBindingId ? { subscriptionBindingId: target.subscriptionBindingId } : {}),
         ...(target.entry.source.kind === 'api_key' ? { apiKeyId: target.entry.source.keyId } : {}) }
-      return { issueId: issue, botId, agentId: agent.id as string, deviceRepoId: repo.id as string,
+      return { issueId: issue, botId, ownerRequested:true, agentId: agent.id as string, deviceRepoId: repo.id as string,
         sourceEventId: source, key: `spec:${randomUUID()}`, needsSpec: true, note: 'Plan first.', selection,
         queue: (...args: Parameters<import('../lib/factory/dispatch').FactoryQueue>) => queueFactoryRun(...args, undefined, selection) }
     }
@@ -220,6 +229,10 @@ test('a Coordinator dispatch_run goes through the Factory', { skip: !dbUrl, time
     const input = await request()
     const [first, replay] = await Promise.all([queueFactoryTask(pool, userId, input), queueFactoryTask(pool, userId, input)])
     assert.equal(replay.runId, first.runId)
+    const delegate = await pool.query(`SELECT i.content->'attrs'->'mikka'->'delegate'->>'id' AS id,
+      (SELECT count(*)::int FROM issue_versions v WHERE v."issueId"=i.id AND v.actor_id=$2) AS assignments
+      FROM issues i WHERE i.id=$1`,[input.issueId,agent.id])
+    assert.deepEqual(delegate.rows,[{id:agent.id,assignments:1}])
     const { rows: [plan] } = await pool.query(`SELECT r.kind,r."agentDefinition",t.stage,t.status,t."sourceEventId"
       FROM agent_runs r JOIN factory_attempts a ON a."runId"=r.id JOIN factory_tasks t ON t.id=a."taskId" WHERE r.id=$1`, [first.runId])
     assert.deepEqual([plan.kind, plan.stage, plan.status, plan.sourceEventId, plan.agentDefinition.readOnly], ['plan', 'spec', 'running', input.sourceEventId, true])

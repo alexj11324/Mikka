@@ -1,7 +1,7 @@
 // Shared real Mikka MCP catalogue and business handlers. No CLI or provider proxy.
 import { createHash, randomUUID } from "node:crypto"
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { closeSync, fstatSync, openSync, readSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, constants } from "node:fs"
 import { isAbsolute, join, resolve, sep } from "node:path"
@@ -220,6 +220,13 @@ const TOOLS = [
         previewDatabaseBranch: { type: "string", description: "Name of the preview database branch you actually created or used; omit when none." },
         verificationCommand: { type: "object", description: "For a Factory verification with no frozen command: the command inferred from repository scripts, Makefile or CI and its concrete source. Run it and report its actual observations too. If no command can be inferred, mark that criterion unverified with its reason; do not invent a command or ask the person for one.", properties: { command: { type: "string" }, basis: { type: "string" } }, required: ["command", "basis"] },
         reviewVerdict: { type: "string", enum: ["passed", "changes_requested", "needs_judgment"], description: "The task’s single review: clear defects require changes; ambiguous findings go to the person. An unverified observation is not an observed defect." },
+        visualEvidence: {
+          type: "array", maxItems: 40,
+          description: "Capture IDs from this task's real visual verification. Inspect every image/video before declaring publicSafe: no credentials, private account details or personal data may appear. This explicit declaration permits only these captures to be linked in the public PR. Never invent a capture ID or authorize an uninspected recording.",
+          items: { type: "object", additionalProperties: false, properties: {
+            captureId: { type: "string", format: "uuid" }, publicSafe: { type: "boolean", const: true },
+          }, required: ["captureId", "publicSafe"] },
+        },
         criteria: {
           type: "array",
           description:
@@ -299,23 +306,50 @@ const TOOLS = [
 ]
 
 // The same limits as @mikka/protocol/capture; this file has no dependencies.
-const CAPTURE_LIMITS = { png: 10_000_000, jpg: 10_000_000, webp: 10_000_000, mp4: 100_000_000, webm: 100_000_000 }
+const CAPTURE_LIMITS = { png: 10_000_000, jpg: 10_000_000, webp: 10_000_000, mp4: 1_000_000_000, webm: 1_000_000_000 }
 const MAX_QUEUED_CAPTURES = 20
 const CAPTURE_TOOL = {
   name: "submit_capture",
   description:
-    "Attach a screenshot or screen recording you made (for example with Playwright) to this thread as evidence for the person. PNG, JPEG or WebP up to 10 MB; MP4 or WebM up to 100 MB. Pass a file inside the worktree or your temp directory.",
+    "Queue a screenshot or real screen recording you made (for example with Playwright) as evidence. Returns its captureId for submit.visualEvidence. Images: PNG/JPEG/WebP up to 10 MB. Raw MP4/WebM up to 1 GB is processed before upload into the existing 100 MB limit; processing failure leaves the task blocked. Prefer video. Pass a file inside the worktree or your temp directory. Include measured action steps to remove only the idle gaps between actions; omit guessed timings.",
   inputSchema: {
     type: "object",
     properties: {
       path: { type: "string", description: "The file's path." },
       title: { type: "string", description: "What it shows, for the person." },
+      steps: { type: "array", maxItems: 200, description: "Optional real recording timeline. atMs is the action's end offset and durationMs its actual execution duration. Omit unknown duration; never guess a timing to remove footage.",
+        items: { type: "object", additionalProperties: false, properties: {
+          atMs: { type: "integer", minimum: 0, maximum: 300000 }, label: { type: "string", minLength: 1, maxLength: 200 },
+          source: { type: "string", enum: ["action", "mark"] }, durationMs: { type: "integer", minimum: 0, maximum: 300000 },
+        }, required: ["atMs", "label", "source"] } },
     },
     required: ["path", "title"],
   },
 }
 
 const KINDS = { submit: "submit", request_help: "ask", ask_human: "ask", report_blocked: "blocked" }
+
+// Profile Skills: only names and purposes are in the brief. This tool serves
+// the exact body pinned for this run, from the daemon-written manifest under
+// the run directory. It grants no tool, credential or repository authority.
+const LOAD_SKILL_TOOL = {
+  name: "load_skill",
+  description:
+    "Load the full instructions of one Assigned Skill when this task needs that capability. Pass the exact id listed in your brief. The body is the version pinned for this run; you may call it again with another id. It grants no tools, credentials or permissions.",
+  inputSchema: {
+    type: "object",
+    properties: { id: { type: "string", description: "The exact Assigned Skill id, for example official:systematic-debugging." } },
+    required: ["id"],
+    additionalProperties: false,
+  },
+}
+const PROFILE_SKILL_ID = /^(?:(?:official|personal|workspace):[a-z0-9][a-z0-9-]{0,127}|repository:[a-z0-9][a-z0-9-]{0,63})$/
+const PROFILE_SKILL_UNAVAILABLE = {
+  not_found: "This Skill was declared for the run but was not found in the task repository.",
+  invalid: "This Skill source is unusable or failed its integrity check.",
+  disabled: "This Skill is no longer enabled.",
+  pending: "This repository Skill has not been pinned yet. Continue the current step and try again.",
+}
 
 /**
  * The real Mikka tool implementation, shared by stdio and an in-process host.
@@ -327,6 +361,11 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
   const lifetime = new AbortController()
   const pending = new Set()
   let closed = false, closing
+  // Profile Skills live only inside the run directory; never follow a link.
+  let profileSkillsDir = null
+  if (typeof config.profileSkillsDir === 'string' && config.profileSkillsDir) {
+    try { profileSkillsDir = realpathSync(config.profileSkillsDir) } catch { profileSkillsDir = null }
+  }
   // Decisions travel directly to the bound Mikka worker endpoint. No decision,
   // conversation or credential is ever written to the handoff or worktree.
   const decisionMcpUrl = config.decisionUrl
@@ -610,6 +649,17 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
     if (!capturesDir) throw new Error("Captures are not available in this run.")
     const title = typeof args.title === "string" ? args.title.replace(/\s+/g, " ").trim().slice(0, 200) : ""
     if (!title) throw new Error("A title is required.")
+    if (args.steps !== undefined && (!Array.isArray(args.steps) || args.steps.length > 200)) throw new Error('Invalid recording timeline.')
+    const steps = args.steps?.map(step => {
+      if (!step || typeof step !== 'object' || Array.isArray(step) ||
+          Object.keys(step).some(key => !['atMs', 'label', 'source', 'durationMs'].includes(key)) ||
+          !Number.isSafeInteger(step.atMs) || step.atMs < 0 || step.atMs > 300000 ||
+          typeof step.label !== 'string' || !step.label.trim() || step.label.length > 200 || !['action', 'mark'].includes(step.source) ||
+          (step.durationMs !== undefined && (step.source !== 'action' || !Number.isSafeInteger(step.durationMs) || step.durationMs < 0 || step.durationMs > step.atMs)))
+        throw new Error('Invalid recording timeline.')
+      return { atMs: step.atMs, label: step.label.replace(/\s+/g, ' ').trim(), source: step.source,
+        ...(step.durationMs === undefined ? {} : { durationMs: step.durationMs }) }
+    })
     if (typeof args.path !== "string" || !args.path) throw new Error("A path is required.")
     const real = realpathSync(args.path)
     if (!captureRoots.some((root) => real === root || real.startsWith(root + sep)))
@@ -622,6 +672,7 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
       const head = Buffer.alloc(64)
       ext = sniff(head.subarray(0, readSync(fd, head, 0, 64, 0)))
       if (!ext) throw new Error("Not a PNG, JPEG or WebP image, or an MP4 or WebM video.")
+      if (steps?.length && !['mp4', 'webm'].includes(ext)) throw new Error('Only recordings have a timeline.')
       if (stat.size === 0 || stat.size > CAPTURE_LIMITS[ext]) throw new Error(`At most ${CAPTURE_LIMITS[ext]} bytes for a .${ext} file.`)
       if (readdirSync(capturesDir).filter((name) => name.endsWith(".json")).length >= MAX_QUEUED_CAPTURES)
         throw new Error("Too many captures waiting to upload; try again shortly.")
@@ -632,13 +683,66 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
     }
     // The metadata lands last: the daemon only takes files that have one.
     const meta = join(capturesDir, `${id}.json`)
-    writeFileSync(`${meta}.tmp`, JSON.stringify({ title, at: new Date().toISOString() }))
+    writeFileSync(`${meta}.tmp`, JSON.stringify({ title, ...(steps ? { steps } : {}), at: new Date().toISOString() }))
     renameSync(`${meta}.tmp`, meta)
+    return id
   }
 
 
 
+  /**
+   * Serve one pinned Profile Skill body. The manifest is host-written under
+   * the run directory; this tool never reads the worktree or the network. A
+   * write-once receipt is the only evidence that this exact body was loaded.
+   */
+  function loadProfileSkill(args) {
+    if (!args || typeof args !== 'object' || Array.isArray(args) || Object.keys(args).some(key => key !== 'id')) throw new Error('profile_skill_input')
+    if (typeof args.id !== 'string' || !PROFILE_SKILL_ID.test(args.id))
+      return { isError: true, content: [{ type: 'text', text: 'Use the exact Assigned Skill id from your brief.' }] }
+    let skills
+    try {
+      const file = join(profileSkillsDir, 'manifest.json')
+      const fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | constants.O_NONBLOCK)
+      try {
+        const stat = fstatSync(fd)
+        if (!stat.isFile() || stat.size < 2 || stat.size > 512 * 1024) throw new Error('profile_skill_manifest')
+        const manifest = JSON.parse(readFileSync(fd, 'utf8'))
+        if (!manifest || manifest.version !== 1 || !Array.isArray(manifest.skills) || manifest.skills.length > 24) throw new Error('profile_skill_manifest')
+        skills = manifest.skills
+      } finally { closeSync(fd) }
+    } catch {
+      return { isError: true, content: [{ type: 'text', text: 'Assigned Skill data is unavailable for this run.' }] }
+    }
+    const skill = skills.find(entry => entry && typeof entry === 'object' && entry.id === args.id)
+    if (!skill) return { isError: true, content: [{ type: 'text', text: 'No such Assigned Skill id. Use only an id listed in your brief.' }] }
+    const usable = skill.available === true && typeof skill.instructions === 'string' && Boolean(skill.instructions.trim()) &&
+      typeof skill.digest === 'string' && /^[a-f0-9]{64}$/.test(skill.digest) && Buffer.byteLength(skill.instructions, 'utf8') <= 20_000 &&
+      createHash('sha256').update(skill.instructions, 'utf8').digest('hex') === skill.digest
+    if (!usable) {
+      const reason = typeof skill.reason === 'string' && Object.hasOwn(PROFILE_SKILL_UNAVAILABLE, skill.reason) ? skill.reason : 'invalid'
+      return { isError: true, content: [{ type: 'text', text: PROFILE_SKILL_UNAVAILABLE[reason] }] }
+    }
+    try {
+      const dir = join(profileSkillsDir, 'loaded')
+      mkdirSync(dir, { recursive: true, mode: 0o700 })
+      const receipt = join(dir, createHash('sha256').update(args.id, 'utf8').digest('hex').slice(0, 32) + '.json')
+      try {
+        writeFileSync(receipt, JSON.stringify({
+          id: args.id, name: typeof skill.name === 'string' ? skill.name.slice(0, 80) : args.id,
+          source: ['official', 'personal', 'workspace', 'repository'].includes(skill.source) ? skill.source : 'repository',
+          digest: skill.digest, loadedAt: new Date().toISOString(),
+        }), { encoding: 'utf8', flag: 'wx', mode: 0o600 })
+      } catch (error) { if (error?.code !== 'EEXIST') throw error }
+    } catch { /* Serving the pinned body still stands; the run detail shows it as not loaded. */ }
+    return { content: [{ type: 'text', text: JSON.stringify({ id: args.id, name: skill.name, source: skill.source, digest: skill.digest, instructions: skill.instructions }) }] }
+  }
+
   function record(kind, args, toolName) {
+    const visualEvidence = kind === 'submit' ? args.visualEvidence : undefined
+    if (visualEvidence !== undefined && (!Array.isArray(visualEvidence) || visualEvidence.length > 40 || visualEvidence.some(item =>
+      !item || typeof item !== 'object' || Array.isArray(item) || Object.keys(item).some(key => !['captureId', 'publicSafe'].includes(key)) ||
+      typeof item.captureId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.captureId) || item.publicSafe !== true)))
+      throw new Error('Visual evidence must name inspected captures explicitly safe for public sharing.')
     // A planning hand-in carries the spec and the split it proposes. The id is
     // generated here, once, so the cards the daemon puts in the conversation
     // and the row the server stores name the same spec.
@@ -707,6 +811,7 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
       // Kept as sent; the daemon validates and trims each entry.
       ...(typeof args.previewDatabaseBranch === "string" ? { previewDatabaseBranch: args.previewDatabaseBranch } : {}),
       ...(Array.isArray(args.criteria) ? { criteria: args.criteria } : {}),
+      ...(visualEvidence === undefined ? {} : { visualEvidence: visualEvidence.map(item => ({ captureId: item.captureId, publicSafe: true })) }),
       ...(typeof args.reviewVerdict === "string" ? { reviewVerdict: args.reviewVerdict } : {}),
       ...(args.verificationCommand ? { verificationCommand: args.verificationCommand } : {}),
       ...(args.repositorySelection ? { repositorySelection: args.repositorySelection } : {}),
@@ -758,13 +863,17 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
           try { return reply(id, verifyCommand(params.arguments ?? {})) }
           catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Verification command refused.' }] }) }
         }
+        if (profileSkillsDir && params?.name === LOAD_SKILL_TOOL.name) {
+          try { return reply(id, loadProfileSkill(params.arguments ?? {})) }
+          catch { return reply(id, { isError: true, content: [{ type: 'text', text: 'Assigned Skill data is unavailable for this run.' }] }) }
+        }
         if (capturesDir && params?.name === CAPTURE_TOOL.name) {
           try {
-            queueCapture(params.arguments ?? {})
+            const captureId = queueCapture(params.arguments ?? {})
+            return reply(id, { content: [{ type: "text", text: JSON.stringify({ captureId, status: 'queued' }) }] })
           } catch (error) {
             return reply(id, { isError: true, content: [{ type: "text", text: `Not attached: ${error instanceof Error ? error.message : error}` }] })
           }
-          return reply(id, { content: [{ type: "text", text: "Attached to this thread. Keep working; it uploads in the background." }] })
         }
         const kind = KINDS[params?.name]
         if (!kind) return fail(id, -32602, `Unknown tool: ${params?.name}`)
@@ -794,6 +903,7 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
   function readTools() {
     return decisionTools().then(decisions => structuredClone([
       ...TOOLS, ...decisions, ...(repositoryRoot ? [REPOSITORY_TOOL] : []),
+      ...(profileSkillsDir ? [LOAD_SKILL_TOOL] : []),
       ...(capturesDir ? [CAPTURE_TOOL] : []), ...(factoryVerify ? [VERIFY_TOOL] : []),
       ...(artifactRoot ? [ARTIFACT_TOOL, INSPECT_REPOSITORY_TOOL] : []),
     ]))
@@ -834,12 +944,13 @@ export function createMikkaMcpBackend(config, { signal, assertLive } = {}) {
  * no authorization are introduced by advertising this catalogue. */
 export function mikkaMcpToolCatalogue({
   decisionCatalogue, repositorySelection = false, captures = false,
-  factoryVerify = false, artifactInspection = false,
+  factoryVerify = false, artifactInspection = false, profileSkills = false,
 } = {}) {
   return structuredClone([
     ...TOOLS, ...(decisionCatalogue === undefined ? [] : [readPreparedDecisionCatalogue(decisionCatalogue)]),
     ...(repositorySelection ? [REPOSITORY_TOOL] : []), ...(captures ? [CAPTURE_TOOL] : []),
     ...(factoryVerify ? [VERIFY_TOOL] : []), ...(artifactInspection ? [ARTIFACT_TOOL, INSPECT_REPOSITORY_TOOL] : []),
+    ...(profileSkills ? [LOAD_SKILL_TOOL] : []),
   ])
 }
 

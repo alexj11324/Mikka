@@ -150,3 +150,56 @@ it('HTTP terminal diagnostics reject unknown fields and malformed values without
   worker.settle('cancelled')
   expect(call.transportSnapshot()).toEqual([{ ordinal: 1, outcome: 'cancelled', state: 'missing' }])
 })
+
+const serviceTierFixture = { version: 1, inputRequested: 'priority', requested: 'priority', created: 'auto', completed: 'default', incomplete: 'missing' } as const
+
+it('service-tier receipts are independent of both legacy timing projections and immutable after settlement', () => {
+  const call = new SubscriptionCallTiming(() => 0), worker = call.startWorker('executeStream')!
+  worker.terminal({ version: 1, readCalls: 0 }, true)
+  worker.terminalTransport({ version: 1, firstTextMs: 7 }, true)
+  const before = call.snapshot(), transport = call.transportSnapshot()
+  worker.terminalServiceTier(serviceTierFixture, true)
+  expect(call.snapshot()).toEqual(before)
+  expect(call.transportSnapshot()).toEqual(transport)
+  expect(call.serviceTierSnapshot()).toEqual([{ ordinal: 1, outcome: 'pending', state: 'reported', serviceTier: serviceTierFixture }])
+  const copied = call.serviceTierSnapshot()
+  copied[0].serviceTier!.completed = 'priority'
+  expect(call.serviceTierSnapshot()[0].serviceTier?.completed).toBe('default')
+  worker.settle('cancelled')
+  worker.terminalServiceTier({ ...serviceTierFixture, completed: 'priority' }, true)
+  expect(call.serviceTierSnapshot()[0]).toMatchObject({ outcome: 'cancelled', serviceTier: { completed: 'default' } })
+  call.startWorker('prepare')!.terminalServiceTier(serviceTierFixture, true)
+  expect(call.serviceTierSnapshot()).toHaveLength(1)
+})
+
+it('service-tier parser keeps absent old-worker fields unavailable and rejects malformed or private values as a whole', () => {
+  for (const value of [
+    null, [], 'fixture-private-tier', { ...serviceTierFixture, version: 2 },
+    { ...serviceTierFixture, token: 'fixture-private-tier' },
+    { ...serviceTierFixture, inputRequested: 'fast' }, { ...serviceTierFixture, requested: 'default' },
+    { ...serviceTierFixture, created: 'fixture-private-tier' }, { ...serviceTierFixture, completed: null },
+    { ...serviceTierFixture, incomplete: { secret: 'fixture-private-tier' } },
+    { version: 1, requested: 'priority' }, Object.assign(Object.create(serviceTierFixture), { version: 1 }),
+    Object.defineProperty({ ...serviceTierFixture }, 'created', { enumerable: true, get() { throw new Error('fixture-private-tier') } }),
+  ]) {
+    const call = new SubscriptionCallTiming(() => 0), worker = call.startWorker('executeStream')!
+    worker.terminal({ version: 1, readCalls: 0 }, true)
+    const before = call.snapshot()
+    worker.terminalServiceTier(value, true)
+    expect(call.snapshot()).toEqual(before)
+    expect(call.serviceTierSnapshot()).toEqual([{ ordinal: 1, outcome: 'pending', state: 'invalid' }])
+    expect(JSON.stringify(call.serviceTierSnapshot())).not.toContain('fixture-private')
+  }
+  const call = new SubscriptionCallTiming(() => 0), worker = call.startWorker('executeStream')!
+  worker.terminalServiceTier(undefined, false)
+  worker.settle('cancelled')
+  expect(call.serviceTierSnapshot()).toEqual([{ ordinal: 1, outcome: 'cancelled', state: 'unavailable' }])
+})
+
+it('service-tier receipts retain each response event separately without inferring a completed tier', () => {
+  for (const observed of ['missing', 'priority', 'default', 'auto', 'flex', 'unrecognized'] as const) {
+    const call = new SubscriptionCallTiming(() => 0), worker = call.startWorker('executeStream')!
+    worker.terminalServiceTier({ version: 1, inputRequested: 'omitted', requested: 'omitted', created: observed, completed: 'missing', incomplete: 'flex' }, true)
+    expect(call.serviceTierSnapshot()[0].serviceTier).toEqual({ version: 1, inputRequested: 'omitted', requested: 'omitted', created: observed, completed: 'missing', incomplete: 'flex' })
+  }
+})

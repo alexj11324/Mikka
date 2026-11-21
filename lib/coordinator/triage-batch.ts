@@ -21,6 +21,8 @@ export interface TriageBatchDependencies<T extends TriageBatchEvent> {
   claim(event: T): Promise<Date | null>
   deliverUser(event: T): Promise<boolean>
   deliverCompletion?(event: T): Promise<boolean>
+  /** Transport-only CI hint: the caller must revalidate host-owned source, run and authorization. */
+  deliverCiSuite?(event: T): Promise<boolean>
   classify(event: T, signal: AbortSignal): Promise<TriageJudgment>
   complete(event: T, attemptedAt: Date, judgment: TriageJudgment & { tier: CoordinatorEventTier; execution: DecisionExecution }): Promise<boolean>
   observe?(event: T, judgment: TriageJudgment, application: 'received' | 'applied' | 'stale' | 'write-unknown'): void
@@ -57,6 +59,12 @@ export async function runTriageBatch<T extends TriageBatchEvent>(
     // A canonical result returns to the Bot that requested the work. Its
     // original subscription can handle it without buying another model call.
     if (event.kind === 'run_finished' && await dependencies.deliverCompletion?.(event)) {
+      outcome.classified.push(event.id)
+      continue
+    }
+    // A source-verified suite receipt is a host transport observation, not a
+    // semantic classification requiring an additional paid model call.
+    if (event.kind === 'run_report' && await dependencies.deliverCiSuite?.(event)) {
       outcome.classified.push(event.id)
       continue
     }

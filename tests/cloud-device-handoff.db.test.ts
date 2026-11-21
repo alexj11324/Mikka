@@ -4,11 +4,13 @@ import { readFile, readdir } from 'node:fs/promises'
 import { gzipSync } from 'node:zlib'
 import { mock, test } from 'node:test'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../lib/db/commit-effects'
 import { orderMigrations } from '../scripts/migration-order.mjs'
 import { isE2eTarget, E2E_DB_RULE } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { fakeThreadMachines } from './support/thread-machine-fake'
 import { sealSecret, userE2bKeyAad } from '../lib/secrets/crypto'
+import { seedRunProjectResources } from './helpers/run-project-resources'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) assert.ok(isE2eTarget(url), E2E_DB_RULE)
@@ -17,25 +19,28 @@ else if (process.env.REQUIRE_DB === '1') assert.fail('REQUIRE_DB=1 needs an isol
 test('admitted Cloud tasks park their real binding before normal local recovery', { skip: !url, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `cloud_handoff_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
+  observePoolCommits(pool)
   let appPool: Pool | undefined, workspacePool: Pool | undefined
   let machines: Awaited<ReturnType<typeof fakeThreadMachines>> | undefined
-  const previous = { MIKKA_DATABASE_URL: process.env.MIKKA_DATABASE_URL, DATABASE_URL: process.env.DATABASE_URL, WORKSPACE_SECRETS_KEY: process.env.WORKSPACE_SECRETS_KEY }
-  Object.assign(process.env, { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') })
+  const scoped = { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(),
+    MIKKA_DATABASE_URL_UNPOOLED: target.toString(), DATABASE_URL_UNPOOLED: target.toString(), WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex') }
+  const previous = Object.fromEntries(Object.keys(scoped).map(name => [name, process.env[name]]))
+  Object.assign(process.env, scoped)
   try {
     const directory = new URL('../drizzle/', import.meta.url)
     for (const migration of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql')))) await pool.query(await readFile(new URL(migration, directory), 'utf8'))
-    const next = await import('next/server')
-    mock.module('next/server', { namedExports: { ...next, after() {} } })
+    const next = await import('@/lib/server-runtime/server')
+    mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after() {} } })
     const workflow = await import('workflow/api')
     let cloudWorkflows = 0
     mock.module('workflow/api', { namedExports: { ...workflow, start: async () => { cloudWorkflows++; return { runId: 'synthetic-workflow' } } } })
     const { queueFactoryCloudRun } = await import('../lib/factory/queue-cloud')
-    const { createExecutionClaim } = await import('../lib/factory/execution-claim')
+    const { createExecutionClaim } = await import('./helpers/factory-execution-claim')
     const { issueRunToken, verifyRunToken } = await import('../lib/mcp/worker')
-    const { apiKeyForRun } = await import('../lib/model-api-keys')
+    const { validateRunApiKey } = await import('../lib/model-api-keys')
     appPool = (await import('../lib/db')).pool; workspacePool = (await import('../lib/workspace-db')).workspacePool
     const harnesses = [{ harness: 'codex', installed: true, toolApproval: true, subscriptionBroker: true, modelSlots: [{ slot: 'gpt-5', model: 'gpt-5', name: 'gpt-5' }] }]
     machines = await fakeThreadMachines(pool, harnesses)
@@ -49,7 +54,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
     } })
     const { reclaimLostRuns, latestCheckpoint } = await import('../lib/run-leases')
 
-    async function fixture(destination?: 'cloud', automatic = true) {
+    async function fixture(destination?: 'cloud', automatic = true, projectResources = false) {
       const id = randomUUID(), userId = `cloud-handoff-${id}`, workspaceId = randomUUID(), botId = randomUUID(), issueId = randomUUID()
       const parentDevice = randomUUID(), agentId = randomUUID(), repoId = randomUUID(), keyId = randomUUID(), deviceB = randomUUID(), agentB = randomUUID()
       const remoteKey = `v2/github.com/mikka-ci/cloud-handoff-${id}`, remoteUrl = `https://github.com/mikka-ci/cloud-handoff-${id}.git`
@@ -59,7 +64,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'admin\',\'active\')', [workspaceId, userId, `${userId}@example.invalid`])
       await pool.query('INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,\'Cloud handoff Bot\')', [botId, userId, workspaceId])
       for (const [device, agent, kind] of [[parentDevice, agentId, 'cloud'], [deviceB, agentB, 'local']]) {
-        await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,harnesses,"protocolVersion","lastSeenAt") VALUES($1,$2,$3,$4,true,$5,3,now())', [device, userId, kind, kind, JSON.stringify(harnesses)])
+        await pool.query('INSERT INTO devices(id,"ownerId",name,kind,enabled,harnesses,"protocolVersion","lastSeenAt","sessionOpenedAt") VALUES($1,$2,$3,$4,true,$5,3,now(),now())', [device, userId, kind, kind, JSON.stringify(harnesses)])
         await pool.query('INSERT INTO agents(id,"userId","deviceId",harness,name) VALUES($1,$2,$3,\'codex\',$4)', [agent, userId, device, kind])
       }
       await pool.query('INSERT INTO device_repos(id,"userId","deviceId","repoPath","remoteUrl","baseBranch") VALUES($1,$2,$3,$4,$5,\'main\')', [repoId, userId, parentDevice, remoteKey, remoteUrl])
@@ -71,6 +76,8 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       const key = sealSecret('synthetic-model-fixture', ['model_api_key', keyId, userId].join('\0'))
       await pool.query('INSERT INTO model_api_keys(id,"ownerId",provider,protocol,ciphertext,iv,"keyVersion",last4,models) VALUES($1,$2,\'openai\',\'openai\',$3,$4,$5,\'test\',\'["gpt-5"]\')', [keyId, userId, key.ciphertext, key.iv, key.keyVersion])
       await pool.query('INSERT INTO issues(id,"userId","workspaceId","ownershipState",title,content,status,priority,scope) VALUES($1,$2,$3,\'bound\',\'Cloud handoff task\',\'{"type":"doc","attrs":{"mikka":{"number":1}},"content":[]}\',\'todo\',\'normal\',\'workspace\')', [issueId, userId, workspaceId])
+      const resources = projectResources ? await seedRunProjectResources(pool, { ownerId: userId, workspaceId, issueId,
+        repositoryKey: remoteKey, runtime: 'cloud', harness: 'codex' }) : undefined
       const sourceEventId = randomUUID()
       await pool.query('INSERT INTO coordinator_events(id,"userId","botId","issueId",kind,"dedupeKey",payload,"deliveredAt") VALUES($1::uuid,$2,$3,$4,\'user_message\',$1::text,$5,now())', [sourceEventId, userId, botId, issueId,
         JSON.stringify({ text: 'Keep the current goal and receipts.', ...(destination ? { taskDestination: { kind: destination } } : {}) })])
@@ -79,7 +86,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       const physical = await machines!.start(actor, runId)
       const now = new Date()
       await pool.query('UPDATE agent_runs SET status=\'running\',"startedAt"=$2,"leaseExpiresAt"=$3,"sessionId"=\'cloud-native-session\' WHERE id=$1', [runId, new Date(now.getTime() - 180_000), new Date(now.getTime() - 1_000)])
-      await pool.query('UPDATE devices SET "lastSeenAt"=$2 WHERE id=$1', [physical.deviceId, new Date(now.getTime() - 120_000)])
+      await pool.query('UPDATE devices SET "lastSeenAt"=$2,"sessionClosedAt"=clock_timestamp() WHERE id=$1', [physical.deviceId, new Date(now.getTime() - 120_000)])
       await pool.query('INSERT INTO run_checkpoints("runId","baseCommit",patch,files,"updatedAt","userId","takenAt") VALUES($1,$2,$3,1,$4,$5,$4)', [runId, 'a'.repeat(40), gzipSync('diff --git a/current.txt b/current.txt\n'), now, userId])
       const source = (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
       const task = (await pool.query('SELECT t.* FROM factory_tasks t JOIN factory_attempts a ON a."taskId"=t.id WHERE a."runId"=$1', [runId])).rows[0]
@@ -87,8 +94,38 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       const { token } = await issueRunToken({ id: runId, userId })
       assert.equal(source.agentDefinition.repositoryAdmission.deviceId, physical.deviceId, 'normal cloud provisioning relocated the admitted receipt')
       assert.notEqual(physical.deviceId, parentDevice)
-      return { userId, workspaceId, botId, issueId, runId, deviceB, agentB, keyId, agentId, repoId, source, task, machine, now, token }
+      return { userId, workspaceId, botId, issueId, runId, deviceB, agentB, keyId, agentId, repoId, source, task, machine, now, token, resources, remoteKey }
     }
+
+    for (const mutation of ['repository', 'environment-revision', 'environment-archive', 'project-archive', 'legacy-environment', 'legacy-branch'] as const)
+      await t.test(`lost cloud Run refuses ${mutation} before a child or any VM handoff`, async () => {
+        const legacy = mutation.startsWith('legacy-')
+        const f = await fixture(undefined, true, !legacy)
+        let resources = f.resources
+        if (legacy) {
+          const definition = structuredClone(f.source.agentDefinition)
+          delete definition.projectExecution
+          const { workerDefinitionDigest } = await import('../lib/agent-kit/worker-digest')
+          definition.definitionDigest = workerDefinitionDigest(definition)
+          await pool.query('UPDATE agent_runs SET "agentDefinition"=$2 WHERE id=$1', [f.runId, JSON.stringify(definition)])
+          resources = await seedRunProjectResources(pool, { ownerId: f.userId, workspaceId: f.workspaceId, issueId: f.issueId,
+            repositoryKey: f.remoteKey, runtime: 'cloud', harness: 'codex', environment: mutation !== 'legacy-branch' })
+        }
+        if (mutation === 'legacy-branch') await resources!.refuse('branch')
+        else if (mutation !== 'legacy-environment') await resources!.refuse(mutation)
+        const before = (await pool.query('SELECT "agentDefinition",report,"sessionId" FROM agent_runs WHERE id=$1', [f.runId])).rows[0]
+        const checkpoint = await latestCheckpoint(f.runId), beforeWorkflows = cloudWorkflows
+        let pauses = 0
+        pause = async () => { pauses++ }
+        await reclaimLostRuns(f.userId, f.now)
+        assert.equal((await pool.query('SELECT count(*)::int AS n FROM agent_runs WHERE "retryOf"=$1', [f.runId])).rows[0].n, 0)
+        assert.equal(pauses, 0); assert.equal(cloudWorkflows, beforeWorkflows)
+        assert.deepEqual((await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [f.runId])).rows[0], f.machine)
+        assert.deepEqual((await pool.query('SELECT "agentDefinition",report,"sessionId" FROM agent_runs WHERE id=$1', [f.runId])).rows[0], before)
+        assert.deepEqual(await latestCheckpoint(f.runId), checkpoint)
+        assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1', [f.runId])).rows[0].status, 'failed',
+          'the expired source may record its legal terminal fact without authorizing another execution')
+      })
 
     await t.test('Cloud→B confirms one provider pause before exposing one fresh local receipt, then adopts the same current epoch', async () => {
       const f = await fixture()
@@ -129,7 +166,7 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
       assert.match(child.prompt, /Host task handoff/)
       assert.ok(child.prompt.includes(f.task.sourceEventId))
       assert.equal((await latestCheckpoint(child.retryOf))?.baseCommit, 'a'.repeat(40))
-      assert.equal((await apiKeyForRun(pool, child.id, f.keyId, 'codex')).ownerId, f.userId)
+      assert.equal((await validateRunApiKey(pool, child.id, f.keyId)).ownerId, f.userId)
       const claim = createExecutionClaim(pool, async () => true)
       assert.equal((await claim(f.userId, f.deviceB, child.id, new Date(Date.now() + 90_000).toISOString())).length, 1)
       await reclaimLostRuns(f.userId, f.now)
@@ -225,7 +262,9 @@ test('admitted Cloud tasks park their real binding before normal local recovery'
     })
   } finally {
     machines?.restore(); mock.restoreAll()
+    await (await import('../lib/builtin-gateway/runtime')).builtinGateway()?.stop()
     for (const [name, value] of Object.entries(previous)) { if (value === undefined) delete process.env[name]; else process.env[name] = value }
+    await (await import('../lib/builtin-gateway/runtime')).builtinGateway()?.stop()
     await dropTestDatabase(admin, database, pool, appPool, workspacePool)
     await admin.end()
   }

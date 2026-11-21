@@ -5,8 +5,7 @@ import { observePoolCommits } from '../db/commit-effects'
 /** A group worker holds a session lock across provider I/O. Neon's transaction
  * pooler may lend the same backend to another logical client during that I/O,
  * allowing the second worker to re-enter the first worker's session lock.
- * Reuse the configured database, role and TLS; only its documented Neon
- * pooler host changes, as in the account-deletion lock owner. */
+ * Use the configured direct connection for this database. */
 export function groupTurnSessionOptions(options: PoolConfig): PoolConfig {
   return { ...directPoolOptions(options), max: 1, connectionTimeoutMillis: 5_000, application_name: 'mikka-group-turn' }
 }

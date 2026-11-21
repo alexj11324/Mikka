@@ -18,8 +18,10 @@ export async function billingManagementResponse(request: Request, scope: Billing
     if (!session) return json({ error: 'authRequired' }, 401)
     if (scope.kind === 'workspace' ? !apiWorkspaceAllowed(session, scope.id) : Boolean(session.tokenWorkspaceId)) throw new WorkspaceError('workspaceAccessDenied')
     if (scope.kind === 'organization') await requireEnterpriseOrganization(session.user.id, z.uuid().parse(scope.id), session.session.id)
-    if (request.method === 'GET') return json(await billingManagementView(session.user.id, scope,
-      new URL(request.url).searchParams.get('budgetWorkspace'), session.user[enterprisePrincipal]))
+    if (request.method === 'GET') {
+      const query = new URL(request.url).searchParams
+      return json(await billingManagementView(session.user.id, scope, query.get('budgetWorkspace'), session.user[enterprisePrincipal], query.get('usageMember')))
+    }
     if (!desktopSameOriginRequest(request) || !request.headers.get('content-type')?.startsWith('application/json')) throw new WorkspaceError('workspaceAccessDenied')
     return json(await mutateBillingManagement(session.user.id, scope, await governanceJson(request), session.user[enterprisePrincipal]))
   } catch (error) {

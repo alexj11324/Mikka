@@ -72,3 +72,18 @@ test('registration and execution wrappers keep a readable display name for every
  const wrapped=registry.coordinatorTools(owner,botId,undefined,{execution:execution(),computerEnabled:true})
  assert.equal((wrapped.dispatch_bot_computer as {displayName?:string}).displayName,'Dispatch bot computer')
 })
+
+test('dispatch tools carry the entry provenance to the host step',async()=>{
+ const originRef={kind:'telegram' as const,chatId:'42',messageId:7}
+ const tools=registry.createCoordinatorRegistry(owner,botId,undefined,{computerEnabled:true,origin:'telegram',originRef})
+ const call=tools.dispatch_run!.execute as unknown as (input:unknown,options:typeof context)=>Promise<unknown>
+ await call({issueId,repo:'octo/repo'},context)
+ const runArgs=dispatched.mock.calls[0].arguments as unknown[]
+ const runInput=runArgs[1] as {origin?:unknown;originRef?:unknown}
+ assert.equal(runArgs[0],owner);assert.equal(runInput.origin,'telegram');assert.deepEqual(runInput.originRef,originRef)
+ const computer=tools.dispatch_bot_computer!.execute as unknown as (input:unknown,options:typeof context)=>Promise<unknown>
+ await computer({issueId,harness:'codex'},context)
+ const computerArgs=dispatched.mock.calls[1].arguments as unknown[]
+ const computerInput=computerArgs[1] as {origin?:unknown;originRef?:unknown}
+ assert.equal(computerInput.origin,'telegram');assert.deepEqual(computerInput.originRef,originRef)
+})

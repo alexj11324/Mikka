@@ -26,8 +26,17 @@ func (p CPAClaudeOAuth) Authorize(state, verifier string) (string, error) {
 	return raw, nil
 }
 func (p CPAClaudeOAuth) Exchange(ctx context.Context, code, state, verifier string) (*core.Auth, error) {
+	return p.ExchangeWithRedirect(ctx, code, state, verifier, claudeCallbackURI)
+}
+
+// The token request names the redirect the authorization used: localhost
+// (desktop) or Claude Code's code page (web, phones).
+func (p CPAClaudeOAuth) ExchangeWithRedirect(ctx context.Context, code, state, verifier, redirect string) (*core.Auth, error) {
+	if redirect != claudeCallbackURI && redirect != claudeCodePageURI {
+		return nil, ErrUnsupported
+	}
 	svc := compat.NewClaudeAuthWithHTTPClient(plainOAuthClient(p.Client))
-	value, err := svc.ExchangeMikkaCodeForTokens(ctx, code, state, claudeCallbackURI, &compat.ClaudePKCECodes{CodeVerifier: verifier})
+	value, err := svc.ExchangeMikkaCodeForTokens(ctx, code, state, redirect, &compat.ClaudePKCECodes{CodeVerifier: verifier})
 	if err != nil {
 		return nil, ErrProvider
 	}

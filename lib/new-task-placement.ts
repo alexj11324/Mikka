@@ -14,5 +14,6 @@ export function taskMachineUsable(device: { id: string; enabled: boolean; online
 }
 
 export function pickedTaskDestination(picked: string | null): TaskDestination | undefined {
+  if (picked === 'cloudflare') return {kind:'cloud',provider:'cloudflare'}
   return picked === null ? undefined : picked === 'cloud' ? { kind: 'cloud' } : { kind: 'device', deviceId: picked }
 }

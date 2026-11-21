@@ -1,16 +1,23 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react"
 import type { EditorView } from "@tiptap/pm/view"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
+import { toast } from 'sonner'
+import { avatarImageSrc } from '@/lib/default-avatar'
+import { isLegacyTaskInstruction } from '@/lib/task-description'
+import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { IssueActivity } from './issue-activity'
+import { TaskDescriptionContext } from '@/components/slots/task-detail-contract'
 import { useEditor, useEditorState, type JSONContent } from "@tiptap/react"
 import { createEditorExtensions, readableIssueContent } from "./issue-editor-schema"
 import { TextSelection } from "@tiptap/pm/state"
 import { Collaboration } from "@tiptap/extension-collaboration"
 import { ySyncPluginKey } from "@tiptap/y-tiptap"
 import * as Y from "yjs"
-import { Check, FileText, MessageSquare, X } from "lucide-react"
+import { Check, FileText, MessageSquare, X } from "@/components/icons"
+import { flushSync } from "react-dom"
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -27,6 +34,7 @@ import { useRichTextOutline, scrollToRichTextHeading } from "@/components/blocks
 import { RichTextTableBubble, RICH_TEXT_TABLE_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-table"
 import { DeleteTableDialog } from "@/components/blocks/rich-text-editor-2/components/delete-table-dialog"
 import { RICH_TEXT_MENTION_PROSE } from "@/components/blocks/rich-text-editor-2/components/rich-text-mention"
+import { BOT_MENTION_PREFIX } from "@/lib/task-activity-wake"
 import { useRichTextChanges, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_MARKUP_VIEW, type RichTextMarkupView } from "@/components/blocks/rich-text-editor-3/components/rich-text-changes"
 import { addThread, createThreadStore, replyToThread, setThreadResolved, bindThreadRepaint, canAnchorComment, useCommentAnchors, RICH_TEXT_COMMENT_PROSE } from "@/components/blocks/rich-text-editor-4/components/rich-text-comments"
 import { FieldError } from '@/components/ui/field'
@@ -41,25 +49,39 @@ export { createEditorExtensions, createDocumentSeed } from './issue-editor-schem
 export type IssueDiscussions = {
   issueId: string
   author: string
+  readOnly?: boolean
   threads: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").ThreadRecord[]
   anchors: import("@/components/blocks/rich-text-editor-4/components/rich-text-comments").CommentAnchor[]
-  onComment: (body: string) => void
-  onReply: (id: string, body: string) => void
+  onComment: (body: string, operationId?: string) => void | false
+  onReply: (id: string, body: string, operationId?: string, replyToMessageId?: string) => void | false
   onResolve: (id: string, resolved: boolean) => void
   /** Selects the text a discussion is about. */
   onSelect: (id: string) => void
 }
-export function IssueEditor({ issueId, content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false, renderActivity }: { issueId?: string; content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean; /** Draws 活动 in place of IssueActivity, with the same discussions and actions (task-detail slot). */ renderActivity?: (activity: IssueDiscussions) => ReactNode }) {
+export function IssueEditor({ issueId, content, onChange, sharedDoc, author: authorProp, authorId: authorUserId, syncLabel: syncLabelProp, replacement, onReplacementApplied, compact = false, layout = 'document', activity, afterDescription, label: labelProp, disabled = false, readOnlyDiscussions, renderActivity }: { issueId?: string; content?: JSONContent; onChange: (content: JSONContent) => void; sharedDoc?: Y.Doc; author?: string; authorId?: string; syncLabel?: string; replacement?: { content: JSONContent; version: number }; onReplacementApplied?: (success: boolean) => void; persisted?: boolean; compact?: boolean; layout?: 'document' | 'issue' | 'description'; activity?: ReactNode; afterDescription?: ReactNode; label?: string; disabled?: boolean; readOnlyDiscussions?: IssueDiscussions['threads']; /** Draws 活动 in place of IssueActivity, with the same discussions and actions (task-detail slot). */ renderActivity?: (activity: IssueDiscussions) => ReactNode }) {
   const t = useTranslations('Editor')
+  const tRichText = useTranslations('Editor.richText')
   const tCommon = useTranslations('Common')
   const author = authorProp ?? t('draftAuthor')
   const syncLabel = syncLabelProp ?? t('unsavedDraft')
   const label = labelProp ?? t('descriptionLabel')
   // Without a shared doc the editor renders `content` directly; content the schema rejects stays read-only and is never echoed back.
   const [initialContent] = useState(() => content === undefined ? EMPTY_DOCUMENT : readableIssueContent(content))
+  // Legacy task creators could store the complete execution contract as Markdown in a paragraph.
+  // Decide once from the stored document so typing into the open editor cannot collapse it.
+  const [foldInstructions] = useState(() => {
+    if (layout !== 'issue' || compact || !initialContent) return false
+    return isLegacyTaskInstruction(issueContentToMarkdown(initialContent))
+  })
+  const [instructionsOpen, setInstructionsOpen] = useState(false)
+  const taskDescription = useContext(TaskDescriptionContext)
+  const descriptionOpen = taskDescription?.open ?? true
+  const focusRequest = taskDescription?.focusRequest ?? 0
+  const handledFocus = useRef(0)
   const unreadable = !sharedDoc && initialContent === null
   // Read-only shows no typing hint, including on the empty document that stands in for unreadable content.
-  const placeholder = disabled || unreadable ? null : compact ? t('placeholderCompact') : t('placeholderFull')
+  // A task's description reads Capy's 「Describe this issue」; other documents keep the fuller hint.
+  const placeholder = disabled || unreadable ? null : compact ? t('placeholderCompact') : layout === 'issue' ? t('placeholderTask') : t('placeholderFull')
   const [localDoc] = useState(() => new Y.Doc())
   const threadDoc = sharedDoc ?? localDoc
   const threadStore = useMemo(() => createThreadStore(threadDoc), [threadDoc])
@@ -78,10 +100,34 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
   changeRef.current = onChange
   const replacementCallback = useRef(onReplacementApplied)
   replacementCallback.current = onReplacementApplied
+  const tMembers = useTranslations('Members')
+  // The editor retains its extensions. Always resolve the Task and its editability at the time of the keystroke.
+  const mentionScope = useRef(issueId)
+  mentionScope.current = disabled || unreadable || mode === 'viewing' || markup !== 'all' ? undefined : issueId
+  const loadMentionPeople = useCallback(async (signal: AbortSignal) => {
+    const id = mentionScope.current
+    if (!id || signal.aborted) return []
+    try {
+      const [{ listMembers }, { listBots }] = await Promise.all([import('@/app/actions/collaboration'), import('@/app/actions/bots')])
+      // The person's own Bots can be mentioned too: a Bot chip wakes that Bot (lib/task-activity-wake.ts).
+      const [{ owner, members }, bots] = await Promise.all([listMembers(id), listBots().catch(() => [])])
+      if (signal.aborted || id !== mentionScope.current) return []
+      return [
+        ...[owner, ...members].map(person => {
+          const label = person.name.trim() || tMembers('role.member')
+          return { id: person.id, label, initials: Array.from(label)[0].toUpperCase(), avatar: avatarImageSrc(person.image) }
+        }),
+        ...bots.filter(bot => !bot.coordinator).map(bot => ({ id: `${BOT_MENTION_PREFIX}${bot.id}`, label: bot.name, initials: Array.from(bot.name)[0]?.toUpperCase() ?? 'B', description: 'Bot' })),
+      ]
+    } catch {
+      if (!signal.aborted && id === mentionScope.current) toast.error(tMembers('readFailed'))
+      return []
+    }
+  }, [tMembers])
   const extensions = useMemo(() => [
-    ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc, compact, placeholder),
+    ...createEditorExtensions(threadStore.isOpen, author, !!sharedDoc, compact, placeholder, loadMentionPeople, key => tRichText(key as Parameters<typeof tRichText>[0])),
     ...(sharedDoc ? [Collaboration.configure({ document: sharedDoc })] : []),
-  ], [threadStore, author, sharedDoc, compact, placeholder])
+  ], [threadStore, author, sharedDoc, compact, placeholder, loadMentionPeople, tRichText])
   // useEditor calls setOptions whenever editorProps is a new object. setOptions
   // re-runs the Yjs binding, so a fresh object on every parent render loops.
   const editorProps = useMemo(() => ({
@@ -136,6 +182,15 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     editor.setEditable(editable)
   }, [editor, mode, editable])
   useEffect(() => {
+    if (!editor || !descriptionOpen || focusRequest <= handledFocus.current || disabled || unreadable) return
+    if (mode === 'viewing') setMode('editing')
+    if (markup !== 'all') setMarkup('all')
+    if (foldInstructions && !instructionsOpen) setInstructionsOpen(true)
+    if (!editable || (foldInstructions && !instructionsOpen)) return
+    handledFocus.current = focusRequest
+    editor.commands.focus('end')
+  }, [editor, descriptionOpen, focusRequest, disabled, unreadable, mode, markup, foldInstructions, instructionsOpen, editable])
+  useEffect(() => {
     if (!editor) return
     // Thread resolve/reopen does not change the ProseMirror document, so the
     // paint plugin would keep the old highlight. Content updates must not
@@ -150,7 +205,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     setLinkOpen(true)
   }
   function addComment() {
-    if (!editor || !comment.trim()) return
+    if (!editable || !editor || !comment.trim()) return
     if (!canAnchorComment(editor, threadStore.isOpen)) { setCommentError(t('selectionRequired')); return }
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
@@ -160,33 +215,54 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
     setCommentError("")
   }
   function submitReply(id: string) {
-    if (!reply.trim()) return
+    if (!editable || !reply.trim()) return
     replyToThread(threadDoc, id, { author, authorUserId, body: reply.trim(), at: new Date().toISOString() })
     setReply("")
     setReplyId(null)
   }
-  const threadList = Object.values(threads)
+  const threadList = readOnlyDiscussions ?? Object.values(threads)
   const openCount = threadList.filter(thread => !thread.resolved).length
 
   const discussions: Omit<IssueDiscussions, 'issueId'> = {
-    author, threads: threadList, anchors,
-    onComment: body => {
+    author, readOnly: !editable, threads: threadList, anchors,
+    onComment: (body, operationId) => {
+      if (!editable) return false
+      const id = `discussion-${operationId ?? crypto.randomUUID()}`
+      if (threadStore.getSnapshot()[id]) return
       const now = new Date().toISOString()
-      addThread(threadDoc, { id: `discussion-${crypto.randomUUID()}`, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
+      addThread(threadDoc, { id, author, authorUserId, createdAt: now, messages: [{ author, authorUserId, body, at: now }] }, 'issue-discussion')
     },
-    onReply: (id, body) => { replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString() }) },
-    onResolve: (id, resolved) => { setThreadResolved(threadDoc, id, resolved) },
+    onReply: (id, body, operationId, replyToMessageId) => {
+      if (!editable) return false
+      if (!replyToThread(threadDoc, id, { author, authorUserId, body, at: new Date().toISOString(), id: operationId, ...(replyToMessageId ? { replyToMessageId } : {}) })) return false
+    },
+    onResolve: (id, resolved) => { if (editable) setThreadResolved(threadDoc, id, resolved) },
     onSelect: id => {
       if (!editor) return
       let from: number | undefined
       let to = 0
       editor.state.doc.descendants((node, pos) => { if (node.isText && node.marks.some(mark => mark.type.name === 'comment' && mark.attrs.id === id)) { from ??= pos; to = pos + node.nodeSize } })
-      if (from !== undefined) editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
+      if (from !== undefined) {
+        if (!descriptionOpen || (foldInstructions && !instructionsOpen)) flushSync(() => {
+          taskDescription?.onOpen()
+          if (foldInstructions) setInstructionsOpen(true)
+        })
+        editor.chain().focus().setTextSelection({ from, to }).scrollIntoView().run()
+      }
     },
   }
+  // The task's supporting sections sit below either editor layout.
+  const taskCompanions = !compact && (layout === 'issue' || (layout === 'document' && renderActivity)) ? <>
+    {afterDescription}
+    {issueId && (renderActivity ? renderActivity({ issueId, ...discussions }) : <IssueActivity issueId={issueId} events={activity} {...discussions} />)}
+  </> : null
 
-  if (compact || layout === 'description' || layout === 'issue') return <TooltipProvider delay={300}>
-    <section aria-label={t('editorAria', { label })} className="flex min-w-0 flex-col gap-2">
+  if (layout === 'description' && disabled) return <section aria-label={t('editorAria', { label })}>
+    <RichTextContent editor={editor} className={cn('min-h-28 px-4 py-2 sm:pl-16', RICH_TEXT_TABLE_PROSE, RICH_TEXT_MENTION_PROSE, RICH_TEXT_CHANGES_PROSE, RICH_TEXT_COMMENT_PROSE)} />
+  </section>
+
+  if (compact || layout === 'description' || layout === 'issue') {
+    const description = <section aria-label={t('editorAria', { label })} data-task-description-editor={taskDescription ? '' : undefined} className="flex min-w-0 flex-col gap-2">
       <div className={cn('min-w-0 [--frame-panel-header-px:--spacing(2)] [--frame-panel-header-py:--spacing(2)]', layout === 'description' ? '[&>[role=toolbar]]:rounded-lg [&>[role=toolbar]]:border' : layout === 'issue' ? '' : 'rounded-lg border')}>
         {layout !== 'issue' && <FormattingToolbar editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} />}
         <div ref={pageRef} className="relative min-w-0">
@@ -195,7 +271,7 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
           {editor && <><RichTextFormatBubble editor={editor} linkOpen={linkOpen} onLinkOpenChange={setLinkOpen} /><RichTextLinkBubble editor={editor} onEdit={openLink} /><RichTextTableBubble editor={editor} onDeleteTable={() => setDeleteTableOpen(true)} /><RichTextBlockGutter editor={editor} editable={editable} scrollerRef={pageRef} gap={layout === 'description' ? 12 : undefined} onDeleteTable={() => setDeleteTableOpen(true)} /></>}
         </div>
       </div>
-      {layout === 'issue' && !compact && <>{(hasSelection || panel === 'comments') && <div className="flex justify-end pb-2">
+      {layout === 'issue' && !compact && editable && <>{(hasSelection || panel === 'comments') && <div className="flex justify-end pb-2">
         <Button variant="ghost" size="xs" onClick={() => setPanel(panel === 'comments' ? '' : 'comments')} aria-expanded={panel === 'comments'}><MessageSquare data-icon="inline-start" />{t('selectionComment')}</Button>
       </div>}
       {panel === 'comments' && <div className="flex flex-col gap-3 rounded-lg border p-4">
@@ -204,12 +280,18 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
         {commentError && <FieldError className="text-xs">{commentError}</FieldError>}
       </div>}</>}
     </section>
-    {layout === 'issue' && !compact && afterDescription}
-    {layout === 'issue' && !compact && issueId && (renderActivity ? renderActivity({ issueId, ...discussions }) : <IssueActivity issueId={issueId} events={activity} {...discussions} />)}
-    <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
-  </TooltipProvider>
+    const descriptionBody = foldInstructions ? <Collapsible open={instructionsOpen} onOpenChange={setInstructionsOpen}>
+      <CollapsibleTrigger className="cursor-pointer text-sm text-muted-foreground">{t('executionInstructions')}</CollapsibleTrigger>
+      <CollapsibleContent keepMounted>{description}</CollapsibleContent>
+    </Collapsible> : description
+    return <TooltipProvider delay={300}>
+      {taskDescription ? <div className="contents" data-task-description-body>{descriptionBody}</div> : descriptionBody}
+      {taskCompanions}
+      <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
+    </TooltipProvider>
+  }
 
-  return <TooltipProvider delay={300}><section aria-label={t('editorAria', { label: t('descriptionLabel') })} className="overflow-hidden rounded-lg border bg-background">
+  return <TooltipProvider delay={300}><section aria-label={t('editorAria', { label: t('descriptionLabel') })} data-task-description-body={taskDescription ? '' : undefined} data-task-description-editor={taskDescription ? '' : undefined} className="overflow-hidden rounded-lg border bg-background">
     <div className="flex flex-wrap items-center justify-between gap-2 bg-muted/20 px-3 py-2">
       <span className="flex items-center gap-2 text-xs font-medium"><FileText className="size-3.5 text-muted-foreground" />{t('document')}{syncLabel && <Badge variant="outline">{syncLabel}</Badge>}</span>
       <div className="flex items-center gap-2"><NativeSelect aria-label={t('editMode')} size="sm" value={mode} onChange={e => setMode(e.target.value)}><NativeSelectOption value="editing">{t('mode.editing')}</NativeSelectOption><NativeSelectOption value="suggesting">{t('mode.suggesting')}</NativeSelectOption><NativeSelectOption value="viewing">{t('mode.viewing')}</NativeSelectOption></NativeSelect><NativeSelect aria-label={t('markupView')} size="sm" value={markup} onChange={e => setMarkup(e.target.value as RichTextMarkupView)}><NativeSelectOption value="all">{t('markup.all')}</NativeSelectOption><NativeSelectOption value="final">{t('markup.final')}</NativeSelectOption><NativeSelectOption value="original">{t('markup.original')}</NativeSelectOption></NativeSelect></div>
@@ -232,5 +314,5 @@ export function IssueEditor({ issueId, content, onChange, sharedDoc, author: aut
       </ResizablePane>}
     </div>
     <DeleteTableDialog editor={editor} open={deleteTableOpen} onOpenChange={setDeleteTableOpen} />
-  </section></TooltipProvider>
+  </section>{taskCompanions}</TooltipProvider>
 }
