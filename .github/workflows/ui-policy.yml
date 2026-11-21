@@ -49,7 +49,7 @@ jobs:
     name: Cloud credential access (OIDC)
     # Credential checks do not run for documentation-only changes.
     needs: changes
-    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && github.event_name == 'push' && github.repository == 'alexj11324/Mikka' && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
+    if: needs.changes.result == 'success' && needs.changes.outputs.docs_only != 'true' && github.event_name == 'push' && (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref != 'refs/heads/wabi/issue-116-migration-prerequisite'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions:
