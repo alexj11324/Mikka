@@ -1,7 +1,6 @@
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import { PluginError } from './contracts'
 import { connectKind, type ConnectKind } from './connect-kind'
-import { wire } from './composio-wire'
 
 // The 插件 store: every Composio toolkit (decisions 2026-10-31 and
 // 2026-11-02), whether it connects in one click (Composio-managed auth), with
@@ -37,7 +36,7 @@ type RawToolkit = {
   no_auth?: boolean | null
   composio_managed_auth_schemes?: string[] | null
   auth_schemes?: string[] | null
-  meta?: { description?: string | null; logo?: string | null; created_at?: string | null; categories?: { id?: string | null; slug?: string | null; name?: string | null }[] | null } | null
+  meta?: { description?: string | null; logo?: string | null; created_at?: string | null; categories?: { id?: string | null; name?: string | null }[] | null } | null
 }
 type RawPage = { items: RawToolkit[]; next_cursor?: string | null }
 /** The one call the store needs: `composio.getClient().toolkits.list`. */
@@ -61,7 +60,7 @@ function listed(item: RawToolkit) {
 
 export function toStoreApp(item: RawToolkit): StoreApp {
   const categories = (item.meta?.categories ?? []).flatMap(category => {
-    const id = clean(category?.id ?? category?.slug, 80), name = clean(category?.name, 80)
+    const id = clean(category?.id, 80), name = clean(category?.name, 80)
     return id && name ? [{ id, name }] : []
   })
   const created = item.meta?.created_at && !Number.isNaN(Date.parse(item.meta.created_at)) ? new Date(item.meta.created_at).toISOString() : null
@@ -130,12 +129,22 @@ export function resetStoreCatalogCache() { cached = null }
 
 /** The real Composio client's lister, with a timeout per page. */
 export function composioToolkitLister(client: { getClient: () => { toolkits: { list: (query: never, options?: { signal?: AbortSignal }) => Promise<unknown> } } }): ToolkitLister {
-  return async query => wire(await client.getClient().toolkits.list(query as never, { signal: AbortSignal.timeout(10_000) })) as RawPage
+  return query => client.getClient().toolkits.list(query as never, { signal: AbortSignal.timeout(10_000) }) as Promise<RawPage>
 }
 
 /** A new connection must be a store app that connects that way. */
-export async function assertCatalogToolkit(list: ToolkitLister, id: string, kind: ConnectKind = 'managed') {
-  if (!(await listStoreCatalog(list)).apps.some(app => app.id === id && app.connect === kind)) throw new PluginError('integrationToolkitNotSupported', 400)
+/** The single-toolkit record's connect kind, checked when the bulk list does not confirm it (null when unreadable). */
+export type ToolkitKindVerifier = (slug: string) => Promise<ConnectKind | null>
+
+/** A new connection must be a store app that connects that way. When the bulk
+ *  list does not confirm it, the single-toolkit record is checked before
+ *  rejecting: reduced list metadata must not silently contradict the verified
+ *  detail response (#1920). */
+export async function assertCatalogToolkit(list: ToolkitLister, id: string, kind: ConnectKind = 'managed', verify?: ToolkitKindVerifier) {
+  if ((await listStoreCatalog(list)).apps.some(app => app.id === id && app.connect === kind)) return
+  const verified = verify ? await verify(id).catch(() => null) : null
+  if (verified === kind) return
+  throw new PluginError('integrationToolkitNotSupported', 400)
 }
 
 /** Whether an app needs no connection at all (its tools run on the person's id alone). */
