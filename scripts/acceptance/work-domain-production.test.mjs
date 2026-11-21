@@ -10,7 +10,7 @@ const ownerId = 'PRIVATE_SHARED_ACCOUNT', adminId = 'PRIVATE_SHARED_ADMIN', sha 
 const source = item => id(item.id === 'claude' ? 40 : 41)
 const scope = () => ({ workspaceId, projectId, environmentId, repositoryKey: 'v2/github.com/alexj11324/mikka', botId,
   models: { claude: { connectionId: id(40) }, codex: { connectionId: id(41) } } })
-const env = (mode = 'preflight', selected = null) => ({ GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka',
+const env = (mode = 'preflight', selected = null) => ({ GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963',
   GITHUB_REF: 'refs/heads/main', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_SHA: sha, DOMAIN_MODEL_SHA: sha,
   DOMAIN_MODEL_MODE: mode, DOMAIN_MODEL_SCOPE: selected ? JSON.stringify(selected) : '', DOMAIN_MODEL_TIMEOUT_MS: '1000',
   SMOKE_OWNER_EMAIL: 'acceptance+mikka-smoke@example.invalid', SMOKE_OWNER_PASSWORD: 'PRIVATE_PASSWORD' })
@@ -23,9 +23,10 @@ const now = () => Date.parse('2026-11-08T08:00:00Z')
 
 test('workflow-only exact SHA and explicit strict scope fail before credentials', () => {
   assert.equal(domainOptions(env()).mode, 'preflight')
+  assert.equal(domainOptions({ ...env(), GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274' }).mode, 'preflight')
   assert.deepEqual(domainOptions(env('active', scope())).scope, scope())
   for (const change of [{ GITHUB_ACTIONS: 'false' }, { GITHUB_REF: 'refs/heads/feature' }, { GITHUB_EVENT_NAME: 'push' },
-    { GITHUB_SHA: 'b'.repeat(40) }, { DOMAIN_MODEL_SHA: 'main' }, { GITHUB_REPOSITORY: 'foreign/Mikka' }])
+    { GITHUB_SHA: 'b'.repeat(40) }, { DOMAIN_MODEL_SHA: 'main' }, { GITHUB_REPOSITORY: 'foreign/Mikka' }, { GITHUB_REPOSITORY_ID: '9' }, { GITHUB_REPOSITORY_ID: undefined }, { GITHUB_REPOSITORY_OWNER_ID: undefined }, { GITHUB_REPOSITORY_OWNER_ID: '359279274' }, { GITHUB_REPOSITORY: 'aspectly-labs/Mikka' }])
     assert.throws(() => domainOptions({ ...env(), ...change }), { code: 'target_refused' })
   assert.throws(() => domainOptions(env('active')), { code: 'scope_required' })
   assert.throws(() => domainOptions(env('candidate')), { code: 'mode_invalid' })
@@ -155,6 +156,36 @@ function fixture({ badProject = false, badEnvironment = false, unsafeProfile = f
     }
     if (path === '/api/issues/search') return Response.json({ items: issues.filter(issue => issue.title.includes(url.searchParams.get('q')))
       .map(issue => ({ id: issue.id, ownerId: issue.userId, title: issue.title })), nextCursor: null, truncated: false })
+    if (path === '/api/agents/eve/v1/session' && body?.message) {
+      assert.match(init.headers['x-mikka-submission-id'], /^[a-f0-9-]{36}$/)
+      assert.equal(body.clientContext.expectedWorkspaceId, workspaceId)
+      const args = [body.message, null, url.searchParams.get('botId'), init.headers['x-mikka-submission-id'], body.clientContext.taskDestination, null, [], null, body.clientContext.profileId]
+        const issue = issues.find(row => args[0].includes(row.id)); assert.ok(issue)
+        assert.ok(projects.some(row => row.id === issue.projectId))
+        assert.deepEqual(args[4], { kind: 'cloud' }); assert.match(args[0], /"readOnly":true/)
+        const profile = profiles.find(row => row.id === args[8]); assert.ok(profile)
+        const item = CASES.find(row => row.harness === profile.harness); assert.ok(item)
+        const start = args[0].indexOf('{"issueId"'), end = args[0].indexOf('}。', start) + 1
+        const dispatchInput = JSON.parse(args[0].slice(start, end))
+        assert.equal(dispatchInput.requestKey, args[3]); assert.ok(dispatchInput.note.startsWith('[1687:' + args[3] + '] '))
+        selectedRun = { id: id(300 + runs.length), issueId: issue.id, item, profile, refused: refuseCase === item.id,
+          note: dispatchInput.note, requestKey: dispatchInput.requestKey }
+        if (!selectedRun.refused) {
+          issue.status = settledBusinessStatus
+          runs.push(selectedRun)
+          const taskId = id(400 + factories.length), sourceEventId = id(800 + factories.length)
+          const snapshot = { task: { id: taskId, issueId: issue.id, workspaceId, userId: ownerId, botId, sourceEventId,
+            revision: 3, stage: 'approval', status: 'waiting' }, attempts: [{ id: id(500 + factories.length), taskId,
+            runId: selectedRun.id, output: { requestEpoch: sourceEventId } }] }
+          factories.push(snapshot)
+          if (foreignRun || foreignEpoch) {
+            const other = { ...selectedRun, id: id(1000 + runs.length), foreign: true }; runs.push(other)
+            if (foreignEpoch) snapshot.attempts.push({ id: id(1100 + runs.length), taskId, runId: other.id, output: { requestEpoch: id(991) } })
+          }
+        }
+        if (uncertainDispatch === item.id) throw new Error('PRIVATE transport failure after successful dispatch')
+        return Response.json({ ok: true, sessionId: 'wrun_domain', deliveryId: 'delivery_fixture' }, { status: 202 })
+      }
     if (path === '/api/agents/eve/v1/session') return Response.json({ ok: true, sessionId: 'wrun_domain' })
     if (/^\/api\/agents\/eve\/v1\/session\/[^/]+\/stream$/.test(path)) {
       elapsed += dispatchAdvanceMs
@@ -256,33 +287,6 @@ function fixture({ badProject = false, badEnvironment = false, unsafeProfile = f
         return rpc({ version: 1, primaryStatus: issue.status, runStatus: 'succeeded', factoryStage: 'handoff', completion: null,
           state: closed ? issue.status : 'waiting', reason: closed ? null : 'pr_review', blockedBy: null,
           group: closed ? 'done' : 'pending', needsAction: closed ? null : 'pr_review', blockedReason: null, ...presentationOverride })
-      }
-      if (action === 'coordinator.sendCoordinatorMessage') {
-        const issue = issues.find(row => args[0].includes(row.id)); assert.ok(issue)
-        assert.ok(projects.some(row => row.id === issue.projectId))
-        assert.deepEqual(args[4], { kind: 'cloud' }); assert.match(args[0], /"readOnly":true/)
-        const profile = profiles.find(row => row.id === args[8]); assert.ok(profile)
-        const item = CASES.find(row => row.harness === profile.harness); assert.ok(item)
-        const start = args[0].indexOf('{"issueId"'), end = args[0].indexOf('}。', start) + 1
-        const dispatchInput = JSON.parse(args[0].slice(start, end))
-        assert.equal(dispatchInput.requestKey, args[3]); assert.ok(dispatchInput.note.startsWith('[1687:' + args[3] + '] '))
-        selectedRun = { id: id(300 + runs.length), issueId: issue.id, item, profile, refused: refuseCase === item.id,
-          note: dispatchInput.note, requestKey: dispatchInput.requestKey }
-        if (!selectedRun.refused) {
-          issue.status = settledBusinessStatus
-          runs.push(selectedRun)
-          const taskId = id(400 + factories.length), sourceEventId = id(800 + factories.length)
-          const snapshot = { task: { id: taskId, issueId: issue.id, workspaceId, userId: ownerId, botId, sourceEventId,
-            revision: 3, stage: 'approval', status: 'waiting' }, attempts: [{ id: id(500 + factories.length), taskId,
-            runId: selectedRun.id, output: { requestEpoch: sourceEventId } }] }
-          factories.push(snapshot)
-          if (foreignRun || foreignEpoch) {
-            const other = { ...selectedRun, id: id(1000 + runs.length), foreign: true }; runs.push(other)
-            if (foreignEpoch) snapshot.attempts.push({ id: id(1100 + runs.length), taskId, runId: other.id, output: { requestEpoch: id(991) } })
-          }
-        }
-        if (uncertainDispatch === item.id) throw new Error('PRIVATE transport failure after successful dispatch')
-        return rpc({ queued: true })
       }
       if (action === 'agents.pollIssueThreads') return rpc({ threads: runs.filter(row => row.issueId === args[0]).map(thread) })
       if (action === 'agents.getIssueThread') {
@@ -431,9 +435,9 @@ test('active runs one useful retained Task per subscription through canonical Pr
   assert.equal(report.coverage.frozenSnapshot, 'requires_separate_authorized_app_read')
   assert.ok(!JSON.stringify(report).includes('PRIVATE_'))
   assert.ok(!f.calls.some(call => call.body?.action === 'issue-operations.setIssueDeleted' || call.body?.action === 'execution-settings.chooseBotModel'))
-  const submissions = f.calls.filter(call => call.body?.action === 'coordinator.sendCoordinatorMessage')
+  const submissions = f.calls.filter(call => call.path === '/api/agents/eve/v1/session' && !!call.body?.message)
   assert.equal(submissions.length, 2)
-  assert.ok(submissions.every(call => /dispatch_run/.test(call.body.args[0])))
+  assert.ok(submissions.every(call => /dispatch_run/.test(call.body.message)))
   assert.deepEqual(f.issues.map(issue => issue.title), CASES.map(item => item.title))
 })
 
@@ -484,11 +488,11 @@ test('live receipts accept current lifecycle states without mistaking preparatio
 test('workflow rerun detects retained internal fingerprints and never submits or creates duplicate Tasks', async () => {
   const f = fixture()
   assert.equal((await f.run()).status, 'execution_observed_pending_snapshot_review')
-  const before = f.calls.filter(call => call.body?.action === 'coordinator.sendCoordinatorMessage').length
+  const before = f.calls.filter(call => call.path === '/api/agents/eve/v1/session' && !!call.body?.message).length
   const repeated = await f.run()
   assert.ok(repeated.cases.every(row => row.failure.code === 'case_already_exists'))
   assert.equal(f.issues.length, 2)
-  assert.equal(f.calls.filter(call => call.body?.action === 'coordinator.sendCoordinatorMessage').length, before)
+  assert.equal(f.calls.filter(call => call.path === '/api/agents/eve/v1/session' && !!call.body?.message).length, before)
 })
 
 for (const [name, options, code] of [['inherited review Profile', { unsafeProfile: true }, 'review_model_unbounded'],
@@ -498,7 +502,7 @@ for (const [name, options, code] of [['inherited review Profile', { unsafeProfil
     const f = fixture(options), report = await f.run()
     assert.ok(report.cases.every(row => row.failure.code === code), JSON.stringify(report))
     assert.equal(f.issues.length, 0); assert.equal(f.runs.length, 0)
-    assert.ok(!f.calls.some(call => call.method === 'PATCH' || call.body?.action === 'coordinator.sendCoordinatorMessage'))
+    assert.ok(!f.calls.some(call => call.method === 'PATCH' || call.path === '/api/agents/eve/v1/session' && !!call.body?.message))
   })
 }
 
@@ -550,7 +554,7 @@ test('a real dispatch quota refusal keeps its Task and code, then continues the 
   assert.equal(report.cases[0].failure.serverCode, 'subscriptionQuotaExhausted')
   assert.equal(report.cases[1].status, 'execution_observed')
   assert.equal(f.issues.length, 2)
-  assert.equal(f.calls.filter(call => call.body?.action === 'coordinator.sendCoordinatorMessage').length, 2)
+  assert.equal(f.calls.filter(call => call.path === '/api/agents/eve/v1/session' && !!call.body?.message).length, 2)
 })
 
 test('unexpected runtime provenance fails honestly and only closes its owned runs', async () => {

@@ -52,9 +52,12 @@ concurrency:
   cancel-in-progress: false
 permissions:
   contents: read
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
 jobs:
   deploy-application:
-    if: github.repository_id == '1427517699' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && !startsWith(inputs.phase, 'pipeline-')
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.actor_id == '183887963' && !startsWith(inputs.phase, 'pipeline-')
     outputs:
       serving-release: ${{ steps.apply.outputs.serving-release }}
     runs-on: ubuntu-latest
@@ -63,6 +66,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
       id-token: write
     env:
       MIKKA_CLOUD_SOURCE_SHA: ${{ inputs.cloud_source_sha }}
@@ -92,8 +96,24 @@ jobs:
           const claims = JSON.parse(Buffer.from(value.split('.')[1], 'base64url'))
           assert.equal(claims.repository_id, '1427517699')
           assert.equal(claims.ref, 'refs/heads/main')
-          assert.equal(claims.workflow_ref, 'alexj11324/Mikka/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main')
+          const owner = {'183887963': 'alexj11324', '359279274': 'aspectly-labs'}[claims.repository_owner_id]
+          assert.ok(owner && claims.repository === owner + '/Mikka')
+          assert.equal(claims.workflow_ref, claims.repository + '/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main')
           console.log(JSON.stringify({subject: claims.sub, repositoryId: claims.repository_id, ref: claims.ref, workflowRef: claims.workflow_ref}))
+          JS
+      - name: Select the source App before credential access
+        id: source-app
+        env:
+          SOURCE_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs'
+          const owner = process.env.SOURCE_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
           JS
       - name: Read the existing source App id
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -103,7 +123,7 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_ID
           recursive: false
           include-imports: false
@@ -115,20 +135,22 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_PRIVATE_KEY
           recursive: false
           include-imports: false
+      - name: Verify the selected source App
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.source-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("CI_SOURCE_APP_ID_MISMATCH")'
       - name: Mint a short-lived read-only operations checkout token
         id: source-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
         with:
           app-id: ${{ env.GITHUB_APP_ID }}
           private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
-          owner: alexj11324
-          repositories: |
-            Mikka
-            mikka-cloud
+          owner: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
+          repositories: mikka-cloud
           permission-contents: read
           permission-actions: read
           permission-issues: read
@@ -138,7 +160,7 @@ jobs:
           echo 'GITHUB_APP_PRIVATE_KEY=' >> "$GITHUB_ENV"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: alexj11324/mikka-cloud
+          repository: ${{ format('{0}/mikka-cloud', vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324') }}
           ref: ${{ inputs.cloud_source_sha }}
           token: ${{ steps.source-token.outputs.token }}
           path: operations
@@ -161,7 +183,7 @@ jobs:
           JS
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: alexj11324/Mikka
+          repository: ${{ github.repository }}
           ref: ${{ steps.product.outputs.source }}
           path: operations/product
           fetch-depth: 0
@@ -197,6 +219,7 @@ jobs:
         working-directory: operations
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
         run: node operations/public-release.mjs
 
   serving-release:
@@ -212,13 +235,14 @@ jobs:
 
 
   pipeline:
-    if: github.repository_id == '1427517699' && github.actor_id == '183887963' && github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.id == github.event.repository.id) || (github.event_name == 'workflow_dispatch' && (inputs.phase == 'pipeline-stage' || inputs.phase == 'pipeline-rollback')))
+    if: (github.repository_id == '1427517699' && (github.repository_owner_id == '183887963' || github.repository_owner_id == '359279274')) && github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_run' && (github.actor_id == '183887963' || (github.actor_id == '118344674' && github.actor == 'github-merge-queue[bot]' && (github.triggering_actor == 'github-merge-queue[bot]' || github.triggering_actor == 'alexj11324'))) && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.id == github.event.repository.id) || (github.event_name == 'workflow_dispatch' && github.actor_id == '183887963' && (inputs.phase == 'pipeline-stage' || inputs.phase == 'pipeline-rollback')))
     runs-on: ubuntu-latest
     environment: cloudflare-runtime-release
     timeout-minutes: 45
     permissions:
       contents: read
       actions: read
+      issues: read
       id-token: write
     outputs:
       selected: ${{ steps.select.outputs.status }}
@@ -252,8 +276,24 @@ jobs:
           const claims = JSON.parse(Buffer.from(value.split('.')[1], 'base64url'))
           assert.equal(claims.repository_id, '1427517699')
           assert.equal(claims.ref, 'refs/heads/main')
-          assert.equal(claims.workflow_ref, 'alexj11324/Mikka/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main')
+          const owner = {'183887963': 'alexj11324', '359279274': 'aspectly-labs'}[claims.repository_owner_id]
+          assert.ok(owner && claims.repository === owner + '/Mikka')
+          assert.equal(claims.workflow_ref, claims.repository + '/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main')
           console.log(JSON.stringify({subject: claims.sub, repositoryId: claims.repository_id, ref: claims.ref, workflowRef: claims.workflow_ref}))
+          JS
+      - name: Select the source App before credential access
+        id: source-app
+        env:
+          SOURCE_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs'
+          const owner = process.env.SOURCE_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
           JS
       - name: Read the existing source App id
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -263,7 +303,7 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_ID
           recursive: false
           include-imports: false
@@ -275,20 +315,22 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_PRIVATE_KEY
           recursive: false
           include-imports: false
+      - name: Verify the selected source App
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.source-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("CI_SOURCE_APP_ID_MISMATCH")'
       - name: Mint a short-lived read-only operations checkout token
         id: source-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
         with:
           app-id: ${{ env.GITHUB_APP_ID }}
           private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
-          owner: alexj11324
-          repositories: |
-            Mikka
-            mikka-cloud
+          owner: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
+          repositories: mikka-cloud
           permission-contents: read
           permission-actions: read
           permission-issues: read
@@ -300,6 +342,7 @@ jobs:
         id: select
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
           INPUT_CLOUD_SOURCE: ${{ inputs.cloud_source_sha }}
           INPUT_RELEASE_RUN: ${{ inputs.release_run }}
           INPUT_PIPELINE_RUN: ${{ inputs.pipeline_run }}
@@ -308,7 +351,7 @@ jobs:
         if: steps.select.outputs.status == 'selected'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: alexj11324/mikka-cloud
+          repository: ${{ format('{0}/mikka-cloud', vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324') }}
           ref: ${{ steps.select.outputs.operations }}
           token: ${{ steps.source-token.outputs.token }}
           path: operations
@@ -318,7 +361,7 @@ jobs:
         if: steps.select.outputs.status == 'selected'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: alexj11324/Mikka
+          repository: ${{ github.repository }}
           ref: ${{ steps.select.outputs.source }}
           path: operations/product
           fetch-depth: 0
@@ -348,7 +391,7 @@ jobs:
         working-directory: operations
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
-          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
         run: node operations/business-api/pipeline-preflight.mjs
       - name: Install pinned product client and verification dependencies
         if: steps.select.outputs.status == 'selected'
@@ -379,7 +422,7 @@ jobs:
         working-directory: operations
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
-          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
         run: node operations/public-release.mjs
       - name: Upload pipeline receipts
         id: report
@@ -436,6 +479,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      issues: read
       id-token: write
     outputs:
       selected: ${{ steps.select.outputs.status }}
@@ -467,8 +511,24 @@ jobs:
           const claims = JSON.parse(Buffer.from(value.split('.')[1], 'base64url'))
           assert.equal(claims.repository_id, '1427517699')
           assert.equal(claims.ref, 'refs/heads/main')
-          assert.equal(claims.workflow_ref, 'alexj11324/Mikka/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main')
+          const owner = {'183887963': 'alexj11324', '359279274': 'aspectly-labs'}[claims.repository_owner_id]
+          assert.ok(owner && claims.repository === owner + '/Mikka')
+          assert.equal(claims.workflow_ref, claims.repository + '/.github/workflows/cloudflare-app-deploy.yml@refs/heads/main')
           console.log(JSON.stringify({subject: claims.sub, repositoryId: claims.repository_id, ref: claims.ref, workflowRef: claims.workflow_ref}))
+          JS
+      - name: Select the source App before credential access
+        id: source-app
+        env:
+          SOURCE_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324' }}
+          ORG_SECRET_PATH: ${{ vars.MIKKA_ORG_GITHUB_SECRET_PATH }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs'
+          const owner = process.env.SOURCE_OWNER
+          if (!['alexj11324', 'aspectly-labs'].includes(owner)) throw Error('CI_SOURCE_APP_OWNER_REQUIRED')
+          const path = owner === 'aspectly-labs' ? process.env.ORG_SECRET_PATH?.trim() : '/github'
+          if (!path || /[\r\n]/.test(path)) throw Error('CI_SOURCE_APP_SECRET_PATH_REQUIRED')
+          appendFileSync(process.env.GITHUB_OUTPUT, `owner=${owner}\nsecret-path=${path}\napp-id=${owner === 'aspectly-labs' ? '5853576' : '4840908'}\n`)
           JS
       - name: Read the existing source App id
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
@@ -478,7 +538,7 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_ID
           recursive: false
           include-imports: false
@@ -490,20 +550,22 @@ jobs:
           oidc-audience: mikka-infisical
           project-id: 89850d6a-f020-4936-863e-df77380dfe40
           env-slug: prod
-          secret-path: /github
+          secret-path: ${{ steps.source-app.outputs.secret-path }}
           secret-name: GITHUB_APP_PRIVATE_KEY
           recursive: false
           include-imports: false
+      - name: Verify the selected source App
+        env:
+          EXPECTED_SOURCE_APP_ID: ${{ steps.source-app.outputs.app-id }}
+        run: node -e 'if (!process.env.EXPECTED_SOURCE_APP_ID || process.env.GITHUB_APP_ID !== process.env.EXPECTED_SOURCE_APP_ID) throw Error("CI_SOURCE_APP_ID_MISMATCH")'
       - name: Mint a short-lived read-only operations checkout token
         id: source-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349
         with:
           app-id: ${{ env.GITHUB_APP_ID }}
           private-key: ${{ env.GITHUB_APP_PRIVATE_KEY }}
-          owner: alexj11324
-          repositories: |
-            Mikka
-            mikka-cloud
+          owner: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324' }}
+          repositories: mikka-cloud
           permission-contents: read
           permission-actions: read
           permission-issues: read
@@ -515,6 +577,7 @@ jobs:
         id: select
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
           INPUT_OPERATIONS_SOURCE: ${{ needs.pipeline.outputs.operations }}
           INPUT_STAGE_ARTIFACT: ${{ needs.pipeline.outputs.artifact }}
         run: node scripts/release/pipeline-inputs.mjs promote
@@ -522,7 +585,7 @@ jobs:
         if: steps.select.outputs.status == 'selected'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: alexj11324/mikka-cloud
+          repository: ${{ format('{0}/mikka-cloud', vars.MIKKA_PRIVATE_GITHUB_OWNER == 'aspectly-labs' && 'aspectly-labs' || 'alexj11324') }}
           ref: ${{ steps.select.outputs.operations }}
           token: ${{ steps.source-token.outputs.token }}
           path: operations
@@ -532,7 +595,7 @@ jobs:
         if: steps.select.outputs.status == 'selected'
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          repository: alexj11324/Mikka
+          repository: ${{ github.repository }}
           ref: ${{ steps.select.outputs.source }}
           path: operations/product
           fetch-depth: 0
@@ -550,7 +613,7 @@ jobs:
         working-directory: operations
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
-          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
         run: node operations/business-api/pipeline-preflight.mjs
       - name: Install pinned product client and verification dependencies
         if: steps.select.outputs.status == 'selected'
@@ -581,7 +644,7 @@ jobs:
         working-directory: operations
         env:
           GH_TOKEN: ${{ steps.source-token.outputs.token }}
-          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ steps.source-token.outputs.token }}
+          MIKKA_PUBLIC_ACTIONS_TOKEN: ${{ github.token }}
         run: node operations/public-release.mjs
       - name: Upload production receipts
         id: report

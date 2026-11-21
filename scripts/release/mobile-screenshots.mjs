@@ -4,6 +4,7 @@ import { appendFileSync, mkdirSync, openSync, closeSync, readFileSync, readdirSy
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { constants } from 'node:os'
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
 import { releaseIdentity, waitForReleaseChecks } from './ci-gate.mjs'
 
 const BUNDLE = 'com.aspectlylabs.mikka'
@@ -160,8 +161,6 @@ export async function screenshotPhase(phase, operation, log = console.log) {
 export function screenshotIdentity(env) {
   const identity = releaseIdentity(env)
   assert.equal(env.GITHUB_EVENT_NAME, 'workflow_dispatch')
-  assert.equal(env.GITHUB_REPOSITORY_ID, '1427517699')
-  assert.equal(env.GITHUB_REPOSITORY_OWNER_ID, '183887963')
   assert.match(env.OVERLAY_SHA ?? '', /^[a-f0-9]{40}$/)
   return identity
 }
@@ -169,9 +168,7 @@ export function screenshotIdentity(env) {
 export function driverPreflightIdentity(env) {
   assert.equal(env.GITHUB_ACTIONS, 'true', 'driverPreflightCIRequired')
   assert.equal(env.GITHUB_EVENT_NAME, 'workflow_dispatch', 'driverPreflightIdentityRequired')
-  assert.equal(env.GITHUB_REPOSITORY, 'alexj11324/Mikka', 'driverPreflightIdentityRequired')
-  assert.equal(env.GITHUB_REPOSITORY_ID, '1427517699', 'driverPreflightIdentityRequired')
-  assert.equal(env.GITHUB_REPOSITORY_OWNER_ID, '183887963', 'driverPreflightIdentityRequired')
+  assert.ok(actionsMikkaRepository(env), 'driverPreflightIdentityRequired')
   assert.match(env.GITHUB_REF ?? '', /^refs\/heads\/[^\s]+$/, 'driverPreflightIdentityRequired')
   assert.match(env.GITHUB_SHA ?? '', /^[a-f0-9]{40}$/, 'driverPreflightIdentityRequired')
   assert.match(env.GITHUB_RUN_ID ?? '', /^\d+$/, 'driverPreflightIdentityRequired')

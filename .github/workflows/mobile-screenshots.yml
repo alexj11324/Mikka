@@ -11,6 +11,9 @@ on:
 
 permissions:
   contents: read
+env:
+  MIKKA_PRIVATE_GITHUB_OWNER: ${{ vars.MIKKA_PRIVATE_GITHUB_OWNER }}
+  MIKKA_HOSTED_UI_GITHUB_OWNER: ${{ vars.MIKKA_HOSTED_UI_GITHUB_OWNER }}
 
 concurrency:
   group: mobile-app-store-screenshots
@@ -20,8 +23,7 @@ jobs:
   screenshots:
     if: >-
       github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' &&
-      github.repository == 'alexj11324/Mikka' && github.repository_id == '1427517699' &&
-      github.repository_owner_id == '183887963'
+      (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274')))
     runs-on: macos-26
     timeout-minutes: 120
     permissions:
@@ -69,6 +71,12 @@ jobs:
           shasum -a 256 -c checksums_sha256.txt
           unzip -q maestro.zip
           echo "$RUNNER_TEMP/mikka-maestro/maestro/bin" >> "$GITHUB_PATH"
+      - name: Validate the selected private UI owner before credential access
+        run: |
+          node --input-type=module - <<'JS'
+          import { privateMikkaRepository } from './scripts/cloudflare-source.mjs'
+          privateMikkaRepository('mikka-hosted-ui')
+          JS
       - name: Read existing hosted UI checkout key
         uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d
         with:
@@ -84,7 +92,7 @@ jobs:
       - name: Check out exact reviewed private UI
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: alexj11324/mikka-hosted-ui
+          repository: ${{ format('{0}/mikka-hosted-ui', vars.MIKKA_HOSTED_UI_GITHUB_OWNER || vars.MIKKA_PRIVATE_GITHUB_OWNER || 'alexj11324') }}
           ref: ${{ inputs.overlay_sha }}
           ssh-key: ${{ env.HOSTED_UI_READ_KEY }}
           path: .hosted-ui
@@ -139,8 +147,7 @@ jobs:
     name: Credential-free native driver preflight
     if: >-
       github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') &&
-      github.ref != 'refs/heads/main' && github.repository == 'alexj11324/Mikka' &&
-      github.repository_id == '1427517699' && github.repository_owner_id == '183887963'
+      github.ref != 'refs/heads/main' && (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274')))
     runs-on: macos-26
     timeout-minutes: 25
     permissions:

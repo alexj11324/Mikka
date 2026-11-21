@@ -20,6 +20,23 @@ async function atProxy(t: TestContext, receiver: typeof fetch, run: () => Promis
 const prompt: Parameters<ReturnType<typeof createLiteLLMModel>['doStream']>[0]['prompt'] = [{ role: 'user', content: [{ type: 'text', text: 'fixture' }] }]
 const chunk = { id: 'model-response-id', object: 'chat.completion.chunk', created: 1, model: 'fixture/model' }
 
+test('a reserved hosted call carries its own internal identity without replacing the original response receipt', async t => {
+  const callId = 'mikka-hosted:00000000-0000-4000-8000-000000000001:wrun_native:step_model:1'
+  await atProxy(t, async (_input, init) => {
+    assert.equal(new Headers(init?.headers).get('x-litellm-call-id'), callId)
+    return Response.json({ id: 'provider-completion', object: 'chat.completion', created: 1, model: 'fixture/model',
+      choices: [{ index: 0, message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }],
+      usage: { prompt_tokens: 6, completion_tokens: 2, total_tokens: 8 } }, {
+      headers: { 'x-litellm-call-id': callId, 'x-litellm-response-cost': '0.0000025' },
+    })
+  }, async () => {
+    const result = await createLiteLLMModel('fixture/model', { user: 'workspace-fixture', callId }).doGenerate({ prompt: structuredClone(prompt) })
+    assert.equal(liteLLMGenerationId(result.providerMetadata), callId)
+    assert.equal(liteLLMCost(result.providerMetadata), 3)
+    assert.equal(result.content[0].type, 'text')
+  })
+})
+
 test('stream settlement reads the final usage cost, not the initial receipt placeholder', async t => {
   const events = [
     { ...chunk, choices: [{ index: 0, delta: { content: 'ok' }, finish_reason: null }] },
@@ -44,6 +61,38 @@ test('stream settlement reads the final usage cost, not the initial receipt plac
     assert.equal(liteLLMGenerationId(finish?.providerMetadata), 'proxy-call')
     assert.equal(finish?.usage.inputTokens.total, 6)
     assert.ok(parts.every(part => part.type !== 'raw'))
+  })
+})
+
+for (const returnedId of [undefined, 'another-proxy-call']) test(`a ${returnedId ? 'mismatched' : 'missing'} correlation ACK preserves the real stream and settled cost`, async t => {
+  const callId = 'mikka-hosted:00000000-0000-4000-8000-000000000001:wrun_native:step_model:1'
+  await atProxy(t, async (_input, init) => {
+    assert.equal(new Headers(init?.headers).get('x-litellm-call-id'), callId)
+    const events = [
+      { ...chunk, choices: [{ index: 0, delta: { content: 'paid content' }, finish_reason: null }] },
+      { ...chunk, choices: [], usage: { prompt_tokens: 6, completion_tokens: 2, total_tokens: 8, cost: 0.0000025 } },
+    ]
+    return new Response(events.map(event => 'data: ' + JSON.stringify(event) + '\n\n').join('') + 'data: [DONE]\n\n', {
+      headers: { 'content-type': 'text/event-stream', ...(returnedId ? { 'x-litellm-call-id': returnedId } : {}) },
+    })
+  }, async () => {
+    const result = await createLiteLLMModel('fixture/model', { callId }).doStream({ prompt: structuredClone(prompt) })
+    const parts = await Array.fromAsync(result.stream)
+    assert.ok(parts.some(part => part.type === 'text-delta' && part.delta === 'paid content'))
+    const finish = parts.find(part => part.type === 'finish')
+    assert.equal(liteLLMCost(finish?.providerMetadata), 3)
+    assert.equal(liteLLMGenerationId(finish?.providerMetadata), returnedId)
+  })
+})
+
+test('caller headers cannot supply a hosted identity without an actual server reservation', async t => {
+  await atProxy(t, async (_input, init) => {
+    assert.equal(new Headers(init?.headers).get('x-litellm-call-id'), null)
+    return new Response('data: [DONE]\n\n', { headers: { 'content-type': 'text/event-stream' } })
+  }, async () => {
+    const result = await createLiteLLMModel('fixture/model').doStream({ prompt: structuredClone(prompt),
+      headers: { 'x-litellm-call-id': 'mikka-hosted:00000000-0000-4000-8000-000000000001' } })
+    await result.stream.pipeTo(new WritableStream())
   })
 })
 

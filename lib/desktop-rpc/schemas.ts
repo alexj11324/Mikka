@@ -14,11 +14,8 @@ import { createIssueStateInput, deleteIssueStateInput, reorderIssueStatesInput, 
 import { taskDestinationSchema } from '@/lib/task-destination'
 import { BOT_DEFAULT_AGENTS, botRunsOnSchema } from '@/lib/bot-settings'
 import { MODEL_ROUTING_EFFORTS } from '@/lib/model-routing'
-import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-reference'
-import { taskTitleInputSchema } from '@/lib/task-title-input'
 import { API_KEY_PRESETS } from '@/lib/model-api-key-providers'
 import { gatewayFeaturesSchema } from '@/lib/model-gateway/features'
-import { userImageInputsSchema } from '@/lib/coordinator/user-attachments'
 import { setAppPolicyInput } from '@/lib/app-policy/apps'
 import { POINTS_PURCHASE_AMOUNTS } from '@/lib/billing/hosted-usage'
 import { MAX_READ_BATCH, READ_BATCH_ACTIONS, type ReadBatchCall } from './read-batch-contract'
@@ -65,12 +62,6 @@ const metadata = object({
   pullRequests: z.array(pullRequestSchema.strict()).max(10).optional(), dueDate: z.iso.date().nullable().optional(),
   estimate: z.number().int().min(0).max(100).nullable().optional(),
   block: blockFlagSchema.strict().nullable().optional(),
-})
-const quote = object({ artifactId: uuid, version: positive, kind: z.enum(['text', 'element']), text: text(2000).trim().min(1), label: text(200).optional(), selector: text(1000).optional() })
-const note = object({
-  n: positive, kind: z.enum(['element', 'region']), url: z.url({ protocol: /^https?$/ }).max(2000),
-  label: text(200).trim().min(1), note: text(500).trim().min(1), selector: text(1000).optional(),
-  rect: object({ x: z.number().finite(), y: z.number().finite(), width: z.number().min(0), height: z.number().min(0), viewportWidth: z.number().min(0), viewportHeight: z.number().min(0) }).optional(),
 })
 const harness = z.enum(['claude_code', 'codex'])
 const orderChange = z.discriminatedUnion('kind', [
@@ -253,7 +244,6 @@ export const desktopActionSchemas = {
   'coordinator.coordinatorCitationSources': tuple(z.array(uuid).min(1).max(50)),
   'coordinator.coordinatorReasoning': tuple(bot, z.array(positive).min(1).max(50)),
   'coordinator.pollBotChatSummaries': none,
-  'coordinator.sendCoordinatorMessage': tuple(text(10_000), quote.nullish(), bot.optional(), uuid.optional(), taskDestinationSchema.optional(), z.array(note).max(20).nullish(), userImageInputsSchema.optional(), positive.optional(), agentProfileReferenceSchema.optional(), workspace, taskTitleInputSchema.optional()),
   'coordinator.welcomeCoordinator': tuple(bot.optional()),
   'coordinator.stopCoordinatorTurn': tuple(bot.optional()),
   'coordinator.retryCoordinatorTurn': tuple(bot.optional()),
