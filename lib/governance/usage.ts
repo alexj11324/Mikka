@@ -102,6 +102,7 @@ export async function readWorkspaceUsage(workspaceId: string, reader: string | E
       coalesce(sum(u."purchasedMicroUsd"),0)::text as "purchasedMicroUsd"
       from hosted_usage u ${joins}
       where u."workspaceId"=$1 and u."createdAt">=$2 and u."createdAt"<$3 and u.state='settled'
+        and COALESCE(u."billingSource",'credits')='credits'
       group by 1,2,3,4 order by 1,2,3,4 limit 50001`, [workspaceId, from, to])
     if (rows.length > 50000) throw new GovernanceError('invalid_request')
     const { rows: runs } = await tx.query<{ status: string; count: number }>('select status,count(*)::int as count from agent_runs where "workspaceId"=$1 and "createdAt">=$2 and "createdAt"<$3 group by status order by status', [workspaceId, from, to])

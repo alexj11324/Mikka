@@ -79,6 +79,67 @@ test('hosted controls on isolated PostgreSQL', { skip: !url }, async (t) => {
     }
   })
   const store = new HostedUsageStore(pool)
+  await pool.query(readFileSync('drizzle/20261121043334_add_hosted_usage_message_attribution.sql', 'utf8'))
+  await t.test('a scripted LiteLLM BYOK receipt keeps its usage and does not consume the workspace budget', async t => {
+    const { createServer } = await import('node:http')
+    const { drizzle } = await import('drizzle-orm/node-postgres')
+    const { handleModelGateway } = await import('../model-gateway/handler')
+    const { recordExternalModelUsage } = await import('../model-gateway/ledger')
+    const workspaceId = randomUUID(), runId = randomUUID(), threadId = randomUUID()
+    const unknownMessage = 'msg_missing_cost'
+    const server = createServer((_request, response) => {
+      const missingCost = _request.headers.accept === 'application/x-missing-cost'
+      const message = missingCost ? unknownMessage : 'msg_with_cost'
+      response.writeHead(200, { 'content-type': 'application/json', ...(missingCost ? {} : { 'x-litellm-response-cost': '0.025' }) })
+      response.end(JSON.stringify({ type: 'message', id: message, usage: { input_tokens: 11, output_tokens: 7 } }))
+    })
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    t.after(() => { server.closeAllConnections(); server.close() })
+    const address = server.address()
+    assert.ok(address && typeof address !== 'string')
+    await pool.query('INSERT INTO workspace_settings VALUES ($1,11)', [workspaceId])
+    await store.verify(workspaceId, 'cus_byok', `card_${workspaceId}`)
+    await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000)', [workspaceId])
+    for (const accept of ['application/json', 'application/x-missing-cost']) {
+      const answer = await handleModelGateway(new Request('http://fixture.test', { method: 'POST',
+        headers: { 'x-api-key': 'fixture-token', accept }, body: JSON.stringify({ messages: [] }) }), 'anthropic', 'messages', {
+        fetch,
+        verify: async () => ({ runId, ownerId: 'fixture-owner', workspaceId, harness: 'claude_code', model: 'fixture-model', source: { kind: 'api_key', keyId: randomUUID() } }),
+        upstream: async () => ({ upstream: { url: `http://127.0.0.1:${address.port}`, masterKey: 'fixture-key' } }),
+        reserve: async () => assert.fail('BYOK must not reserve credits'),
+        settle: async () => assert.fail('BYOK must not settle credits'),
+        catalogue: async () => assert.fail('BYOK cost is not inferred from list price'),
+        recordExternal: (grant, id, receipt) => recordExternalModelUsage(drizzle(pool), { ...receipt, id, runId: grant.runId, threadId, ownerId: grant.ownerId,
+          workspaceId, model: grant.model, source: 'api_key' }),
+      })
+      assert.equal(answer.status, 200)
+      await answer.json()
+    }
+    assert.deepEqual((await pool.query(`SELECT "usageThreadId","usageMessageId","billingSource","costMicroUsd"::int AS cost,
+      "inputTokens"::int AS input,"outputTokens"::int AS output FROM hosted_usage WHERE "usageRunId"=$1 ORDER BY "usageMessageId"`, [runId])).rows,
+    [{ usageThreadId: threadId, usageMessageId: unknownMessage, billingSource: 'api_key', cost: null, input: 11, output: 7 },
+      { usageThreadId: threadId, usageMessageId: 'msg_with_cost', billingSource: 'api_key', cost: 25_000, input: 11, output: 7 }])
+    assert.equal((await store.balance(workspaceId)).free, 1_000_000)
+    assert.equal((await store.status(workspaceId)).state, 'ready')
+    assert.deepEqual(await store.recent(workspaceId), [])
+  })
+  await t.test('credits attribute an unknown receipt and settle it only once', async () => {
+    const { hostedBillingScope } = await import('./context')
+    const [workspaceId, runId, threadId, call] = Array.from({ length: 4 }, () => randomUUID())
+    await store.verify(workspaceId, 'cus_credits', `card_${workspaceId}`)
+    await pool.query('INSERT INTO hosted_allowances ("workspaceId",remaining) VALUES ($1,1000000)', [workspaceId])
+    await hostedBillingScope.run({ workspaceId, billingAccountWorkspaceId: workspaceId, runId, threadId, billingSource: 'credits' },
+      () => store.reserve(workspaceId, 'fixture-model', call))
+    const receipt = async () => (await pool.query(`SELECT "usageRunId","usageThreadId","usageMessageId","billingSource",state,
+      "costMicroUsd"::int AS cost,"inputTokens"::int AS input FROM hosted_usage WHERE id=$1`, [call])).rows[0]
+    await store.settle(call, null, 11, 7, 'fixture-call', null, 'msg_credits')
+    const attribution = { usageRunId: runId, usageThreadId: threadId, usageMessageId: 'msg_credits', billingSource: 'credits' }
+    assert.deepEqual(await receipt(), { ...attribution, state: 'unknown', cost: null, input: 11 })
+    await store.settle(call, 25_000, 11, 7, 'fixture-call')
+    await store.settle(call, 75_000, 40, 8, 'fixture-call', null, 'different-message')
+    assert.deepEqual(await receipt(), { ...attribution, state: 'settled', cost: 25_000, input: 11 })
+    assert.equal((await store.balance(workspaceId)).free, 975_000)
+  })
   /** `n` messages sent in this workspace's chats (created by `creator`), plus a 重试 and a welcome request that never count. */
   const sent = async (workspaceId: string, n: number, creator = `creator-${workspaceId}`) => {
     await pool.query('INSERT INTO mikka_workspaces VALUES ($1,$2) ON CONFLICT (id) DO NOTHING', [workspaceId, creator])

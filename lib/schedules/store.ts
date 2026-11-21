@@ -361,7 +361,8 @@ export class ScheduleStore {
         const cost=privileged?(await tx.query<{day:string;cost:string}>(`SELECT to_char((u."createdAt" AT TIME ZONE $2)::date,'YYYY-MM-DD') AS day,COALESCE(sum(u."costMicroUsd"),0)::text cost
           FROM (SELECT DISTINCT (result->>'id')::uuid task FROM schedule_occurrences WHERE schedule_id=$1 AND definition#>>'{task,kind}'='dispatch_task' AND result ? 'id') t
           JOIN agent_runs r ON r."issueId"=t.task JOIN hosted_usage u ON u."usageRunId"=r.id
-          WHERE u."createdAt">=(date_trunc('day',now() AT TIME ZONE $2)-($3::int-1)*interval '1 day') AT TIME ZONE $2 GROUP BY 1`,[row.id,zone,days])).rows:[]
+          WHERE COALESCE(u."billingSource",'credits')='credits'
+          AND u."createdAt">=(date_trunc('day',now() AT TIME ZONE $2)-($3::int-1)*interval '1 day') AT TIME ZONE $2 GROUP BY 1`,[row.id,zone,days])).rows:[]
         const spent=new Map(cost.map(item=>[item.day,Number(item.cost)]))
         const byDay=new Map(runs.rows.map(item=>[item.day,item]))
         for(const day of spent.keys())if(!byDay.has(day))byDay.set(day,{day,runs:0,skipped:0,tasks:0})

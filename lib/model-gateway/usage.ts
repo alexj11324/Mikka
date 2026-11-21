@@ -26,7 +26,7 @@ const count = (value: unknown) => typeof value === 'number' && Number.isFinite(v
  * `response.completed`, with cached input inside `input_tokens`. Null when the
  * answer carried no usage at all (an interrupted or failed request).
  */
-export function readGatewayUsage(protocol: GatewayProtocol, body: string): GatewayUsage | null {
+function gatewayEvents(body: string): Record<string, any>[] {
   const events: unknown[] = []
   const trimmed = body.trimStart()
   if (trimmed.startsWith('{')) { try { events.push(JSON.parse(trimmed)) } catch { /* not JSON: no usage */ } }
@@ -36,11 +36,17 @@ export function readGatewayUsage(protocol: GatewayProtocol, body: string): Gatew
     if (!data || data === '[DONE]') continue
     try { events.push(JSON.parse(data)) } catch { /* a partial line: skipped */ }
   }
+  return events.filter((value): value is Record<string, any> => value !== null && typeof value === 'object')
+}
+
+export function readGatewayUsage(protocol: GatewayProtocol, body: string): GatewayUsage | null {
+  return readUsage(protocol, gatewayEvents(body))
+}
+
+function readUsage(protocol: GatewayProtocol, events: Record<string, any>[]): GatewayUsage | null {
   let seen = false
   const usage: GatewayUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }
-  for (const event of events) {
-    if (!event || typeof event !== 'object') continue
-    const value = event as Record<string, any>
+  for (const value of events) {
     if (protocol === 'anthropic') {
       const reported = value.type === 'message_start' ? value.message?.usage : value.type === 'message_delta' ? value.usage : value.type === 'message' ? value.usage : undefined
       if (!reported || typeof reported !== 'object') continue
@@ -60,6 +66,23 @@ export function readGatewayUsage(protocol: GatewayProtocol, body: string): Gatew
     }
   }
   return seen ? usage : null
+}
+
+export function readGatewayReceipt(protocol: GatewayProtocol, body: string) {
+  const events = gatewayEvents(body)
+  let messageId: string | null = null
+  let cost: number | null = null
+  for (const event of events) {
+    const result = protocol === 'anthropic' ? (event.type === 'message_start' ? event.message : event.type === 'message' ? event : null)
+      : event.object === 'response' ? event : event.response
+    const id = result?.id
+    if (!messageId && typeof id === 'string' && /^[\w.-]{1,200}$/.test(id)) messageId = id
+    const dollars = result?.usage?.cost ?? event.usage?.cost
+    if (typeof dollars === 'number' && dollars >= 0 && Number.isSafeInteger(Math.ceil(dollars * 1_000_000))) {
+      cost = Math.ceil(dollars * 1_000_000)
+    }
+  }
+  return { messageId, cost, usage: readUsage(protocol, events) }
 }
 
 /** Anthropic bills a 5-minute cache write at 1.25 times the input price. */

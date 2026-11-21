@@ -52,6 +52,36 @@ test('#438 masking write-then-read-back', { skip: !dbUrl }, async t => {
   // Output writes belong to a claimed live run, including its active lease.
   const newRun = async () => (await pool.query(`insert into agent_runs (id,"agentId","userId","deviceId","workspaceId","deviceTokenId",status,"leaseExpiresAt") values (gen_random_uuid(),$1,$2,$3,$4,$5,'running',now()+interval '10 minutes') returning id`, [agent, admin, device, ws.id, claimTokenId])).rows[0].id as string
   const call = (method: string, path: string, body: unknown) => new Request(`http://localhost${path}`, { method, headers: { authorization: `Bearer ${token}`, 'x-mikka-device-session': '1', 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  await t.test('claimed subscription turns persist once, with no Mikka charge', async () => {
+    const { POST } = await import('../app/v1/runs/[runId]/events/route')
+    const send = async (runId: string, fromSeq: number, chunks: Record<string, unknown>[]) => {
+      const response = await POST(call('POST', `/v1/runs/${runId}/events`, { fromSeq, chunks }), { params: Promise.resolve({ runId }) })
+      assert.equal(response.status, 200)
+    }
+    const [runId, otherRunId] = await Promise.all([newRun(), newRun()])
+    const [connection, binding, messageId, nextMessageId] = Array.from({ length: 4 }, () => randomUUID())
+    await pool.query(`INSERT INTO byos_connections (id,"ownerId","workspaceId",provider,state,epoch,"secretName","secretDigest","providerSubject")
+      VALUES ($1,$2,$3,'codex','connected',1,$4,$5,'fixture')`, [connection, admin, ws.id, `fixture-${connection}`, 'a'.repeat(64)])
+    await pool.query(`INSERT INTO byos_bindings (id,"ownerId","workspaceId","consumerId","connectionId","connectionRevision",route,"modelId")
+      VALUES ($1,$2,$3,$4,$5,1,'codex_cli','gpt-5')`, [binding, admin, ws.id, agent, connection])
+    await pool.query(`INSERT INTO byos_native_runs ("runId","bindingId") VALUES ($1,$2)`, [runId, binding])
+    const usage = (inputTokens: number, outputTokens: number) => ({ type: 'data-usage',
+      data: { inputTokens: 999, outputTokens: 999, turnUsage: { inputTokens, outputTokens },
+        costUsd: 12, billingSource: 'credits', runId: otherRunId, messageId: 'forged-attribution' } })
+    await send(runId, 1, [{ type: 'start', messageId }])
+    const tail = [usage(23, 7), { type: 'start', messageId: nextMessageId }, usage(9, 2)]
+    await send(runId, 2, tail)
+    await send(runId, 2, tail)
+    await send(otherRunId, 2, tail)
+    await send(runId, 5, [{ type: 'data-usage', data: { inputTokens: 999, outputTokens: 999 } }])
+    const { rows } = await pool.query(`SELECT "usageRunId","usageThreadId","usageMessageId",model,"billingSource",
+      "costMicroUsd","freeMicroUsd"::int AS free,"purchasedMicroUsd"::int AS purchased,"holdMicroUsd"::int AS held,
+      "inputTokens"::int AS input,"outputTokens"::int AS output FROM hosted_usage WHERE "usageRunId"=ANY($1::uuid[]) ORDER BY id`, [[runId, otherRunId]])
+    const row = { usageRunId: runId, usageThreadId: runId, model: 'gpt-5', billingSource: 'subscription',
+      costMicroUsd: null, free: 0, purchased: 0, held: 0 }
+    assert.deepEqual(rows, [{ ...row, usageMessageId: messageId, input: 23, output: 7 },
+      { ...row, usageMessageId: nextMessageId, input: 9, output: 2 }])
+  })
   /** The row is committed before Next's `after()` (the wake-up) runs; outside a request it throws. */
   const afterOnly = (error: unknown) => { if (!String((error as Error)?.message).includes('outside a request scope')) throw error }
   const noPlain = (label: string, text: string) => {
