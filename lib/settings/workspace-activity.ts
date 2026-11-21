@@ -12,6 +12,10 @@ import { threadCostsPending, type WorkspaceContributionDay, type WorkspaceSettin
 
 /** Workspace activity is an administrator's aggregate, with task content ACLs
  * still applied. Thread content, task titles and private PR URLs never leave it. */
+function issueMetadata(alias: 'i' | 'v') {
+  return `coalesce(${alias}.content->'attrs'->'mikka',${alias}.content->'attrs'->'orvilo','{}'::jsonb)`
+}
+
 export async function readWorkspaceSettingsActivity(reader: EnterpriseReader, workspaceId: string,
   range: { from?: string | null; to?: string | null }, groupBy: string | null = null): Promise<WorkspaceSettingsActivity> {
   z.uuid().parse(workspaceId)
@@ -26,14 +30,16 @@ export async function readWorkspaceSettingsActivity(reader: EnterpriseReader, wo
       ${runChainSql('r."workspaceId"=$1 AND r."userId"=ANY($2::text[])', '$6')},
       visible_tasks AS (
         SELECT i.id,i."userId" FROM issues i WHERE i."workspaceId"=$1 AND i."ownershipState"='bound'
-          AND coalesce(i.content->'attrs'->'mikka',i.content->'attrs'->'orvilo')->>'deletedAt' IS NULL
+          AND ${issueMetadata('i')}->>'deletedAt' IS NULL
           AND mikka_resource_acl_allowed('account',$5,i."workspaceId",'task',i.id,'canReadContent')
       ), versions AS (
-        SELECT v."issueId",v."userId",v.revision,v.status,v."createdAt" AS at,v.actor_type,v.actor_id,
-          coalesce(v.content->'attrs'->'mikka',v.content->'attrs'->'orvilo','{}'::jsonb) AS metadata,
+        SELECT v."issueId",v."userId",v.revision,v.status,v."createdAt" AS at,v.actor_type,v.actor_id,metadata,
           lag(v.status) OVER w AS previous_status,lag(v.revision) OVER w AS previous_revision,
-          lag(coalesce(v.content->'attrs'->'mikka',v.content->'attrs'->'orvilo','{}'::jsonb)) OVER w AS previous_metadata
+          pulls,lag(pulls) OVER w AS previous_pulls
         FROM issue_versions v JOIN visible_tasks i ON i.id=v."issueId" AND i."userId"=v."userId"
+        CROSS JOIN LATERAL (SELECT ${issueMetadata('v')} AS metadata) m
+        CROSS JOIN LATERAL (SELECT CASE WHEN jsonb_typeof(metadata->'pullRequests')='array'
+          THEN metadata->'pullRequests' ELSE '[]'::jsonb END AS pulls) p
         WINDOW w AS (PARTITION BY v."issueId" ORDER BY v.revision,v.id)
       ), credited AS (
         SELECT *,coalesce(CASE WHEN metadata->'assignee'->>'kind'='member' THEN metadata->'assignee'->>'id' END,
@@ -44,11 +50,9 @@ export async function readWorkspaceSettingsActivity(reader: EnterpriseReader, wo
         FROM credited WHERE status='done' AND previous_status<>'done' AND at>=$3 AND at<$4
       ), pull_events AS (
         SELECT DISTINCT ON (rtrim(pull->>'url','/')) rtrim(pull->>'url','/') AS url,c.at,c.member
-        FROM credited c CROSS JOIN LATERAL jsonb_array_elements(CASE WHEN jsonb_typeof(c.metadata->'pullRequests')='array'
-          THEN c.metadata->'pullRequests' ELSE '[]'::jsonb END) pull
+        FROM credited c CROSS JOIN LATERAL jsonb_array_elements(c.pulls) pull
         WHERE pull->>'state'='merged' AND nullif(pull->>'url','') IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(c.previous_metadata->'pullRequests')='array'
-            THEN c.previous_metadata->'pullRequests' ELSE '[]'::jsonb END) previous
+          AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(c.previous_pulls) previous
             WHERE rtrim(previous->>'url','/')=rtrim(pull->>'url','/') AND previous->>'state'='merged')
         ORDER BY rtrim(pull->>'url','/'),c.at,c."issueId"
       ), events AS (

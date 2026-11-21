@@ -901,15 +901,6 @@
       "sourceHash": "7aabc8355a4c6c7b13e2bd3f11c1a8a28ebfe9481ce445f496597b56bc9a28be"
     },
     {
-      "path": "/mikka/api/devices/[deviceId]/checkpoints",
-      "template": "/api/devices/[deviceId]/checkpoints",
-      "source": "app/api/devices/[deviceId]/checkpoints/route.ts",
-      "methods": [
-        "GET"
-      ],
-      "sourceHash": "81a44fb39c94d851d6805accaa6fe9f433b762b4e4f615771b3c77c0c5594ce7"
-    },
-    {
       "path": "/mikka/api/devices/[deviceId]/commands",
       "template": "/api/devices/[deviceId]/commands",
       "source": "app/api/devices/[deviceId]/commands/route.ts",
@@ -927,15 +918,6 @@
         "GET"
       ],
       "sourceHash": "dad67c5802c32965a89813015101b118a4f04bf464f49a49e341314098d55c03"
-    },
-    {
-      "path": "/mikka/api/devices/[deviceId]/migrations",
-      "template": "/api/devices/[deviceId]/migrations",
-      "source": "app/api/devices/[deviceId]/migrations/route.ts",
-      "methods": [
-        "POST"
-      ],
-      "sourceHash": "4ab25dd9ad8339ddda127eac2fe7798bf3b2f3ec4caa3d744fd2e6b69765fba3"
     },
     {
       "path": "/mikka/api/drive/scopes",

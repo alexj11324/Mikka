@@ -11,11 +11,9 @@ mock.module('@/lib/auth', { namedExports: { auth: { api: { getSession: async () 
 } : null } } } })
 
 test('settings device and contribution HTTP reads preserve owner, tenant and role boundaries on PG17', { skip: !dbUrl }, async t => {
-  const [{ pool }, { workspacePool }, detail, checkpoints, migrations, activity] = await Promise.all([
+  const [{ pool }, { workspacePool }, detail, activity] = await Promise.all([
     import('../lib/db'), import('../lib/workspace-db'),
     import('../app/api/devices/[deviceId]/detail/route'),
-    import('../app/api/devices/[deviceId]/checkpoints/route'),
-    import('../app/api/devices/[deviceId]/migrations/route'),
     import('../app/api/workspaces/[workspaceId]/activity/route'),
   ])
   pool.options.max = 1
@@ -42,10 +40,10 @@ test('settings device and contribution HTTP reads preserve owner, tenant and rol
   const workspace = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }, { userId: member, role: 'member' }])
   const foreign = await seedWorkspace(pool, outsider, [{ userId: outsider, role: 'admin' }])
   fixtureWorkspaces.push(workspace.id, foreign.id)
-  const source = randomUUID(), target = randomUUID(), otherDevice = randomUUID()
+  const source = randomUUID()
   await pool.query(`INSERT INTO devices(id,"ownerId",name,hostname,platform,arch,"maxConcurrentRuns","sessionOpenedAt")
-    VALUES($1,$4,'Source','owner-host','linux','x64',3,now()),($2,$4,'Target',null,null,null,3,null),($3,$5,'Other',null,null,null,3,null)`,
-  [source, target, otherDevice, owner, member])
+    VALUES($1,$2,'Source','owner-host','linux','x64',3,now())`,
+  [source, owner])
   const agent = await seedAgent(pool, owner)
   const issue = await seedIssue(pool, owner, workspace.id, { registered: true })
   const run = await seedRun(pool, { userId: owner, agentId: agent, workspaceId: workspace.id, issueId: issue, status: 'running' })
@@ -77,19 +75,12 @@ test('settings device and contribution HTTP reads preserve owner, tenant and rol
   const deviceRequest = (action: string, workspaceId = workspace.id) => new Request(`https://mikka.test/api/devices/${source}/${action}?workspaceId=${workspaceId}`)
   const readActivity = (query = '?from=2026-11-19&to=2026-11-19', workspaceId = workspace.id) => activity.GET(
     new Request(`https://mikka.test/api/workspaces/${workspaceId}/activity${query}`), { params: Promise.resolve({ workspaceId }) })
-  const migrate = (targetDeviceId = target, origin = 'https://mikka.test') => migrations.POST(new Request(`https://mikka.test/api/devices/${source}/migrations`, {
-    method: 'POST', headers: { origin, 'content-type': 'application/json' },
-    body: JSON.stringify({ workspaceId: workspace.id, runId: run, targetDeviceId }),
-  }), deviceContext())
-
   await t.test('missing session and nonowners cannot read device details or checkpoints', async () => {
     for (const id of [null, member, outsider]) {
       principal = id ? { id } : null
-      for (const route of [detail.GET, checkpoints.GET]) {
-        const response = await route(deviceRequest('detail'), deviceContext())
-        assert.equal(response.status, id === member ? 404 : 403)
-        assert.ok(!(await response.text()).includes('owner-host'))
-      }
+      const response = await detail.GET(deviceRequest('detail'), deviceContext())
+      assert.equal(response.status, id === member ? 404 : 403)
+      assert.ok(!(await response.text()).includes('owner-host'))
     }
     principal = { id: owner }
     assert.equal((await detail.GET(deviceRequest('detail', foreign.id), deviceContext())).status, 403)
@@ -110,13 +101,8 @@ test('settings device and contribution HTTP reads preserve owner, tenant and rol
       capturedAt: '2026-11-19T13:00:00.000Z', available: true, unavailableReason: null }])
     assert.deepEqual(value.cloudCheckpoints, [{ runId: run, state: 'ready', capturedAt: '2026-11-19T13:00:00.000Z', available: true }])
     assert.equal(value.migration.available, false)
+    assert.equal(value.migration.reason, 'machine_migration_not_supported')
     for (const secret of ['private-checkpoint-patch', 'private-template-id', 'private-snapshot-id']) assert.ok(!JSON.stringify(value).includes(secret))
-    const checkpointResponse = await checkpoints.GET(deviceRequest('checkpoints'), deviceContext())
-    assert.equal(checkpointResponse.status, 200)
-    const checkpointPage = await checkpointResponse.json()
-    assert.equal(checkpointPage.repository[0].runId, run)
-    assert.equal(checkpointPage.cloud[0].available, true)
-    assert.ok(!('hardware' in checkpointPage))
     await pool.query(`UPDATE workspace_projects SET "archivedAt"=now() WHERE id=$1`, [directory])
     await pool.query(`UPDATE devices SET "sessionClosedAt"=now() WHERE id=$1`, [source])
     const offline = await (await detail.GET(deviceRequest('detail'), deviceContext())).json()
@@ -125,33 +111,14 @@ test('settings device and contribution HTTP reads preserve owner, tenant and rol
     assert.deepEqual(offline.directories, [])
   })
 
-  await t.test('migration entry refuses cross-origin and nonowned endpoints and reports blocked without a fake task', async () => {
-    principal = { id: owner }
-    assert.equal((await migrate(target, 'https://untrusted.invalid')).status, 403)
-    assert.equal((await migrate(otherDevice)).status, 404)
-    assert.equal((await migrate(source)).status, 400)
-    principal = { id: member }
-    assert.equal((await migrate()).status, 404)
-    principal = { id: outsider }
-    assert.equal((await migrate()).status, 403)
-    principal = { id: owner }
-    const response = await migrate()
-    assert.equal(response.status, 409)
-    const value = await response.json()
-    assert.equal(value.state, 'blocked')
-    assert.equal(value.taskId, null)
-    assert.equal(value.capability.reason, 'machine_migration_not_supported')
-    assert.equal((await pool.query('SELECT "deviceId" FROM agent_runs WHERE id=$1', [run])).rows[0].deviceId, source)
-  })
-
   await t.test('calendar counts transitions once and groups retry attempts under the thread root', async () => {
-    const metadata = (state: string) => JSON.stringify({ type: 'doc', attrs: { mikka: { assignee: { kind: 'member', id: member, name: 'Member', image: null },
-      pullRequests: [{ url: 'https://github.com/example/repo/pull/1', state }] } } })
+    const metadata = (state: string, key: string) => JSON.stringify({ type: 'doc', attrs: { [key]: { assignee: { kind: 'member', id: member, name: 'Member', image: null },
+      pullRequests: state === 'open' ? {} : [{ url: 'https://github.com/example/repo/pull/1', state }] } } })
     for (const [revision, status, prState, at] of [[1, 'todo', 'open', '2026-11-18T12:00:00Z'],
       [2, 'done', 'merged', '2026-11-19T14:00:00Z'], [3, 'done', 'merged', '2026-11-19T15:00:00Z']] as const) {
       await pool.query(`INSERT INTO issue_versions(id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id,"createdAt")
         VALUES($1,$2,$3,$4,'Fixture',$5::jsonb,$6,'normal','user',$7,$8)`,
-      [randomUUID(), issue, owner, revision, metadata(prState), status, owner, at])
+      [randomUUID(), issue, owner, revision, metadata(prState, revision < 3 ? 'orvilo' : 'mikka'), status, owner, at])
     }
     principal = { id: owner }
     const response = await readActivity()
@@ -169,14 +136,13 @@ test('settings device and contribution HTTP reads preserve owner, tenant and rol
     assert.equal((await readActivity('?groupBy=invalid')).status, 400)
   })
 
-  await t.test('revoked task access also removes checkpoint metadata and migration admission for the original run owner', async () => {
+  await t.test('revoked task access also removes checkpoint metadata for the original run owner', async () => {
     principal = { id: owner }
     await pool.query(`UPDATE resource_access_policies SET "ownerId"=$2,visibility='private' WHERE kind='task' AND id=$1`, [issue, member])
     try {
       const value = await (await detail.GET(deviceRequest('detail'), deviceContext())).json()
       assert.deepEqual(value.checkpoints, [])
       assert.deepEqual(value.cloudCheckpoints, [])
-      assert.equal((await migrate()).status, 404)
     } finally {
       await pool.query('UPDATE resource_access_policies SET "ownerId"=$2 WHERE kind=\'task\' AND id=$1', [issue, owner])
     }

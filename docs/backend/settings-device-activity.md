@@ -24,25 +24,18 @@ selected Workspace, device owner and current content ACL. Their
 `environmentIds` come from actual `workspace_project_environments` bindings.
 An existing Project identifier is never relabelled as an Environment identifier.
 
-`GET /api/devices/:deviceId/checkpoints?workspaceId=WORKSPACE_ID` returns the
-same persisted repository and cloud checkpoint projections without the rest of
-the detail. Both lists contain at most 100 entries, newest first. Repository
+The device detail returns both repository and cloud checkpoint lists. Each
+contains at most 100 entries, newest first. Repository
 entries expose the base commit, file count, capture time and recorded
 availability. Cloud entries expose `snapshotState`, capture time and whether a
 ready filesystem snapshot exists. Template identifiers, provider snapshot IDs,
 checkpoint patches and credentials are not returned.
 
-## Migration entry and its constraint
+## Migration capability
 
-`POST /api/devices/:deviceId/migrations` accepts
-`{ workspaceId, runId, targetDeviceId }`. The route validates same-origin
-mutation authority, current membership, ownership of both devices, and the
-run's source device and immutable Workspace.
-
-The returned status is **409**, with `state: "blocked"`, `taskId: null`, and
-`capability.reason: "machine_migration_not_supported"`. No migration job is
-created, and the run remains on its original device. This is an explicit
-capability gap, not a successful or queued migration.
+Device detail reports `migration.available: false` and
+`migration.reason: "machine_migration_not_supported"`. No migration mutation
+is exposed.
 
 The existing recovery paths can restore a repository checkpoint or recreate
 the same task's provider machine from its own filesystem snapshot. They do

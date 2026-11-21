@@ -57,16 +57,6 @@ export interface DeviceMigrationCapability {
   excludes: ['process_memory', 'native_session', 'ignored_files', 'credentials']
 }
 
-export interface DeviceMigrationInspection {
-  workspaceId: string
-  sourceDeviceId: string
-  targetDeviceId: string
-  runId: string
-  taskId: null
-  state: 'blocked'
-  capability: DeviceMigrationCapability
-}
-
 export interface WorkspaceContributionDay {
   day: string
   memberId: string

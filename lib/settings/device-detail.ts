@@ -7,12 +7,11 @@ import { writeTransaction } from '@/lib/operations/write-transaction'
 import { deviceIsOnline } from '@/lib/device-presence'
 import { GovernanceError } from '@/lib/governance/errors'
 import type { EnterpriseReader } from '@/lib/enterprise/principal'
-import type { DeviceMigrationCapability, DeviceMigrationInspection, DeviceSettingsDetail } from './device-activity-contract'
+import type { DeviceMigrationCapability, DeviceSettingsDetail } from './device-activity-contract'
 
 const scope = z.object({ workspaceId: z.uuid(), deviceId: z.uuid() }).strict()
-export const deviceMigrationInput = z.object({ workspaceId: z.uuid(), runId: z.uuid(), targetDeviceId: z.uuid() }).strict()
 
-export const deviceMigrationCapability: DeviceMigrationCapability = {
+const deviceMigrationCapability: DeviceMigrationCapability = {
   available: false,
   reason: 'machine_migration_not_supported',
   preserves: ['repository_checkpoint'],
@@ -82,24 +81,5 @@ export async function readDeviceSettingsDetail(reader: EnterpriseReader, input: 
         capturedAt: row.snapshotTakenAt?.toISOString() ?? null, available: row.available })),
       migration: deviceMigrationCapability,
     }
-  }))
-}
-
-/** Validate the task entry without claiming a machine migration was enqueued.
- * The existing recovery writer restores a repository or the same task's own
- * provider snapshot; it does not transfer a live machine to another device. */
-export async function inspectDeviceMigration(reader: EnterpriseReader, deviceId: string, input: unknown): Promise<DeviceMigrationInspection> {
-  const value = deviceMigrationInput.parse(input)
-  scope.parse({ workspaceId: value.workspaceId, deviceId })
-  if (deviceId === value.targetDeviceId) throw new GovernanceError('invalid_request')
-  return withTaskWorkspace(reader, value.workspaceId, () => writeTransaction(pool, async tx => {
-    const { rows } = await tx.query(`SELECT id FROM devices WHERE id=ANY($1::uuid[]) AND "ownerId"=$2 AND "removedAt" IS NULL FOR SHARE`, [[deviceId, value.targetDeviceId], reader.id])
-    if (rows.length !== 2) throw new GovernanceError('not_found')
-    const run = await tx.query(`SELECT id FROM agent_runs WHERE id=$1 AND "userId"=$2 AND "workspaceId"=$3 AND "deviceId"=$4
-      AND ("issueId" IS NULL OR mikka_resource_acl_allowed('account',$2,"workspaceId",'task',"issueId",'canReadContent')) FOR SHARE`,
-      [value.runId, reader.id, value.workspaceId, deviceId])
-    if (!run.rowCount) throw new GovernanceError('not_found')
-    return { workspaceId: value.workspaceId, sourceDeviceId: deviceId, targetDeviceId: value.targetDeviceId,
-      runId: value.runId, taskId: null, state: 'blocked' as const, capability: deviceMigrationCapability }
   }))
 }
