@@ -24,8 +24,17 @@ export async function startLocalCloudImage({ release, ca, env = {}, root = resol
   const sdkRequire = createRequire(require.resolve('@anthropic-ai/claude-agent-sdk'))
   const binary = await realpath(join(dirname(sdkRequire.resolve('@anthropic-ai/claude-agent-sdk-linux-x64/package.json')), 'claude'))
   const binaryHash = createHash('sha256').update(await readFile(binary)).digest('hex')
+  const packageDir = async name => {
+    // exports maps can hide ./package.json; walk up from the resolved entry instead.
+    let dir = dirname(await realpath(require.resolve(name)))
+    while (dir !== dirname(dir)) {
+      try { if (JSON.parse(await readFile(join(dir, 'package.json'), 'utf8')).name === name) return dir } catch {}
+      dir = dirname(dir)
+    }
+    throw Error(`cannot locate ${name}`)
+  }
   const modules = await Promise.all(['pino', '@anthropic-ai/claude-agent-sdk'].map(async name => {
-    const source = await realpath(dirname(require.resolve(`${name}/package.json`))), path = relative(dependencyRoot, source)
+    const source = await packageDir(name), path = relative(dependencyRoot, source)
     assert.ok(path && !path.startsWith('..'), 'LOCAL_CLOUD_DEPENDENCY_OUTSIDE_INSTALL')
     return { name, target: `/mikka-dependencies/${path}` }
   }))
