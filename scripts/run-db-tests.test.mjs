@@ -478,6 +478,8 @@ test('force-exit node tests run with blocking stdio so the TAP summary is flushe
   assert.deepEqual(plain, ['pnpm', ['-s', 'test:plain']])
   const quoted = launch('test:quoted', 'node --test-force-exit "tests/odd name.db.test.mjs"')
   assert.deepEqual(quoted, ['pnpm', ['-s', 'test:quoted']])
+  const chained = launch('test:chained', 'node --test-force-exit --test a.test.mjs && node --experimental-test-module-mocks --test b.test.mjs')
+  assert.deepEqual(chained, ['pnpm', ['-s', 'test:chained']])
   const [bin, args] = launch('test:workspace-admin-db', 'node --test-force-exit --import tsx --test tests/one.db.test.mjs')
   assert.equal(bin, process.execPath)
   assert.equal(args[0], '--import')

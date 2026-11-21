@@ -506,11 +506,11 @@ export function runScript(command, args, options) {
 
 const blockingStdio = fileURLToPath(new URL('./ci/blocking-stdio.mjs', import.meta.url))
 
-// Force-exit can return before libc/libuv flushes the TAP summary. Run those
-// node --test commands on a blocking stdio handle so the summary is in the pipe
-// before the process ends.
+// Force-exit can return before libc/libuv flushes the TAP summary. A single
+// node --test command gets a blocking stdio handle so the summary is in the
+// pipe before exit. Shell chains stay on pnpm so each command keeps its flags.
 export function launch(script, command) {
-  if (typeof command === 'string' && command.startsWith('node ') && command.includes('--test-force-exit') && !/['"\\]/.test(command)) {
+  if (typeof command === 'string' && command.startsWith('node ') && command.includes('--test-force-exit') && !/['"\\&|;]/.test(command)) {
     return [process.execPath, ['--import', blockingStdio, ...command.slice(5).trim().split(/\s+/)]]
   }
   return ['pnpm', ['-s', script]]
