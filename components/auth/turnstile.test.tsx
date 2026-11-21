@@ -68,7 +68,7 @@ test('signup blocks missing/expired tokens and recovers from refusal with retain
   } })
   const { createRoot } = await import('react-dom/client')
   const { AuthForm } = await import('../auth-form')
-  const container = document.createElement('div')
+  const container = browser.document.createElement('div') as unknown as HTMLElement
   document.body.append(container)
   const root = createRoot(container)
   const dispatchSubmit = () => container.querySelector('form')!.dispatchEvent(new browser.Event('submit', { bubbles: true, cancelable: true }) as unknown as Event)
