@@ -435,6 +435,7 @@
     "passwordPlaceholder": "At least 8 characters",
     "submitCreate": "Create account and continue",
     "submitSignIn": "Sign in to the workspace",
+    "turnstilePending": "Verifying you're human…",
     "oauthFailed": "OAuth sign-in did not finish. It may have been canceled or expired.",
     "googleAccountNotLinked": "This Google account is not linked to Mikka. Sign in with your existing method, then link Google in Settings → Account.",
     "githubAccountNotLinked": "This GitHub account is not linked to Mikka. Sign in with the method already linked to your account, or create a Mikka account first.",
@@ -1052,6 +1053,7 @@
         "start": "3 Start",
         "startAlone": "Start"
       },
+      "downloadDesktop": "Download Mikka Desktop",
       "requirements": "Node.js 24+ · Git",
       "configurationFailed": "Installation commands are unavailable",
       "reconnectTitle": "Reconnect"
@@ -4265,7 +4267,8 @@
         "ownProvider": "Runs on this server's own provider",
         "usedUntil": "{service} subscription is used up until {time}",
         "usedUp": "{service} subscription is used up"
-      }
+      },
+      "noModelSetUp": "no model set up"
     },
     "empty": "Tell {name} what you need",
     "events": {

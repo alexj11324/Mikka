@@ -35,6 +35,10 @@ type SignInCardProps = {
   onGitHubSignIn: () => Promise<void>
   /** Sign-up's Turnstile widget; renders nothing without a site key. */
   turnstile?: ReactNode
+  /** Extra submit block beyond `pending`, e.g. human verification still running (#3015). */
+  submitDisabled?: boolean
+  /** Hint shown while `submitDisabled` holds the submit button. */
+  submitHint?: string
   /** Company SSO entry from a UI layer (slot auth-sso); nothing in the open-source UI. */
   sso?: ReactNode
 }
@@ -47,7 +51,7 @@ const FIELD = 'h-11 sm:h-10'
 const FIELD_ORDER: FieldName[] = ['name', 'email', 'password']
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', authQuery, onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile, sso }: SignInCardProps) {
+export function SignInCard({ registering, addAccount = false, pending, googleEnabled, githubEnabled, emailEnabled = true, showGoogleLinkHint, error, unverified = false, notice, next = '/', authQuery, onSubmit, onGoogleSignIn, onGitHubSignIn, turnstile, submitDisabled = false, submitHint, sso }: SignInCardProps) {
   const t = useTranslations('Auth')
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const oauthEnabled = googleEnabled || githubEnabled
@@ -161,10 +165,11 @@ export function SignInCard({ registering, addAccount = false, pending, googleEna
             </Field>
           </FieldGroup>
           {turnstile}
-          <Button type="submit" className={cn('w-full', FIELD)} disabled={pending}>
+          <Button type="submit" className={cn('w-full', FIELD)} disabled={pending || submitDisabled}>
             {registering ? t('submitCreate') : t('submitSignIn')}
-            {pending ? <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-end" /> : <ArrowRight aria-hidden="true" data-icon="inline-end" />}
+            {pending || submitDisabled ? <LoaderCircle aria-hidden="true" className="animate-spin" data-icon="inline-end" /> : <ArrowRight aria-hidden="true" data-icon="inline-end" />}
           </Button>
+          {submitDisabled && submitHint && <p className="text-muted-foreground text-center text-xs">{submitHint}</p>}
         </form>
         </> : error && <p id="auth-error" role="alert" className="text-destructive-foreground text-sm">{error}</p>}
         {/* The one sign-in / sign-up switch; the page header no longer repeats it (R-32). */}
