@@ -1,5 +1,6 @@
 import { readFile, writeFile, rename } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { ARTIFACT_CLEANUP_SQL } from '../../lib/subscription-cleanup-sql.mjs'
 
 import { requestOutcomes, WINDOW_MS } from './request-outcomes.mjs'
 export { requestOutcomes, WINDOW_MS } from './request-outcomes.mjs'
@@ -62,8 +63,8 @@ export async function databaseSignals(pool, now = new Date()) {
       (SELECT count(*)::int FROM agent_runs WHERE status IN ('preparing','running','finishing') AND "leaseExpiresAt" < $1::timestamptz-interval '2 minutes') AS "expiredRunLease",
       (SELECT count(*)::int FROM operation_ledger WHERE status='uncertain') AS "uncertainEffect",
       (SELECT count(*)::int FROM operation_ledger WHERE status='executing' AND "updatedAt" < $1::timestamptz-interval '5 minutes') AS "staleEffect",
-      (SELECT count(*)::int FROM byos_secret_artifacts a WHERE a."deletedAt" IS NULL AND a."notBefore" < $1::timestamptz-interval '5 minutes'
-        AND NOT EXISTS (SELECT 1 FROM byos_connections c WHERE a.name IN (c."secretName",c."accessSecretName",c."stagedSecretName",c."stagedAccessName"))) AS "overdueSecretCleanup",
+      (SELECT count(*)::int ${ARTIFACT_CLEANUP_SQL}
+        AND (a."publishedAt" < $1::timestamptz-interval '5 minutes' OR a."notBefore" < $1::timestamptz-interval '5 minutes')) AS "overdueSecretCleanup",
       (SELECT count(*)::int FROM schedule_occurrences WHERE due_at >= $1::timestamptz-interval '15 minutes' AND due_at <= $1::timestamptz-interval '2 minutes' AND execution_decision='execute') AS "dueTotal",
       (SELECT count(*)::int FROM schedule_occurrences WHERE due_at >= $1::timestamptz-interval '15 minutes' AND due_at <= $1::timestamptz-interval '2 minutes' AND execution_decision='execute' AND status='succeeded' AND finished_at <= due_at+interval '2 minutes') AS "dueSuccessful",
       (SELECT count(*)::int FROM agent_runs WHERE "createdAt" >= $1::timestamptz-interval '15 minutes' AND "createdAt" <= $1::timestamptz-interval '2 minutes') AS "dispatchTotal",
