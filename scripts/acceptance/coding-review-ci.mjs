@@ -4,7 +4,8 @@
  */
 import { resolve } from 'node:path'
 import { attestAcceptance, assertArtifactIdentity, downloadReleaseReport, releasePins } from './task-secrets-ci.mjs'
-import { assertReleaseIdentity, selectRelease, REPOSITORY } from './thread-lifecycle-ci.mjs'
+import { assertReleaseIdentity, selectRelease } from './thread-lifecycle-ci.mjs'
+import { actionsMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 const SHA = /^[a-f0-9]{40}$/
 const positive = value => typeof value === 'string' && /^[1-9][0-9]*$/.test(value) && Number.isSafeInteger(Number(value))
@@ -12,7 +13,7 @@ const check = value => { if (!value) throw Error('workspace_review_guard_refused
 
 export function readWorkspaceReviewOptions(args, env = process.env) {
   check(args.length === 1 && ['--execute', '--cleanup'].includes(args[0]))
-  check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === REPOSITORY && env.GITHUB_REF === 'refs/heads/main'
+  check(env.GITHUB_ACTIONS === 'true' && actionsMikkaRepository(env) && env.GITHUB_REF === 'refs/heads/main'
     && env.GITHUB_EVENT_NAME === 'workflow_dispatch' && env.ACCEPTANCE_MODE === 'workspace-review'
     && env.TASK_SECRETS_MODEL_CASE === 'all' && env.PRODUCTION_CANARY === 'false'
     && env.FACTORY_ACCEPTANCE_REQUESTED === 'false' && !env.TASK_SECRETS_WINDOW
@@ -38,7 +39,7 @@ export async function attestCodingWorkspace(env = process.env, { fetchImpl = fet
   const application = await attest(env, { fetchImpl })
   check(application?.sourceCommit === options.sourceCommit && application.publicBuild === options.sourceCommit)
   const read = async path => {
-    const response = await fetchImpl(`https://api.github.com/repos/${REPOSITORY}${path}`, {
+    const response = await fetchImpl(`https://api.github.com/repositories/${publicRepositoryId}${path}`, {
       headers: { accept: 'application/vnd.github+json', authorization: 'Bearer ' + env.GITHUB_TOKEN,
         'x-github-api-version': '2022-11-28' }, redirect: 'error', signal: AbortSignal.timeout(20000) })
     check(response.ok); return response.json()
@@ -47,7 +48,9 @@ export async function attestCodingWorkspace(env = process.env, { fetchImpl = fet
     read('/actions/workflows/e2b-official-runtime.yml'), read(`/actions/runs/${options.releaseRunId}`),
   ])
   const expected = { sourceCommit: options.workerSourceCommit, runId: options.releaseRunId,
-    runAttempt: options.releaseRunAttempt, workflowId: workflow.id, event: run.event }
+    runAttempt: options.releaseRunAttempt, workflowId: workflow.id, event: run.event,
+    repositoryFullName: actionsMikkaRepository(env), repositoryId: Number(publicRepositoryId),
+    repositoryOwnerId: env.GITHUB_REPOSITORY_OWNER_ID }
   assertReleaseIdentity(expected, workflow, run)
   const jobs = await read(`/actions/runs/${expected.runId}/attempts/${expected.runAttempt}/jobs?per_page=100`)
   const selection = selectRelease(expected, jobs, [])

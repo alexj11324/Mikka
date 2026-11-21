@@ -3,6 +3,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { chmod, lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
+import { actionsMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i
 const SHA = /^[a-f0-9]{40}$/, DIGEST = /^[a-f0-9]{64}$/
@@ -16,12 +17,12 @@ export const SECRET_BUDGET = Object.freeze({ jobMs: 35 * 60_000, stepMs: 24 * 60
  * actions:read token suffices; a partial page or unknown job never starts work.
  */
 export async function readSecretJobStart(env, { fetchImpl = fetch, now = Date.now, expectedJob = 'acceptance' } = {}) {
-  const repo = 'alexj11324/Mikka', runId = Number(env.GITHUB_RUN_ID), attempt = Number(env.GITHUB_RUN_ATTEMPT)
-  check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === repo && env.GITHUB_REF === 'refs/heads/main'
+  const runId = Number(env.GITHUB_RUN_ID), attempt = Number(env.GITHUB_RUN_ATTEMPT)
+  check(env.GITHUB_ACTIONS === 'true' && actionsMikkaRepository(env) && env.GITHUB_REF === 'refs/heads/main'
     && ['acceptance', 'factory'].includes(expectedJob) && env.GITHUB_JOB === expectedJob
     && positive(runId) && positive(attempt) && env.GITHUB_TOKEN
     && SHA.test(env.GITHUB_SHA ?? '') && env.APPLICATION_SHA === env.GITHUB_SHA, 'budget')
-  const response = await fetchImpl(`https://api.github.com/repos/${repo}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`, {
+  const response = await fetchImpl(`https://api.github.com/repositories/${publicRepositoryId}/actions/runs/${runId}/attempts/${attempt}/jobs?per_page=100`, {
     headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${env.GITHUB_TOKEN}`,
       'x-github-api-version': '2022-11-28' }, redirect: 'error', signal: AbortSignal.timeout(15_000),
   })

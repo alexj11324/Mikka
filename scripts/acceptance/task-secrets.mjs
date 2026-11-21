@@ -20,6 +20,7 @@ import { assertDriverAttestation, attestAcceptance } from './task-secrets-ci.mjs
 import { canaryWindow, createProductionCanary } from './task-secrets-production-canary.mjs'
 import { createSecretBudget, createSecretEvidenceStore, secretJournal, secretMutation, writeSecretCheckpoint } from './task-secrets-journal.mjs'
 import { cleanupTaskSecrets } from './task-secrets-cleanup.mjs'
+import { actionsMikkaRepository } from '../cloudflare-source.mjs'
 
 export const ORIGIN = 'https://app.aspectlylabs.com'
 export const REPOSITORY = 'alexj11324/Mikka-handoff'
@@ -56,7 +57,7 @@ export function readOptions(args = [], env = process.env, releaseAttestation) {
   check(args.every(item => ['--execute', '--production-canary', '--cleanup'].includes(item)) && new Set(args).size === args.length, 'configuration')
   const cleanupOnly = args.includes('--cleanup')
   check(!cleanupOnly || args.length === 1, 'configuration')
-  check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === 'alexj11324/Mikka' && ['workflow_dispatch', 'workflow_run'].includes(env.GITHUB_EVENT_NAME)
+  check(env.GITHUB_ACTIONS === 'true' && actionsMikkaRepository(env) && ['workflow_dispatch', 'workflow_run'].includes(env.GITHUB_EVENT_NAME)
     && env.GITHUB_REF === 'refs/heads/main', 'main_workflow_required')
   if (env.GITHUB_EVENT_NAME === 'workflow_run' && !cleanupOnly) assertDriverAttestation(env, releaseAttestation)
   const sourceCommit = env.APPLICATION_SHA

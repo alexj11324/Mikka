@@ -1,0 +1,593 @@
+{
+  "schemaVersion": 1,
+  "issue": 2984,
+  "pr": 3000,
+  "scope": [
+    "B",
+    "F"
+  ],
+  "base": "ee36d52f3ee391ddd529f1135ff86fa8f55bd99d",
+  "regressionCheckpoint": "d86dade94a7977c14e073820dc8c98e22d27f475",
+  "sourceBlobs": {
+    "before": "caf1450463e6293c82ef9c012808b0edfaf00183",
+    "initialRepairAt46cc": "a230dbc02dd3882799690f185163fe32db4bf374",
+    "initialNodeRegressionAt46cc": "f77fd0c802315eab6b74f743b06a8c29edd9b2d9",
+    "artifactReaderBeforeIntegration": "a55edb760f77913f12595e476e55b9f47645f35c",
+    "reportIdentity": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f",
+    "integratedImplementation": {
+      "scripts/e2b/runtime-inputs.mjs": "fd3f919d955f547db24f175a4bfdae8057a49a95",
+      "scripts/e2b/runtime-inputs.test.mjs": "2cd378b4161da15993ff0fa0408c1ea906f434eb",
+      "scripts/acceptance/task-secrets-ci.mjs": "f5e11abae81d4409ccb7f16c875ce640e4dee0ae",
+      "scripts/acceptance/task-secrets-ci.test.mjs": "9d46d4a1263095c75419dbc46d7ffb61cf6ad6da",
+      "scripts/acceptance/coding-review-ci.mjs": "3df22561dea3e818222aa501a6fa5dd0ad30404b",
+      "scripts/acceptance/coding-review-ci.test.mjs": "0834c0a27a9cdc060dfe5f461a9714c7920a4f71",
+      "scripts/acceptance/factory-visual-evidence.mjs": "09c9a4cc89d05d01b115e982e4490464616553c6"
+    }
+  },
+  "problem": "The history reader ignores the official templates publication job and treats the workflow head as the published worker source, even though a later main dispatch can publish an earlier served source.",
+  "existingPublication": {
+    "runUrl": "https://github.com/alexj11324/Mikka/actions/runs/44140435060/attempts/1",
+    "runId": 44140435060,
+    "attempt": 1,
+    "workflowPath": ".github/workflows/e2b-official-runtime.yml",
+    "event": "workflow_dispatch",
+    "status": "completed",
+    "conclusion": "success",
+    "workflowHead": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+    "jobsInExactAttempt": 9,
+    "publicationJob": {
+      "id": 134248391647,
+      "name": "release / templates",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Make only fully accepted candidates public",
+          "conclusion": "success",
+          "startedAt": "2026-11-17T17:56:57Z",
+          "completedAt": "2026-11-17T17:56:57Z"
+        },
+        {
+          "name": "Preserve the complete public release report",
+          "conclusion": "success",
+          "startedAt": "2026-11-17T17:56:57Z",
+          "completedAt": "2026-11-17T17:56:59Z"
+        }
+      ]
+    },
+    "sourceBindingFromOriginalJobLog": {
+      "at": "2026-11-17T17:56:43.765985Z",
+      "event": "runtime_report_verified",
+      "sourceCommit": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "workerSha": "3c001413e47063cc68108c84938c697f4cf18357",
+      "candidateReportSha256": "c5f9c6ca054b3e0a599e84f59df412c777b88579a465c5fd3a39eff8d14fb914",
+      "qualification": "This is the candidate verifier's actual log; the same source and worker bindings appear in the subsequent successful publication step. It is not a claim that this reviewer parsed the original release ZIP."
+    },
+    "artifact": {
+      "id": 14354323589,
+      "name": "e2b-release-evidence-44140435060-1",
+      "sizeBytes": 46376,
+      "archiveDigestReportedByGitHub": "sha256:eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429",
+      "expiredAtRead": false,
+      "expiresAt": "2026-11-24T17:56:58Z",
+      "archiveBytesIndependentlyVerified": true,
+      "initialCheckpointArchiveBytesIndependentlyVerified": false,
+      "archiveVerificationObservedAt": "2026-11-20T23:53:41.161Z"
+    },
+    "sampleDenominator": 1,
+    "qualification": "Existing historical publication only. No new E2B build, deployment, sandbox or real model execution was triggered for this evidence.",
+    "laterReadOnlyArchiveVerification": {
+      "schema": "mikka-2984-independent-real-published-artifact-v1",
+      "started_at": "2026-11-20T23:53:41.114Z",
+      "completed_at": "2026-11-20T23:53:41.161Z",
+      "parser_checkout": "d86dade94a7977c14e073820dc8c98e22d27f475",
+      "archive_parser_blob": "a55edb760f77913f12595e476e55b9f47645f35c",
+      "report_parser_blob": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f",
+      "node": "v24.22.3",
+      "python": "Python 3.12.14",
+      "repository_id": 1427517699,
+      "repository_full_name": "aspectly-labs/Mikka",
+      "run_id": 44140435060,
+      "run_attempt": 1,
+      "workflow_head_sha": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "artifact_id": 14354323589,
+      "archive_bytes": 46376,
+      "archive_sha256": "eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429",
+      "native_archive_digest_match": true,
+      "report_bytes": 329438,
+      "report_sha256": "8847c9c24574ae7361b0c172d93c5728359468df2bbf22a33e4c4a3004b3b482",
+      "published_source_commit": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "published_worker_sha": "3c001413e47063cc68108c84938c697f4cf18357",
+      "report_identity": "passed",
+      "all_three_templates_public_ready": true,
+      "workflow_head_used_as_published_source": "rejected_runtime_report_source_mismatch",
+      "scope": "Existing GitHub artifact downloaded read-only through purpose-built connector, original Python-backed ZIP reader and Node report identity function executed. No publication payload or resource locators emitted; no model, provider, VM, deployment or DB action. This proves actual artifact bytes, not the new helper network path.",
+      "receiptSha256": "5f397932902b0ecb7ef209c0cdddca1c76a398ca5229346e40f8bf39a089b85f"
+    }
+  },
+  "sourceOnlyValidation": {
+    "runtime": "Existing functions V8 isolate; no persistent runner or validation framework added",
+    "before": {
+      "source": "ee36d52f3ee391ddd529f1135ff86fa8f55bd99d",
+      "productionBlob": "caf1450463e6293c82ef9c012808b0edfaf00183",
+      "scope": "Exact original lastPublishedSource/githubRead/pages JavaScript executed in the available V8 isolate with one fixed native run/jobs response fixture; AbortSignal and HTTP I/O injected, no actual network or Node suite",
+      "runId": 44140435060,
+      "attempt": 1,
+      "workflowHead": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "expectedPublishedSource": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "observedResult": null,
+      "assertionPassed": false,
+      "requests": 2
+    },
+    "diagnosticNameOnlyChange": {
+      "scope": "Diagnostic-only expression change in the V8 source-only reproduction; not committed production code",
+      "change": "Recognize templates as well as subscriptions, leaving return run.head_sha unchanged",
+      "runId": 44140435060,
+      "attempt": 1,
+      "observedSource": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "expectedSource": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "assertionPassed": false
+    },
+    "after": {
+      "scope": "Source-only V8 execution of the new production history functions and the unchanged original pure artifact/report identity checks; HTTP responses mocked; Node-only archive download/digest/ZIP code replaced at the import binding by a synthetic report transport fixture, not executed or claimed passed",
+      "realRunId": 44140435060,
+      "realAttempt": 1,
+      "expectedPublishedSource": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "workflowHead": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "artifactHelperBlob": "a55edb760f77913f12595e476e55b9f47645f35c",
+      "reportHelperBlob": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f",
+      "total": 14,
+      "passed": 14,
+      "results": [
+        {
+          "name": "published served source differs from workflow head",
+          "passed": true,
+          "observed": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+          "error": null,
+          "httpReads": 5,
+          "archiveTransportCalls": 1
+        },
+        {
+          "name": "legacy publication job remains readable",
+          "passed": true,
+          "observed": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+          "error": null,
+          "httpReads": 5,
+          "archiveTransportCalls": 1
+        },
+        {
+          "name": "foreign run refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 1,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "nonpublication event refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 1,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "failed run refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 1,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "wrong publication attempt refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 2,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "skipped publication step refused",
+          "passed": true,
+          "observed": null,
+          "error": null,
+          "httpReads": 2,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "missing original artifact refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "runtimeInputs:publicationArtifactRequired",
+          "httpReads": 3,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "expired original artifact refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "task_secret_ci:artifact_identity",
+          "httpReads": 3,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "foreign artifact repository refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "task_secret_ci:artifact_identity",
+          "httpReads": 3,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "changed artifact digest metadata refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "runtimeInputs:publicationArtifactChanged",
+          "httpReads": 4,
+          "archiveTransportCalls": 0
+        },
+        {
+          "name": "old report attempt refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "runtime_report_attempt_mismatch",
+          "httpReads": 4,
+          "archiveTransportCalls": 1
+        },
+        {
+          "name": "nonpublic template refuses reuse",
+          "passed": true,
+          "observed": null,
+          "error": "runtimeInputs:publicationNotPublic",
+          "httpReads": 4,
+          "archiveTransportCalls": 1
+        },
+        {
+          "name": "newer run attempt refuses stale selection",
+          "passed": true,
+          "observed": null,
+          "error": "runtimeInputs:publicationAttemptChanged",
+          "httpReads": 5,
+          "archiveTransportCalls": 1
+        }
+      ],
+      "sourceCommit": "46cc2c27d169d7d70c5946b94cca56688ea391aa"
+    },
+    "measurement": "For this one fixed run/jobs metadata sample the original reader returns null; the repaired source-only path returns the logged served source with a synthetic report transport fixture. This does not measure wall-time or paid-resource savings.",
+    "qualification": "Historical first-pass source-only evidence at 46cc while the execution machine was unavailable. The later original Node results below supersede the unexecuted-Node status; V8 assertions are not counted as Node tests."
+  },
+  "nodeRegression": {
+    "status": "local_offline_passed_protected_ci_pending",
+    "validationRuntime": "Node 24.22.3 / Python 3.12.14; original CI-pinned tsx 4.23.15 and zod 4.6.7, with the original protocol workspace linked; no application install/build",
+    "before": {
+      "head": "d86dade94a7977c14e073820dc8c98e22d27f475",
+      "tree": "942a2d1637cb2998a5393ef49cd17dfff5da0a21",
+      "production_blob": "caf1450463e6293c82ef9c012808b0edfaf00183",
+      "test_blob": "09b20cede208860b58561969171a3da211f9ac0b",
+      "command": [
+        "node",
+        "--test",
+        "scripts/e2b/runtime-inputs.test.mjs"
+      ],
+      "node": "v24.22.3",
+      "python": "Python 3.12.14",
+      "started_at": "2026-11-20T23:42:34.312206+00:00",
+      "completed_at": "2026-11-20T23:42:37.152587+00:00",
+      "wall_seconds": 2.8403613909999876,
+      "exit_code": 1,
+      "summary": {
+        "tests": 13,
+        "suites": 0,
+        "pass": 12,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0,
+        "duration_ms": 2739.079292
+      },
+      "log_sha256": "c35b92bd4d3d79ffae73d20ed8ca15c39f99d09f671d70c0e1e29231ab6119eb",
+      "log_bytes": 2334,
+      "source_unchanged": true,
+      "worktree_status_before": "",
+      "worktree_status_after": "",
+      "scope": "First actual original Node suite execution at the RED checkpoint. No source edits, model calls, dispatches or provider resources.",
+      "receiptSha256": "c0809a2f1842cc207fd6fc2e96623d037e79e5015608f47c82314ec026e3cf55",
+      "failure": "The sole publication-history test returned null for the templates job instead of its expected published source."
+    },
+    "runtimeGreen": {
+      "scope": "Original Node suite, real local Git worker inputs and Python ZIP/digest path with closed HTTP fixtures. Three original transfer-owner tests are retained, so the post-integration denominator is 19 rather than the earlier 16.",
+      "head": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+      "mergeParent": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "indexTree": "02320d8d34193730048ae7fc47a9d63d15ece7bd",
+      "node": "v24.22.3",
+      "command": [
+        "node",
+        "--test",
+        "scripts/e2b/runtime-inputs.test.mjs"
+      ],
+      "startedAt": "2026-11-20T23:44:16.769465+00:00",
+      "exitCode": 0,
+      "wallSeconds": 4.977104458000213,
+      "completedAt": "2026-11-20T23:44:21.746588+00:00",
+      "logSha256": "07d5a68cd06540c0741a50c1be5acf252fcf3a3372619e701bf04996c1d7c107",
+      "summary": {
+        "tests": 19,
+        "pass": 19,
+        "fail": 0,
+        "skipped": 0
+      },
+      "productionBlob": "fd3f919d955f547db24f175a4bfdae8057a49a95",
+      "testBlob": "2cd378b4161da15993ff0fa0408c1ea906f434eb"
+    },
+    "initialConsumerAttempt": {
+      "scope": "Local integrated working tree before commit; original offline acceptance guards only",
+      "head": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+      "mergeParent": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "indexTree": "9f892b2d117abf9e1eb02628aa55ad85e2f4d571",
+      "node": "v24.22.3",
+      "tsx": "4.23.15",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs",
+        "scripts/acceptance/coding-review-ci.test.mjs",
+        "scripts/acceptance/factory-visual-evidence.test.mjs"
+      ],
+      "startedAt": "2026-11-20T23:47:17.703861+00:00",
+      "exitCode": 1,
+      "wallSeconds": 1.711037837999811,
+      "completedAt": "2026-11-20T23:47:19.414933+00:00",
+      "logSha256": "977b0235d0d17d149726364c176597c6e09167f5dd602a45e311db7780ad2aa3",
+      "summary": {
+        "records": 27,
+        "pass": 26,
+        "fail": 1,
+        "skipped": 0
+      },
+      "cause": "The 16-case task-secrets file could not load because the restored minimal environment lacked the original @mikka/protocol workspace link. The separate coding-review (4) and Factory (22) tests passed, including the original FFmpeg byte-determinism case.",
+      "correction": "Restore the original workspace link and pinned zod 4.6.7; do not install or run the application."
+    },
+    "taskSecretFixtureFailure": {
+      "scope": "Original task-secrets offline guard suite after restoring pinned zod and the existing protocol workspace link; no production/model/network acceptance",
+      "head": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+      "mergeParent": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "indexTree": "9f892b2d117abf9e1eb02628aa55ad85e2f4d571",
+      "node": "v24.22.3",
+      "tsx": "4.23.15",
+      "zod": "4.6.7",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs"
+      ],
+      "startedAt": "2026-11-20T23:51:01.522178+00:00",
+      "exitCode": 1,
+      "wallSeconds": 2.763606935000098,
+      "completedAt": "2026-11-20T23:51:04.285807+00:00",
+      "logSha256": "c2cf944d10739ba57039afa6c2010a189cb979ea171fb80062bb47c19336dae9",
+      "summary": {
+        "tests": 16,
+        "pass": 14,
+        "fail": 2,
+        "skipped": 0
+      },
+      "cause": "After normal integration, the test main-ref mock still expected the mutable repository URL while the original owner web-deploy helper used the immutable repository endpoint. The real CLI fixture also omitted the newly imported cloudflare-source module.",
+      "correction": "Use the exact immutable main-ref and archive URLs in the closed fixture and copy the actual cloudflare-source dependency. All original positive and refusal assertions remain."
+    },
+    "taskSecretGreen": {
+      "scope": "Original task-secrets offline guard suite after exact fixture route/dependency integration; all original assertions retained",
+      "head": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+      "mergeParent": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "indexTree": "187979b6ea68eab5b7716d27c76f2a52f20d1d7a",
+      "node": "v24.22.3",
+      "tsx": "4.23.15",
+      "zod": "4.6.7",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs"
+      ],
+      "startedAt": "2026-11-20T23:51:57.530604+00:00",
+      "exitCode": 0,
+      "wallSeconds": 3.9277578860001086,
+      "completedAt": "2026-11-20T23:52:01.458382+00:00",
+      "logSha256": "c34ad2e0e6525815f9a75975dabc5dabb191f7483fb03429f2495fef3d232e98",
+      "summary": {
+        "tests": 16,
+        "pass": 16,
+        "fail": 0,
+        "skipped": 0
+      },
+      "helperBlob": "f5e11abae81d4409ccb7f16c875ce640e4dee0ae",
+      "testBlob": "9d46d4a1263095c75419dbc46d7ffb61cf6ad6da"
+    },
+    "passedUnaffectedConsumerCases": {
+      "codingReview": 4,
+      "factoryVisualEvidence": 22,
+      "skipped": 0,
+      "sourceIndexTree": "9f892b2d117abf9e1eb02628aa55ad85e2f4d571",
+      "logSha256": "977b0235d0d17d149726364c176597c6e09167f5dd602a45e311db7780ad2aa3",
+      "qualification": "These 26 original cases completed successfully in the recorded multi-file command even though task-secrets failed to load. This is not a claim that the whole command passed."
+    },
+    "scope": "Only original offline suites with closed network fixtures. No live subscription, E2B, release, database, browser session or production acceptance. Final commit review and real protected CI are separate gates.",
+    "independentFixedTreeGreen": {
+      "schema": "mikka-2984-independent-node-green-v1",
+      "head": "e2d9ee268f5479fdbfbab629232bf362674808d8",
+      "tree": "3fb748ecb57aedacc354ca2b86a20563cfc8187e",
+      "parents": [
+        "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+        "6fe25cf9413d4078ce350a97e284c33f1efa9de7"
+      ],
+      "node": "v24.22.3",
+      "python": "Python 3.12.14",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/e2b/runtime-inputs.test.mjs",
+        "scripts/acceptance/task-secrets-ci.test.mjs",
+        "scripts/acceptance/coding-review-ci.test.mjs",
+        "scripts/acceptance/factory-visual-evidence.test.mjs"
+      ],
+      "started_at": "2026-11-20T23:55:00.691810+00:00",
+      "completed_at": "2026-11-20T23:55:05.540587+00:00",
+      "wall_seconds": 4.848754298000131,
+      "node_exit_code": 0,
+      "node_summary": {
+        "tests": 61,
+        "suites": 0,
+        "pass": 61,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "log_bytes": 7239,
+      "log_sha256": "fdf2ccbdb982fe527bf06d2503e5336d4aeb6038893f8dc087300617157bab2d",
+      "worktree_clean_after": true,
+      "scope": "Original four offline Node test files on fixed commit; actual Python ZIP/SHA/canonical Git work and offline FFmpeg tests execute; external HTTP/provider/model I/O stays mocked by original fixtures. This is not protected GitHub CI or live paid acceptance.",
+      "receiptSha256": "42bd1c892b8a766c0bd8d8db72e32e3620fed56ca2280f22976180a0a87c6453"
+    },
+    "independentNativeArtifactGreen": {
+      "schema": "mikka-2984-independent-node-real-artifact-green-v1",
+      "head": "e2d9ee268f5479fdbfbab629232bf362674808d8",
+      "tree": "3fb748ecb57aedacc354ca2b86a20563cfc8187e",
+      "helper_blob": "f5e11abae81d4409ccb7f16c875ce640e4dee0ae",
+      "runtime_blob": "fd3f919d955f547db24f175a4bfdae8057a49a95",
+      "report_parser_blob": "a2ca50ec713ad4a1b104a7110288efd2d1363d1f",
+      "started_at": "2026-11-20T23:56:10.478Z",
+      "completed_at": "2026-11-20T23:56:10.615Z",
+      "node": "v24.22.3",
+      "repository_id": 1427517699,
+      "run_id": 44140435060,
+      "run_attempt": 1,
+      "publication_job_id": 134248391647,
+      "native_job_denominator": 9,
+      "native_artifact_denominator": 4,
+      "artifact_id": 14354323589,
+      "native_metadata_unchanged": true,
+      "archive_bytes": 46376,
+      "archive_sha256": "eaf16c7b76bd6a82b2394f93a42fa41ad12c55fbe96dea415d07c742d4fb2429",
+      "native_digest_match": true,
+      "report_bytes": 329438,
+      "report_sha256": "8847c9c24574ae7361b0c172d93c5728359468df2bbf22a33e4c4a3004b3b482",
+      "workflow_head_sha": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+      "published_source_commit": "b53e8f369ff23eb062b1cc8509e499a60ec0bbe0",
+      "published_worker_sha": "3c001413e47063cc68108c84938c697f4cf18357",
+      "all_three_templates_public_ready": true,
+      "authenticated_route": "https://api.github.com/repositories/1427517699/actions/artifacts/14354323589/zip",
+      "token_forwarded_to_storage": false,
+      "actual_new_helper_identity": "passed",
+      "actual_new_helper_byte_digest_zip_report": "passed",
+      "isolated_native_publication_selection": "passed",
+      "transport_boundary": "Node requests use a closed offline response adapter over captured native run/jobs/artifact list and the actual downloaded archive. Artifact detail and latest-run responses reuse their captured metadata; no direct artifact-detail response was available through the connector. Real archive download occurred separately through the authorized GitHub connector. This does not prove live execution of the new HTTP route or protected CI.",
+      "scope": "Original production functions only; no source changes, new framework, model/provider/VM/deployment/DB calls or publication payload output.",
+      "receiptSha256": "b3a7ad499450780df4bd12cb68243d2caf3a5012cb18bedba4d23d45baa661aa"
+    },
+    "currentRemoteEquivalentSource": {
+      "head": "7c01475dbc3a0bc14b84dcd2e7236b0a8187a911",
+      "tree": "3fb748ecb57aedacc354ca2b86a20563cfc8187e",
+      "parents": [
+        "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+        "6fe25cf9413d4078ce350a97e284c33f1efa9de7"
+      ],
+      "qualification": "Native commit API readback confirms the same tree and normal two parents as tested local e2d9ee268. Different commit metadata does not create a second test execution. This documentation append preserves all tested code and test blobs."
+    },
+    "validationBoundary": "The complete 61-case result is a real independent local Node run at e2d9, byte-identical to remote 7c01475d. The separately fetched historical artifact is real and native-digest verified. The new reader was exercised with a closed adapter over those actual bytes/metadata; the artifact-detail and latest-run adapter responses reuse captured metadata. No live execution of the new HTTP route, protected CI, publication or model acceptance is inferred."
+  },
+  "ownership": [
+    {
+      "pr": 2821,
+      "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+      "checkedFiles": 107,
+      "relationship": "Runtime inputs files are absent from its diff; its report-retention and attestation work is separate.",
+      "recheckedAt": "2026-11-20T23:53:17.217632+00:00",
+      "currentReaderBlobs": {
+        "scripts/acceptance/task-secrets-ci.mjs": "a55edb760f77913f12595e476e55b9f47645f35c",
+        "scripts/acceptance/thread-lifecycle-ci.mjs": "625a96191e7c272c08b7a9f9db723a5f00cf0bbd",
+        "scripts/acceptance/coding-review-ci.mjs": "393d89d09e9ec0df529653c33c775aa85e3aa328",
+        "scripts/acceptance/factory-visual-evidence.mjs": "61fd9e3898cc6d5002ef472def96c6cdcac1582a"
+      },
+      "currentReaderQualification": "Fresh reads of the unchanged current #2821 head retain the legacy full-name guards/API paths and the old shared artifact reader. This PR neither replaces that owner work nor claims that all acceptance consumers have migrated."
+    },
+    {
+      "pr": 2978,
+      "head": "0633b43e6149749e62503e6537997b480131ab23",
+      "checkedFiles": 26,
+      "relationship": "Touches runtime-inputs for official repository transfer identity and immutable API addressing; leaves the subscriptions-only matcher and return run.head_sha. Preserve that owner's changes during normal integration; this PR does not copy the transfer implementation."
+    },
+    {
+      "pr": 2981,
+      "head": "eebbed5dca0ddba5841ec43d0e870678a1f313f5",
+      "checkedFiles": 58,
+      "relationship": "Touches runtime-inputs for official repository transfer identity and immutable API addressing; leaves the subscriptions-only matcher and return run.head_sha. Preserve that owner's changes during normal integration; this PR does not copy the transfer implementation."
+    }
+  ],
+  "retainedBoundaries": [
+    "Fixed official workflow/repository and main history",
+    "Reuse the original owner official repository profile and bind both names and immutable repository IDs before reading artifact bytes",
+    "Successful exact-attempt publication job and step",
+    "Existing artifact identity, expiry, size, digest and bounded ZIP reader",
+    "Existing complete runtime-report source/run/attempt/template identity",
+    "Latest run attempt recheck after reading evidence",
+    "No workflow, permission, timeout, trigger, publisher or model-policy change"
+  ],
+  "remaining": [
+    "Final-head independent review COMMENT and applicable protected CI",
+    "Normal merge and exact merged-source verification by the root coordinator",
+    "Existing acceptance-consumer top-level identity migration remains a separately tracked owner dependency",
+    "No claim of production acceptance, real subscription execution or measured paid-build savings"
+  ],
+  "repositoryTransferIntegration": {
+    "mergedMain": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+    "previousBranchHead": "46cc2c27d169d7d70c5946b94cca56688ea391aa",
+    "method": "Normal two-parent integration; preserve the original owner officialMikkaRepository/publicRepositoryId implementation and immutable history routes, without a second identity profile.",
+    "officialIdentityBlob": "e1c7817f533fcb0b85f543e99aba25f8d0af7beb",
+    "repositoryId": 1427517699,
+    "currentRepository": "aspectly-labs/Mikka",
+    "readerFailure": {
+      "schema": "mikka-2984-independent-node-native-identity-red-v1",
+      "head": "d86dade94a7977c14e073820dc8c98e22d27f475",
+      "tree": "942a2d1637cb2998a5393ef49cd17dfff5da0a21",
+      "helper_blob": "a55edb760f77913f12595e476e55b9f47645f35c",
+      "node": "v24.22.3",
+      "started_at": "2026-11-20T23:52:09.896Z",
+      "completed_at": "2026-11-20T23:52:09.926Z",
+      "native_metadata_sha256": "a258506911eb42cfe73520f5f842a104bea06e01ca3784d122f7ab9d5963141c",
+      "native_metadata_refusal": "task_secret_ci:artifact_identity",
+      "diagnostic_only_old_owner_url_copy_accepted": 14354323589,
+      "tracked_source_changed": false,
+      "scope": "Original helper imported under Node. Native metadata rejected; changing only two URL owner spellings in a disposable in-memory diagnostic copy passes. No production metadata rewritten, no archive/network/deployment/provider/model operation.",
+      "identity_assertions": 3,
+      "checkout_assertions": 3,
+      "receiptSha256": "a7115c41efae84d01be575530320ae11a27a03e993a34854f687d4e0c0210426"
+    },
+    "repair": "The shared reader requires the caller-pinned official repository ID and full name after the existing official-run guard. It binds run/head/artifact IDs and unmodified native metadata URLs, then downloads only through the fixed immutable repository ID. Missing/foreign IDs fail before a request; storage receives no GitHub token.",
+    "negativeCoverage": [
+      "missing/string/unsafe expected repository ID",
+      "missing or foreign expected name",
+      "run/head ID or name mismatch",
+      "artifact run/head repository mismatch",
+      "foreign or stale metadata URLs",
+      "expired/missing/duplicate artifacts",
+      "changed detail digest or archive bytes",
+      "old report or newer native run attempt",
+      "non-public or unready template",
+      "missing/foreign legacy download proof",
+      "untrusted storage URL and credential forwarding"
+    ],
+    "callerCompatibility": [
+      "scripts/acceptance/task-secrets-ci.mjs",
+      "scripts/acceptance/coding-review-ci.mjs",
+      "scripts/acceptance/factory-visual-evidence.mjs"
+    ],
+    "callerScope": "Only the new shared artifact-reader contract is adapted in these three existing callers after their original guards. Their legacy top-level repository identity/route migration is not implemented or claimed accepted by this PR."
+  }
+}

@@ -7,12 +7,13 @@ import { createHash } from 'node:crypto'
 import { expectedRelease, assertReleaseIdentity, selectRelease, REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW } from './thread-lifecycle-ci.mjs'
 import { assertCurrentMain, PRODUCTION_VERSION_URL } from '../release/web-deploy.mjs'
 import { assertReportIdentity, TEMPLATE_KINDS } from '../e2b/runtime-report.mjs'
+import { actionsMikkaRepository, officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 export { REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW }
 export const MAX_ARCHIVE_BYTES = 16 * 1024 * 1024
 export const MAX_REPORT_BYTES = 32 * 1024 * 1024
 const ROOT = resolve(import.meta.dirname, '../..')
-const API = `https://api.github.com/repos/${REPOSITORY}`
+const API = `https://api.github.com/repositories/${publicRepositoryId}`
 const SHA = /^[a-f0-9]{40}$/, DIGEST = /^[a-f0-9]{64}$/
 const positive = value => Number.isSafeInteger(value) && value > 0
 const number = value => typeof value === 'string' && /^[1-9][0-9]*$/.test(value) && positive(Number(value))
@@ -26,7 +27,7 @@ const check = (ok, code) => { if (!ok) throw new SecretCIError(code) }
 export const safeCIFailure = error => error instanceof SecretCIError && CODES.has(error.code) ? error.code : 'guard_failed'
 
 function context(env) {
-  check(env.GITHUB_ACTIONS === 'true' && env.GITHUB_REPOSITORY === REPOSITORY && env.GITHUB_REF === 'refs/heads/main'
+  check(env.GITHUB_ACTIONS === 'true' && actionsMikkaRepository(env) && env.GITHUB_REF === 'refs/heads/main'
     && ['workflow_run', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME)
     && number(env.GITHUB_RUN_ID) && number(env.GITHUB_RUN_ATTEMPT), 'context')
   // There is no rerun API or self-trigger. A single automatic receiver permits
@@ -69,20 +70,27 @@ async function readGithub(path, { token, fetchImpl = fetch }) {
 }
 
 export function assertArtifactIdentity(expected, run, artifact, now = Date.now()) {
+  // The caller binds these fields after its official-run API check. Artifact
+  // metadata cannot choose a repository or supply the authenticated download URL.
+  const repository = expected?.repositoryFullName
+  check(positive(expected?.repositoryId)
+    && officialMikkaRepository(repository, String(expected.repositoryId)), 'artifact_identity')
+  const api = `https://api.github.com/repos/${repository}`
   const name = `e2b-release-evidence-${expected.runId}-${expected.runAttempt}`
   const created = Date.parse(artifact?.created_at), expires = Date.parse(artifact?.expires_at), started = Date.parse(run?.run_started_at)
   check(positive(artifact?.id) && artifact.name === name && artifact.expired === false
     && Number.isFinite(created) && Number.isFinite(expires) && Number.isFinite(started)
     && created >= started && created <= now + 60_000 && expires > now
-    && positive(run.repository?.id) && run.head_repository?.id === run.repository.id
-    && artifact.workflow_run?.id === expected.runId && artifact.workflow_run.repository_id === run.repository.id
-    && artifact.workflow_run.head_repository_id === run.repository.id && artifact.workflow_run.head_branch === 'main'
+    && run.repository?.id === expected.repositoryId && run.head_repository?.id === expected.repositoryId
+    && run.repository?.full_name === repository && run.head_repository?.full_name === repository
+    && artifact.workflow_run?.id === expected.runId && artifact.workflow_run.repository_id === expected.repositoryId
+    && artifact.workflow_run.head_repository_id === expected.repositoryId && artifact.workflow_run.head_branch === 'main'
     && artifact.workflow_run.head_sha === expected.sourceCommit
-    && artifact.url === `${API}/actions/artifacts/${artifact.id}`
-    && artifact.archive_download_url === `${API}/actions/artifacts/${artifact.id}/zip`, 'artifact_identity')
+    && artifact.url === `${api}/actions/artifacts/${artifact.id}`
+    && artifact.archive_download_url === `${api}/actions/artifacts/${artifact.id}/zip`, 'artifact_identity')
   check(positive(artifact.size_in_bytes) && artifact.size_in_bytes <= MAX_ARCHIVE_BYTES, 'artifact_size')
   check(typeof artifact.digest === 'string' && /^sha256:[a-f0-9]{64}$/.test(artifact.digest), 'artifact_digest')
-  return { id: artifact.id, name, sha256: artifact.digest.slice(7), sizeBytes: artifact.size_in_bytes,
+  return { id: artifact.id, repositoryId: expected.repositoryId, name, sha256: artifact.digest.slice(7), sizeBytes: artifact.size_in_bytes,
     createdAt: artifact.created_at, expiresAt: artifact.expires_at }
 }
 
@@ -154,10 +162,11 @@ export function archiveReport(bytes) {
 }
 
 export async function downloadReleaseReport(proof, { token, fetchImpl = fetch }) {
-  check(proof?.selected === true && positive(proof.artifact?.id) && DIGEST.test(proof.artifact.sha256 ?? ''), 'attestation')
+  check(proof?.selected === true && positive(proof.artifact?.id) && proof.artifact.repositoryId === Number(publicRepositoryId)
+    && DIGEST.test(proof.artifact.sha256 ?? ''), 'attestation')
   let response
   try {
-    const redirect = await fetchImpl(`${API}/actions/artifacts/${proof.artifact.id}/zip`, {
+    const redirect = await fetchImpl(`https://api.github.com/repositories/${proof.artifact.repositoryId}/actions/artifacts/${proof.artifact.id}/zip`, {
       headers: { accept: 'application/vnd.github+json', authorization: `Bearer ${token}`, 'x-github-api-version': '2022-11-28' },
       redirect: 'manual', signal: AbortSignal.timeout(20_000) })
     check(redirect.status === 302, 'artifact_redirect')

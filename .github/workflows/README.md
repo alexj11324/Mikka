@@ -160,6 +160,17 @@ dispatch of **E2B additive runtime release** on current main with `reason` and
 any template builder starts. Every gate rechecks the receipt against the live
 gateway and current main.
 
+The previous published worker source comes from the successful publication's
+`e2b-release-evidence-RUN-ATTEMPT` artifact. The reader recognizes `templates`
+and historical `subscriptions` jobs, verifies their original attempt and report,
+and compares the report's `sourceCommit`: a later workflow head can publish an
+earlier served commit. It reuses the official repository identity and downloads
+by immutable repository ID, retaining the report's original recorded identity.
+Missing, expired or inconsistent publication evidence
+fails the automatic comparison before a paid builder starts. The explicit manual
+retry below remains available to the release owner. Source and regression
+boundaries are recorded in the [runtime reuse evidence](../../docs/ci/2984-runtime-reuse.json).
+
 The Coding Workspace, Task VM and Task Secret consumers accept this official
 producer's `workflow_run` event alongside its retained push/manual events. The
 event is only a pointer: their pre-checkout and shared guards confirm the fixed

@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
+import { runInNewContext } from 'node:vm'
 import { assertAttestation, assertReleaseIdentity, completeEvidence, expectedRelease, lifecycleChanged,
   providerReceipt, REPOSITORY, RELEASE_NAME, RELEASE_WORKFLOW, selectRelease, verifyRelease } from './thread-lifecycle-ci.mjs'
 
@@ -11,12 +12,36 @@ const SHA = 'a'.repeat(40), OTHER = 'b'.repeat(40)
 const workflow = { id: 405833668, name: RELEASE_NAME, path: RELEASE_WORKFLOW, state: 'active' }
 const run = { id: 123, run_attempt: 2, workflow_id: workflow.id, name: RELEASE_NAME, path: RELEASE_WORKFLOW,
   head_sha: SHA, head_branch: 'main', event: 'push', status: 'completed', conclusion: 'success',
-  repository: { full_name: REPOSITORY }, head_repository: { full_name: REPOSITORY } }
+  repository: { id: 1427517699, full_name: REPOSITORY, owner: { id: 183887963 } },
+  head_repository: { id: 1427517699, full_name: REPOSITORY, owner: { id: 183887963 } } }
 const event = () => ({ workflow_run: structuredClone(run) })
-const env = () => ({ GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY, GITHUB_REF: 'refs/heads/main',
+const env = () => ({ GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REPOSITORY: REPOSITORY,
+  GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_REF: 'refs/heads/main',
   EXPECTED_SOURCE_SHA: SHA, EXPECTED_UPSTREAM_RUN_ID: String(run.id), EXPECTED_UPSTREAM_RUN_ATTEMPT: String(run.run_attempt),
   GITHUB_TOKEN: 'private-credential-sentinel' })
 const expected = () => expectedRelease(env(), event())
+
+test('the shared release guard admits the transferred official repository with coherent immutable identity', () => {
+  const repository = { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274, login: 'aspectly-labs' } }
+  const current = { ...structuredClone(run), event: 'workflow_run', repository, head_repository: structuredClone(repository) }
+  const context = { ...env(), GITHUB_REPOSITORY: repository.full_name, GITHUB_REPOSITORY_ID: String(repository.id),
+    GITHUB_REPOSITORY_OWNER_ID: String(repository.owner.id) }
+  const source = expectedRelease(context, { workflow_run: current })
+  assert.equal(source.sourceCommit, SHA)
+  assert.doesNotThrow(() => assertReleaseIdentity(source, workflow, current))
+  for (const key of ['repositoryFullName', 'repositoryId', 'repositoryOwnerId']) {
+    const missing = { ...source }; delete missing[key]
+    assert.throws(() => assertReleaseIdentity(missing, workflow, current), /thread_lifecycle_ci:upstream/)
+  }
+  for (const mutate of [value => { value.repository.id++ }, value => { value.head_repository.id++ },
+    value => { value.repository.owner.id = 183887963 }, value => { value.head_repository.full_name = 'alexj11324/Mikka' },
+    value => { value.head_repository = { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } } }]) {
+    const bad = structuredClone(current); mutate(bad)
+    assert.throws(() => expectedRelease(context, { workflow_run: bad }), /thread_lifecycle_ci:trigger/)
+    assert.throws(() => assertReleaseIdentity(source, workflow, bad), /thread_lifecycle_ci:upstream/)
+  }
+})
+
 function jobs(validated = true) {
   const names = ['test', 'check', validated ? 'validate / build' : 'validate', 'await-web', 'subscriptions',
     validated ? 'publish / deploy' : 'publish', 'cleanup']
@@ -26,6 +51,22 @@ function jobs(validated = true) {
 }
 const relevant = ['scripts/acceptance/thread-lifecycle.mjs']
 const workflowText = readFileSync(new URL('../../.github/workflows/thread-lifecycle-acceptance.yml', import.meta.url), 'utf8')
+
+test('the three native job predicates retain coherent official owner identities', () => {
+  for (const name of ['thread-lifecycle', 'coding-workspace', 'task-secret']) {
+    const text = readFileSync(new URL(`../../.github/workflows/${name}-acceptance.yml`, import.meta.url), 'utf8')
+    const expression = text.split('  authorize:\n')[1].split('    if: >-\n')[1].split('    runs-on:')[0].trim()
+    for (const [repository, ownerId] of [['alexj11324/Mikka', '183887963'], ['aspectly-labs/Mikka', '359279274']]) {
+      const github = { repository, repository_id: '1427517699', repository_owner_id: ownerId, ref: 'refs/heads/main',
+        event_name: 'workflow_run', event: { workflow_run: { conclusion: 'success', head_branch: 'main' } } }
+      assert.equal(runInNewContext(expression, { github }), true, name)
+      for (const patch of [{ repository_id: '999' }, { repository_owner_id: '999' },
+        { repository: repository === 'alexj11324/Mikka' ? 'aspectly-labs/Mikka' : 'alexj11324/Mikka' },
+        { ref: 'refs/heads/other' }, { repository: 'foreign/Mikka' }])
+        assert.equal(runInNewContext(expression, { github: { ...github, ...patch } }), false, name)
+    }
+  }
+})
 
 function metadataScript() {
   const lines = workflowText.split('\n'), start = lines.findIndex(line => line.trim() === "node --input-type=module <<'JS'")
@@ -47,14 +88,14 @@ function executeMetadata(t, mutate = () => {}) {
     import { readFileSync as readFixtureFile } from 'node:fs'
     const fixtureData = JSON.parse(readFixtureFile(process.env.FIXTURE_PATH, 'utf8'))
     globalThis.fetch = async (url, options) => {
-      if (!url.startsWith('https://api.github.com/repos/alexj11324/Mikka/') || options.redirect !== 'error'
+      if (!url.startsWith('https://api.github.com/repositories/1427517699/') || options.redirect !== 'error'
         || options.headers.authorization !== 'Bearer private-credential-sentinel') throw Error('unexpected_private_request')
       const routes = {
         '/actions/workflows/e2b-official-runtime.yml': fixtureData.workflow,
         ['/actions/runs/' + fixtureData.event.workflow_run.id]: fixtureData.run,
         '/git/ref/heads/main': fixtureData.main,
       }
-      const route = url.slice('https://api.github.com/repos/alexj11324/Mikka'.length)
+      const route = url.slice('https://api.github.com/repositories/1427517699'.length)
       if (!Object.hasOwn(routes, route)) throw Error('unexpected_private_request')
       return Response.json(routes[route], { status: fixtureData.httpStatus })
     }
@@ -77,6 +118,9 @@ test('the actual metadata script permits only an API-confirmed immutable main re
 test('Cloudflare-triggered runtime metadata retains all pre-checkout identity checks', t => {
   const automatic = mutate => executeMetadata(t, fixture => {
     fixture.event.workflow_run.event = 'workflow_run'; fixture.run.event = 'workflow_run'
+    fixture.environment.GITHUB_REPOSITORY = 'aspectly-labs/Mikka'; fixture.environment.GITHUB_REPOSITORY_OWNER_ID = '359279274'
+    for (const value of [fixture.event.workflow_run, fixture.run]) for (const key of ['repository', 'head_repository'])
+      value[key] = { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
     mutate?.(fixture)
   })
   const result = automatic()
@@ -84,7 +128,13 @@ test('Cloudflare-triggered runtime metadata retains all pre-checkout identity ch
   assert.equal(result.output, `source-sha=${SHA}\nupstream-run-id=123\nupstream-run-attempt=2\n`)
   for (const mutate of [fixture => { fixture.event.workflow_run.head_repository.full_name = 'fork/Mikka' },
     fixture => { fixture.workflow.path = '.github/workflows/other.yml' }, fixture => { fixture.run.event = 'push' },
-    fixture => { fixture.run.run_attempt++ }, fixture => { fixture.main.object.sha = OTHER }]) {
+    fixture => { fixture.run.run_attempt++ }, fixture => { fixture.main.object.sha = OTHER },
+    fixture => { fixture.environment.GITHUB_REPOSITORY_ID = '999' },
+    fixture => { fixture.environment.GITHUB_REPOSITORY_OWNER_ID = '183887963' },
+    fixture => { delete fixture.environment.GITHUB_REPOSITORY_OWNER_ID },
+    fixture => { fixture.event.workflow_run.repository.id++ },
+    fixture => { fixture.event.workflow_run.head_repository.owner.id = 183887963 },
+    fixture => { fixture.run.repository.owner.id = 183887963 }, fixture => { fixture.run.head_repository.id++ }]) {
     const refused = automatic(mutate)
     assert.equal(refused.status, 1); assert.equal(refused.output, '')
     assert.equal(refused.stderr.trim(), 'thread_lifecycle_source_refused')
@@ -170,19 +220,19 @@ test('skipped, incomplete, stale-attempt or unsuccessful release jobs cannot aut
   }
 })
 
-function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event, validated = true } = {}) {
+function apiFixture({ rerun = false, mainMoved = false, releaseEvent = run.event, validated = true, repository = run.repository } = {}) {
   let runs = 0, refs = 0
   const calls = []
   const fetchImpl = async (input, options) => {
     assert.equal(options.redirect, 'error')
     const url = new URL(input)
     assert.equal(url.origin, 'https://api.github.com')
-    const main = url.pathname === '/repositories/1427517699/git/ref/heads/main'
-    assert.equal(main || url.pathname.startsWith('/repos/' + REPOSITORY + '/'), true)
-    const route = main ? '/git/ref/heads/main' : url.pathname.slice(('/repos/' + REPOSITORY).length) + url.search
+    assert.equal(url.pathname.startsWith('/repositories/1427517699/'), true)
+    const route = url.pathname.slice('/repositories/1427517699'.length) + url.search
     calls.push(route)
     if (route === '/actions/workflows/e2b-official-runtime.yml') return Response.json(workflow)
-    if (route === '/actions/runs/123') return Response.json({ ...run, event: releaseEvent, run_attempt: rerun && ++runs > 1 ? 3 : 2 })
+    if (route === '/actions/runs/123') return Response.json({ ...run, event: releaseEvent, repository, head_repository: repository,
+      run_attempt: rerun && ++runs > 1 ? 3 : 2 })
     if (route === '/git/ref/heads/main') return Response.json({ object: { type: 'commit', sha: mainMoved && ++refs > 1 ? OTHER : SHA } })
     if (route === '/actions/runs/123/attempts/2/jobs?per_page=100') return Response.json(jobs(validated))
     assert.fail('Unexpected endpoint; upstream artifacts are never read')
@@ -204,18 +254,21 @@ test('the credential guard rechecks main and the attempt after exact-attempt job
 
 test('the shared guard verifies an automatic release and still rejects reruns and moving main', async () => {
   const trigger = event(); trigger.workflow_run.event = 'workflow_run'
-  const fixture = apiFixture({ releaseEvent: 'workflow_run' })
-  const proof = await verifyRelease({ env: env(), event: trigger, files: relevant, ...fixture })
+  const repository = { id: 1427517699, full_name: 'aspectly-labs/Mikka', owner: { id: 359279274 } }
+  trigger.workflow_run.repository = repository; trigger.workflow_run.head_repository = structuredClone(repository)
+  const environment = { ...env(), GITHUB_REPOSITORY: repository.full_name, GITHUB_REPOSITORY_OWNER_ID: '359279274' }
+  const fixture = apiFixture({ releaseEvent: 'workflow_run', repository })
+  const proof = await verifyRelease({ env: environment, event: trigger, files: relevant, ...fixture })
   assert.equal(proof.selected, true)
   assert.equal(proof.runtime, 'validated_and_published')
   assert.equal(proof.sourceCommit, SHA)
   assert.equal(fixture.calls.filter(path => path === '/actions/runs/123').length, 2)
   assert.equal(fixture.calls.filter(path => path === '/git/ref/heads/main').length, 2)
   for (const change of [{ rerun: true }, { mainMoved: true }, { releaseEvent: 'push' }])
-    await assert.rejects(verifyRelease({ env: env(), event: trigger, files: relevant,
-      ...apiFixture({ releaseEvent: 'workflow_run', ...change }) }))
-  const skipped = await verifyRelease({ env: env(), event: trigger, files: ['README.md'],
-    ...apiFixture({ releaseEvent: 'workflow_run', validated: false }) })
+    await assert.rejects(verifyRelease({ env: environment, event: trigger, files: relevant,
+      ...apiFixture({ releaseEvent: 'workflow_run', repository, ...change }) }))
+  const skipped = await verifyRelease({ env: environment, event: trigger, files: ['README.md'],
+    ...apiFixture({ releaseEvent: 'workflow_run', repository, validated: false }) })
   assert.equal(skipped.selected, false)
   assert.equal(skipped.runtime, 'unchanged_worker')
 })

@@ -1,0 +1,644 @@
+{
+  "issue": 2984,
+  "finding": "SDLC-008",
+  "status": "Identity and downstream immutable-API repair locally verified; current integrated head review and exact Ready CI/security receipts pending",
+  "repository": "aspectly-labs/Mikka",
+  "repositoryId": 1427517699,
+  "source": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+  "rootCause": "The three existing runtime consumers and shared release guard require the former repository name before they can reach the existing source, job, receipt and credential fences. The official repository transfer retains numeric repository identity but changes the coherent owner/name pair.",
+  "scope": {
+    "workflows": [
+      ".github/workflows/coding-workspace-acceptance.yml",
+      ".github/workflows/thread-lifecycle-acceptance.yml",
+      ".github/workflows/task-secret-acceptance.yml"
+    ],
+    "sharedGuard": "scripts/acceptance/thread-lifecycle-ci.mjs",
+    "exclusions": [
+      "Mikka-handoff is a different repository and is not renamed by this repair.",
+      "Factory visual evidence remains bound to original #1789 source and the #1783 finite window.",
+      "No existing model/provider, release, database or production operation is executed by this proof."
+    ]
+  },
+  "originalSourceDiagnosis": {
+    "kind": "read-only original-source identity diagnosis",
+    "main": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+    "localCheckout": "e2d9ee268f5479fdbfbab629232bf362674808d8",
+    "node": "v24.22.3",
+    "startedAt": "2026-11-21T00:03:59.182Z",
+    "completedAt": "2026-11-21T00:03:59.231Z",
+    "nativeProducer": {
+      "id": 44839753192,
+      "attempt": 1,
+      "head": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "repository": {
+        "id": 1427517699,
+        "full_name": "aspectly-labs/Mikka",
+        "owner": {
+          "id": 359279274,
+          "login": "aspectly-labs"
+        }
+      },
+      "status": "completed",
+      "conclusion": "success"
+    },
+    "workflows": [
+      {
+        "path": ".github/workflows/coding-workspace-acceptance.yml",
+        "sourceBlob": "ed2634bb7c5f08a3da4b5a74d0892dbe5416799c",
+        "nativeJobPredicate": "github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&       github.event.workflow_run.conclusion == 'success' &&       github.event.workflow_run.head_branch == 'main'",
+        "selectedForCurrentOfficialRepository": false,
+        "originalInlineExitCode": 1,
+        "originalInlineErrors": [
+          "coding_workspace_source_refused"
+        ],
+        "eventReads": 0,
+        "networkRequests": 0,
+        "outputWrites": 0
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "sourceBlob": "614ac6b7d261f01a79b5bf88aa89faea2051839c",
+        "nativeJobPredicate": "github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&       github.event.workflow_run.conclusion == 'success' &&       github.event.workflow_run.head_branch == 'main'",
+        "selectedForCurrentOfficialRepository": false,
+        "originalInlineExitCode": 1,
+        "originalInlineErrors": [
+          "thread_lifecycle_source_refused"
+        ],
+        "eventReads": 0,
+        "networkRequests": 0,
+        "outputWrites": 0
+      },
+      {
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "sourceBlob": "bc5fb61e0b28c29e640bab9abfc52c7fc73a054c",
+        "nativeJobPredicate": "github.repository == 'alexj11324/Mikka' && github.ref == 'refs/heads/main' &&       (github.event_name == 'workflow_dispatch' ||        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'))",
+        "selectedForCurrentOfficialRepository": false,
+        "originalInlineExitCode": 1,
+        "originalInlineErrors": [
+          "task_secret_source_refused"
+        ],
+        "eventReads": 0,
+        "networkRequests": 0,
+        "outputWrites": 0
+      }
+    ],
+    "sharedGuard": {
+      "file": "scripts/acceptance/thread-lifecycle-ci.mjs",
+      "blob": "cc2109dfcef25f372c9dc7254ca5d5c4057a6f80",
+      "observedError": "thread_lifecycle_ci:context"
+    },
+    "existingOfficialProfileRecognizesNativeMetadata": "aspectly-labs/Mikka",
+    "existingProfileRejectsForeignIdAndMixedOwner": true,
+    "scope": "Exact original authorization expression and inline pre-checkout body, with only import bindings supplied in an isolated VM; source equals fixed main. Native metadata is unchanged. All env values are plain fixture object fields; host process environment is untouched. I/O is closed: no requests, outputs, checkout, credentials, model, provider, database, dispatch or deploy. This identity-only proof does not assert publication eligibility or product acceptance."
+  },
+  "nativeObservation": {
+    "capturedAt": "2026-11-21 00:03:00 UTC",
+    "source": "https://api.github.com/repos/aspectly-labs/Mikka/actions/runs/44839753192/attempts/1",
+    "mainAtRead": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+    "producer": {
+      "id": 44839753192,
+      "run_attempt": 1,
+      "workflow_id": 405833668,
+      "name": "E2B additive runtime release",
+      "path": ".github/workflows/e2b-official-runtime.yml",
+      "event": "workflow_run",
+      "head_branch": "main",
+      "head_sha": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-20T23:50:57Z",
+      "updated_at": "2026-11-20T23:55:40Z",
+      "run_started_at": "2026-11-20T23:50:57Z",
+      "repository": {
+        "id": 1427517699,
+        "full_name": "aspectly-labs/Mikka",
+        "owner": {
+          "id": 359279274,
+          "login": "aspectly-labs"
+        }
+      },
+      "head_repository": {
+        "id": 1427517699,
+        "full_name": "aspectly-labs/Mikka",
+        "owner": {
+          "id": 359279274,
+          "login": "aspectly-labs"
+        }
+      },
+      "actor": {
+        "id": 183887963,
+        "login": "alexj11324"
+      }
+    },
+    "receivers": [
+      {
+        "id": 44840740262,
+        "attempt": 1,
+        "head": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "repository": {
+          "id": 1427517699,
+          "full_name": "aspectly-labs/Mikka",
+          "owner": {
+            "id": 359279274,
+            "login": "aspectly-labs"
+          }
+        },
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-20T23:59:36Z"
+      },
+      {
+        "id": 44840740174,
+        "attempt": 1,
+        "head": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "repository": {
+          "id": 1427517699,
+          "full_name": "aspectly-labs/Mikka",
+          "owner": {
+            "id": 359279274,
+            "login": "aspectly-labs"
+          }
+        },
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-20T23:59:36Z"
+      },
+      {
+        "id": 44840740207,
+        "attempt": 1,
+        "head": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "repository": {
+          "id": 1427517699,
+          "full_name": "aspectly-labs/Mikka",
+          "owner": {
+            "id": 359279274,
+            "login": "aspectly-labs"
+          }
+        },
+        "path": ".github/workflows/coding-workspace-acceptance.yml",
+        "status": "completed",
+        "conclusion": "skipped",
+        "createdAt": "2026-11-20T23:59:36Z"
+      }
+    ]
+  },
+  "nodeRegression": {
+    "source": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+    "production_blob": "cc2109dfcef25f372c9dc7254ca5d5c4057a6f80",
+    "test_blob": "59be3881dc988360caaafd4583c6ee3fabd18c49",
+    "command": [
+      "node",
+      "--test",
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs"
+    ],
+    "started_at": "2026-11-21T00:11:54.476278+00:00",
+    "completed_at": "2026-11-21T00:11:56.702603+00:00",
+    "seconds": 2.220442873,
+    "exit": 1,
+    "stdout_sha256": "b73f10f34f5c264b938ca62ecc7e1cede41f6e2ac7ff4293eb4677b9752e0d20",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "tests": 40,
+    "pass": 39,
+    "fail": 1,
+    "skip": 0,
+    "failure": "thread_lifecycle_ci:context at the new transferred-official-repository regression",
+    "boundary": "Original Node test suite; production helper remains unchanged. No actual network, VM or model request."
+  },
+  "dependencies": {
+    "artifactReader": "Normally integrated original #3000 head8b5de3dacd3771737b0e25974c195deb057817e8 with mained905; repositoryId/fullName already verified by #3002 are passed unchanged to the one existing artifact reader. #3000 still must normally merge before this dependent PR.",
+    "producerJobContract": "Accepted #2789 producer contract and its retired consumer assumptions are separately repaired in Draft #3007 / SDLC-010. Product acceptance subscription/tool/version/cleanup assertions remain unchanged."
+  },
+  "completionLimits": [
+    "The observed skipped receivers can have other eligibility reasons; the source counterexample proves the name predicate rejects every current official context, not that name was the sole cause of each native skip.",
+    "The new routing observation is an actual unauthenticated HTTP GET to public GitHub; original-suite replay uses synthetic fixtures. Neither proves a paid model/VM/product journey, current publication, or release acceptance.",
+    "#3000 must merge normally first; final integrated-head independent review, applicable protected CI/GitGuardian, normal merge and exact merged-source verification remain required.",
+    "SDLC-010 separately owns the old publication job/report/source contract. The identity repair does not weaken it or count unchanged/skipped publication as validated."
+  ],
+  "nodeGreen": {
+    "command": [
+      "node",
+      "--import",
+      "tsx",
+      "--test",
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs",
+      "scripts/acceptance/coding-workspace-ci.test.mjs",
+      "scripts/acceptance/task-secrets-ci.test.mjs",
+      "scripts/acceptance/task-secrets.test.mjs",
+      "scripts/acceptance/coding-review-ci.test.mjs",
+      "scripts/acceptance/factory-visual-evidence.test.mjs"
+    ],
+    "started_at": "2026-11-21T00:22:03.050103+00:00",
+    "completed_at": "2026-11-21T00:22:07.770415+00:00",
+    "elapsed_seconds": 4.711969237,
+    "exit": 0,
+    "stdout_sha256": "df06df49ff6c0d242cf4b778443746e89b734640e433a412b78a8095ee9fa447",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "source_blobs": {
+      ".github/workflows/coding-workspace-acceptance.yml": "e65e571d57d6cb54fc5f0d10e34c59d9d4a27354",
+      ".github/workflows/task-secret-acceptance.yml": "3060c83346879ee5904b575802343eb999bb4083",
+      ".github/workflows/thread-lifecycle-acceptance.yml": "edf343de47c53873d3b16f0e784ee1cae57d1f8e",
+      "scripts/acceptance/coding-review-ci.mjs": "fd00f4fd9a9c1eb87a18f7972779aac9b8dcda62",
+      "scripts/acceptance/coding-review-ci.test.mjs": "e7763045583ccf970857bebe526d876efad0dde6",
+      "scripts/acceptance/coding-workspace-ci.test.mjs": "a881c8d11669227b09503f15af7e3c0373cadbf5",
+      "scripts/acceptance/factory-visual-evidence.mjs": "184dcdbb36e78ab960be79fe1240dc9a3a27e9dc",
+      "scripts/acceptance/task-secrets-ci.mjs": "3c042af269c79bfced44dbd9d65391606630131b",
+      "scripts/acceptance/task-secrets-ci.test.mjs": "ae6c31a44b96c5b97de52dbac8b22628a2baec40",
+      "scripts/acceptance/task-secrets-journal.mjs": "51d2e95c7c62aa0b046d8c26aeb8cbe09efe3e3f",
+      "scripts/acceptance/task-secrets.mjs": "08a91f899a1134dcb74471ee0bae334583432049",
+      "scripts/acceptance/task-secrets.test.mjs": "cb18054a302add8b7a12f7af68df712315da7e5d",
+      "scripts/acceptance/thread-lifecycle-ci.mjs": "b2fdd76bfbbe9bfc4a83ba0cad99d41188720f1d",
+      "scripts/acceptance/thread-lifecycle-ci.test.mjs": "85b8ea4fc47afd42b2968a97b44c28337f17fabf"
+    },
+    "tests": 159,
+    "pass": 159,
+    "fail": 0,
+    "skip": 0,
+    "scope": "Six existing offline Node suites; exact workflow scripts, shared/caller identity refusals, and original local synthetic TCP SDK/Secret fixtures. No live provider/model call."
+  },
+  "nativeIdentityGreen": {
+    "capturedAt": "2026-11-21T00:20:24.440Z",
+    "node": "v24.22.3",
+    "producer": {
+      "id": 44839753192,
+      "attempt": 1,
+      "head": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "repository": {
+        "id": 1427517699,
+        "full_name": "aspectly-labs/Mikka",
+        "owner": {
+          "id": 359279274,
+          "login": "aspectly-labs"
+        }
+      }
+    },
+    "workflows": [
+      {
+        "path": ".github/workflows/coding-workspace-acceptance.yml",
+        "blob": "e65e571d57d6cb54fc5f0d10e34c59d9d4a27354",
+        "predicate": true,
+        "exit": 0,
+        "eventReads": 1,
+        "mockedApiReads": 3,
+        "outputFields": [
+          "source-sha",
+          "upstream-run-id",
+          "upstream-run-attempt"
+        ]
+      },
+      {
+        "path": ".github/workflows/thread-lifecycle-acceptance.yml",
+        "blob": "edf343de47c53873d3b16f0e784ee1cae57d1f8e",
+        "predicate": true,
+        "exit": 0,
+        "eventReads": 1,
+        "mockedApiReads": 3,
+        "outputFields": [
+          "source-sha",
+          "upstream-run-id",
+          "upstream-run-attempt"
+        ]
+      },
+      {
+        "path": ".github/workflows/task-secret-acceptance.yml",
+        "blob": "3060c83346879ee5904b575802343eb999bb4083",
+        "predicate": true,
+        "exit": 0,
+        "eventReads": 1,
+        "mockedApiReads": 3,
+        "outputFields": [
+          "source-sha",
+          "upstream-run-id",
+          "upstream-run-attempt"
+        ]
+      }
+    ],
+    "shared": {
+      "blob": "b2fdd76bfbbe9bfc4a83ba0cad99d41188720f1d",
+      "expected": {
+        "sourceCommit": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "runId": 44839753192,
+        "runAttempt": 1,
+        "workflowId": 405833668,
+        "event": "workflow_run",
+        "repositoryFullName": "aspectly-labs/Mikka",
+        "repositoryId": 1427517699,
+        "repositoryOwnerId": "359279274"
+      },
+      "proof": {
+        "kind": "thread-lifecycle-ci-attestation",
+        "sourceCommit": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+        "upstream": {
+          "runId": 44839753192,
+          "runAttempt": 1,
+          "workflowId": 405833668
+        },
+        "selected": false,
+        "reason": "unrelated",
+        "runtime": "unchanged_worker",
+        "jobs": {
+          "test": 136644911514,
+          "check": 136646242757,
+          "release": 136646711790
+        }
+      },
+      "mockedApiReads": 6
+    },
+    "boundary": "Unchanged captured native run/attempt/repository/owner and jobs are supplied to exact production functions and pre-checkout bodies in closed I/O. Workflow state=active and main ref at captured6fe are explicit support fixtures. No live new HTTP routing, model, VM, credentials, dispatch or release acceptance. The native skipped publication remains unchanged_worker and unselected for empty changed-files input."
+  },
+  "localPreparation": {
+    "failedAttempt": {
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs",
+        "scripts/acceptance/task-secrets.test.mjs",
+        "scripts/acceptance/coding-review-ci.test.mjs",
+        "scripts/acceptance/factory-visual-evidence.test.mjs"
+      ],
+      "started_at": "2026-11-21T00:18:05.869803+00:00",
+      "completed_at": "2026-11-21T00:18:10.665947+00:00",
+      "elapsed_seconds": 4.79534462,
+      "exit": 1,
+      "stdout_sha256": "07e6f4625f1e7b6a650b7cac18d14f5c2565963b6f44ad8a8962b7e39cc447b1",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "failures": [
+      "A test-only readApi constant was initially scoped inside its mock but referenced by the retained call assertion outside it; moved to the fixture module scope, assertions retained.",
+      "Two original bundle/loopback SDK tests required missing pinned ai7.0.148 and @ai-sdk/openai-compatible3.0.75. Installed only those fixed original dependencies into the research test directory, reused existing tsx4.23.15/zod4.6.7 and workspace protocol/config. No package manifest or lockfile changes."
+    ],
+    "resolvedBeforeGreen": true
+  },
+  "boundaryInventory": [
+    {
+      "paths": [
+        ".github/workflows/coding-workspace-acceptance.yml",
+        ".github/workflows/thread-lifecycle-acceptance.yml",
+        ".github/workflows/task-secret-acceptance.yml"
+      ],
+      "action": "Reuse accepted native finite repository ID/name/owner predicate before checkout; bind both webhook/API repository identities and route reads via immutable repository ID. Existing events/main/source/attempt/timeouts/permissions/output fields stay unchanged."
+    },
+    {
+      "path": "scripts/acceptance/thread-lifecycle-ci.mjs",
+      "action": "Use existing actionsMikkaRepository/officialMikkaRepository, require explicit expected repository binding, compare native run/head identities, use immutable API. Preserve original jobs/source/cost/lifecycle/precredential gates."
+    },
+    {
+      "path": "scripts/acceptance/task-secrets-ci.mjs",
+      "action": "Runner context reuses official profile. Its real artifact and API transport repair remains #3000 normal-integration dependency."
+    },
+    {
+      "path": "scripts/acceptance/task-secrets-journal.mjs",
+      "action": "Actual task-secret acceptance/factory budget reads require coherent official Actions context and immutable attempt-jobs API; current-job/source/attempt/body/time limits unchanged."
+    },
+    {
+      "path": "scripts/acceptance/task-secrets.mjs",
+      "action": "Driver runner context reuses official profile; separate Mikka-handoff target, canary selection, budget, source/worker/window and cleanup constraints remain unchanged."
+    },
+    {
+      "path": "scripts/acceptance/coding-review-ci.mjs",
+      "action": "Real workspace-review dispatch mode inside task-secret workflow reuses profile/immutable API and passes expected repository binding; original manual mode, source/worker/report and credential checks remain."
+    },
+    {
+      "path": "scripts/acceptance/factory-visual-evidence.mjs",
+      "action": "Only mandatory ABI compatibility: pass this caller existing trusted Actions repository fields to shared assertReleaseIdentity. Original repository guard, #1789 fixed merge/source, #1783 window, prior cases, job selector, API and workload scope are unchanged; current canonical context remains excluded."
+    },
+    {
+      "paths": [
+        "scripts/acceptance/task-secrets-fixture-runtime.mjs",
+        "scripts/acceptance/task-secrets-native.mjs",
+        "scripts/acceptance/coding-workspace-native.mjs"
+      ],
+      "action": "Retain Mikka-handoff identity: it is a separate target repository, not the transferred public product repository."
+    },
+    {
+      "path": "scripts/acceptance/run-observability-workflow.mjs",
+      "action": "No edit: old browser/progress writer guard is used only by --runner-browser. The task-secret factory consumer uses original --execute and explicitly forbids browser/progress token paths."
+    }
+  ],
+  "publicationContractDependency": {
+    "finding": "SDLC-010",
+    "observation": {
+      "source": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "helperBlob": "cc2109dfcef25f372c9dc7254ca5d5c4057a6f80",
+      "node": "v24.22.3",
+      "capturedAt": "2026-11-21T00:15:07.382Z",
+      "result": [
+        {
+          "runId": 44839753192,
+          "runAttempt": 1,
+          "sourceCommit": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+          "result": {
+            "selected": true,
+            "reason": "lifecycle_changes",
+            "runtime": "unchanged_worker",
+            "jobs": {
+              "test": 136644911514,
+              "check": 136646242757,
+              "release": 136646711790
+            }
+          }
+        },
+        {
+          "runId": 44140435060,
+          "runAttempt": 1,
+          "sourceCommit": "5189fa615cfd7ce281ce7c7e17e477206dba2254",
+          "error": "thread_lifecycle_ci:jobs"
+        }
+      ],
+      "boundary": "Exact original pure selectRelease over unchanged native attempt job metadata; no network, models, VM, credentials or publication."
+    },
+    "limit": "No selector or report requirement changed in this identity repair. Historical workflow source differs from actual published source; job-name-only substitution would be insufficient."
+  },
+  "pullRequest": {
+    "number": 3002,
+    "url": "https://github.com/aspectly-labs/Mikka/pull/3002",
+    "branch": "feat/sdlc-2984-consumer-identity",
+    "redHead": "8cc4979852486183137434a74018baaf7514d63f",
+    "redTree": "a9728e847ffac8c889c7fd9aac75ed1d0204f314"
+  },
+  "ownerCheck": {
+    "source": "Native canonical GitHub PR metadata plus prior complete changed-file/source inspection at the same unchanged heads.",
+    "pr2821": {
+      "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+      "draft": true,
+      "scope": "Original Vercel/attestation work; old identity guards still present. No same-root transfer implementation."
+    },
+    "pr2994": {
+      "head": "40571ce6c780d4044f3c664099e060c857085879",
+      "scope": "Original six other workflows plus CI policy test integration; none of the three runtime consumers."
+    },
+    "pr3000": {
+      "head": "275cf937d8de19da2baa761aa3567930b880fe84",
+      "draft": true,
+      "scope": "Independent historical runtime/artifact reader; explicit normal-integration dependency, not copied."
+    },
+    "originalIssues": [
+      1593,
+      1721,
+      1712
+    ],
+    "originalProductOwnership": "Unchanged; this repair only changes common engineering source admission and authenticated read routing.",
+    "nativeReadbacks": [
+      {
+        "id": 2821,
+        "head": "7dbd4c78b83c168b0b741e1c6c9c85b75bfaeb16",
+        "draft": true,
+        "merged": false,
+        "readCompletedAt": "2026-11-21T00:22:56.462Z"
+      },
+      {
+        "id": 2994,
+        "head": "40571ce6c780d4044f3c664099e060c857085879",
+        "draft": false,
+        "merged": false,
+        "readCompletedAt": "2026-11-21T00:22:56.580Z"
+      },
+      {
+        "id": 3000,
+        "head": "275cf937d8de19da2baa761aa3567930b880fe84",
+        "draft": true,
+        "merged": false,
+        "readCompletedAt": "2026-11-21T00:22:56.627Z"
+      }
+    ]
+  },
+  "normalIntegration": {
+    "kind": "008 normal integration reuses tested 010 dependency-only tree",
+    "sourceTestedTree": "7cfb020bb90ad32af7d2fa2466623f197eb0a9a0",
+    "sourceReceipt": "research/runtime-publication-contract/baseline-integrated/receipt.json",
+    "sourceCount": 179,
+    "sourceSkip": 0,
+    "integratedTree": "7006522f8472acd29034a0af1326a6eb99d126de",
+    "parents": [
+      "1ff6f09d66f025f5c1fc2e2125e58a1ae9dfabc1",
+      "8b5de3dacd3771737b0e25974c195deb057817e8"
+    ],
+    "mainFilesRetained": [
+      ".github/workflows/device-gateway.yml",
+      ".github/workflows/mobile-screenshots.yml",
+      ".github/workflows/production-smoke.yml",
+      ".github/workflows/suggestions-cron.yml",
+      ".github/workflows/ui-policy.yml",
+      ".github/workflows/workspace-governance-acceptance.yml",
+      "docs/dev-workflow.md",
+      "scripts/acceptance/work-domain-production.mjs",
+      "scripts/acceptance/work-domain-production.test.mjs",
+      "scripts/ci-docs-only.test.mjs",
+      "scripts/ci/optimization.test.mjs",
+      "scripts/ci/select.test.mjs",
+      "scripts/cloudflare-native-oci.test.mjs",
+      "scripts/device-gateway/deploy.mjs",
+      "scripts/device-gateway/deploy.test.mjs",
+      "scripts/device-gateway/select-release.mjs",
+      "scripts/release/mobile-screenshots.mjs",
+      "scripts/release/mobile-screenshots.test.mjs",
+      "scripts/suggestions-cron/deploy.mjs"
+    ],
+    "allOtherBlobsIdenticalToTestedTree": true,
+    "remoteIntegrationCommit": "3946f274752d83d5388082e934770476e50e287d",
+    "localIntegrationCommit": "92fa29009a3db86b83912b4a331c117b62f2bcec",
+    "artifactAbi": "Use the caller-verified expected.repositoryId and expected.repositoryFullName; never replace the current fullName with legacy REPOSITORY.",
+    "testReuse": "All files outside the 19 exact #2994 main paths are byte-identical to dependency-only 7cfb020b tree; 179/179 source-bound result is historical reused evidence, not a claimed new integrated-head 179-test execution."
+  },
+  "downstreamMetadataRoute": {
+    "observedAt": "2026-11-21T00:59:33.172971+00:00",
+    "rootCause": "The shared and pre-checkout guards admitted canonical identity, but Task readGithub still used the retired personal-name URL with redirect:error. Native GitHub returns301 to immutable repository1427517699; source-only top-level guard tests missed this later phase.",
+    "nativeHttp": {
+      "observedAt": "2026-11-21T00:50:28.141221+00:00",
+      "url": "https://api.github.com/repos/alexj11324/Mikka/actions/runs/44839753192",
+      "method": "GET",
+      "requestBody": false,
+      "credentials": false,
+      "followRedirects": false,
+      "exitCode": 0,
+      "httpStatus": "301",
+      "location": "https://api.github.com/repositories/1427517699/actions/runs/44839753192",
+      "bodySha256": "5b4152ef1abcef950c7c6fa603919a48e247c56252a093ef432c7ac0ac87b007"
+    },
+    "red": {
+      "source": "92fa29009a3db86b83912b4a331c117b62f2bcec",
+      "testedIndexTree": "66edbac684a51ef6e91d136e0e2cb56959f37699",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs"
+      ],
+      "startedAt": "2026-11-21T00:53:56.498111+00:00",
+      "endedAt": "2026-11-21T00:54:00.987451+00:00",
+      "wallSeconds": 4.489338598000359,
+      "exitCode": 1,
+      "counts": {
+        "tests": 17,
+        "pass": 16,
+        "fail": 1,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "stdoutSha256": "74bde2ed1cb7e1c9d2b4db1839aabdb63d8b60f6ff590bbdbafc43ae6065e714",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "nativeObservation": "research/runtime-consumer-transfer/legacy-api-routing/receipt.json",
+      "scope": "Existing Task suite plus one native-301 routing/canonical artifact regression; no external request or model in test execution",
+      "remoteCommit": "eca34186fdaf20882352f96ddae48d094cd9ea64",
+      "firstError": "task_secret_ci:github",
+      "otherOriginalTests": "16 passing; only new canonical metadata route case fails"
+    },
+    "green": {
+      "source": "19879e4aa687f51d35679c5a3f00f71037783b11",
+      "testedIndexTree": "16bf9642521e8455b6df43907cd081eafe810c5c",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "--test",
+        "scripts/acceptance/task-secrets-ci.test.mjs"
+      ],
+      "startedAt": "2026-11-21T00:56:19.049844+00:00",
+      "endedAt": "2026-11-21T00:56:23.637610+00:00",
+      "wallSeconds": 4.5873730579996845,
+      "exitCode": 0,
+      "counts": {
+        "tests": 17,
+        "pass": 17,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0
+      },
+      "stdoutSha256": "2f09d6ef10b29c811efcfd629937f075f9a70382aa3d75c8a9f10785cf6a6c5b",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "productionChange": "one fixed API origin switched to existing immutable publicRepositoryId; redirect:error and paired artifact metadata identity unchanged",
+      "scope": "Original 17 Task tests including actual-301 counterexample; synthetic test IO, no real model/provider",
+      "localImplementationCommit": "c5f8f2d32d922fbb1558ec6be11dd4c4b72547f3",
+      "productionBlob": "ab554b659ba50a220cdc43fdd2e3c8d76599b7a1",
+      "testBlob": "c63144ebd55be30f7aeab3053c55871be8bcf9f4"
+    },
+    "preservedChecks": [
+      "same redirect:error and20s timeout",
+      "existing fixed repository ID",
+      "paired official fullName/owner/ID",
+      "foreign artifact URLs reject",
+      "two original latest-run and main fences",
+      "original artifact size/digest/expiry/ZIP/report checks",
+      "token not forwarded to storage"
+    ],
+    "fixtureChange": "Only original fake API request keys follow the immutable metadata route. Artifact URL fields retain the actual full-name metadata contract. The new regression replays the observed301 for any old-name request.",
+    "staticChecks": {
+      "oxlint": "1.89.0 exact lock version; deny-warnings pass",
+      "syntax": "both changed original modules pass node --check",
+      "errorCause": "pass",
+      "polling": "pass after restoring missing local TypeScript5.9.3 from an identical pnpm-lock blob8edabcdf0c0d946b0f0e8ddb12dbc0f215595061",
+      "cloudBoundary": "pass after same dependency restoration",
+      "initialFailures": "Two policy processes could not start because the recovered minimal worktree lacked TypeScript; both failures retained separately, not product failures or passes."
+    },
+    "exclusions": [
+      "Factory visual remains its finite original #1789 source/window; no scope expansion",
+      "No new API helper/validator/workflow/trigger",
+      "No paid model/VM/publication or Cloud/customer data operation"
+    ],
+    "reviewStatus": "The existing review6001366091 remains bound to earlier1ff; this main/artifact/API delta requires a new exact-head review."
+  }
+}

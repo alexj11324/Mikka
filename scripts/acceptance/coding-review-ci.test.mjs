@@ -5,7 +5,8 @@ import { attestCodingWorkspace, readWorkspaceReviewOptions } from './coding-revi
 
 const app = 'a'.repeat(40), source = 'b'.repeat(40), worker = 'c'.repeat(40), token = 'synthetic-private-github-token'
 const repo = 'alexj11324/Mikka', api = `https://api.github.com/repos/${repo}`
-const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: repo, GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main',
+const readApi = 'https://api.github.com/repositories/1427517699'
+const env = () => ({ GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: repo, GITHUB_REPOSITORY_ID: '1427517699', GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main',
   GITHUB_SHA: app, APPLICATION_SHA: app, EXPECTED_SOURCE_SHA: app, GITHUB_RUN_ID: '990', GITHUB_RUN_ATTEMPT: '1', GITHUB_TOKEN: token,
   EXPECTED_WORKER_SHA: worker, EXPECTED_WORKER_SOURCE_SHA: source, EXPECTED_CLAUDE_TEMPLATE: 'released-claude', EXPECTED_CODEX_TEMPLATE: 'released-codex',
   WORKSPACE_REVIEW_RELEASE_RUN_ID: '123', WORKSPACE_REVIEW_RELEASE_RUN_ATTEMPT: '2', ACCEPTANCE_MODE: 'workspace-review',
@@ -15,14 +16,15 @@ function fixture() {
   const now = Date.now(), workflow = { id: 456, name: 'E2B additive runtime release', path: '.github/workflows/e2b-official-runtime.yml', state: 'active' }
   const run = { id: 123, run_attempt: 2, workflow_id: 456, name: workflow.name, path: workflow.path, head_sha: source, head_branch: 'main',
     event: 'push', status: 'completed', conclusion: 'success', run_started_at: new Date(now - 60000).toISOString(),
-    repository: { id: 789, full_name: repo }, head_repository: { id: 789, full_name: repo } }
+    repository: { id: 1427517699, full_name: repo, owner: { id: 183887963 } },
+    head_repository: { id: 1427517699, full_name: repo, owner: { id: 183887963 } } }
   const names = ['test', 'check', 'validate / build', 'await-web', 'subscriptions', 'publish / deploy', 'cleanup']
   const jobs = { total_count: names.length, jobs: names.map((name, index) => ({ id: index + 1, name, run_id: 123, run_attempt: 2,
     head_sha: source, status: 'completed', conclusion: 'success' })) }
   const artifact = { id: 321, name: 'e2b-release-evidence-123-2', expired: false, size_in_bytes: 1000, digest: 'sha256:' + 'd'.repeat(64),
     created_at: new Date(now - 10000).toISOString(), expires_at: new Date(now + 3600000).toISOString(),
     url: `${api}/actions/artifacts/321`, archive_download_url: `${api}/actions/artifacts/321/zip`,
-    workflow_run: { id: 123, repository_id: 789, head_repository_id: 789, head_branch: 'main', head_sha: source } }
+    workflow_run: { id: 123, repository_id: 1427517699, head_repository_id: 1427517699, head_branch: 'main', head_sha: source } }
   const report = { sourceCommit: source, workerSha: worker,
     templates: Object.fromEntries(['desktop', 'claude', 'codex'].map(kind => [kind, { name: `mikka-${source.slice(0, 12)}-123-2-${kind}`,
       baseTemplate: kind, templateId: `released-${kind}`, buildId: `build-${kind}`, preinstalled: true, public: true, buildStatus: 'ready' }])),
@@ -35,10 +37,10 @@ function fixture() {
   return { data, calls, attestations: () => attestations, dependencies: { now: () => now,
     attest: async received => { assert.equal(received.APPLICATION_SHA, app); attestations++; return { sourceCommit: app, publicBuild: app } },
     fetchImpl: async (url, options) => {
-      calls.push(url); assert.ok(url.startsWith(api + '/')); assert.equal(options.headers.authorization, 'Bearer ' + token)
+      calls.push(url); assert.ok(url.startsWith(readApi + '/')); assert.equal(options.headers.authorization, 'Bearer ' + token)
       assert.equal(options.redirect, 'error')
-      if (url === `${api}/actions/workflows/e2b-official-runtime.yml`) return Response.json(data.workflow)
-      if (url === `${api}/actions/runs/123`) { reads++; return Response.json(data.mutateFinalRun && reads > 1 ? { ...data.run, run_attempt: 3 } : data.run) }
+      if (url === `${readApi}/actions/workflows/e2b-official-runtime.yml`) return Response.json(data.workflow)
+      if (url === `${readApi}/actions/runs/123`) { reads++; return Response.json(data.mutateFinalRun && reads > 1 ? { ...data.run, run_attempt: 3 } : data.run) }
       if (url.endsWith('/attempts/2/jobs?per_page=100')) return Response.json(data.jobs)
       if (url.endsWith('/artifacts?per_page=100')) return Response.json({ total_count: 1, artifacts: [data.artifact] })
       if (url.endsWith('/actions/artifacts/321')) return Response.json(data.artifact)
@@ -55,6 +57,11 @@ test('workspace-review is exclusive, explicit, main-bound and fixed to both orig
   assert.equal(options.sourceCommit, app); assert.equal(options.workerSourceCommit, source)
   assert.equal(options.releaseRunId, 123); assert.equal(options.cleanupOnly, false)
   assert.equal(readWorkspaceReviewOptions(['--cleanup'], env()).cleanupOnly, true)
+  const transferred = { ...env(), GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274' }
+  assert.equal(readWorkspaceReviewOptions(['--execute'], transferred).sourceCommit, app)
+  for (const patch of [{ GITHUB_REPOSITORY_ID: '999' }, { GITHUB_REPOSITORY_OWNER_ID: '183887963' },
+    { GITHUB_REPOSITORY_OWNER_ID: undefined }, { GITHUB_REPOSITORY: 'foreign/Mikka' }])
+    assert.throws(() => readWorkspaceReviewOptions(['--execute'], { ...transferred, ...patch }), /workspace_review_guard_refused/)
   for (const args of [[], ['--execute', '--cleanup'], ['--execute', '--production-canary'], ['--prepare']])
     assert.throws(() => readWorkspaceReviewOptions(args, env()), /workspace_review_guard_refused/)
   for (const change of [{ ACCEPTANCE_MODE: 'execute' }, { GITHUB_EVENT_NAME: 'workflow_run' }, { GITHUB_REF: 'refs/heads/other' },
@@ -72,7 +79,7 @@ test('manual application and exact published worker release are independently bo
   assert.equal(proof.sourceCommit, app); assert.equal(proof.workerSourceCommit, source); assert.equal(proof.workerSha, worker)
   assert.equal(proof.upstream.runAttempt, 2); assert.equal(proof.runtime, 'validated_and_published')
   assert.equal(f.attestations(), 2); assert.equal(JSON.stringify(proof).includes(token), false)
-  assert.equal(f.calls.filter(url => url === `${api}/actions/runs/123`).length, 2)
+  assert.equal(f.calls.filter(url => url === `${readApi}/actions/runs/123`).length, 2)
 })
 
 test('a stale attempt, failed publish, wrong subscription/template or changed upstream is refused', async () => {

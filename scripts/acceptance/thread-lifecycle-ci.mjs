@@ -4,6 +4,7 @@ import { appendFileSync, mkdirSync, readFileSync, realpathSync, writeFileSync } 
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { assertCurrentMain, waitForWebDeployment } from '../release/web-deploy.mjs'
+import { actionsMikkaRepository, officialMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 
 export const REPOSITORY = 'alexj11324/Mikka'
 export const RELEASE_WORKFLOW = '.github/workflows/e2b-official-runtime.yml'
@@ -43,30 +44,36 @@ const require = (ok, code) => { if (!ok) throw new LifecycleCIError(code) }
 
 /** The webhook is only a pointer. Every identity and attempt is checked against the API. */
 export function expectedRelease(env, event) {
-  require(env.GITHUB_EVENT_NAME === 'workflow_run' && env.GITHUB_REPOSITORY === REPOSITORY
+  const repository = actionsMikkaRepository(env)
+  require(env.GITHUB_EVENT_NAME === 'workflow_run' && repository
     && env.GITHUB_REF === 'refs/heads/main', 'context')
   const run = event?.workflow_run
   require(integer(run?.id) && integer(run?.run_attempt) && integer(run?.workflow_id)
     && SHA.test(run?.head_sha ?? '') && run.name === RELEASE_NAME
     && run.status === 'completed' && run.conclusion === 'success'
     && ['push', 'workflow_dispatch', 'workflow_run'].includes(run.event) && run.head_branch === 'main'
-    && run.repository?.full_name === REPOSITORY && run.head_repository?.full_name === REPOSITORY, 'trigger')
+    && officialMikkaRepository(run.repository?.full_name, String(run.repository?.id), String(run.repository?.owner?.id)) === repository
+    && officialMikkaRepository(run.head_repository?.full_name, String(run.head_repository?.id), String(run.head_repository?.owner?.id)) === repository, 'trigger')
   require(env.EXPECTED_SOURCE_SHA === run.head_sha
     && env.EXPECTED_UPSTREAM_RUN_ID === String(run.id)
     && env.EXPECTED_UPSTREAM_RUN_ATTEMPT === String(run.run_attempt), 'trigger')
   return { sourceCommit: run.head_sha, runId: run.id, runAttempt: run.run_attempt, workflowId: run.workflow_id,
-    event: run.event }
+    event: run.event, repositoryFullName: repository, repositoryId: Number(publicRepositoryId),
+    repositoryOwnerId: env.GITHUB_REPOSITORY_OWNER_ID }
 }
 
 export function assertReleaseIdentity(expected, workflow, run) {
   require(workflow?.id === expected.workflowId && workflow.path === RELEASE_WORKFLOW
     && workflow.name === RELEASE_NAME && workflow.state === 'active', 'workflow')
-  require(run?.id === expected.runId && run.run_attempt === expected.runAttempt
+  const repository = officialMikkaRepository(expected.repositoryFullName, String(expected.repositoryId), expected.repositoryOwnerId)
+  require(repository && typeof expected.repositoryOwnerId === 'string'
+    && run?.id === expected.runId && run.run_attempt === expected.runAttempt
     && run.workflow_id === expected.workflowId && run.path === RELEASE_WORKFLOW && run.name === RELEASE_NAME
     && run.status === 'completed' && run.conclusion === 'success' && run.event === expected.event
     && ['push', 'workflow_dispatch', 'workflow_run'].includes(run.event) && run.head_branch === 'main'
-    && run.head_sha === expected.sourceCommit && run.repository?.full_name === REPOSITORY
-    && run.head_repository?.full_name === REPOSITORY, 'upstream')
+    && run.head_sha === expected.sourceCommit
+    && officialMikkaRepository(run.repository?.full_name, String(run.repository?.id), String(run.repository?.owner?.id)) === repository
+    && officialMikkaRepository(run.head_repository?.full_name, String(run.head_repository?.id), String(run.head_repository?.owner?.id)) === repository, 'upstream')
 }
 
 /** Only lifecycle source/driver changes or an actually validated candidate spend money. */
@@ -117,7 +124,7 @@ async function githubRead(path, { token, fetchImpl }) {
   require(typeof token === 'string' && token.length > 0, 'context')
   let response
   try {
-    response = await fetchImpl('https://api.github.com/repos/' + REPOSITORY + path, {
+    response = await fetchImpl('https://api.github.com/repositories/' + publicRepositoryId + path, {
       headers: { accept: 'application/vnd.github+json', authorization: 'Bearer ' + token,
         'x-github-api-version': '2022-11-28' }, redirect: 'error', signal: AbortSignal.timeout(20_000),
     })
