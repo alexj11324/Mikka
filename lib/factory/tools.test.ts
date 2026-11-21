@@ -11,7 +11,7 @@ before(async()=>{registry=await import('@/workflows/coordinator/tools')})
 test('normal Coordinator dispatch tools carry the closed task Profile reference, never defaultOnly',()=>{
  const tools=registry.createCoordinatorRegistry('owner',randomUUID(),undefined,{computerEnabled:true,switches:{issueTools:true,factoryRouting:true,factoryLifecycle:true}})
  for(const name of ['dispatch_run','dispatch_bot_computer']){
-  const schema=tools[name]!.inputSchema as {safeParse:(value:unknown)=>{success:boolean;data?:Record<string,unknown>}}
+  const schema=tools[name]!.inputSchema as unknown as {safeParse:(value:unknown)=>{success:boolean;data?:Record<string,unknown>}}
   const input=name==='dispatch_run'?{issueId:randomUUID(),model:{harness:'codex'}}:{issueId:randomUUID()}
   for(const profileId of ['default',randomUUID()]){
    const result=schema.safeParse({...input,profileId,defaultOnly:true})

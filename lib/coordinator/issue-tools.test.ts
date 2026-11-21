@@ -60,7 +60,7 @@ test('issue tools are available in the default definition and global capability 
 
 test('GitHub discovery accepts an exact schema lookup and its bounded page cursor without adding call arguments', () => {
   const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
-  const schema = tools.github_tools!.inputSchema as { safeParse(input: unknown): { success: boolean } }
+  const schema = tools.github_tools!.inputSchema as unknown as { safeParse(input: unknown): { success: boolean } }
   assert.equal(schema.safeParse({ tool: 'actions_run_trigger', cursor: 'x'.repeat(4096) }).success, true)
   assert.equal(schema.safeParse({ cursor: 'x'.repeat(4097) }).success, false)
   assert.equal(schema.safeParse({ name: 'actions_run_trigger', arguments: { method: 'run_workflow' } }).success, false)
@@ -95,7 +95,7 @@ test('schedule tools use the host source event and SDK call identity', async () 
     title: 'Read the task', timezone: 'UTC', timing: { kind: 'once', at: '2030-01-01T09:00:00Z' },
     task: { kind: 'reminder', text: 'Read the task' }, misfire: 'catch_up_once', maxLatenessMinutes: 5,
   }
-  const schema = tools.schedule_create!.inputSchema as { safeParse(input: unknown): { success: boolean } }
+  const schema = tools.schedule_create!.inputSchema as unknown as { safeParse(input: unknown): { success: boolean } }
   assert.equal(schema.safeParse({ definition, sourceEventId: 'forged' }).success, false)
   await tools.schedule_create!.execute!({ definition }, { toolCallId: 'sdk-schedule', messages: [], context: {} })
   assert.deepEqual(scheduled.mock.calls.at(-1)!.arguments, ['owner', 'bot', sourceEventId, { action: 'create', requestId: 'sdk-schedule', definition }, scope])
@@ -158,7 +158,7 @@ test('one task, one thread: dispatch takes newThread from the model but the pers
   assert.match(String(dispatch.description), /one thread at a time/)
   assert.match(String(dispatch.description), /never to start over/)
   assert.match(COORDINATOR_INSTRUCTIONS, /Never dispatch a second thread/)
-  const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean; data?: Record<string, unknown> } }
+  const schema = dispatch.inputSchema as unknown as { safeParse(input: unknown): { success: boolean; data?: Record<string, unknown> } }
   const input = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository', newThread: true, model: { harness: 'codex' as const } }
   assert.equal(schema.safeParse(input).success, true)
   // A model-supplied message id is not part of the tool's input.
@@ -170,7 +170,7 @@ test('one task, one thread: dispatch takes newThread from the model but the pers
 test('dispatch takes a named place: one of the person\'s computers by id, or the cloud, and reports where it runs', async () => {
   const tools = registry.createCoordinatorRegistry('owner', COORDINATOR_BOT, undefined, { coordinator: true })
   const dispatch = tools.dispatch_run!
-  const schema = dispatch.inputSchema as { safeParse(input: unknown): { success: boolean } }
+  const schema = dispatch.inputSchema as unknown as { safeParse(input: unknown): { success: boolean } }
   const base = { issueId: 'b4000000-0000-4000-8000-000000000005', repo: 'example/repository', model: { harness: 'claude_code' as const } }
   assert.equal(schema.safeParse({ ...base, target: { deviceId: 'b4000000-0000-4000-8000-000000000008' } }).success, true)
   assert.equal(schema.safeParse({ ...base, target: 'cloud' }).success, true)
