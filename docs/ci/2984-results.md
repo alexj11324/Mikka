@@ -571,7 +571,7 @@ Owner exclusions and review boundaries are retained in the
 [local Git-mode evidence](2984-local-modes-evidence.json) and
 [approved-writes duplicate evidence](2984-approved-writes-dedup.json).
 The expanded fixture JSON's original012 snapshot points to its unchanged
-[historical bdec evidence file](https://github.com/aspectly-labs/Mikka/blob/bdec301935a3ad2b07e14e7a24d03adcd16d5434/docs/ci/2984-agent-kit-fixture.json),
+[historical44dc evidence file for the bdec code](https://github.com/aspectly-labs/Mikka/blob/44dc61e20dd21a4109fcfcc89c33ee89727898fe/docs/ci/2984-agent-kit-fixture.json),
 SHA256 `312c3f38ef1871c7dbc66b5bd6674254da1f51f97fbe63793c6ef709ec82a405`;
 that older snapshot and review do not cover the expanded candidate.
 The audit's125 transaction-call candidates are candidates, not125 defects.
