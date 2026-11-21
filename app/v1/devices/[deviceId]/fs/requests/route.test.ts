@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
 
 let signedIn = true, owned = true
-mock.module('next/server', { namedExports: { NextResponse: { json: Response.json } } })
+mock.module('@/lib/server-runtime/server', { namedExports: { NextResponse: { json: Response.json } } })
 mock.module(new URL('../../../../../../lib/device-link.ts', import.meta.url).href, { namedExports: {
   authenticateDevice: async () => signedIn ? { userId: 'PRIVATE_USER' } : null,
   ownsDevice: async () => owned ? { id: 'PRIVATE_DEVICE' } : null,

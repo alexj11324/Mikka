@@ -36,8 +36,8 @@ export const SECTION_TITLE_KEYS: Record<WorkspaceSection, string> = {
 const URL_SECTIONS = ['pulls', 'conversations', 'agent', 'plugins', 'suggestions', 'artifacts', 'memory', 'automations', 'all-issues', 'projects'] as const satisfies readonly WorkspaceSection[]
 const READ_SECTIONS: readonly string[] = [...URL_SECTIONS, 'coordinator']
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-/** Query keys that belong to a page inside a section (the plugins page's app and category, an open automation); a new place drops them. */
-const PAGE_KEYS = ['app', 'category', 'automation'] as const
+/** Query keys that belong to a page inside a section (the plugins page's app and category, an open automation, a PR's own page); a new place drops them. */
+const PAGE_KEYS = ['app', 'category', 'automation', 'pull'] as const
 
 /** The retired 任务 page's address. Tasks have one entry, the board (2026-11-13-1405): an old link opens it in its list view. */
 export const LEGACY_TASKS_SECTION = 'tasks'
@@ -59,6 +59,8 @@ export type WorkspaceLocation = {
   bot: string | null
   /** Optional Bot filter for the conversation directory. */
   directoryBot?: string | null
+  /** 查看运行: the thread directory filtered to one automation's runs (`directoryAutomation=<id>`; `automation` is the editor's). */
+  directoryAutomation?: string | null
   /** The group chat in the centre (`group=<id>`; its section is implied). */
   group: string | null
   /** The saved chat in the centre (`section=agent&session=<id>`); null opens the latest. */
@@ -86,9 +88,9 @@ const TEAM_SECTIONS: readonly string[] = ['team-home', 'team-issues', 'team-proj
 /** Pages that can show one project. */
 const PROJECT_SECTIONS: readonly string[] = ['projects', 'team-projects'] satisfies readonly WorkspaceSection[]
 /** Keys this file owns besides `section`, in the order a new address writes them. */
-const PLACE_KEYS = ['bot','directoryBot', 'group', 'session', 'team', 'project', 'issue', 'mainThread', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const PLACE_KEYS = ['bot','directoryBot', 'directoryAutomation', 'group', 'session', 'team', 'project', 'issue', 'mainThread', 'task', 'thread', 'artifact', 'threads'] as const satisfies readonly (keyof WorkspaceLocation)[]
 /** What is in the centre; the thread sits beside it and the Artifact window over it. */
-const CENTRE_KEYS = ['section', 'bot','directoryBot', 'group', 'session', 'team', 'project', 'issue', 'mainThread'] as const satisfies readonly (keyof WorkspaceLocation)[]
+const CENTRE_KEYS = ['section', 'bot','directoryBot', 'directoryAutomation', 'group', 'session', 'team', 'project', 'issue', 'mainThread'] as const satisfies readonly (keyof WorkspaceLocation)[]
 
 /** A team page without a team is the workspace-wide page it would scope. */
 export function sectionFor(section: WorkspaceSection, team: string | null): WorkspaceSection {
@@ -106,6 +108,7 @@ export function readLocation(params: URLSearchParams): WorkspaceLocation {
   return {
     section,
     ...(section === 'conversations' && id('directoryBot') ? {directoryBot:id('directoryBot')} : {}),
+    ...(section === 'conversations' && id('directoryAutomation') ? {directoryAutomation:id('directoryAutomation')} : {}),
     bot: section === 'coordinator' ? id('bot') : null,
     group: section === 'group' ? id('group') : null,
     session: section === 'agent' ? id('session') : null,
@@ -144,7 +147,7 @@ function buildHref(current: URL, change: Partial<WorkspaceLocation>, nameCoordin
   const named = params.get('section') === 'coordinator'
   const next = { ...before, ...change }
   next.section = sectionFor(next.section, next.team)
-  if (next.section !== 'conversations') delete next.directoryBot
+  if (next.section !== 'conversations') { delete next.directoryBot; delete next.directoryAutomation }
   if (next.section !== 'coordinator') next.bot = null
   if (next.section !== 'group') next.group = null
   if (next.section !== 'agent') next.session = null

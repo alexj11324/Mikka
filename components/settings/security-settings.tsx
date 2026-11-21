@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'

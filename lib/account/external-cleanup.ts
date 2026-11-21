@@ -5,14 +5,22 @@ import { getComposio, retireComposioAccount } from '@/lib/composio'
 import { listComposioPages } from '@/lib/composio-pagination'
 import type { AccountCleanupReport } from './cleanup-result'
 import { cleanupAccountSubscriptions, type SubscriptionDeletionLease } from './subscription-cleanup'
+import { cleanupAccountBilling } from './billing-cleanup'
 import { cleanupAccountRuntimes } from './runtime-cleanup'
 
-/** No provider contents are deleted. Managed authorization must be revoked before its local mapping goes. */
-export async function cleanupAccountConnections(ownerId: string, database: Pool, job?: SubscriptionDeletionLease): Promise<AccountCleanupReport> {
+/**
+ * No provider contents are deleted. Managed authorization must be revoked before its local mapping goes.
+ * `soloWorkspaceIds` are the workspaces this deletion removes (Plan.solo); their paid plans must be
+ * cancelled here, before the delete path takes the only entry point that could cancel them.
+ */
+export async function cleanupAccountConnections(ownerId: string, database: Pool, job?: SubscriptionDeletionLease, soloWorkspaceIds: readonly string[] = []): Promise<AccountCleanupReport> {
   // Remote adapters resolve custody/key material through the current server scope.
   // A restore or caller-supplied SQL target must use explicit adapters, never ambient remote credentials.
   if (database.options.connectionString !== pool.options.connectionString || database.options.options !== pool.options.options) return { blockedReasons: ['external_cleanup_target_mismatch'], warnings: [] }
   const blocked: string[] = [], warnings: string[] = []
+  // Billing goes first: a card that keeps being charged outlives every local row this job removes.
+  const billing = await cleanupAccountBilling(database, { soloWorkspaceIds })
+  blocked.push(...billing.blockedReasons); warnings.push(...billing.warnings)
   const cached = (await database.query('SELECT "accountId" FROM composio_accounts WHERE "userId"=$1', [ownerId])).rows
   const composio = getComposio()
   if (!composio && cached.length) blocked.push('composio_not_configured')

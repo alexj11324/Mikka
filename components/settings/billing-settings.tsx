@@ -1,7 +1,7 @@
 'use client'
 
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { BillingPage } from '@ui-slot/settings-billing'
 import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { useBillingManagement } from '@/hooks/settings/use-billing-management'

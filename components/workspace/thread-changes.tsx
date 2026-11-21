@@ -3,7 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getSingularPatch, Virtualizer } from '@pierre/diffs'
 import { FileDiff, VirtualizerContext } from '@pierre/diffs/react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronDown, ChevronRight, ExternalLink } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'

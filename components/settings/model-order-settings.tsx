@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, type ReactNode } from 'react'
-import Link from 'next/link'
-import { useTranslations } from 'next-intl'
+import Link from '@/lib/client-runtime/link'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronDown, GripVertical, KeyRound, MoreHorizontal } from '@/components/icons'
 import { Kanban, KanbanColumnContent, KanbanItem, KanbanItemHandle } from '@/components/reui/kanban'
 import { ModelLabel, harnessName } from '@/components/labels/entity-labels'

@@ -10,7 +10,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true
 let currentTeam, submit, calls, choices, prompts
 const team={id:'team-explicit',identifier:'TEAM',name:'Synthetic'}
 window.confirm=()=>{prompts++;throw Error('Unexpected manual approval')}
-mock.module('next-intl',{namedExports:{useTranslations:()=>key=>key}})
+mock.module('@/lib/intl/i18n-client',{namedExports:{useTranslations:()=>key=>key}})
 mock.module('swr',{defaultExport:key=>key==='teams'?{data:[team]}:{data:currentTeam,mutate:async value=>{currentTeam=value}},namedExports:{useSWRConfig:()=>({mutate:async()=>{}})}})
 mock.module(new URL('../app/actions/teams.ts',import.meta.url).href,{namedExports:{listTeams:async()=>[team]}})
 mock.module(new URL('../app/actions/team-relations.ts',import.meta.url).href,{namedExports:{getIssueTeam:async()=>currentTeam,setIssueTeam:async input=>{calls.push(input);return submit(input)}}})

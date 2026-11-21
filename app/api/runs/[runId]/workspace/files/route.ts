@@ -8,7 +8,6 @@ import { requestWorkspaceRead } from '@/lib/coding-workspace/requests'
 import { workspaceReadResponse } from '@/lib/coding-workspace/response'
 import { workspaceErrorStatus, workspaceSessionStillValid } from '@/lib/coding-workspace/http'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 export async function GET(request: Request, context: { params: Promise<{ runId: string }> }) {

@@ -2,7 +2,7 @@
 
 // The default panel-header slot (docs/ui-overlay.md): the header row of a bot's 概览 and of a group's panel as the
 // community layer draws them. 概览: its actions, ⤢ and ✕ at the end, no title. A group: 详情 as a pill, then ✕.
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Maximize2, Minimize2, X } from '@/components/icons'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'

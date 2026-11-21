@@ -5,8 +5,6 @@ import { GovernanceError } from '@/lib/governance/errors'
 import { AccountAuthenticationError, requireFreshAccountSession } from '@/lib/account/fresh-session'
 import { cancelAccountDeletion, readAccountDeletionReceipt, requestAccountDeletion } from '@/lib/account/deletion-jobs'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 const headers = { 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' }
 const receipt = z.string().uuid()
 const requestBody = z.object({ email: z.string().trim().max(320), requestId: receipt }).strict()

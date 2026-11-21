@@ -1,5 +1,5 @@
-import { workersAiRequest } from '../../workers-ai/binding.mjs'
 import { WorkerEntrypoint } from 'cloudflare:workers'
+import { liteLlmRequest } from '../../api/ingress/services.mjs'
 import { productRequest } from '../runtime/product.mjs'
 import { singletonContainerName } from '../runtime/config.mjs'
 export { EveRuntime } from './index.mjs'
@@ -7,8 +7,8 @@ export { ContainerProxy } from '@cloudflare/containers'
 
 const missing = () => new Response(null, { status: 404 })
 
-export class WorkersAiOutbound extends WorkerEntrypoint {
-  fetch(request) { return workersAiRequest(request, this.env.WORKERS_AI, this.ctx.props.capability, this.ctx) }
+export class LiteLlmOutbound extends WorkerEntrypoint {
+  fetch(request) { return liteLlmRequest(request, this.env.LITELLM) }
 }
 
 export class EveProductOutbound extends WorkerEntrypoint {

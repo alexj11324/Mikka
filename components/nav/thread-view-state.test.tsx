@@ -13,7 +13,7 @@ let createRoot: typeof import('react-dom/client')['createRoot']
 let AllThreadsColumn: typeof import('./all-threads')['AllThreadsColumn']
 let ThreadList: typeof import('./thread-list')['ThreadList']
 const translate = (key: string) => key
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useNow: () => new Date('2026-11-03'), useFormatter: () => ({ relativeTime: () => 'yesterday' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate, useNow: () => new Date('2026-11-03'), useFormatter: () => ({ relativeTime: () => 'yesterday' }) } })
 mock.module('../workspace/thread-column', { namedExports: { RightColumn: ({ children }: { children: ReactNode }) => <aside>{children}</aside> } })
 mock.module('./context-panel', { namedExports: {
   matches: (query: string, ...texts: (string | null)[]) => texts.some(text => text?.includes(query)),

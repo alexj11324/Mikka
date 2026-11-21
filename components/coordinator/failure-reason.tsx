@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { CircleAlert } from '@/components/icons'
 import { failureMessageKey, type ChatFailure } from '@/lib/chat-failure'
 import { Button } from '@/components/ui/button'

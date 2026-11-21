@@ -1,16 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
 import type { z } from 'zod'
 import { withBasePath } from '@/lib/base-path'
 import { personalProjectSelection } from '@/lib/project-input'
-import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 
 type Selection = z.infer<typeof personalProjectSelection>
-type Read = { scope: string; data?: Selection; error?: boolean; continueUnbound?: boolean }
+type Read = { scope: string; data?: Selection; error?: boolean }
 
 export function usePersonalProjectPicker(readerId?: string, workspaceId?: string) {
   const scope = readerId && workspaceId ? JSON.stringify([readerId, workspaceId]) : null
@@ -41,7 +37,12 @@ export function usePersonalProjectPicker(readerId?: string, workspaceId?: string
   }, [scope, readerId, url, version])
   const data = current?.data
   const project = data?.projects.find(item => item.id === data.projectId)
-  const pending = Boolean(scope && (!current || writing === scope || current.error && !current.continueUnbound))
+  // A default project is a convenience, never a precondition: a read that fails
+  // (a solo account has no organization to hold one, or the request simply
+  // lost) leaves `project` undefined and the task is created without one. It
+  // used to hold `pending` true and block the dialog behind "无项目", so a
+  // person with no projects could not create a task at all.
+  const pending = Boolean(scope && (!current || writing === scope))
   async function choose(projectId: string | null) {
     if (!url || !scope || !data?.organizationId || writeInFlight.current) return
     writeInFlight.current = true
@@ -59,21 +60,5 @@ export function usePersonalProjectPicker(readerId?: string, workspaceId?: string
       setWriting(null)
     }
   }
-  return { data, project, pending, error: current?.error === true, continueUnbound: scope && current?.error && !current.continueUnbound
-    ? () => setRead({ scope, error: true, continueUnbound: true }) : undefined, choose, reload: () => setVersion(value => value + 1) }
-}
-
-export function PersonalProjectPicker({ picker, disabled }: { picker: ReturnType<typeof usePersonalProjectPicker>; disabled: boolean }) {
-  const t = useTranslations('Shell.newTaskDialog'), board = useTranslations('Shell.board'), common = useTranslations('Common')
-  if (picker.error) return <div role="alert" className="flex items-center gap-2 text-sm">
-    {t('projectPreferenceUnavailable')}{picker.continueUnbound && <Button type="button" variant="outline" size="sm" onClick={picker.continueUnbound}>{board('noProject')}</Button>}<Button type="button" variant="link" size="sm" onClick={picker.reload}>{common('retry')}</Button>
-  </div>
-  if (!picker.data?.organizationId || !picker.data.projects.length) return null
-  return <Label className="flex items-center gap-2 text-sm">{t('defaultProject')}
-    <NativeSelect size="sm" disabled={disabled || picker.pending} value={picker.project?.id ?? ''}
-      onChange={event => { void picker.choose(event.currentTarget.value || null) }}>
-      <NativeSelectOption value="">{board('noProject')}</NativeSelectOption>
-      {picker.data.projects.map(item => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}
-    </NativeSelect>
-  </Label>
+  return { data, project, pending, error: current?.error === true, choose, reload: () => setVersion(value => value + 1) }
 }

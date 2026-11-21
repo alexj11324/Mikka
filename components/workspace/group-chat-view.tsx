@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import useSWRInfinite, { unstable_serialize as infiniteKey } from 'swr/infinite'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { listAgents } from '@/app/actions/agents'
 import { ChatComposer } from '@/components/coordinator/chat-composer'
 import { BotModelPicker } from '@/components/coordinator/bot-model-picker'

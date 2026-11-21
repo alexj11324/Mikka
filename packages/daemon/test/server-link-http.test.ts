@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { CLIENT_VERSION_HEADER, RUN_CREDENTIALS_HEADER, SUBSCRIPTION_MODEL_CATALOGUE_HEADER, emptyRunReport } from "@mikka/protocol"
 import { defaultRunPolicy } from "@mikka/protocol/agent-policy"
 import { TEAM_SKILL_HEADER } from '@mikka/protocol/skill'
-import { RECOVERY_WORKTREE_HEADER } from "@mikka/protocol/device"
+import { RECOVERY_WORKTREE_HEADER, MODEL_GATEWAY_LOOPBACK_HEADER } from "@mikka/protocol/device"
 import { TASK_SECRETS_HEADER, TASK_SECRETS_VERSION } from '@mikka/protocol/task-secrets'
 
 import {
@@ -159,11 +159,22 @@ describe("HttpServerLink", () => {
       expect(new Headers(init?.headers).get(RUN_CREDENTIALS_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(SUBSCRIPTION_MODEL_CATALOGUE_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(TEAM_SKILL_HEADER)).toBe('1')
+      expect(new Headers(init?.headers).get(MODEL_GATEWAY_LOOPBACK_HEADER)).toBe('1')
       expect(new Headers(init?.headers).get(TASK_SECRETS_HEADER)).toBe(TASK_SECRETS_VERSION)
       return json({...assignment('run-1'),continuesRunId:'lost-run',requireWorktreeContinuation:true})
     }) as typeof fetch
     const result=await new HttpServerLink('http://server.test',fetcher).claimRun('dev-1','run-1')
     expect(result.requireWorktreeContinuation).toBe(true)
+  })
+  it('accepts a loopback gateway assignment only for the configured server origin', async () => {
+    const key = 'mkg_' + 'a'.repeat(43)
+    for (const origin of ['http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://localhost:3000']) {
+      const modelCredential = { kind: 'provider', protocol: 'openai', baseUrl: origin + '/mikka/api/model-gateway/openai/v1', key }
+      const { fetch } = scripted(() => json({ ...assignment('run-1'), harness: 'codex', modelCredential }))
+      const claimed = new HttpServerLink('http://127.0.0.1:3000/mikka', fetch).claimRun('dev-1', 'run-1')
+      if (origin === 'http://127.0.0.1:3000') expect((await claimed).modelCredential).toEqual(modelCredential)
+      else await expect(claimed).rejects.toThrow('Loopback model gateway unavailable')
+    }
   })
   it('a claim delivers task grants for the whole run; the report renews nothing', async () => {
     const grant = { name: 'VENDOR_KEY', capability: 'synthetic-opaque-initial', expiresAt: SOON(), origin: 'https://api.example.com' }

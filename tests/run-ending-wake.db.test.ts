@@ -11,8 +11,8 @@ if (process.env.REQUIRE_DB === '1') assert.ok(ready, 'matching isolated loopback
 
 test('run endings wake their committed owner once, including a pre-existing cloud completion event', { skip: !ready, timeout: 30_000 }, async t => {
   const tasks: Promise<unknown>[] = []
-  const next = await import('next/server')
-  t.mock.module('next/server', { namedExports: { ...next, after: (work: () => Promise<unknown>) => { tasks.push(work()) } } })
+  const next = await import('@/lib/server-runtime/server')
+  t.mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => Promise<unknown>) => { tasks.push(work()) } } })
   const { pool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
   const { coordinatorWakeTransport } = await import('../lib/coordinator/wake-after-commit')

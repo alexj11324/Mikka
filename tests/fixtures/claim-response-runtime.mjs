@@ -86,7 +86,8 @@ export const claimWorkspacePool = { async query(sql, args) {
   p.membershipReads.push(args)
   return { rows: p.workspaceMemberAllowed ? args[1].map(userId => ({ userId })) : [] }
 } }
-const nextServer = import.meta.resolve('next/server')
+const realServer = new URL('../../lib/server-runtime/server.ts', import.meta.url).href
+const nextServer = realServer
 const modelContract = new URL('../../lib/model-admission/contract.ts', import.meta.url).href
 const actionError = new URL('../../lib/action-error.ts', import.meta.url).href
 const mailboxCapability = new URL('../../lib/personal-mailbox-capability.ts', import.meta.url).href
@@ -229,7 +230,7 @@ const sources = new Map([
   // The claim transaction's session check (decision 2026-11-17-2215) reads the probe's device.
   ['/lib/device-session.ts', 'export async function deviceSessionHeld(tx,deviceId){const p=globalThis.claimResponseProbe;if(typeof tx?.query!=="function"||deviceId!==p.device.id)throw new Error("unexpected session check");return Boolean(p.device.sessionOpenedAt)&&!p.device.sessionClosedAt}'],
   ['/lib/project-resources/run-lease.ts', projectExecutionSource],
-  ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
+  ['/lib/model-admission/runtime.ts', `import {ModelAdmissionError} from ${JSON.stringify(modelContract)};export async function assertUnmanagedModelTransport(scope,model){const p=globalThis.claimResponseProbe;p.preparation.push('model-admission');(p.modelAdmissionScopes??=[]).push(scope);(p.modelAdmissionCalls??=[]).push({scope,model});if(p.modelAdmissionDeniedWorkspace===scope.workspaceId)throw new ModelAdmissionError('modelRouteDenied')};export async function assertLiteLLMModelTransport(scope,model,endpoint){const p=globalThis.claimResponseProbe;(p.liteLLMAdmissionCalls??=[]).push({scope,model,endpoint});await assertUnmanagedModelTransport(scope,model)};export async function assertSubscriptionModelTransport(scope,model,route){const p=globalThis.claimResponseProbe;(p.subscriptionAdmissionCalls??=[]).push({scope,model,route});await assertUnmanagedModelTransport(scope,model)}`],
   ['/lib/db/index.ts', dbSource],
   ['/lib/workspace-db.ts', `export {claimWorkspaceDatabase as workspaceDb, claimWorkspacePool as workspacePool} from ${JSON.stringify(import.meta.url)}`],
   ['/lib/device-link.ts', 'export async function authenticateDevice(){const p=globalThis.claimResponseProbe;return Object.hasOwn(p,"caller") ? (p.caller && {tokenId:"synthetic-device-token",...p.caller}) : {userId:"member",tokenId:"synthetic-device-token"}};export async function ownedDevice(){return globalThis.claimResponseProbe.device};export async function ownedDeviceWithReport(){return globalThis.claimResponseProbe.device}'],
@@ -346,6 +347,9 @@ registerHooks({
     if(specifier==='server-only')return {url:'claim-fixture:empty',shortCircuit:true}
     if(specifier==='next/server')return {url:'claim-fixture:next-server',shortCircuit:true}
     const result=next(specifier,context)
+    // tsx resolves the `@/` alias first, so match the resolved path, not the specifier.
+    // The stub itself imports the real classes; let that one through.
+    if(result.url===realServer&&context.parentURL!=='claim-fixture:next-server')return {url:'claim-fixture:next-server',shortCircuit:true}
     for(const [suffix,source] of sources)if(result.url.endsWith(suffix))return {url:`claim-fixture:${encodeURIComponent(source)}`,shortCircuit:true}
     return result
   },

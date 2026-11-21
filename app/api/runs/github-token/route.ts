@@ -3,7 +3,6 @@ import { createRunGitHubTokenExchange, RUN_GITHUB_MIN_VALIDITY_MS } from '@/lib/
 import { githubMachineCredential } from '@/lib/github/machine-credential'
 import { recordRepositoryInstallation, repositoryInstallationFresh } from '@/lib/github/repository-installation'
 
-export const dynamic = 'force-dynamic'
 
 export const POST = createRunGitHubTokenExchange({
   authorize: authorizeRunGitHubToken,

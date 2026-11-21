@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import useSWR from 'swr'
 import { withBasePath } from '@/lib/base-path'
 import { useActionError } from '@/lib/use-action-error'

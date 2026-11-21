@@ -14,7 +14,7 @@ let mcpRead: { data?: McpWorkspacePage; error?: Error }
 const retry = mock.fn(async () => undefined)
 const names = { github: 'GitHub', linear: 'Linear', telegram: 'Telegram' }
 const t = (key: string, args?: Record<string, string>) => key === 'connectionStatusFailed' ? `Could not read ${args?.names}` : key
-mock.module('next-intl', { namedExports: { useTranslations: () => t } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => t } })
 mock.module('swr', { defaultExport: (key: unknown, fetcher: () => Promise<Read>) => {
   if (key === null) return { mutate: retry }
   if (Array.isArray(key) && key[0] === 'settings:mcp-connections') return { ...mcpRead, mutate: retry }

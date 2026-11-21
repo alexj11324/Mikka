@@ -1,8 +1,8 @@
 'use client'
 
-import NextLink from 'next/link'
+import NextLink from '@/lib/client-runtime/link'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { AudioLines, Download, FileText, Image, RotateCw, X } from '@/components/icons'
 import {
   Attachment,

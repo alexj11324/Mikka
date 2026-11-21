@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { pollIssue } from '@/app/actions/issues'
 import { moveIssueToProject } from '@/app/actions/projects'
 import useSWR from 'swr'

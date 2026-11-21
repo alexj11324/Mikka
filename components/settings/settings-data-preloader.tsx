@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import type { WorkspaceSettings } from '@/lib/workspace-access'
 import { prefetchConnectedApps } from '@/lib/settings-prefetch'
 import { fetchSettingsData, fetchTeamDirectory, fetchTeamMembers, memberSettingsKey, settingsReadOptions, teamDirectoryKey, teamMembersKey } from '@/lib/settings-data'

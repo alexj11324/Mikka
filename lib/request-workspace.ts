@@ -1,5 +1,5 @@
 import 'server-only'
-import { cookies } from 'next/headers'
+import { cookies } from '@/lib/server-runtime/headers'
 import { activeTaskWorkspaces } from '@/lib/task-workspace'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal, type EnterprisePrincipal } from '@/lib/enterprise/principal'

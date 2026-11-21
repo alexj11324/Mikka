@@ -1,6 +1,7 @@
 import "server-only";
 import { pool } from "./db";
 import { ActionFailureError } from "./action-error";
+import { botModelEffort } from "./bot-model-effort";
 import { ExecutionSettings, executionWorkspace } from "./execution-settings";
 import { botApiKeyChoice, usableApiKeys } from "./model-api-keys";
 import { apiKeyServesBotModel, resolveBotModelChoice } from "./bot-model-choice";
@@ -14,6 +15,17 @@ import {
 
 /** Runs inside the first reservation callback; replays keep their frozen choice. */
 export async function freezeBotModel(
+  scope: HostedModelScope,
+  dependencies: HostedModelDependencies,
+): Promise<HostedRuntimeSnapshot> {
+  const workspaceId = scope.workspaceId ?? (await executionWorkspace(scope.ownerId, scope.botId));
+  const snapshot = await freezeBotModelChoice({ ...scope, workspaceId }, dependencies);
+  // The Bot's reasoning effort is frozen with the turn's model (lib/model-effort.ts applies it per call).
+  const effort = await botModelEffort(pool, { ownerId: scope.ownerId, workspaceId }, scope.botId);
+  return effort ? { ...snapshot, effort } : snapshot;
+}
+
+async function freezeBotModelChoice(
   scope: HostedModelScope,
   dependencies: HostedModelDependencies,
 ): Promise<HostedRuntimeSnapshot> {

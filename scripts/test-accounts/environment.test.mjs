@@ -9,7 +9,7 @@ import { assertDatabaseIdentity, databaseTarget, deploymentAttestation, environm
 import { readBoundedBody } from './http-body.mjs'
 import { MVP_DECISION_KEY, installMvpTransport, verifyMvpTransport, hasBoundMvpTransport } from '../../tests/mvp/transport.mjs'
 import { hasBoundDevLocalTransport, installDevLocalTransport, verifyDevLocalTransport } from '../dev-local/transport.mjs'
-import { LOCAL_RESEND_KEY } from '../dev-local/services.mjs'
+import { LOCAL_RESEND_KEY, LOCAL_LITELLM_KEY, LOCAL_LITELLM_URL } from '../dev-local/services.mjs'
 import { prepareCloudAcceptance } from '../e2b/cloud-acceptance-release.mjs'
 
 function withSyntheticCredentials(value) {
@@ -35,9 +35,9 @@ test('environment binds all explicit database aliases, origin, SHA and capabilit
     { DATABASE_URL: 'postgresql://elsewhere.invalid/production' }, { ORVILO_DATABASE_URL: 'postgresql://elsewhere.invalid/production' },
     { BETTER_AUTH_URL: 'https://app.aspectlylabs.com' }, { E2E_BASE_URL: 'http://localhost:9999' },
     { MIKKA_TEST_DEPLOYMENT_SHA: 'b'.repeat(40) }, { RESEND_API_KEY: 'synthetic-mail-canary' }, { VERCEL_ENV: 'production' }, { VERCEL: '1' },
-    { AI_GATEWAY_API_KEY: 'synthetic-model-canary' }, { OPENAI_API_KEY: 'synthetic-model-canary' },
+    { AI_GATEWAY_API_KEY: 'synthetic-model-canary' }, { ZEROCAT_API_KEY: 'synthetic-model-canary' }, { MIKKA_LITELLM_MASTER_KEY: 'synthetic-model-canary' }, { OPENAI_API_KEY: 'synthetic-model-canary' },
     { ANTHROPIC_API_KEY: 'synthetic-model-canary' }, { COMPOSIO_API_KEY: 'synthetic-service-canary' }, { E2B_API_KEY: 'synthetic-service-canary' }, { EXPO_ACCESS_TOKEN: 'synthetic-service-canary' },
-    { POSTHOG_SECRET_KEY: 'synthetic-service-canary' }, { AI_GATEWAY_API_KEY: MVP_DECISION_KEY },
+    { POSTHOG_SECRET_KEY: 'synthetic-service-canary' }, { MIKKA_LITELLM_MASTER_KEY: MVP_DECISION_KEY },
   ]) assert.throws(() => validateEnvironment(descriptor, { ...env, ...change }))
 })
 
@@ -160,7 +160,7 @@ test('only the exact isolated MVP key with a proven current loopback transport c
   const fixtureEnv = {
     ...env, MIKKA_TEST_ENVIRONMENT_FILE: file,
     CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1',
-    AI_GATEWAY_API_KEY: MVP_DECISION_KEY,
+    MIKKA_LITELLM_MASTER_KEY: MVP_DECISION_KEY,
   }
   let upstreamCalls = 0
   // This is a pure transport/descriptor fixture. No database, app server or
@@ -185,7 +185,7 @@ test('only the exact isolated MVP key with a proven current loopback transport c
       { VERCEL: '1' }, { VERCEL_ENV: 'production' },
       { E2E_BASE_URL: 'https://outside.invalid' }, { BETTER_AUTH_URL: 'https://outside.invalid' },
       { MIKKA_TEST_DEPLOYMENT_SHA: 'b'.repeat(40) }, { DATABASE_URL: 'postgresql://outside.invalid/production' },
-      ...['AI_GATEWAY_API_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY', 'RESEND_API_KEY'].map(name => ({ [name]: 'synthetic-live-key-canary' })),
+      ...['MIKKA_LITELLM_MASTER_KEY', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'COMPOSIO_API_KEY', 'E2B_API_KEY', 'EXPO_ACCESS_TOKEN', 'POSTHOG_SECRET_KEY', 'RESEND_API_KEY'].map(name => ({ [name]: 'synthetic-live-key-canary' })),
     ]) {
       assert.throws(() => validateEnvironment(descriptor, { ...fixtureEnv, ...change }))
       await assert.rejects(loadEnvironment({ ...fixtureEnv, ...change }))
@@ -216,7 +216,7 @@ test('only the exact isolated MVP key with a proven current loopback transport c
 test('local placeholders require a proven active stub transport while real keys remain forbidden', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-local-environment-guard-'))
   const file = join(directory, 'environment.json')
-  const local = { ...env, MIKKA_LOCAL_TEST_ACCOUNTS: '1', MIKKA_TEST_ENVIRONMENT_FILE: file, AI_GATEWAY_API_KEY: MVP_DECISION_KEY, RESEND_API_KEY: LOCAL_RESEND_KEY }
+  const local = { ...env, MIKKA_LOCAL_TEST_ACCOUNTS: '1', MIKKA_TEST_ENVIRONMENT_FILE: file, MIKKA_LITELLM_MASTER_KEY: LOCAL_LITELLM_KEY, MIKKA_LITELLM_URL: LOCAL_LITELLM_URL, RESEND_API_KEY: LOCAL_RESEND_KEY }
   let upstreamCalls = 0
   const upstream = async () => { upstreamCalls++; return new Response(null, { status: 204 }) }
   let restore
@@ -231,7 +231,7 @@ test('local placeholders require a proven active stub transport while real keys 
     assert.equal(upstreamCalls, 0)
     for (const change of [
       { MIKKA_LOCAL_TEST_ACCOUNTS: undefined }, { VERCEL_ENV: 'production' },
-      { AI_GATEWAY_API_KEY: 'real-key' }, { RESEND_API_KEY: 'real-mail-key' }, { OPENAI_API_KEY: 'real-key' },
+      { MIKKA_LITELLM_MASTER_KEY: 'real-key' }, { RESEND_API_KEY: 'real-mail-key' }, { OPENAI_API_KEY: 'real-key' },
       { E2E_DATABASE_URL: 'postgresql://outside.invalid/production' },
     ]) await assert.rejects(loadEnvironment({ ...local, ...change }))
     const boundary = globalThis.fetch

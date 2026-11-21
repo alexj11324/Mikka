@@ -1097,18 +1097,18 @@ test('the Coordinator is an ordinary bot row', { skip: !dbUrl }, async t => {
     const p = await person('model-choice')
     const { ExecutionSettings } = await import('../lib/execution-settings')
     const { creditsOptionId } = await import('../lib/bot-model-menu-view')
-    const { COORDINATOR_MODEL } = await import('../lib/coordinator/model')
+    const { SELF_HOSTED_DEFAULT_CATALOG_ID } = await import('../lib/model-gateway/config')
     const { botId, workspaceId } = await bots.coordinatorBot(p.id, null)
     const settings = new ExecutionSettings(appPool)
-    // A self-hosted server's own provider is what Mikka 额度 offers here; the pick is saved like any other.
-    const names = ['MIKKA_EDITION', 'MIKKA_DEFAULT_MODEL_BASE_URL', 'MIKKA_DEFAULT_MODEL_API_KEY', 'MIKKA_DEFAULT_MODEL_ID'] as const
+    // A self-hosted server offers its managed LiteLLM default; the pick is saved like any other.
+    const names = ['MIKKA_EDITION', 'MIKKA_LITELLM_URL', 'MIKKA_LITELLM_MASTER_KEY'] as const
     const before = Object.fromEntries(names.map(name => [name, process.env[name]]))
-    Object.assign(process.env, { MIKKA_EDITION: 'community', MIKKA_DEFAULT_MODEL_BASE_URL: 'https://provider.example.invalid/v1',
-      MIKKA_DEFAULT_MODEL_API_KEY: 'synthetic-fixture-only', MIKKA_DEFAULT_MODEL_ID: 'local-configured-model' })
+    Object.assign(process.env, { MIKKA_EDITION: 'community', MIKKA_LITELLM_URL: 'https://litellm.example.invalid',
+      MIKKA_LITELLM_MASTER_KEY: 'synthetic-fixture-only' })
     try {
-      const credits = creditsOptionId(COORDINATOR_MODEL)
+      const credits = creditsOptionId(SELF_HOSTED_DEFAULT_CATALOG_ID)
       await settings.setBotModel({ ownerId: p.id, workspaceId }, botId, credits)
-      assert.deepEqual((await pool.query('SELECT "botKey","creditsModel" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: botId, creditsModel: COORDINATOR_MODEL }], 'saved under the bot row, never \'coordinator\'')
+      assert.deepEqual((await pool.query('SELECT "botKey","creditsModel" FROM bot_model_choices WHERE "ownerId"=$1', [p.id])).rows, [{ botKey: botId, creditsModel: SELF_HOSTED_DEFAULT_CATALOG_ID }], 'saved under the bot row, never \'coordinator\'')
       assert.equal(await settings.botModel({ ownerId: p.id, workspaceId }, botId), credits)
     } finally { for (const name of names) if (before[name] === undefined) delete process.env[name]; else process.env[name] = before[name] }
   })

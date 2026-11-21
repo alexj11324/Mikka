@@ -16,8 +16,6 @@ on:
         value: ${{ jobs.select.outputs.daemon }}
       desktop:
         value: ${{ jobs.select.outputs.desktop }}
-      image:
-        value: ${{ jobs.select.outputs.image }}
       analytics:
         value: ${{ jobs.select.outputs.analytics }}
       db:
@@ -43,7 +41,6 @@ jobs:
       source: ${{ steps.select.outputs.source }}
       daemon: ${{ steps.select.outputs.daemon }}
       desktop: ${{ steps.select.outputs.desktop }}
-      image: ${{ steps.select.outputs.image }}
       analytics: ${{ steps.select.outputs.analytics }}
       db: ${{ steps.select.outputs.db }}
       units: ${{ steps.select.outputs.units }}
@@ -74,7 +71,7 @@ jobs:
           import { pathToFileURL } from 'node:url'
           const {inventory, readTree} = await import(pathToFileURL(`${process.env.TRUSTED_ROOT}/scripts/run-db-tests.mjs`))
           const db = inventory(readTree('.'), JSON.parse(fs.readFileSync('package.json')).scripts)
-          const result = {docs_only:false,core:true,integration:true,source:true,daemon:true,desktop:true,image:true,analytics:true,db:true,units:['*'],db_suites:db.scripts,db_matrix:{shard:['1/4','2/4','3/4','4/4']}}
+          const result = {docs_only:false,core:true,integration:true,source:true,daemon:true,desktop:true,analytics:true,db:true,units:['*'],db_suites:db.scripts,db_matrix:{shard:['1/4','2/4','3/4','4/4']}}
           for (const [key,value] of Object.entries(result)) fs.appendFileSync(process.env.GITHUB_OUTPUT, `${key}=${typeof value === 'object' ? JSON.stringify(value) : value}\n`)
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Trusted selector absent: full legacy coverage and complete DB inventory.\n')
           JS

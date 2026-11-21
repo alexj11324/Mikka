@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { withBasePath } from '@/lib/base-path'
 
 /**

@@ -26,8 +26,8 @@ test('an artifact key reaches only its owner home, after the real artifact write
   t.mock.module(new URL('../coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: receive } })
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { pending.push(work) } } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { pending.push(work) } } })
   const channelScopes = new Map<string, LiveScope>(), unexpected: string[] = []
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'

@@ -3,7 +3,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 import { z } from "zod";
 import { orchestratorSettings } from "@mikka/protocol/orchestrator";
-import { gatewayAuth } from "../ai-gateway-auth";
 import { invokeDecision, type DecisionExecution } from "../coordinator/decide";
 import {
   DECISION_MODEL,
@@ -314,7 +313,7 @@ export function createFactoryCheckRecovery(
     let result: Awaited<ReturnType<typeof invokeDecision>> = null;
     try {
       const call = () => invoke("factory-check-recovery", prepared.context, questions, signal);
-      if (invoke !== invokeDecision || !(await gatewayAuth())) result = await call();
+      if (invoke !== invokeDecision) result = await call();
       else {
         const [{ hostedBillingScope }, { executionWorkspace }, { lockCliTaskScope }] = await Promise.all([
           import('../abuse/context'), import('../execution-settings'), import('../agent-tool-approval/policy-store'),

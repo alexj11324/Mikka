@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createFormatter } from 'next-intl'
+import { createFormatter } from '@/lib/intl/i18n-client'
 import { formatDateOnly } from './date-only'
 
 const ZONES = ['America/Los_Angeles', 'Pacific/Honolulu', 'UTC', 'Asia/Shanghai', 'Pacific/Kiritimati']

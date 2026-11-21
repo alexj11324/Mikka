@@ -1,6 +1,6 @@
 'use client'
 
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { Download } from '@/components/icons'
 import { SettingsSection } from '@/components/settings/primitives'
 import { Badge } from '@/components/ui/badge'

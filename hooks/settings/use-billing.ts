@@ -3,7 +3,7 @@
 import { settingsKeys } from '@/lib/swr/keys'
 import { useCallback, useEffect, useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
 import { openBillingPortal, startPlanCheckout, type getBilling } from '@/app/actions/billing'
 import { settingsRead } from '@/lib/settings-read'

@@ -3,7 +3,7 @@ import { after, before, mock, test } from 'node:test'
 import { act } from 'react'
 import { Window } from 'happy-dom'
 import type { Root } from 'react-dom/client'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import messages from '../messages/en.json'
 import { taskPresentation } from '../lib/task-presentation'
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Server } from '@/components/icons'
 import type { BundledBridge, BundledServer, BundledServerProbe, BundledServerState } from '@mikka/protocol/bridge'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'

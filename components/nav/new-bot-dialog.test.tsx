@@ -12,7 +12,7 @@ mock.module(new URL('../slots/new-bot.tsx', import.meta.url).href, { namedExport
   NewBot: (next: NewBotProps) => { props = next; return null },
 } })
 mock.module(new URL('../slots/bot-avatar.tsx', import.meta.url).href, { namedExports: { BotAvatar: () => null } })
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => Object.assign((key: string) => `${namespace}.${key}`, { has: () => false }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => Object.assign((key: string) => `${namespace}.${key}`, { has: () => false }) } })
 mock.module('sonner', { namedExports: { toast: { error: (text: string) => { toasts.push(text) }, success: () => {} } } })
 
 const selectedScopes: (string | undefined)[] = []
@@ -26,6 +26,11 @@ let failChoose = false
 mock.module(new URL('../../app/actions/bots.ts', import.meta.url).href, { namedExports: {
   getWorkspaceBotDefaults: async (workspaceId?: string) => { selectedScopes.push(workspaceId); calls.push('defaults'); return defaultsResult },
   createBot: async (input: Record<string, unknown>, workspaceId?: string) => { selectedScopes.push(workspaceId); created.push(input); return { id: 'new-bot', name: input.name, color: input.color, shape: input.shape } },
+  listBotEnvironments: async () => { calls.push('environments'); return { environments: [{ id: 'env-default', name: 'Default', repositoryKeys: ['v2/github.com/acme/app'] }], shareable: false } },
+  setBotEffort: async (botId: string, effort: string | null) => { calls.push(`effort:${botId}:${effort}`); return { id: botId, effort } },
+} })
+mock.module(new URL('../../app/actions/agents.ts', import.meta.url).href, { namedExports: {
+  listDevices: async () => { calls.push('devices'); return [] },
 } })
 mock.module(new URL('../../app/actions/execution-settings.ts', import.meta.url).href, { namedExports: {
   getBotModelMenu: async (bot: string | null, workspaceId?: string) => { selectedScopes.push(workspaceId); calls.push(`menu:${bot}`); return menu },
@@ -75,7 +80,7 @@ test('a closed window sends no request', async () => {
 test('opening reads the model menu and the workspace defaults once, and shows the default repository', async () => {
   await render(dialog(true))
   await settle()
-  assert.deepEqual(calls.sort(), ['defaults', 'menu:null'])
+  assert.deepEqual(calls.sort(), ['defaults', 'devices', 'environments', 'menu:null'])
   assert.equal(props!.repository.value, 'acme/app')
   assert.equal(props!.repository.disabled, false)
   assert.deepEqual(props!.repository.choices.map(choice => choice.value), ['', 'acme/app', 'acme/web'])

@@ -72,6 +72,9 @@ export async function transferBots(tx: MainTransaction, workspaceId: string, fro
   await tx.execute(sql`delete from agent_kit_heads where bot_id in ${ids}`)
   // A bot handed over runs on its new owner's resources, never on the previous owner's credentials.
   await tx.update(bots).set({ ownerId: toUserId, archivedAt: null, updatedAt: new Date() }).where(and(inArray(bots.id, ids), eq(bots.workspaceId, workspaceId), ownedBy))
+  // The Bot's access policy follows its owner, so the new owner can manage and share it and the old one no longer can.
+  await tx.execute(sql`select set_config('mikka.acl_actor',${toUserId},true),set_config('mikka.acl_source','bot_transfer',true)`)
+  await tx.execute(sql`update resource_access_policies set "ownerId"=${toUserId} where kind='bot' and id in ${ids} and "ownerId" is distinct from ${toUserId}`)
   for (const id of ids) await botListChanged(tx, id)
   if (fromUserId) await ownerListChanged(tx, fromUserId, ['thread_list', 'task_run_list', 'bot_chat_list'])
   await workspaceListChanged(tx, workspaceId, ['bot_list'])

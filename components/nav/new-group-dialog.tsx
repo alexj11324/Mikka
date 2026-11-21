@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { BotView } from '@/app/actions/bots'
 import { withBasePath } from '@/lib/base-path'
 import { Button } from '@/components/ui/button'

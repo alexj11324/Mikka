@@ -4,17 +4,17 @@ import { IncomingMessage, ServerResponse } from 'node:http'
 import { Socket } from 'node:net'
 import test from 'node:test'
 import { NodeRequest } from 'srvx/node'
-import { NextRequest as OriginalNextRequest } from 'next/server.js'
 import { context as otelContext, propagation, trace } from '@opentelemetry/api'
 import { AlwaysOnSampler, InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node'
 import { beginRequestTrace } from '../runtime/request-trace'
 import { createApiHandler } from './application'
 import { createRequestScope, currentRequestScope, requestCache, runRequestScope } from './context'
-import { cookies, headers } from '../compat/headers'
-import { after, NextRequest, NextResponse, NextURL } from '../compat/server'
-import { getLocale, getTranslations } from '../compat/intl'
-import { getPathname } from '../compat/localized-navigation'
+import { cookies, headers } from '@/lib/server-runtime/headers'
+// oxlint-disable-next-line no-restricted-imports -- this spec exercises the request lifetime itself
+import { after, NextRequest, NextResponse, NextURL } from '@/lib/server-runtime/server'
+import { getLocale, getTranslations } from '../../../lib/intl/i18n-server'
+import { getPathname } from '../../../lib/server-runtime/localized-navigation'
 import type { ApiRoute } from './routes'
 import { createWebTransport } from '../../../lib/web-connection/transport'
 
@@ -46,18 +46,29 @@ test('official web bearer adaptation is installed before the API scope and strip
 })
 
 test('request cookies match the installed SDK for duplicates and malformed encoding without rewriting auth headers', async () => {
-  for (const cookie of [
-    'NEXT_LOCALE=en; NEXT_LOCALE=zh-CN; mikka-workspace=old; mikka-workspace=new',
-    'NEXT_LOCALE=en; NEXT_LOCALE=%E0%A4%A; bad=%; invalid=%FF; valid=%E4%B8%AD',
-    'bad=%; bad=okay; empty=; flag; quoted="value"; plus=a+b; equals=a=b; encoded=%3D',
-    'spaced =value;\tuntouched=name; %6Eame=literal; ; final=one; final=two',
-  ]) {
+  // Frozen from the cookie parser this application used before the migration:
+  // a later duplicate name replaces the earlier one, an undecodable pair is
+  // dropped, a bare name is `true`, and surrounding spaces stay in the name.
+  const frozen = new Map([
+    ['NEXT_LOCALE=en; NEXT_LOCALE=zh-CN; mikka-workspace=old; mikka-workspace=new',
+      [{ name: 'NEXT_LOCALE', value: 'zh-CN' }, { name: 'mikka-workspace', value: 'new' }]],
+    ['NEXT_LOCALE=en; NEXT_LOCALE=%E0%A4%A; bad=%; invalid=%FF; valid=%E4%B8%AD',
+      [{ name: 'NEXT_LOCALE', value: 'en' }, { name: 'valid', value: '中' }]],
+    ['bad=%; bad=okay; empty=; flag; quoted="value"; plus=a+b; equals=a=b; encoded=%3D',
+      [{ name: 'bad', value: 'okay' }, { name: 'empty', value: '' }, { name: 'flag', value: 'true' },
+        { name: 'quoted', value: '"value"' }, { name: 'plus', value: 'a+b' }, { name: 'equals', value: 'a=b' },
+        { name: 'encoded', value: '=' }]],
+    ['spaced =value;\tuntouched=name; %6Eame=literal; ; final=one; final=two',
+      [{ name: 'spaced ', value: 'value' }, { name: '\tuntouched', value: 'name' },
+        { name: '%6Eame', value: 'literal' }, { name: 'final', value: 'two' }]],
+  ])
+  for (const [cookie, expected] of frozen) {
     const input = request('one', { headers: { cookie } })
-    const original = new OriginalNextRequest(input), adapted = new NextRequest(input)
-    assert.deepEqual(adapted.cookies.getAll(), original.cookies.getAll())
+    const adapted = new NextRequest(input)
+    assert.deepEqual(adapted.cookies.getAll(), expected)
     assert.equal(adapted.headers.get('cookie'), input.headers.get('cookie'))
     await runRequestScope(createRequestScope(input), async () => {
-      assert.deepEqual((await cookies()).getAll(), original.cookies.getAll())
+      assert.deepEqual((await cookies()).getAll(), expected, 'the request scope sees the same cookies')
       assert.equal((await headers()).get('cookie'), input.headers.get('cookie'))
     })
   }

@@ -66,7 +66,7 @@ overwrite a later edit or allocate a second issue number.
 
 Linear outbox processing, automatic issue-scope judgment and Coordinator wakes
 are captured as followup descriptors during the write, then run after commit.
-Workflow steps do not depend on a Next.js request's `after()` context. If the
+Workflow steps do not depend on an application request's `after()` context. If the
 step fails after commit, a retry resumes its pending followups without repeating
 the issue mutation. These followups use the existing outbox and wake semantics.
 Normal UI actions continue scheduling the same work with `after()`.

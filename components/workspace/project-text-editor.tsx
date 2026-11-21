@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { FieldError } from '@/components/ui/field'
 import { cn } from '@/lib/utils'
 import { readProjectDescription } from '@/lib/project-description'

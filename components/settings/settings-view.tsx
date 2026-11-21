@@ -1,9 +1,9 @@
 'use client'
 
 import { BotPermissionsSettings } from './bot-permissions'
-import { useEffect, useRef, useState } from 'react'
+import { Component, type ReactNode, useEffect, useRef, useState } from 'react'
 import { useSWRConfig } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { cn } from '@/lib/utils'
 import { SettingsContentFrame } from '@ui-slot/settings-content'
 import { ApiAndSubscriptions } from '@ui-slot/settings-models'
@@ -21,6 +21,7 @@ import { WebServerControl } from '@/components/settings/web-server-control'
 import { DesktopServerSettings } from '@/components/settings/desktop-server-settings'
 import { AccountSettings } from '@/components/settings/account-settings'
 import { EnvironmentsSettings } from './environments-settings'
+import { IssueStatesSettings } from './issue-states-settings'
 import { CloudSettings } from '@/components/settings/cloud-settings'
 
 import { PrivacySettings } from '@/components/settings/privacy-settings'
@@ -85,13 +86,17 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
   // A personal workspace has no team settings (decision 2026-11-01-2310); an old link to one opens 偏好设置 instead.
   const teamOnly = personal && TEAM_ONLY_SECTIONS.has(requestedSection)
   const unavailableBilling = workspace?.edition === 'community' && requestedSection === 'billing'
+  // Mikka 云服务 draws for a self-hosted server's admin only, so anyone else landing on it is told why instead of 偏好设置 alone.
+  const unavailableCloud = workspace !== undefined && requestedSection === 'cloud' && !cloudAdmin
   useEffect(() => {
-    if (!teamOnly && !unavailableBilling) return
+    if (!teamOnly && !unavailableBilling && !unavailableCloud) return
     // Say why the page asked for is not the one shown (UI audit settings2-06); one toast, however often the effect runs.
     if (teamOnly) toast(t('teamOnlyNotice'), { id: 'settings-team-only' })
+    if (unavailableBilling) toast(t('billingUnavailableNotice'), { id: 'settings-billing-unavailable' })
+    if (unavailableCloud) toast(t('cloudUnavailableNotice'), { id: 'settings-cloud-unavailable' })
     if (activeSection) router.replace(settingsHref('preferences', workspaceId ?? workspace?.workspace.id))
     else setSection('preferences')
-  }, [teamOnly, unavailableBilling, activeSection, router, workspaceId, workspace?.workspace.id, t])
+  }, [teamOnly, unavailableBilling, unavailableCloud, activeSection, router, workspaceId, workspace?.workspace.id, t])
   const { cache, mutate } = useSWRConfig()
   // Settings opened without ?workspace= still has one: the default the API resolved.
   const resolvedWorkspaceId = workspaceId ?? workspace?.workspace.id
@@ -137,6 +142,7 @@ export function SettingsView({ user, userKey, googleEnabled = false, onRail, onS
 }
 
 function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, workspaceName, personal = false, team = false, admin = false, community = false, workspaceError = false, linearNotice, preview, onSignOut, signingOut, onSection }: { t: ReturnType<typeof useTranslations<'Settings'>> } & Pick<SettingsViewProps, 'user' | 'userKey' | 'workspaceId' | 'linearNotice' | 'preview' | 'onSignOut' | 'signingOut'> & { section: SettingsSectionId; googleEnabled: boolean; workspaceName?: string; personal?: boolean; team?: boolean; admin?: boolean; community?: boolean; workspaceError?: boolean; onSection: (section: SettingsSectionId) => void }) {
+  const common = useTranslations('Common')
   // Workspace sections wait for the workspace instead of rendering nothing.
   const waiting = preview || !workspaceId
     ? preview || workspaceError ? <FieldError>{t('workspaceUnavailable')}</FieldError> : <p role="status" className="text-sm text-muted-foreground">{t('workspaceLoading')}</p>
@@ -147,6 +153,7 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'security': return <SecurityAndSignIn googleEnabled={googleEnabled} />
 
     case 'environments': return workspaceId && !preview ? <EnvironmentsSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
+    case 'issue-states': return workspaceId && !preview ? <IssueStatesSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     case 'privacy': return <PrivacySettings />
     case 'logins':
     case 'secrets': return <SecretsPage side={section === 'logins' ? 'mine' : 'workspace'} onSide={side => onSection(side === 'mine' ? 'logins' : 'secrets')} workspaceId={workspaceId && !preview ? workspaceId : undefined} workspaceName={workspaceName} waiting={waiting} />
@@ -158,7 +165,12 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'models': return <>{workspaceId && !preview ? <ApiAndSubscriptions key={workspaceId} workspaceId={workspaceId} workspaceName={workspaceName} team={team} cloudUserKey={community ? userKey : undefined} /> : waiting}</>
     case 'developer': return workspaceId && !preview ? <AccessTokensSettings key={workspaceId} workspaceId={workspaceId} /> : waiting
     // Admins only, as its read: anyone else (a link, a bookmark, a workspace where they are a member) is told so, and nothing is read.
-    case 'audit': return workspaceId && !preview && team ? admin ? <AuditLogSettings key={workspaceId} workspaceId={workspaceId} /> : <p role="status" className="text-sm text-muted-foreground">{t('audit.adminOnly')}</p> : waiting
+    // Its page is a UI layer's (slot settings-audit): a layer without one, or a page that throws, fails inside the section.
+    case 'audit': return workspaceId && !preview && team
+      ? admin
+        ? <SectionErrorBoundary key={`audit-${workspaceId}`} message={t('audit.loadFailed')} retryLabel={common('retry')}><AuditLogSettings key={workspaceId} workspaceId={workspaceId} /></SectionErrorBoundary>
+        : <p role="status" className="text-sm text-muted-foreground">{t('audit.adminOnly')}</p>
+      : waiting
     case 'organization': return !preview ? <OrganizationSettings key={workspaceId ?? 'organization-only'} workspaceId={workspaceId ?? ''} personal={!team} /> : waiting
     case 'usage': return workspaceId && !preview ? <><UsageSettings key={workspaceId} workspaceId={workspaceId} personal={personal} />{team && <GovernanceUsage key={`governance-${workspaceId}`} workspaceId={workspaceId} />}</> : waiting
     case 'billing': return workspaceId && !preview ? <>{team && <PaymentDesignationSettings key={`payment-${workspaceId}`} workspaceId={workspaceId} />}<BillingSettings key={workspaceId} workspaceId={workspaceId} personal={personal} admin={admin} /></> : waiting
@@ -167,5 +179,21 @@ function SectionBody({ t, section, user, userKey, googleEnabled, workspaceId, wo
     case 'computers': return null
     case 'permissions': return workspaceId && !preview ? <><TeamPermissionsSettings key={workspaceId} workspaceId={workspaceId} /><GovernanceTemplates key={`governance-${workspaceId}`} workspaceId={workspaceId} /></> : waiting
     default: return null
+  }
+}
+
+/**
+ * A section whose body throws says so in place: the sidebar and the page stay,
+ * 重试 remounts the body and its reads run again. Without it one section took
+ * the whole page down: a 审计日志 page no UI layer draws, or a body that throws
+ * while it renders.
+ */
+class SectionErrorBoundary extends Component<{ message: string; retryLabel: string; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false }
+  static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch(error: unknown) { console.error('Settings section failed', error instanceof Error ? error.message : error) }
+  render() {
+    if (!this.state.failed) return this.props.children
+    return <InlineLoadError message={this.props.message} retryLabel={this.props.retryLabel} onRetry={() => this.setState({ failed: false })} />
   }
 }

@@ -5,10 +5,11 @@ import useSWR, { unstable_serialize, useSWRConfig } from 'swr'
 import { useLiveKey } from '@/hooks/use-live-key'
 import { useListExpiry } from '@/hooks/use-list-expiry'
 import { issueRestoreDeadline } from '@/lib/issue-metadata'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import type { JSONContent } from '@tiptap/react'
 import { ArrowLeft } from '@/components/icons'
 import type { IssueDetailNavigation } from './issue-detail-header'
+import { TaskPageLoading } from './workspace-loading'
 import type { IssueActionRequest } from './issue-detail-actions'
 import { IssueDescriptionHistory } from './issue-description-history'
 import type { MetadataRequest } from './issue-metadata-controls'
@@ -41,7 +42,7 @@ import { useResizableWidth } from '@/hooks/use-resizable-width'
 import { useViewState } from '@/lib/hooks/view-state'
 import { closeOnEscape, useFocusReturn } from '@/hooks/use-focus-return'
 import { TaskDetailFrame } from '@ui-slot/task-detail'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { presentedFactoryEvents, readTaskEvidenceTarget, taskEvidenceThread } from '@/lib/task-factory-events'
 import { TaskArtifactsButton } from './thread-artifacts'
 
@@ -82,51 +83,6 @@ async function loadIssue(id: string, viewerId: string, previous?: IssueRead, inc
 }
 type WorkspaceUser = { id: string; name: string; email: string }
 type DetailProps = { /** The thread open in the right column, from the address (R-82). */ thread: string | null; /** Where the task was opened from: the first crumb. */ origin: string; navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
-
-/** The property column's seven rows: a label bar, then a value bar at a plausible width. */
-function PropertySkeleton() {
-  return <>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-14" /><Skeleton className="h-3 w-1/4" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-12" /><Skeleton className="h-3 w-16" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-14" /><Skeleton className="h-3 w-1/5" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-8" /><Skeleton className="h-3 w-1/3" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-10" /><Skeleton className="h-3 w-2/5" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-10" /><Skeleton className="h-3 w-20" /></div>
-    <div className="grid min-h-7 grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-3"><Skeleton className="h-3 w-12" /><Skeleton className="h-3 w-24" /></div>
-  </>
-}
-
-/**
- * The page before its task arrives: the same shape as the page it becomes, so
- * nothing moves when the data lands (R-96). A 48px bar, then the reading column
- * at its own width — title, the code line, the property rows, the description's
- * first lines.
- */
-function TaskDetailSkeleton({ label }: { label: string }) {
-  return <div role="status" aria-label={label} className="flex min-h-0 flex-1 flex-col">
-    <div className="flex h-12 shrink-0 items-center gap-3 px-3">
-      <Skeleton className="h-3.5 w-24" />
-      <Skeleton className="h-3.5 w-56" />
-      <span className="flex-1" />
-      <Skeleton className="size-6 rounded-md" />
-      <Skeleton className="size-6 rounded-md" />
-    </div>
-    <div className="flex min-h-0 flex-1 justify-center overflow-hidden px-6 pt-7">
-      <div className="flex w-full max-w-170 flex-col">
-        <Skeleton className="h-7 w-3/4" />
-        <Skeleton className="mt-2 h-3 w-40" />
-        <div className="mt-5 flex flex-col gap-0.5">
-          <PropertySkeleton />
-        </div>
-        <div className="mt-6 flex flex-col gap-2">
-          <Skeleton className="h-3 w-12" />
-          <Skeleton className="h-3.5 w-full" />
-          <Skeleton className="h-3.5 w-4/5" />
-        </div>
-      </div>
-    </div>
-  </div>
-}
 
 function UnavailableIssue({ id, onRetry, onClose }: { id: string; onRetry: () => void; onClose: () => void }) {
   const t = useTranslations('IssueDetail')
@@ -217,7 +173,7 @@ export function TaskDetail({ id, deferWork = false, ...props }: DetailProps & { 
     return () => { toast.dismiss(notice) }
   }, [backgroundFailed, id, mutate, readFailedMessage, retryLabel])
   if (error && !backgroundFailed) return <UnavailableIssue id={id} onRetry={() => { void mutate() }} onClose={props.onClose} />
-  if (!data) return <TaskDetailSkeleton label={t('reading')} />
+  if (!data) return <TaskPageLoading />
   // Show a local snapshot immediately, but do not seed a writable Y.Doc from
   // it before the normal read rechecks access and the current body fingerprint.
   return <SectionBoundary key={id} onClose={props.onClose}><TaskForm key={loadedId !== id ? 'cached' : data.canSteer === false ? 'reader' : 'editor'} initial={data} refreshDetail={mutate} preview={loadedId !== id} {...props} /></SectionBoundary>
@@ -286,11 +242,12 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   const [title, setTitle] = useState(initial.title)
   const [content, setContent] = useState<JSONContent>(initial.content)
   const [status, setStatus] = useState(initial.status)
+  const [stateId, setStateId] = useState<string | null>(initial.stateId ?? null)
   const [priority, setPriority] = useState(initial.priority)
   const [dirty, setDirty] = useState(false)
   const [pending, setPending] = useState(false)
   const flight = useRef<Promise<boolean> | null>(null)
-  const draft = useRef({ title: initial.title, content: initial.content, status: initial.status, priority: initial.priority, generation: 0 })
+  const draft = useRef({ title: initial.title, content: initial.content, status: initial.status, stateId: (initial.stateId ?? null) as string | null, priority: initial.priority, generation: 0 })
   const savedRef = useRef(initial)
   const acknowledged = useRef(0)
   const conflictingRead = useRef<Issue | null>(null)
@@ -358,7 +315,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
     // Only fields unchanged since the last server snapshot adopt its newer
     // value. Updating the draft too keeps a later text save from reopening Done.
     if (current.title === previous.title && !composing.current) { next.title = fresh.title; setTitle(fresh.title) }
-    if (current.status === previous.status) { next.status = fresh.status; setStatus(fresh.status) }
+    if (current.status === previous.status && current.stateId === (previous.stateId ?? null)) { next.status = fresh.status; setStatus(fresh.status); next.stateId = fresh.stateId ?? null; setStateId(fresh.stateId ?? null) }
     if (current.priority === previous.priority) { next.priority = fresh.priority; setPriority(fresh.priority) }
     if (JSON.stringify(current.content) === JSON.stringify(previous.content)) { next.content = fresh.content; setContent(fresh.content) }
     draft.current = next
@@ -375,12 +332,13 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
     window.addEventListener('beforeunload', beforeUnload)
     return () => window.removeEventListener('beforeunload', beforeUnload)
   }, [hasUnsavedChanges])
-  function changed(patch: Partial<Pick<Issue, 'title' | 'content' | 'status' | 'priority'>>) {
+  function changed(patch: Partial<Pick<Issue, 'title' | 'content' | 'status' | 'stateId' | 'priority'>>) {
     if (locked) return
     draft.current = { ...draft.current, ...patch, generation: draft.current.generation + 1 }
     if (patch.title !== undefined) setTitle(patch.title)
     if (patch.content !== undefined) setContent(patch.content)
     if (patch.status !== undefined) setStatus(patch.status)
+    if (patch.stateId !== undefined) setStateId(patch.stateId)
     if (patch.priority !== undefined) setPriority(patch.priority)
     setDirty(true)
     setError('')
@@ -411,7 +369,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
           if (snapshot.generation !== acknowledged.current) {
             let result: Awaited<ReturnType<typeof saveIssue>> | undefined
             try {
-              result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, priority: snapshot.priority })
+              result = await saveIssue({ id: initial.id, revision, title: snapshot.title, content: snapshot.content, status: snapshot.status, stateId: snapshot.stateId && snapshot.stateId !== previous.stateId ? snapshot.stateId : undefined, priority: snapshot.priority })
             } catch (error) {
               if (error && typeof error === 'object') {
                 if ('code' in error && error.code === 'desktop_session_changed') throw error
@@ -437,6 +395,8 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
             if (confirmed.revision >= savedRef.current.revision) {
               savedRef.current = confirmed
               setSaved(confirmed)
+              // A status saved without a state took its category's default: the draft follows the server's choice.
+              if (draft.current.stateId === snapshot.stateId && draft.current.status === confirmed.status) { draft.current = { ...draft.current, stateId: confirmed.stateId ?? null }; setStateId(confirmed.stateId ?? null) }
             }
             conflictingRead.current = null
             acknowledged.current = snapshot.generation
@@ -476,8 +436,8 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   function adopt(issue: Issue) {
     if (issue.revision < savedRef.current.revision) return
     const previousStatus = savedRef.current.status
-    savedRef.current = issue; setSaved(issue); setStatus(issue.status); setPriority(issue.priority)
-    draft.current = { ...draft.current, status: issue.status, priority: issue.priority }
+    savedRef.current = issue; setSaved(issue); setStatus(issue.status); setStateId(issue.stateId ?? null); setPriority(issue.priority)
+    draft.current = { ...draft.current, status: issue.status, stateId: issue.stateId ?? null, priority: issue.priority }
     void refreshVersions().catch(() => {}); publishSaved(issue, previousStatus)
   }
   async function getCurrent() { return await save() ? savedRef.current : null }
@@ -524,7 +484,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   const titleChange = (value: string) => changed({ title: value })
   const titleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return; if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void save() } }
   return <FramedTask Frame={TaskDetailFrame} rootRef={rootRef} onKeyDown={onKeyDown} label={title || t('titleLabel')} preview={preview} locked={locked} origin={origin} navigation={navigation} onClose={onClose} onOpen={onOpen} onDeleted={onDeleted} userId={user.id}
-    task={saved} title={title} status={status} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
+    task={saved} title={title} status={status} stateId={stateId} priority={priority} liveWorkspaceId={liveWorkspaceId} saveLabel={saveLabel} saved={!error && !syncState.error && !pending && !metadataSaving}
     discussionSave={sync ? { afterAcknowledged: sync.afterAcknowledged, retry: () => { void save() } } : undefined}
     titleField={{ value: title, label: t('titleLabel'), readOnly: locked, maxLength: 200, onChange: titleChange, onCompositionStart: () => { composing.current = true }, onCompositionEnd: () => { composing.current = false; setEditSequence(value => value + 1) }, onBlur: () => { if (title.trim() && title !== saved.title) void save() }, onKeyDown: titleKeyDown }}
     saveError={error ? { text: error, retry: t('retryAutosave'), onRetry: retryAutosave, busy: pending } : null} syncNotice={syncState.error ? t('syncRetryNotice') : null}
@@ -533,7 +493,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
     teamSnapshot={!preview && initial.taskWork?.teamId !== undefined ? { teamId: initial.taskWork.teamId, refresh: refreshDetail } : undefined}
     versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} agentActivity={agentActivity}
     documentTools={documentTools} actionRequest={actionRequest} propertyRequest={propertyRequest} requestAction={requestAction} requestProperty={requestProperty} getCurrent={getCurrent} adopt={adopt} onMetadataBusy={setMetadataSaving}
-    onStatus={value => { changed({ status: value }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
+    onStatus={(value, picked) => { changed(picked === undefined ? { status: value, stateId: null } : { status: value, stateId: picked }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
     onHistory={() => { void openHistory() }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}
     panel={threadPanel || null} wide={wide} resize={{ handle: wide && threadPanel ? <ResizeHandle resize={threadWidth} label={tCommon('resize.taskPanel')} edge="start" /> : null, width: threadWidth.width, dragging: threadWidth.dragging }} dialogs={dialogs} />
 

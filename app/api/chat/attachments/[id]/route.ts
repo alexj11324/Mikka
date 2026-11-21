@@ -11,7 +11,6 @@ import {
   removeChatFile,
 } from '@/lib/chat-attachments/store'
 
-export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }
 function fileErrorResponse(error: unknown) {
   const missing = error instanceof ChatFileError && error.code === 'notFound'

@@ -1,8 +1,8 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams } from '@/lib/client-runtime/navigation'
 import { usePathname, useRouter } from '@/i18n/navigation'
 import { useSWRConfig } from 'swr'
 import { endSession } from '@/lib/auth-client'

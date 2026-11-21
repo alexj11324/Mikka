@@ -1,6 +1,6 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { PersonalSecretsSettings } from '@/components/settings/personal-secrets-settings'
 import { SavedLoginsSettings } from '@/components/settings/saved-logins-settings'

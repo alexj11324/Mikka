@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
-const model = 'self-hosted/decision-http-fixture'
+const model = 'mikka-decision'
 const workspaceId = randomUUID()
 const question = { type: 'choice', name: 'outcome', instructions: 'Controlled fixture only', choices: [{ value: 'accepted' }] }
 const child = `
@@ -22,7 +22,7 @@ const child = `
   import { mock } from 'node:test';
   let checks = 0;
   mock.module(${JSON.stringify(new URL('../lib/model-admission/runtime.ts', import.meta.url).href)}, {
-    namedExports: { assertUnmanagedModelTransport: async (scope, selected) => {
+    namedExports: { assertLiteLLMModelTransport: async (scope, selected) => {
       assert.deepEqual(scope, { workspaceId: ${JSON.stringify(workspaceId)} });
       assert.equal(selected, ${JSON.stringify(model)}); checks++;
     } }
@@ -35,7 +35,7 @@ const child = `
     accepted: result?.get('outcome')?.choice === 'accepted', policyChecks: checks }));
 `
 
-test('self-hosted Decisions use the configured model/key over verified TLS and fail closed', { timeout: 30_000 }, async t => {
+test('self-hosted Decisions use the configured LiteLLM alias/key over verified TLS and fail closed', { timeout: 30_000 }, async t => {
   const directory = await mkdtemp(join(tmpdir(), 'mikka-decisions-http-'))
   const keyPath = join(directory, 'key.pem'), certificatePath = join(directory, 'cert.pem')
   let server
@@ -68,11 +68,11 @@ test('self-hosted Decisions use the configured model/key over verified TLS and f
         authenticated: request.headers.authorization === `Bearer ${key}`,
         modelMatched: payload.model === model, inputMatched: payload.input === 'Synthetic decision input',
         questionsMatched: JSON.stringify(payload.questions) === JSON.stringify([question]), tls: request.socket.encrypted === true })
-      if (mode === 'redirect' && request.url === '/custom/decisions') {
+      if (mode === 'redirect' && request.url === '/v1/decisions') {
         response.writeHead(307, { location: base + '/credential-sink' }); response.end(); return
       }
-      response.writeHead(200, { 'content-type': 'application/json' })
-      response.end(JSON.stringify({ model, provider_metadata: { gateway: { generationId: 'local-tls-fixture', cost: '0' } },
+      response.writeHead(200, { 'content-type': 'application/json', 'x-litellm-call-id': 'local-tls-fixture', 'x-litellm-response-cost': '0' })
+      response.end(JSON.stringify({ model: 'fixture-backing-model',
         answers: [{ type: 'choice', name: 'outcome', choice: 'accepted' }] }))
     })().catch(() => { response.writeHead(500); response.end() })
   })
@@ -83,18 +83,18 @@ test('self-hosted Decisions use the configured model/key over verified TLS and f
     // A closed environment also prevents inherited PostHog/OIDC/proxy/model or
     // database settings from turning this local check into an external request.
     const env = { PATH: process.env.PATH, NODE_ENV: 'test', MIKKA_EDITION: 'community',
-      DECISION_MODEL: model, DECISIONS_URL: base + '/custom/decisions',
+      MIKKA_LITELLM_URL: base,
       ...(trust ? { NODE_EXTRA_CA_CERTS: certificatePath } : {}),
-      ...(credential ? { DECISIONS_API_KEY: key, AI_GATEWAY_API_KEY: 'synthetic-unselected-fallback' } : {}) }
+      ...(credential ? { MIKKA_LITELLM_MASTER_KEY: key } : {}) }
     const result = await promisify(execFile)(process.execPath, ['--experimental-test-module-mocks', '--import', './tests/support/server-only.mjs',
       '--import', 'tsx', '--input-type=module', '--eval', child], { cwd: root, env, timeout: 12_000, maxBuffer: 32_768 })
     assert.equal(result.stdout.includes(key) || result.stderr.includes(key), false)
     return JSON.parse(result.stdout)
   }
 
-  await t.test('the real custom endpoint receives the selected model and dedicated authentication', async () => {
+  await t.test('the configured LiteLLM endpoint receives its purpose alias and proxy authentication', async () => {
     assert.deepEqual(await invoke(), { unavailable: false, accepted: true, policyChecks: 2 })
-    assert.deepEqual(calls, [{ path: '/custom/decisions', method: 'POST', authenticated: true, modelMatched: true,
+    assert.deepEqual(calls, [{ path: '/v1/decisions', method: 'POST', authenticated: true, modelMatched: true,
       inputMatched: true, questionsMatched: true, tls: true }])
   })
   await t.test('a redirect returns null and never sends a second request or credentials to its target', async () => {

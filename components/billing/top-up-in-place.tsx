@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { loadStripe } from '@stripe/stripe-js/pure'
 import type { StripeEmbeddedCheckout } from '@stripe/stripe-js'
 import { startChatPointsPurchase } from '@/app/actions/billing'

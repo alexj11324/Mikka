@@ -6,7 +6,7 @@ import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll
 import { issueKeys } from '@/lib/swr/keys'
 import { waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import type { listIssueVersions } from '@/app/actions/issues'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
 import { ChevronRight } from '@/components/icons'
 import { pollIssueThreads, type IssueWorkSnapshot } from '@/app/actions/agents'
 import { acceptedProducerOutcome, agentStretches, threadQuestionView, threadTime, type IssueThread } from '@/lib/issue-threads'

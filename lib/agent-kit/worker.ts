@@ -23,6 +23,8 @@ export interface WorkerModelDispatch {
   /** The model was not named: the task followed the dispatching chat's own
    * (decision 2026-11-15-1630). Still pinned like a pick, never swapped silently. */
   followed?: true
+  /** The reasoning effort the request asked for (an automation's), host-checked against the model. */
+  effort?: import('../model-routing').ModelRoutingEffort
 }
 
 export interface WorkerDefinitionSnapshot {
@@ -61,7 +63,7 @@ export interface WorkerDefinitionSnapshot {
   /** Host-selected automatic Cloud placement may recover on an authorized local device. Absent means no grant. */
   allowLocalRecovery?: true
   subscription?: { bindingId: string; modelId: string; route: string }
-  /** The person's API key the run uses, by id only; the key is opened at claim (`apiKeyForRun`). Never with `subscription`. */
+  /** The person's API key the run uses, by id only; the key is authorized at claim (`validateRunApiKey`). Never with `subscription`. */
   apiKey?: { keyId: string; model: string }
   /** Paid by Mikka 额度 through the Mikka model gateway (decision 2026-11-15-2000): a catalogue model. Never with `subscription` or `apiKey`. */
   credits?: { model: string }

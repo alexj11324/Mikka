@@ -3,7 +3,6 @@ import { teamSkillStore,skillAssignments } from '@/lib/self-improvement/server'
 import { createTeamSkillHandler } from '@/lib/self-improvement/team-skill-http'
 import { humanSessionHeaders } from '@/lib/desktop-rpc/handler'
 
-export const dynamic='force-dynamic'
 const handle=createTeamSkillHandler({store:teamSkillStore,assignments:skillAssignments,
   async principal(request,workspaceId) {
     const sessionHeaders=humanSessionHeaders(request)

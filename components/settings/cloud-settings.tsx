@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

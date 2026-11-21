@@ -8,6 +8,7 @@ export const MACHINE_SIZES = {
   'standard-2': { vcpu: 1, gib: 6 },
   'standard-3': { vcpu: 2, gib: 8 },
   'standard-4': { vcpu: 4, gib: 12 },
+  'standard-4-16': { vcpu: 4, gib: 16 },
 } as const
 export type MachineSize = keyof typeof MACHINE_SIZES
 /** The size every new task machine gets (decision 2026-11-15-1900). */

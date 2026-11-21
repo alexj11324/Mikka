@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import useSWR, { useSWRConfig } from 'swr'
 import { toast } from 'sonner'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { chooseBotModel, getBotModelMenu, refreshBotModelMenuAction } from '@/app/actions/execution-settings'
 import { previewBotModelChoice } from '@/lib/bot-model-optimistic'
 import { withChosenModel, type BotModelCurrent, type BotModelMenu, type BotModelMenuGroup, type BotModelMenuOption } from '@/lib/bot-model-menu-view'

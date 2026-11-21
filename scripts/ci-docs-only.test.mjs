@@ -224,7 +224,7 @@ test('a trusted stdin wrapper can import the paired classifier without running i
 test('blocking CI checks synthetic PR merge candidates once and preserves every main run', () => {
   const source = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
   const events = source.split('\npermissions:')[0]
-  assert.match(events, /on:\n  push:\n    branches: \[main\]\n  pull_request:\n  merge_group:/)
+  assert.match(events, /on:\n  push:\n    branches: \[main\]\n  pull_request:\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft\]\n  merge_group:/)
   assert.doesNotMatch(events, /branches-ignore:/)
   assert.doesNotMatch(source, /github\.event\.pull_request\.head\.repo\.full_name != github\.repository/)
   assert.match(source, /name: UI policy \(strict\)/)
@@ -263,7 +263,7 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   assert(!daemon.includes('MIKKA_SANDBOX_ACCEPTANCE'))
   assert(daemon.includes('pnpm --filter @mikka/daemon test:package'))
   const gate = job('ui-policy')
-  for (const name of ['changes','ui-policy-full','ui-policy-integrations','source-checks','daemon-checks','image-checks','analytics-checks']) assert(gate.includes(name))
+  for (const name of ['changes','ui-policy-full','ui-policy-integrations','source-checks','daemon-checks','analytics-checks']) assert(gate.includes(name))
   for (const name of ['ui-policy-full', 'ui-policy-integrations', 'source-checks', 'daemon-checks']) assert(gate.includes(`needs.${name}.result`))
 })
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, type ChangeEvent } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { Ellipsis, Eye, EyeOff, FileUp, Plus } from '@/components/icons'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'

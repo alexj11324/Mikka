@@ -1,5 +1,5 @@
 // oxlint-disable-next-line no-restricted-imports -- the one place that schedules after() work
-import { after } from 'next/server'
+import { after } from '@/lib/server-runtime/server'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { waitUntil } from '@vercel/functions'
 import { context } from '@opentelemetry/api'

@@ -1,6 +1,5 @@
 import { driveResponse } from '@/lib/drive/server'
 
-export const dynamic = 'force-dynamic'
 
 type Context = { params: Promise<{ volumeId: string }> }
 

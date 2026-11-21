@@ -1,12 +1,14 @@
 import { appendFile, readFile } from 'node:fs/promises'
 import { createHash } from 'node:crypto'
 import { pathToFileURL } from 'node:url'
+import { actionsMikkaRepository, officialMikkaRepository } from '../cloudflare-source.mjs'
 import { isValidDeploymentId } from '../../lib/deployment-id.mjs'
 import { containsDesktopSource, githubRead, PRODUCTION_VERSION_URL } from './web-deploy.mjs'
 
-const repository = 'alexj11324/Mikka'
 const ownerId = 183887963
-const issue = 'https://api.github.com/repos/' + repository + '/issues/1954'
+const ownerIssue = /^https:\/\/api\.github\.com\/repos\/(alexj11324|aspectly-labs)\/Mikka\/issues\/1954$/
+const officialRepository = row => officialMikkaRepository(row?.full_name, String(row?.id),
+  row?.owner?.id === undefined ? undefined : String(row.owner.id))
 const runtimeWorkflow = '.github/workflows/e2b-official-runtime.yml'
 const desktopWorkflow = '.github/workflows/desktop-release.yml'
 const deploymentWorkflow = '.github/workflows/cloudflare-app-deploy.yml'
@@ -23,8 +25,10 @@ const requireProof = (ok, code) => { if (!ok) throw Error('cloudflareWeb:' + cod
 
 async function readOwnerBody(id, bodyHash, prefix, api) {
   const row = await githubRead('/issues/comments/' + id, api)
-  requireProof(String(row.id) === id && row.issue_url === issue && row.user?.id === ownerId
-    && row.user.login === 'alexj11324' && row.author_association === 'OWNER', 'ownerComment')
+  const owner = ownerIssue.exec(row.issue_url ?? '')?.[1]
+  requireProof(String(row.id) === id && owner && row.user?.id === ownerId
+    && row.user.login === 'alexj11324' && (row.author_association === 'OWNER'
+      || owner === 'aspectly-labs' && row.author_association === 'MEMBER'), 'ownerComment')
   requireProof(typeof row.body === 'string' && digest(row.body) === bodyHash && row.body.startsWith(prefix), 'commentChanged')
   return row.body.slice(prefix.length)
 }
@@ -107,7 +111,7 @@ async function servingObservation(ref, api) {
   const [, runId, attempt] = ref
   const path = '/actions/runs/' + runId + '/attempts/' + attempt
   const [run, listing] = await Promise.all([githubRead(path, api), githubRead(path + '/jobs?per_page=100', api)])
-  requireProof([run.repository, run.head_repository].every(r => r?.id === 1427517699 && r.full_name === repository && r.fork === false)
+  requireProof([run.repository, run.head_repository].every(r => officialRepository(r) && r.fork === false)
     && run.path === '.github/workflows/cloudflare-app-deploy.yml' && run.head_branch === 'main' && present(run.head_sha, sha)
     && run.event === 'workflow_dispatch' && run.status === 'completed' && run.conclusion === 'success'
     && run.actor?.id === ownerId && run.triggering_actor?.id === ownerId
@@ -163,7 +167,7 @@ async function verifyPromotion(workflow, { env = process.env, event, fetchImpl =
   // A consumer started by the observation itself (workflow_run) may only use that
   // exact observation; a historical owner receipt still needs a manual dispatch.
   const chained = env.GITHUB_EVENT_NAME === 'workflow_run'
-  requireProof((pin || observed) && env.GITHUB_REPOSITORY === repository && env.GITHUB_REF === 'refs/heads/main'
+  requireProof((pin || observed) && actionsMikkaRepository(env) && env.GITHUB_REF === 'refs/heads/main'
     && (env.GITHUB_EVENT_NAME === 'workflow_dispatch' || chained && observed) && present(env.GITHUB_SHA, sha)
     && present(env.GITHUB_RUN_ID, decimal) && present(env.GITHUB_RUN_ATTEMPT, decimal), 'dispatch')
   if (chained) {
@@ -187,7 +191,7 @@ async function verifyPromotion(workflow, { env = process.env, event, fetchImpl =
   requireProof(workflow === desktopWorkflow ? true : record.product === runtimeSource
     && (record.product === env.GITHUB_SHA || !chained), 'dispatchSource')
   const run = await githubRead('/actions/runs/' + env.GITHUB_RUN_ID + '/attempts/' + env.GITHUB_RUN_ATTEMPT, api)
-  requireProof(run.repository?.full_name === repository && run.event === (chained ? 'workflow_run' : 'workflow_dispatch') && run.path === workflow
+  requireProof(officialRepository(run.repository) === env.GITHUB_REPOSITORY && run.event === (chained ? 'workflow_run' : 'workflow_dispatch') && run.path === workflow
     && run.head_sha === env.GITHUB_SHA && run.head_branch === 'main' && String(run.id) === env.GITHUB_RUN_ID
     && String(run.run_attempt) === env.GITHUB_RUN_ATTEMPT, 'runIdentity')
   if (observed) {
@@ -242,9 +246,9 @@ export async function promotionTrigger(consumer, { env = process.env, event, fet
   requireProof([runtimeWorkflow, desktopWorkflow].includes(consumer), 'consumer')
   const source = (event ?? await readEvent(env)).workflow_run
   const api = { token: env.GITHUB_TOKEN, fetchImpl }
-  if (env.GITHUB_EVENT_NAME !== 'workflow_run' || source?.path !== deploymentWorkflow || source.event !== 'workflow_dispatch'
+  if (!actionsMikkaRepository(env) || env.GITHUB_EVENT_NAME !== 'workflow_run' || source?.path !== deploymentWorkflow || source.event !== 'workflow_dispatch'
     || source.status !== 'completed' || source.conclusion !== 'success' || source.head_branch !== 'main'
-    || source.repository?.full_name !== repository || !present(String(source.id), decimal) || !present(String(source.run_attempt), decimal)) {
+    || !officialRepository(source.repository) || !present(String(source.id), decimal) || !present(String(source.run_attempt), decimal)) {
     return { ready: false, reason: 'not a successful Cloudflare deployment run on main' }
   }
   const path = '/actions/runs/' + source.id + '/attempts/' + source.run_attempt + '/jobs?per_page=100'

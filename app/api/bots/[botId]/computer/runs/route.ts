@@ -3,7 +3,7 @@ import { agentProfileReferenceSchema } from '@/lib/factory/agent-profile-referen
 import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
 import { z } from 'zod'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { AGENT_NAMES, agentHasNoModel, MODEL_SETTINGS_HREF } from '@/lib/agent-no-model'
 import { auth } from '@/lib/api-auth'
 import { pool } from '@/lib/db'

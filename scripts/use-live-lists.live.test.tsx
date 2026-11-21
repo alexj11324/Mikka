@@ -32,7 +32,7 @@ mock.module(new URL('../app/actions/task-runs.ts', import.meta.url).href, { name
 mock.module(new URL('../app/actions/coordinator.ts', import.meta.url).href, { namedExports: { pollBotChatSummaries: () => read('bots') } })
 mock.module(new URL('../app/actions/bots.ts', import.meta.url).href, { namedExports: { pollBots: (workspace?: string) => { rosterWorkspace = workspace; return read('roster') } } })
 
-mock.module('next/navigation', { namedExports: { useSearchParams: () => ({ get: () => null }) } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { useSearchParams: () => ({ get: () => null }) } })
 mock.module(new URL('../i18n/navigation.ts', import.meta.url).href, { namedExports: { useRouter: () => ({ refresh() {} }) } })
 
 const browser = new Window({ url: 'https://mikka.example/mikka/en' })

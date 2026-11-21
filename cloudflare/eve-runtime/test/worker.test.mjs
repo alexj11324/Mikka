@@ -25,7 +25,7 @@ const env = {
 }
 let selected, forwarded, calls = 0
 class NativeContainer {
-  constructor(ctx) { this.ctx = ctx; this.pending = []; this.stops = 0; this.failedStarts = 0; this.started = false }
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.pending = []; this.stops = 0; this.failedStarts = 0; this.started = false }
   async fetch(request) { this.calls = (this.calls ?? 0) + 1; return this.respond ? this.respond(request) : new Response('fixture') }
   renewActivityTimeout() { this.renewed = (this.renewed ?? 0) + 1 }
   async getState() { return { status: this.started ? 'running' : 'stopped' } }

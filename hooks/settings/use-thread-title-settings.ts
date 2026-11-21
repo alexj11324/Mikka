@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { saveThreadTitleSettings, type ThreadTitleSettingsView } from '@/app/actions/thread-title-settings'
 import type { ThreadTitleTriggers } from '@/lib/thread-title'
 import { settingsRead } from '@/lib/settings-read'

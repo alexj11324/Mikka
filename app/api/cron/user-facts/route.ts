@@ -6,7 +6,6 @@ import { profileEntitled } from '@/lib/profile/entitlement'
 import { consolidateDueFacts } from '@/lib/profile/store'
 import { purgeExpiredMemoryUndo } from '@/lib/profile/memory'
 
-export const runtime = 'nodejs'
 export const maxDuration = 60
 
 /** Leaves time to answer before maxDuration; whoever is left is merged by the next run. */

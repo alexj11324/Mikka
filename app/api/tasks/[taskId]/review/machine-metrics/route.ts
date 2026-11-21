@@ -3,7 +3,6 @@ import { computerGone, readComputerMetrics } from '@/lib/computer/e2b-provider'
 import { ReviewAuthorityError, taskReviewAuthority } from '@/lib/coding-workspace/review-authority'
 import { E2BKeyError } from '@/lib/secrets/flag'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
 const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' }

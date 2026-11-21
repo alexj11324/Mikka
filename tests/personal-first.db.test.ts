@@ -13,8 +13,8 @@ test('personal workspace first', { skip: !dbUrl }, async t => {
   let user = { id: '', name: '', email: '' }
   const translate = Object.assign((key: string) => key, { has: () => true })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => user } })
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set() {}, delete() {}, get() {} }) } })
-  mock.module('next-intl/server', { namedExports: { getTranslations: async () => translate, getLocale: async () => 'zh-CN' } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set() {}, delete() {}, get() {} }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => translate, getLocale: async () => 'zh-CN' } })
   const actions = await import('../app/actions/workspace')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')

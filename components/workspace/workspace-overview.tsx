@@ -1,5 +1,5 @@
 'use client'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 import { Inbox, Star, Bell } from '@/components/icons'
 import useSWR, { unstable_serialize } from 'swr'
@@ -7,8 +7,8 @@ import { useLiveKey } from '@/hooks/use-live-key'
 import { InlineLoadError } from '@/components/load-error'
 import { countWorkspaceTaskViews, type listIssues } from '@/app/actions/issues'
 import { IssueList } from './issue-list'
-import dynamic from 'next/dynamic'
-import { WorkspaceContentLoading } from './workspace-loading'
+import dynamic from '@/lib/client-runtime/dynamic'
+import { ConversationPageLoading, WorkspaceContentLoading } from './workspace-loading'
 import { Button } from '@/components/ui/button'
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty'
 import { ISSUE_STATUSES, type IssueView } from './issue-properties'
@@ -22,8 +22,8 @@ import type { BotView } from '@/app/actions/bots'
 import type { CoordinatorPrefill } from '@/components/coordinator/coordinator-chat'
 import { loadCoordinator } from './page-loaders'
 
-const LegacyChatArchive = dynamic(() => import('./legacy-chat-archive').then(module => module.LegacyChatArchive), { loading: WorkspaceContentLoading })
-const CoordinatorChat = dynamic(loadCoordinator, { loading: WorkspaceContentLoading })
+const LegacyChatArchive = dynamic(() => import('./legacy-chat-archive').then(module => module.LegacyChatArchive), { loading: ConversationPageLoading })
+const CoordinatorChat = dynamic(loadCoordinator, { loading: ConversationPageLoading })
 
 export function WorkspaceOverview({ section, workspaceId, onView, tasks, userId, onOpen, initialAgentHistory, agentRequest, onAgentActive, onAgentSessions, coordinatorPrefill, bot }: { bot?: BotView; onAgentSessions?: (sessions: SavedAgentSession[]) => void; coordinatorPrefill?: CoordinatorPrefill; section: WorkspaceSection; workspaceId?: string; onView: (view: IssueView) => void; tasks: Awaited<ReturnType<typeof listIssues>>; userId: string; onOpen: (id: string) => void; initialAgentHistory?: AgentHistory; agentRequest?: LegacyChatRequest; onAgentActive?: (sessionId: string | null) => void }) {
   const i18nText = useTranslations()

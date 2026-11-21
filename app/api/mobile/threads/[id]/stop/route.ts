@@ -5,7 +5,6 @@ import { ActionFailureError } from '@/lib/action-error'
 import { forbiddenOrigin, json, mobileUser, unauthorized, writeAllowed } from '@/lib/mobile-api'
 import { runOutsideToken } from '@/lib/tokens/scope'
 
-export const dynamic = 'force-dynamic'
 
 type Params = { params: Promise<{ id: string }> }
 

@@ -18,13 +18,15 @@ import { seedRunProjectResources } from './helpers/run-project-resources'
 import { threadPromptView } from '../lib/thread-prompt'
 
 test('quota exhausted mid-run: continue on the person\'s key, else pause with the reset; resume and retry actions', { skip: !dbUrl }, async t => {
-  const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
+  const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED, liteLLMUrl: process.env.MIKKA_LITELLM_URL, liteLLMKey: process.env.MIKKA_LITELLM_MASTER_KEY }
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
+  process.env.MIKKA_LITELLM_URL = 'https://models.example.test/v1'
+  process.env.MIKKA_LITELLM_MASTER_KEY = 'synthetic-quota-fallback'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
   const { Client, Pool } = await import('pg')
   const query = Client.prototype.query
   let resourceReads = 0
@@ -54,7 +56,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   const claimRoute = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const users: string[] = []
   t.after(async () => {
-    for (const [name, value] of [['WORKSPACE_SECRETS_KEY', saved.key], ['MIKKA_BYOS_ENABLED', saved.byos]] as const) if (value === undefined) delete process.env[name]; else process.env[name] = value
+    for (const [name, value] of [['WORKSPACE_SECRETS_KEY', saved.key], ['MIKKA_BYOS_ENABLED', saved.byos], ['MIKKA_LITELLM_URL', saved.liteLLMUrl], ['MIKKA_LITELLM_MASTER_KEY', saved.liteLLMKey]] as const) if (value === undefined) delete process.env[name]; else process.env[name] = value
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM thread_machines WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
@@ -129,7 +131,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   const row = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
   const events = async (runId: string) => (await pool.query('SELECT kind,"dedupeKey","issueId","botId",payload FROM coordinator_events WHERE "runId"=$1 ORDER BY "createdAt"', [runId])).rows
   const continuations = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [runId])).rows
-  const claim = (p: Person, runId: string) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
+  const claim = (p: Person, runId: string) => claimRoute.POST(new Request(`https://mikka.test/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
     method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${p.token}`, [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
   }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
   const failsWith = async (work: Promise<unknown>, code: string) => assert.rejects(work, (error: { code?: string }) => error.code === code)

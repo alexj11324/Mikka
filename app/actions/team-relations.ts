@@ -1,5 +1,5 @@
 'use server'
-import { getTranslations } from 'next-intl/server'
+import { getTranslations } from '@/lib/intl/i18n-server'
 import { and, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import { requireIssueAccess, requireUser } from '@/lib/issue-access'

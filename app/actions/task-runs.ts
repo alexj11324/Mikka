@@ -8,7 +8,7 @@ import { singleFlight } from '@/lib/single-flight'
 import { readCompactRunFailure, runFailureBrief, type CompactRunFailure } from '@/lib/run-failure-projection'
 
 import { createHash } from 'node:crypto'
-import { headers } from 'next/headers'
+import { headers } from '@/lib/server-runtime/headers'
 import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import { deviceOnlineStates, deviceSessionOpen } from '@/lib/device-presence'
 import { gatewayConfig } from '@/lib/builtin-gateway/config'
@@ -331,7 +331,13 @@ export async function listConversations(input: DirectoryInput) {
   const { reader, workspaceId } = await conversationActor()
   const { conversationDirectory } = await import('@/lib/conversation-directory')
   const { pool } = await import('@/lib/db')
-  return conversationDirectory(pool, reader, workspaceId, input)
+  const projectId = typeof input?.projectId === 'string' ? input.projectId : undefined
+  if (!projectId) return conversationDirectory(pool, reader, workspaceId, input)
+  // Projects and their task links live in the workspace database; the reader's own project ACL picks the tasks.
+  const [{ accessibleProjects }, { projectDb }] = await Promise.all([import('@/lib/project-access'), import('@/lib/db/projects')])
+  const [project] = await accessibleProjects(reader, projectDb, workspaceId, projectId)
+  if (!project) throw new ActionFailureError('projectNotFound')
+  return conversationDirectory(pool, reader, workspaceId, input, { projectIssueIds: project.issueIds })
 }
 
 export async function listConversationSidebar() {

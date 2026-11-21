@@ -63,6 +63,8 @@ const SERVICE_IDENTITY_ROUTES: ReadonlyArray<readonly [RegExp, string]> = [
 ]
 /** Route families are enumerated; there is deliberately no generic /api/* forwarding. */
 const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
+  [new RegExp(`^/api/workspaces/${UUID}/devices/${UUID}/project-checkout(?:/clear)?$`), ['POST']],
+  [new RegExp(`^/api/workspaces/${UUID}/projects/${UUID}/device-checkouts$`), ['GET']],
   [/^\/api\/agents\/eve\/v1\/session$/, ['POST']],
   [new RegExp(`^/api/agents/eve/v1/session/${ID}$`), ['GET', 'POST']],
   [new RegExp(`^/api/agents/eve/v1/session/${ID}/(?:cancel|compact|clear|end|reset)$`), ['POST']],
@@ -72,25 +74,35 @@ const ROUTES: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/^\/api\/version$/, ['GET']], [/^\/api\/auth\/device$/, ['GET']],
   [/^\/api\/auth\/device\/(approve|deny)$/, ['POST']],
   [/^\/api\/(workspace|workspace\/switcher|search|issues\/search|skills|skills\/search|teams\/directory)$/, ['GET']],
+  // Sharing an installed Skill into a workspace is the Skills panel's one write.
+  [/^\/api\/skills\/share$/, ['POST']],
   [/^\/api\/settings\/(?:password|sessions|preferences|saved-logins|workspace-general|transfer-targets|deletion-impact|app-policy|share-policy|secrets|e2b-key|usage|billing|credit-billing|card-verification|audit|model-order|bots|workspace-bots|api-keys|environments)$/, ['GET']],
   [/^\/api\/agent-cli-policy$/, ['GET', 'POST']],
   // 收件箱 (Inbox) reads its page and writes its lifecycle commands here; both
   // are authorized per reader and workspace inside the handler.
   [/^\/api\/(bots|conversations|subscriptions|subscriptions\/usage|pending-actions|approved-writes|inbox|suggestions|computer\/events|agent\/sessions\/active)$/, ['GET', 'POST']],
   [/^\/api\/(coordinator\/(?:runtime|messages|attention))$/, ['GET', 'POST', 'DELETE']],
-  [/^\/api\/(chat\/attachments|integrations\/mcp|integrations\/mcp\/shares|credentials|device-tokens)$/, ['GET', 'POST', 'PATCH', 'DELETE']],
-  [/^\/api\/(agent\/images|agent\/sessions|devices\/hosts)$/, ['GET']],
+  [/^\/api\/(chat\/attachments|integrations\/mcp|integrations\/mcp\/shares|integrations\/mcp\/refresh|credentials|device-tokens)$/, ['GET', 'POST', 'PATCH', 'DELETE']],
+  [/^\/api\/(agent\/images|agent\/sessions|devices|devices\/hosts)$/, ['GET']],
   [/^\/api\/devices\/ssh$/, ['POST']],
   [/^\/api\/github\/pull-request-status$/, ['POST']],
   [/^\/api\/(self-improvement|mobile\/reactions)$/, ['GET', 'POST']],
   [/^\/api\/factory\/(?:agent-profiles|tasks|tasks\/route|questions)$/, ['GET', 'POST']],
-  [/^\/api\/integrations\/(github|github\/permissions|github\/repositories\/verification|github\/connect|github\/connect\/intent|github\/connect\/intent\/confirm|linear\/status|composio|composio\/credentials|composio\/catalog)$/, ['GET', 'POST', 'DELETE']],
+  [/^\/api\/integrations\/(github|github\/permissions|github\/tools|github\/repositories\/verification|github\/repositories\/pulls|github\/connect|github\/connect\/intent|github\/connect\/intent\/confirm|linear\/status|composio|composio\/credentials|composio\/catalog)$/, ['GET', 'POST', 'DELETE']],
   [/^\/api\/integrations\/composio$/, ['PATCH']],
   [/^\/api\/(subscriptions\/enrollments|subscriptions\/enrollments\/handoff|subscriptions\/enrollments\/bind)$/, ['GET', 'POST']],
   [/^\/api\/(billing\/stripe|account\/deletion)$/, ['GET', 'POST', 'DELETE']],
-  [new RegExp(`^/api/(?:bots/${ID}(?:/(?:definition|subagents(?:/${ID}(?:/(?:stop|viewer|credentials(?:/(?:challenge|login))?))?)?|computer(?:/(?:runtimes|subscription|takeover|runs|wake|handback|viewer))?))?|conversations/${ID}(?:/(?:decisions(?:/replay)?|members|stop|read|messages))?|suggestions/${ID}(?:/start)?|threads/${ID}/(?:machine|credentials(?:/(?:challenge|login))?))$`), ['GET', 'POST', 'PATCH', 'DELETE']],
+  [new RegExp(`^/api/(?:bots/${ID}(?:/(?:app-tools|definition|subagents(?:/${ID}(?:/(?:stop|viewer|credentials(?:/(?:challenge|login))?))?)?|computer(?:/(?:runtimes|subscription|takeover|runs|wake|handback|viewer))?))?|conversations/${ID}(?:/(?:decisions(?:/replay)?|members|stop|read|messages))?|suggestions/${ID}(?:/start)?|threads/${ID}/(?:machine|credentials(?:/(?:challenge|login))?))$`), ['GET', 'POST', 'PATCH', 'DELETE']],
   [new RegExp(`^/api/(?:workspaces/${ID}/(?:audit-log(?:/retention)?|skills|computer-policy|model-admission)|teams/${ID}/members|projects/${ID}/decisions(?:/from-message)?|conversation-links/${ID}/messages|integrations/composio/catalog/${ID}|devices/${ID}/commands|device-tokens/${ID}/revoke|computer/approvals/${ID})$`), ['GET', 'POST', 'PUT', 'PATCH', 'DELETE']],
-  [new RegExp(`^/api/(?:chat/attachments/${ID}|captures/${ID}|captures/shared/${ID}|artifacts/${ID}/versions/[0-9]+/(?:download|frame)|artifacts/shared/${ID}/frame|avatars/${ID}/${ID}|account/export/${ID})$`), ['GET']],
+  [new RegExp(`^/api/(?:captures/${ID}|captures/shared/${ID}|artifacts/${ID}/versions/[0-9]+/(?:download|frame)|artifacts/shared/${ID}/frame|avatars/${ID}/${ID}|account/export/${ID})$`), ['GET']],
+  // A chat attachment is read, and removed from the composer, by the same person.
+  [new RegExp(`^/api/chat/attachments/${ID}$`), ['GET', 'DELETE']],
+  [new RegExp(`^/api/tasks/${ID}/attachments$`), ['GET', 'POST', 'DELETE']],
+  // New-task dictation (S2) transcribes one recording for the signed-in member.
+  [/^\/api\/tasks\/dictation$/, ['POST']],
+  // PR directory (S3): one PR's preview reads its detail and merges it; both re-check the reader's repository access.
+  [/^\/api\/integrations\/github\/repositories\/pulls\/detail$/, ['GET']],
+  [/^\/api\/integrations\/github\/repositories\/pulls\/merge$/, ['POST']],
   [new RegExp(`^/api/artifacts/shared/${ID}$`), ['GET']],
   [new RegExp(`^/api/(?:mobile/(?:bots|artifacts)/${ID}|runs/${ID}/evidence)$`), ['GET']],
   [new RegExp(`^/api/factory/(?:agent-profiles/${ID}|tasks/${ID}(?:/(?:approval|dispatch(?:/cloud)?|evidence/${ID}))?|questions/${ID}(?:/recover)?|monitor-incidents/${ID}/links)$`), ['GET', 'POST', 'PATCH', 'DELETE']],
@@ -114,7 +126,7 @@ export function allowedApiPath(path: string, method: string): boolean {
   if (ORGANIZATION_DRIVE_VERSIONS.test(path) || ORGANIZATION_VERSION_FILE.test(path) || ORGANIZATION_FILE_HISTORY.test(path)) return method === 'GET'
   if (ORGANIZATION_FILE_SHARE.test(path)) return method === 'PATCH' || method === 'DELETE'
   if (path.startsWith('/api/drive/')) return DRIVE_ROUTES.some(([pattern, methods]) => pattern.test(path) && methods.includes(method))
-  if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments') return method === 'GET'
+  if (path === '/api/settings/issue-prefix' || path === '/api/settings/environments' || path === '/api/settings/thread-titles') return method === 'GET'
   // This human approval/read surface has exactly its declared methods. Do not
   // inherit the wider CRUD family or the generic asset HEAD allowance.
   if (FACTORY_FLOW.test(path)) return method === 'GET' || method === 'POST'

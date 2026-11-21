@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 import type { Editor } from "@tiptap/react"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 import { Button } from "@/components/ui/button"
 import {

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import useSWR from 'swr'
 import useSWRInfinite from 'swr/infinite'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { CalendarClock, FileText, MessageSquare } from '@/components/icons'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'

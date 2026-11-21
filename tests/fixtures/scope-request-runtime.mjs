@@ -4,7 +4,7 @@ import './team-auth-runtime.mjs'
 import { registerHooks } from 'node:module'
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === 'next-intl/server') return { url: 'scope-request-fixture:intl', shortCircuit: true }
+    if (specifier === '@/lib/intl/i18n-server') return { url: 'scope-request-fixture:intl', shortCircuit: true }
     return next(specifier, context)
   },
   load(url, context, next) {

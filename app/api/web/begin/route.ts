@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { db } from '@/lib/db'
 import { desktopAuthRequests } from '@/lib/db/schema'
 import { DESKTOP_AUTH_PENDING_TTL_MS, desktopAuthChallenge, desktopAuthState } from '@/lib/desktop-auth'
@@ -7,7 +7,6 @@ import { officialWebCallback, officialWebOriginAllowed } from '@/lib/web-connect
 import { webAuthSignInPath } from '@/lib/web-connection/auth'
 import { webAuthHeaders, webAuthStateHash } from '@/lib/web-connection/auth-server'
 
-export const dynamic = 'force-dynamic'
 async function handlePOST(request: Request) {
   if (!officialWebOriginAllowed(request.headers.get('origin'))) return NextResponse.json({ error: 'web_auth_forbidden' }, { status: 403, headers: webAuthHeaders })
   let value: Record<string, unknown>

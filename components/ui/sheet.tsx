@@ -6,7 +6,7 @@ import { cn } from "cn"
 
 import { Button } from '@/components/ui/button'
 import { X } from "@/components/icons"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />

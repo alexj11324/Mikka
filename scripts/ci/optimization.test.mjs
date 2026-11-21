@@ -1,12 +1,25 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, join, resolve } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { spawnSync } from 'node:child_process'
 import yaml from 'js-yaml'
 
 const workflow = name => yaml.load(readFileSync(`.github/workflows/${name}.yml`, 'utf8'))
 const evaluate = (expression, context) => runInNewContext(expression.replace(/^\$\{\{|\}\}$/g, '').replace(/\.([\w-]+)/g, '[$1]').replace(/\[([\w-]+)\]/g, '["$1"]'), { always: () => true, cancelled: () => false, ...context })
+
+test('dedicated self-hosted CI is retired while cloud compatibility and official builds remain', () => {
+  for (const name of ['self-hosted-image', 'self-hosted-stable-release', 'self-hosting-ui'])
+    assert.equal(existsSync(`.github/workflows/${name}.yml`), false, name)
+  const parent = workflow('ui-policy')
+  assert.equal(parent.jobs['image-checks'], undefined)
+  assert(!parent.jobs['ui-policy'].needs.includes('image-checks'))
+  assert.equal(workflow('self-hosted-production').name, 'Mikka cloud core compatibility')
+  for (const name of ['cloudflare-api-image', 'cloudflare-eve-image', 'cloudflare-litellm-image', 'desktop-release'])
+    assert.ok(workflow(name).jobs, name)
+})
 
 test('Desktop platform caches warm on changed main install inputs without duplicating acceptance on main', () => {
   const warmer = workflow('ci-dependencies')
@@ -17,15 +30,14 @@ test('Desktop platform caches warm on changed main install inputs without duplic
   assert.deepEqual(warmer.permissions, { contents: 'read' })
   const setup = warmer.jobs['desktop-dependencies'].steps.find(step => step.uses === './.github/actions/pnpm-install')
   assert.deepEqual(setup.with, { profile: 'desktop', 'skip-electron': 'true' })
-  // Analytics can consume the full Linux tree populated by the main Image job,
-  // which already suppresses Electron's unused runtime download.
+  // Analytics does not need Electron's runtime download.
   const analyticsSetup = workflow('analytics-ssr').jobs['analytics-ssr-full'].steps.find(step => step.uses === './.github/actions/pnpm-install')
   assert.equal(analyticsSetup.with['skip-electron'], 'true')
 })
 
 test('selected specialty calls reuse the parent decision; direct dispatch still runs trusted selection', () => {
   const parent = workflow('ui-policy')
-  const automatic = [['analytics-ssr', 'analytics'], ['self-hosted-image', 'image']]
+  const automatic = [['analytics-ssr', 'analytics']]
   for (const [, lane] of automatic) assert.equal(parent.jobs[`${lane}-checks`].with.selected, true)
   assert.equal(parent.jobs['desktop-checks'], undefined)
   assert.ok(Object.hasOwn(workflow('desktop').on, 'workflow_dispatch'), 'Desktop acceptance remains available manually')
@@ -34,6 +46,7 @@ test('selected specialty calls reuse the parent decision; direct dispatch still 
     assert.equal(w.on.workflow_call.inputs.selected.default, false)
     assert.equal(evaluate(w.jobs.changes.if, { inputs: { selected: true } }), false)
     assert.equal(evaluate(w.jobs.changes.if, { inputs: { selected: false } }), true)
+    if (name === 'analytics-ssr') continue // Its native job validates malformed selection before any build step.
     for (const job of Object.values(w.jobs).filter(j => j.needs?.includes('changes') && j.if?.includes('inputs.selected'))) {
       for (const [selected, result, output, expected] of [[true, 'skipped', 'false', true], [false, 'success', 'true', true], [false, 'success', 'false', false], [false, 'failure', 'true', false]]) {
         assert.equal(evaluate(job.if, { inputs: { selected }, needs: { changes: { result, outputs: { [lane]: output } } } }), expected, `${name}: ${selected}/${result}/${output}`)
@@ -42,14 +55,47 @@ test('selected specialty calls reuse the parent decision; direct dispatch still 
   }
 })
 
-test('the analytics gate accepts a reused decision but rejects failed, cancelled and skipped selected work', () => {
-  const gate = workflow('analytics-ssr').jobs['analytics-ssr'].steps[0]
-  for (const selected of [true, false]) {
-    for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
-      const context = { inputs: { selected }, needs: { changes: { result: selected ? 'skipped' : 'success', outputs: { analytics: 'true' } }, 'analytics-ssr-full': { result } } }
-      const env = Object.fromEntries(Object.entries(gate.env).map(([key, value]) => [key, evaluate(value, context)]))
-      assert.equal(spawnSync('bash', ['-e', '-c', gate.run], { env }).status, result === 'success' ? 0 : 1, `${selected}/${result}`)
-    }
+test('Analytics reports its real build and browser result without a second queued summary runner', () => {
+  const w = workflow('analytics-ssr')
+  const [jobId, job] = Object.entries(w.jobs).find(([, job]) => job.name === 'analytics-ssr')
+  assert(job.steps.some(step => step.run === 'pnpm build'), 'the named check must perform the actual build')
+  assert(job.steps.some(step => step.run === 'node scripts/check-analytics-ssr.mjs --check-build'))
+  assert(job.steps.some(step => step.run === 'node scripts/check-analytics-ssr.mjs'), 'the named check must render the real compiled pages')
+  assert.equal(job['continue-on-error'], undefined)
+  assert(job.steps.every(step => !step['continue-on-error']), 'native step failures must fail the check')
+  assert(!Object.values(w.jobs).some(candidate => [candidate.needs].flat().includes(jobId)), 'native job status needs no second summary allocation')
+
+  const gate = job.steps[0]
+  for (const [selected, result, output, scheduled, status] of [
+    [true, 'skipped', undefined, true, 0],
+    [false, 'success', 'true', true, 0],
+    [false, 'success', 'false', false, null],
+    [false, 'failure', 'true', true, 1],
+    [false, 'cancelled', 'true', true, 1],
+    [false, 'skipped', 'true', true, 1],
+    [false, 'success', undefined, true, 1],
+    [false, 'success', 'invalid', true, 1],
+  ]) {
+    const context = { inputs: { selected }, needs: { changes: { result, outputs: { analytics: output } } } }
+    assert.equal(evaluate(job.if, context), scheduled, `${selected}/${result}/${output}`)
+    if (!scheduled) continue
+    const env = Object.fromEntries(Object.entries(gate.env).map(([key, value]) => [key, evaluate(value, context)]))
+    assert.equal(spawnSync('bash', ['-e', '-c', gate.run], { env }).status, status, `${selected}/${result}/${output}`)
+  }
+  assert.equal(evaluate(job.if, { inputs: { selected: true }, needs: { changes: {} }, cancelled: () => true }), false)
+})
+
+test('the protected parent requires success from selected Analytics work', () => {
+  const gate = workflow('ui-policy').jobs['ui-policy'].steps.find(step => step.name === 'Require every selected source, unit and daemon job')
+  for (const result of ['success', 'failure', 'cancelled', 'skipped']) {
+    const context = { github: { event_name: 'pull_request' }, needs: {
+      changes: { result: 'success', outputs: { core: 'false', integration: 'false', source: 'false', daemon: 'false', analytics: 'true', db: 'false' } },
+      'ui-policy-full': { result: 'skipped' }, 'ui-policy-integrations': { result: 'skipped' },
+      'source-checks': { result: 'skipped' }, 'daemon-checks': { result: 'skipped' },
+      'workspace-governance-checks': { result: 'skipped' }, 'analytics-checks': { result },
+    } }
+    const env = { ...Object.fromEntries(Object.entries(gate.env).map(([key, value]) => [key, evaluate(value, context)])), GITHUB_STEP_SUMMARY: '/dev/null' }
+    assert.equal(spawnSync('bash', ['-e', '-c', gate.run], { env }).status, result === 'success' ? 0 : 1, result)
   }
 })
 
@@ -136,4 +182,50 @@ test('Eve migration and maintenance check out the Eve publication source and oth
         : phase.startsWith('service-') ? service : application) + '\n')
     }
   } finally { await rm(directory, { recursive: true, force: true }) }
+})
+
+
+test('Site search checks types once through its build and a type failure prevents HTTP acceptance', t => {
+  const job = workflow('site-search').jobs['site-search']
+  const precheck = job.steps.find(step => step.run?.includes('generate-routes.mjs --check'))
+  const build = job.steps.find(step => step.run === 'pnpm build')
+  const http = job.steps.find(step => step.run?.includes('playwright test tests/e2e/site-search.spec.ts'))
+  assert.ok(precheck && build && http, 'route checks, the real build and HTTP acceptance remain selected')
+  assert.notEqual(build['continue-on-error'], true)
+  const directory = mkdtempSync(join(tmpdir(), 'site-search-typechecks-'))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const trace = join(directory, 'calls.jsonl')
+  // Exercise the actual workflow shell and root build command. Only external
+  // package/build tools are recorded here; this is a wiring/failure-boundary
+  // regression, not evidence that a compiler, PostgreSQL or HTTP suite passed.
+  writeFileSync(join(directory, 'pnpm'), `#!${process.execPath}
+const { appendFileSync, readFileSync } = require('node:fs')
+const { spawnSync } = require('node:child_process')
+const args = process.argv.slice(2)
+appendFileSync(process.env.SDLC_TRACE_FILE, JSON.stringify({ tool: 'pnpm', args }) + '\\n')
+if (args[0] === 'build') {
+  const command = JSON.parse(readFileSync(process.env.SDLC_PACKAGE_FILE, 'utf8')).scripts.build
+  const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', command], { stdio: 'inherit', env: process.env })
+  process.exit(result.status ?? 1)
+}
+if (args[0] === 'typecheck' && process.env.SDLC_FAIL_TYPECHECK === '1') process.exit(17)
+`, { mode: 0o755 })
+  writeFileSync(join(directory, 'node'), `#!${process.execPath}
+require('node:fs').appendFileSync(process.env.SDLC_TRACE_FILE,
+  JSON.stringify({ tool: 'node', args: process.argv.slice(2) }) + '\\n')
+`, { mode: 0o755 })
+  for (const failed of [false, true]) {
+    writeFileSync(trace, '')
+    const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', [precheck.run, build.run, http.run].join('\n')], {
+      encoding: 'utf8', env: { PATH: directory + delimiter + process.env.PATH,
+        SDLC_TRACE_FILE: trace, SDLC_PACKAGE_FILE: resolve('package.json'), SDLC_FAIL_TYPECHECK: failed ? '1' : '0' },
+    })
+    const calls = readFileSync(trace, 'utf8').trim().split('\n').map(line => JSON.parse(line))
+    assert.equal(result.status, failed ? 17 : 0, result.stderr)
+    assert.equal(calls.filter(call => call.tool === 'pnpm' && call.args[0] === 'typecheck').length, 1,
+      'the existing build owns the complete typecheck')
+    assert.equal(calls.filter(call => call.tool === 'pnpm' && call.args[0] === 'lint').length, 1)
+    assert.equal(calls.filter(call => call.tool === 'node' && call.args.join(' ') === 'apps/api/scripts/generate-routes.mjs --check').length, 1)
+    assert.equal(calls.some(call => call.tool === 'pnpm' && call.args.join(' ') === 'exec playwright test tests/e2e/site-search.spec.ts'), !failed)
+  }
 })

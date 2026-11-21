@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { issueStatusEvent, runBlockedEvent, runFinishedEvent, runQuestionEvent, runReportEvent, runRetriedEvent, telegramReplyTargets, userMessageEvent } from './coordinator-events'
+import { issueAssignedEvent, issueStatusEvent, runBlockedEvent, runFinishedEvent, runQuestionEvent, runReportEvent, runRetriedEvent, telegramReplyTargets, userMessageEvent } from './coordinator-events'
 
 const issue = { id: 'issue-1', userId: 'user-1', title: 'Fix login', status: 'done', revision: 4 }
 
@@ -78,4 +78,11 @@ test('worker tool calls become events on the run, each one new', () => {
 test('a question keeps only the parts the agent gave', () => {
   assert.deepEqual(runQuestionEvent(workerRun, { question: 'Rename it?' }).payload, { question: 'Rename it?' })
   assert.deepEqual(runQuestionEvent(workerRun, { question: 'Which?', options: ['A', 'B'], context: 'Both work' }).payload, { question: 'Which?', options: ['A', 'B'], context: 'Both work' })
+})
+
+test('assigning a task to a Bot writes one wake into that Bot chat per revision', () => {
+  const bot = { id: 'b0000000-0000-4000-8000-00000000b0b1' }
+  const event = issueAssignedEvent({ id: 'issue-1', ownerId: 'user-1', identifier: 'MIKKA-7', title: 'Fix login', revision: 2 }, bot, { name: 'Alex' })
+  assert.deepEqual(event, { userId: 'user-1', botId: bot.id, kind: 'issue_assigned', dedupeKey: `issue_assigned:issue-1:${bot.id}:2`, issueId: 'issue-1', runId: null,
+    payload: { title: 'Fix login', identifier: 'MIKKA-7', actorName: 'Alex' } })
 })

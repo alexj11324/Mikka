@@ -50,6 +50,11 @@ test('actual Vite resolution rejects server runtime and unregistered action cons
     'import "next/headers"',
     'import "server-only"',
     'import "@/lib/auth"',
+    // Server translations read the request scope and ship both message catalogs;
+    // a component that needs them must import the client entry instead. This
+    // names a value and calls it, so the bundler cannot drop the import before
+    // resolution.
+    'import { getTranslations } from "@/lib/intl/i18n-server"; export const read = () => getTranslations("Common")',
   ]) await assert.rejects(compile(source), /FRONTEND_SERVER_(?:IMPORT|MODULE)/)
   await assert.rejects(compile('export { shareCapture } from "@/app/actions/captures"'), /FRONTEND_ACTION_NOT_ALLOWED: captures.shareCapture/)
 })

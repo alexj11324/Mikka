@@ -32,8 +32,8 @@ mock.module('sonner', { namedExports: { toast: {
   error(message: string, options?: typeof removalNotice) { errors.push(message); removalNotice = options },
   dismiss() { removalNotice = undefined },
 } } })
-mock.module('next-intl', {
-  namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` },
+mock.module('@/lib/intl/i18n-client', {
+  namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` },
 })
 
 const browser = new Window({ url: 'https://fixture.example/mikka' })

@@ -48,5 +48,8 @@ export interface PublishedPullRequest {
   branch?: string
   headSha?: string
   changedFiles?: number
+  /** GitHub login that opened the PR and when, recorded since the PR directory's author/Since filters (S3). */
+  author?: string
+  createdAt?: string
   reviewChecks?: import('./github/review-checks').ReviewChecks | null
 }

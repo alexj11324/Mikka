@@ -16,7 +16,6 @@ import { taskStateOf } from '@/lib/task-state'
 import { taskReviewSummaries } from '@/lib/coding-workspace/task-review/summaries'
 import { readTaskRefreshFailure, TASK_PRESENTATION_PARAM, TASK_PRESENTATION_VERSION, TASK_REFRESH_FAILURE_HEADER } from '@/lib/mobile-task-refresh'
 
-export const dynamic = 'force-dynamic'
 
 function recordMobileRefreshFailure(request: Request) {
   if (request.headers.get('x-mikka-client-kind') !== 'mobile') return

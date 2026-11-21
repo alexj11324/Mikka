@@ -1,6 +1,7 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "cn"
+import { Spinner } from "@/components/ui/spinner"
 import { touchTarget } from "@/lib/touch-target"
 import { statusTones, type StatusTone } from '@/lib/status-appearance'
 
@@ -55,21 +56,49 @@ const buttonVariants = cva(
   }
 )
 
+/** The square the size variant draws its glyph at, so the busy spinner takes the same one. */
+const BUSY_SPINNER_SIZE: Record<string, string | undefined> = {
+  xs: "size-3",
+  sm: "size-3.5",
+  "icon-xs": "size-3",
+  "icon-sm": "size-3.5",
+}
+
+interface ButtonProps extends ButtonPrimitive.Props, VariantProps<typeof buttonVariants> {
+  tone?: StatusTone
+  /**
+   * The press is still running. The button says so (`aria-busy`), draws a
+   * spinner in place of its leading glyph, and takes no second press.
+   */
+  busy?: boolean
+}
+
 function Button({
   className,
   variant = "default",
   size = "default",
   tone,
+  busy = false,
+  disabled,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants> & { tone?: StatusTone }) {
+}: ButtonProps) {
+  // An icon size has no label to sit beside: the spinner takes the glyph's place instead.
+  const glyphOnly = (size ?? "default").startsWith("icon")
   return (
     <ButtonPrimitive
       data-slot="button"
       data-button-variant={tone ? undefined : variant}
       data-tone={tone}
-      className={cn(buttonVariants({ variant: tone ? 'status' : variant, size }), tone && 'rounded-md hover:brightness-95 aria-expanded:brightness-95', tone && statusTones[tone], touchTarget(className), className)}
+      aria-busy={busy || undefined}
+      disabled={busy || disabled}
+      className={cn(buttonVariants({ variant: tone ? 'status' : variant, size }), tone && 'rounded-md hover:brightness-95 aria-expanded:brightness-95', tone && statusTones[tone], touchTarget(className), className, busy && 'disabled:opacity-100')}
       {...props}
-    />
+    >
+      {/* The spinner is a picture of the state `aria-busy` already announces, and its own label is not translated. */}
+      {busy ? <Spinner data-icon="inline-start" aria-hidden="true" className={BUSY_SPINNER_SIZE[size ?? "default"]} /> : null}
+      {busy && glyphOnly ? null : children}
+    </ButtonPrimitive>
   )
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import { SettingRow, SettingsSection } from '@/components/settings/primitives'
 import { createTelegramConnectLink, disconnectTelegram, getTelegramIntegrationStatus } from '@/app/actions/telegram'

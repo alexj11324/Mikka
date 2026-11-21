@@ -119,7 +119,7 @@ stub('../github/user-access.ts', { readAuthorizedIssue: forbidden })
 stub('../pending-action-store.ts', { proposeAction: forbidden, writeAccountAction: forbidden, proposeRepositoryPush: forbidden })
 stub('../telegram/client.ts', { postTelegramText: forbidden })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: forbidden })
-mock.module('next/server', { namedExports: { NextResponse: Response, after: () => {} } })
+mock.module('@/lib/server-runtime/server', { namedExports: { NextResponse: Response, after: () => {} } })
 
 let composer: typeof import('./product-instructions'), store: typeof import('./store'), personal: typeof import('./personal-instructions')
 before(async () => {

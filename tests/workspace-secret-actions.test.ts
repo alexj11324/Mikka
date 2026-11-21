@@ -9,7 +9,7 @@ let rejected = false
 let actions: typeof import('../app/actions/workspace-secrets')
 
 before(async () => {
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers() } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers() } })
   mock.module('@/lib/workspace-admin/current', { namedExports: { currentWorkspaceActor: async (workspaceId?: string) => {
     requested.push(workspaceId)
     if (workspaceId === 'foreign-workspace') throw new Error('workspaceAccessDenied')

@@ -2,7 +2,6 @@ import { withDeviceRoute } from '@/lib/device-route'
 import { authenticateDevice } from '@/lib/device-link'
 import { pool } from '@/lib/db'
 import { localComputerAuthority } from '@/lib/computer/local-authority'
-export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store' }
 async function handleGET(request: Request, { params }: { params: Promise<{ deviceId: string; runId: string }> }) {
   const actor = await authenticateDevice(request)
