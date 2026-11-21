@@ -145,7 +145,7 @@
   ],
   "preservedGuards": [
     "Finite official repository ID/name/owner profile; fixed workflow identity, path, event, run ID, attempt and native run status.",
-    "Existing pre-checkout actor/source and pre-credential rechecks; workflows and product drivers are not modified by this PR.",
+    "Existing pre-checkout repository/source and pre-credential rechecks; workflows and product drivers are not modified by this PR.",
     "Modern nested validate/build, recheck, await-web, web-ready, templates and cleanup success; remember-failure skipped; unique successful publish then report-upload steps; mixed legacy shape rejected.",
     "Artifact exact name and one match, complete bounded listing, listing/detail consistency, run/head/repository/attempt binding, size, digest and non-expiry.",
     "Immutable GitHub API archive route, bounded approved HTTPS redirect, no GitHub token at storage, bounded stream, exact archive digest/size and one safe ZIP release.json member.",
