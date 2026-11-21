@@ -13,7 +13,11 @@ import { chatPath, openChat } from '@/lib/navigate'
 import { colors, font } from '@/lib/theme'
 
 // The same labels as messages/zh-CN.json; API values remain the shared shape/colour ids.
-const shapeLabels: Record<string, string> = { cercle: '圆形', squircle: '圆角方', nuage: '云朵', goutte: '水滴', fleur: '花', chat: '猫' }
+const shapeLabels: Record<string, string> = {
+  cercle: '圆形', galet: '卵石', squircle: '圆角方', capsule: '胶囊', triangle: '三角', hexagone: '六边形',
+  nuage: '云朵', goutte: '水滴', coeur: '爱心', etoile: '星星', fleur: '花', chat: '猫',
+  champignon: '蘑菇', fantome: '幽灵', feuille: '叶子', ecran: '屏幕',
+}
 const colorLabels: Record<string, string> = {
   encre: '墨色', brun: '棕色', rouge: '红色', orange: '橙色', ambre: '琥珀色', vert: '绿色',
   turquoise: '青色', bleu: '蓝色', violet: '紫色', rose: '粉色', gris: '灰色', creme: '奶油色',

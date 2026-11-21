@@ -12,7 +12,7 @@
 export type BotAvatarProps = {
   /** A colour id from `BOT_COLORS` (@/lib/bot-look); unknown or missing is ink. */
   color?: string
-  /** A shape id from the web's sixteen (`BOT_SHAPE_DRAWINGS`); unknown or missing is cercle. */
+  /** A shape id from the web's sixteen (`BOT_BLOB_RADII`); unknown or missing is cercle. */
   shape?: string
   /** The bot's id, when the caller has one, so a layer can give each bot one steady look (most bots keep the default ink circle). */
   id?: string
