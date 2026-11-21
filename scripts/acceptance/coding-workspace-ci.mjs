@@ -90,8 +90,10 @@ export async function attestWorkspaceAcceptance(env, { fetchImpl = fetch } = {})
   const web = await waitForWebDeployment({ expectedBuild: expected.sourceCommit, token: env.GITHUB_TOKEN, fetchImpl })
   const after = await verifyRelease({ env, event, files: source.files, fetchImpl })
   check(workspaceReleaseSelection(after, source.files).selected, 'not_selected')
+  const workerSha = source.workerSha()
+  check(after.publication !== 'build_time' || after.workerSha === workerSha, 'attestation')
   const proof = { ...after, ...workspaceReleaseSelection(after, source.files), kind: 'coding-workspace-ci-attestation',
-    workerSha: source.workerSha(), workerSourceCommit: expected.sourceCommit, web }
+    workerSha, workerSourceCommit: expected.sourceCommit, web }
   assertWorkspaceAttestation(expected, proof)
   write(env, 'attestation.json', proof)
   return proof

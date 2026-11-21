@@ -33,7 +33,10 @@ function fixture() {
       credentialRoute: 'subscription', replyVerified: true, replyVerifiedAfterTool: true,
     }])) }
   const calls = []; let attestations = 0, reads = 0
-  const data = { workflow, run, jobs, artifact, report, mutateFinalRun: false, comparisons: {} }
+  const path = `/compare/${source}...${app}`
+  const data = { workflow, run, jobs, artifact, report, mutateFinalRun: false,
+    comparisons: { [`${readApi}${path}?per_page=1`]: { url: api + path, base_commit: { sha: source },
+      merge_base_commit: { sha: source }, status: 'ahead', ahead_by: 1, behind_by: 0 } } }
   return { data, calls, attestations: () => attestations, dependencies: { now: () => now,
     attest: async received => { assert.equal(received.APPLICATION_SHA, app); attestations++; return { sourceCommit: app, publicBuild: app } },
     fetchImpl: async (url, options) => {
