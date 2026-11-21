@@ -11,6 +11,6 @@ export type OnboardingProps = {
   computer?: OnboardingComputer
   saveKey?: (apiKey: string) => Promise<E2BKeyResult>
   workspaceId?: string
-  /** After completeOnboarding: a Bot the guide made opens its chat; with none (the hosted guide makes none, decision 2026-11-15-1900), 新建任务 opens. */
+  /** After completeOnboarding: a Bot the guide made opens its chat; with none (the hosted guide makes none, decision 2026-11-15-1900), the Coordinator opens (#3032). */
   onDone: (bot: BotView | null) => void
 }

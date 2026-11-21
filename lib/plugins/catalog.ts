@@ -133,8 +133,18 @@ export function composioToolkitLister(client: { getClient: () => { toolkits: { l
 }
 
 /** A new connection must be a store app that connects that way. */
-export async function assertCatalogToolkit(list: ToolkitLister, id: string, kind: ConnectKind = 'managed') {
-  if (!(await listStoreCatalog(list)).apps.some(app => app.id === id && app.connect === kind)) throw new PluginError('integrationToolkitNotSupported', 400)
+/** The single-toolkit record's connect kind, checked when the bulk list does not confirm it (null when unreadable). */
+export type ToolkitKindVerifier = (slug: string) => Promise<ConnectKind | null>
+
+/** A new connection must be a store app that connects that way. When the bulk
+ *  list does not confirm it, the single-toolkit record is checked before
+ *  rejecting: reduced list metadata must not silently contradict the verified
+ *  detail response (#1920). */
+export async function assertCatalogToolkit(list: ToolkitLister, id: string, kind: ConnectKind = 'managed', verify?: ToolkitKindVerifier) {
+  if ((await listStoreCatalog(list)).apps.some(app => app.id === id && app.connect === kind)) return
+  const verified = verify ? await verify(id).catch(() => null) : null
+  if (verified === kind) return
+  throw new PluginError('integrationToolkitNotSupported', 400)
 }
 
 /** Whether an app needs no connection at all (its tools run on the person's id alone). */

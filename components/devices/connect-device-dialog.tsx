@@ -1,17 +1,17 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Plus, SquareTerminal } from '@/components/icons'
+import { Download, Plus, SquareTerminal } from '@/components/icons'
 import { useTranslations } from '@/lib/intl/i18n-client'
 import { useSWRConfig } from 'swr'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { CodeBlock, CodeBlockCopyButton, CodeBlockHeader, CodeBlockTitle } from '@/components/reui/code-block/code-block'
 import { IconTile } from '@/components/reui/icon-tile'
 import { daemonCommands } from '@/lib/daemon-commands'
 import { FieldError } from '@/components/ui/field'
 import { publicServiceAddress } from '@/lib/platform/public-origin'
-import { daemonPackageName } from '@/lib/platform/client-config'
+import { daemonPackageName, DESKTOP_DOWNLOAD_URL } from '@/lib/platform/client-config'
 
 export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTrigger = false, reconnect = false }: {
   open?: boolean
@@ -44,6 +44,11 @@ export function ConnectDeviceDialog({ open: controlledOpen, onOpenChange, hideTr
           {reconnect ? t('reconnectTitle') : t('title')}
         </DialogTitle>
       </DialogHeader>
+      {/* #3031: a desktop install adds this computer as a device without the terminal. */}
+      {!reconnect && <a className={buttonVariants({ variant: 'outline' })} href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">
+        <Download data-icon="inline-start" aria-hidden="true" />
+        {t('downloadDesktop')}
+      </a>}
       <DaemonCommandList open={open} reconnect={reconnect} />
       <DialogFooter>
         <Button size="sm" onClick={() => changeOpen(false)}>{t('done')}</Button>

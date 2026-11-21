@@ -1053,6 +1053,7 @@
         "start": "3 Start",
         "startAlone": "Start"
       },
+      "downloadDesktop": "Download Mikka Desktop",
       "requirements": "Node.js 24+ · Git",
       "configurationFailed": "Installation commands are unavailable",
       "reconnectTitle": "Reconnect"
@@ -4266,7 +4267,8 @@
         "ownProvider": "Runs on this server's own provider",
         "usedUntil": "{service} subscription is used up until {time}",
         "usedUp": "{service} subscription is used up"
-      }
+      },
+      "noModelSetUp": "no model set up"
     },
     "empty": "Tell {name} what you need",
     "events": {

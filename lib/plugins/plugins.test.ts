@@ -188,6 +188,11 @@ test('store lists every Composio toolkit but local ones and own integrations, in
   await assert.rejects(assertCatalogToolkit(async () => pages[0], 'own_keys'), /integrationToolkitNotSupported/)
   await assertCatalogToolkit(async () => pages[0], 'slack')
   await assertCatalogToolkit(async () => pages[0], 'dcr_app')
+  // Reduced bulk metadata does not contradict a verified detail record (#1920):
+  // a toolkit the list calls unsupported still connects when retrieve proves it.
+  await assertCatalogToolkit(async () => pages[0], 'dev_app', 'managed', async slug => slug === 'dev_app' ? 'managed' : null)
+  await assert.rejects(assertCatalogToolkit(async () => pages[0], 'dev_app', 'managed', async () => 'credentials'), /integrationToolkitNotSupported/)
+  await assert.rejects(assertCatalogToolkit(async () => pages[0], 'dev_app', 'managed', async () => { throw new Error('retrieve failed') }), /integrationToolkitNotSupported/)
   // A failed read is not kept.
   resetStoreCatalogCache()
   await assert.rejects(listStoreCatalog(async () => { throw new Error('down') }))

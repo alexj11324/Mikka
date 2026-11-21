@@ -818,7 +818,7 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
       onCreated={id => { refreshTaskPages(); open(id) }} onAdded={() => { void refreshTaskPages() }} initialText={typedAhead}
 
       onOpenChange={open => { setCreating(open); if (!open) setTypedAhead('') }} />}
-    {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={listWorkspaceId} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot); else setCreating(true) }} />}
+    {onboardingOpen && <Onboarding computer={onboarding?.computer} saveKey={saveOnboardingKey} workspaceId={listWorkspaceId} onDone={bot => { setOnboardingOpen(false); if (bot) openChat({ kind: 'bot', botId: bot.id }, bot); else openChat({ kind: 'coordinator' }) }} />}
     <NewGroupDialog key={`group:${listWorkspaceId}`} workspaceId={listWorkspaceId} bots={bots} purpose={creation === 'conversation' ? creation : undefined} open={creation !== null} onOpenChange={open => { if (!open) closeComposer() }}
       onCreated={group => {
         if (creation === 'conversation') setDirectoryRevision(value => value + 1)

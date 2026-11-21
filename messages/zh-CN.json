@@ -1053,6 +1053,7 @@
         "start": "3 上线",
         "startAlone": "上线"
       },
+      "downloadDesktop": "下载 Mikka 桌面版",
       "requirements": "Node.js 24+ · Git",
       "configurationFailed": "安装命令暂不可用",
       "reconnectTitle": "重新连接"
@@ -4266,7 +4267,8 @@
         "ownProvider": "用这台服务器自带的服务商",
         "usedUntil": "{service} 订阅到 {time} 前用完了",
         "usedUp": "{service} 订阅额度用完了"
-      }
+      },
+      "noModelSetUp": "还没有配置模型"
     },
     "empty": "告诉 {name} 你要做什么",
     "events": {
