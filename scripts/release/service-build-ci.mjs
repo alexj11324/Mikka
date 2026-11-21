@@ -10,6 +10,10 @@ import { assertInputCoverage, buildContexts, registryImage, releaseManifest, ser
 import { actionsMikkaRepository, officialMikkaRepository, privateMikkaRepository, publicRepositoryId } from '../cloudflare-source.mjs'
 import { uiOverlay } from '../../lib/ui-overlay.mjs'
 
+const trustedActors = { owner: { id: '183887963', login: 'alexj11324' }, mergeQueue: { id: '118344674', login: 'github-merge-queue[bot]' } }
+const trustedPushActor = actor => String(actor?.id) === trustedActors.owner.id
+  || (String(actor?.id) === trustedActors.mergeQueue.id && actor?.login === trustedActors.mergeQueue.login)
+
 const root = fileURLToPath(new URL('../..', import.meta.url))
 const hash = bytes => 'sha256:' + createHash('sha256').update(bytes).digest('hex')
 const workflow = 'cloudflare-api-image.yml'
@@ -26,9 +30,9 @@ export function trustedBuildSource(env, event) {
   assert.equal(env.GITHUB_ACTIONS, 'true')
   const repository = actionsMikkaRepository(env)
   assert.ok(repository, 'Official Mikka workflow repository required')
-  assert.equal(env.GITHUB_ACTOR_ID, '183887963')
-  assert.equal(env.GITHUB_ACTOR, 'alexj11324')
-  assert.equal(env.GITHUB_TRIGGERING_ACTOR, 'alexj11324')
+  const actor = Object.values(trustedActors).find(actor => actor.id === env.GITHUB_ACTOR_ID && actor.login === env.GITHUB_ACTOR)
+  assert.ok(actor, 'Trusted main push actor required')
+  assert.ok([actor.login, trustedActors.owner.login].includes(env.GITHUB_TRIGGERING_ACTOR))
   // The existing protected publication environment only permits main. PR
   // qualification stays credential-free; do not simulate another event/ref.
   assert.equal(env.GITHUB_EVENT_NAME, 'push')
@@ -95,8 +99,8 @@ export function checkedServiceCache(name, receipt, run, jobs, artifact) {
   assert.equal(run.head_branch, 'main')
   assert.equal(run.status, 'completed')
   assert.ok(['success', 'failure'].includes(run.conclusion), 'Cancelled or incomplete workflows cannot supply release artifacts')
-  assert.equal(run.actor?.id, 183887963)
-  assert.equal(run.triggering_actor?.id, 183887963)
+  assert.ok(trustedPushActor(run.actor))
+  assert.ok(trustedPushActor(run.triggering_actor))
   assert.equal(run.head_sha, receipt.sourceCommit)
   assert.equal(String(run.id), receipt.build.runId)
   assert.equal(String(run.run_attempt), receipt.build.runAttempt)
@@ -181,7 +185,7 @@ async function cachedService(name, context, image) {
     if (artifact.name !== artifactName || artifact.expired || artifact.workflow_run?.repository_id !== 1427517699
       || artifact.workflow_run?.head_repository_id !== 1427517699) continue
     const origin = await github('actions/runs/' + artifact.workflow_run.id)
-    if (origin.actor?.id !== 183887963 || origin.triggering_actor?.id !== 183887963
+    if (!trustedPushActor(origin.actor) || !trustedPushActor(origin.triggering_actor)
       || origin.path !== '.github/workflows/' + workflow || origin.event !== 'push' || origin.head_branch !== 'main') continue
     const receipt = await readCacheArtifact(artifact)
     if (receipt.contextDigest !== context.contextDigest || (context.kind === 'container' && receipt.imageDigest !== image?.imageDigest)) continue
