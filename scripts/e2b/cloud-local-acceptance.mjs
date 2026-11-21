@@ -1,9 +1,10 @@
+// Actual cloud-worker repository task through fake E2B HTTP + fake LiteLLM.
 import { submitEveMessage } from '../acceptance/eve-session.mjs'
 // New remote repository task on official E2B instances + real DeepSeek + local API.
 // Run only after local acceptance, with the isolated server's database env:
 // NODE_USE_ENV_PROXY=1 node --import ./tests/support/server-only.mjs --import tsx \
 //   scripts/e2b/cloud-local-acceptance.mjs <environment.json>
-// E2B_API_KEY stays in process memory; worker source and digest are fixed to this checkout.
+// No provider credential is read. Worker source/digest match this checkout.
 import assert from 'node:assert/strict'
 import { randomBytes, randomUUID } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
@@ -12,7 +13,7 @@ import { resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 import pg from 'pg'
-import { Agent, EnvHttpProxyAgent, fetch as proxyFetch } from 'undici'
+import { Agent, fetch as proxyFetch } from 'undici'
 import { Sandbox } from 'e2b'
 import { remoteKey } from '@mikka/protocol/repository'
 import { assertE2eTarget, disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
@@ -22,20 +23,26 @@ import { preferredModel } from '../dev-local/seed-model-keys.ts'
 import { ensureBotRuntime } from '../../lib/computer/bot-runtime.ts'
 import { ensureThreadMachine } from '../../lib/cloud-computer/thread-machines.ts'
 import { localGitOrigin } from '../../packages/daemon/src/agents/local-git-origin.ts'
-import { startLocalRelay } from './local-api-relay.mjs'
+import { startLoopbackCloudRelay } from './loopback-cloud-relay.mjs'
+import { startLocalCloudImage } from './local-cloud-image.mjs'
+import { LOCAL_E2B_KEY } from '../../tests/fakes/e2b.mjs'
 import { cloudAcceptanceRelease } from './cloud-acceptance-release.mjs'
 import { bootstrapOfficialInstance } from '../../lib/computer/official-runtime.ts'
 import { computerTemplate, taskTemplate } from '../../lib/secrets/e2b-runtime.ts'
 
 const id = randomUUID(), directory = resolve('.cache/dev-local', `cloud-${id}`), sandboxIds = new Set()
-const localAgent = new Agent(), remoteAgent = new EnvHttpProxyAgent()
+const localAgent = new Agent()
 const abort = new AbortController()
-let options = {}, timeout, heartbeat, started = false, release
-const send = (url, options) => proxyFetch(url, { ...options, dispatcher: ['localhost', '127.0.0.1', '[::1]'].includes(new URL(url).hostname) ? localAgent : remoteAgent })
+let options = {}, timeout, heartbeat, started = false, release, tlsAgent, fakeProvider
+const send = (url, options) => {
+  const target = new URL(url)
+  assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname), 'LOCAL_CLOUD_EXTERNAL_HTTP_REFUSED')
+  return proxyFetch(url, { ...options, dispatcher: target.protocol === 'https:' ? tlsAgent : localAgent, redirect: 'error' })
+}
 let pool, accounts, relay, actor, botId, sourceDevice, sourceSandboxId, runId, taskDevice, stage = 'guard'
 let ownsPool = false, ownsAccounts = false
-const observed = [], metric = { id, scope: 'new remote repository task on official E2B instances, isolated local API/DB, real DeepSeek, run-bound MCP' }
-const connection = { apiKey: process.env.E2B_API_KEY, proxy: process.env.HTTPS_PROXY ?? process.env.https_proxy }
+const observed = [], metric = { id, scope: 'real cloud-worker repository task, fake E2B HTTP, fake LiteLLM, isolated local API/DB, run-bound MCP', networkBoundary: 'one owned network namespace; independent mount/PID/user execution environments' }
+const connection = {}
 const quote = value => `'${value.replaceAll("'", "'\\''")}'`
 async function wait(check, limit = 120_000) {
   const until = performance.now() + limit
@@ -50,7 +57,6 @@ async function api(path, body, method = body ? 'POST' : 'GET') {
 async function main() {
   assert.ok(disposableDatabase(process.env), 'All application databases must be disposable loopback _e2e targets')
   assertE2eTarget(process.env.E2E_DATABASE_URL)
-  assert.ok(connection.apiKey, 'The test-team E2B key is required')
   const parentTemplate = computerTemplate(), codingTemplate = taskTemplate('claude_code')
   metric.officialTemplates = { parent: parentTemplate, task: codingTemplate }
   metric.workerSourceCommit = release.sourceCommit
@@ -59,6 +65,21 @@ async function main() {
   const environment = options.environment ?? await loadEnvironment({ ...process.env, MIKKA_TEST_ENVIRONMENT_FILE: process.argv[2] ?? process.env.MIKKA_TEST_ENVIRONMENT_FILE })
   const localOrigin = environment.origin
   assert.ok(['localhost', '127.0.0.1'].includes(new URL(localOrigin).hostname))
+  const runtime = options.runtime ?? JSON.parse(await readFile(resolve('.cache/dev-local/runtime.json'), 'utf8'))
+  assert.equal(new URL(runtime.server).origin, localOrigin)
+  const barePath = localGitOrigin({ ...process.env, MIKKA_DEV_GIT_ORIGIN: runtime.scenario.barePath })
+  assert.ok(barePath, 'Only the existing isolated dev:local Git fixture can be exposed')
+  const repoToken = randomBytes(32).toString('base64url')
+  relay = await startLoopbackCloudRelay({ localOrigin, barePath, repoToken, observe: value => { observed.push({ at: new Date().toISOString(), ...value }); if (value.type === 'claim') metric.policyIssuer = value.issuer } })
+  const relayOrigin = relay.origin
+  tlsAgent = new Agent({ connect: { ca: relay.ca } })
+  stage = 'local-provider-image'
+  fakeProvider = await startLocalCloudImage({ release, ca: relay.ca })
+  Object.assign(connection, fakeProvider.e2bOptions)
+  assert.equal(connection.apiKey, LOCAL_E2B_KEY, 'Only the synthetic local E2B credential is allowed')
+  metric.workerCliSha256 = fakeProvider.worker.cliSha256
+  metric.networkNamespace = fakeProvider.worker.networkNamespace
+  process.env.MIKKA_CLOUD_WORKER_URL = `${relayOrigin}/mikka`
   ownsPool = !options.pool
   pool = options.pool ?? new pg.Pool({ connectionString: process.env.E2E_DATABASE_URL, max: 5, statement_timeout: 20_000 })
   assert.equal((await pool.query('SELECT current_database() AS name')).rows[0].name, environment.database.name)
@@ -80,6 +101,7 @@ async function main() {
   sandboxIds.add(source.sandboxId)
   const sourceBootstrap = performance.now()
   await bootstrapOfficialInstance(source, parentTemplate)
+  metric.ingressGuard = fakeProvider.guardEvidence
   metric.sourceInstanceBootstrapMs = Math.round(performance.now() - sourceBootstrap)
   assert.equal((await source.files.read('/opt/mikka/worker-source-sha', { user: 'root' })).trim(), release.workerHash)
   sourceDevice = randomUUID()
@@ -89,7 +111,7 @@ async function main() {
   await pool.query('INSERT INTO cloud_machines ("workspaceId","ownerId","sandboxId","operationId","runtimeReady",state,"deviceId") VALUES ($1,$2,$3,$4,true,\'running\',$5)', [actor.workspaceId, actor.userId, source.sandboxId, randomUUID(), sourceDevice])
   await pool.query('INSERT INTO bot_desktops ("botId","workspaceId","ownerId",display) VALUES ($1,$2,$3,1)', [botId, actor.workspaceId, actor.userId])
   const sourceRuntimes = await ensureBotRuntime(pool, actor, botId, source, sourceDevice)
-  stage = 'real-model-selection'
+  stage = 'model-selection-via-fake-litellm'
   await wait(async () => {
     assert.ok((await send('http://127.0.0.1:3191/refresh', { method: 'POST', signal: abort.signal })).ok)
     const key = (await pool.query('SELECT models FROM model_api_keys WHERE "ownerId"=$1 AND provider=\'deepseek\'', [actor.userId])).rows[0]
@@ -103,11 +125,6 @@ async function main() {
   const issue = await wait(async () => (await pool.query('SELECT id FROM issues WHERE "userId"=$1 AND title=$2', [actor.userId, marker])).rows[0])
 
   stage = 'restricted-https-relay'
-  const relayOrigin = `https://${source.getHost(8765)}`, controlToken = randomBytes(32).toString('base64url'), initialDevice = `orv_${randomBytes(32).toString('base64url')}`, repoToken = randomBytes(32).toString('base64url')
-  const runtime = options.runtime ?? JSON.parse(await readFile(resolve('.cache/dev-local/runtime.json'), 'utf8'))
-  assert.equal(new URL(runtime.server).origin, localOrigin)
-  const barePath = localGitOrigin({ ...process.env, MIKKA_DEV_GIT_ORIGIN: runtime.scenario.barePath })
-  assert.ok(barePath, 'Only the existing isolated dev:local Git fixture can be exposed')
   const baseBranch = runtime.scenario.baseBranch
   assert.equal(typeof baseBranch, 'string', 'The fixture must declare its actual default base branch')
   execFileSync('git', ['check-ref-format', '--branch', baseBranch], { stdio: 'ignore' })
@@ -117,14 +134,7 @@ async function main() {
   const fixtureReadme = execFileSync('git', ['--git-dir', barePath, 'show', `${metric.fixtureBaseCommit}:README.md`], { encoding: 'utf8' })
   const verifyCommand = `node -e ${quote(`const fs = require('node:fs'), assert = require('node:assert/strict'); assert.equal(fs.readFileSync('cloud-acceptance.txt', 'utf8').trim(), ${JSON.stringify(marker)}); assert.equal(fs.readFileSync('README.md', 'utf8'), ${JSON.stringify(fixtureReadme)});`)}`
   for (const current of sourceRuntimes) await pool.query('UPDATE device_repos SET "repoPath"=$2,"remoteUrl"=$3,"baseBranch"=$4,"verifyCommand"=$6 WHERE id=$1 AND "userId"=$5', [current.repoId, remoteKey(repository), repository, baseBranch, actor.userId, verifyCommand])
-  await source.commands.run('install -d -m 700 /run/mikka-relay', { user: 'root' })
-  await source.files.write('/run/mikka-relay/server.py', await readFile(new URL('./local-api-relay.py', import.meta.url), 'utf8'), { user: 'root' })
-  await source.files.write('/run/mikka-relay/config.json', JSON.stringify({ origin: relayOrigin, deviceToken: initialDevice, controlToken, repoToken, bindDeviceOnce: true }), { user: 'root' })
-  await source.commands.run('chmod 600 /run/mikka-relay/config.json; exec /usr/bin/python3 /run/mikka-relay/server.py /run/mikka-relay/config.json > /run/mikka-relay/server.log 2>&1', { user: 'root', background: true, timeoutMs: 0 })
   await wait(async () => { try { return (await send(`${relayOrigin}/mikka/v1/probe`, { signal: abort.signal })).status === 401 } catch { return false } })
-  relay = await startLocalRelay({ localOrigin, relayOrigin, deviceToken: initialDevice, controlToken, signal: abort.signal, barePath, send, observe: value => { observed.push({ at: new Date().toISOString(), ...value }); if (value.type === 'claim') metric.policyIssuer = value.issuer } })
-  void relay.done.catch(error => abort.abort(error))
-  process.env.MIKKA_CLOUD_WORKER_URL = `${relayOrigin}/mikka`
 
   stage = 'signed-route-warmup'
   // next dev compiles routes lazily. Warm the unchanged authorization paths
@@ -137,11 +147,11 @@ async function main() {
   }
 
   stage = 'api-task-dispatch'
-  const queued = await api(`/api/bots/${botId}/computer/runs`, { issueId: issue.id, harness: 'claude_code', note: `Use the real selected ${metric.model}. Write cloud-acceptance.txt with ${marker}, then submit. Do not push or open a PR.` })
+  const queued = await api(`/api/bots/${botId}/computer/runs`, { issueId: issue.id, harness: 'claude_code', note: `Use the selected ${metric.model}. Write cloud-acceptance.txt with ${marker}, then submit. Do not push or open a PR.` })
   runId = queued.runId
   assert.ok(runId)
   const frozen = (await pool.query('SELECT r."agentDefinition",k.provider FROM agent_runs r JOIN model_api_keys k ON k.id=(r."agentDefinition"->\'apiKey\'->>\'keyId\')::uuid AND k."ownerId"=r."userId" WHERE r.id=$1 AND r."userId"=$2', [runId, actor.userId])).rows[0]
-  assert.equal(frozen?.provider, 'deepseek', 'Cloud run must freeze the real DeepSeek key')
+  assert.equal(frozen?.provider, 'deepseek', 'Cloud run must freeze the selected provider at the LiteLLM boundary')
   assert.equal(frozen.agentDefinition.modelSource, 'api_key')
   assert.equal(frozen.agentDefinition.model, metric.model)
   const provider = {
@@ -164,7 +174,7 @@ async function main() {
       const gitConfig = '/home/user/.mikka/worker/adapters/pids/fixture-git.config'
       // install sets ownership only on named directories, not implicit parents.
       await sandbox.commands.run('install -d -o user -g user -m 700 /home/user/.mikka/worker /home/user/.mikka/worker/adapters /home/user/.mikka/worker/adapters/pids', { user: 'root' })
-      await sandbox.files.write(gitConfig, `[http "${repository}"]\n\textraHeader =\n\textraHeader = Authorization: Bearer ${repoToken}\n`, { user: 'root' })
+      await sandbox.files.write(gitConfig, `[http "${repository}"]\n\tsslCAInfo = /opt/mikka/fixture-ca.pem\n\textraHeader =\n\textraHeader = Authorization: Bearer ${repoToken}\n`, { user: 'root' })
       await sandbox.files.write('/opt/mikka/runtime/harness-bin/git', `#!/bin/sh\nif test -r ${gitConfig}; then exec /usr/bin/git -c include.path=${gitConfig} "$@"; fi\nexec /usr/bin/git "$@"\n`, { user: 'root' })
       await sandbox.commands.run(`chown user:user ${gitConfig}; chmod 600 ${gitConfig}; chown root:root /opt/mikka/runtime/harness-bin/git; chmod 755 /opt/mikka/runtime/harness-bin/git`, { user: 'root' })
       metric.fixtureTransportSetupMs = Math.round(performance.now() - fixtureStarted)
@@ -208,17 +218,17 @@ async function main() {
   assert.ok(taskMachine?.sandboxId && sandboxIds.has(taskMachine.sandboxId))
   const taskSandbox = await Sandbox.connect(taskMachine.sandboxId, connection)
   const content = await taskSandbox.files.read(`/home/user/.mikka/worker/worktrees/${runId}/cloud-acceptance.txt`, { user: 'user' })
-  assert.ok(content.includes(marker), 'Real E2B worktree lacks the model-written marker')
+  assert.ok(content.includes(marker), 'The actual isolated worker worktree lacks the model-written marker')
   const base = (await taskSandbox.commands.run(`git -C /home/user/.mikka/worker/worktrees/${runId} merge-base HEAD ${quote(`origin/${baseBranch}`)}`, { user: 'user', timeoutMs: 10_000 })).stdout.trim()
   assert.equal(base, metric.fixtureBaseCommit, 'The task must branch from the repository-declared default base commit')
   metric.runId = runId
   metric.status = done.status
-  metric.actualDeepSeek = true
+  metric.modelTransport = 'fake-litellm'
   metric.verificationPassed = true
-  metric.latencyIncludes = ['real model inference', 'restricted test reverse relay and fixture transport setup', 'application and worker startup']
+  metric.latencyIncludes = ['scripted LiteLLM response', 'restricted local TLS relay and fixture transport setup', 'actual application, native CLI and worker startup']
   metric.normalAccountLease = true
   metric.productionDbWrites = false
-  metric.testTransport = 'restricted HTTPS reverse relay; provider transport uses the test team E2B key'
+  metric.testTransport = 'loopback HTTPS relay; real E2B SDK to HTTP fake with a synthetic key'
   await writeFile(resolve(directory, 'result.json'), JSON.stringify(metric, null, 2), { mode: 0o600 })
   console.log(JSON.stringify(metric))
 }
@@ -227,7 +237,7 @@ export async function verifyCloud(input = {}) {
   assert.equal(started, false, 'Use a fresh process for another cloud acceptance run')
   started = true
   options = input
-  if (input.apiKey) connection.apiKey = input.apiKey
+  assert.ok(!input.apiKey, 'LOCAL_CLOUD_PROVIDER_KEY_REFUSED')
   assert.ok(disposableDatabase(process.env), 'Cloud acceptance requires the owning isolated database environment')
   let failure
   try {
@@ -237,18 +247,6 @@ export async function verifyCloud(input = {}) {
   process.env.MIKKA_CLOUD_WORKER_SHA = release.workerHash
   // Validate the normal official-template policy before allocating anything.
   computerTemplate(); taskTemplate('claude_code')
-  if (!connection.apiKey) {
-    // Reuse the configured existing Infisical identity. These response values
-    // remain in memory; no key is printed, written to an env file or sent to a task.
-    const endpoint = process.env.INFISICAL_API_URL ?? 'https://app.infisical.com'
-    const authenticated = await send(`${endpoint}/api/v1/auth/universal-auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ clientId: process.env.INFISICAL_CLIENT_ID, clientSecret: process.env.INFISICAL_CLIENT_SECRET }), signal: AbortSignal.timeout(20_000) })
-    assert.ok(authenticated.ok, `Infisical authentication HTTP ${authenticated.status}`)
-    const { accessToken } = await authenticated.json()
-    const query = new URLSearchParams({ projectId: process.env.INFISICAL_PROJECT_ID, environment: 'prod', secretPath: '/vercel', viewSecretValue: 'true', includeImports: 'false' })
-    const response = await send(`${endpoint}/api/v4/secrets/E2B_API_KEY?${query}`, { headers: { authorization: `Bearer ${accessToken}` }, signal: AbortSignal.timeout(20_000) })
-    assert.ok(response.ok, `Test-team E2B key HTTP ${response.status}`)
-    connection.apiKey = (await response.json()).secret?.secretValue
-  }
   timeout = setTimeout(() => abort.abort(Error('Cloud acceptance timeout')), 900_000)
   heartbeat = setInterval(() => { if (input.progress) void Promise.resolve(input.progress('item8-cloud-loop', 'heartbeat', stage)).catch(() => {}); else console.log(JSON.stringify({ stage, at: new Date().toISOString() })) }, 15_000)
   const cancelled = () => abort.abort(input.signal.reason)
@@ -281,6 +279,7 @@ export async function verifyCloud(input = {}) {
     catch { try { await Sandbox.kill(sandboxId, connection) } catch { cleanupFailures.push({ resource: 'sandbox', id: sandboxId }) } }
   }
   if (relay) await relay.stop()
+  await fakeProvider?.close()
   if (pool && actor) {
     // Remove only this invocation's resources, including when the owning
     // driver lends its lease and database pool for the cloud leg.
@@ -294,7 +293,7 @@ export async function verifyCloud(input = {}) {
   // changed. Retained evidence is never mislabelled as a clean reusable slot.
   if (ownsAccounts) await accounts?.release({ outcome: 'dirty' }).catch(() => {})
   if (ownsPool) await pool?.end()
-  await localAgent.close(); await remoteAgent.close()
+  await localAgent.close(); await tlsAgent?.close()
   connection.apiKey = undefined
   metric.cleanupConfirmed = cleanupFailures.length === 0
   if (cleanupFailures.length) console.error(JSON.stringify({ stage: 'cleanup', failures: cleanupFailures }))
