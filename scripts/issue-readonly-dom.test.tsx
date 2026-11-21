@@ -15,6 +15,8 @@ mock.module(u('../app/actions/agents.ts'), { namedExports: { pollTaskDetail: asy
 mock.module(u('../app/actions/issues.ts'), { namedExports: {
   pollIssue: async (id: string) => ({ viewerId: 'u1', version: 'a'.repeat(32), issue: { id, title: 'Invalid body', content: invalid, status: 'todo', priority: 'normal', identifier: 'MIK-1', userId: 'u1', updatedAt: new Date(), createdAt: new Date() } }),
   pollIssueVersionSummaries: async () => ({ viewerId: 'u1', snapshot: { version: 'a'.repeat(32), items: [], positions: [] } }),
+  pollIssueActivityPage: async () => ({ viewerId: 'u1', snapshot: { version: 'a'.repeat(32), items: [], hasMore: false } }),
+  loadEarlierIssueActivity: async () => ({ viewerId: 'u1', page: { items: [], hasMore: false, cursor: null } }),
   saveIssue: async () => { throw new Error('read-only must not save') },
   listIssueVersions: async () => [],
 } })

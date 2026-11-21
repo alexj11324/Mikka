@@ -71,7 +71,7 @@ async function readFixtureIssue(id: string, known?: string, cursor?: object) {
     const document = known === version ? { viewerId: readViewerId, version, unchanged: true } : { viewerId: readViewerId, issue, version }
     if (!serveJoined || !cursor) return document
     joinedReads++
-    return { ...document, taskWork: { live: { workspaceId }, viewerId: readViewerId, work: null, connections: [], threads: [], activity: { version, items: structuredClone(versions) } } }
+    return { ...document, taskWork: { live: { workspaceId }, viewerId: readViewerId, work: null, connections: [], threads: [], activity: { version, items: structuredClone(versions), hasMore: false, predecessor: null } } }
   }
 mock.module(at('app/actions/agents.ts'), { namedExports: { pollTaskDetail: readFixtureIssue } })
 mock.module(at('app/actions/issues.ts'), { namedExports: {
@@ -79,6 +79,14 @@ mock.module(at('app/actions/issues.ts'), { namedExports: {
   pollIssueVersionSummaries: async (id: string) => {
     assert.equal(id, issueId); versionReads++
     return { viewerId: readViewerId, snapshot: { version: String(versions.length).padStart(32, '0'), items: structuredClone(versions) } }
+  },
+  pollIssueActivityPage: async (id: string) => {
+    assert.equal(id, issueId); versionReads++
+    return { viewerId: readViewerId, snapshot: { version: String(versions.length).padStart(32, '0'), items: structuredClone(versions), hasMore: false } }
+  },
+  loadEarlierIssueActivity: async (id: string, _beforeRevision: number, _beforeId: string) => {
+    assert.equal(id, issueId)
+    return { viewerId: readViewerId, page: { items: [], hasMore: false, cursor: null } }
   },
   listIssueVersions: async (id: string) => { assert.equal(id, issueId); fullVersionReads++; return structuredClone(versions) },
   saveIssue: async (input: Parameters<typeof import('../app/actions/issues')['saveIssue']>[0]) => {

@@ -1608,7 +1608,7 @@
         "POST"
       ],
       "maxDuration": 120,
-      "sourceHash": "fe6688cd89ecd3df4c651d884dbd591e775af5341d3b982a8b1d9e9879a04bea"
+      "sourceHash": "959449522ab77e5c4c034d0a2bb5d1cc8236f790ae4f451c79949be61cb20643"
     },
     {
       "path": "/mikka/api/me/invitations",

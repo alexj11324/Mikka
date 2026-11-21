@@ -255,7 +255,7 @@ export async function listIssueThreads(issueId: string): Promise<IssueThread[]> 
 
 /** The same list, plus the channel its `issue_threads` key arrives on: the issue's
  * workspace, or the owner's home for a personal issue; null reads once a minute. */
-export async function pollIssueThreads(issueId: string, includeTaskWork = false, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[] }) {
+export async function pollIssueThreads(issueId: string, includeTaskWork = false, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[]; paged?: boolean }) {
   return withDatabaseOperation('/actions/threads/issue-list', async () => {
     const { threads, issue, user, teamId } = await readIssueThreads(issueId)
     const [{ documentLiveWorkspace }, { workspacePool }] = await Promise.all([import('@/lib/live/panels'), import('@/lib/workspace-db')])
@@ -267,8 +267,10 @@ export async function pollIssueThreads(issueId: string, includeTaskWork = false,
     if (!includeTaskWork) return snapshot
     const { listIssueConnections } = await import('@/app/actions/issue-operations')
     const connections = await listIssueConnections(issue.id)
-    const { pollIssueVersionSummaries } = await import('@/app/actions/issues')
-    const activity = await pollIssueVersionSummaries(issue.id, activityCursor?.version, activityCursor?.positions)
+    const { pollIssueVersionSummaries, pollIssueActivityPage } = await import('@/app/actions/issues')
+    const activity = activityCursor?.paged
+      ? await pollIssueActivityPage(issue.id, activityCursor.version)
+      : await pollIssueVersionSummaries(issue.id, activityCursor?.version, activityCursor?.positions)
     if (activity.error) throw new ActionFailureError(activity.error)
     if (activity.viewerId !== user.id) throw new ActionFailureError('issueNotFound')
     return { ...snapshot, teamId, connections, activity: activity.snapshot, viewerId: user.id }
@@ -279,7 +281,7 @@ export type IssueWorkSnapshot = Extract<Awaited<ReturnType<typeof pollIssueThrea
 
 /** Reuse the authorized content read, then release its document lock before
  * reading the Work view. The stable task and both viewer identities must agree. */
-export async function pollTaskDetail(issueId: string, known?: string, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[] }) {
+export async function pollTaskDetail(issueId: string, known?: string, activityCursor?: { version?: string; positions?: import('@/lib/list-poll').ListPosition[]; paged?: boolean }) {
   return cacheReadAction(async () => {
     const { pollIssue } = await import('@/app/actions/issues')
     const document = await pollIssue(issueId, known)

@@ -45,7 +45,7 @@ test('each sentence reads as Capy\'s English, actor first', () => {
 })
 
 test('an Agent\'s change is said by its conversation, a chip that opens it', () => {
-  const parts = activityLineParts(event({ kind: 'status', status: 'review', actor: claude, at: '2026-11-14T14:30:00.000Z' }), labels(en), subject, conversations)
+  const parts = activityLineParts(event({ kind: 'status', status: 'review', actor: claude, at: '2026-11-14T14:30:00.000Z', source: { kind: 'revision', id: 'revision-1', revision: 2, runId: 'run-1' } }), labels(en), subject, conversations)
   assert.deepEqual(parts[0], { kind: 'thread', text: 'Refresh after retry', runId: 'run-1', harness: 'claude_code', title: 'Refresh after retry', result: 'Done' })
   assert.equal(words(parts), 'Refresh after retry moved CAP-12 to In review')
   assert.ok(!words(parts).includes('Claude Code'), 'the Agent\'s name is never the actor')
@@ -81,11 +81,14 @@ test('a task this page cannot name is "a task", never a dead chip', () => {
   assert.equal(taskHistoryLabel(event({ kind: 'created' }), labels(en), { taskId: 't', code: null }), 'created the task')
 })
 
-test('only an Agent with a conversation that had started matches a run', () => {
-  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', claude, conversations), 'run-1')
-  assert.equal(activityRunId('2026-11-14T15:30:00.000Z', claude, conversations), null)
-  assert.equal(activityRunId('2026-11-14T13:00:00.000Z', claude, conversations), null)
-  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', ada, conversations), null)
+test('a source run id, not a unique actor/time guess, identifies a conversation', () => {
+  const at = '2026-11-14T14:30:00.000Z'
+  assert.equal(activityRunId(at, claude, conversations), null, 'an Agent may write outside the only known run')
+  assert.equal(activityRunId(at, claude, conversations, 'run-1'), 'run-1')
+  assert.equal(activityRunId(at, claude, conversations, 'run-2'), null, 'the recorded run must have the same Agent and be visible')
+  assert.equal(activityRunId(at, ada, conversations, 'run-1'), null)
+  const parts = activityLineParts(event({ kind: 'status', actor: claude, at }), labels(en), subject, conversations)
+  assert.notEqual(parts[0].kind, 'thread', 'a revision without a recorded run is not linked')
 })
 
 test('renders supported task-attribute changes in English and Chinese', () => {
@@ -95,20 +98,14 @@ test('renders supported task-attribute changes in English and Chinese', () => {
   assert.equal(taskHistoryLabel(event({ kind: 'relation', targetId: 'task-2', relation: 'blockedBy' }), labels(zh), subject), '把 CAP-12 标记为被 CAP-13 阻塞')
 })
 
-test('missing, stale and ambiguous Agent identities cannot open a conversation', () => {
-  const stretches = [...conversations, { at: '2026-11-14T16:00:00Z', runId: 'third', agentId: 'a1', linked: true }]
-  assert.equal(activityRunId('2026-11-14T13:00:00.000Z', claude, stretches), null)
-  assert.equal(activityRunId('2026-11-14T14:00:00.000Z', claude, [{ at: '2026-11-14T14:00:00Z', runId: 'run-1', agentId: 'a1', linked: true }]), 'run-1')
-  assert.equal(activityRunId('2026-11-14T15:30:00.000Z', claude, stretches), null)
-  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', claude, stretches), null)
-  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', claude, stretches), 'run-1')
-  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', { ...claude, id: 'a2' }, stretches), null)
-  assert.equal(activityRunId('2026-11-14T16:30:00.000Z', { ...claude, id: null }, stretches), null)
-  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', ada, stretches), null)
-  assert.equal(activityRunId('2026-11-14T14:30:00.000Z', claude, [
-    { at: '2026-11-14T14:00:00Z', runId: 'run-1', agentId: 'a1', linked: true },
-    { at: '2026-11-14T14:00:00Z', runId: 'run-2', agentId: 'a1', linked: true },
-  ]), null)
+test('missing, mismatched, hidden or duplicate source runs cannot open a conversation', () => {
+  const at = '2026-11-14T14:30:00.000Z'
+  const visible = [{ at, runId: 'run-1', agentId: 'a1', linked: true }]
+  assert.equal(activityRunId(at, claude, visible, null), null)
+  assert.equal(activityRunId(at, { ...claude, id: null }, visible, 'run-1'), null)
+  assert.equal(activityRunId(at, { ...claude, id: 'another' }, visible, 'run-1'), null)
+  assert.equal(activityRunId(at, claude, [{ ...visible[0], linked: false }], 'run-1'), null)
+  assert.equal(activityRunId(at, claude, [...visible, ...visible], 'run-1'), null)
 })
 
 test('pull request activity uses provider event timestamps and appears only when its source time exists', () => {

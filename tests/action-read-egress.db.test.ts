@@ -243,6 +243,16 @@ test('task thread lists retain exact titles, summaries and privacy while details
     assert.deepEqual(snapshot.threads, work.threads)
     assert.equal(snapshot.threads.find(row => row.id === peerId)?.detail, null)
     assert.ok(snapshot.work?.presentation)
+    // The detail can opt into bounded activity without another client round trip;
+    // legacy callers above retain the list-position protocol.
+    const paged = await withActivitySession(owner, () => pollTaskDetail(issue, undefined, { paged: true }), workspace)
+    assert.ok(!paged.error && paged.taskWork)
+    assert.ok('hasMore' in paged.taskWork.activity)
+    const pageVersion = paged.taskWork.activity.version
+    const unchangedPage = await withActivitySession(owner, () => pollTaskDetail(issue, paged.version, { paged: true, version: pageVersion }), workspace)
+    assert.ok(!unchangedPage.error && unchangedPage.taskWork && 'unchanged' in unchangedPage.taskWork.activity && unchangedPage.taskWork.activity.unchanged)
+    const deniedPage = await withActivitySession(outsider, () => pollTaskDetail(issue, paged.version, { paged: true, version: pageVersion }), workspace)
+    assert.equal(deniedPage.error, 'issueNotFound')
     const forbidden = await readDetail(outsider, combined.value.version)
     assert.equal(forbidden.error, 'issueNotFound')
     assert.equal('taskWork' in forbidden, false)

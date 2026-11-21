@@ -12,7 +12,8 @@ import { AgentProfileAdmissionError } from '@/lib/factory/profile-admission'
 import { issueForUser } from '@/lib/issue-access'
 import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { actAs } from '@/lib/acting-user'
-import type { ActivityActor } from '@/lib/activity-actor'
+import { actingContext, type ActivityActor } from '@/lib/activity-actor'
+import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { addRunMessage,  requestRunStop } from '@/lib/agent-runs'
 import { forgetNotes, rememberNote } from '@/lib/coordinator/context'
 import { editMemory } from '@/lib/coordinator/store'
@@ -40,7 +41,8 @@ type Failure = { error: string; params?: Record<string, string | number>; confir
 
 function scopedUser(userId: string) {
   const workspaceId = taskReaderScope(userId).workspaceId
-  return workspaceId ? { id: userId, [tokenWorkspace]: workspaceId } : userId
+  const context = actingContext.getStore()
+  return workspaceId ? { id: userId, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: context?.userId === userId ? context.enterprisePrincipal : undefined } : userId
 }
 
 async function taskActor(userId: string, actor?: ActivityActor) {

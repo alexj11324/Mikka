@@ -406,7 +406,7 @@ test('mobile task endpoints with real task ACL, current workspace membership and
       assert.deepEqual(data.timeline.map((row: { id: string }) => row.id), [
         `discussion:${threadId}:c1`, `history:created-${v1}`, `history:title-${v2}`, `discussion:${threadId}:c2`,
       ])
-      assert.deepEqual(data.timeline[2].event.source, { kind: 'revision', id: v2, revision: 2 })
+      assert.deepEqual(data.timeline[2].event.source, { kind: 'revision', id: v2, revision: 2, runId: null })
       assert.equal(data.timeline[2].event.actor.id, owner)
       assert.equal(data.timeline[3].kind, 'reply')
       assert.equal(data.timeline[3].threadId, threadId)

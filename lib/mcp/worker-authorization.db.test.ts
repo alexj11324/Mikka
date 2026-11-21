@@ -14,14 +14,14 @@ if (!target && process.env.REQUIRE_DB === '1') throw new Error('An isolated auth
 
 test('run tokens recheck current task, workspace and execution authority', { skip: !target }, async t => {
   const { Pool } = await import('pg')
-  const { issueRunToken, revokeRunTokens, verifyRunToken } = await import('./worker')
+  const { issueRunToken, revokeRunTokens, verifyRunToken, updateOwnIssue } = await import('./worker')
   const { issueForUser } = await import('../issue-access')
   const { pool: appPool } = await import('../db')
   const { workspacePool } = await import('../workspace-db')
   const pool = new Pool({ connectionString: target, max: 2 })
   const owner = `auth207-owner-${randomUUID()}`, member = `auth207-member-${randomUUID()}`, outsider = `auth207-outsider-${randomUUID()}`
   const workspace = randomUUID(), otherWorkspace = randomUUID(), team = randomUUID()
-  const shared = randomUUID(), personal = randomUUID(), ownPersonal = randomUUID()
+  const shared = randomUUID(), personal = randomUUID(), ownPersonal = randomUUID(), foreignIssue = randomUUID()
   const devices = new Map<string, string>(), agents = new Map<string, string>()
   const bot = randomUUID()
   const runs: string[] = []
@@ -48,6 +48,7 @@ test('run tokens recheck current task, workspace and execution authority', { ski
   for (const [id, user, scope] of [[shared, owner, 'workspace'], [personal, owner, 'personal'], [ownPersonal, member, 'personal']]) {
     await pool.query('INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope) VALUES ($1,$2,$4,\'Authorization fixture\',\'{"type":"doc","content":[]}\',\'doing\',\'normal\',$3)', [id, user, scope, id === shared ? workspace : user === owner ? personalOwnerWorkspace : personalMemberWorkspace])
   }
+  await pool.query(`INSERT INTO issues (id,"userId","workspaceId",title,content,status,priority,scope) VALUES ($1,$2,$3,'Foreign fixture','{"type":"doc","content":[]}','doing','normal','workspace')`, [foreignIssue, outsider, otherWorkspace])
   await pool.query('INSERT INTO mikka_team_issues ("issueId","teamId","workspaceId","userId") VALUES ($1,$2,$3,$4)', [shared, team, workspace, owner])
   await pool.query('INSERT INTO bots (id,"ownerId","workspaceId",name) VALUES ($1,$2,$3,\'Authorization fixture\')', [bot, member, workspace])
 
@@ -111,8 +112,33 @@ test('run tokens recheck current task, workspace and execution authority', { ski
     assert.equal(Boolean(await revoked.verify()), false)
     assert.equal(Boolean(await ended.verify()), false)
   })
+  await t.test('a verified run updates only its own issue and records its exact provenance', async () => {
+    const run = await fixture()
+    const auth = await run.verify()
+    assert.ok(auth)
+    const before = (await pool.query('SELECT revision FROM issues WHERE id=$1', [shared])).rows[0].revision
+    // Even stale caller-provided claims cannot select a different run, actor, issue or tenant.
+    const relabeled = { ...auth, extra: { ...auth.extra, runId: randomUUID(), issueId: foreignIssue, workspaceId: otherWorkspace, agentId: agents.get(outsider) } }
+    const result = await updateOwnIssue(relabeled, { issueId: shared, title: 'Verified run update' })
+    assert.ok(!('error' in result), JSON.stringify(result))
+    const rows = await pool.query('SELECT actor_type, actor_id, source_run_id FROM issue_versions WHERE "issueId"=$1 AND revision>$2 ORDER BY revision', [shared, before])
+    assert.equal(rows.rowCount, 1)
+    assert.equal(rows.rows[0].actor_type, 'agent')
+    assert.equal(rows.rows[0].actor_id, agents.get(member))
+    assert.equal(rows.rows[0].source_run_id, run.runId)
+    const denied = await updateOwnIssue(auth, { issueId: ownPersonal, title: 'Wrong issue' })
+    assert.deepEqual(denied, { error: 'workspaceAccessDenied' })
+    assert.deepEqual(await updateOwnIssue(auth, { issueId: foreignIssue, title: 'Cross-workspace' }), { error: 'workspaceAccessDenied' })
+    const forged = { ...auth, token: 'mkw_forged', extra: { ...auth.extra, issueId: shared, workspaceId: otherWorkspace, runId: randomUUID() } }
+    assert.deepEqual(await updateOwnIssue(forged, { issueId: shared, title: 'Forged' }), { error: 'workspaceAccessDenied' })
+    assert.deepEqual(await updateOwnIssue(undefined, { issueId: shared, title: 'No run' }), { error: 'workspaceAccessDenied' })
+    await revokeRunTokens(run.runId)
+    assert.deepEqual(await updateOwnIssue(auth, { issueId: shared, title: 'Revoked' }), { error: 'workspaceAccessDenied' })
+    assert.equal((await pool.query('SELECT revision FROM issues WHERE id=$1', [shared])).rows[0].revision, before + 1)
+  })
   await t.test('the exported MCP HTTP handler rejects a removed member before report writes', async () => {
     const { createServer } = await import('node:http')
+    t.mock.module('@/lib/background', { namedExports: { afterJob: () => {} } })
     const { POST } = await import('../../app/api/mcp/route')
     const run = await fixture()
     const server = createServer(async (incoming, outgoing) => {
@@ -138,7 +164,23 @@ test('run tokens recheck current task, workspace and execution authority', { ski
     try {
       const allowed = await request('tools/list', {})
       assert.equal(allowed.status, 200)
-      await allowed.text()
+      const catalogue = await allowed.text()
+      assert.match(catalogue, /update_issue/)
+      const issueRevision = (await pool.query('SELECT revision FROM issues WHERE id=$1', [shared])).rows[0].revision
+      const update = await request('tools/call', { name: 'update_issue', arguments: { issueId: shared, title: 'HTTP verified worker update' } })
+      assert.equal(update.status, 200)
+      const updateBody = await update.text()
+      assert.match(updateBody, /HTTP verified worker update/)
+      const saved = await pool.query('SELECT source_run_id, actor_type, actor_id FROM issue_versions WHERE "issueId"=$1 AND revision=$2', [shared, issueRevision + 1])
+      assert.equal(saved.rowCount, 1)
+      assert.equal(saved.rows[0].source_run_id, run.runId)
+      assert.equal(saved.rows[0].actor_type, 'agent')
+      assert.equal(saved.rows[0].actor_id, agents.get(member))
+      const revisionAfterAuthorized = issueRevision + 1
+      const forbidden = await request('tools/call', { name: 'update_issue', arguments: { issueId: shared, title: 'Should not change', workspaceId: otherWorkspace, runId: randomUUID() } })
+      assert.equal(forbidden.status, 200)
+      assert.match(await forbidden.text(), /isError|Invalid|additional property/i)
+      assert.equal((await pool.query('SELECT revision FROM issues WHERE id=$1', [shared])).rows[0].revision, revisionAfterAuthorized)
       const before = (await pool.query('SELECT count(*)::int AS count FROM coordinator_events WHERE "userId"=$1', [member])).rows[0].count
       await pool.query('UPDATE mikka_workspace_members SET status=\'suspended\' WHERE "workspaceId"=$1 AND "userId"=$2', [workspace, member])
       const denied = await request('tools/call', { name: 'report', arguments: { text: 'A removed worker must not deliver this report.' } })

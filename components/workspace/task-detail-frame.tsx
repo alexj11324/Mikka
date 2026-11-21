@@ -116,7 +116,9 @@ export type FramedTaskProps = {
   acceptance: ReactNode
   artifacts?: ReactNode
   versions: ActivityVersion[]
+  activityPredecessor?: ActivityVersion | null
   historyFailed: (() => void) | null
+  earlierActivity: { hasMore: boolean; loading: boolean; failed: boolean; load: () => void }
   teamSnapshot?: TaskTeamSnapshot
   agentActivity: ReturnType<typeof useTaskWork>
   documentTools: boolean
@@ -324,12 +326,13 @@ export function FramedTask(props: FramedTaskProps) {
 
   // 活动: the task's events, its Agent rows and its discussions in one log, oldest first.
   const subtaskRows = (connections.rows ?? []).filter(row => row.metadata.parentId === task.id).map(row => ({ id: row.id, title: row.title, identifier: row.identifier, createdAt: row.createdAt }))
-  // An Agent's change is said by its conversation (Capy: the thread's code or title), matched to the conversation that had started by then.
+  // A recorded source run can name an Agent's conversation; actor and time alone do not establish it.
   const runConversations = (props.agentActivity.threads ?? []).map(thread => ({
     at: new Date(thread.createdAt).toISOString(), runId: thread.id, agentId: thread.detail?.agentId ?? null, linked: Boolean(thread.detail),
     title: thread.detail?.name || tDirectory('untitled'), ...thread.detail?.harness ? { harness: thread.detail.harness } : {},
   }))
   const eventsFor = useActivityEvents(props.historyFailed ? [] : props.versions, props.historyFailed ? [] : subtaskRows, {
+    predecessor: props.historyFailed ? null : props.activityPredecessor,
     task: {
       taskId: task.id, code: task.identifier, title: props.title, status: props.status, priority: props.priority, assignee: member?.name,
       // Parent, sub-tasks and related tasks this page already reads, so a sentence names them by code, as Capy's does.
@@ -415,6 +418,7 @@ export function FramedTask(props: FramedTaskProps) {
     subtasks={preview ? null : { items: subtasks, done: subtasks.filter(item => item.done).length, total: subtasks.length, onCreate: connections.error ? async () => false : menu.createChild, disabled: locked || connections.pending || Boolean(connections.error), failed: connections.error ? { text: tRelations('readFailedRetry'), retry: () => { void connections.mutate() } } : null }}
     activity={preview ? null : {
       items: activityItems, timeline: (current, additional) => activityItems(current, true, additional),
+      earlier: { hasMore: props.earlierActivity.hasMore, loading: props.earlierActivity.loading, failed: props.earlierActivity.failed, load: props.earlierActivity.load },
       failed: [...props.historyFailed ? [{ text: tDetail('activityFailed'), retry: props.historyFailed }] : [], ...props.agentActivity.failed ? [{ text: props.agentActivity.failed.label, retry: props.agentActivity.failed.retry }] : [], ...pullRequestTimeline.data?.failed ? [{ text: tActivity('timelinePullFailed'), retry: () => { void pullRequestTimeline.mutate() } }] : []],
       drafts, subscribed: menu.subscribed, onSubscribe: menu.toggleSubscribed, subscribeLabel: menu.subscribed ? tFrame('unsubscribe') : tFrame('subscribe'),
     }}

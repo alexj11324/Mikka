@@ -15,14 +15,15 @@ import { IssueDescriptionHistory } from './issue-description-history'
 import type { MetadataRequest } from './issue-metadata-controls'
 import { toast } from 'sonner'
 import { getDeletedIssue, setIssueDeleted } from '@/app/actions/issue-operations'
-import { pollIssue, pollIssueVersionSummaries, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
+import { pollIssue, pollIssueActivityPage, loadEarlierIssueActivity, saveIssue, listIssueVersions, type IssueView } from '@/app/actions/issues'
 import { pollTaskDetail, type IssueWorkSnapshot } from '@/app/actions/agents'
 import { descriptionKey } from '@/lib/issue-relations'
 import { CacheReadError } from '@/lib/cache-read-error'
 import { readAccessFailure, waitForCacheHydration } from '@/lib/swr/persistent-cache'
 import { isTaskPresentationKey, issueKeys } from '@/lib/swr/keys'
 import { ListReadScopeError } from '@/lib/live/list-read'
-import { heldListPositions, mergeList, type ListSnapshot } from '@/lib/list-poll'
+import { mergeActivityEarlier, mergeActivityPoll, type ActivityPage } from '@/lib/activity-page-cache'
+import { mergeList, type ListSnapshot } from '@/lib/list-poll'
 import { IssueEditor, createDocumentSeed, type IssueDiscussions } from './issue-editor'
 import { DocumentSync } from '@/lib/document-sync'
 import { useActionError } from '@/lib/use-action-error'
@@ -47,8 +48,9 @@ import { presentedFactoryEvents, readTaskEvidenceTarget, taskEvidenceThread } fr
 import { TaskArtifactsButton } from './thread-artifacts'
 
 type Issue = IssueView
-type IssueRead = IssueView & { readVersion?: string; taskWork?: IssueWorkSnapshot & { history: ActivityRead } }
-type ActivityRead = ListSnapshot<Awaited<ReturnType<typeof listIssueVersions>>[number]>
+type ActivityRow = Awaited<ReturnType<typeof listIssueVersions>>[number]
+type IssueRead = IssueView & { readVersion?: string; taskWork?: IssueWorkSnapshot & { history: ListSnapshot<ActivityRow>; pageHistory?: ActivityRead } }
+type ActivityRead = ActivityPage<ActivityRow>
 
 function savedChangesMatch(previous: Issue, submitted: Pick<Issue, 'title' | 'status' | 'priority' | 'content'>, latest: Issue) {
   return latest.id === previous.id && latest.workspaceId === previous.workspaceId && latest.canSteer !== false && latest.revision > previous.revision &&
@@ -61,11 +63,9 @@ function savedChangesMatch(previous: Issue, submitted: Pick<Issue, 'title' | 'st
 // No access and deleted come back as an action error; SWR's error state renders UnavailableIssue.
 async function loadIssue(id: string, viewerId: string, previous?: IssueRead, includeWork = false): Promise<IssueRead> {
   const held = previous?.taskWork?.viewerId === viewerId ? previous.taskWork.history : undefined
-  const positions = heldListPositions(held)
-  const version = positions && positions.length === held?.positions?.length ? held.version : undefined
   let result: Awaited<ReturnType<typeof pollIssue>> & { taskWork?: IssueWorkSnapshot }
   try {
-    result = includeWork ? await pollTaskDetail(id, previous?.readVersion, { version, positions }) : await pollIssue(id, previous?.readVersion)
+    result = includeWork ? await pollTaskDetail(id, previous?.readVersion, { version: previous?.taskWork?.pageHistory?.version, paged: true }) : await pollIssue(id, previous?.readVersion)
   } catch (error) {
     // Earlier servers have no joined RPC. A refused task is still a refusal.
     if (!includeWork || !error || typeof error !== 'object' || !('code' in error) || error.code !== 'desktop_rpc_action_unknown' || !('status' in error) || error.status !== 404) throw error
@@ -79,7 +79,12 @@ async function loadIssue(id: string, viewerId: string, previous?: IssueRead, inc
   if (work.viewerId !== viewerId) throw new ListReadScopeError('owner')
   const next = work.activity
   const history = { version: next.version, items: mergeList(held?.items ?? [], next), positions: 'positions' in next ? next.positions : held?.positions }
-  return { ...document, readVersion: result.version, taskWork: { ...work, history } }
+  // New servers return a bounded page in the joined read; older servers still
+  // provide the legacy list, so the separate page reader remains a fallback.
+  const previousPage = previous?.taskWork?.viewerId === viewerId ? previous.taskWork.pageHistory : undefined
+  const pageHistory = 'hasMore' in next ? mergeActivityPoll(previousPage, next)
+    : 'unchanged' in next && previousPage ? { ...previousPage, version: next.version } : undefined
+  return { ...document, readVersion: result.version, taskWork: { ...work, history, pageHistory } }
 }
 type WorkspaceUser = { id: string; name: string; email: string }
 type DetailProps = { /** The thread open in the right column, from the address (R-82). */ thread: string | null; /** Where the task was opened from: the first crumb. */ origin: string; navigation: IssueDetailNavigation; onOpen: (id: string) => void; user: WorkspaceUser; onSaved: (id: string) => void; onDirty: (dirty: boolean) => void; onClose: () => void; onDeleted: () => void; onRegisterFlush: (flush: (() => Promise<boolean>) | null) => void }
@@ -291,20 +296,49 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
   const restoration = useRef<{ resolve: (success: boolean) => void } | null>(null)
   const [replacement, setReplacement] = useState<{ content: JSONContent; version: number }>()
   const activityKey = issueKeys.activityVersions(saved.id)
-  const localActivity = useSWR<ActivityRead>(preview || agentActivity.history ? null : activityKey, async () => {
+  const [joinedPage, setJoinedPage] = useState<ActivityRead | undefined>(initial.taskWork?.pageHistory)
+  useEffect(() => {
+    if (initial.taskWork?.pageHistory) setJoinedPage(current => mergeActivityPoll(current, initial.taskWork!.pageHistory!))
+  }, [initial.taskWork?.pageHistory])
+  const [activityPageLoading, setActivityPageLoading] = useState(false)
+  const [activityPageError, setActivityPageError] = useState(false)
+  const activityPageFlight = useRef(false)
+  const localActivity = useSWR<ActivityRead>(preview || initial.taskWork?.pageHistory ? null : activityKey, async () => {
     await waitForCacheHydration(cache)
     const previous = cache.get(unstable_serialize(activityKey))?.data as ActivityRead | undefined
-    const held = heldListPositions(previous)
-    const known = held && held.length === previous?.positions?.length ? previous?.version : undefined
-    const result = await pollIssueVersionSummaries(saved.id, known, held)
+    const result = await pollIssueActivityPage(saved.id, previous?.version)
     if (result.error) throw new CacheReadError(result.error)
     if (result.viewerId !== user.id) throw new ListReadScopeError('owner')
     const next = result.snapshot
-    return { version: next.version, items: mergeList(previous?.items ?? [], next), positions: 'positions' in next ? next.positions : previous?.positions }
+    if (next.unchanged) {
+      if (!previous) throw new Error('Activity cache missing for unchanged response')
+      return { ...previous, version: next.version }
+    }
+    return mergeActivityPoll(previous, next)
   })
-  const versions = agentActivity.history ? agentActivity.history.rows : localActivity.data?.items
-  const historyError = agentActivity.history ? agentActivity.history.error : localActivity.error
-  const refreshVersions = agentActivity.history?.refresh ?? localActivity.mutate
+  const activityRead = initial.taskWork?.pageHistory ? joinedPage : localActivity.data
+  const loadEarlierActivity = useCallback(async () => {
+    const before = activityRead?.items.at(-1)
+    if (!activityRead?.hasMore || !before || activityPageFlight.current) return
+    activityPageFlight.current = true
+    setActivityPageLoading(true)
+    setActivityPageError(false)
+    try {
+      const result = await loadEarlierIssueActivity(saved.id, before.revision, before.id)
+      if (result.error) throw new CacheReadError(result.error)
+      if (result.viewerId !== user.id) throw new ListReadScopeError('owner')
+      if (initial.taskWork?.pageHistory) setJoinedPage(current => mergeActivityEarlier(current, before.id, result.page))
+      else await localActivity.mutate(current => mergeActivityEarlier(current, before.id, result.page), { revalidate: false })
+    } catch {
+      setActivityPageError(true)
+    } finally {
+      activityPageFlight.current = false
+      setActivityPageLoading(false)
+    }
+  }, [activityRead, initial.taskWork?.pageHistory, localActivity.mutate, saved.id, user.id])
+  const versions = activityRead?.items
+  const historyError = localActivity.error
+  const refreshVersions = initial.taskWork?.pageHistory ? refreshDetail : localActivity.mutate
   const { data: historyVersions, error: historyBodyError, mutate: refreshHistoryVersions } = useSWR(history && !preview ? issueKeys.versions(saved.id) : null, () => listIssueVersions(saved.id))
   const applyRead = useCallback((fresh: Issue) => {
     const previous = savedRef.current
@@ -491,7 +525,7 @@ function TaskForm({ initial, refreshDetail, preview = false, thread: openThread,
     descriptionEditable={!readOnly && !locked && syncState.ready}
     editor={(afterDescription, renderActivity) => editorWith(afterDescription, renderActivity)} acceptance={acceptance} artifacts={artifacts}
     teamSnapshot={!preview && initial.taskWork?.teamId !== undefined ? { teamId: initial.taskWork.teamId, refresh: refreshDetail } : undefined}
-    versions={versions ?? []} historyFailed={historyError ? () => { void refreshVersions() } : null} agentActivity={agentActivity}
+    versions={versions ?? []} activityPredecessor={activityRead?.predecessor ?? null} historyFailed={historyError ? () => { void refreshVersions() } : null} earlierActivity={{ hasMore: activityRead?.hasMore ?? false, loading: activityPageLoading, failed: activityPageError, load: loadEarlierActivity }} agentActivity={agentActivity}
     documentTools={documentTools} actionRequest={actionRequest} propertyRequest={propertyRequest} requestAction={requestAction} requestProperty={requestProperty} getCurrent={getCurrent} adopt={adopt} onMetadataBusy={setMetadataSaving}
     onStatus={(value, picked) => { changed(picked === undefined ? { status: value, stateId: null } : { status: value, stateId: picked }); void save() }} onPriority={value => { changed({ priority: value }); void save() }}
     onHistory={() => { void openHistory() }} onMembers={() => setMembers(true)} onDocumentTools={() => setDocumentTools(value => !value)}

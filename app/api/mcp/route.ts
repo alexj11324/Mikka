@@ -309,6 +309,16 @@ function createWorkerHandler(mailbox: readonly MailboxToolName[]) { return creat
     }
   })
 
+  // A run's credential fixes both the task and the tenant; callers cannot choose
+  // a run, workspace, delegate, project, membership or access change.
+  server.registerTool('update_issue', {
+    title: 'Update this run’s issue',
+    description: 'Update the title, status or priority of this run’s own issue.',
+    inputSchema: z.object({ issueId: id, title: z.string().trim().min(1).max(200).optional(), status: z.enum(ISSUE_STATUS_CODES).optional(), priority: z.enum(ISSUE_PRIORITY_CODES).optional() }).strict()
+      .refine(value => value.title !== undefined || value.status !== undefined || value.priority !== undefined),
+    annotations: { idempotentHint: true },
+  }, async (input, ctx) => outcome(await worker.updateOwnIssue(ctx.http?.authInfo, input)))
+
   server.registerTool('report', {
     title: 'Report progress',
     description: 'Tell the person\'s Coordinator about progress on this run. Use it sparingly, at milestones (a plan settled, a hard part solved, ready for review), not after every step.',

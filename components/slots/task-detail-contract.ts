@@ -172,6 +172,7 @@ export type TaskDetailFrameProps = {
     /** New renderers display each reply at its own time; commands still use the original thread. */
     timeline?: (discussions: IssueDiscussions, additional?: readonly TaskActivityItem[]) => TaskActivityItem[]
     failed: { text: string; retry: () => void }[]
+    earlier?: { hasMore: boolean; loading: boolean; failed?: boolean; load: () => void }
     /** The comment being written and the reply open on one discussion; sending goes to the discussions last drawn. */
     drafts: { body: string; setBody: (value: string) => void; replyTo: string | null; setReplyTo: (id: string | null) => void; reply: string; setReply: (value: string) => void; submit: () => void; sendReply: (id: string) => void }
     subscribed: boolean

@@ -234,6 +234,7 @@ Object.assign(fixtures, {
   'issues.getIssue': (id: unknown) => ({ issue: issue(String(id), 'Fix sign-in redirect') }),
   'issues.pollIssue': (id: unknown, known: unknown) => known === CHAT_VERSION ? { viewerId: OWNER, unchanged: true, version: CHAT_VERSION } : { viewerId: OWNER, issue: issue(String(id), 'Fix sign-in redirect'), version: CHAT_VERSION },
   'issues.pollIssueVersionSummaries': () => ({ viewerId: OWNER, snapshot: { version: CHAT_VERSION, items: [], positions: [] } }),
+  'issues.pollIssueActivityPage': (_id: unknown, known: unknown) => ({ viewerId: OWNER, snapshot: known === CHAT_VERSION ? { version: CHAT_VERSION, unchanged: true } : { version: CHAT_VERSION, items: [], hasMore: false, predecessor: null } }),
   'issues.listIssueVersions': () => [],
   'issue-operations.getDeletedIssue': () => null,
   'issue-operations.listIssueConnections': () => [],

@@ -58,14 +58,14 @@ export type ActivityEventItem = {
 }
 
 /** The task's own events as words, oldest first, for IssueActivityFeed and a layer that draws the log. */
-export function useActivityEvents(versions: ActivityVersion[], children: ActivityChild[], context?: { task?: ActivitySubject | null; stretches?: readonly ActivityStretch[] }) {
+export function useActivityEvents(versions: ActivityVersion[], children: ActivityChild[], context?: { task?: ActivitySubject | null; stretches?: readonly ActivityStretch[]; predecessor?: ActivityVersion | null }) {
   const t = useTranslations('Workspace.activity')
   const tIssue = useTranslations('Issue')
   const format = useFormatter()
   const now = useNow({ updateInterval: 60_000 })
   const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
-  const history = deriveIssueActivity(versions, children, Infinity)
+  const history = deriveIssueActivity(versions, children, Infinity, context?.predecessor)
   const labels = { activity: t, status: statusLabel, priority: priorityLabel }
   return (barriers: readonly { id: string; at: string }[]): ActivityEventItem[] => {
     const rows = activityTimeline(history, barriers.map(row => ({ id: row.id, createdAt: row.at })))

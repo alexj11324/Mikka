@@ -9,6 +9,7 @@ import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { runBlockedEvent, runQuestionEvent, runReportEvent } from '@/lib/coordinator-events'
 import { maskForRun } from '@/lib/secrets/runtime'
 import { issueForUser } from '@/lib/issue-access'
+import { issueMutationsEnabled } from '@/lib/coordinator/issue-tools-enabled'
 import { agentScope } from '@/lib/agent-kit/service'
 import { AgentKitError } from '@/lib/agent-kit/store'
 import { LEASED_RUN_STATUSES } from '@/lib/run-retry'
@@ -119,4 +120,20 @@ export async function ask(run: ReturnType<typeof workerRun>, question: { questio
 export async function blocked(run: ReturnType<typeof workerRun>, reason: string) {
   await recordCoordinatorEvent(db, runBlockedEvent(run, await maskForRun(run.id, reason)))
   return 'Noted. The Coordinator will tell the person.'
+}
+
+/** A run may update only its own issue's basic fields. Source comes exclusively
+ * from a freshly verified run credential, never from the tool arguments. */
+export async function updateOwnIssue(auth: AuthInfo | undefined, input: { issueId: string; title?: string; status?: string; priority?: string }) {
+  const verified = await verifyRunToken(new Request('http://localhost/api/mcp'), auth?.token)
+  const extra = verified?.extra
+  if (!verified || extra?.credentialKind !== 'run' || typeof extra.runId !== 'string' || typeof extra.userId !== 'string' ||
+      typeof extra.issueId !== 'string' || typeof extra.workspaceId !== 'string' || typeof extra.agentId !== 'string' || extra.issueId !== input.issueId) {
+    return { error: 'workspaceAccessDenied' }
+  }
+  if (!issueMutationsEnabled()) return { error: 'issueToolsDisabled' }
+  const { withMcpWorkspace } = await import('./workspace')
+  const actions = await import('./actions')
+  const actor = { actorType: 'agent' as const, actorId: extra.agentId, sourceRunId: extra.runId }
+  return withMcpWorkspace(verified, extra.workspaceId, userId => actions.updateIssue(userId, input, actor))
 }

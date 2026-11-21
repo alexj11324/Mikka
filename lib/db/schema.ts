@@ -275,6 +275,7 @@ export const issueVersions = pgTable('issue_versions', {
   content: jsonb('content').$type<JSONContent>().notNull(), status: text('status').notNull(), priority: text('priority').notNull(),
   // Who made the change; set on the server only. Null on rows written before 20261025200000_activity_version_actor.
   actorType: text('actor_type').$type<'user' | 'agent' | 'system'>(), actorId: text('actor_id'),
+  sourceRunId: uuid('source_run_id'),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 })
 
