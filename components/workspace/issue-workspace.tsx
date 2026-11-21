@@ -101,6 +101,7 @@ import type { AgentHistory, SavedAgentSession } from '@/lib/agent-history'
 import { useAgentHistory } from '@/hooks/use-agent-history'
 import { useEnterpriseSignOut } from '@/hooks/use-enterprise-sign-out'
 import { useWorkspace } from '@/hooks/use-workspace'
+import { useGatedFeature } from '@/hooks/use-feature-availability'
 import { LiveProvider, useLiveKey } from '@/hooks/use-live-key'
 import { focusChatComposer } from '@/hooks/use-focus-return'
 import { usePresence } from '@/lib/use-presence'
@@ -165,6 +166,8 @@ type IssueWorkspaceProps = { onboarding?: { computer: OnboardingComputer }; init
 function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHistory, initialSection = 'coordinator', initialSettingsSection, googleEnabled = false, onboarding, listWorkspaceId, workspaceData, workspaceContext }: IssueWorkspaceProps & { listWorkspaceId: string; workspaceData?: WorkspaceSettings; workspaceContext?: WorkspaceSwitcher }) {
   const i18nText = useTranslations()
   const { data: agentHistory } = useAgentHistory(user.id, initialAgentHistory)
+  // 记忆 is behind the `memory` PostHog flag while it does not work (gatedFeatures.memory).
+  const memory = useGatedFeature('memory')
   const t = useTranslations('Workspace')
   const tIssue = useTranslations('Issue')
   const tPlugins = useTranslations('Plugins')
@@ -325,7 +328,10 @@ function IssueWorkspaceContent({ user, initialSelected = null, initialAgentHisto
   }
   const [teamId, setTeamId] = useState<string | null>(() => readLocation(params).team)
   const activeTeam = teams.find(team => team.id === teamId)
-  const [section, setSection] = useState<WorkspaceSection>(() => { const at = readLocation(params); return at.team || at.group ? at.section : initialSection })
+  const [requestedSection, setSection] = useState<WorkspaceSection>(() => { const at = readLocation(params); return at.team || at.group ? at.section : initialSection })
+  // With the memory flag off, ?section=memory (an old link, a sign-in return) opens the default section: title, layout and body alike.
+  // The URL is left as asked, so someone whose flag is on is not sent away while flags are still loading.
+  const section: WorkspaceSection = requestedSection === 'memory' && !memory ? 'coordinator' : requestedSection
   // Team Issues has its own authorized first page. Filtering the global first
   // 100 Task rows after pagination can incorrectly show an empty Team.
   // A stable key keeps `refreshTaskPages` (a useCallback over it) stable too, so the dialogs below can be reused.
