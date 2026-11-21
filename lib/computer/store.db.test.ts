@@ -9,6 +9,7 @@ import { createServer } from 'node:http'
 import { once } from 'node:events'
 import { observePoolCommits } from '../db/commit-effects'
 import { ComputerStore } from './store'
+import { createComputerHandler } from './handler'
 import { bindComputerRun } from './run-binding'
 import { claimCloudRun, claimLocalRun } from './claim'
 import { syncComputerReviews, decideComputerReview } from './reviews'
@@ -108,6 +109,8 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     }
     const store = new ComputerStore(pool, runtime)
     const bot = await store.createBot(actor, 'Desktop')
+    const computer = createComputerHandler(store, async () => actor)
+    const computerUrl = `http://localhost/api/bots/${bot.id}/computer`
     async function stateView() {
       const { live, ...view } = await store.state(actor, bot.id)
       assert.equal(live?.workspaceId, actor.workspaceId, 'freshness metadata keeps the authorized workspace')
@@ -126,6 +129,12 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     await assert.rejects(store.operate(actor, bot.id, 'wake'), { status: 409, message: 'Computer provisioning in progress' })
     await pool.query(`UPDATE cloud_machines SET "sandboxId"='sandbox-provisioning' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
     assert.deepEqual(await stateView(), { machine: 'waking', control: 'idle' }, 'provider state cannot replace an unfinished runtime installation')
+    assert.ok((await store.state(actor, bot.id)).live?.deadline?.afterMs, 'an active lease schedules a state reread')
+    await pool.query(`UPDATE cloud_machines SET "sandboxId"=NULL,"provisionLeaseUntil"=now()-interval '1 second' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
+    const abandoned = await computer(new Request(computerUrl), bot.id)
+    assert.equal(abandoned.status, 200)
+    assert.deepEqual(await abandoned.json(), { machine: 'error', control: 'idle', live: { workspaceId: actor.workspaceId } }, 'an abandoned first allocation offers retry and drops the expired deadline')
+    assert.equal(created, 0, 'a state read does not start provisioning again')
     await pool.query(`UPDATE cloud_machines SET state='running' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
     assert.deepEqual(await stateView(), { machine: 'sleeping', control: 'idle' }, 'an unallocated desktop stays sleeping when its owner machine is already running')
     await pool.query('DELETE FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [actor.workspaceId, actor.userId])
@@ -139,6 +148,12 @@ test('real PostgreSQL: allocation, owner boundary, control generations and recov
     assert.equal(created, 1)
     await pool.query(`UPDATE cloud_machines SET state='waking' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
     assert.deepEqual(await stateView(), { machine: 'waking', control: 'idle' }, 'a resumed desktop stays waking until provisioning completes')
+    await pool.query(`UPDATE cloud_machines SET "provisionLeaseId"=$3,"provisionLeaseUntil"=now()-interval '1 second' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId, randomUUID()])
+    assert.deepEqual(await stateView(), { machine: 'error', control: 'idle' }, 'an abandoned resume also offers retry')
+    const retried = await computer(new Request(`${computerUrl}/wake`, { method: 'POST', headers: { origin: 'http://localhost' } }), bot.id, 'wake')
+    assert.equal(retried.status, 202)
+    assert.equal(created, 1, 'an explicit retry reuses the existing sandbox')
+    assert.deepEqual(await stateView(), { machine: 'sleeping', control: 'idle' }, 'the completed retry returns to the provider-reported state')
     await pool.query(`UPDATE cloud_machines SET state='running' WHERE "workspaceId"=$1 AND "ownerId"=$2`, [actor.workspaceId, actor.userId])
     const leaseA = randomUUID(), leaseB = randomUUID()
     const leaseClaims = await Promise.all([claimWorkerLease(pool, actor, 'sandbox-test', leaseA), claimWorkerLease(pool, actor, 'sandbox-test', leaseB)])
