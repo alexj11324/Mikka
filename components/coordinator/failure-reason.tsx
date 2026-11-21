@@ -37,7 +37,7 @@ export function CloudFailureAction({ code, fallback }: { code: CloudErrorCode; f
  * recovery, model selection for a rejected choice, else 重新发送.
  */
 /** `retry`: the turn runs again (a welcome has no message of the person's to send again), so the action reads 重试. */
-export function FailureReason({ failure, botId, onResend, sending = false, retry = false }: { failure: ChatFailure; botId: string | null; onResend: () => void; sending?: boolean; retry?: boolean }) {
+export function FailureReason({ failure, botId, onResend, sending = false, retry = false, showReason = true }: { failure: ChatFailure; botId: string | null; onResend: () => void; sending?: boolean; retry?: boolean; showReason?: boolean }) {
   const chat = useTranslations('Coordinator')
   const common = useTranslations('Common')
   const refusal = useTranslations('Billing.refusal')
@@ -60,7 +60,7 @@ export function FailureReason({ failure, botId, onResend, sending = false, retry
       : resend
   return <div data-failure-reason="" className={cn('flex flex-col gap-0.5', retry ? 'items-start' : 'items-end')}>
     <p data-message-failure="past" className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-      <CircleAlert aria-hidden="true" className="size-3.5 shrink-0" />{reason}<span aria-hidden="true">·</span>{action}
+      {showReason && <><CircleAlert aria-hidden="true" className="size-3.5 shrink-0" />{reason}<span aria-hidden="true">·</span></>}{action}
     </p>
     {/* The stored code only under 详情, never in place of the words (decision 2026-11-05-0330). */}
     {failure.raw && <RunErrorDetails code={failure.raw} />}
