@@ -203,7 +203,8 @@ test('Project v2: split database migration, canonical relationships and live ten
     await t.test('Task label suggestions stay in the Task workspace for a reader who belongs to both', async () => {
       const { getIssuePropertyOptions } = await import('../app/actions/issue-metadata')
       const { readIssueMetadata, withIssueMetadata } = await import('../lib/issue-metadata')
-      for (const [id, name] of [[initialTasks[0], 'Alpha only'], [foreignTask, 'Beta only']]) {
+      for (const [workspaceId, id, name] of [[alpha, initialTasks[0], 'Alpha only'], [beta, foreignTask, 'Beta only']]) {
+        await application.query("INSERT INTO workspace_issue_labels (workspace_id,name,color) VALUES ($1,$2,'blue')", [workspaceId, name])
         const document = { type: 'doc' }
         const metadata = readIssueMetadata(document)
         metadata.labels = [{ name, color: 'blue' }]

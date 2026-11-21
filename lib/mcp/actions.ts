@@ -101,9 +101,9 @@ interface IssueChanges {
 }
 
 /** Applies the changes one action at a time, each on the revision the last one left. */
-async function applyChanges(userId: string, issueId: string, changes: IssueChanges) {
+async function applyChanges(issueId: string, changes: IssueChanges, resolvedLabelIds?: string[]) {
   let issue = unwrap(await getIssue(issueId)).issue
-  const labels = changes.labels === undefined ? undefined : await resolveTaskLabelNames(db, issue.workspaceId!, changes.labels)
+  const labelIds = resolvedLabelIds ?? (changes.labels === undefined ? undefined : (await resolveTaskLabelNames(db, issue.workspaceId!, changes.labels)).labelIds)
   // Historical invitations do not grant personal-task or revoked workspace
   // access. Check the proposed person's effective access before any mutation.
   if (changes.assigneeUserId && !await issueForUser(changes.assigneeUserId, issue.id)) throw new ActionFailureError('memberNotJoined')
@@ -114,7 +114,7 @@ async function applyChanges(userId: string, issueId: string, changes: IssueChang
     })).issue
   }
   const patch: IssueMetadataPatch = {}
-  if (labels) patch.labelIds = labels.labelIds
+  if (labelIds !== undefined) patch.labelIds = labelIds
   if (changes.assigneeUserId !== undefined) patch.assignee = changes.assigneeUserId ? { kind: 'member', id: changes.assigneeUserId } : null
   if (changes.assigneeAgentId !== undefined) patch.delegate = changes.assigneeAgentId ? { kind: 'agent', id: changes.assigneeAgentId } : null
   if (Object.keys(patch).length) issue = unwrap(await updateIssueMetadata({ id: issue.id, revision: issue.revision, patch })).issue
@@ -139,14 +139,16 @@ export async function createIssue(userId: string, input: IssueChanges & { title:
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     if (teamId && toolCallId === undefined) return { error: 'validationGeneric' }
     const mutate = async () => {
-      if (input.labels !== undefined) {
+      const { labels, projectId, assigneeUserId, assigneeAgentId } = input
+      let labelIds: string[] | undefined
+      if (labels !== undefined) {
         const workspaceId = taskReaderScope(userId).workspaceId
         if (!workspaceId) throw new ActionFailureError('workspaceAccessDenied')
-        await withTaskWorkspace(userId, workspaceId, () => resolveTaskLabelNames(db, workspaceId, input.labels))
+        labelIds = (await withTaskWorkspace(userId, workspaceId, () => resolveTaskLabelNames(db, workspaceId, labels))).labelIds
       }
       const fields = { title: input.title, content: textToDoc(input.body ?? ''), status: input.status ?? 'todo', priority: input.priority ?? 'normal' }
       const created = unwrap(await saveIssue(fields)).issue
-      return issueResult(await applyChanges(userId, created.id, { projectId: input.projectId, labels: input.labels, assigneeUserId: input.assigneeUserId, assigneeAgentId: input.assigneeAgentId }))
+      return issueResult(await applyChanges(created.id, { projectId, assigneeUserId, assigneeAgentId }, labelIds))
     }
     if (toolCallId === undefined) return mutate()
     if (!issueMutationsEnabled()) return { error: 'issueToolsDisabled' }
@@ -173,7 +175,7 @@ export async function updateIssue(userId: string, input: IssueChanges & { issueI
   return attempt(async () => actAs(await taskActor(userId, actor), async () => {
     if (toolCallId === undefined && input.assigneeUserId !== undefined) return { error: 'issueToolsDisabled' }
     const { issueId, ...changes } = input
-    const mutate = async () => issueResult(await applyChanges(userId, issueId, changes))
+    const mutate = async () => issueResult(await applyChanges(issueId, changes))
     if (toolCallId === undefined) return mutate()
     if (!issueMutationsEnabled()) return { error: 'issueToolsDisabled' }
     const parsed = updateIssueInput.safeParse(input)

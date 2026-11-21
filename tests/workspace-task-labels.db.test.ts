@@ -141,6 +141,9 @@ test('workspace task label HTTP management and real task writers preserve tenant
     const count = (await pool.query('SELECT count(*)::int n FROM issues WHERE "userId"=$1', [owner])).rows
     assert.deepEqual(await scoped(() => mcp.createIssue(owner, { title: 'Must not create', labels: ['Unregistered'] })), { error: 'issueMetadataInvalid' })
     assert.deepEqual((await pool.query('SELECT count(*)::int n FROM issues WHERE "userId"=$1', [owner])).rows, count)
+    const created = await scoped(() => mcp.createIssue(owner, { title: 'Create with workspace labels', labels: ['Review', 'BUG'] }))
+    assert.ok('id' in created)
+    assert.deepEqual(await refs(created.id), [review.id, bug.id])
     assert.ok('id' in await scoped(() => mcp.updateIssue(owner, { issueId: privateTask, labels: ['Review', 'BUG'] })))
     assert.deepEqual(await refs(privateTask), [review.id, bug.id])
     const { linearTeamSyncs } = await import('../lib/db/schema')
