@@ -583,6 +583,20 @@ cp -R "$SRC/Default/Local Storage" "$DST/Default/"
      Anthropic（ClaudeBot / Claude-SearchBot / Claude-User）都有两套，拦前者无损；
      **Perplexity 只有一个索引爬虫 PerplexityBot**，拦掉等于退出它的检索面。
 
+## 2026-11-19 设计稿里的引用 / chip 不能凭印象画
+- 错误：inline chip 画成灰底药丸，把 Claude Code 当成可 @ 的对象，还编了一个 Skill chip（snapshot-update）。用户连续纠正三次。
+- 根因：没先读 Capy 源码就动手；也没核对 Mikka 的名词——Bot 是用户建的派发者，Claude Code / Codex 是 Agent（见 messages/en.json "agentRequired"）。
+- 规则：
+  1. 画任何对标 Capy 的控件前，先在 /Applications/Capy.app/Contents/Resources/renderer/assets 里找到对应组件（按 data-track-owner 路径搜），读清类型、样式 class、交互，再画。
+  2. 例句里只出现 Mikka 真实存在的对象：文件 / 任务 / PR / thread / Bot。Agent 不可提及。
+  3. 新增的状态不要放在会被相邻 section 盖住的位置；画完截整节确认可见。
+
+## 2026-11-20 模型调用只许走 LiteLLM；对用户的选项也要用中文
+
+- 规则（Alex）：LiteLLM 建好之后，所有模型调用都必须经后台的 LiteLLM，任何绕开它的方式都不允许。换模型时不要在代码里写死模型 ID，也不要直连 Vercel AI Gateway 或厂商，哪怕仓库里已经有同样写死的先例（`WRITE_PLANNING_MODEL`）。先例不等于合规，要先查规则。迁移由 alexj11324/Mikka#2869 跟进。
+- 用户说"走 Vercel 网关"时，先确认这条路是不是经过 LiteLLM，再动手；不确定就先问，不要按字面直连。
+- AskUserQuestion 的问题和选项也算"对话"，必须用简体中文。
+
 ## 2026-11-19 · Figma 对照稿
 - 画 Mikka 设计稿前，先去「Mikka 三栏布局草图 v0」（zPe5LKycb2XuT1ivCLRw07）找现有约定和已接入的 shadcn 库，不要新建文件、自建组件。`get_libraries` 显示为空不代表没有库：直接 `search_design_system` 搜 "Button - Nova"，就能命中 Obra shadcn/ui kit 与 ReUI shadcn。
 - 抓竞品页面只用内置浏览器，不要切到 chrome-devtools 或别的浏览器。内置浏览器截图的分辨率受面板宽度限制，要高清图就请用户把面板拉宽，不要往页面里注入外部脚本。
