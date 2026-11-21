@@ -15,8 +15,8 @@ import { colors, font } from '@/lib/theme'
 
 // The same catalog the web reads (messages/*.json newBot); API values remain the shared
 // shape/colour ids.
-const shapeLabels = mobileMessages.newBot.shapes as Record<string, string>
-const colorLabels = mobileMessages.newBot.colors as Record<string, string>
+const shapeLabels = mobileMessages.Shell.newBot.shapes as Record<string, string>
+const colorLabels = mobileMessages.Shell.newBot.colors as Record<string, string>
 
 /**
  * 新建 Bot (Comma design 06), a form sheet from 线程's 新建: a name, a shape and a colour, as on the web
