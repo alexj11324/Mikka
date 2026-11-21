@@ -6,6 +6,7 @@
   "license": "AGPL-3.0-only",
   "exports": {
     "./settings": "./src/settings.ts",
+    "./work-visibility": "./src/work-visibility.ts",
     "./coding-terminal": "./src/coding-terminal.ts",
     "./coding-workspace": "./src/coding-workspace.ts",
     "./coding-workspace-review": "./src/coding-workspace-review.ts",
@@ -64,6 +65,7 @@
     "./members": "./src/members.ts",
     "./collab": "./src/collab.ts",
     "./artifact-frame": "./src/artifact-frame.ts",
+    "./artifact-share": "./src/artifact-share.ts",
     "./coordinator": "./src/coordinator.ts",
     "./computer": "./src/computer.ts",
     "./subscription": "./src/subscription.ts",

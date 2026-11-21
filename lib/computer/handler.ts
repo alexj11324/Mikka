@@ -2,6 +2,7 @@ import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { createBotSchema, viewerRequestSchema } from '@mikka/protocol/computer'
 import { ComputerError, type ComputerStore } from './store'
+import { ActionFailureError } from '@/lib/action-error'
 
 export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'createBot' | 'state' | 'operate'>, authenticate: (request: Request) => Promise<{ userId: string; workspaceId: string } | null>, wakeWorker?: (actor: { userId: string; workspaceId: string }, botId: string) => Promise<void>) {
   return async function computerRoute(request: Request, botId?: string, action?: 'wake' | 'viewer' | 'takeover' | 'handback') {
@@ -12,8 +13,8 @@ export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'c
       if (request.method !== 'GET' && request.headers.get('origin') !== new URL(request.url).origin) return response({ error: 'Invalid origin' }, 403)
       if (!botId) {
         if (request.method === 'GET') return response(await store.listBots(actor))
-        const { name } = createBotSchema.parse(await request.json())
-        return response(await store.createBot(actor, name), 201)
+        const { name, visibility } = createBotSchema.parse(await request.json())
+        return response(visibility === undefined ? await store.createBot(actor, name) : await store.createBot(actor, name, { visibility }), 201)
       }
       z.uuid().parse(botId)
       if (!action) return response(await store.state(actor, botId))
@@ -30,6 +31,7 @@ export function createComputerHandler(store: Pick<ComputerStore, 'listBots' | 'c
       if (action === 'wake' && wakeWorker) await wakeWorker(actor, botId)
       return response(result, action === 'wake' ? 202 : 200)
     } catch (error) {
+      if (error instanceof ActionFailureError) return response({ error: error.code }, 403)
       if (error instanceof ComputerError) return response({ error: error.message }, error.status)
       if (error instanceof z.ZodError || error instanceof SyntaxError) return response({ error: 'Invalid request' }, 400)
       // Provider errors may contain request URLs or headers. Never serialize them: the log

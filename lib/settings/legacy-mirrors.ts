@@ -4,6 +4,7 @@ import type { db } from '@/lib/db'
 import { threadTitleSettings, userPreferences } from '@/lib/db/schema'
 import { archivePreferenceChanged } from '@/lib/live/lists'
 import { SETTINGS_REGISTRY, type SettingKey } from './registry'
+import { workspaceInstructions } from './schema'
 import type { SettingsContext } from './store'
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
@@ -32,6 +33,13 @@ const mirrors = {
     const field = SETTINGS_REGISTRY.threadTitleTriggers
     const triggers = value === null && scope === 'personal' ? null : field.guard.parse(value ?? field.defaultValue)
     await mirrorTitle(tx, scope, context, { triggers })
+  },
+  async workspaceInstructions(tx, scope, { workspaceId }, value) {
+    if (scope !== 'workspace') return
+    const field = SETTINGS_REGISTRY.workspaceInstructions
+    const instructions = field.guard.parse(value ?? field.defaultValue)
+    await tx.insert(workspaceInstructions).values({ workspaceId, instructions })
+      .onConflictDoUpdate({ target: workspaceInstructions.workspaceId, set: { instructions, updatedAt: new Date() } })
   },
 } satisfies Partial<Record<SettingKey, Mirror>>
 

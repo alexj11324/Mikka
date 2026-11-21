@@ -1202,11 +1202,12 @@ export const artifactVersions = pgTable('artifact_versions', {
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('artifact_versions_version_key').on(table.artifactId, table.version)])
 
-/** A link anyone can open at /a/<token>. Only the token's hash is stored; revoking ends it. */
+/** A scoped link at /a/<token>. Only the token's hash is stored; revoking ends it. */
 export const artifactShares = pgTable('artifact_shares', {
   id: uuid('id').primaryKey(),
   artifactId: uuid('artifactId').notNull().references(() => artifacts.id, { onDelete: 'cascade' }),
   tokenHash: text('tokenHash').notNull(), createdBy: text('createdBy').notNull(),
+  visibility: text('visibility').$type<'private' | 'workspace' | 'link'>().notNull().default('link'),
   revokedAt: timestamp('revokedAt', { withTimezone: true }),
   createdAt: timestamp('createdAt', { withTimezone: true }).notNull().defaultNow(),
 }, table => [uniqueIndex('artifact_shares_token_key').on(table.tokenHash), index('artifact_shares_artifact_idx').on(table.artifactId)])

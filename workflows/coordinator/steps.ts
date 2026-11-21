@@ -621,9 +621,9 @@ export async function createComputerBot(userId: string, input: { workspaceId: st
     await (await import('@/lib/subscription-runtime')).authorizeSubscriptionWorkspace(userId, input.workspaceId)
     const hash = createHash('sha256').update(JSON.stringify(['create-bot', userId, toolCallId])).digest('hex')
     const botId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
-    await pool.query('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4) ON CONFLICT (id) DO NOTHING', [botId, input.workspaceId, userId, input.name])
-    const found = await pool.query('SELECT id,name FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "ownerId"=$3 AND name=$4', [botId, input.workspaceId, userId, input.name])
-    return found.rows[0] ?? { error: 'cloudComputerUnavailable' }
+    const { ComputerStore } = await import('@/lib/computer/store')
+    const bot = await new ComputerStore(pool).createBot({ userId, workspaceId: input.workspaceId }, input.name, { id: botId })
+    return { id: bot.id, name: bot.name }
   } catch { return { error: 'cloudComputerUnavailable' } }
 }
 

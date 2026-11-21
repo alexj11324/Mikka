@@ -39,6 +39,7 @@ test('cron, lazy suggestion reads and app connection deliver each briefing throu
     delete coordinatorWakeTransport.wake
     for (const table of ['coordinator_events', 'briefings', 'suggestions', 'user_time_zones']) await pool.query(`DELETE FROM ${table} WHERE "userId"=ANY($1::text[])`, [people])
     await pool.query('DELETE FROM "user" WHERE id=ANY($1::text[])', [people])
+    await (await import('../builtin-gateway/runtime')).builtinGateway()?.stop()
     await Promise.all([pool.end(), workspacePool.end()])
   })
   coordinatorWakeTransport.wake = async userId => {

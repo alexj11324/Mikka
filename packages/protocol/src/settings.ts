@@ -1,3 +1,5 @@
+import type { WorkCreationView } from './work-visibility'
+
 /** Shared settings contract. Clients never import the server registry or storage. */
 export type SettingSource = 'personal' | 'workspace' | 'default'
 export type SettingScope = 'personal' | 'workspace'
@@ -25,8 +27,12 @@ export interface SettingSchemaEntry {
 export interface SettingsView {
   workspaceId: string
   values: Record<string, ResolvedSetting>
+  workCreation: WorkCreationView
 }
 
 export interface SettingsPatch {
   values: Record<string, SettingValue | null>
 }
+export type ShareVisibility = 'private' | 'workspace' | 'link'
+export interface ResolvedShareVisibility { value: ShareVisibility; source: SettingSource }
+export interface WorkspaceSharingDefaults { thread: ResolvedShareVisibility; artifact: ResolvedShareVisibility }

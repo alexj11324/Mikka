@@ -13,6 +13,7 @@ import { pool } from '@/lib/db'
 import { deleteOwnedBot, ownArchivedBots, setOwnedBotArchived } from '@/lib/bot-lifecycle'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
+import { withTaskWorkspace } from '@/lib/task-workspace'
 import { botDefaultOptions, listBotThreadsFor, saveBotDefaults, workspaceBots, type BotDefaultOptions, type BotDefaults, type BotThreadPage, type WorkspaceBotView } from '@/lib/workspace-admin/bots'
 
 /** A bot in the left column. Its instructions grow inside its chat, so they are not here. */
@@ -119,11 +120,11 @@ export async function setBotAccess(botId: string, input: { visibility?: 'shared'
     const actor = await actorOf(workspaceId)
     const { db, withDatabaseTransaction } = await import('@/lib/db')
     // Access and followers change together or not at all.
-    return db.transaction(tx => withDatabaseTransaction(tx, async () => {
-      let view = input.visibility ? await access.setBotVisibility(actor, botId, input.visibility) : await access.botAccess(actor, botId)
+    return withTaskWorkspace(actor.userId, actor.workspaceId, () => db.transaction(tx => withDatabaseTransaction(tx, async () => {
+      let view = input.visibility ? await access.setBotVisibility(actor, botId, input.visibility, tx) : await access.botAccess(actor, botId)
       if (input.subscribers) view = await access.setBotSubscribers(actor, botId, input.subscribers)
       return view
-    }))
+    })))
   })
 }
 

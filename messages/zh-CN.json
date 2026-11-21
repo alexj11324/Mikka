@@ -1549,6 +1549,8 @@
     "botAliasTaken": "工作区里已有 Bot 使用这个别名。",
     "botTargetUnavailable": "这台机器、Agent 或配置不可用。",
     "botShareUnavailable": "个人工作区没有可以共享的成员。",
+    "privateWorkNotAllowed": "此工作区不允许创建私有线程或 Bot。",
+    "sharedWorkNotAllowed": "个人工作区的线程和 Bot 只能设为私有。",
     "botSubscriberNoAccess": "这位成员看不到这个 Bot。",
     "usageLimitReached": "已达到用量上限，新任务已暂停，运行中的任务会继续完成。",
     "usageCreditsExhausted": "点数已用完，新任务已暂停，运行中的任务会继续完成。",
@@ -9031,6 +9033,14 @@
     "mergeFailed": "合并没有完成。"
   },
   "SettingsRegistry": {
+    "newWorkVisibility": {
+      "label": "新线程与 Bot 的默认可见性",
+      "keywords": "新工作|创建|可见性|私有|共享|线程|Bot"
+    },
+    "allowPrivateNewWork": {
+      "label": "允许私有线程与 Bot",
+      "keywords": "新工作|创建|私有|权限|工作区|线程|Bot"
+    },
     "archiveIdleAfterDays": {
       "label": "归档闲置线程",
       "keywords": "归档|闲置"
@@ -9046,6 +9056,18 @@
     "subagentMaxConcurrent": {
       "label": "并发子 Agent 数量",
       "keywords": "子 Agent|并发|限制"
+    },
+    "workspaceInstructions": {
+      "label": "工作区指令",
+      "keywords": "指令|工作区"
+    },
+    "threadShareVisibility": {
+      "label": "线程默认分享范围",
+      "keywords": "线程|分享|可见"
+    },
+    "artifactShareVisibility": {
+      "label": "产物默认分享范围",
+      "keywords": "产物|分享|可见"
     }
   }
 }

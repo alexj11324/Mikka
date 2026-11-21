@@ -11,6 +11,10 @@ import { computerChanged, computerWorkspaceChanged, machineChanged } from '@/lib
 import { computerLiveState } from './state-deadline'
 import { wakeTokens, wakeWorkflowSoon, workflowWakesEnabled } from '@/lib/workflow-wake'
 import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
+import type { WorkVisibility } from '@mikka/protocol/work-visibility'
+import { connectForCommitEffects } from '@/lib/db/commit-effects'
+import { withTaskWorkspace } from '@/lib/task-workspace'
+import { initializeWorkVisibility } from '@/lib/settings/work-creation'
 
 export class ComputerError extends Error {
   constructor(public status: number, message: string) { super(message) }
@@ -24,10 +28,24 @@ type Desktop = { botId: string; ownerId: string; display: number; epoch: number;
 export class ComputerStore {
   constructor(private pool: Pool, private runtime = provider) {}
 
-  async createBot(actor: Actor, name: string) {
-    const { rows } = await this.pool.query<Bot>('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4) RETURNING id,name,"workspaceId","ownerId"', [randomUUID(), actor.workspaceId, actor.userId, name])
-    if (rows[0]) await botListChanged(this.pool, rows[0].id)
-    return rows[0]
+  async createBot(actor: Actor, name: string, input: { id?: string; visibility?: WorkVisibility } = {}) {
+    return withTaskWorkspace(actor.userId, actor.workspaceId, async () => {
+      const client = await connectForCommitEffects(this.pool)
+      try {
+        await client.query('BEGIN')
+        const id = input.id ?? randomUUID()
+        const { rows: [created] } = await client.query<Bot>('INSERT INTO bots (id,"workspaceId","ownerId",name) VALUES ($1,$2,$3,$4) ON CONFLICT (id) DO NOTHING RETURNING id,name,"workspaceId","ownerId"', [id, actor.workspaceId, actor.userId, name])
+        const bot = created ?? (await client.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE id=$1 AND "workspaceId"=$2 AND "ownerId"=$3 AND name=$4', [id, actor.workspaceId, actor.userId, name])).rows[0]
+        if (!bot) throw new ComputerError(409, 'Bot request changed')
+        if (created) {
+          await initializeWorkVisibility(client, actor, { kind: 'bot', id, visibility: input.visibility })
+          await botListChanged(client, id)
+        }
+        await client.query('COMMIT')
+        return bot
+      } catch (error) { await client.query('ROLLBACK'); throw error }
+      finally { client.release() }
+    })
   }
   async listBots(actor: Actor) {
     return (await this.pool.query<Bot>('SELECT id,name,"workspaceId","ownerId" FROM bots WHERE "workspaceId"=$1 AND "ownerId"=$2 ORDER BY "createdAt"', [actor.workspaceId, actor.userId])).rows

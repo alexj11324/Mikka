@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MODEL_ROUTING_EFFORTS } from './model-routing'
 import { MACHINE_SIZES, type MachineSize } from './cloud-computer/machine-pricing'
+import { workVisibilitySchema } from '@mikka/protocol/work-visibility'
 
 // Kept free of server imports: the task commands that carry it (lib/task-create-command.ts) are shared with the
 // mobile and web clients. The server reads it back through lib/task-run-settings.ts.
@@ -10,6 +11,8 @@ import { MACHINE_SIZES, type MachineSize } from './cloud-computer/machine-pricin
  * event, never from the dispatching model's tool input.
  */
 export const taskRunSettingsSchema = z.strictObject({
+  /** An authenticated choice for this new root thread, never a model tool argument. */
+  visibility: workVisibilitySchema.optional(),
   /** The workspace Environment the run uses instead of its Project's default. */
   environmentId: z.uuid().optional(),
   /** The model the run asks for, and its reasoning effort. */

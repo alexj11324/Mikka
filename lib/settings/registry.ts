@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ResolvedSetting, SettingSchemaEntry, SettingScope, SettingValue } from '@mikka/protocol/settings'
+import { workVisibilitySchema } from '@mikka/protocol/work-visibility'
 import { archiveIdleDays } from '@/lib/conversation-directory-input'
 import { DEFAULT_TITLE_TRIGGERS, THREAD_TITLE_TRIGGERS, TITLE_INSTRUCTIONS_MAX } from '@/lib/thread-title'
 import { settingMetadata } from './metadata'
@@ -41,9 +42,44 @@ export const SETTINGS_REGISTRY = {
     type: 'integer', guard: z.number().int().min(1).max(20), defaultValue: 6,
     personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
   },
+  workspaceInstructions: {
+    key: 'workspaceInstructions', scope: ['workspace'], group: 'instructions', page: 'instructions',
+    ...settingMetadata('workspaceInstructions'),
+    type: 'string', guard: z.string().trim().max(2000), defaultValue: '',
+    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
+  },
+  newWorkVisibility: {
+    ...inherited, key: 'newWorkVisibility', group: 'work-creation', page: 'general',
+    ...settingMetadata('newWorkVisibility'),
+    type: 'string', guard: workVisibilitySchema, defaultValue: 'private', options: ['private', 'shared'],
+    personalContext: 'workspace',
+  },
+  allowPrivateNewWork: {
+    key: 'allowPrivateNewWork', scope: ['workspace'], group: 'work-creation', page: 'general',
+    ...settingMetadata('allowPrivateNewWork'),
+    type: 'boolean', guard: z.boolean(), defaultValue: true,
+    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
+  },
+  threadShareVisibility: {
+    key: 'threadShareVisibility', scope: ['workspace'], group: 'sharing', page: 'general',
+    ...settingMetadata('threadShareVisibility'),
+    type: 'string', guard: z.enum(['private', 'workspace', 'link']), defaultValue: 'private', options: ['private', 'workspace', 'link'],
+    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
+  },
+  artifactShareVisibility: {
+    key: 'artifactShareVisibility', scope: ['workspace'], group: 'sharing', page: 'general',
+    ...settingMetadata('artifactShareVisibility'),
+    type: 'string', guard: z.enum(['private', 'workspace', 'link']), defaultValue: 'link', options: ['private', 'workspace', 'link'],
+    personalOverride: false, writeAccess: { workspace: 'admin' }, personalContext: 'workspace',
+  },
 } satisfies Record<string, SettingDefinition>
 
 export type SettingKey = keyof typeof SETTINGS_REGISTRY
+export type SettingValueFor<K extends SettingKey> = z.output<(typeof SETTINGS_REGISTRY)[K]['guard']>
+
+export function personalSettingWorkspace(field: Pick<SettingDefinition, 'personalContext'>, workspaceId: string): string | null {
+  return field.personalContext === 'workspace' ? workspaceId : null
+}
 
 export function settingDefinition(key: string): SettingDefinition {
   if (!Object.hasOwn(SETTINGS_REGISTRY, key)) throw new z.ZodError([{ code: 'custom', path: [key], message: 'Unknown setting' }])
