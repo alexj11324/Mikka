@@ -4,7 +4,6 @@ import { subscriptionRuntime } from "@/lib/subscription-runtime";
 import { subscriptionNativeHTTP } from "@/lib/subscription-native-http";
 import { hostedBrokerDevice } from "@/lib/subscription-native-device";
 
-export const runtime = "nodejs";
 export const maxDuration = 300;
 const handlePOST = subscriptionNativeHTTP({
   authorize: async (request, deviceId) => {

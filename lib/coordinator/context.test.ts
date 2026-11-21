@@ -1,7 +1,8 @@
+import {compactionCut} from '../../tests/support/legacy-compaction'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import type { ModelMessage } from 'ai'
-import { chatItems, jsonbText, compactionCut, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
+import { chatItems, jsonbText, COMPACT_AT_TOKENS, estimateTokens, eventPrompt, forgetNotes, instructionsWithMemory, KEEP_RECENT_TOKENS, MEMORY_MAX_CHARS, promptMessages, rememberNote, type StoredMessage } from './context'
 import { scheduleChatMessage } from '../schedules/chat-result'
 import { modelMessage, pointsSwitchMessage, quotaSwitchMessage, sourcedEventMessage } from './message-safety'
 import { runCompletionObservations } from './run-completion-observation'
@@ -237,6 +238,23 @@ test('a stored reply carries the stream it was first shown from, so the chat kee
     ['coordinator', 'Nothing open.\n\nAnything else?', 'wrun_1:1'],
     ['person', 'thanks', null],
     ['coordinator', 'Any time.', null],
+  ])
+})
+
+test('a welcome settling after the first question keeps its Eve turn separate from the answer', () => {
+  const welcome = 'eve:wrun_1:turn_0'
+  const answer = 'eve:wrun_1:turn_1'
+  const rows = [
+    { role: 'user', content: 'What is next?' },
+    { role: 'assistant', content: 'Welcome.', mikkaStreamId: welcome },
+    { role: 'assistant', content: 'First words.', mikkaStreamId: answer },
+    { role: 'assistant', content: 'Final words.', mikkaStreamId: answer },
+  ] as ModelMessage[]
+  const items = chatItems(rows.map((message, index) => ({ position: index + 1, message, createdAt: new Date(0) })))
+  assert.deepEqual(items.map(item => [item.position, item.text, item.streamId]), [
+    [1, 'What is next?', undefined],
+    [2, 'Welcome.', welcome],
+    [3, 'First words.\n\nFinal words.', answer],
   ])
 })
 

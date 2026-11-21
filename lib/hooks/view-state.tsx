@@ -4,9 +4,14 @@ import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRe
 import { CLEAR_VIEW_STATE_EVENT, VIEW_STATE_PREFIX } from '../chat-drafts'
 
 /** Browsing state lives for this window's session, separate from saved product settings. */
-function createViewStore(scope: string | null) {
+export function createViewStore(scope: string | null) {
   const values = new Map<string, unknown>()
-  const listeners = new Set<() => void>()
+  // One listener set per cell: a list saves its scroll position on every scroll event, and that
+  // write must not wake every other reader on the screen (they read a different key).
+  const cellListeners = new Map<string, Set<() => void>>()
+  // The escape hatch for a reader that cannot name one cell: it hears every write.
+  const anyListeners = new Set<() => void>()
+  const generations = new Map<string, number>()
   let active = true
   const storageKey = (key: string) => `${VIEW_STATE_PREFIX}v1:${scope}:${key}`
   return {
@@ -21,15 +26,32 @@ function createViewStore(scope: string | null) {
       }
       return values.has(key) ? values.get(key) as T : fallback
     },
-    set<T,>(key: string, value: T) {
-      if (!active) return
+    generation(key: string) { return generations.get(key) ?? 0 },
+    reset<T,>(key: string, value: T) {
+      generations.set(key, this.generation(key) + 1)
+      this.set(key, value)
+    },
+    set<T,>(key: string, value: T, generation?: number) {
+      if (!active || (generation !== undefined && generation !== this.generation(key))) return
       values.set(key, value)
       if (scope) {
         try { window.sessionStorage.setItem(storageKey(key), JSON.stringify(value)) } catch { /* storage unavailable */ }
       }
-      listeners.forEach(listener => listener())
+      // Copy out first: a listener may unsubscribe another while it runs, and
+      // iterating the live Set would then skip whichever one sat after it.
+      const forKey = cellListeners.get(key)
+      if (forKey) for (const listener of Array.from(forKey)) listener()
+      if (anyListeners.size) for (const listener of Array.from(anyListeners)) listener()
     },
-    subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener) } },
+    /** Subscribe to one cell. Every `useViewState` reader takes this path. */
+    subscribeKey(key: string, listener: () => void) {
+      const forKey = cellListeners.get(key) ?? new Set<() => void>()
+      if (!cellListeners.has(key)) cellListeners.set(key, forKey)
+      forKey.add(listener)
+      return () => { forKey.delete(listener); if (!forKey.size && cellListeners.get(key) === forKey) cellListeners.delete(key) }
+    },
+    /** Hears every cell. A reader that knows its key must use `subscribeKey` (or it re-renders on unrelated writes). */
+    subscribe(listener: () => void) { anyListeners.add(listener); return () => { anyListeners.delete(listener) } },
   }
 }
 
@@ -53,6 +75,17 @@ function useViewStore() {
   return provided ?? local
 }
 
+/** A confirmed loss of group membership also retires this tab's saved drafts. */
+export function useForgetGroupDrafts(ownerId: string, workspaceId: string | null) {
+  const store = useViewStore()
+  return useCallback((id: string) => {
+    if (!workspaceId) return
+    store.reset(`group:${id}:draft`, '')
+    store.reset(`group:${id}:pending`, [])
+    store.reset(`chat-send:group:${ownerId}:${workspaceId}:${id}`, [])
+  }, [store, ownerId, workspaceId])
+}
+
 /** A keyed state cell: changing objects reads that object's state immediately. */
 export function useViewState<T,>(key: string, initial: T): [T, Dispatch<SetStateAction<T>>] {
   const store = useViewStore()
@@ -60,10 +93,14 @@ export function useViewState<T,>(key: string, initial: T): [T, Dispatch<SetState
   if (initialRef.current.store !== store || initialRef.current.key !== key) initialRef.current = { store, key, value: initial }
   const fallback = initialRef.current.value
   const getSnapshot = useCallback(() => store.get(key, fallback), [store, key, fallback])
-  const value = useSyncExternalStore(store.subscribe, getSnapshot, () => fallback)
+  // Stable per key, or `useSyncExternalStore` would resubscribe on every render.
+  const subscribe = useCallback((listener: () => void) => store.subscribeKey(key, listener), [store, key])
+  const value = useSyncExternalStore(subscribe, getSnapshot, () => fallback)
+  // A late completion belongs to the membership under which this cell was opened.
+  const generation = useMemo(() => store.generation(key), [store, key])
   const setValue = useCallback<Dispatch<SetStateAction<T>>>(next => {
-    store.set(key, typeof next === 'function' ? (next as (previous: T) => T)(store.get(key, fallback)) : next)
-  }, [store, key, fallback])
+    store.set(key, typeof next === 'function' ? (next as (previous: T) => T)(store.get(key, fallback)) : next, generation)
+  }, [store, key, fallback, generation])
   return [value, setValue]
 }
 

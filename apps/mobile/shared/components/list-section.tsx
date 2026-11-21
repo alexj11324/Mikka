@@ -1,9 +1,10 @@
 import { Pressable, StyleSheet, View } from 'react-native'
 import { Text } from '@/components/Text'
 import { tap } from '@/lib/haptics'
+import { mobileMessages } from '@/lib/messages'
 import { colors, GROUP_INSET, LIST_INSET } from '@/lib/theme'
 
-/** How many rows a closed section (已解决, 已完成) shows before 显示全部. */
+/** How many rows a closed section (已解决, 已完成) shows before 「显示全部」. */
 export const CLOSED_SHOWN = 5
 
 /** A list section's header, as on the home list (Comma designs 01, 13, 15): its name in grey semibold, and a count when given. */
@@ -21,7 +22,7 @@ export function ListSectionHeader({ title, count, grouped = false }: { title: st
 export function ShowAllRow({ count, onPress }: { count: number; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" onPress={() => { tap(); onPress() }} hitSlop={6} style={({ pressed }) => [styles.all, pressed && { opacity: 0.6 }]}>
-      <Text style={styles.allText}>显示全部 {count} 个</Text>
+      <Text style={styles.allText}>{mobileMessages.MobileCore.showAllItems.replace('{count}', String(count))}</Text>
     </Pressable>
   )
 }

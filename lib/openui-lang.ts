@@ -168,23 +168,39 @@ export function isComponent(value: Value | undefined): value is Component {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value) && (value as Component).kind === 'component')
 }
 
-/** The card tree of an OpenUI reply, or null when it does not parse (the caller falls back to its text). */
-export function parseOpenUI(text: string): Value | null {
+function readStatements(text: string) {
   const split = splitOpenUI(text)
   if (!split) return null
   try {
     const reader = new Reader(split.source)
     const statements = new Map<string, Value>()
+    let roots = 0
     while (reader.peek() !== undefined) {
       const name = reader.identifier()
       if (!name) throw new Error(`expected a statement at ${reader.i}`)
       reader.expect('=')
       statements.set(name, reader.value())
+      if (name === 'root') roots++
       if (reader.peek() === ';') reader.i++
     }
-    const root = statements.get('root')
-    return root === undefined ? null : resolve(root, statements)
+    return { statements, roots }
   } catch {
+    return null
+  }
+}
+
+/** Several SDK messages can settle into one reply. Only the final root assignment is displayed. */
+export function openUIRootCount(text: string): number {
+  return readStatements(text)?.roots ?? 0
+}
+
+export function parseOpenUI(text: string): Value | null {
+  const document = readStatements(text)
+  const root = document?.statements.get('root')
+  try {
+    return document && root !== undefined ? resolve(root, document.statements) : null
+  } catch {
+    // Component-shaped objects with invalid props or args retain the text fallback.
     return null
   }
 }

@@ -20,6 +20,17 @@ test('compiled production identity is checked before server code can execute', a
   const save = value => writeFile(join(root, '.output/mikka-build.json'), JSON.stringify(value))
   await save(manifest)
   assert.equal((await readCompiledBuild(root, { env: { MIKKA_TEST_DEPLOYMENT_SHA: revision } })).revision, revision)
+  // Build and runtime majors need not match: both are supported, and the exact
+  // build version remains in the immutable manifest instead of being rewritten.
+  for (const node of ['v22.23.5', 'v24.22.1', 'v25.0.0']) {
+    await save({ ...manifest, node })
+    assert.equal((await readCompiledBuild(root, { expectedRevision: revision })).node, node)
+  }
+  for (const node of ['v20.19.0', 'v21.7.0', 'v24.not-a-version', '', null]) {
+    await save({ ...manifest, node })
+    await assert.rejects(readCompiledBuild(root), /APP_COMPILED_MANIFEST_INVALID/)
+  }
+  await save(manifest)
   await assert.rejects(readCompiledBuild(root, { env: { MIKKA_TEST_DEPLOYMENT_SHA: 'e'.repeat(40) } }), /APP_COMPILED_REVISION_MISMATCH/)
   await save({ ...manifest, testDeploymentSha: '' })
   await assert.rejects(readCompiledBuild(root, { expectedRevision: revision }), /APP_COMPILED_REVISION_MISMATCH/)

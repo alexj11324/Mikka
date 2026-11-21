@@ -8,7 +8,7 @@ import type { AgentProfilesView, ProfileAvailability } from '../settings/factory
 
 const workspaceId = randomUUID()
 const translate = (key: string) => key
-mock.module('next-intl', { namedExports: { useTranslations: () => translate } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate } })
 // Inspect the real picker/notice through a noninteractive projection of Select
 // disabled props. Popup interaction and layout stay in the production-build capture.
 let changeValue: (value: string) => void
@@ -25,7 +25,7 @@ let TaskProfileNotice: typeof import('./task-profile-picker')['TaskProfileNotice
 let taskProfileSelectable: typeof import('../settings/factory-profiles-data')['taskProfileSelectable']
 let data: AgentProfilesView | undefined
 const choices: Array<string | null> = []
-const profile = (name: string): AgentProfile => ({ id: randomUUID(), name, description: '', roles: [name], icon: 'chevrons', color: 'teal', harness: 'codex', model: { mode: 'inherit' }, enabled: true, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64), createdAt: '2026-11-05T00:00:00Z', updatedAt: '2026-11-05T00:00:00Z', archivedAt: null })
+const profile = (name: string): AgentProfile => ({ id: randomUUID(), name, description: '', roles: [], icon: 'chevrons', color: 'teal', harness: 'auto', model: { mode: 'inherit' }, enabled: true, instructions: '', skills: [], version: 1, digest: 'a'.repeat(64), createdAt: '2026-11-05T00:00:00Z', updatedAt: '2026-11-05T00:00:00Z', archivedAt: null })
 const view = (state: ProfileAvailability): AgentProfilesView => {
   const profiles = ['Frontend', 'Backend', 'Review'].map(profile)
   return { profiles, catalog: { models: [], skills: [] }, defaultAvailability: { ...state }, availability: Object.fromEntries(profiles.map(item => [item.id, { ...state }])) }
@@ -44,11 +44,11 @@ const optionDisabled = (id: string) => {
   return /data-disabled="true"/.test(tag)
 }
 
-test('checking Default and custom Profiles remain selectable without claiming allowance is available', () => {
+test('a checking Profile stays selectable without claiming it is available', () => {
   data = view({ available: false, reason: 'checking' }); const before = structuredClone(data)
   render()
-  for (const id of ['default', ...data.profiles.map(item => item.id)]) {
-    assert.equal(optionDisabled(id), false, 'checking is pending authorization, not a confirmed refusal')
+  for (const id of data.profiles.map(item => item.id)) {
+    assert.equal(optionDisabled(id), false, 'checking is pending, not a confirmed refusal')
     changeValue(id); assert.equal(choices.at(-1), id, 'the selection remains an exact structured Profile reference')
     const body = render(id)
     assert.doesNotMatch(body, /role="alert"/)
@@ -57,43 +57,52 @@ test('checking Default and custom Profiles remain selectable without claiming al
   assert.deepEqual(data, before)
 })
 
-test('a selected checking Profile has a neutral pending status, not a blocking alert', () => {
-  data = view({ available: false, reason: 'checking' })
-  const body = render(data.profiles[0].id)
-  assert.doesNotMatch(body, /role="alert"/)
-  assert.match(body, /role="status"[^>]*>reasons.checking/)
+test('the menu offers no Agent 配置 and each Profile, never an automatic or Default choice', () => {
+  render()
+  assert.equal(optionDisabled('auto'), false)
+  assert.match(markup, /data-value="auto"[^>]*>none</)
+  assert.doesNotMatch(markup, /data-value="default"/)
+  assert.doesNotMatch(markup, /automatic/)
 })
 
-test('confirmed refusals, disabled and archived Profiles remain unselectable', () => {
-  for (const reason of ['quota', 'expired', 'paused', 'missing', 'noDevice', 'cloudNotConfigured', 'pinConflict', 'skillsChanged', 'providerUnavailable', 'disabled', 'archived', 'unknown_reason']) {
+test('refused, disabled and archived Profiles are unselectable; no Agent 配置 always is', () => {
+  for (const reason of ['skillsChanged', 'skillMissing', 'skillDisabled', 'skillForbidden', 'disabled', 'archived', 'unknown_reason']) {
     data = view({ available: false, reason })
     if (reason === 'disabled') data.profiles[0].enabled = false
     if (reason === 'archived') data.profiles[0].archivedAt = '2026-11-05T00:01:00Z'
     const body = render(data.profiles[0].id)
-    for (const id of ['default', ...data.profiles.map(item => item.id)]) assert.equal(optionDisabled(id), true, reason)
+    for (const id of data.profiles.map(item => item.id)) assert.equal(optionDisabled(id), true, reason)
+    assert.equal(optionDisabled('auto'), false, reason)
     assert.match(body, /role="alert"/, reason)
     assert.doesNotMatch(body, /role="status"/)
   }
 })
 
-test('missing availability remains blocked while Automatic and read-error recovery remain reachable', () => {
+test('a read error keeps no Agent 配置 reachable and offers a retry', () => {
   data = undefined
-  const body = render('default', new Error('fixture unavailable'))
-  assert.equal(optionDisabled('default'), true); assert.equal(optionDisabled('auto'), false)
+  const body = render(null, new Error('fixture unavailable'))
+  assert.equal(optionDisabled('auto'), false)
   assert.match(body, /loadFailed/); assert.match(body, /retry/)
 })
 
-test('confirmed availability preserves ordinary explicit selection, Default inheritance and Automatic', () => {
-  const body = render('default')
-  assert.equal(optionDisabled('default'), false); assert.doesNotMatch(body, /role="(?:status|alert)"/)
-  changeValue('default'); changeValue(data!.profiles[0].id); changeValue('auto')
-  assert.deepEqual(choices, ['default', data!.profiles[0].id, null])
+test('choosing a Profile and then none sends its id and then null', () => {
+  const body = render()
+  assert.doesNotMatch(body, /role="(?:status|alert)"/)
+  changeValue(data!.profiles[0].id); changeValue('auto')
+  assert.deepEqual(choices, [data!.profiles[0].id, null])
 })
 
-test('the shared form gate admits checking only for an existing enabled role and preserves metadata refusals', () => {
+test('a draft saved with the retired Default choice reads as no Agent 配置', () => {
+  const body = render('default')
+  assert.doesNotMatch(body, /selectionUnavailable/)
+  assert.doesNotMatch(body, /role="(?:status|alert)"/)
+  assert.equal(taskProfileSelectable('default', undefined), true)
+})
+
+test('the shared form gate admits checking only for an existing enabled Profile', () => {
   for (const state of [{ available: true }, { available: false, reason: 'checking' }]) {
     data = view(state)
-    for (const id of ['default', ...data.profiles.map(item => item.id)]) assert.equal(taskProfileSelectable(id, data), true)
+    for (const id of data.profiles.map(item => item.id)) assert.equal(taskProfileSelectable(id, data), true)
     const selected = data.profiles[0]
     selected.enabled = false; render(selected.id)
     assert.equal(taskProfileSelectable(selected.id, data), false); assert.equal(optionDisabled(selected.id), true)
@@ -101,16 +110,8 @@ test('the shared form gate admits checking only for an existing enabled role and
     selected.archivedAt = '2026-11-05T00:01:00Z'; render(selected.id)
     assert.equal(taskProfileSelectable(selected.id, data), false); assert.equal(optionDisabled(selected.id), true)
     assert.match(markup, /role="alert"[^>]*>reasons.archived/, 'archive takes precedence even when disabled')
-    selected.enabled = true; render(selected.id)
-    assert.equal(taskProfileSelectable(selected.id, data), false); assert.equal(optionDisabled(selected.id), true)
-    assert.match(markup, /role="alert"[^>]*>reasons.archived/)
     assert.equal(taskProfileSelectable(randomUUID(), data), false)
   }
-  for (const reason of ['quota', 'expired', 'paused', 'missing', 'noDevice', 'unknown_reason']) {
-    data = view({ available: false, reason })
-    for (const id of ['default', ...data.profiles.map(item => item.id)]) assert.equal(taskProfileSelectable(id, data), false, reason)
-  }
-  assert.equal(taskProfileSelectable('default', undefined), false)
   assert.equal(taskProfileSelectable(randomUUID(), undefined), false)
   assert.equal(taskProfileSelectable(null, undefined), true)
   assert.equal(taskProfileSelectable(undefined, undefined), true)

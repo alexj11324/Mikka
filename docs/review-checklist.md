@@ -40,6 +40,13 @@ what they came for. A reviewer who did not build the screen runs this.
 - [ ] The walk-through table (task | before | after) is in the PR body or the
       review page.
 
+### Action coverage and honest completion (before visual polish)
+
+- [ ] For changed business capabilities, the authoritative `command × permission × business transition × promised UI entry` is traced **both ways**; each authorized user job has a discoverable path and every visible action reaches a real command and durable result. Use [mikka-action-coverage](../.claude/skills/mikka-action-coverage/SKILL.md).
+- [ ] Do not confuse derived Task run/Factory states such as `running` with writable Task business status; a compact/read-only view may link to the canonical editor instead of duplicating every action.
+- [ ] A real action has immediate pending/error feedback, an ACK or explicit error, persisted readback/retry and appropriate permission denial. A Toast or callable handler alone is not acceptance.
+- [ ] Every audit labels source-only, runtime-verified, not-tested and intentionally-unavailable states and attaches the exact public/hosted source pair. Follow [UX audit baseline](design/ux-quality-audit.md) and [mikka-ux-quality-audit](../.claude/skills/mikka-ux-quality-audit/SKILL.md); do not revive retired browser E2E CI.
+
 ### Model
 
 - [ ] Left column lists bots and group chats only; no thread names (R-01).

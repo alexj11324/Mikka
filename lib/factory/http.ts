@@ -81,12 +81,14 @@ export async function handleFactory(
     if (!parsed.success || parsed.data.binding.taskId !== req.taskId)
       return { status: 422, body: { error: "factoryInvalid" } };
     const { binding, eventId, action, reason } = parsed.data;
+    // A refused handoff is committed as blocked before returning a conflict.
+    const result = action === 'recheck'
+      ? (await store.recheckCandidate(req.userId, binding, eventId, maskFactoryNote(reason))).result
+      : await store.apply(req.userId, binding, eventId, { action, reason: maskFactoryNote(reason) });
     return {
-      status: 200,
+      status: result.refusal ? 409 : 200,
       // A person typed this reason; mask before it reaches task/attempt rows.
-      body: action === 'recheck'
-        ? (await store.recheckCandidate(req.userId, binding, eventId, maskFactoryNote(reason))).result
-        : await store.apply(req.userId, binding, eventId, { action, reason: maskFactoryNote(reason) }),
+      body: result.refusal ? { ...result, error: result.refusal.code } : result,
     };
   } catch (error) {
     if (!(error instanceof FactoryError)) throw error;

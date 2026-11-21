@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { before, mock, test } from 'node:test'
-import { act, type ReactNode } from 'react'
+import { act, useState, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
 import { ViewStateProvider } from '../lib/hooks/view-state'
 import { clearChatDrafts } from '../lib/chat-drafts'
@@ -10,7 +10,8 @@ import type { ThreadRecord } from '../components/blocks/rich-text-editor-4/compo
 const invalid = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'mystery', text: 'kept' }] }] }
 const translate = (key: string) => key
 const u = (path: string) => new URL(path, import.meta.url).href
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useLocale: () => 'zh-CN', useFormatter: () => ({ dateTime: () => '08:00' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useTranslations: () => translate, useLocale: () => 'zh-CN', useFormatter: () => ({ dateTime: () => '08:00' }) } })
+mock.module(u('../app/actions/agents.ts'), { namedExports: { pollTaskDetail: async () => { throw Object.assign(new Error('older server'), { code: 'desktop_rpc_action_unknown', status: 404 }) } } })
 mock.module(u('../app/actions/issues.ts'), { namedExports: {
   pollIssue: async (id: string) => ({ viewerId: 'u1', version: 'a'.repeat(32), issue: { id, title: 'Invalid body', content: invalid, status: 'todo', priority: 'normal', identifier: 'MIK-1', userId: 'u1', updatedAt: new Date(), createdAt: new Date() } }),
   pollIssueVersionSummaries: async () => ({ viewerId: 'u1', snapshot: { version: 'a'.repeat(32), items: [], positions: [] } }),
@@ -21,14 +22,16 @@ mock.module(u('../app/actions/issue-operations.ts'), { namedExports: { getDelete
 mock.module(u('../lib/document-sync.ts'), { namedExports: { DocumentSync: class { constructor() { throw new Error('read-only must not construct DocumentSync') } } } })
 const stub = (name: string) => () => <div data-stub={name} />
 for (const [file, names] of [
-  ['issue-detail-actions', ['IssueDetailActions']], ['issue-description-history', ['IssueDescriptionHistory']], ['issue-relations', ['IssueRelations']],
-  ['issue-members', ['IssueMembers']], ['issue-detail-properties', ['IssueDetailProperties']],
+  ['issue-description-history', ['IssueDescriptionHistory']], ['issue-relations', ['IssueRelations']],
+  ['issue-members', ['IssueMembers']],
   ['issue-thread-panel', ['IssueThreadPanel']], ['factory-acceptance', ['FactoryAcceptance', 'FactoryAcceptancePanel']], ['issue-activity-feed', ['IssueActivityFeed']],
 ] as const) mock.module(u(`../components/workspace/${file}.tsx`), { namedExports: Object.fromEntries(names.map(name => [name, stub(name)])) })
-mock.module(u('../components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: stub('IssueThreads'), useAgentActivity: () => ({ rows: [], error: null }) } })
-// The layer-drawn page (task-detail slot) is not under test here; its hooks read actions these mocks leave out.
-mock.module(u('../components/workspace/task-detail-frame.tsx'), { namedExports: { FramedTask: () => null } })
-mock.module(u('../components/workspace/issue-detail-header.tsx'), { namedExports: { IssueDetailHeader: ({ saveLabel }: { saveLabel: string }) => <header data-save-label={saveLabel}>{saveLabel}</header> } })
+mock.module(u('../components/workspace/issue-threads.tsx'), { namedExports: { IssueThreads: stub('IssueThreads'), useIssueThreads: () => ({}), useTaskWork: () => ({ rows: [], error: null }) } })
+mock.module(u('../components/workspace/task-detail-frame.tsx'), { namedExports: {
+  FramedTask: (props: import('../components/workspace/task-detail-frame').FramedTaskProps) =>
+    <><header data-save-label={props.saveLabel} />{props.editor(null, discussions =>
+      <textarea id="issue-comment" disabled={discussions.readOnly} />)}</>,
+} })
 
 const browser = new Window({ url: 'https://mikka.example/' })
 let createRoot: typeof import('react-dom/client')['createRoot']
@@ -50,6 +53,80 @@ async function render(node: ReactNode, ready = '.ProseMirror') {
   return { container, update: (next: ReactNode) => act(async () => { root.render(next) }), done: () => act(async () => { root.unmount(); container.remove() }) }
 }
 
+test('legacy machine instructions can be opened without hiding related work or rewriting the task', async () => {
+  const { IssueEditor } = await import('../components/workspace/issue-editor')
+  const digest = 'ac'.repeat(32)
+  const raw = ['Implement the file contract.', ...Array.from({ length: 20 }, (_, i) => `src/module-${i}.ts sha256: ${digest}`)].join('\n')
+  const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: raw }] }] }
+  const { container, done } = await render(<IssueEditor issueId="legacy-instructions" layout="issue" content={content}
+    onChange={() => { throw new Error('opening instructions cannot edit the task') }} afterDescription={<a href="#linked-work">Related conversation</a>} />)
+  try {
+    const disclosure = container.querySelector('[data-slot="collapsible"]')
+    assert.ok(disclosure)
+    const summary = disclosure.querySelector<HTMLButtonElement>('button[data-slot="collapsible-trigger"]')
+    assert.equal(summary?.getAttribute('aria-expanded'), 'false')
+    assert.ok(summary?.textContent)
+    assert.ok(!disclosure.contains(container.querySelector('a[href="#linked-work"]')))
+    await act(async () => { summary.click() })
+    assert.equal(summary.getAttribute('aria-expanded'), 'true')
+    assert.equal(disclosure.querySelector('.ProseMirror')?.getAttribute('contenteditable'), 'true')
+    assert.equal(disclosure.querySelector('.ProseMirror')?.textContent, raw)
+  } finally { await done() }
+})
+
+test('a task frame edit request opens and focuses the folded description without saving it', async () => {
+  const { IssueEditor } = await import('../components/workspace/issue-editor')
+  const { TaskDescriptionContext } = await import('../components/slots/task-detail-contract')
+  const content = { type: 'doc', content: [
+    { type: 'paragraph', content: [{ type: 'text', text: 'sha256 file contract '.repeat(58) }] },
+  ] }
+  function FramedEditor() {
+    const [focusRequest, setFocusRequest] = useState(0)
+    return <TaskDescriptionContext value={{ open: focusRequest > 0, focusRequest, onOpen: () => {} }}>
+      <button type="button" onClick={() => setFocusRequest(value => value + 1)}>Edit description</button>
+      <IssueEditor layout="issue" content={content} onChange={() => { throw new Error('focusing cannot edit the task') }} />
+    </TaskDescriptionContext>
+  }
+  const { container, done } = await render(<FramedEditor />)
+  try {
+    const disclosure = container.querySelector('button[data-slot="collapsible-trigger"]')
+    assert.equal(disclosure?.getAttribute('aria-expanded'), 'false')
+    await act(async () => { container.querySelector('button')!.click() })
+    await act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)) })
+    assert.equal(disclosure?.getAttribute('aria-expanded'), 'true')
+    assert.equal(document.activeElement, container.querySelector('.ProseMirror'))
+  } finally { await done() }
+})
+
+test('task supporting sections stay mounted when switching to document tools', async () => {
+  const { IssueEditor } = await import('../components/workspace/issue-editor')
+  const editor = (layout: 'issue' | 'document') => <IssueEditor issueId="task-tools" layout={layout}
+    onChange={() => { throw new Error('switching layouts cannot edit the task') }}
+    afterDescription={<a href="#linked-work">Related conversation</a>}
+    renderActivity={() => <textarea aria-label="Task comment" />} />
+  const { container, update, done } = await render(editor('issue'))
+  try {
+    const related = container.querySelector('a[href="#linked-work"]')
+    const comment = container.querySelector('textarea')
+    assert.ok(related && comment)
+    await update(editor('document'))
+    assert.equal(container.querySelector('a[href="#linked-work"]'), related)
+    assert.equal(container.querySelector('textarea'), comment)
+  } finally { await done() }
+})
+
+test('a long human task brief stays visible', async () => {
+  const { IssueEditor } = await import('../components/workspace/issue-editor')
+  const text = 'Talk to the customer and record the outcome. '.repeat(35)
+  const { container, done } = await render(<IssueEditor layout="issue" content={{ type: 'doc', content: [
+    { type: 'paragraph', content: [{ type: 'text', text }] },
+  ] }} onChange={() => {}} />)
+  try {
+    assert.equal(container.querySelector('[data-slot="collapsible"]'), null)
+    assert.equal(container.querySelector('.ProseMirror')?.textContent, text)
+  } finally { await done() }
+})
+
 test('IssueEditor: unreadable content is not editable and shows no typing hint or sync label', async () => {
   const { IssueEditor } = await import('../components/workspace/issue-editor')
   const { container, done } = await render(<IssueEditor issueId="issue-readonly" content={invalid} onChange={() => { throw new Error('no echo') }} layout="issue" syncLabel="" />)
@@ -57,7 +134,7 @@ test('IssueEditor: unreadable content is not editable and shows no typing hint o
   assert.ok(prose, 'editor mounted')
   assert.equal(prose.getAttribute('contenteditable'), 'false')
   assert.equal(container.querySelectorAll('[data-placeholder]').length, 0)
-  assert.ok(container.querySelector('#issue-comment'), 'a known task renders its activity')
+  assert.equal(container.querySelector<HTMLTextAreaElement>('#issue-comment')?.disabled, true, 'the timeline remains visible without accepting unsaved comments')
   await done()
 })
 
@@ -75,7 +152,7 @@ test('TaskDetail: invalid content opens read-only, with an empty save label and 
   assert.equal(prose.getAttribute('contenteditable'), 'false')
   assert.equal(container.querySelectorAll('[data-placeholder]').length, 0)
   assert.doesNotMatch(container.textContent ?? '', /syncFailedLabel|syncedLabel|autosaved/)
-  assert.ok(container.querySelector('#issue-comment'), 'the successful task read passes its stable id through IssueEditor')
+  assert.equal(container.querySelector<HTMLTextAreaElement>('#issue-comment')?.disabled, true, 'verified malformed content has no writable discussion document')
   await done()
 })
 
@@ -97,7 +174,7 @@ async function activityFixture() {
   const comments: string[] = [], replies: { id: string; body: string }[] = []
   const view = ({ shown = true, issueId = 'issue-a', scope = 'owner:workspace-a' } = {}) =>
     <ViewStateProvider scope={scope}>{shown && <IssueActivity issueId={issueId} author="Owner" threads={activityThreads} anchors={[]}
-      onComment={body => comments.push(body)} onReply={(id, body) => replies.push({ id, body })} onResolve={() => {}} onSelect={() => {}} />}</ViewStateProvider>
+      onComment={body => { comments.push(body) }} onReply={(id, body) => { replies.push({ id, body }) }} onResolve={() => {}} onSelect={() => {}} />}</ViewStateProvider>
   const { container, update, done } = await render(view(), '#issue-comment')
   const field = (selector: string) => {
     const element = container.querySelector<HTMLTextAreaElement>(selector)
@@ -215,7 +292,13 @@ test('IssueEditor: a cached preview does not restore activity drafts before rece
     try {
       assert.equal(editor.container.querySelector('#issue-comment'), null)
       await editor.update(view('issue-a'))
-      assert.equal(editor.container.querySelector<HTMLTextAreaElement>('#issue-comment')?.value, 'Only restore after task access is confirmed')
+      const draft = editor.container.querySelector<HTMLTextAreaElement>('#issue-comment')
+      assert.ok(draft)
+      assert.equal(draft.value, 'Only restore after task access is confirmed')
+      assert.equal(draft.disabled, true)
+      const form = draft.closest('form')!
+      await act(async () => { form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })) })
+      assert.equal(draft.value, 'Only restore after task access is confirmed', 'a rejected write cannot clear the stored draft')
     } finally { await editor.done() }
   } finally { await fixture.done() }
 })

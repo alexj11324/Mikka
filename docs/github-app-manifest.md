@@ -41,8 +41,17 @@ The exact permission snapshot is:
 
 Events: `deployment_protection_rule`, `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`.
 
+The table and event list above are the **historical verified official
+App snapshot**, not an assertion about its current live configuration.
+For #2064 the bundled template retains those permissions and adds
+`check_suite` and `status` to the subscriptions of **new self-hosted Apps**.
+This is required for event-driven CI completion wakeups. Existing App
+installations (including the official hosted App) are not updated by editing
+a bundled manifest: the owner must verify and, if absent, enable both events
+in the real GitHub App settings. A code change alone cannot prove deliveries.
+
 A new self-hosted server creates its private App entirely from this bundled
-snapshot, without reading Mikka or the official App at runtime. The server-admin
+template, without reading Mikka or the official App at runtime. The server-admin
 metadata endpoint remains an explicit read-only operation; it is not a runtime
 registration dependency. Existing cloud App configuration remains unchanged.
 

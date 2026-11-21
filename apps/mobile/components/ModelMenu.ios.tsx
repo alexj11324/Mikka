@@ -1,7 +1,8 @@
 import { Button, HStack, Host, Image, Menu, Section, Text, Toggle } from '@expo/ui/swift-ui'
 import { buttonStyle, controlSize, disabled, tint } from '@expo/ui/swift-ui/modifiers'
-import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, optionName, type ModelMenuState } from '@/lib/model-menu'
+import { groupTag, groupTitle, modelMenuLabel, modelMenuReadLabel, shownOptions, optionName, type ModelMenuControls } from '@/lib/model-menu'
 import { colors } from '@/lib/theme'
+import { mobileMessages as copy } from '@/lib/messages'
 
 /**
  * The model chip beside the composer's 「+」: a borderless SwiftUI menu like 「+」's
@@ -9,7 +10,7 @@ import { colors } from '@/lib/theme'
  * who pays shows under the name; 刷新 re-reads the list. Saved per bot for its next runs;
  * a pick that does not save keeps the saved model here (ModelNotice says why).
  */
-export function ModelMenu({ model, running = false, label: override }: { model: ModelMenuState; running?: boolean; label?: string }) {
+export function ModelMenu({ model, running = false, label: override }: { model: ModelMenuControls; running?: boolean; label?: string }) {
   const { menu, choose, refresh, refreshing, refreshFailed, loading, retryRead, busy } = model
   if (!menu) return <Host matchContents>{loading
     ? <Text>{modelMenuReadLabel(true)}</Text>
@@ -23,7 +24,7 @@ export function ModelMenu({ model, running = false, label: override }: { model: 
       <Menu label={<HStack spacing={3}><Text>{label}</Text><Image systemName="chevron.down" size={10} /></HStack>} modifiers={[buttonStyle('borderless'), controlSize('small'), disabled(busy), tint(override ? colors.accent : unavailable ? colors.secondary : colors.ink)]}>
         {groups.map((group, index) => (
           <Section key={`${group.kind}-${index}`} title={groupTitle(group)}>
-            {group.options.map(option => {
+            {shownOptions(group, current.id).map(option => {
               const tag = groupTag(group)
               return (
                 <Toggle key={option.id} isOn={current.id === option.id} onIsOnChange={() => { void choose(option.id) }}>
@@ -34,7 +35,7 @@ export function ModelMenu({ model, running = false, label: override }: { model: 
           </Section>
         ))}
         <Section>
-          <Button label={refreshing ? '正在刷新' : refreshFailed ? '刷新失败，重试' : '刷新'} systemImage="arrow.clockwise" onPress={() => { void refresh() }} />
+          <Button label={refreshing ? copy.Common.loading : refreshFailed ? copy.Coordinator.modelPicker.refreshFailed : copy.Coordinator.modelPicker.refresh} systemImage="arrow.clockwise" onPress={() => { void refresh() }} />
         </Section>
       </Menu>
     </Host>

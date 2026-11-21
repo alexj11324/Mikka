@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest"
 
 import {
   daemonUpdateFailureSchema,
-  DEVICE_ONLINE_WINDOW_MS,
-  deviceHeartbeatSchema,
   devicePaths,
+  deviceReportResultSchema,
+  deviceReportSchema,
+  deviceSessionReportSchema,
   devicesOnline,
-  heartbeatResultSchema,
   isDeviceOnline,
   runAssignmentSchema,
   runPatchSchema,
@@ -14,29 +14,22 @@ import {
 import { TASK_SECRET_MAX_CAPABILITIES, TASK_SECRET_MAX_TOKEN_BYTES } from './task-secrets'
 
 describe("device online state", () => {
-  const now = Date.parse("2026-10-16T12:00:00Z")
+  const opened = "2026-10-16T12:00:00.000Z"
 
-  it("counts a device online within the heartbeat window", () => {
-    expect(isDeviceOnline(new Date(now - 1_000), now)).toBe(true)
-    expect(isDeviceOnline(now - DEVICE_ONLINE_WINDOW_MS, now)).toBe(true)
-    expect(isDeviceOnline(now - DEVICE_ONLINE_WINDOW_MS - 1, now)).toBe(false)
-    expect(isDeviceOnline(null, now)).toBe(false)
-    expect(isDeviceOnline("not a date", now)).toBe(false)
-    expect(isDeviceOnline(now + 1, now)).toBe(false)
-    expect(isDeviceOnline("2036-11-06T12:00:00Z", now)).toBe(false)
+  it("counts a device online while its gateway session is open", () => {
+    expect(isDeviceOnline({ sessionOpenedAt: opened, sessionClosedAt: null })).toBe(true)
+    expect(isDeviceOnline({ sessionOpenedAt: opened, sessionClosedAt: "2026-10-16T11:59:00Z" })).toBe(true)
+    expect(isDeviceOnline({ sessionOpenedAt: opened, sessionClosedAt: "2026-10-16T12:00:01Z" })).toBe(false)
+    expect(isDeviceOnline({ sessionOpenedAt: null, sessionClosedAt: null })).toBe(false)
+    expect(isDeviceOnline({ sessionOpenedAt: "not a date", sessionClosedAt: null })).toBe(false)
   })
 
   it("summarizes 设备 n/m 在线", () => {
-    expect(
-      devicesOnline(
-        [
-          { lastSeenAt: new Date(now - 5_000).toISOString() },
-          { lastSeenAt: new Date(now - 10 * 60_000) },
-          { lastSeenAt: null },
-        ],
-        now
-      )
-    ).toEqual({ online: 1, total: 3 })
+    expect(devicesOnline([
+      { sessionOpenedAt: opened, sessionClosedAt: null },
+      { sessionOpenedAt: opened, sessionClosedAt: new Date("2026-10-16T12:05:00Z") },
+      { sessionOpenedAt: null, sessionClosedAt: null },
+    ])).toEqual({ online: 1, total: 3 })
   })
 })
 
@@ -48,16 +41,15 @@ describe("device link schemas", () => {
     expect(devicePaths.pendingRuns("d")).toBe("/v1/devices/d/runs?state=queued")
   })
 
-  it("parses a heartbeat and its result", () => {
-    const hb = deviceHeartbeatSchema.parse({
-      harnesses: [{ harness: "mock", installed: true, version: "0.0.1" }],
-      runs: [{ runId: "r1", lastProgressAt: "2026-10-16T12:00:00.000Z" }],
-      worktreeDiskBytes: 0,
-    })
-    expect(hb.runs).toHaveLength(1)
-    expect(
-      heartbeatResultSchema.parse({ leases: { r1: "2026-10-16T12:01:30Z" } })
-    ).toEqual({ leases: { r1: "2026-10-16T12:01:30Z" } })
+  it("parses a device report, its result and a gateway session report", () => {
+    expect(deviceReportSchema.parse({})).toEqual({})
+    expect(deviceReportSchema.parse({ harnesses: [{ harness: "mock", installed: true, version: "0.0.1" }] }).harnesses).toHaveLength(1)
+    expect(deviceReportSchema.safeParse({ runs: [] }).success).toBe(true)
+    expect(deviceReportResultSchema.parse({})).toEqual({})
+    const session = { state: "connected", at: "2026-10-16T12:00:00.000Z", socketId: "socket-0001" }
+    expect(deviceSessionReportSchema.parse(session)).toEqual(session)
+    expect(deviceSessionReportSchema.safeParse({ ...session, state: "alive" }).success).toBe(false)
+    expect(deviceSessionReportSchema.safeParse({ ...session, extra: 1 }).success).toBe(false)
   })
 
   it("refuses an assignment without a base branch or with an unknown harness", () => {
@@ -129,6 +121,28 @@ describe("device link schemas", () => {
     expect(runAssignmentSchema.safeParse({ ...base, subscriptionLease, modelCredential: { kind: "api_key", key: "fixture-key" } }).success).toBe(false)
   })
 
+  it("allows HTTP model credentials only for scoped Mikka gateway tokens on loopback", () => {
+    const base = { runId: 'r1', issueId: 'i1', deviceId: 'd1', repoId: 'repo', harness: 'claude_code', prompt: 'p' }
+    const key = 'mkg_' + 'a'.repeat(43)
+    for (const hostname of ['127.0.0.1', 'localhost', '[::1]']) {
+      for (const [protocol, path] of [['anthropic', '/api/model-gateway/anthropic'], ['openai', '/mikka/api/model-gateway/openai/v1']]) {
+        const modelCredential = { kind: 'provider', protocol, baseUrl: `http://${hostname}:3000${path}`, key }
+        expect(runAssignmentSchema.parse({ ...base, modelCredential }).modelCredential).toEqual(modelCredential)
+      }
+    }
+    const provider = { kind: 'provider', protocol: 'anthropic', baseUrl: 'http://127.0.0.1:3000/api/model-gateway/anthropic', key }
+    for (const changed of [
+      { key: 'raw-provider-key' }, { key: 'mkg_short' },
+      { baseUrl: 'http://remote.example/api/model-gateway/anthropic' },
+      { baseUrl: 'http://127.0.0.1:3000/v1/messages' },
+      { baseUrl: 'http://127.0.0.1:3000/api/model-gateway/anthropic/' },
+      { baseUrl: 'http://127.0.0.1:3000/api/model-gateway/openai/v1' },
+      { baseUrl: provider.baseUrl + '?redirect=elsewhere' },
+      { baseUrl: provider.baseUrl + '#fragment' },
+      { baseUrl: 'http://user:pass@127.0.0.1:3000/api/model-gateway/anthropic' },
+    ]) expect(runAssignmentSchema.safeParse({ ...base, modelCredential: { ...provider, ...changed } }).success).toBe(false)
+  })
+
   it("accepts prepared GitHub credentials with their natural expiry and keeps old assignments compatible", () => {
     const base = { runId: "r1", issueId: "i1", deviceId: "d1", repoId: "repo", harness: "codex", prompt: "p" }
     const github = { endpoint: "https://example.com/api/runs/github-token", repository: "owner/repo" }
@@ -167,24 +181,16 @@ describe("device link schemas", () => {
     }
   })
 
-  it('bounds opaque assignment and heartbeat payloads while retaining renewal metadata', () => {
+  it('bounds opaque task Secret grants in an assignment', () => {
     const grant = { name: 'VENDOR_KEY', capability: 'synthetic-opaque-grant', expiresAt: '2030-01-01T00:00:00.000Z', origin: 'https://api.example.com' }
     const taskSecrets = { version: 1, endpoint: 'https://mikka.example.com/v1/task-secrets/r1', grants: [grant], unavailable: [] }
     const assignment = { runId: 'r1', issueId: 'i1', deviceId: 'd1', repoId: 'repo', harness: 'codex', prompt: 'p', taskSecrets }
-    const heartbeat = { harnesses: [], runs: [{ runId: 'r1', lastProgressAt: '2030-01-01T00:00:00.000Z', secretCapabilities: [grant.capability] }], worktreeDiskBytes: 0 }
-    expect(deviceHeartbeatSchema.parse(heartbeat).runs[0].secretCapabilities).toEqual([grant.capability])
-    expect(heartbeatResultSchema.parse({ leases: { r1: grant.expiresAt }, taskSecrets: { r1: taskSecrets } }).taskSecrets).toEqual({ r1: taskSecrets })
     const largest = 'x'.repeat(TASK_SECRET_MAX_TOKEN_BYTES)
     expect(runAssignmentSchema.safeParse({ ...assignment, taskSecrets: { ...taskSecrets, grants: [{ ...grant, capability: largest }] } }).success).toBe(true)
     for (const grants of [Array.from({ length: TASK_SECRET_MAX_CAPABILITIES + 1 }, () => grant),
       [{ ...grant, capability: largest + 'x' }], Array.from({ length: 4 }, () => ({ ...grant, capability: largest }))]) {
       expect(runAssignmentSchema.safeParse({ ...assignment, taskSecrets: { ...taskSecrets, grants } }).success).toBe(false)
-      expect(heartbeatResultSchema.safeParse({ leases: {}, taskSecrets: { r1: { ...taskSecrets, grants } } }).success).toBe(false)
     }
-    for (const secretCapabilities of [Array(TASK_SECRET_MAX_CAPABILITIES + 1).fill(grant.capability), [largest + 'x'], Array(5).fill(largest), ['']]) {
-      expect(deviceHeartbeatSchema.safeParse({ ...heartbeat, runs: [{ ...heartbeat.runs[0], secretCapabilities }] }).success).toBe(false)
-    }
-    expect(deviceHeartbeatSchema.safeParse({ ...heartbeat, runs: [{ ...heartbeat.runs[0], secretCapabilities: Array(4).fill(largest) }] }).success).toBe(true)
   })
 
   it("accepts every daemon-local state in a patch, including stopped", () => {
@@ -194,11 +200,11 @@ describe("device link schemas", () => {
   })
 })
 
-describe("daemon releases in the heartbeat answer", () => {
-  it("passes plain versions and drops a malformed value instead of failing the heartbeat", () => {
-    expect(heartbeatResultSchema.parse({ leases: {}, daemonVersions: { min: "0.0.299", latest: "0.0.331" } }).daemonVersions).toEqual({ min: "0.0.299", latest: "0.0.331" })
+describe("daemon releases in the report answer", () => {
+  it("passes plain versions and drops a malformed value instead of failing the report", () => {
+    expect(deviceReportResultSchema.parse({ daemonVersions: { min: "0.0.299", latest: "0.0.331" } }).daemonVersions).toEqual({ min: "0.0.299", latest: "0.0.331" })
     for (const daemonVersions of [{ min: "0.0.299", latest: "0.0.332-beta.1" }, { latest: "0.0.331" }, "0.0.331", null])
-      expect(heartbeatResultSchema.parse({ leases: {}, daemonVersions }).daemonVersions).toBeUndefined()
+      expect(deviceReportResultSchema.parse({ daemonVersions }).daemonVersions).toBeUndefined()
   })
   it("reports an update failure by code only", () => {
     const failure = { version: "0.0.331", code: "install_failed", at: "2026-11-02T21:00:00.000Z" }

@@ -71,12 +71,10 @@ test('active assignment mounts exact candidate bytes and withdrawals block claim
   const again = await f.assignments.recordClaim(f.userId, f.run.deviceId, f.run.id, f.run.leaseExpiresAt!.toISOString(), true)
   assert.equal(again.skillReceipt?.id, prepared.skillReceipt.id)
   await f.assignments.revalidate(f.userId, f.run.id, prepared.skillReceipt.id, true)
-  assert.ok((await f.assignments.renewHeartbeat(f.userId, f.run.deviceId, [f.run.id], true)).leases[f.run.id])
   f.state.withdrawn = true
   await assert.rejects(f.assignments.preflight(f.userId, f.run.id, true), /runUnavailable/)
   await assert.rejects(f.assignments.recordClaim(f.userId, f.run.deviceId, f.run.id, f.run.leaseExpiresAt!.toISOString(), true), /runUnavailable/)
   await assert.rejects(f.assignments.revalidate(f.userId, f.run.id, prepared.skillReceipt.id, true), /runUnavailable/)
-  assert.deepEqual((await f.assignments.renewHeartbeat(f.userId, f.run.deviceId, [f.run.id], true)).revoked, [f.run.id])
   assert.equal((await assignedSkillForRun(f.tx, f.userId, f.run)).skillUsage, 'assigned')
 })
 
@@ -92,15 +90,4 @@ test('candidate scope and evaluation verifier remain enforced before selection a
   f.state.evaluationAllowed = true
   f.metadata.agentId = randomUUID()
   await assert.rejects(f.assignments.preflight(f.userId, f.run.id, true), /sourceMismatch/)
-})
-
-test('heartbeat excludes malformed IDs from the UUID lookup and preserves them for legacy revocation', async () => {
-  const runId = randomUUID(), runIds = [runId, 'not-a-uuid']
-  const pool = { query: async (_sql: string, values: unknown[]) => {
-    assert.deepEqual(values[1], [runId])
-    return { rows: [] }
-  } } as unknown as Pool
-  const assignments = createSkillAssignments(pool, async () => false)
-  assert.deepEqual(await assignments.renewHeartbeat('owner', 'device', runIds, false),
-    { legacy: runIds, leases: {}, revoked: [] })
 })

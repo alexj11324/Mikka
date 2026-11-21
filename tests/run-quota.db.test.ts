@@ -18,14 +18,23 @@ import { seedRunProjectResources } from './helpers/run-project-resources'
 import { threadPromptView } from '../lib/thread-prompt'
 
 test('quota exhausted mid-run: continue on the person\'s key, else pause with the reset; resume and retry actions', { skip: !dbUrl }, async t => {
-  const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED }
+  const saved = { key: process.env.WORKSPACE_SECRETS_KEY, byos: process.env.MIKKA_BYOS_ENABLED, liteLLMUrl: process.env.MIKKA_LITELLM_URL, liteLLMKey: process.env.MIKKA_LITELLM_MASTER_KEY }
   process.env.WORKSPACE_SECRETS_KEY = randomBytes(32).toString('hex')
   process.env.MIKKA_BYOS_ENABLED = '1'
+  process.env.MIKKA_LITELLM_URL = 'https://models.example.test/v1'
+  process.env.MIKKA_LITELLM_MASTER_KEY = 'synthetic-quota-fallback'
   delete process.env.MIKKA_CLOUD_COMPUTER_TASKS
   delete process.env.MIKKA_FACTORY_ROUTING_ENABLED
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
-  const { Pool } = await import('pg')
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { NextRequest: next.NextRequest, NextResponse: next.NextResponse, after: () => {} } })
+  const { Client, Pool } = await import('pg')
+  const query = Client.prototype.query
+  let resourceReads = 0
+  t.mock.method(Client.prototype, 'query', function (this: InstanceType<typeof Client>, ...args: unknown[]) {
+    const text = typeof args[0] === 'string' ? args[0] : (args[0] as { text?: string })?.text
+    if (text?.includes('FOR SHARE OF repo,device,agent')) resourceReads++
+    return Reflect.apply(query, this, args)
+  })
   const pool = new Pool({ connectionString: dbUrl, max: 3 })
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
@@ -47,7 +56,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   const claimRoute = await import('../app/v1/devices/[deviceId]/runs/[runId]/claim/route')
   const users: string[] = []
   t.after(async () => {
-    for (const [name, value] of [['WORKSPACE_SECRETS_KEY', saved.key], ['MIKKA_BYOS_ENABLED', saved.byos]] as const) if (value === undefined) delete process.env[name]; else process.env[name] = value
+    for (const [name, value] of [['WORKSPACE_SECRETS_KEY', saved.key], ['MIKKA_BYOS_ENABLED', saved.byos], ['MIKKA_LITELLM_URL', saved.liteLLMUrl], ['MIKKA_LITELLM_MASTER_KEY', saved.liteLLMKey]] as const) if (value === undefined) delete process.env[name]; else process.env[name] = value
     await pool.query('DELETE FROM coordinator_events WHERE "userId" = ANY($1)', [users])
     await pool.query('DELETE FROM thread_machines WHERE "ownerId" = ANY($1)', [users])
     await pool.query('DELETE FROM computer_run_bindings WHERE "ownerId" = ANY($1)', [users])
@@ -94,7 +103,7 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     // An installation row an earlier build recorded; admission no longer reads it (decision 2026-11-02-1600).
     await recordPushGrant(pool, id, normalizeRepository(remote).key)
     const deviceId = randomUUID()
-    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses) VALUES ($1,$2,'Laptop','local',true,$3,now(),$4)`,
+    await pool.query(`INSERT INTO devices (id,"ownerId",name,kind,enabled,"protocolVersion","lastSeenAt",harnesses,"sessionOpenedAt") VALUES ($1,$2,'Laptop','local',true,$3,now(),$4,now())`,
       [deviceId, id, DAEMON_PROTOCOL_VERSION, JSON.stringify([{ harness: 'claude_code', installed: true, toolApproval: true }, { harness: 'codex', installed: true, toolApproval: true }])])
     const agents: Record<'claude_code' | 'codex', string> = { claude_code: randomUUID(), codex: randomUUID() }
     for (const [harness, agentId] of Object.entries(agents)) await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,$4,$5)', [agentId, id, deviceId, harness, `${harness}-${agentId.slice(0, 8)}`])
@@ -122,8 +131,8 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
   const row = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE id=$1', [runId])).rows[0]
   const events = async (runId: string) => (await pool.query('SELECT kind,"dedupeKey","issueId","botId",payload FROM coordinator_events WHERE "runId"=$1 ORDER BY "createdAt"', [runId])).rows
   const continuations = async (runId: string) => (await pool.query('SELECT * FROM agent_runs WHERE "retryOf"=$1', [runId])).rows
-  const claim = (p: Person, runId: string) => claimRoute.POST(new Request(`http://127.0.0.1/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
-    method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${p.token}`, [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
+  const claim = (p: Person, runId: string) => claimRoute.POST(new Request(`https://mikka.test/v1/devices/${p.deviceId}/runs/${runId}/claim`, {
+    method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${p.token}`, [REPO_ORIGIN_HEADER]: '1', [MODEL_CREDENTIAL_HEADER]: '1', [RECOVERY_WORKTREE_HEADER]: '1' },
   }), { params: Promise.resolve({ deviceId: p.deviceId, runId }) })
   const failsWith = async (work: Promise<unknown>, code: string) => assert.rejects(work, (error: { code?: string }) => error.code === code)
   const resetsAt = new Date(Date.now() + 3 * 3_600_000).toISOString()
@@ -340,8 +349,11 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
     assert.equal(event.payload.resetsAt, null)
     assert.deepEqual(event.payload.actions, [{ action: 'addApiKey' }, { action: 'retryAfterReset', at: null }])
 
+    const readsBeforeRetry = resourceReads
     const { runId: retryRunId } = await quota.retryQuotaPausedRun(p.id, runId)
+    assert.equal(resourceReads - readsBeforeRetry, 1, 'the device continuation validates its locked project placement once')
     assert.deepEqual(await quota.retryQuotaPausedRun(p.id, runId), { runId: retryRunId }, 'idempotent')
+    assert.equal(resourceReads - readsBeforeRetry, 1, 'replaying the recorded child performs no new placement admission')
     assert.equal((await row(runId)).status, 'failed')
     const [continuation] = await continuations(runId)
     assert.equal(continuation.id, retryRunId)
@@ -682,6 +694,17 @@ test('quota exhausted mid-run: continue on the person\'s key, else pause with th
           const cause = error instanceof Error && error.cause ? error.cause : error
           return !!cause && typeof cause==='object' && 'code' in cause && cause.code==='P0001'
         })
+      const { ActionFailureError, runAction } = await import('../lib/action-error')
+      const retry = () => actAs(reader, () => quota.retryQuotaPausedRun(p.id, original.id))
+      await assert.rejects(retry, (error: unknown) => {
+        assert.ok(error instanceof ActionFailureError)
+        assert.equal(error.code, 'runInvalid')
+        assert.equal(Object.hasOwn(JSON.parse(JSON.stringify(error)), 'cause'), false)
+        const underlying = error.cause instanceof Error && error.cause.cause ? error.cause.cause : error.cause
+        assert.equal((underlying as { code?: string } | undefined)?.code, 'P0001')
+        return true
+      })
+      assert.deepEqual(await runAction(retry), { error: 'runInvalid', params: undefined })
       assert.deepEqual(await quotaState(p.id),before,'run, binding, machine and notification writes must roll back together')
     } finally {
       await pool.query(`DROP TRIGGER IF EXISTS "${name}" ON agent_runs`)

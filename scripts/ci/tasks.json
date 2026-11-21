@@ -19,11 +19,6 @@
     "kind": "core",
     "env": {}
   },
-  "core-6": {
-    "command": "node --test scripts/ci-docs-only.test.mjs",
-    "kind": "core",
-    "env": {}
-  },
   "core-7": {
     "command": "pnpm test:ui-policy",
     "kind": "core",
@@ -100,12 +95,12 @@
     "env": {}
   },
   "core-22": {
-    "command": "pnpm test:self-hosting",
+    "command": "pnpm test:runtime-config",
     "kind": "core",
     "env": {}
   },
   "core-23": {
-    "command": "pnpm test:self-hosted-byok",
+    "command": "pnpm test:service-config",
     "kind": "core",
     "env": {}
   },
@@ -205,7 +200,7 @@
     "env": {}
   },
   "core-43": {
-    "command": "pnpm test:coordinator-issue-tools",
+    "command": "pnpm test:coordinator-issue-mutations",
     "kind": "core",
     "env": {}
   },
@@ -225,7 +220,7 @@
     "env": {}
   },
   "core-47": {
-    "command": "pnpm test:artifacts",
+    "command": "pnpm test:artifacts && pnpm test:chat-actions",
     "kind": "core",
     "env": {}
   },
@@ -426,8 +421,48 @@
     "kind": "core",
     "env": {}
   },
+  "core-view-state": {
+    "command": "pnpm test:view-state",
+    "kind": "core",
+    "env": {}
+  },
   "core-governance": {
     "command": "pnpm test:governance",
+    "kind": "core",
+    "env": {}
+  },
+  "core-coding-workspace-review-runtime": {
+    "command": "pnpm test:coding-workspace-review-runtime",
+    "kind": "core",
+    "env": {}
+  },
+  "core-drive": {
+    "command": "pnpm test:drive",
+    "kind": "core",
+    "env": {}
+  },
+  "core-interop": {
+    "command": "pnpm test:interop",
+    "kind": "core",
+    "env": {}
+  },
+  "core-github-pulls": {
+    "command": "pnpm test:github-pulls",
+    "kind": "core",
+    "env": {}
+  },
+  "core-model-gateway-litellm": {
+    "command": "pnpm test:model-gateway-litellm",
+    "kind": "core",
+    "env": {}
+  },
+  "core-factory-query-http": {
+    "command": "pnpm test:factory-query-http",
+    "kind": "core",
+    "env": {}
+  },
+  "core-factory-monitor-http": {
+    "command": "pnpm test:factory-monitor-http",
     "kind": "core",
     "env": {}
   },

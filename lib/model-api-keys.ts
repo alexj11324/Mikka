@@ -7,6 +7,7 @@ import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
+import { gatewayFeaturesSchema, parseGatewayFeatures, type GatewayFeatures } from './model-gateway/features'
 import { isPrivateAddress } from '@/lib/link-preview-parse'
 import { isLoopbackHost } from '@/lib/loopback'
 import { memberSubscriptionsAllowed } from '@/lib/personal-policy'
@@ -15,7 +16,7 @@ import { stopRunsUsingApiKeys } from '@/lib/model-api-key-runs'
 import { openSecret, sealSecret, SecretsKeyMissingError } from '@/lib/secrets/crypto'
 import { WorkspaceError } from '@/lib/workspace-error'
 import {
-  API_KEY_PRESET_ENDPOINTS, API_KEY_PRESETS, apiKeyChatBaseUrl, apiKeyEndpoint, apiKeyHarnesses, apiKeyProtocols, customModelsUrl,
+  API_KEY_PRESET_ENDPOINTS, API_KEY_PRESETS, apiKeyChatBaseUrl, apiKeyHarnesses, apiKeyProtocols, customModelsUrl,
   type ApiKeyHarness, type ApiKeyProtocol, type ApiKeyProvider, type ApiKeyView,
 } from '@/lib/model-api-key-providers'
 
@@ -24,7 +25,7 @@ import {
  * conflict C22). A key belongs to the account. It is checked against the
  * provider's read-only model list before it is saved, sealed with
  * WORKSPACE_SECRETS_KEY, and never returned: views carry its last four
- * characters only. Only `apiKeyForRun` opens it, for the run that uses it.
+ * characters only. Only the server opens it for each authorized model request.
  */
 type Query = Pick<Pool | PoolClient, 'query'>
 type Env = Record<string, string | undefined>
@@ -92,31 +93,10 @@ export async function verifyApiKey(target: { modelsUrl: string; auth: ApiKeyProt
   } catch { return { ok: false, code: 'unavailable' } }
 }
 
-/**
- * Whether an OpenAI-protocol endpoint serves the Responses API, which Codex
- * runs on: POST {base}/responses with an empty body. A server that has it
- * refuses the body (400, no model asked, nothing billed); one that does not
- * has no such route (404/405/501). Anything else, a timeout included, is not
- * an answer: null, and the caller keeps what it knew.
- */
-export async function probeResponsesApi(baseUrl: string, apiKey: string, fetchImpl: typeof fetch = fetch): Promise<boolean | null> {
-  try {
-    const response = await fetchImpl(`${baseUrl.replace(/\/+$/, '')}/responses`, {
-      method: 'POST', body: '{}', headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json', accept: 'application/json' },
-      redirect: 'manual', signal: AbortSignal.timeout(10_000), cache: 'no-store',
-    })
-    void response.body?.cancel().catch(() => {})
-    if ([404, 405, 501].includes(response.status)) return false
-    return response.status >= 400 && response.status < 500 ? true : null
-  } catch { return null }
-}
-
-interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError']; responsesApi: boolean; modelSettings?: ModelSettings | null }
-const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi"'
-const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null, responsesApi: row.responsesApi })
-/** Only a custom OpenAI-protocol provider is probed; the presets' endpoints serve the Responses API. */
-const probed = (row: Pick<Row, 'provider' | 'protocol' | 'baseUrl'>) => row.provider === 'custom' && row.protocol === 'openai' && row.baseUrl
-
+interface Row { id: string; ownerId: string; provider: ApiKeyProvider; name: string | null; baseUrl: string | null; protocol: ApiKeyProtocol; last4: string; models: string[]; modelsError: ApiKeyView['modelsError']; responsesApi: boolean; modelSettings?: ModelSettings | null; features?: unknown }
+const COLUMNS = 'id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi",features'
+const view = (row: Row): ApiKeyView => ({ id: row.id, provider: row.provider, name: row.name, baseUrl: row.baseUrl, protocol: row.protocol, last4: row.last4, models: row.models, modelsError: row.modelsError ?? null, responsesApi: row.responsesApi,
+  ...(row.features ? { features: parseGatewayFeatures(row.features) } : {}) })
 /** Where a key's models are listed: the preset's list, or the custom provider's by its protocol. */
 function modelsTarget(row: Pick<Row, 'provider' | 'baseUrl' | 'protocol'>): { modelsUrl: string; auth: ApiKeyProtocol } {
   if (row.provider === 'custom') return { modelsUrl: customModelsUrl(row.baseUrl!, row.protocol), auth: row.protocol }
@@ -168,8 +148,8 @@ export async function addApiKey(query: Query, ownerId: string, input: unknown, o
   if (!result.ok) throw new WorkspaceError(result.code === 'invalid' ? 'apiKeyInvalid' : 'apiKeyUnverifiable')
   // A custom provider's own list, when given, is what its models are; otherwise what the provider listed.
   const models = custom?.models?.length ? [...new Set(custom.models)] : result.models
-  // Saved either way: without the Responses API the key still serves bot chats.
-  const responsesApi = probed({ provider: parsed.provider, protocol, baseUrl }) ? await probeResponsesApi(baseUrl!, parsed.apiKey, options.fetch) ?? true : true
+  // LiteLLM converts Chat Completions to Responses; no native inference probe.
+  const responsesApi = true
   const { rows: [row] } = await query.query<Row>(`INSERT INTO model_api_keys (id,"ownerId",provider,name,"baseUrl",protocol,ciphertext,iv,"keyVersion",last4,models,"responsesApi")
     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12)
     ON CONFLICT (id) DO UPDATE SET ciphertext=EXCLUDED.ciphertext,iv=EXCLUDED.iv,"keyVersion"=EXCLUDED."keyVersion",last4=EXCLUDED.last4,models=EXCLUDED.models,"modelsError"=NULL,"responsesApi"=EXCLUDED."responsesApi","updatedAt"=now()
@@ -194,8 +174,7 @@ export async function refreshApiKeyModels(query: Query, ownerId: string, id: str
   const reachable = row.provider !== 'custom' || await checkBaseUrl(row.baseUrl!, env, options.resolve).then(() => true, () => false)
   const result: ApiKeyVerifyResult = reachable ? await verifyApiKey(modelsTarget(row), apiKey, options.fetch) : { ok: false, code: 'unavailable' }
   const models = result.ok ? (result.models.length || row.provider !== 'custom' ? result.models : row.models) : row.models
-  // Asked again too: the provider may have added (or dropped) the Responses API since.
-  const responsesApi = result.ok && probed(row) ? await probeResponsesApi(row.baseUrl!, apiKey, options.fetch) ?? row.responsesApi : row.responsesApi
+  const responsesApi = result.ok ? true : row.responsesApi
   const { rows: [saved] } = await query.query<Row>(`UPDATE model_api_keys SET models=$3::jsonb,"modelsError"=$4,"responsesApi"=$5,"updatedAt"=now() WHERE id=$1 AND "ownerId"=$2 RETURNING ${COLUMNS}`,
     [id, ownerId, JSON.stringify(models), result.ok ? null : result.code, responsesApi])
   if (!saved) throw new WorkspaceError('apiKeyNotFound')
@@ -274,13 +253,6 @@ export async function usableApiKeys(query: Query, userId: string, workspaceId: s
   return [...mine.map(row => usable(row, true)), ...others.filter((_, index) => grants[index]).map(row => usable(row, false))]
 }
 
-/** What the run's Agent gets: environment variables, plus Codex's model provider when it runs on Codex. */
-export type ApiKeyRunCredential =
-  | { harness: 'claude_code'; keyId: string; ownerId: string; env: { ANTHROPIC_API_KEY: string; ANTHROPIC_BASE_URL: string } }
-  | { harness: 'codex'; keyId: string; ownerId: string; env: { MIKKA_MODEL_API_KEY: string }
-    /** Codex config: `model_provider = "mikka"` and `[model_providers.mikka]`. The key stays in the env var named by env_key. */
-    codex: { model_provider: 'mikka'; model_providers: { mikka: { name: string; base_url: string; env_key: 'MIKKA_MODEL_API_KEY'; wire_api: 'responses' } } } }
-
 async function openKey(query: Query, keyId: string, env: Env) {
   const { rows: [row] } = await query.query<Row & { ciphertext: string; iv: string; keyVersion: number }>(`SELECT ${COLUMNS},ciphertext,iv,"keyVersion" FROM model_api_keys WHERE id=$1`, [keyId])
   if (!row) throw new WorkspaceError('apiKeyNotFound')
@@ -289,6 +261,27 @@ async function openKey(query: Query, keyId: string, env: Env) {
     console.error(`[model-api-keys] open_failed id=${row.id}`)
     throw new WorkspaceError('apiKeyNotFound')
   }
+}
+
+/**
+ * A key opened for one request of the Mikka model gateway (decision
+ * 2026-11-15-2000): the run that may use it was checked at claim
+ * (`validateRunApiKey`) and is checked again by its gateway token.
+ */
+export async function openGatewayApiKey(query: Query, keyId: string, env: Env = process.env) {
+  z.uuid().parse(keyId)
+  const { row, apiKey } = await openKey(query, keyId, env)
+  return { key: view(row), apiKey, features: parseGatewayFeatures(row.features) }
+}
+
+/** The owner turns request features off for a provider that rejects them (decision 2026-11-15-2000). */
+export async function setApiKeyFeatures(query: Query, ownerId: string, id: string, features: GatewayFeatures): Promise<void> {
+  z.uuid().parse(id)
+  const parsed = gatewayFeaturesSchema.parse(features)
+  const off = Object.fromEntries(Object.entries(parsed).filter(([, on]) => on === false))
+  const { rowCount } = await query.query('UPDATE model_api_keys SET features=$3::jsonb WHERE id=$1 AND "ownerId"=$2',
+    [id, ownerId, Object.keys(off).length ? JSON.stringify(off) : null])
+  if (!rowCount) throw new WorkspaceError('apiKeyNotFound')
 }
 
 /** A bot's saved API key model (bot_model_choices), with the Agents its threads can run on (§ 3). */
@@ -316,7 +309,7 @@ export async function setBotApiKeyChoice(query: Query, scope: { ownerId: string;
   const key = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).find(item => item.id === keyId)
   if (!key || !apiKeyChatBaseUrl(key) || !key.models.includes(modelName)) throw new WorkspaceError('executionModelUnknown')
   await query.query(`INSERT INTO bot_model_choices ("ownerId","workspaceId","botKey","bindingId","apiKeyId","apiKeyModel") VALUES ($1,$2,$3,NULL,$4,$5)
-    ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel"`,
+    ON CONFLICT ("ownerId","workspaceId","botKey") DO UPDATE SET "bindingId"=NULL,"apiKeyId"=EXCLUDED."apiKeyId","apiKeyModel"=EXCLUDED."apiKeyModel","creditsModel"=NULL`,
   [scope.ownerId, scope.workspaceId, botId ?? 'coordinator', keyId, modelName])
   return { keyId, model: modelName, harnesses: apiKeyHarnesses(key) }
 }
@@ -326,7 +319,7 @@ export async function setBotApiKeyChoice(query: Query, scope: { ownerId: string;
  * Checked on every call, so a withdrawn share or a deleted key stops the
  * chat instead of switching (§ 2). Throws WorkspaceError('apiKeyNotFound').
  */
-export async function openApiKeyForChat(query: Query, userId: string, workspaceId: string, keyId: string, env: Env = process.env): Promise<{ apiKey: string; baseUrl: string; keyOwnerId: string }> {
+export async function openApiKeyForChat(query: Query, userId: string, workspaceId: string, keyId: string, env: Env = process.env): Promise<{ apiKey: string; baseUrl: string; keyOwnerId: string; provider: ApiKeyProvider; protocol: ApiKeyProtocol }> {
   await assertOrganizationModelProvider(workspaceId, 'api-key')
   const usable = (await usableApiKeys(query, userId, workspaceId)).find(key => key.id === keyId)
   const baseUrl = usable && apiKeyChatBaseUrl(usable)
@@ -334,22 +327,13 @@ export async function openApiKeyForChat(query: Query, userId: string, workspaceI
   const { rows: [owner] } = await query.query<{ ownerId: string }>('SELECT "ownerId" FROM model_api_keys WHERE id=$1', [keyId])
   if (!owner || (owner.ownerId !== userId && !await executionMembersActive(workspaceId, [userId, owner.ownerId]))) throw new WorkspaceError('apiKeyNotFound')
   const { row, apiKey } = await openKey(query, keyId, env)
-  return { apiKey, baseUrl, keyOwnerId: row.ownerId }
+  return { apiKey, baseUrl, keyOwnerId: row.ownerId, provider: row.provider, protocol: row.protocol }
 }
 
 const ACTIVE_RUN = ['queued', 'preparing', 'running', 'paused', 'waiting_input', 'finishing']
 
-/**
- * The key a run uses, opened for injection at the start of that run
- * (orchestration.md § 6), for the run's Agent: the endpoint of the protocol
- * that Agent speaks (a DeepSeek or Kimi key serves both). The run must still
- * be active, and the key must be usable by the run's owner in the run's
- * workspace: their own key, or a teammate's shared there with 分享给团队成员,
- * and it must serve that Agent. Throws WorkspaceError('apiKeyNotFound')
- * otherwise, so a withdrawn share or a deleted key stops the run instead of
- * switching (§ 2).
- */
-export async function apiKeyForRun(query: Query, runId: string, keyId: string, harness: ApiKeyHarness, env: Env = process.env): Promise<ApiKeyRunCredential> {
+/** Authorize and record a run's current key without disclosing it to the machine. */
+export async function validateRunApiKey(query: Query, runId: string, keyId: string): Promise<{ ownerId: string; workspaceId: string | null }> {
   z.uuid().parse(runId); z.uuid().parse(keyId)
   const { rows: [run] } = await query.query<{ userId: string; botId: string | null; deviceId: string | null; agentDefinition: WorkerDefinitionSnapshot | null; workspaceId: string | null; status: string; stopRequestedAt: Date | null }>(
     'SELECT r."userId",r."botId",r."deviceId",r."agentDefinition",b."workspaceId"::text AS "workspaceId",r.status,r."stopRequestedAt" FROM agent_runs r LEFT JOIN bots b ON b.id=r."botId" WHERE r.id=$1', [runId])
@@ -364,16 +348,8 @@ export async function apiKeyForRun(query: Query, runId: string, keyId: string, h
   if (!usable) throw new WorkspaceError('apiKeyNotFound')
   const { rows: [owner] } = await query.query<{ ownerId: string }>('SELECT "ownerId" FROM model_api_keys WHERE id=$1', [keyId])
   if (!owner || (owner.ownerId !== run.userId && (!run.agentDefinition?.apiKey || !run.workspaceId || !await executionMembersActive(run.workspaceId, [run.userId, owner.ownerId])))) throw new WorkspaceError('apiKeyNotFound')
-  const { row, apiKey } = await openKey(query, keyId, env)
-  const endpoint = apiKeyEndpoint(row, harness)
-  if (!endpoint) throw new WorkspaceError('apiKeyNotFound')
   // Recorded so withdrawing the key or its share stops this run (stopRunsUsingApiKeys).
   await query.query(`INSERT INTO model_api_key_runs ("runId","keyId","workspaceId") VALUES ($1,$2,$3)
     ON CONFLICT ("runId") DO UPDATE SET "keyId"=EXCLUDED."keyId","workspaceId"=EXCLUDED."workspaceId"`, [runId, keyId, run.workspaceId])
-  if (harness === 'claude_code') return { harness: 'claude_code', keyId: row.id, ownerId: row.ownerId, env: { ANTHROPIC_API_KEY: apiKey, ANTHROPIC_BASE_URL: endpoint.baseUrl } }
-  return {
-    harness: 'codex', keyId: row.id, ownerId: row.ownerId, env: { MIKKA_MODEL_API_KEY: apiKey },
-    // The daemon runs Codex on the Responses API (packages/daemon/src/agents/run-credential.ts).
-    codex: { model_provider: 'mikka', model_providers: { mikka: { name: row.name ?? 'OpenAI', base_url: endpoint.baseUrl, env_key: 'MIKKA_MODEL_API_KEY', wire_api: 'responses' } } },
-  }
+  return { ownerId: owner.ownerId, workspaceId: run.workspaceId }
 }

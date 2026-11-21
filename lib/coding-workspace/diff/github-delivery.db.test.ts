@@ -6,12 +6,13 @@ import { Pool } from 'pg'
 import { CodingWorkspaceError } from '@mikka/protocol/coding-workspace'
 import { WorkspaceReviewError, type DiffFileMetadata, type DiffFilePatch, type GitHubReviewMutation,
   type ReviewAnchor, type ReviewBatchReceipt } from '@mikka/protocol/coding-workspace-review'
+import { observePoolCommits } from '../../db/commit-effects'
 import { GitHubAccessError } from '../../github/user-access-error'
 import type { RequestBudget } from '../../request-budget'
 import type { ReviewActor } from './authority'
 import { orderMigrations } from '../../../scripts/migration-order.mjs'
 import { disposableDatabase, E2E_DB_RULE } from '../../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../../tests/support/drop-test-database'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) assert.ok(disposableDatabase(process.env, url), E2E_DB_RULE)
@@ -45,9 +46,10 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
   const database = `github_review_delivery_${randomUUID().replaceAll('-', '')}_e2e`
   const version = Number((await admin.query('SHOW server_version_num')).rows[0].server_version_num)
   assert.ok(version >= 170000 && version < 180000, 'native delivery acceptance requires PostgreSQL 17')
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!); target.pathname = `/${database}`
   const pool = new Pool({ connectionString: target.toString(), max: 16, connectionTimeoutMillis: 5000 })
+  observePoolCommits(pool)
   const environment = { MIKKA_DATABASE_URL: target.toString(), DATABASE_URL: target.toString(), ORVILO_DATABASE_URL: target.toString(),
     E2E_DATABASE_URL: target.toString(), BETTER_AUTH_SECRET: randomBytes(32).toString('hex'),
     BETTER_AUTH_URL: 'http://127.0.0.1:3199', WORKSPACE_SECRETS_KEY: randomBytes(32).toString('hex'),
@@ -60,12 +62,12 @@ test('native GitHub review delivery and reconciliation on PostgreSQL 17', { skip
     const directory = new URL('../../../drizzle/', import.meta.url)
     for (const name of orderMigrations((await readdir(directory)).filter(name => name.endsWith('.sql'))))
       await pool.query(await readFile(new URL(name, directory), 'utf8'))
-    const next = await import('next/server')
-    mock.module('next/server', { namedExports: { ...next, after() {} } })
-    mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
+    const next = await import('@/lib/server-runtime/server')
+    mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after() {} } })
+    mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({
       get: () => undefined, getAll: () => [], has: () => false, set() {}, delete() {},
     }) } })
-    mock.module('next-intl/server', { namedExports: { getLocale: async () => 'en',
+    mock.module('@/lib/intl/i18n-server', { namedExports: { getLocale: async () => 'en',
       getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
     const userToken = mock.fn(async (userId: string, options: { minValidityMs?: number; budget?: RequestBudget } = {}) => {
       const value = tokens.get(userId)

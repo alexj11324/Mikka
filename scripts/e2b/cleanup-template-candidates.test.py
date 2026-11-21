@@ -11,7 +11,8 @@ from urllib.error import HTTPError
 spec = importlib.util.spec_from_file_location('cleanup', Path(__file__).with_name('cleanup-template-candidates.py'))
 cleanup = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cleanup)
-ENV = {'GITHUB_REPOSITORY': 'alexj11324/Mikka', 'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '2'}
+ENV = {'GITHUB_REPOSITORY': 'alexj11324/Mikka', 'GITHUB_REPOSITORY_ID': '1427517699',
+       'GITHUB_REPOSITORY_OWNER_ID': '183887963', 'GITHUB_SHA': 'a' * 40, 'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '2'}
 CANDIDATE = {'kind': 'codex', 'name': 'mikka-fixture-codex', 'templateId': 'owned-id'}
 
 

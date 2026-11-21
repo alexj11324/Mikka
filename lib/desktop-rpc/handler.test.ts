@@ -156,7 +156,6 @@ test('registry schemas reject forged authority, malformed nested input and extra
     ['desktop.workspaceLink', ['valid-slug', { userId: peer }]],
     ['desktop.workspaceLink', ['../private']],
     ['workspace.switchWorkspace', [{ workspaceId: owner, ownerId: peer }]],
-    ['coordinator.sendCoordinatorMessage', ['hello', null, null, owner, { kind: 'device', deviceId: 'invalid' }]],
     ['issue-metadata.updateIssueMetadata', [{ id: owner, revision: 1, patch: { userId: peer } }]],
     ['account.changePassword', [{ currentPassword: 'password', newPassword: 'password', userId: peer }]],
     ['workspace-secrets.createSecret', [{ name: 'KEY', kind: 'secret', value: 'fixture', scope: { type: 'repository', repository: {} } }]],
@@ -168,6 +167,17 @@ test('registry schemas reject forged authority, malformed nested input and extra
   ]
   for (const [name, args] of cases) assert.equal(desktopActionSchemas[name].safeParse(args).success, false, name)
   assert.equal(desktopActionSchemas['coordinator.pollCoordinatorChat'].safeParse([null, undefined, { after: 2, cursor: 1, prefix: 'a'.repeat(32) }]).success, true)
+})
+
+test('Board status moves accept an optional checked block change across the shared RPC boundary', () => {
+  const schema = desktopActionSchemas['issues.moveIssue']
+  const move = { id: owner, revision: 3, status: 'doing' }
+  for (const input of [move, { ...move, block: { blocked: false, runId: null } }, { ...move, block: { blocked: false, runId: 'last-run' } }]) {
+    assert.deepEqual(schema.parse([input]), [input])
+  }
+  for (const block of [null, { blocked: false }, { blocked: 'false', runId: null }, { blocked: false, runId: null, issueId: peer }]) {
+    assert.equal(schema.safeParse([{ ...move, block }]).success, false)
+  }
 })
 
 test('explicit schemas and function map have exactly matching action names', () => {
@@ -226,33 +236,8 @@ test('Task presentation batch rejects forged authority and oversized input befor
   assert.equal(calls, 2, 'empty and bounded inputs still enter the reader and its membership checks')
 })
 
-test('Coordinator submission accepts an optional captured workspace without widening its authority tuple', () => {
-  const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
-  const legacy = ['hello', null, null, owner, undefined, undefined, undefined, undefined, undefined]
-  for (const args of [['hello'], legacy, [...legacy, undefined], [...legacy, peer], [...legacy, peer.toUpperCase()]]) {
-    assert.equal(schema.safeParse(args).success, true)
-  }
-  for (const expected of [null, '', 'invalid', { workspaceId: peer }, { userId: owner }]) {
-    assert.equal(schema.safeParse([...legacy, expected]).success, false)
-  }
-  assert.equal(schema.safeParse([...legacy, peer, { admin: true }]).success, false)
-})
-
-test('Coordinator task titles cross the shared Web and desktop RPC boundary', () => {
-  const schema = desktopActionSchemas['coordinator.sendCoordinatorMessage']
-  const args = ['Task description', null, null, owner, undefined, undefined, undefined, undefined, undefined]
-  for (const workspaceId of [undefined, peer]) {
-    const parsed = schema.safeParse([...args, workspaceId, '  修复登录后回跳  '])
-    assert.equal(parsed.success, true)
-    if (parsed.success) {
-      assert.ok(Array.isArray(parsed.data))
-      assert.equal(parsed.data[10], '修复登录后回跳')
-    }
-    for (const title of ['', ' ', 'x'.repeat(61), 'two\nlines', null, { admin: true }]) {
-      assert.equal(schema.safeParse([...args, workspaceId, title]).success, false)
-    }
-  }
-  assert.equal(schema.safeParse([...args, peer, 'Title', { admin: true }]).success, false)
+test('retired Coordinator submission has no registered RPC schema', () => {
+  assert.equal(Object.hasOwn(desktopActionSchemas, 'coordinator.sendCoordinatorMessage'), false)
 })
 
 test('billing re-export consumers accept only the existing workspace selector and purchase amounts', () => {
@@ -275,7 +260,7 @@ test('cached list cursors retain each reader limit, old calls and unique bounded
   const readers = [
     ['issues.pollIssues', 100, []], ['issues.syncIssueList', 100, []],
     ['task-runs.pollThreads', 200, []], ['task-runs.syncThreadList', 200, []],
-    ['issues.pollIssueVersionSummaries', 50, [owner]],
+    ['issues.pollIssueVersionSummaries', 5000, [owner]],
   ] as const
   for (const [name, limit, prefix] of readers) {
     const schema = desktopActionSchemas[name]
@@ -310,4 +295,12 @@ test('cached detail and bootstrap accept identity-free selectors while preservin
   }
   for (const args of [[], [undefined], [owner]]) assert.equal(desktopActionSchemas['desktop.bootstrap'].safeParse(args).success, true)
   for (const args of [[null], ['invalid'], [{ workspaceId: owner, role: 'admin' }], [owner, peer]]) assert.equal(desktopActionSchemas['desktop.bootstrap'].safeParse(args).success, false)
+})
+
+test('自动化 lists accept 我的 and 定时 and nothing wider', () => {
+  const list = desktopActionSchemas['automations.listAutomations']
+  const workspace = '3f0c9d2e-5b1a-4c7e-9f00-1a2b3c4d5e6f'
+  assert.equal(list.safeParse([{ owner: 'me', trigger: 'schedule', deleted: false }, workspace]).success, true)
+  assert.equal(list.safeParse([{ owner: 'someone' }, workspace]).success, false)
+  assert.equal(list.safeParse([{ trigger: 'github' }, workspace]).success, false)
 })

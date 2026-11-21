@@ -1,15 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { createAuthClient } from 'better-auth/react'
 import { oauthProviderClient } from '@better-auth/oauth-provider/client'
-import { Loader2Icon } from 'lucide-react'
 import { AuthLogo } from '@/components/blocks/auth-19/components/auth-logo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { withBasePath } from '@/lib/base-path'
 import { FieldError } from '@/components/ui/field'
+import { Spinner } from '@/components/ui/spinner'
 
 // Its own client: the plugin attaches the page's signed query to every POST,
 // which only this page wants.
@@ -52,11 +52,11 @@ export function OAuthConsent({ clientName, clientUri, account }: { clientName: s
           </CardContent>
           <CardFooter className="flex gap-3 px-7 pt-5 pb-7 sm:px-9 sm:pb-8">
             <Button type="button" variant="outline" className="flex-1" disabled={pending !== null} onClick={() => answer(false)}>
-              {pending === 'deny' && <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" />}
+              {pending === 'deny' && <Spinner aria-hidden="true" data-icon="inline-start" />}
               {t('deny')}
             </Button>
             <Button type="button" className="flex-1" disabled={pending !== null} onClick={() => answer(true)}>
-              {pending === 'allow' && <Loader2Icon aria-hidden="true" className="animate-spin" data-icon="inline-start" />}
+              {pending === 'allow' && <Spinner aria-hidden="true" data-icon="inline-start" />}
               {t('allow')}
             </Button>
           </CardFooter>

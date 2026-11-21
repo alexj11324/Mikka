@@ -1,8 +1,8 @@
 // MIK-2：迁移文件名检查（时间戳命名）。
 // scripts/migrate.mjs 以文件名为主键记录已执行的迁移，所以：
 // - 旧的 NNNN_*.sql 已经在生产执行过，冻结：不许新增、改名或修改（含 0004–0008 的历史重号）。
-// - 新迁移一律 YYYYMMDDHHMMSS_slug.sql（UTC），时间戳必须合法、晚于 main 上最新的迁移、文件名唯一。
-//   时间戳由协调者派活时分配（docs/dev-workflow.md § 6），不要自己挑。
+// - 新迁移由 migration:new 自动生成 UTC 时间戳，ID 唯一；main 上的文件保持原名和原内容。
+// - 分支的新迁移可早于 main 的最新时间戳；runner 按逐文件执行台账补齐，而非使用最大时间戳。
 import { execFileSync } from 'node:child_process'
 import { readdirSync, readFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
@@ -45,14 +45,12 @@ export function parseTimestamp(name) {
 
 export const hash = (text) => createHash('sha256').update(text).digest('hex').slice(0, 12)
 
-// files: 当前分支的 [{name, content}]；mainFiles: main 上的文件名数组（拿不到时为 null）
+// files: 当前分支的 [{name, content}]；mainFiles: main 上的文件快照（兼容旧的文件名数组）。
 export function checkMigrations(files, mainFiles, legacy = LEGACY_FROZEN) {
   const problems = []
   const names = files.map((f) => f.name)
   if (new Set(names).size !== names.length) problems.push('存在重复的迁移文件名')
   const seenTs = new Map()
-  const mainSet = new Set(mainFiles ?? [])
-  const mainLatest = (mainFiles ?? []).map(parseTimestamp).filter(Boolean).sort().at(-1) ?? ''
   for (const { name, content } of files) {
     if (!name.endsWith('.sql')) continue
     if (/^\d{4}_/.test(name)) {
@@ -62,22 +60,34 @@ export function checkMigrations(files, mainFiles, legacy = LEGACY_FROZEN) {
     }
     const ts = parseTimestamp(name)
     if (!ts) { problems.push(`${name}：文件名必须是 YYYYMMDDHHMMSS_snake_case.sql，且时间合法（UTC）`); continue }
-    if (seenTs.has(ts)) problems.push(`${name}：时间戳和 ${seenTs.get(ts)} 相同，请换一个时间戳`)
+    if (seenTs.has(ts)) problems.push(`${name}：时间戳和 ${seenTs.get(ts)} 相同，请用 migration:new 重新生成未执行的迁移`)
     seenTs.set(ts, name)
-    if (mainFiles && !mainSet.has(name) && ts <= mainLatest) {
-      problems.push(`${name}：时间戳必须晚于 main 上最新的迁移 ${mainLatest}，请向协调者要一个新的时间戳（docs/dev-workflow.md § 6）`)
-    }
   }
   for (const name of Object.keys(legacy)) {
     if (!names.includes(name)) problems.push(`${name}：已执行的旧迁移不能删除或改名`)
   }
+  const current = new Map(files.map(file => [file.name, file.content]))
+  for (const entry of mainFiles ?? []) {
+    const { name, content } = typeof entry === 'string' ? { name: entry } : entry
+    if (!current.has(name)) problems.push(`${name}：main 上的迁移不能删除或改名`)
+    else if (content !== undefined && current.get(name) !== content) problems.push(`${name}：main 上的迁移不能修改，请新增修正迁移`)
+  }
   return problems
 }
 
-function mainMigrationNames() {
+function mainMigrations() {
   const git = (...args) => execFileSync('git', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
   for (const ref of ['origin/main', 'FETCH_HEAD']) {
-    try { return git('ls-tree', '--name-only', ref, 'drizzle/').split('\n').filter(Boolean).map((p) => p.slice('drizzle/'.length)) } catch {}
+    try {
+      // A stale branch has not deleted migrations added to main after it forked.
+      // Freeze its inherited history; the merged tree also includes newer main files.
+      const inherited = git('merge-base', ref, 'HEAD').trim()
+      return {
+        names: git('ls-tree', '--name-only', ref, 'drizzle/').split('\n').filter(path => path.endsWith('.sql')).map(path => path.slice('drizzle/'.length)),
+        files: git('ls-tree', '--name-only', inherited, 'drizzle/').split('\n').filter(path => path.endsWith('.sql'))
+          .map(path => ({ name: path.slice('drizzle/'.length), content: git('show', `${inherited}:${path}`) })),
+      }
+    } catch {}
     if (ref === 'origin/main') { try { git('fetch', '--depth=1', 'origin', 'main') } catch {} }
   }
   return null
@@ -86,10 +96,9 @@ function mainMigrationNames() {
 /**
  * Every migration name that exists on any ref, not only on main.
  *
- * The main-only check cannot see a collision that is still in flight: it compares a
- * branch's file against main's watermark, so two branches claiming one timestamp both
- * pass while main is behind them. That is how 20261110200000_agent_profile_skill_shares
- * looked green against a main that still stopped at 20261110150013.
+ * A working tree cannot see an ID collision on another branch. This diagnostic
+ * includes locally known refs; the ordinary check rejects duplicate IDs when
+ * both files appear in the same merged tree.
  *
  * `git log --all` visits every commit once and lists the .sql files it added or
  * renamed, which is one process instead of one `ls-tree` per ref (2300 refs cost
@@ -146,9 +155,17 @@ export function liveCollisions(collisions, mainFiles) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const dir = new URL('../drizzle/', import.meta.url)
   const files = readdirSync(dir).filter((n) => n.endsWith('.sql')).map((name) => ({ name, content: readFileSync(new URL(name, dir), 'utf8') }))
-  const mainFiles = mainMigrationNames()
-  if (!mainFiles) console.warn('migrations: 拿不到 origin/main，跳过「晚于 main 最新迁移」这一项')
-  const problems = checkMigrations(files, mainFiles)
+  const main = mainMigrations()
+  if (!main) console.warn('migrations: 拿不到 origin/main，跳过 main 文件内容比对；保留格式、重复 ID 和旧迁移检查')
+  const problems = checkMigrations(files, main?.files)
+  const localNames = new Set(files.map(file => file.name))
+  // Include post-fork main names even when this stale branch has not merged
+  // them. Identical filenames are one migration; distinct names cannot share an ID.
+  for (const { slot, names } of slotCollisions([...localNames, ...(main?.names ?? [])])) {
+    if (names.some(name => localNames.has(name)) && names.some(name => !localNames.has(name))) {
+      problems.push(`main 与当前分支的迁移 ID ${slot} 冲突：${names.join('、')}，请用 migration:new 重新生成未执行的迁移`)
+    }
+  }
 
   // --all-refs: report slots that another branch already claimed. Report-only by
   // default because in-flight collisions are not this branch's fault and must not
@@ -160,8 +177,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     else {
       const collisions = slotCollisions(names)
       const mine = new Set(files.map((f) => f.name))
-      const merged = new Set(mainFiles ?? [])
-      const live = liveCollisions(collisions, mainFiles)
+      const mainNames = main?.names ?? null
+      const merged = new Set(mainNames ?? [])
+      const live = liveCollisions(collisions, mainNames)
       // Every collision is listed, this branch's own marked, because a race that
       // does not touch this branch today is still why a slot is not free tomorrow.
       if (collisions.length) {
@@ -173,7 +191,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         // branches would red CI for a pull request that has nothing wrong with it.
         const mineLive = live.filter(({ names: held }) => held.some((n) => mine.has(n)))
         if (mineLive.length) {
-          console.error(`migrations: --all-refs 本分支占用的 ${mineLive.length} 个 slot 仍在飞：${mineLive.map((c) => c.slot).join('、')}，请换一个时间戳`)
+          console.error(`migrations: --all-refs 本分支占用的 ${mineLive.length} 个 slot 仍在飞：${mineLive.map((c) => c.slot).join('、')}，请用 migration:new 重新生成未执行的迁移`)
           if (process.argv.includes('--enforce')) process.exit(1)
         } else console.log('migrations: --all-refs 本分支占用的 slot 不在这些争用里')
       } else console.log(`migrations: --all-refs 扫了 ${new Set(names).size} 个历史迁移名，没有仍在飞的 slot 争用`)

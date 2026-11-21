@@ -1,4 +1,10 @@
 import 'server-only'
+import { sql } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/node-postgres'
+import { recordCoordinatorEvent } from '../coordinator-event-store'
+import { runFinishedEvent } from '../coordinator-events'
+import { wakeCoordinatorAfterCommit } from '../coordinator/wake-after-commit'
+import { afterRunEnded } from '../run-completion-effects'
 import { serverRunFailure } from '../run-failure-details'
 import type { Pool } from 'pg'
 import { withDatabaseClient } from '../db'
@@ -80,14 +86,18 @@ export async function handoffFactoryCloudStage(pool: Pool, actor: Actor, previou
 }
 
 export async function failFactoryCloudStage(pool: Pool, actor: Actor, runId: string, message: string) {
-  const { rows: [ended] } = await pool.query(`UPDATE agent_runs r SET status='failed',"stopReason"='device_lost',error=$4,"failureDetails"=$5::jsonb,"finishedAt"=now(),"updatedAt"=now()
-    WHERE r.id=$1 AND r."userId"=$2 AND r.status='queued' AND EXISTS (
-      SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."ownerId"=r."userId" AND b."workspaceId"=$3) RETURNING r.*`, [runId, actor.userId, actor.workspaceId, message, JSON.stringify(serverRunFailure(runId, new Date()))])
-  if (!ended) return
-  const [{ db }, { recordCoordinatorEvent }, { runFinishedEvent }, { wakeCoordinator }, { afterRunEnded }] = await Promise.all([
-    import('@/lib/db'), import('@/lib/coordinator-event-store'), import('@/lib/coordinator-events'), import('@/lib/coordinator/wake'), import('@/lib/run-completion-effects'),
-  ])
-  await recordCoordinatorEvent(db, runFinishedEvent(ended))
-  await afterRunEnded(actor.userId, runId)
-  await wakeCoordinator(actor.userId).catch(() => undefined)
+  const ended = await drizzle(pool).transaction(async tx => {
+    const { rows: [run] } = await tx.execute<Parameters<typeof runFinishedEvent>[0]>(sql`UPDATE agent_runs r
+      SET status='failed',"stopReason"='device_lost',error=${message},"failureDetails"=${JSON.stringify(serverRunFailure(runId, new Date()))}::jsonb,
+        "finishedAt"=now(),"updatedAt"=now()
+      WHERE r.id=${runId} AND r."userId"=${actor.userId} AND r.status='queued' AND EXISTS (
+        SELECT 1 FROM computer_run_bindings b WHERE b."runId"=r.id AND b."ownerId"=r."userId" AND b."workspaceId"=${actor.workspaceId}) RETURNING r.*`)
+    if (!run) return false
+    await recordCoordinatorEvent(tx, runFinishedEvent(run))
+    // The terminal transition also wakes an already persisted completion row.
+    // Its commit key coalesces with the event writer's when the row is new.
+    wakeCoordinatorAfterCommit(tx, actor.userId)
+    return true
+  })
+  if (ended) await afterRunEnded(actor.userId, runId)
 }

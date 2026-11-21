@@ -224,7 +224,7 @@ test('a trusted stdin wrapper can import the paired classifier without running i
 test('blocking CI checks synthetic PR merge candidates once and preserves every main run', () => {
   const source = readFileSync('.github/workflows/ui-policy.yml', 'utf8')
   const events = source.split('\npermissions:')[0]
-  assert.match(events, /on:\n  push:\n    branches: \[main\]\n  pull_request:\n  merge_group:/)
+  assert.match(events, /on:\n  push:\n    branches: \[main\]\n  pull_request:\n    types: \[opened, reopened, synchronize, ready_for_review, converted_to_draft\]\n  merge_group:/)
   assert.doesNotMatch(events, /branches-ignore:/)
   assert.doesNotMatch(source, /github\.event\.pull_request\.head\.repo\.full_name != github\.repository/)
   assert.match(source, /name: UI policy \(strict\)/)
@@ -244,7 +244,10 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   const job = name => source.split(`\n  ${name}:\n`)[1].split(/\n  [a-z][a-z-]*:\n/)[0]
   const database = job('browser-tests-full')
   assert.match(database, /fail-fast: false/)
-  assert(database.includes('matrix: ${{ fromJSON(needs.changes.outputs.db_matrix) }}'))
+  assert(database.includes('shard: ${{ fromJSON(needs.changes.outputs.db_matrix).shard }}'))
+  assert(database.includes("node: ['22', '24']"))
+  assert(database.includes('node-version: ${{ matrix.node }}'))
+  assert(database.includes("name: Database checks (${{ matrix.shard }})${{ matrix.node == '22' && ' (Node 22)' || '' }}"))
   assert(database.includes('DB_TEST_SHARD: ${{ matrix.shard }}'))
   assert(database.includes('DB_TEST_SELECTED: ${{ needs.changes.outputs.db_suites }}'))
   assert.match(database, /services:\n      postgres:\n        image: postgres:17/)
@@ -260,7 +263,7 @@ test('CI partitions DB suites across isolated jobs and requires source and daemo
   assert(!daemon.includes('MIKKA_SANDBOX_ACCEPTANCE'))
   assert(daemon.includes('pnpm --filter @mikka/daemon test:package'))
   const gate = job('ui-policy')
-  for (const name of ['changes','ui-policy-full','ui-policy-integrations','source-checks','daemon-checks','image-checks','desktop-checks','analytics-checks']) assert(gate.includes(name))
+  for (const name of ['changes','ui-policy-full','ui-policy-integrations','source-checks','daemon-checks','analytics-checks']) assert(gate.includes(name))
   for (const name of ['ui-policy-full', 'ui-policy-integrations', 'source-checks', 'daemon-checks']) assert(gate.includes(`needs.${name}.result`))
 })
 

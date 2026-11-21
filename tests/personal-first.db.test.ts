@@ -13,8 +13,8 @@ test('personal workspace first', { skip: !dbUrl }, async t => {
   let user = { id: '', name: '', email: '' }
   const translate = Object.assign((key: string) => key, { has: () => true })
   mock.module('@/lib/issue-access', { namedExports: { requireUser: async () => user } })
-  mock.module('next/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set() {}, delete() {}, get() {} }) } })
-  mock.module('next-intl/server', { namedExports: { getTranslations: async () => translate, getLocale: async () => 'zh-CN' } })
+  mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set() {}, delete() {}, get() {} }) } })
+  mock.module('@/lib/intl/i18n-server', { namedExports: { getTranslations: async () => translate, getLocale: async () => 'zh-CN' } })
   const actions = await import('../app/actions/workspace')
   const { pool: appPool } = await import('../lib/db')
   const { workspacePool } = await import('../lib/workspace-db')
@@ -42,8 +42,13 @@ test('personal workspace first', { skip: !dbUrl }, async t => {
   await t.test('accepting an invitation makes the personal workspace first', async () => {
     const owner = await signIn('first-owner')
     const team = await seedWorkspace(pool, owner, [{ userId: owner, role: 'admin' }])
-    const invited = await actions.createWorkspaceInvitation({ workspaceId: team.id, emails: ['first-joiner@example.invalid'], role: 'member' })
+    const email = 'first-joiner@example.invalid'
+    const invited = await actions.createWorkspaceInvitation({ workspaceId: team.id, emails: [email, email.toUpperCase()], role: 'member' })
     if (!invited.ok) throw new Error('Invitation unexpectedly failed')
+    assert.equal(invited.data.length, 1)
+    assert.deepEqual(invited.outcomes.map(outcome => [outcome.email, outcome.created ? 'created' : outcome.reason]), [
+      [email, 'created'], [email, 'duplicate'],
+    ])
     const token = invited.data[0].path.split('/').at(-1)!
     const joiner = await seedUser(pool, 'first-joiner')
     user = { id: joiner, name: 'first-joiner', email: 'first-joiner@example.invalid' }

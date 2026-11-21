@@ -23,5 +23,6 @@ test('online devices also need scheduling enabled and the dispatch planner to ac
 test('only an explicit destination overrides the workspace default', () => {
   assert.equal(pickedTaskDestination(null), undefined)
   assert.deepEqual(pickedTaskDestination('cloud'), { kind: 'cloud' })
+  assert.deepEqual(pickedTaskDestination('cloudflare'), { kind:'cloud',provider:'cloudflare' })
   assert.deepEqual(pickedTaskDestination('device'), { kind: 'device', deviceId: 'device' })
 })

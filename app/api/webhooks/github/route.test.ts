@@ -9,14 +9,19 @@ const originalEdition = process.env.MIKKA_EDITION, originalBackend = process.env
 mock.module(new URL('../../../../lib/github/app-config.ts', import.meta.url).href, { namedExports: { readGitHubAppConfig: async () => ({ webhookSecret: process.env.GITHUB_WEBHOOK_SECRET ?? null }) } })
 const callbacks: Array<() => Promise<void>> = []
 const refresh = mock.fn(async (_event: string, _payload: unknown) => {})
+const wakeSuite = mock.fn(async (_suite: unknown) => 1)
 const notifications = [{ userId: 'owner', source: 'github', externalId: 'comment:7' }]
 const readNotifications = mock.fn(async (_event: string, _payload: unknown) => notifications)
 const ingest = mock.fn(async (_notifications: unknown[]) => {})
-mock.module('next/server', { namedExports: { after: (callback: () => Promise<void>) => callbacks.push(callback) } })
-const heavyModules = ['lib/github/publication-webhook.ts', 'lib/suggestions/sources.ts', 'lib/suggestions/store.ts']
+mock.module('@/lib/server-runtime/server', { namedExports: { after: (callback: () => Promise<void>) => callbacks.push(callback) } })
+const heavyModules = ['lib/github/publication-webhook.ts', 'lib/github/ci-suite-wake.ts', 'lib/suggestions/sources.ts', 'lib/suggestions/store.ts']
 mock.module(new URL('../../../../lib/github/publication-webhook.ts', import.meta.url).href, { namedExports: { refreshPublishedPullRequest: refresh } })
+mock.module(new URL('../../../../lib/github/ci-suite-wake.ts', import.meta.url).href, { namedExports: { wakeLinkedCiSuite: wakeSuite } })
 mock.module(new URL('../../../../lib/suggestions/sources.ts', import.meta.url).href, { namedExports: { githubWebhookNotifications: readNotifications } })
 mock.module(new URL('../../../../lib/suggestions/store.ts', import.meta.url).href, { namedExports: { ingestNotifications: ingest } })
+// 自动化 event triggers: the schedule store is the database's; here it records what it was asked to queue.
+const fireAutomations = mock.fn(async (_key: string, _event: string, _payload: unknown) => 0)
+mock.module(new URL('../../../../lib/schedules/runtime.ts', import.meta.url).href, { namedExports: { fireGitHubAutomations: fireAutomations } })
 const loaded: string[] = []
 const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
@@ -34,9 +39,13 @@ beforeEach(() => {
   callbacks.length = 0
   refresh.mock.resetCalls()
   refresh.mock.mockImplementation(async () => {})
+  wakeSuite.mock.resetCalls()
+  wakeSuite.mock.mockImplementation(async () => 1)
   readNotifications.mock.resetCalls()
   readNotifications.mock.mockImplementation(async () => notifications)
   ingest.mock.resetCalls()
+  fireAutomations.mock.resetCalls()
+  fireAutomations.mock.mockImplementation(async () => 0)
 })
 after(() => {
   hooks.deregister()
@@ -52,12 +61,23 @@ function request(event: string, payload: unknown, signature?: string) {
   return rawRequest(event, JSON.stringify(payload), signature)
 }
 
-function rawRequest(event: string, body: string, signature?: string) {
+function rawRequest(event: string, body: string, signature?: string, delivery?: string) {
   return new Request('https://preview.example.test/mikka/api/webhooks/github', {
     method: 'POST', body,
-    headers: { 'x-github-event': event, 'x-hub-signature-256': signature ?? `sha256=${createHmac('sha256', secret).update(body).digest('hex')}` },
+    headers: { 'x-github-event': event, 'x-hub-signature-256': signature ?? `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`, ...(delivery ? { 'x-github-delivery': delivery } : {}) },
   })
 }
+
+test('a delivery an automation can run on is queued before the ACK, keyed by its delivery ID; a failure is retried', async () => {
+  const opened = { action: 'opened', sender: { login: 'ada', type: 'User' }, repository: { full_name: 'Acme/App' }, pull_request: { number: 3, title: 'Fix', base: { ref: 'main' }, labels: [] } }
+  const body = JSON.stringify(opened)
+  assert.equal((await POST(rawRequest('pull_request', body, undefined, 'abc-123'))).status, 202)
+  assert.deepEqual(fireAutomations.mock.calls[0]!.arguments.slice(0, 2), ['github:abc-123', 'pull_request'])
+  fireAutomations.mock.mockImplementation(async () => { throw Error('database unavailable') })
+  assert.equal((await POST(rawRequest('pull_request', body, undefined, 'abc-124'))).status, 503, 'GitHub retries the delivery')
+  assert.equal((await POST(request('pull_request', { ...opened, sender: { login: 'bot', type: 'Bot' } }))).status !== 503, true, 'a bot’s delivery never reaches the store')
+  assert.equal(fireAutomations.mock.callCount(), 2)
+})
 
 test('route import and signed no-op actions never load heavy modules or schedule background work', async () => {
   for (const [event, payload] of [
@@ -142,6 +162,44 @@ test('verified repository-bound check and status events use publication ingestio
   assert.equal(ingest.mock.callCount(), 0)
 })
 
+
+test('signed completed suite is durably enqueued before webhook ACK, without per-job wakeups', async () => {
+  const hint = {
+    installation: { id: 7 }, repository: { id: 8, full_name: 'acme/app' },
+    action: 'completed',
+    check_suite: {
+      id: 9, status: 'completed', conclusion: 'failure',
+      head_sha: 'a'.repeat(40), pull_requests: [{ number: 10 }],
+    },
+  }
+  assert.equal((await POST(request('check_suite', hint, 'sha256=invalid'))).status, 401)
+  assert.equal(wakeSuite.mock.callCount(), 0)
+  assert.equal((await POST(request('check_suite', hint))).status, 202)
+  assert.equal(wakeSuite.mock.callCount(), 1, 'persist before response, not in afterJob')
+  assert.equal(callbacks.length, 0, 'suite-only webhook does not schedule empty afterJob')
+  assert.deepEqual(wakeSuite.mock.calls[0].arguments[0], {
+    installationId: 7, repositoryId: 8, repository: 'acme/app', suiteId: 9,
+    headSha: 'a'.repeat(40), conclusion: 'failure', numbers: [10], heads: {},
+  })
+  assert.equal(refresh.mock.callCount(), 0)
+  assert.equal(readNotifications.mock.callCount(), 0)
+  assert.equal(wakeSuite.mock.callCount(), 1)
+})
+
+test('suite persistence failure fails the webhook and can be retried by GitHub', async () => {
+  let attempts = 0
+  wakeSuite.mock.mockImplementation(async () => { if (++attempts === 1) throw Error('queue unavailable'); return 1 })
+  const hint = {
+    installation: { id: 7 }, repository: { id: 8, full_name: 'acme/app' },
+    action: 'completed',
+    check_suite: { id: 9, status: 'completed', conclusion: 'failure', head_sha: 'a'.repeat(40), pull_requests: [{ number: 10 }] },
+  }
+  await assert.rejects(POST(request('check_suite', hint)), /queue unavailable/)
+  assert.equal(callbacks.length, 0, 'never acknowledge before queue persistence')
+  assert.equal((await POST(request('check_suite', hint))).status, 202)
+  assert.equal(wakeSuite.mock.callCount(), 2)
+})
+
 test('created comments retain notification ingestion and do not refresh publications', async () => {
   const payload = { action: 'created', issue: { user: { id: 42 } } }
   assert.equal((await POST(request('issue_comment', payload))).status, 202)
@@ -204,4 +262,30 @@ test('the official route keeps business handling in its own runtime and does not
     assert.equal((await POST(retry)).status, 202); assert.equal(sends, 2); assert.equal(callbacks.length, 1)
     assert.equal(JSON.stringify(logs).includes('PRIVATE_'), false)
   } finally { send.mock.restore(); error.mock.restore() }
+})
+
+test('the internal Cloudflare receipt rejects tampering, other domains, oversized rows and stale queue authentication', async t => {
+  const { POST: receipt } = await import('../../internal/github/workflow-result/route')
+  const value = { version: 1, deliveryId: 'fixture', installationId: 11, repositoryId: 22, repository: 'o/r',
+    workflowId: 33, workflowRunId: 44, attempt: 1, headSha: 'a'.repeat(40), branch: 'mikka/ci-7', conclusion: 'failure' }
+  const now = Date.UTC(2026, 0, 1)
+  t.mock.method(Date, 'now', () => now)
+  const body = JSON.stringify(value), stamp = now / 1000, route = 'https://app.aspectlylabs.com/mikka/api/internal/github/workflow-result'
+  async function receive(bytes: string, macBody: string, time: number, internal = true) {
+    const signature = createHmac('sha256', secret).update(internal ? 'mikka-ci-workflow-v1\n' + time + '\n' + macBody : macBody).digest('hex')
+    return (await receipt(new Request(route, { method: 'POST', body: bytes, headers: {
+      'x-mikka-ci-signature': signature, 'x-mikka-ci-time': String(time), 'content-type': 'application/json' } }))).status
+  }
+  process.env.MIKKA_EDITION = 'cloud'
+  assert.equal(await receive(body, body, stamp - 301), 401)
+  assert.equal(await receive(body, body, stamp + 301), 401)
+  assert.equal(await receive(body + ' ', body, stamp), 401)
+  assert.equal(await receive(body, body, stamp, false), 401)
+  assert.equal(await receive('a'.repeat(2049), body, stamp), 413)
+  const unknown = JSON.stringify({ ...value, url: 'https://example.invalid' })
+  // These boundary receipts pass the clock check and reach schema validation.
+  assert.equal(await receive(unknown, unknown, stamp - 300), 400)
+  assert.equal(await receive(unknown, unknown, stamp + 300), 400)
+  process.env.MIKKA_EDITION = 'community'
+  assert.equal(await receive(body, body, stamp), 404)
 })

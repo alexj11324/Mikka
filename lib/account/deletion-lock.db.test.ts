@@ -40,6 +40,39 @@ test('Postgres sessions demonstrate the transaction-pooler lock hazard and owned
   assert.equal(locks.n, 0)
 })
 
+test('the custody child loses its narrow PostgreSQL permission when the deletion backend exits', { skip: !dbUrl }, async t => {
+  const main = new Pool({ connectionString: dbUrl })
+  const job = randomUUID(), owner = randomUUID(), workspace = randomUUID(), connection = randomUUID(), grant = randomUUID()
+  const lease = await acquireAccountDeletionLock(main, job)
+  const child = await main.connect()
+  t.after(async () => {
+    child.release(true)
+    try {
+      await lease.close()
+      await main.query('DELETE FROM account_deletion_workspace_guards WHERE "workspaceId"=$1 AND "jobId"=$2', [workspace,job])
+      await main.query('DELETE FROM account_deletion_guards WHERE "subjectId"=$1 AND "jobId"=$2', [owner,job])
+      await main.query('DELETE FROM account_deletion_jobs WHERE id=$1 AND "subjectUserId"=$2', [job,owner])
+      await main.query('DELETE FROM byos_connections WHERE id=$1 AND "ownerId"=$2', [connection,owner])
+    } finally { await main.end() }
+  })
+  await main.query(`INSERT INTO byos_connections(id,"ownerId","workspaceId",provider,state,"credentialVersion")
+    VALUES($1,$2,$3,'codex','disconnected',1)`, [connection,owner,workspace])
+  await main.query(`INSERT INTO account_deletion_jobs(id,"subjectUserId","subjectEmailHash",stage,plan)
+    VALUES($1,$2,repeat('0',64),'external_pending',$3)`, [job,owner,JSON.stringify({solo:[workspace]})])
+  await main.query('INSERT INTO account_deletion_guards("subjectId","jobId") VALUES($1,$2)', [owner,job])
+  await main.query('INSERT INTO account_deletion_workspace_guards("workspaceId","jobId") VALUES($1,$2)', [workspace,job])
+  await child.query("SELECT set_config('mikka.byos_cleanup_grant',$1,false)", [grant])
+  const hide = 'UPDATE byos_connections SET "removedAt"=now() WHERE id=$1'
+  await assert.rejects(child.query(hide,[connection]), {code:'55000'})
+  await lease.client.query('SELECT pg_advisory_lock(hashtextextended($1,0))', ['mikka-account-byos-cleanup:' + job + ':' + grant])
+  await assert.rejects(child.query('UPDATE byos_connections SET paused=true WHERE id=$1',[connection]), {code:'55000'})
+  assert.equal((await child.query(hide,[connection])).rowCount, 1)
+  const {rows:[backend]} = await lease.client.query('SELECT pg_backend_pid() AS pid')
+  assert.equal((await main.query('SELECT pg_terminate_backend($1::integer,5000) AS terminated', [backend.pid])).rows[0].terminated, true)
+  await assert.rejects(child.query(hide,[connection]), {code:'55000'})
+  assert.equal((await main.query('SELECT stage FROM account_deletion_jobs WHERE id=$1', [job])).rows[0].stage, 'external_pending')
+})
+
 test('a busy deletion sweep preserves the pending report and retries after closure, cancellation and errors', { skip: !dbUrl }, async t => {
   // A real server statement timeout also bounds the old implementation's wait
   // so the regression fails on its report mutation instead of hanging a test.

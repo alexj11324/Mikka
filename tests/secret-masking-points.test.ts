@@ -14,7 +14,9 @@ const points: Array<[string, string, RegExp]> = [
   ['completion result', 'app/v1/runs/[runId]/complete/route.ts', /secretMaskerFor\(\{ workspaceId: caller\.scopeWorkspaceId, ownerId: caller\.userId \}\)/],
   ['run PATCH error', 'app/v1/runs/[runId]/route.ts', /maskFor\(\{ workspaceId: caller\.scopeWorkspaceId, ownerId: caller\.userId \}/],
   ['checkpoint patch/files', 'app/v1/runs/[runId]/checkpoint/route.ts', /maskCheckpoint\(/],
-  ['capture title', 'app/v1/runs/[runId]/captures/route.ts', /maskFor\(\{ workspaceId: found\.caller\.scopeWorkspaceId, ownerId: found\.owner\.userId \}/],
+  ['capture owner and workspace scope', 'app/v1/runs/[runId]/captures/route.ts', /const scope = \{ workspaceId: found\.caller\.scopeWorkspaceId, ownerId: found\.owner\.userId \}/],
+  ['capture title', 'app/v1/runs/[runId]/captures/route.ts', /title: await maskFor\(scope, parsed\.data\.title\)/],
+  ['capture timeline labels', 'app/v1/runs/[runId]/captures/route.ts', /label: await maskFor\(scope, step\.label\)/],
   ['screen capture title', 'app/v1/runs/[runId]/screen/route.ts', /maskFor\(\{ workspaceId: caller\.workspaceId, ownerId: caller\.userId \}/],
   ['MCP report/ask/blocked', 'lib/mcp/worker.ts', /maskForRun\(run\.id/],
   ['MCP artifacts', 'lib/mcp/artifacts.ts', /maskForRun\(/],
@@ -22,7 +24,6 @@ const points: Array<[string, string, RegExp]> = [
   ['subagent workflow report', 'workflows/subagent/steps.ts', /maskFor\(\{workspaceId:actor\.workspaceId,ownerId:actor\.userId\}/],
   ['computer review call', 'lib/computer/reviews.ts', /maskDeep\(row\.call, mask\)/],
   ['computer review route passes masker', 'app/v1/devices/[deviceId]/computer/route.ts', /secretMaskerFor\(\{ workspaceId: caller\.scopeWorkspaceId, ownerId: caller\.userId \}\)/],
-  ['native coordinator command', 'app/v1/devices/[deviceId]/coordinator/route.ts', /maskFor\(\{ workspaceId: caller\.scopeWorkspaceId, ownerId: caller\.userId \}, body\.command\)/],
 ]
 
 for (const [name, file, pattern] of points) {

@@ -23,6 +23,21 @@ Do not retain an independently functioning old loop or permanent runtime
 toggle. A required adapter documents the missing public eve equivalent and
 tests the product boundary it preserves.
 
+## Cloudflare internal calls
+
+Carry the principal established by Eve through Cloudflare's private service
+bindings. Do not add a second signed, expiring Mikka credential to these calls.
+Public API ingress removes caller-supplied internal identity headers. Only the
+private binding entrypoints stamp identity for the receiving container, which
+still checks persisted owner, Workspace, Bot, session and execution bindings.
+Cloudflare internal handlers reject legacy service-token and cookie fallbacks.
+Other hosting modes retain their existing authentication contracts.
+
+API and Eve changes to this transport must ship as a paired, source-bound
+release. Prepare both services and their reciprocal bindings before moving
+production traffic. A completed publish is not chat acceptance: verify actual
+generated text through both supported official subscription providers.
+
 ## Native MCP on a task machine
 
 Configure authorized HTTP MCP endpoints and headers directly on the task's

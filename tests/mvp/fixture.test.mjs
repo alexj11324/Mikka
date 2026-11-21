@@ -18,8 +18,6 @@ import { artifactSubmittedEvent } from '../../lib/coordinator-events.ts'
 import { startMvpServices } from './services.mjs'
 import { traceGitHubEnvironment } from './trace-codex.mjs'
 import { hasBoundMvpTransport, installMvpTransport, MVP_DECISION_KEY, verifyMvpTransport } from './transport.mjs'
-import { createDedupeFetch } from 'next/dist/server/lib/dedupe-fetch.js'
-import { createPatchedFetcher } from 'next/dist/server/lib/patch-fetch.js'
 
 const database = 'postgresql://ci:fixture@127.0.0.1:5432/mikka_e2e'
 const isolated = { CI: 'true', GITHUB_ACTIONS: 'true', MIKKA_MVP_E2E: '1', MIKKA_TEST_MODE: '1', E2E_DATABASE_URL: database, MIKKA_DATABASE_URL: database, DATABASE_URL: database }
@@ -260,10 +258,8 @@ test('local test mode replaces only the GitHub Actions requirement (the rule: sc
 })
 
 test('synthetic MVP transport binds the active fetch path, preserves requests and refuses other external services', async () => {
-  const env = { ...isolated, AI_GATEWAY_API_KEY: MVP_DECISION_KEY }
+  const env = { ...isolated, MIKKA_LITELLM_MASTER_KEY: MVP_DECISION_KEY }
   const requests = []
-  const nextPatch = Symbol.for('next-patch')
-  const previousNextPatch = Object.getOwnPropertyDescriptor(globalThis, nextPatch)
   const restore = installMvpTransport(env, async (request, options) => {
     requests.push({ url: request.url, method: request.method, authorization: request.headers.get('authorization'), body: await request.text(), redirect: options?.redirect })
     return new Response('{}', { headers: { 'content-type': 'application/json' } })
@@ -274,14 +270,14 @@ test('synthetic MVP transport binds the active fetch path, preserves requests an
     assert.equal(hasBoundMvpTransport(env), true)
     assert.equal(requests.length, 0, 'the transport challenge does not contact a server')
     const transport = globalThis.fetch
-    // Exercise the installed Next wrapper and its opaque dedupe closure.
-    // The proof must work through its real delegation, without property names.
-    const noRequestStore = { getStore: () => undefined }
-    globalThis.fetch = createPatchedFetcher(createDedupeFetch(transport), { workAsyncStorage: noRequestStore, workUnitAsyncStorage: noRequestStore })
+    // Exercise the installed transport behind an opaque wrapper, the way a host
+    // runtime may wrap fetch. The proof must work through delegation alone,
+    // without reading property names off the wrapper.
+    globalThis.fetch = (...args) => transport(...args)
     assert.equal(hasBoundMvpTransport(env), false)
     assert.equal(await verifyMvpTransport(env), true)
     assert.equal(hasBoundMvpTransport(env), true)
-    await fetch('https://ai-gateway.vercel.sh/v1/decisions', {
+    await fetch('http://127.0.0.1:3191/litellm/v1/decisions', {
       method: 'POST', headers: { authorization: `Bearer ${MVP_DECISION_KEY}`, 'content-type': 'application/json' }, body: '{"synthetic":true}',
     })
     await fetch(new Request('https://api.github.com/repos/mikka-e2e/core-loop/pulls?page=1', { headers: { authorization: 'Bearer initial-fixture' } }), {
@@ -293,7 +289,7 @@ test('synthetic MVP transport binds the active fetch path, preserves requests an
       { url: 'http://127.0.0.1:3191/github/repos/mikka-e2e/core-loop/pulls?page=1', method: 'POST', authorization: 'Bearer overridden-fixture', body: '{"draft":true}', redirect: 'error' },
       { url: 'http://localhost:3100/mikka/api/test-environment', method: 'GET', authorization: null, body: '', redirect: 'error' },
     ])
-    for (const url of ['https://example.invalid', 'https://ai-gateway.vercel.sh/v1/decisions?unexpected=1', 'https://api.github.com.attacker.invalid'])
+    for (const url of ['https://example.invalid', 'http://127.0.0.1:3191/litellm/v1/decisions?unexpected=1', 'https://api.github.com.attacker.invalid'])
       await assert.rejects(async () => fetch(url), /unstubbed external request/)
     assert.equal(requests.length, 3)
     globalThis.fetch = async (_input, options) => new Response(null, { status: 204, headers: { 'x-mikka-fixture-response': options.headers['x-mikka-fixture-challenge'] } })
@@ -302,8 +298,6 @@ test('synthetic MVP transport binds the active fetch path, preserves requests an
     assert.equal(hasBoundMvpTransport(env), false)
   } finally {
     restore()
-    if (previousNextPatch) Object.defineProperty(globalThis, nextPatch, previousNextPatch)
-    else delete globalThis[nextPatch]
   }
 })
 
@@ -365,7 +359,7 @@ test('scripted Decisions accepts only the runtime triage contract and identifies
   try {
     const runId = randomUUID(), eventId = randomUUID()
     const request = {
-      model: 'openai/gpt-6-luna-decisions',
+      model: 'mikka-decision',
       input: [{ role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ hostObservation: JSON.stringify({ eventId, eventKind: 'run_finished', ownerId: randomUUID(), runId, observedRun: { id: runId, status: 'succeeded' } }) }) }] }],
       questions: [{ type: 'choice', name: 'tier', choices: ['attention', 'result', 'background'].map(value => ({ value })) }],
     }
@@ -374,8 +368,8 @@ test('scripted Decisions accepts only the runtime triage contract and identifies
     assert.equal(response.status, 200)
     const result = await response.json()
     assert.equal(result.model, request.model)
-    assert.match(result.provider_metadata.gateway.generationId, /^mvp-synthetic-/)
-    assert.equal(result.provider_metadata.gateway.cost,'0.001','scripted hosted triage includes its billing receipt')
+    assert.match(response.headers.get('x-litellm-call-id'), /^mvp-synthetic-/)
+    assert.equal(response.headers.get('x-litellm-response-cost'),'0.001','scripted hosted triage includes its billing receipt')
     assert.deepEqual(result.answers, [{ type: 'choice', name: 'tier', choice: 'result' }])
     for (const invalid of [{ ...request, model: 'unconfigured-model' }, { ...request, questions: [{ type: 'predicate', name: 'approved' }] }, { ...request, input: 'unexpected judgment request' }]) {
       assert.equal((await post(invalid)).status, 500)
@@ -394,7 +388,7 @@ test('scripted Decisions accepts the real artifact notice contract without requi
     const artifact = { artifactId: randomUUID(), version: 1, title: 'Synthetic acceptance report', kind: 'markdown' }
     const submitter = { userId: randomUUID(), botId: randomUUID(), issueId: randomUUID(), runId: randomUUID(), authorName: 'Synthetic Agent' }
     const event = (source = submitter, value = artifact) => ({ ...artifactSubmittedEvent(source, value), id: randomUUID(), observedRun: null })
-    const request = value => ({ model: 'openai/gpt-6-luna-decisions', input: decisionRequestInput(triageInput(value)), questions: triageQuestions(value) })
+    const request = value => ({ model: 'mikka-decision', input: decisionRequestInput(triageInput(value)), questions: triageQuestions(value) })
     const post = body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
     // Both a run artifact and a Factory/agent report without a run use this
     // producer. Neither receipt supplies the independent PR publication gate.
@@ -417,7 +411,7 @@ test('scripted Decisions answers an ended run\'s outcome only from the run outco
   try {
     const OUTCOME_QUESTIONS = [{ type: 'choice', name: 'outcome', choices: ['done', 'blocked', 'needs_input', 'failed', 'idle'].map(value => ({ value })) }]
     const facts = (status) => ['status: ' + status, 'stop reason: none', 'attempts on this task: 1', 'task: in_review — "Add README"', 'pull requests: open', 'summary (quoted): "Opened the PR"', 'last reply (quoted): "Done"'].join('\n')
-    const request = (text, questions = OUTCOME_QUESTIONS) => ({ model: 'openai/gpt-6-luna-decisions', input: decisionRequestInput(text), questions })
+    const request = (text, questions = OUTCOME_QUESTIONS) => ({ model: 'mikka-decision', input: decisionRequestInput(text), questions })
     const post = async body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
     assert.deepEqual((await (await post(request(facts('succeeded')))).json()).answers, [{ type: 'choice', name: 'outcome', choice: 'done' }])
     assert.deepEqual((await (await post(request(facts('cancelled')))).json()).answers, [{ type: 'choice', name: 'outcome', choice: 'idle' }])
@@ -435,7 +429,7 @@ test('scripted Decisions answers a Coordinator reply\'s phone push only from the
   try {
     const PUSH_QUESTIONS = [{ type: 'choice', name: 'push', choices: ['decide', 'review', 'finished', 'briefing', 'none'].map(value => ({ value })) }]
     const evidence = (answers) => `answeredEvents: user_message (attention)\nanswersAMessageFromThePerson: ${answers}\nreply: 已在你选择的电脑上启动线程。`
-    const request = (input, questions = PUSH_QUESTIONS) => ({ model: 'openai/gpt-6-luna-decisions', input, questions })
+    const request = (input, questions = PUSH_QUESTIONS) => ({ model: 'mikka-decision', input, questions })
     const post = async body => fetch(`${services.origin}/decisions`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer mvp-synthetic-decisions' }, body: JSON.stringify(body) })
     assert.deepEqual((await (await post(request(evidence('yes')))).json()).answers, [{ type: 'choice', name: 'push', choice: 'none' }])
     for (const invalid of [request('reply: hi'), request([{ role: 'user', content: [{ type: 'input_text', text: evidence('yes') }] }]), request(evidence('yes'), [{ ...PUSH_QUESTIONS[0], choices: PUSH_QUESTIONS[0].choices.slice(1) }])]) {

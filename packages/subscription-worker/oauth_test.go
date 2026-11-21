@@ -204,3 +204,46 @@ func TestCodexDeviceCPAProtocolOwnerSessionIntervalPKCEOneUseAndExpiry(t *testin
 		t.Fatal("token redirect followed")
 	}
 }
+
+// What a person pastes on a phone or the web: the address Safari ended on, in
+// any of the shapes it shows, Claude's code page's `code#state`, or the code.
+func TestClaudeReturnCodeAcceptsPastedShapes(t *testing.T) {
+	state := strings.Repeat("s", 43)
+	for _, text := range []string{
+		"http://localhost:54545/callback?code=abc_123-x&state=" + state,
+		"https://localhost:54545/callback?code=abc_123-x&state=" + state,
+		"localhost:54545/callback?code=abc_123-x&state=" + state,
+		"  http://127.0.0.1:54545/callback?state=" + state + "&code=abc_123-x\n",
+		"https://platform.claude.com/oauth/code/callback?code=abc_123-x&state=" + state,
+		"abc_123-x#" + state,
+		"abc_123-x",
+	} {
+		if code, ok := claudeReturnCode(strings.TrimSpace(text), state); !ok || code != "abc_123-x" {
+			t.Fatalf("%q: got %q %v", text, code, ok)
+		}
+	}
+	for _, text := range []string{
+		"",
+		"http://localhost:54545/callback?code=abc&state=" + strings.Repeat("t", 43),
+		"abc#" + strings.Repeat("t", 43),
+		"https://evil.example/callback?code=abc&state=" + state,
+		"http://localhost:54545/callback?code=a&code=b&state=" + state,
+		"http://localhost:54545/other?code=abc&state=" + state,
+		"ab c",
+		"ab/c",
+	} {
+		if code, ok := claudeReturnCode(text, state); ok {
+			t.Fatalf("%q: accepted %q", text, code)
+		}
+	}
+}
+
+// Web and phones authorize with Claude Code's code page; the exchange names it.
+func TestClaudeCodePageRedirectIsTheOfficialOne(t *testing.T) {
+	if claudeCodePageURI != "https://platform.claude.com/oauth/code/callback" {
+		t.Fatal(claudeCodePageURI)
+	}
+	if _, err := (CPAClaudeOAuth{}).ExchangeWithRedirect(context.Background(), "c", "s", "v", "https://evil.example/cb"); err != ErrUnsupported {
+		t.Fatal(err)
+	}
+}

@@ -7,10 +7,10 @@ import { settingsRead } from '@/lib/settings-read'
 import { settingsKeys } from '@/lib/swr/keys'
 import type { Preferences } from '@/lib/preferences'
 
-export type NotificationFlags = Pick<Preferences, 'proactive' | 'pushDecide' | 'pushReview' | 'pushFinished' | 'pushBriefing' | 'pushWhen'>
+export type NotificationFlags = Pick<Preferences, 'proactive' | 'pushDecide' | 'pushReview' | 'pushFinished' | 'pushBriefing' | 'pushWhen' | 'organizationInvitationEmails'>
 export type NotificationSwitch = Exclude<keyof NotificationFlags, 'pushWhen'>
 /** The switches in the order both pages show them */
-export const NOTIFICATION_SWITCHES: NotificationSwitch[] = ['proactive', 'pushDecide', 'pushReview', 'pushFinished', 'pushBriefing']
+export const NOTIFICATION_SWITCHES: NotificationSwitch[] = ['proactive', 'pushDecide', 'pushReview', 'pushFinished', 'pushBriefing', 'organizationInvitationEmails']
 
 /**
  * D16: the notification settings the phone already has, with optimistic saves
@@ -37,5 +37,5 @@ export function useNotificationSettings() {
     }
   }
 
-  return { data, error, set, failed, retry: () => { if (failed) void set(failed) } }
+  return { data, error, reload: mutate, set, failed, retry: () => { if (failed) void set(failed) } }
 }

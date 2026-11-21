@@ -2,6 +2,7 @@
 // Postgres (both database targets on one URL) and seed helpers.
 import { randomUUID } from 'node:crypto'
 import type { Pool } from 'pg'
+import { registeredTask } from '../helpers/registered-task'
 
 export const dbUrl = process.env.E2E_DATABASE_URL
 if (dbUrl) {
@@ -58,11 +59,16 @@ export async function seedPersonalWorkspace(pool: Pool, userId: string) {
   return id
 }
 
-export async function seedIssue(pool: Pool, userId: string, workspaceId?: string) {
+export async function seedIssue(pool: Pool, userId: string, workspaceId?: string, options: { registered?: boolean } = {}) {
   const id = randomUUID()
   const tenant = workspaceId ?? await seedPersonalWorkspace(pool, userId)
-  await pool.query(`insert into issues (id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
+  const insert = (client: Pick<Pool, 'query'>) => client.query(`insert into issues (id,"userId","workspaceId","ownershipState",scope,"linearSyncPolicy","linearSyncBlocked",title,content,status,priority)
     select $1,$2,w.id,'bound',case when w.kind='personal' then 'personal' else 'workspace' end,'disabled',true,'Task','{"type":"doc"}','todo','normal' from mikka_workspaces w where w.id=$3`, [id, userId, tenant])
+  // Legacy/rollback fixtures may intentionally own uncommitted Workspace rows
+  // on this same connection. Only normal committed creation opts into the
+  // production WS-first registration boundary; it cannot borrow those rows.
+  if (options.registered) await registeredTask(pool, userId, tenant, id, insert)
+  else await insert(pool)
   return id
 }
 
@@ -101,13 +107,3 @@ export async function seedProjectTasks(pool: Pool, projectId: string, issueIds: 
 
 export const count = async (pool: Pool, text: string, params: unknown[]) => Number((await pool.query<{ n: string }>(`select count(*)::text as n from ${text}`, params)).rows[0].n)
 
-/**
- * The workspace's free messages (TRIAL_MESSAGES, no card yet) are used up: one
- * more message than the trial sent in a chat there, so Mikka 默认 asks for a card.
- */
-export async function useUpFreeMessages(pool: Pool, workspaceId: string, ownerId: string) {
-  const { TRIAL_MESSAGES } = await import('../../lib/abuse/policy')
-  const bot = await seedBot(pool, workspaceId, ownerId)
-  for (let i = 0; i <= TRIAL_MESSAGES; i++)
-    await pool.query(`insert into coordinator_events (id,"userId","botId",kind,"dedupeKey",payload) values ($1,$2,$3,'user_message',$4,$5)`, [randomUUID(), ownerId, bot, `user_message:${randomUUID()}`, JSON.stringify({ text: `message ${i}` })])
-}

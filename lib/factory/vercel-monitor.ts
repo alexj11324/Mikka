@@ -1,7 +1,7 @@
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { FactoryError } from "./contract";
 import type { MonitorProbeAdapter, MonitorPublication } from "./monitor-probe";
-import { MIKKA_VERCEL, vercelTarget } from "./vercel-publication";
+import { MIKKA_VERCEL, vercelTarget } from "./vercel-target";
 import { isLoopbackHost } from "../loopback";
 
 export const FACTORY_HEALTH_PATH = "/mikka/api/health";

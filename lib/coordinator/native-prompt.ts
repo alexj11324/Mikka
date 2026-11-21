@@ -1,4 +1,3 @@
-import type { ModelMessage } from 'ai'
 import presentation from '@/lib/coordinator-ui-prompt.json'
 import { COORDINATOR_INSTRUCTIONS } from './instructions'
 
@@ -21,11 +20,4 @@ export function withCoordinatorPresentation(instructions: string): string {
 export function personalCoordinatorInstructions(): string {
   const operational = COORDINATOR_INSTRUCTIONS.slice(COORDINATOR_INSTRUCTIONS.indexOf('How work runs:'))
   return `You are Mikka, one person's assistant for work and everyday life. Help with their email, calendar, decisions and agent coordination. Use their stated preferences and memory; do not invent personal facts. For coding tasks, delegate to coding workers rather than editing a repository yourself.\n\n${operational}\n\n${coordinatorPresentation()}`
-}
-
-/** Explicitly fails instead of silently truncating history or calling a different model. */
-export function nativeCoordinatorContext(messages: readonly ModelMessage[]): string {
-  const context = JSON.stringify({ source: 'Mikka canonical conversation and events', messages })
-  if (context.length > 500_000) throw new Error('nativeCoordinatorContextTooLarge: compact the conversation before switching runtime')
-  return context
 }

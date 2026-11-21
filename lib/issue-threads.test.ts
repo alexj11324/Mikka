@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { agentStretches, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
+import { agentStretches, taskThreadRoots, canReadThread, projectIssueThreads, taskFreeThreadMembers, threadName, threadQuestionRunId, threadQuestionView, threadTime, withRunChain } from './issue-threads'
 import type { RunChain } from './run-chain'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 
 const make = (id: string, userId = 'teammate', issueId = 'issue') => ({
   id, issueId, userId, status: 'running', prompt: 'Route group replies\nthen run e2e', report: { summary: 'Done' }, error: null,
-  createdAt: new Date('2026-01-01'), finishedAt: null, agentName: 'Mikka Backend', harness: 'codex', ownerName: userId === 'viewer' ? 'Me' : 'Lin',
+  createdAt: new Date('2026-01-01'), finishedAt: null, agentName: 'Mikka Backend', harness: 'codex', agentId: 'agent-codex', ownerName: userId === 'viewer' ? 'Me' : 'Lin',
 })
 
 test('a teammate thread shows whose it is, its status and time, never its content', () => {
@@ -22,7 +22,7 @@ test('a teammate thread shows whose it is, its status and time, never its conten
 test('the owner reads their own thread in full', () => {
   const [mine] = projectIssueThreads([make('mine', 'viewer')], 'issue', 'viewer', new Set(['teammate', 'viewer']))
   assert.equal(mine.ownerName, null)
-  assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', summary: 'Done', summarySource: 'report', bot: null })
+  assert.deepEqual(mine.detail, { name: 'Route group replies', agentName: 'Mikka Backend', harness: 'codex', agentId: 'agent-codex', summary: 'Done', summarySource: 'report', bot: null })
 })
 
 test('the full owner detail identifies an error fallback without exposing private details to teammates', () => {
@@ -73,7 +73,19 @@ test('threads are latest first and bounded to twenty', () => {
 test('a thread is named by the first line it was asked, shortened, else by its agent', () => {
   assert.equal(threadName('\n  Fix the board  \nmore', 'Agent'), 'Fix the board')
   assert.equal(threadName('', 'Mikka Backend'), 'Mikka Backend')
-  assert.equal(Array.from(threadName('长'.repeat(80), 'x')).length, 60)
+  assert.equal(Array.from(threadName('长'.repeat(80), 'x')).length, 12, 'held to the short-title bound, as every surface names it')
+})
+
+test('the conversation and activity read the pause reason from the displayed attempt', () => {
+  const root = { ...make('root', 'viewer'), status: 'paused', pauseReason: 'quota_exhausted' as const }
+  const [thread] = projectIssueThreads([root], 'issue', 'viewer', new Set(['viewer']))
+  assert.equal(threadQuestionView(thread).pauseReason, 'quota_exhausted')
+  const tail = { ...thread.attempts[0], runId: 'child', attempt: 2, pauseReason: 'human_control' as const, stopRequestedAt: null }
+  const resumed = withRunChain(thread, { rootRunId: 'root', latestRunId: 'child', attempts: [
+    { ...thread.attempts[0], stopRequestedAt: null }, tail,
+  ] })
+  assert.equal(threadQuestionView(resumed).pauseReason, 'human_control')
+  assert.equal(resumed.attempts[0].pauseReason, 'quota_exhausted')
 })
 
 test('a resumed question is one thread: its run chain folds the continuation into the origin row, named as the origin', () => {
@@ -209,7 +221,7 @@ test('thread lists expose only compact diagnostics, including the latest continu
 })
 
 test('agentStretches joins consecutive threads by one Agent, oldest first (2026-11-09-0045)', () => {
-  const t = (id: string, at: number, harness: string | null) => ({ id, createdAt: new Date(at), detail: harness ? { harness } : null })
+  const t = (id: string, at: number, harness: string | null) => ({ id, createdAt: new Date(at), detail: harness ? { harness, agentId: `${harness}-agent` } : null })
   const out = agentStretches([t('c', 3, 'codex'), t('a', 1, 'claude_code'), t('b', 2, 'claude_code'), t('d', 4, 'claude_code'), t('h1', 5, null), t('h2', 6, null)])
   assert.deepEqual(out.map(s => [s.agent, s.first.id, s.last.id, s.ids]), [
     ['claude_code', 'a', 'b', ['a', 'b']], ['codex', 'c', 'c', ['c']], ['claude_code', 'd', 'd', ['d']], [null, 'h1', 'h2', ['h1', 'h2']],
@@ -220,8 +232,44 @@ test('agentStretches joins consecutive threads by one Agent, oldest first (2026-
   assert.deepEqual(checks.map(s => [s.agent, s.ids]), [['claude_code', ['i']]])
 })
 
+test('agentStretches does not merge distinct Agents that share a harness and Profile', () => {
+  const t = (id: string, at: number, agentId: string) => ({ id, createdAt: new Date(at), detail: { harness: 'codex', agentId, profile: null } })
+  const out = agentStretches([t('a', 1, 'agent-a'), t('b', 2, 'agent-b')])
+  assert.deepEqual(out.map(stretch => [stretch.agentId, stretch.ids]), [['agent-a', ['a']], ['agent-b', ['b']]])
+})
+
 test('agentStretches also splits where the custom Agent 配置 changes (2026-11-10)', () => {
   const t = (id: string, at: number, profile: string | null) => ({ id, createdAt: new Date(at), detail: { harness: 'codex', profile: profile ? { id: profile } : null } })
   const out = agentStretches([t('a', 1, null), t('b', 2, 'review'), t('c', 3, 'review'), t('d', 4, 'docs'), t('e', 5, null)])
   assert.deepEqual(out.map(s => [s.profile, s.ids]), [[null, ['a']], ['review', ['b', 'c']], ['docs', ['d']], [null, ['e']]])
+})
+
+test('the newest visible conversational continuation owns replies even after a private run or a Factory check', () => {
+  const visible = new Set(['teammate', 'viewer'])
+  const [first] = projectIssueThreads([make('first', 'viewer')], 'issue', 'viewer', visible)
+  const [later] = projectIssueThreads([make('second', 'viewer')], 'issue', 'viewer', visible)
+  const [redacted] = projectIssueThreads([make('other')], 'issue', 'viewer', visible)
+  first.latestRunId = 'resumed'
+  first.attempts.push({ ...first.attempts[0], runId: 'resumed', createdAt: new Date('2026-01-03') })
+  later.createdAt = new Date('2026-01-02')
+  later.attempts[0].createdAt = later.createdAt
+  const review = { ...later, id: 'review', kind: 'acceptance', createdAt: new Date('2026-01-04') }
+  for (const list of [[redacted, later, review, first], [first, review, later, redacted]]) {
+    const { readable, reply } = taskThreadRoots(list)
+    assert.deepEqual(readable.map(run => run.id), ['first', 'second', 'review'])
+    assert.equal(reply?.latestRunId, 'resumed')
+  }
+  assert.equal(taskThreadRoots([review, redacted]).reply, null)
+})
+
+test('only an authorized thread owner sees the runtime-observed model in the task work list', () => {
+  const members = new Set(['owner', 'peer'])
+  const { prompt: _prompt, report: _report, error: _error, ...base } = make('root', 'owner')
+  const row = { ...base, name: 'Conversation', summary: 'Done', observedModel: 'served-v2' }
+  assert.equal(projectIssueThreads([row], 'issue', 'owner', members)[0].detail?.observedModel, 'served-v2')
+  assert.equal(projectIssueThreads([{ ...row, observedModel: null }], 'issue', 'owner', members)[0].detail?.observedModel, null)
+  const [peer] = projectIssueThreads([row], 'issue', 'peer', members)
+  assert.equal(peer.detail, null)
+  assert.equal(JSON.stringify(peer).includes('served-v2'), false)
+  assert.deepEqual(projectIssueThreads([row], 'issue', 'owner', new Set(['peer'])), [])
 })

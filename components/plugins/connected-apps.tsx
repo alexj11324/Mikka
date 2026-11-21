@@ -3,8 +3,8 @@
 import { ReadResponseError } from '@/lib/swr/retry'
 import { useEffect, useState, type MouseEvent, type ReactNode } from 'react'
 import useSWR from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
-import { ArrowUpRight, Blocks, ChevronDown, ChevronRight, Ellipsis, Plus } from 'lucide-react'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
+import { ArrowUpRight, Blocks, ChevronDown, ChevronRight, Ellipsis, Plus } from '@/components/icons'
 import { toast } from 'sonner'
 
 import { APP_ICONS } from '@/components/plugins/app-icons'
@@ -21,9 +21,11 @@ import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
+import { WhyDisabled } from '@/components/ui/why-disabled'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'
-import { COMPOSIO_APP_IDS, composioConnectRedirect, type ComposioAppId, type ConnectedAccountView as AccountView } from '@/lib/composio-accounts'
-import type { StoreApp, StoreCatalog } from '@/lib/plugins/catalog'
+import { appState, needsReconnect } from '@/lib/composio-account-state'
+import { composioConnectRedirect, type ConnectedAccountView as AccountView } from '@/lib/composio-accounts'
+import { findCredentialAlternative, type StoreApp, type StoreCatalog } from '@/lib/plugins/catalog'
 import type { AppDetail, AppTool } from '@/lib/plugins/app-detail'
 import { openCurrentPageInBrowser } from '@/lib/platform/open-settings'
 import { useCheckOnReturn } from '@/lib/hooks/use-check-on-return'
@@ -63,8 +65,9 @@ export type OwnAppId = typeof OWN_APPS[number]
 export const isOwnApp = (value: string | null): value is OwnAppId => value !== null && (OWN_APPS as readonly string[]).includes(value)
 
 /**
- * An app's name and icon anywhere on the page: ours and the first four apps
- * from messages, every other store app from Composio's catalog.
+ * An app's name and icon anywhere on the page: ours from messages, every
+ * Composio app from Composio's live catalog (a message for its id stands in
+ * only while the catalog has not been read, then the toolkit slug).
  */
 export function useAppInfo() {
   const t = useTranslations('Settings.integrations')
@@ -74,7 +77,7 @@ export function useAppInfo() {
   const byId = new Map<string, StoreApp>((data?.apps ?? []).map(app => [app.id, app]))
   return (id: string) => {
     const store = byId.get(id)
-    const name = id === 'linear' ? tLinear('title') : id === 'telegram' ? tTelegram('title') : id === 'github' || isComposioAppId(id) ? t(id) : store?.name ?? id
+    const name = id === 'linear' ? tLinear('title') : id === 'telegram' ? tTelegram('title') : id === 'github' ? t(id) : store?.name ?? (t.has(id as never) ? t(id as never) : id)
     return { name, iconUrl: store?.iconUrl ?? null, description: isOwnApp(id) ? '' : store?.description ?? '' }
   }
 }
@@ -91,16 +94,12 @@ export async function readConnectedApps(): Promise<IntegrationState> {
   return await response.json() as IntegrationState
 }
 
-/** Facts for 关于: who makes the app and where it lives. */
-const APP_ABOUT: Record<ComposioAppId, { developer: string; website: string }> = {
+/** Facts for 关于 that Composio does not give: who makes a few apps and where they live. Optional; any app has a page without one. */
+const APP_ABOUT: Readonly<Record<string, { developer: string; website: string }>> = {
   gmail: { developer: 'Google', website: 'https://mail.google.com' },
   googlecalendar: { developer: 'Google', website: 'https://calendar.google.com' },
   notion: { developer: 'Notion Labs', website: 'https://www.notion.com' },
   slack: { developer: 'Slack', website: 'https://slack.com' },
-}
-
-export function isComposioAppId(value: string | null): value is ComposioAppId {
-  return value !== null && (COMPOSIO_APP_IDS as readonly string[]).includes(value)
 }
 
 
@@ -138,8 +137,6 @@ function useTakeoverText() {
   }
 }
 
-/** An account Composio can no longer use until it is reconnected. */
-const needsReconnect = (account: ConnectedAccountView) => account.status !== 'ACTIVE'
 
 /** State and actions for the Composio apps, shared by the list and the detail page. */
 export function useConnectedApps(enabled = true) {
@@ -299,12 +296,6 @@ export function useConnectedApps(enabled = true) {
 
 export type ConnectedApps = ReturnType<typeof useConnectedApps>
 
-/** A disabled button takes no pointer events, so its reason sits on a wrapper. */
-function WhyDisabled({ reason, fill = false, children }: { reason?: string; fill?: boolean; children: ReactNode }) {
-  if (!reason) return children
-  return <span title={reason} className={cn('inline-flex', fill && 'w-full')}>{children}</span>
-}
-
 /**
  * Setup and result lines above the list or the detail page. Loading is read out only:
  * a visible line would push the list down and then let it jump up when the accounts arrive.
@@ -320,13 +311,7 @@ export function ConnectedAppsStatus({ apps }: { apps: ConnectedApps }) {
 }
 
 /** The app's overall state from its accounts. */
-/** One app's accounts read as one row: usable ones, all expired, on or off. Shared with UI layers. */
-export function appState(accounts: ConnectedAccountView[]) {
-  const usable = accounts.filter(account => !needsReconnect(account))
-  const expired = accounts.length > 0 && usable.length === 0
-  const on = usable.some(account => account.enabled)
-  return { usable, expired, on, off: accounts.length > 0 && !expired && !on }
-}
+export { appState }
 
 /** A plain click opens the app's page in place; a modified click keeps the link's own behaviour. */
 function openInPlace(event: MouseEvent<HTMLAnchorElement>, onOpen: (() => void) | undefined) {
@@ -443,8 +428,10 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   const { name, iconUrl } = useAppInfo()(app)
   // Composio's own page data, for everyone, connected or not.
   const detail = useAppDetail(app)
+  const catalog = useStoreCatalog()
+  const credentialAlternative = detail.data ? findCredentialAlternative({ id: app, connect: detail.data.auth.kind }, catalog.data?.apps ?? []) : null
   // 开发者 only where Mikka already knows it; Composio does not say.
-  const about = isComposioAppId(app) ? APP_ABOUT[app] : null
+  const about = Object.hasOwn(APP_ABOUT, app) ? APP_ABOUT[app] : null
   const website = detail.data?.website ?? about?.website ?? null
   const busy = Boolean(apps.pending)
   const accountName = useAccountName()
@@ -454,10 +441,10 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   // How it connects: Composio's OAuth, the person's own key in a form, or nothing to connect.
   const kind = detail.data?.auth.kind ?? null
   const withKey = kind === 'credentials'
-  const canAdd = withKey ? apps.canEnterKey : apps.canLink
+  const canAdd = withKey ? apps.canEnterKey : kind === 'managed' && apps.canLink
   const [keyTarget, setKeyTarget] = useState<CredentialTarget | null>(null)
-  const add = () => { if (withKey) setKeyTarget({ app }); else void apps.connect(app) }
-  const reconnect = (accountId: string) => { if (withKey) setKeyTarget({ app, replaceAccountId: accountId }); else void apps.reconnect(accountId) }
+  const add = () => { if (withKey) setKeyTarget({ app }); else if (kind === 'managed') void apps.connect(app) }
+  const reconnect = (accountId: string) => { if (withKey) setKeyTarget({ app, replaceAccountId: accountId }); else if (kind === 'managed') void apps.reconnect(accountId) }
   const makeDefault = (account: ConnectedAccountView) => {
     const title = accountName(account)
     void apps.makeDefault(account.id).then(ok => { if (ok) toast.success(t('madeDefault', { account: title })) })
@@ -483,7 +470,7 @@ export function useConnectedAppPage(apps: ConnectedApps, app: string) {
   /** What the confirmation says will happen. */
   const disconnectText = (account: ConnectedAccountView) => takeoverText(accounts, account.id) ?? t('disconnectConsequence', { name })
   return {
-    name, iconUrl, accounts, several, detail, about, website, busy, kind, withKey, canAdd, keyTarget, setKeyTarget,
+    name, iconUrl, accounts, several, detail, about, website, busy, kind, withKey, canAdd, credentialAlternative, keyTarget, setKeyTarget,
     accountName, statusLabel, needsReconnect, add, reconnect, makeDefault, toggle, disconnect, disconnectText,
   }
 }

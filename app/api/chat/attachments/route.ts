@@ -14,7 +14,6 @@ import {
 } from '@/lib/chat-attachments/store'
 import { ChatFileError } from '@/lib/chat-attachments/extract'
 
-export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 const init = z
   .object({
@@ -81,7 +80,7 @@ export async function POST(request: Request) {
           : 'unavailable'
     return Response.json(
       { error: code },
-      { status: code === 'notFound' ? 404 : code === 'tooLarge' ? 413 : 400, headers },
+      { status: code === 'notFound' ? 404 : code === 'tooLarge' ? 413 : code === 'unavailable' ? 503 : 400, headers },
     )
   }
 }

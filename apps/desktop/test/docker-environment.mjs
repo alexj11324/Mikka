@@ -42,7 +42,6 @@ async function main() {
   const root = process.env.MIKKA_TEST_APP_DIR ? resolve(process.env.MIKKA_TEST_APP_DIR) : harnessRoot
   process.chdir(root)
   process.env.NODE_ENV = 'production'
-  process.env.NEXT_TELEMETRY_DISABLED = '1'
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
   const built = await readCompiledDockerBuild(root, { expectedRevision: revision })
   // The harness also uses pg to attest its database. Start the same compiled

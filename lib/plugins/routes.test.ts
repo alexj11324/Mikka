@@ -5,14 +5,20 @@ import { sessionMustBeFresh } from '@/lib/fresh-session'
 
 const calls: unknown[][] = []
 let owner: string | null = 'owner'
+let installedForRefresh: { id: string; enabled: boolean; transport: string }[] = []
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 stub('../api-auth.ts', { auth: { api: { getSession: async () => owner ? { user: { id: owner } } : null } } })
 stub('../request-log.ts', { noteLogRpcAction: () => {}, noteLogUser: () => {}, withRequestLog: (_path: string, handler: unknown) => handler })
-stub('./runtime.ts', { personalPlugins: {
-  listMcp: async (userId: string) => { calls.push(['listMcp', userId]); return [] },
+stub('./runtime.ts', { runPersonalMcp: async (actor: string, authority: unknown, command: { serverId: string; cursor?: string }) => {
+  assert.ok(sessionMustBeFresh())
+  calls.push(['refreshMcp', actor, authority, command])
+  return { serverId: command.serverId, tools: [{ name: 'list_issues', description: 'server description', inputSchema: {} }], nextCursor: null }
+}, personalPlugins: {
+  listMcp: async (userId: string) => { calls.push(['listMcp', userId]); return installedForRefresh },
   createMcp: async (...args: unknown[]) => { calls.push(['createMcp', ...args]); return { id: randomUUID(), authKind: 'header' } },
   updateMcp: async (...args: unknown[]) => { calls.push(['updateMcp', ...args]); return {} },
   deleteMcp: async (...args: unknown[]) => { calls.push(['deleteMcp', ...args]) },
+  getSkill: async (userId: string, id: string) => { calls.push(['getSkill', userId, id]); return { id } },
   listSkills: async (userId: string) => { calls.push(['listSkills', userId]); return [] },
   installSkill: async (...args: unknown[]) => { calls.push(['installSkill', ...args]); return {} },
   updateSkill: async (...args: unknown[]) => { calls.push(['updateSkill', ...args]); return {} },
@@ -79,6 +85,19 @@ test('actual routes use the authenticated owner, reject injected owners and expo
   assert.deepEqual(await store.json(), { configured: true, apps: [{ id: 'googledrive' }], popular: ['googledrive'], latest: [], categories: [] })
   const oversized = request('/api/skills', 'POST', { source: 'x'.repeat(17_000), slug: 'x' })
   assert.equal((await skills.POST(oversized)).status, 413)
+})
+
+test('one installed Skill is read by its authenticated owner and exact installation id', async () => {
+  owner = 'owner'
+  const id = randomUUID()
+  calls.length = 0
+  const response = await skills.GET(request('/api/skills?id=' + id))
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { skill: { id } })
+  for (const query of ['id=', 'id=invalid', 'id=' + id + '&id=' + id]) {
+    assert.equal((await skills.GET(request('/api/skills?' + query))).status, 400)
+  }
+  assert.deepEqual(calls, [['getSkill', 'owner', id]])
 })
 
 test('an app page needs a signed-in person, not a connected account', async () => {
@@ -173,4 +192,26 @@ test('a key goes from the signed-in person to Composio and never back out, in a 
     initiateFails = false
     methods.forEach((method, index) => { console[method] = original[index] })
   }
+})
+
+test('owner Settings refresh uses the personal discovery grant, accepts only a listing, and returns just tool names and cursor', async () => {
+  const { POST } = await import('../../app/api/integrations/mcp/refresh/route')
+  const path = '/api/integrations/mcp/refresh', serverId = randomUUID()
+  calls.length = 0
+  owner = null
+  assert.equal((await POST(request(path, 'POST', { serverId }))).status, 401)
+  owner = 'owner'
+  assert.equal((await POST(request(path, 'POST', { serverId }, 'https://other.example'))).status, 403)
+  assert.equal((await POST(request(path, 'POST', { serverId, name: 'tool' }))).status, 400)
+  assert.deepEqual(calls, [])
+  assert.equal((await POST(request(path, 'POST', { serverId }))).status, 404)
+  installedForRefresh = [{ id: serverId, enabled: true, transport: 'stdio' }]
+  assert.equal((await POST(request(path, 'POST', { serverId }))).status, 409)
+  installedForRefresh = [{ id: serverId, enabled: true, transport: 'http' }]
+  calls.length = 0
+  const result = await POST(request(path, 'POST', { serverId, cursor: 'next' }))
+  installedForRefresh = []
+  assert.equal(result.status, 200)
+  assert.deepEqual(await result.json(), { serverId, tools: [{ name: 'list_issues' }], nextCursor: null })
+  assert.deepEqual(calls, [['listMcp', 'owner'], ['refreshMcp', 'owner', undefined, { serverId, cursor: 'next' }]])
 })

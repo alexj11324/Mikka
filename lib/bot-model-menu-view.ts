@@ -4,8 +4,18 @@
  * and tests can read it.
  */
 
-/** The menu's id for Mikka 默认; `bot_model_choices` stores it as a row with no binding. */
+/**
+ * The retired id of 「Mikka 默认」 (decision 2026-11-15-1900). No menu offers it
+ * and no save accepts it; it only lets old clients and tests be recognised.
+ */
 export const HOSTED_CHOICE = '00000000-0000-0000-0000-000000000000'
+
+/** The menu's id for a catalogue model run on Mikka 额度: `credits:<vendor/model>`. */
+export const creditsOptionId = (model: string) => `credits:${model}`
+export function parseCreditsOption(id: string): string | null {
+  const match = /^credits:([a-z0-9][a-z0-9.-]*\/[a-z0-9][a-z0-9._:-]*)$/.exec(id)
+  return match && match[1].length <= 128 ? match[1] : null
+}
 
 /** The menu's id for a model an API key or custom provider serves (C22): `apikey:<keyId>:<model>`. */
 export const apiKeyOptionId = (keyId: string, model: string) => `apikey:${keyId}:${model}`
@@ -14,16 +24,20 @@ export function parseApiKeyOption(id: string): { keyId: string; model: string } 
   return match ? { keyId: match[1], model: match[2] } : null
 }
 
-/** The menu's groups, in the order they appear. */
+/** The menu's groups, in the order they appear. `hosted` is Mikka 额度: the catalogue's models. */
 export type BotModelGroupKind = 'hosted' | 'subscription' | 'apiKey' | 'shared'
 
 export interface BotModelMenuOption {
-  /** What `chooseBotModel` saves: a binding id, HOSTED_CHOICE, or an API key model (`apiKeyOptionId`). */
+  /** What `chooseBotModel` saves: a binding id, a Mikka 额度 model (`creditsOptionId`), or an API key model (`apiKeyOptionId`). */
   id: string
-  /** The model's id as its provider names it; empty for Mikka 默认. */
+  /** The model's id as its provider names it; a catalogue id (`vendor/model`) on Mikka 额度; empty when nothing is chosen. */
   modelId: string
-  /** `claude`, `codex`, `mikka` for the hosted model, or an API key's provider (`anthropic`, `deepseek`, `custom`…). */
+  /** `claude`, `codex`, `mikka` for Mikka 额度, or an API key's provider (`anthropic`, `deepseek`, `custom`…). */
   provider: string
+  /** Mikka 额度: the catalogue's name for the model, its USD list price per million tokens, and whether a picker shows it before a search. */
+  name?: string
+  price?: { input: number; output: number }
+  featured?: boolean
   /** A community default uses cloud credits or the administrator's own provider. */
   hostedSource?: 'cloud' | 'self-hosted'
 }
@@ -40,14 +54,13 @@ export interface BotModelMenuGroup {
   credentialLabel?: string
   /** Mikka 默认: the points it can spend in this chat's workspace (its own and members' shared ones). */
   points?: number
-  /** Mikka 默认 with no points yet: the free messages left before a card is needed. */
-  trialLeft?: number
   hostedSource?: 'cloud' | 'self-hosted'
   options: BotModelMenuOption[]
 }
 
 export interface BotModelCurrent extends BotModelMenuOption {
-  kind: BotModelGroupKind
+  /** `none`: nothing is chosen and no subscription or key fills in; the chip asks the person to choose (decision 2026-11-15-1900). */
+  kind: BotModelGroupKind | 'none'
   /** The person picked it. False: it is what the resolution order gives today. */
   chosen: boolean
   /** True only when this credential is confirmed usable. */
@@ -87,7 +100,23 @@ export function isCurrent(menu: Pick<BotModelMenu, 'current'>, option: BotModelM
 }
 
 /**
- * The person's own subscription a refused Mikka 默认 turn can move to (decision
+ * The menu as it reads the moment the person picks `id`, before the server answers: the chip and the check mark move
+ * at once. Only what the menu already knows is claimed (the option, its group's kind and label); a fallback or a used-up
+ * quota is the server's to say when it answers. Null when the menu has no such option.
+ */
+export function withChosenModel(menu: BotModelMenu, id: string): BotModelMenu | null {
+  for (const group of menu.groups) {
+    const option = group.options.find(item => item.id === id)
+    if (option) return { ...menu, current: { ...option, kind: group.kind, chosen: true, available: true, ...(group.credentialLabel ? { credentialLabel: group.credentialLabel } : {}) } }
+  }
+  return null
+}
+
+/** Nothing chosen: what the menu reports when no choice, subscription or key applies. */
+export const NO_MODEL: BotModelCurrent = { id: '', modelId: '', provider: '', kind: 'none', chosen: false, available: false }
+
+/**
+ * The person's own subscription a refused Mikka 额度 turn can move to (decision
  * 2240): the first in the menu's order, its first model. Null with none.
  */
 export function ownSubscriptionOption(menu: Pick<BotModelMenu, 'groups'>): { option: string; provider: string; plan: string | null } | null {

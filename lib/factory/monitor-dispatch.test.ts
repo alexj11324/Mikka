@@ -1,4 +1,9 @@
-import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { observePoolCommits } from '../db/commit-effects';
+import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
+import { coordinatorWakeTransport } from '../coordinator/wake-after-commit';
+import { builtinGateway } from '../builtin-gateway/runtime';
+import { claimFixtureFactoryCheck, createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryPublicationEvidence, addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { isolatedPostgresURL } from "../../tests/helpers/isolated-postgres.mjs";
 import assert from "node:assert/strict";
@@ -17,10 +22,6 @@ import { factoryDispatchDatabase } from "./transaction";
 import { insertRunOnce } from "../run-dispatch";
 import { createFactoryTestAuthority } from "../../tests/helpers/factory-test-authority";
 import { createLocalPublicationAdapter } from "./local-publication";
-import {
-  createFactoryCheckClaim,
-  isFactoryCheckRun,
-} from "./checks";
 import { createFactoryMonitor, monitorGate } from "./monitor";
 import { createLocalMonitorProbe } from "./monitor-probe";
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
@@ -52,6 +53,9 @@ test(
   "PG17 normal monitor dispatch: actual local publication receipt, readonly claim, queue replay/rollback and closed boundaries; policy/Harness receipts are fixtures",
   { skip: !dbURL, timeout: 120000 },
   async (t) => {
+    const previousWake = coordinatorWakeTransport.wake;
+    coordinatorWakeTransport.wake = async () => undefined;
+    t.after(() => { coordinatorWakeTransport.wake = previousWake; });
     const fixtureURL = await isolatedPostgresURL(dbURL!);
     const schema = `monitor_dispatch_${randomUUID().replaceAll("-", "")}`;
     const admin = new Pool({ connectionString: fixtureURL, max: 1 });
@@ -61,6 +65,8 @@ test(
       max: 12,
       options: `-c search_path=${schema}`,
     });
+    observePoolCommits(pool);
+    const closeWorkspace = await bindFixtureWorkspaceDatabase(pool);
     const root = await mkdtemp(join(tmpdir(), "factory-monitor-dispatch-"));
     const actor = { userId: "owner", sessionId: randomUUID() };
     const deviceId = randomUUID(),
@@ -105,7 +111,7 @@ test(
         botId,
       }),
     );
-    const claim = createFactoryCheckClaim(pool, authorize);
+    const claim = claimFixtureFactoryCheck(pool, store);
     const monitor = createFactoryMonitor(
       pool,
       store,
@@ -143,7 +149,7 @@ test(
         [randomUUID()],
       );
       await pool.query(
-        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt",harnesses) VALUES ($1,'owner','Fixture device',true,now(),'[{"harness":"codex","installed":true}]')`,
+        `INSERT INTO devices (id,"ownerId",name,enabled,"lastSeenAt","sessionOpenedAt",harnesses) VALUES ($1,'owner','Fixture device',true,now(),now(),'[{"harness":"codex","installed":true}]')`,
         [deviceId],
       );
       await pool.query(
@@ -276,6 +282,8 @@ test(
           `UPDATE factory_tasks SET stage='approval',status='pending',revision=5,"candidateId"=$2,"attemptId"=$3 WHERE id=$1`,
           [state.task.id, candidateId, approvalAttempt],
         );
+        await addFactoryVisualEvidence(pool,runIds[0]);
+        await addFactoryPublicationEvidence(pool,state.task.id);
         const evidence = await service.evidence(actor, state.task.id);
         const approval = await service.approve(actor, policyFixture.request(actor.userId, {
           binding: evidence.binding,
@@ -349,10 +357,6 @@ test(
           assert.equal(
             metadata.publication.publicationId,
             fixtureState.publicationId,
-          );
-          assert.equal(
-            await isFactoryCheckRun(pool, "owner", result.runId),
-            true,
           );
           const assignment = await claim(
             "owner",
@@ -643,6 +647,7 @@ test(
             connectionString: fixtureURL,
             options: `-c search_path=${schema}`,
           });
+          observePoolCommits(other);
           try {
             const restarted = createFactoryDispatch(
               other,
@@ -671,6 +676,8 @@ test(
         },
       );
     } finally {
+      await builtinGateway()?.stop();
+      await closeWorkspace();
       await pool.end();
       await admin.query(`DROP SCHEMA "${schema}" CASCADE`);
       await admin.end();

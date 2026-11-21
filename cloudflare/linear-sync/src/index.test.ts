@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createHmac } from 'node:crypto'
 import { test } from 'node:test'
-import { handleRequest, runScheduled, type Env } from './index'
+import worker, { handleRequest, type Env } from './index'
 
 const webhookSecret = 'worker-test-webhook-secret'
 const ctx = { waitUntil: (_promise: Promise<unknown>) => {} }
@@ -84,7 +84,7 @@ test('disabled Worker webhook, protected cron and scheduler never read Hyperdriv
   assert.equal(revoked.headers.get('retry-after'), '60')
   const cron = await handleRequest(new Request('https://sync.example.test/mikka/api/cron/linear-sync', { headers: { authorization: 'Bearer test-worker-cron' } }), env, ctx)
   assert.deepEqual(await cron.json(), { inbox: 0, outbox: 0, disabled: true })
-  await runScheduled(env)
+  await worker.scheduled({ cron: '0 4 * * *' }, env)
   assert.equal(background, 0)
 })
 
@@ -108,4 +108,42 @@ test('Worker requires an explicit true from its own configured PostHog project b
   // No project token stays off even when another project's flag was true.
   const unconfigured = await handleRequest(request(), { CRON_SECRET: env.CRON_SECRET }, ctx)
   assert.deepEqual(await unconfigured.json(), { inbox: 0, outbox: 0, disabled: true })
+})
+
+test('a native scheduled delivery reports failures even when the manual HTTP cron is unconfigured', async t => {
+  t.mock.method(globalThis, 'fetch', async () => Response.json({ errorsWhileComputingFlags: false, flags: { 'mikka-linear-sync': { enabled: true } } }))
+  const env: Env = { NEXT_PUBLIC_POSTHOG_KEY: 'test-native-cron-enabled' }
+  const http = await handleRequest(new Request('https://sync.example.test/mikka/api/cron/linear-sync'), env, ctx)
+  assert.equal(http.status, 503)
+  await assert.rejects(worker.scheduled({ cron: '0 4 * * *' }, env), /Linear sync is not configured/)
+})
+
+test('an Issue delivery is handed to the app’s automations with Linear’s own headers and body, sync on or off', async t => {
+  const forwarded: Array<{ url: string; headers: Headers; body: string }> = []
+  let automations = 200
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input instanceof Request ? input.url : input)
+    if (url === 'https://app.example.test/mikka/api/webhooks/linear/automations') {
+      forwarded.push({ url, headers: new Headers(init?.headers), body: String(init?.body) })
+      return new Response(null, { status: automations })
+    }
+    return Response.json({ errorsWhileComputingFlags: false, flags: { 'mikka-linear-sync': { enabled: false } } })
+  })
+  const env: Env = { NEXT_PUBLIC_POSTHOG_KEY: 'test-worker-forward', LINEAR_WEBHOOK_SECRET: webhookSecret, LINEAR_AUTOMATIONS_FORWARD_URL: 'https://app.example.test/mikka/api/webhooks/linear/automations' }
+  const body = JSON.stringify({ action: 'create', type: 'Issue', organizationId: 'org', webhookTimestamp: Date.now(), data: { id: 'issue', teamId: 'team' }, actor: { type: 'user', name: 'Ada' } })
+  const signature = createHmac('sha256', webhookSecret).update(body).digest('hex')
+  const send = (delivery: string) => handleRequest(new Request('https://sync.example.test/mikka/api/webhooks/linear', {
+    method: 'POST', body, headers: { 'linear-event': 'Issue', 'linear-delivery': delivery, 'linear-signature': signature },
+  }), env, ctx)
+  assert.equal((await send('forward-1')).status, 200)
+  assert.equal(forwarded.length, 1)
+  assert.deepEqual([forwarded[0]!.body, forwarded[0]!.headers.get('linear-delivery'), forwarded[0]!.headers.get('linear-event'), forwarded[0]!.headers.get('linear-signature')], [body, 'forward-1', 'Issue', signature])
+  automations = 500
+  assert.equal((await send('forward-2')).status, 503, 'a failed hand-off asks Linear to redeliver')
+  automations = 401
+  assert.equal((await send('forward-3')).status, 200, 'a refused hand-off does not hold up sync')
+  delete env.LINEAR_AUTOMATIONS_FORWARD_URL
+  forwarded.length = 0
+  assert.equal((await send('forward-4')).status, 200)
+  assert.equal(forwarded.length, 0, 'unset, nothing is handed off')
 })

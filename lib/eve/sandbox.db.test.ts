@@ -18,7 +18,7 @@ async function command(connection:SandboxConnection,value:string) {
   const [result,stdout,stderr]=await Promise.all([process.wait(),new Response(process.stdout).text(),new Response(process.stderr).text()])
   assert.equal(result.exitCode,0,stderr);return stdout
 }
-test('portable public provider prepares skills and persists attachments across replicas without idle PG leases',{skip:!url,timeout:30000},async()=>{
+test('portable public provider prepares skills and persists attachments across replicas without idle PG leases',{skip:!url,timeout:30000},async t=>{
   const schema=`eve_sandbox_${randomUUID().replaceAll('-','')}`,admin=new Pool({connectionString:url})
   await admin.query(`CREATE SCHEMA ${schema}`)
   const makePool=()=>new Pool({connectionString:url,options:`-c search_path=${schema},pg_catalog`,max:1})
@@ -46,9 +46,20 @@ test('portable public provider prepares skills and persists attachments across r
     await opened.connection.writeFiles({files:[{path:'/workspace/attachment.bin',content:bytes}]})
     assert.equal(pool.idleCount,pool.totalCount,'an idle sandbox owns no pool connection')
     const nextProvider=createPortableScratchProvider(async()=>store(replica))
+    const version = async () => (await pool.query<{version:string}>('SELECT xmin::text AS version FROM eve_sandbox_sessions WHERE session_id=$1', [ctx.session.id])).rows[0]!.version
+    const beforeResume = await version()
     const resumed=await nextProvider.resume(ctx,artifact,opened.state)
+    const afterResume = await version()
     assert.deepEqual(Array.from(await resumed.readFile({path:'/workspace/attachment.bin'}) as Uint8Array),Array.from(bytes))
+    const afterRead = await version()
+    const reopened = await provider.start(ctx,undefined,artifact)
+    const afterReopen = await version()
+    await reopened.connection.close?.()
+    const versions = [beforeResume, afterResume, afterRead, afterReopen]
+    t.diagnostic(`Snapshot rewrites across resume, read and repeated start: ${versions.slice(1).filter((value, i) => value !== versions[i]).length}`)
+    assert.deepEqual(versions, Array(4).fill(beforeResume), 'read-only operations preserve the durable snapshot version')
     await Promise.all([command(opened.connection,'printf A >> counter.txt'),command(resumed,'printf B >> counter.txt')])
+    assert.notEqual(await version(), beforeResume, 'mutations commit new durable bytes')
     const counter=await text(resumed,'/workspace/counter.txt')
     assert.ok(counter==='AB'||counter==='BA',counter)
     assert.equal(replica.idleCount,replica.totalCount)

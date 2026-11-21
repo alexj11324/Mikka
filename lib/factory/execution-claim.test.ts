@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test, { describe } from 'node:test'
 import { withFactoryQuestionDeliveryContext } from './questions/continuation-delivery-context'
 import type { Pool, PoolClient } from 'pg'
-import { createExecutionClaim } from './execution-claim'
+import { createExecutionClaim } from '../../tests/helpers/factory-execution-claim'
 import { createFactoryClaim } from './claim'
 import { FactoryError } from './contract'
 

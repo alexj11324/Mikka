@@ -3,6 +3,7 @@ import { after, afterEach, before, beforeEach, mock, test } from 'node:test'
 import { act } from 'react'
 import type { Root } from 'react-dom/client'
 import { Window } from 'happy-dom'
+import * as live from '@/hooks/use-live-key'
 import * as groupMessages from '@/lib/group-messages'
 import type { GroupMessage, GroupMessagePage } from '@/lib/group-messages'
 import { ViewStateProvider, useViewState } from '@/lib/hooks/view-state'
@@ -19,18 +20,18 @@ const mutate = async () => { reads++; return pages }
 const sent: { group: string; body: string }[] = []
 let post: (id: string, body: string) => Promise<GroupMessage>
 const notices = new Map<string, { message: string; action?: { label: string; onClick: (event: Event) => void } }>()
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useMessages: () => ({ AgentCopy: {} }), useFormatter: () => ({}) } })
-mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { unstable_serialize: (key: unknown) => JSON.stringify(key) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate, useMessages: () => ({ AgentCopy: {} }), useFormatter: () => ({}) } })
+mock.module('swr', { defaultExport: () => ({ data: undefined }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module('swr/infinite', { defaultExport: () => ({ data: pages, error: readError, size: 1, setSize: async () => {}, mutate, isValidating: false }), namedExports: { unstable_serialize: (getKey: (index: number, previous: null) => unknown) => '$inf$' + JSON.stringify(getKey(0, null)) } })
 mock.module('@/lib/group-messages', { namedExports: { ...groupMessages, postGroupMessage: async (id: string, body: string) => { sent.push({ group: id, body }); return post(id, body) } } })
 mock.module('sonner', { namedExports: { toast: {
   error: (message: string, options?: { id?: string; action?: { label: string; onClick: (event: Event) => void } }) => { notices.set(options?.id ?? message, { message, action: options?.action }) },
   dismiss: (id: string) => { notices.delete(id) },
 } } })
-mock.module('@/hooks/use-live-key', { namedExports: { useLiveKey: nothing } })
+mock.module('@/hooks/use-live-key', { namedExports: { ...live, useLiveKey: nothing } })
 mock.module('@/lib/use-action-error', { namedExports: { useActionError: () => translate } })
 mock.module('@/app/actions/agents', { namedExports: { listAgents: async () => [] } })
-mock.module('@/app/actions/link-preview', { namedExports: { getLinkPreview: async () => null } })
+mock.module('@/app/actions/link-preview', { namedExports: { getLinkPreview: async () => null, getLinkPreviews: async () => ({}) } })
 mock.module('@/components/nav/conversation-pill', { namedExports: { ConversationPill: empty } })
 mock.module('@/components/nav/group-avatar', { namedExports: { GroupAvatar: empty, groupMembersKey: (id: string) => ['group-members', id], memberAvatar: (member: { id: string }) => ({ id: member.id }), useGroupMembers: () => ({ data: [] }) } })
 mock.module('@/components/nav/letter-avatar', { namedExports: { LetterAvatar: empty } })
@@ -49,8 +50,8 @@ let root: Root, container: HTMLDivElement
 let createRoot: typeof import('react-dom/client')['createRoot']
 let GroupChatView: typeof import('./group-chat-view')['GroupChatView']
 let pendingSnapshot: unknown[] = []
-function PendingState({ groupId }: { groupId: string }) {
-  const [value] = useViewState<unknown[]>(`group:${groupId}:pending`, [])
+function PendingState({ groupId, owner, workspace }: { groupId: string; owner: string; workspace: string }) {
+  const [value] = useViewState<unknown[]>(`chat-send:group:${owner}:${workspace}:${groupId}`, [])
   pendingSnapshot = value
   return null
 }
@@ -82,7 +83,7 @@ afterEach(async () => { await act(async () => root.unmount()); container.remove(
 after(() => browser.happyDOM.close())
 const render = async ({ visible = true, owner = 'owner', workspace = 'workspace', groupId = 'group-one' } = {}) => {
   await act(async () => root.render(<ViewStateProvider scope={`${owner}:${workspace}`}>
-    <PendingState groupId={groupId} />
+    <PendingState groupId={groupId} owner={owner} workspace={workspace} />
     {visible && <GroupChatView key={groupId} group={{ id: groupId, title: 'Fixture group', workspaceId: workspace }} userId={owner} people={new Map()} />}
   </ViewStateProvider>))
 }
@@ -90,6 +91,20 @@ const draft = async (value: string) => { await act(async () => composer.onChange
 const send = async () => { await act(async () => composer.onSubmit()) }
 const pending = () => container.querySelector('[data-pending]')
 const input = () => container.querySelector('textarea')!
+
+test('an offline bundled renderer still posts its group message once', async t => {
+  Object.defineProperty(browser.navigator, 'onLine', { configurable: true, value: false })
+  Object.defineProperty(browser, 'mikka', { configurable: true, value: { bundled: {} } })
+  t.after(() => {
+    Reflect.deleteProperty(browser.navigator, 'onLine')
+    Reflect.deleteProperty(browser, 'mikka')
+  })
+  post = async (_id, body) => message(body, 'stored', '2')
+  await render()
+  await draft('group delivery')
+  await send()
+  assert.deepEqual(sent, [{ group: 'group-one', body: 'group delivery' }])
+})
 
 test('a failed group send survives leaving for Settings and returning, with explicit retry only', async () => {
   await render(); await draft('keep the failed message'); await send()

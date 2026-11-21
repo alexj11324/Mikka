@@ -484,7 +484,12 @@ describe.skipIf(process.platform !== 'linux')('coding workspace Diff on a real G
   })
 
   it('uses the registered clone when the worktree .git file points at a different repository', async () => {
-    const foreign = await makeRepo()
+    // Keep Git's automatic background maintenance out of the foreign-repository
+    // immutability oracle. A transient maintenance.lock is not a write by the Diff reader.
+    const foreign = tempDir('mikka-workspace-diff-foreign-')
+    git(foreign, 'init', '-q', '-b', 'main')
+    git(foreign, 'config', 'maintenance.auto', 'false')
+    git(foreign, 'config', 'gc.auto', '0')
     git(foreign, 'remote', 'add', 'origin', remote)
     writeFileSync(join(foreign, 'README.md'), 'foreign repository must not provide the frozen base')
     git(foreign, 'add', '--all'); git(foreign, 'commit', '-qm', 'foreign history')

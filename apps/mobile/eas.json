@@ -9,7 +9,10 @@
       "pnpm": "10.34.3",
       "channel": "production",
       "distribution": "store",
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "MIKKA_MOBILE_OVERLAY_DIR": ".hosted-ui/mobile"
+      }
     },
     "preview": {
       "node": "24.22.1",

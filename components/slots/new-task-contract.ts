@@ -21,10 +21,53 @@ export type NewTaskBot = { id: string | null; name: string; avatar: ReactNode }
 /** An Agent 配置 choice; `icon` is its ProfileMark as Mikka draws it, absent for 自动. */
 export type NewTaskProfile = { value: string; label: string; detail?: string; disabled?: boolean; icon?: ReactNode }
 
+/** An Agent the task can run on (Claude Code or Codex). */
+export type NewTaskAgent = { value: 'claude_code' | 'codex'; label: string }
+
+/** A Project the task can go to, in the window's context line. */
+export type NewTaskProject = { value: string; label: string }
+
+/** A status the task can be created in (Mikka's own statuses), as a chip in the row of pills. */
+export type NewTaskStatus = { value: string; label: string; /** Its mark, as Mikka draws it (`TaskStatusIcon`). */ mark: ReactNode }
+
+/** One Assignee choice (Capy's People and Bots): `value` is `user:<id>` or `bot:<id>`. Assigning a Bot wakes it. */
+export type NewTaskAssignee = { value: string; kind: 'user' | 'bot'; label: string; avatar: ReactNode }
+
+/** A label, as the task stores it. */
+export type NewTaskLabel = { name: string; color: string }
+
+/** A workspace member Access can name (Only specific people). */
+export type NewTaskMember = { value: string; label: string; avatar: ReactNode }
+
 export type NewTaskProps = {
+  /**
+   * 新建任务 only registers a task (decision 2026-11-19-2110), so its window is `create_only`. `create_and_dispatch`
+   * is the same window opened by Start work on an existing task (`startWork`): the Bot, Agent, machine and profile
+   * pickers and a note, sent to the picked Bot.
+   */
+  intent?: 'create_only' | 'create_and_dispatch'
+  /**
+   * Start work on this existing task: the layer names it (identifier and title) in place of the title field, the text
+   * is an optional note for the Bot, and there is no 继续新建 or status. Absent in 新建任务.
+   */
+  startWork?: { identifier: string | null; title: string }
+  /** 创建方式, when the person may switch between 只创建 and 创建并派发 (a page that can open the created task). */
+  chooseIntent?: { onChange: (intent: 'create_only' | 'create_and_dispatch') => void; disabled: boolean }
   onClose: () => void
-  /** The project page the request came from. */
+  /** The Project the task goes to: the project page's, else the person's default. The window reads it as a breadcrumb
+   * before the title; absent, there is no context line (and the task is created without a Project). */
   project?: string | null
+  /**
+   * The Projects the person may switch to, when the page leaves the Project open (the personal default). Absent when
+   * the page fixes it or there is nothing to choose; then the context line is the name alone. Never a precondition:
+   * 创建任务 sends with whatever is chosen, including none.
+   */
+  projects?: { choices: NewTaskProject[]; value: string; onChange: (value: string) => void; disabled: boolean; noneLabel: string }
+  /**
+   * The status the task is created in. Absent when the request that creates it cannot carry one (a dispatched task is
+   * created by its Bot's own command, which has no status field), so the window then draws no status chip.
+   */
+  status?: { choices: NewTaskStatus[]; value: string; onChange: (value: string) => void; disabled: boolean }
   /** 标题 the person wrote (optional; empty, the Bot writes one). */
   title: string
   onTitle: (title: string) => void
@@ -48,6 +91,13 @@ export type NewTaskProps = {
   bots: NewTaskBot[]
   bot: string | null
   onBot: (id: string | null) => void
+  /** 交给哪个 Agent: required to create and dispatch; `value` is null until the person picks one (nothing is preselected). */
+  agent: {
+    choices: NewTaskAgent[]
+    value: NewTaskAgent['value'] | null
+    onChange: (value: NewTaskAgent['value']) => void
+    disabled: boolean
+  }
   profile: {
     choices: NewTaskProfile[]
     value: string
@@ -62,8 +112,29 @@ export type NewTaskProps = {
   }
   /** Profile checks, 未开启任务创建 and Coordinator unavailable, as Mikka draws them; null when there are none. */
   notices: ReactNode
+  /** Priority (Capy's urgent / high / normal / low), Normal by default. Absent outside 新建任务. */
+  priority?: { choices: NewTaskStatus[]; value: string; onChange: (value: string) => void; disabled: boolean }
+  /**
+   * Assignee: No assignee, the workspace's people, or the person's Bots; single choice, searchable by `label`. `value` is
+   * the picked choice's `value`, null for No assignee. Absent outside 新建任务 or before the choices are read.
+   */
+  assignee?: { choices: NewTaskAssignee[]; value: string | null; onChange: (value: string | null) => void; disabled: boolean }
+  /** Due date as YYYY-MM-DD; `presets` are Today, Tomorrow, End of this week and In one week, by date. */
+  dueDate?: { value: string | null; presets: { value: string; label: string }[]; onChange: (value: string | null) => void; disabled: boolean }
+  /** Labels: the workspace's labels to pick from, the picked names, and creating one from what was typed. */
+  labels?: { choices: NewTaskLabel[]; value: string[]; onToggle: (name: string) => void; onCreate: (name: string) => void; disabled: boolean }
+  /**
+   * Access: everyone in the workspace (`workspaceLabel`), or only the creator and the picked members. Absent in a
+   * personal space, where there is no one else to name.
+   */
+  access?: { value: 'workspace' | 'members'; workspaceLabel: string; onChange: (value: 'workspace' | 'members') => void
+    members: NewTaskMember[]; picked: string[]; onToggleMember: (id: string) => void; disabled: boolean }
+  /** 语音: record, then the words are added to the description. Absent where recording is unavailable. */
+  dictation?: { state: 'idle' | 'recording' | 'transcribing'; onStart: () => void; onStop: () => void; disabled: boolean }
+  /** 继续新建 (Capy's Create more): on, a created task clears the window and leaves it open for the next one. */
+  more: { checked: boolean; onChange: (checked: boolean) => void }
   sending: boolean
-  /** Whether 创建任务 can send now (a title or text, a usable profile, files done, creation available). */
+  /** Whether 创建任务 can send now (a title or text, an Agent, a usable profile, files done, creation available). */
   canSubmit: boolean
   onSubmit: () => void
 }

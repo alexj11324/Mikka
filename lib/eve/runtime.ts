@@ -1,40 +1,46 @@
 import type { DynamicModelContext } from 'eve'
+import { defineState } from 'eve/context'
+import {evaluationForSession,evaluationModel} from './evaluation-runtime'
 import { HostedWorkflowModel } from '../abuse/workflow-model'
 import { SubscriptionWorkflowModel } from '../subscription-workflow-model'
-import { assertEveScope, scopeFromAuth } from './scope'
+import { scopeFromAuth } from './scope'
 import { streamingModel } from './streaming-model'
-import { prepareEveExecution, productRpc } from './product-rpc'
+import { withModelEffort } from '../model-effort'
+import type { DefinitionSnapshot } from '../agent-kit/definition'
+import type { HostedRuntimeSnapshot } from '../subscription-model-snapshot'
+import type { ScheduledRead } from '../schedules/contract'
 
-/** The immutable execution is a Mikka policy/model grant, not model history. */
-export async function executionForSession(ctx: DynamicModelContext) {
-  const scope = await assertEveScope(scopeFromAuth(ctx.session.auth.current))
-  if (!ctx.turn) throw new Error('agentExecutionClosed')
-  const prepared = await ctx.memo(['mikka-execution', ctx.turn.id], async () => {
-    return prepareEveExecution(scope,ctx.session.id,ctx.turn!.id)
-  })
-  // Answers retain the original request's authority, rather than creating a
-  // new human request. This memo is owned by the native eve turn.
-  const sourceEventId = await ctx.memo(['mikka-source',ctx.turn.id], async () => {
-    const {pool} = await import('../db')
-    return (await pool.query<{source_event_id:string}>('SELECT source_event_id FROM eve_turn_sources WHERE session_id=$1 AND turn_id=$2',[ctx.session.id,ctx.turn!.id])).rows[0]?.source_event_id ?? null
-  })
-  const scheduledRead = sourceEventId ? await (await import('./scheduled-read')).loadScheduledRead(scope,sourceEventId) : null
-  return { scope, ...prepared, sourceEventId, scheduledRead }
-}
+// The turn.started hook selects the person's model and Bot capabilities.
+// Eve persists these business choices before evaluating the turn's definitions.
+export const turnModel = defineState<HostedRuntimeSnapshot | null>('mikka.model', () => null)
+export const turnPolicy = defineState<Pick<DefinitionSnapshot, 'definition' | 'effectiveTools' | 'personalPlugins'> | null>('mikka.policy', () => null)
+export const turnRequest = defineState<{ sourceEventId?: string; scheduledRead: ScheduledRead | null; startIndex?: number }>('mikka.request', () => ({ scheduledRead: null }))
 
 export async function modelForSession(ctx: DynamicModelContext) {
-  const { scope, runtime } = await executionForSession(ctx)
-  if (runtime.harness !== 'ai_sdk' || !runtime.model) throw new Error('subscription_model_unavailable')
-  return runtime.modelSelection ? streamingModel(new SubscriptionWorkflowModel(runtime.modelSelection)) : new HostedWorkflowModel(scope.ownerId, scope.botId, runtime.model)
+  const evaluation=await evaluationForSession(ctx)
+  if(evaluation)return evaluationModel(evaluation)
+  const scope = scopeFromAuth(ctx.session.auth.current)
+  const runtime = turnModel.get()
+  if (!runtime || runtime.harness !== 'ai_sdk' || !runtime.model) throw new Error('subscription_model_unavailable')
+  if (!runtime.modelSelection) return withModelEffort(new HostedWorkflowModel(scope.ownerId, scope.botId, runtime.model), runtime.effort)
+  const requestPolicy = ctx.session.parent || turnRequest.get().scheduledRead ? undefined : { codexServiceTier: 'priority' as const }
+  return withModelEffort(streamingModel(new SubscriptionWorkflowModel(runtime.modelSelection, requestPolicy)), runtime.effort)
 }
 
 export async function instructionsForSession(ctx: DynamicModelContext) {
-  const { scope, execution, scheduledRead } = await executionForSession(ctx)
+  const evaluation=await evaluationForSession(ctx)
+  if(evaluation)return evaluation.instructions
+  const scope = scopeFromAuth(ctx.session.auth.current)
+  const { scheduledRead } = turnRequest.get()
   if (scheduledRead) return `This is an authorized scheduled read-only task. Use only the provided read tools. Do not request approval, create schedules or perform writes. Return the result for the original chat.\n${scheduledRead.prompt}`
   // Slack gets product policy but never private web history, memory or profile.
   if (scope.surface === 'slack') {
     const { COORDINATOR_INSTRUCTIONS } = await import('../coordinator/instructions')
     return COORDINATOR_INSTRUCTIONS + '\nUse only this Slack conversation. Do not access private web chat history or memories. Reply in the same thread; call no_reply when no useful response is needed.'
   }
-  return (await productRpc<{instructions:string}>(scope,{operation:'instructions',sessionId:ctx.session.id,turnId:ctx.turn!.id,executionId:execution?.id})).instructions
+  const { asProductPrincipal } = await import('./product-definitions')
+  return asProductPrincipal(scope, async () => {
+    const { composeEveInstructions } = await import('../coordinator/product-instructions')
+    return composeEveInstructions(scope.ownerId, scope.botId, undefined, { sessionId: ctx.session.id, turnId: ctx.turn!.id }, turnPolicy.get() ?? undefined)
+  })
 }

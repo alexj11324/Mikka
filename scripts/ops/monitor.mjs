@@ -1,6 +1,6 @@
 import { readFile, writeFile, rename } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
-import { Pool } from 'pg'
+import { ARTIFACT_CLEANUP_SQL } from '../../lib/subscription-cleanup-sql.mjs'
 
 import { requestOutcomes, WINDOW_MS } from './request-outcomes.mjs'
 export { requestOutcomes, WINDOW_MS } from './request-outcomes.mjs'
@@ -8,7 +8,11 @@ export const REQUEST_DEADLINE_MS = 120_000
 const groupFor = route => route === '/api/auth/[...all]' ? 'login' : route === '/api/coordinator/messages' ? 'chat' : 'api'
 
 /** Completed 4xx remain failures: this SLI measures the user's successful request, not server availability. */
-export function requestSlis(lines, now = Date.now()) {
+export function requestSlis(lines, now = Date.now(), {
+  from = now - WINDOW_MS, until = now - REQUEST_DEADLINE_MS + 1,
+} = {}) {
+  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(until) || from >= until ||
+    until > now - REQUEST_DEADLINE_MS + 1) throw Error('opsIncompleteRequestWindow')
   const starts = new Map(), ends = new Map()
   for (const line of lines) {
     let entry
@@ -22,11 +26,12 @@ export function requestSlis(lines, now = Date.now()) {
   for (const [id, start] of starts) {
     const at = Date.parse(start.timestamp)
     // Grace for unfinished requests; overdue starts stay in the denominator.
-    if (at < now - WINDOW_MS || at > now - REQUEST_DEADLINE_MS) continue
+    if (at < from || at >= until) continue
     const group = groupFor(start.route), end = ends.get(id)
     const metric = result[group] ??= { total: 0, successful: 0, timedOut: 0, rateLimited: 0, durations: [] }
     metric.total++
-    if (!end || !Number.isFinite(end.durationMs) || end.durationMs > REQUEST_DEADLINE_MS) metric.timedOut++
+    if (!end || end.route !== start.route || Date.parse(end.timestamp) < at || Date.parse(end.timestamp) > now ||
+      !Number.isFinite(end.durationMs) || end.durationMs < 0 || end.durationMs > REQUEST_DEADLINE_MS) metric.timedOut++
     else {
       metric.durations.push(end.durationMs)
       if (end.status >= 200 && end.status < 400) metric.successful++
@@ -42,6 +47,10 @@ export function requestSlis(lines, now = Date.now()) {
   return result
 }
 
+/** lib/coordinator/wake-recovery.ts MAX_WAKE_ATTEMPTS: wakes at this count are
+ * terminal. They are reported as exhaustedWake, never as a recoverable staleWake. */
+const MAX_WAKE_ATTEMPTS = 8
+
 /** Read-only aggregate queries; bodies, provider errors, owner IDs and secret references never leave the database. */
 export async function databaseSignals(pool, now = new Date()) {
   const client = await pool.connect()
@@ -49,12 +58,13 @@ export async function databaseSignals(pool, now = new Date()) {
     await client.query('BEGIN READ ONLY')
     await client.query("SET LOCAL statement_timeout = '5s'")
     const { rows: [row] } = await client.query(`SELECT
-      (SELECT count(*)::int FROM coordinator_events WHERE "deliveredAt" IS NULL AND (tier IS NULL OR tier<>'background') AND "createdAt" < $1::timestamptz-interval '5 minutes') AS "staleWake",
+      (SELECT count(*)::int FROM coordinator_events WHERE "deliveredAt" IS NULL AND (tier IS NULL OR tier<>'background') AND "wakeAttempts" < ${MAX_WAKE_ATTEMPTS} AND "createdAt" < $1::timestamptz-interval '5 minutes') AS "staleWake",
+      (SELECT count(*)::int FROM coordinator_events WHERE "deliveredAt" IS NULL AND (tier IS NULL OR tier<>'background') AND "wakeAttempts" >= ${MAX_WAKE_ATTEMPTS}) AS "exhaustedWake",
       (SELECT count(*)::int FROM agent_runs WHERE status IN ('preparing','running','finishing') AND "leaseExpiresAt" < $1::timestamptz-interval '2 minutes') AS "expiredRunLease",
       (SELECT count(*)::int FROM operation_ledger WHERE status='uncertain') AS "uncertainEffect",
       (SELECT count(*)::int FROM operation_ledger WHERE status='executing' AND "updatedAt" < $1::timestamptz-interval '5 minutes') AS "staleEffect",
-      (SELECT count(*)::int FROM byos_secret_artifacts a WHERE a."deletedAt" IS NULL AND a."notBefore" < $1::timestamptz-interval '5 minutes'
-        AND NOT EXISTS (SELECT 1 FROM byos_connections c WHERE a.name IN (c."secretName",c."accessSecretName",c."stagedSecretName",c."stagedAccessName"))) AS "overdueSecretCleanup",
+      (SELECT count(*)::int ${ARTIFACT_CLEANUP_SQL}
+        AND (a."publishedAt" < $1::timestamptz-interval '5 minutes' OR a."notBefore" < $1::timestamptz-interval '5 minutes')) AS "overdueSecretCleanup",
       (SELECT count(*)::int FROM schedule_occurrences WHERE due_at >= $1::timestamptz-interval '15 minutes' AND due_at <= $1::timestamptz-interval '2 minutes' AND execution_decision='execute') AS "dueTotal",
       (SELECT count(*)::int FROM schedule_occurrences WHERE due_at >= $1::timestamptz-interval '15 minutes' AND due_at <= $1::timestamptz-interval '2 minutes' AND execution_decision='execute' AND status='succeeded' AND finished_at <= due_at+interval '2 minutes') AS "dueSuccessful",
       (SELECT count(*)::int FROM agent_runs WHERE "createdAt" >= $1::timestamptz-interval '15 minutes' AND "createdAt" <= $1::timestamptz-interval '2 minutes') AS "dispatchTotal",
@@ -68,21 +78,48 @@ export async function databaseSignals(pool, now = new Date()) {
   } finally { client.release() }
 }
 
-export function actionableAlerts({ requests, database }) {
-  const alerts = []
-  const add = (id, value, action) => alerts.push({ id, value, owner: 'repository-maintainers', runbook: 'docs/operations/observability.md', action })
+const alertRecord = (id, value, action) => ({ id, value, owner: 'repository-maintainers', runbook: 'docs/operations/observability.md', action })
+
+/** No eligible starts means no success assessment. Timed-out requests count as
+ * failures and cannot supply a latency sample for a recovery notification. */
+export function requestAlertAssessment(requests) {
+  const assessed = [], alerts = []
+  for (const [group, metric] of Object.entries(requests)) {
+    if (metric.total > 0) {
+      const id = group + '-request-success'
+      assessed.push(id)
+      if (metric.successRatio < .99) alerts.push(alertRecord(id, metric.successRatio,
+        'Inspect status classes, worker and dependency health; investigate 429 and timeouts without copying request data.'))
+    }
+    if (Number.isFinite(metric.p95Ms)) {
+      const id = group + '-request-latency'
+      assessed.push(id)
+      if (metric.p95Ms > 10_000) alerts.push(alertRecord(id, metric.p95Ms,
+        'Check request latency and database/worker saturation; API response time does not prove stream or run completion.'))
+    }
+  }
+  return { assessed, alerts }
+}
+
+/** Only observed metrics may resolve a previous incident. */
+export function operationalAlertAssessment({ requests, database }) {
+  const assessed = ['database-unavailable'], alerts = []
+  const add = (id, value, action) => alerts.push(alertRecord(id, value, action))
   if (database.databaseAvailable !== 1) add('database-unavailable', 1, 'Check database connectivity and pool saturation; keep uncertain actions quarantined.')
   else {
-    for (const key of ['staleWake', 'expiredRunLease', 'uncertainEffect', 'staleEffect', 'overdueSecretCleanup'])
+    for (const key of ['staleWake', 'expiredRunLease', 'uncertainEffect', 'staleEffect', 'overdueSecretCleanup']) {
+      if (!Number.isFinite(database[key])) continue
+      assessed.push(key)
       if (database[key] > 0) add(key, database[key], key.includes('Effect') ? 'Reconcile provider receipt and ledger before retrying any external effect.' : 'Inspect the existing worker and durable retry/cleanup queue; resume only the original authorized work.')
-    for (const [total, successful, name] of [['dueTotal', 'dueSuccessful', 'due-on-time'], ['dispatchTotal', 'dispatchStarted', 'dispatch-start']])
-      if (database[total] > 0 && database[successful] / database[total] < .99) add(name, database[successful] / database[total], 'Inspect worker heartbeat, lease and durable queue; failed and unfinished work remain in this denominator.')
+    }
+    for (const [total, successful, name] of [['dueTotal', 'dueSuccessful', 'due-on-time'], ['dispatchTotal', 'dispatchStarted', 'dispatch-start']]) {
+      if (!(database[total] > 0) || !Number.isFinite(database[successful])) continue
+      assessed.push(name)
+      if (database[successful] / database[total] < .99) add(name, database[successful] / database[total], 'Inspect worker heartbeat, lease and durable queue; failed and unfinished work remain in this denominator.')
+    }
   }
-  for (const [group, metric] of Object.entries(requests)) {
-    if (metric.total > 0 && metric.successRatio < .99) add(`${group}-request-success`, metric.successRatio, 'Inspect status classes, worker and dependency health; investigate 429 and timeouts without copying request data.')
-    if (metric.p95Ms > 10_000) add(`${group}-request-latency`, metric.p95Ms, 'Check request latency and database/worker saturation; API response time does not prove stream or run completion.')
-  }
-  return alerts
+  const request = requestAlertAssessment(requests)
+  return { assessed: [...assessed, ...request.assessed], alerts: [...alerts, ...request.alerts] }
 }
 
 export function internalSink(raw) {
@@ -92,10 +129,13 @@ export function internalSink(raw) {
 }
 
 /** A failed delivery never advances lastSent, so retries cannot silently suppress a page. */
-export async function notifyAlerts(alerts, { state = {}, sink, now = Date.now(), fetchImpl = fetch }) {
+export async function notifyAlerts(alerts, { state = {}, assessed = /** @type {string[] | undefined} */ (undefined), sink, now = Date.now(), fetchImpl = fetch }) {
   const target = internalSink(sink), next = structuredClone(state), deliveries = []
   const current = new Map(alerts.map(alert => [alert.id, alert]))
-  for (const id of new Set([...Object.keys(next), ...current.keys()])) {
+  // A partial source may resolve only alert IDs it could actually evaluate.
+  const considered = assessed === undefined ? new Set([...Object.keys(next), ...current.keys()]) : new Set(assessed)
+  if ([...current.keys()].some(id => !considered.has(id))) throw Error('opsAlertOutsideAssessment')
+  for (const id of considered) {
     const previous = next[id] ?? {}, active = current.has(id)
     if (!active && !previous.active) continue
     if (active && previous.active && now - (previous.lastSent ?? 0) < 30 * 60_000) continue
@@ -116,6 +156,7 @@ export async function notifyAlerts(alerts, { state = {}, sink, now = Date.now(),
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const [logs, stateFile] = process.argv.slice(2)
   if (!logs || !stateFile || !process.env.OPS_DATABASE_URL || !process.env.OPS_INTERNAL_ALERT_SINK) throw Error('opsMonitorInputsRequired')
+  const { Pool } = await import('pg')
   const pool = new Pool({ connectionString: process.env.OPS_DATABASE_URL, max: 1, connectionTimeoutMillis: 5_000 })
   let database
   try { database = await databaseSignals(pool) } catch { database = { databaseAvailable: 0 } } finally { await pool.end() }
@@ -123,7 +164,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const requests = requestSlis(lines, observedAt), outcomes = requestOutcomes(lines, observedAt)
   let state = {}
   try { state = JSON.parse(await readFile(stateFile, 'utf8')) } catch (error) { if (error.code !== 'ENOENT') throw Error('opsAlertStateInvalid') }
-  const result = await notifyAlerts(actionableAlerts({ requests, database }), { state, sink: process.env.OPS_INTERNAL_ALERT_SINK })
+  const { alerts, assessed } = operationalAlertAssessment({ requests, database })
+  const result = await notifyAlerts(alerts, { state, assessed, sink: process.env.OPS_INTERNAL_ALERT_SINK })
   await writeFile(`${stateFile}.tmp`, JSON.stringify(result.state), { mode: 0o600 }); await rename(`${stateFile}.tmp`, stateFile)
   console.log(JSON.stringify({ observedAt: new Date(observedAt).toISOString(), requests, outcomes, database, deliveries: result.deliveries, healthy: result.healthy }))
   if (!result.healthy) process.exitCode = 1

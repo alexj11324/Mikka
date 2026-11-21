@@ -3,7 +3,7 @@ import Constants from 'expo-constants'
 import * as Device from 'expo-device'
 import * as Notifications from 'expo-notifications'
 import * as SecureStore from 'expo-secure-store'
-import { api, apiConnection, type ApiConnection } from '@/lib/api'
+import { api, apiConnection, ApiError, type ApiConnection } from '@/lib/api'
 import { pushBelongsToAccount, pushTarget, pushTaskTarget, type TaskPushTarget } from '@/lib/push-route'
 import { pushState, setPushState as set, type PushState } from '@/lib/push-state'
 import { currentAccount, onServerChange } from './config'
@@ -16,7 +16,7 @@ import { accountStorageKey } from './server-store'
  * stayed open) is redone on the next sign-in, session change or return to the front after that, never on a timer.
  * The session is kept in memory to compare; it is never sent, stored or logged.
  */
-let confirmed: { key: string; at: number } | null = null
+let confirmed: { key: string; at: number; id?: string } | null = null
 let session: string | null = null
 export const CONFIRMED_FOR_MS = 12 * 60 * 60 * 1000
 const bindingKey = (accountId: string, token: string) => `${accountId}\u0000${session ?? ''}\u0000${token}`
@@ -43,7 +43,16 @@ export function easProjectId(): string | null {
   return id || null
 }
 
-async function remove(connection: ApiConnection, token: string) {
+async function remove(connection: ApiConnection, token: string, id?: string) {
+  if (id) {
+    try {
+      await api('/api/mobile/push-tokens/' + encodeURIComponent(id), { method: 'DELETE', timeoutMs: 5000 }, connection)
+      return
+    } catch (error) {
+      // A downgraded server can deny the method. Other failures must not remove a newer binding by token.
+      if (!(error instanceof ApiError) || error.status !== 405) return
+    }
+  }
   await api('/api/mobile/push-tokens', { method: 'DELETE', body: { token }, timeoutMs: 5000 }, connection).catch(() => undefined)
 }
 
@@ -57,13 +66,13 @@ async function register(connection: ApiConnection, started: number): Promise<Pus
       if (cancelled()) return 'unknown'
       const key = bindingKey(connection.account.id, token)
       if (isConfirmed(key)) return 'registered'
-      await api('/api/mobile/push-tokens', { method: 'POST', body: { token, platform: Platform.OS, deviceName: Device.deviceName }, timeoutMs: 5000 }, connection)
+      const binding = await api<{ id?: string } | undefined>('/api/mobile/push-tokens', { method: 'POST', body: { token, platform: Platform.OS, deviceName: Device.deviceName }, timeoutMs: 5000 }, connection)
       // A switch can begin while the POST is in flight. Finish its cleanup
       // before a new account may register this same device token.
-      if (cancelled()) { await remove(connection, token); return 'unknown' }
+      if (cancelled()) { await remove(connection, token, binding?.id); return 'unknown' }
       try { await SecureStore.setItemAsync(accountStorageKey(connection.account.id, 'push_token'), token) }
-      catch (error) { await remove(connection, token); throw error }
-      if (!cancelled()) confirmed = { key, at: Date.now() }
+      catch (error) { await remove(connection, token, binding?.id); throw error }
+      if (!cancelled()) confirmed = { key, at: Date.now(), id: binding?.id }
       return 'registered'
     })
   } catch {
@@ -113,7 +122,10 @@ export async function unregisterPush(): Promise<void> {
   generation++
   await mutate(async () => {
     const token = await SecureStore.getItemAsync(key)
-    if (token) await remove(connection, token)
+    if (token) {
+      const id = confirmed?.key === bindingKey(connection.account.id, token) ? confirmed.id : undefined
+      await remove(connection, token, id)
+    }
     await SecureStore.deleteItemAsync(key)
     if (currentAccount().id === connection.account.id) confirmed = null
   })

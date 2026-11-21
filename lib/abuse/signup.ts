@@ -5,6 +5,7 @@ import { APIError } from 'better-auth'
 import { auditRequestContext } from '../audit/events'
 import { localTestAccountsMode } from '@mikka/protocol/local-test-mode'
 import { runtimeResourcePath } from '../runtime-resource'
+import { deploymentStage } from '../deployment-stage.mjs'
 const domains = new Set(
   readFileSync(
     runtimeResourcePath('lib/abuse/data/disposable-email-domains.txt'),
@@ -35,9 +36,10 @@ export async function verifyTurnstile(
   env: Record<string, string | undefined> = process.env,
   fetchImpl: typeof fetch = fetch,
 ) {
+  const production = deploymentStage(env) === 'production'
   const secret = env.TURNSTILE_SECRET_KEY
   if (!secret) {
-    if (env.VERCEL_ENV === 'production') {
+    if (production) {
       console.error('signup_turnstile_not_configured')
       failure('SERVICE_UNAVAILABLE', 'SIGNUP_VERIFICATION_UNAVAILABLE')
     }
@@ -62,7 +64,7 @@ export async function verifyTurnstile(
     if (!response.ok || result.success !== true)
       failure('BAD_REQUEST', 'TURNSTILE_INVALID')
     if (
-      env.VERCEL_ENV === 'production' &&
+      production &&
       !(
         result.hostname === 'aspectlylabs.com' ||
         result.hostname?.endsWith('.aspectlylabs.com')

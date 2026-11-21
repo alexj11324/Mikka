@@ -8,8 +8,7 @@ export class AccountDeletionLockLost extends Error {
   constructor() { super('accountDeletionLockLost') }
 }
 
-/** Session advisory locks cannot use Neon's transaction pooler. Reuse the
- * configured database/credentials, changing only the documented Neon host. */
+/** Session advisory locks use the configured direct connection for this database. */
 export function deletionLockPoolOptions(options: PoolConfig): PoolConfig {
   const result = { ...directPoolOptions(options), max: 1, connectionTimeoutMillis: 5_000, application_name: 'mikka-account-deletion' }
   return result

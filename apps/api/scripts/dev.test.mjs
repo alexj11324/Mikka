@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { Agent } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
 import { getEventListeners } from 'node:events'
+import { waitForApiReady } from '../../../scripts/dev-local/shutdown.mjs'
 import { apiProxyOptions, developmentDocument, developmentRequest } from './dev-http.mjs'
-import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, staleRouteFiles, staleRoutesRefusal } from './dev.mjs'
+import { closeDevelopment, developmentOptions, developmentResponse, developmentWorkerReady, openPublicPort, staleRouteFiles, staleRoutesRefusal } from './dev.mjs'
 
 const request = (path, options) => new Request(`http://localhost:3000${path}`, options)
 const html = '<!doctype html><html lang="zh-CN"><head></head><body><div id="root"></div></body></html>'
@@ -152,6 +153,30 @@ test('a worker ready message arriving before the wait is retained', async () => 
   worker.dispose()
 })
 
+test('the public port opens only after the worker has an address', async () => {
+  // A browser reaching the port during the first build gets the runner's own
+  // six-second wait as a 500 ("Runner did not become ready in time") and shows a
+  // failed thread for a server that is merely still starting.
+  const api = workerMessages(), worker = developmentWorkerReady(api), opened = []
+  const pending = openPublicPort(worker, async () => { opened.push('listen') }, AbortSignal.timeout(30_000))
+  api.emit({ event: 'compiled' })
+  await Promise.resolve()
+  assert.deepEqual(opened, [], 'compiled is not an address; nothing may listen yet')
+  api.emit({ address: { host: '127.0.0.1', port: 43003 } })
+  await pending
+  assert.deepEqual(opened, ['listen'])
+  worker.dispose()
+})
+
+test('a worker that never becomes ready never opens the public port', async () => {
+  const api = workerMessages(), worker = developmentWorkerReady(api), opened = []
+  const pending = openPublicPort(worker, async () => { opened.push('listen') }, AbortSignal.timeout(30_000))
+  api.emit({ event: 'init-error', error: 'private initialization detail' })
+  await assert.rejects(pending, { code: 'API_DEV_WORKER_INIT_FAILED' })
+  assert.deepEqual(opened, [], 'a server with no worker behind it must not accept requests')
+  assert.equal(api.listenerCount, 0)
+})
+
 test('a real worker init error fails immediately without an HTTP retry or raw error disclosure', async () => {
   const api = workerMessages(), worker = developmentWorkerReady(api)
   let calls = 0
@@ -274,4 +299,17 @@ test('worker disposal rejects an outstanding wait and HTTP failure remains fatal
     async () => { calls++; return new Response('unavailable', { status: 503 }) }),
   { code: 'API_DEV_STARTUP_RESPONSE_INVALID' })
   assert.equal(calls, 1)
+})
+
+test('owned API readiness ignores unrelated IPC and preserves failure before ready', async t => {
+  const origin = 'http://localhost:3110'
+  const child = program => {
+    const proc = spawn(process.execPath, ['-e', program], { stdio: ['ignore', 'ignore', 'ignore', 'ipc'] })
+    t.after(() => { if (proc.exitCode === null && proc.signalCode === null) proc.kill() })
+    return proc
+  }
+  await waitForApiReady(child(`process.send({ type: 'other' });process.send({ type: 'api-ready', origin: '${origin}' })`), origin, AbortSignal.timeout(10_000))
+  await assert.rejects(waitForApiReady(child('process.exit(23)'), origin, AbortSignal.timeout(10_000)), /exited before readiness: 23/)
+  await assert.rejects(waitForApiReady(child("process.send({ type: 'api-ready', origin: 'http://localhost:9000' })"), origin, AbortSignal.timeout(10_000)), /API_DEV_ORIGIN_MISMATCH/)
+  await assert.rejects(waitForApiReady(child('setTimeout(() => {}, 10000)'), origin, AbortSignal.timeout(100)), { name: 'TimeoutError' })
 })

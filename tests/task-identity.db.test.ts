@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { measured } from './helpers/read-metrics'
 
 const url = process.env.E2E_DATABASE_URL
@@ -15,7 +15,7 @@ test('task identity: split DB migration, immutable issuance, historical aliases 
   const admin = new Pool({ connectionString: url, max: 1 })
   const suffix = randomUUID().replaceAll('-', '')
   const names = [`identity_app_${suffix}_e2e`, `identity_ws_${suffix}_e2e`]
-  for (const name of names) await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  for (const name of names) await createTestDatabase(admin, name, 'template0')
   const appUrl = new URL(url!), wsUrl = new URL(url!)
   appUrl.pathname = `/${names[0]}`; wsUrl.pathname = `/${names[1]}`
   const app = new Pool({ connectionString: appUrl.toString(), max: 8 })

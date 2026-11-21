@@ -61,11 +61,11 @@ test('monitor mappings use actual owner/scope authorization, GitHub readback and
     await pool.end();await(await import('../lib/db')).pool.end();await(await import('../lib/workspace-db')).workspacePool.end()
   })
   const context=await import('../apps/api/src/context')
-  const framework=await import('next/headers')
-  mock.module('next/headers',{namedExports:{...framework,
+  const framework=await import('@/lib/server-runtime/headers')
+  mock.module('@/lib/server-runtime/headers',{namedExports:{...framework,
     headers:async()=>context.requireRequestScope().headers,cookies:async()=>context.requireRequestScope().cookies}})
-  const next=await import('next/server')
-  mock.module('next/server',{namedExports:{...next,after:(work:()=>unknown)=>context.requireRequestScope().after.add(work)}})
+  const next=await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server',{namedExports:{...next,after:(work:()=>unknown)=>context.requireRequestScope().after.add(work)}})
   const {auth}=await import('../lib/auth')
   const nativeTokens=new Map<string,string>()
   for(const id of [owner,peer]){
@@ -76,12 +76,14 @@ test('monitor mappings use actual owner/scope authorization, GitHub readback and
   const {saveGitHubConnection}=await import('../lib/github/connection')
   await saveGitHubConnection(owner,{githubAccountId:'42',githubLogin:'monitor-fixture'},{access_token:credential})
   const {recordMonitorIncidentState}=await import('../lib/factory/monitor-incidents')
+  const {withTaskWorkspace}=await import('../lib/task-workspace')
   const routes=await import('../app/api/factory/monitor-incidents/[incidentId]/links/route')
   const urlFor=(number=7)=>`https://github.com/mikka-ci/followup/issues/${number}`
   async function seed(workspace=false,imported?:{id:string;workspaceKey:string;workspaceId:string}){
     const issueId=imported?.id??randomUUID(),taskId=randomUUID(),attemptId=randomUUID(),candidateId=randomUUID()
     const workspaceId=imported?.workspaceId??await seedFixtureWorkspace(pool,workspace?peer:owner,workspace?'team':'personal')
     if(workspace)await pool.query('INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role,status) VALUES($1,$2,$2,$3,\'member\',\'active\')',[workspaceId,owner,`${owner}@example.invalid`])
+    return withTaskWorkspace(owner,workspaceId,async()=>{
     const tx=await pool.connect()
     try{
       await tx.query('BEGIN')
@@ -100,6 +102,7 @@ test('monitor mappings use actual owner/scope authorization, GitHub readback and
       incidentWorkspaces.set(String(incident.id),workspaceId)
       return {incidentId:String(incident.id),sourceIssueId:issueId,issueId:String(incident.followupIssueId??incident.issueId),workspaceId,taskId}
     }catch(error){await tx.query('ROLLBACK');throw error}finally{tx.release()}
+    })
   }
   const request=(id:string,method='GET',body:unknown={url:urlFor()},requestOrigin=origin)=>{
     const workspaceId=incidentWorkspaces.get(id)

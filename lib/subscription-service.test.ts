@@ -41,19 +41,29 @@ test('the trusted actual native model checks its own allowance instead of the sa
   await assert.rejects(service.check(use, undefined, 'claude-opus-5-5'), { code: 'quota_exhausted' })
 })
 
-test('a reset crossed since a recent observation triggers a real provider read before execution', async () => {
-  const { use, access } = subscriptionFixture('claude_cpa')
+for (const sample of [
+  { name: 'hosted model', route: 'claude_cpa', preparation: 'prepareStream' },
+  { name: 'native execution', route: 'claude_code_cli', preparation: 'prepare' },
+  { name: 'run-bound model', route: 'claude_cpa', preparation: 'prepare', runId: 'fixture-run' },
+] as const) test(`${sample.name}: a crossed quota reset refreshes allowance with its supported preparation`, async () => {
+  const { use, access } = subscriptionFixture(sample.route)
+  if ('runId' in sample) use.runId = sample.runId
   const now = Date.now()
   access.connection!.quota.observedAt = new Date(now - 2_000).toISOString()
   access.connection!.quota.windows = [{ kind: 'five_hour', used: 1, resetsAt: new Date(now - 1_000).toISOString() }]
   const row = { id: access.connection!.id, ownerId: use.ownerId, workspaceId: use.workspaceId, provider: 'claude', state: 'connected', epoch: '1', quota: access.connection!.quota }
   const methods: string[] = []
   const repository = { binding: async () => ({ ...access.binding!, modelId: 'claude-haiku-5-5' }), connection: async () => row, scope: () => ({}), saveQuota: async (_row: unknown, quota: typeof row.quota) => { row.quota = quota } } as unknown as SubscriptionService['repository']
-  const worker = (() => ({ forUse: () => ({ call: async (method: string) => { methods.push(method); return { status: 200, body: { five_hour: { utilization: 20 } } } } }) })) as never
-  const service = new SubscriptionService(repository, worker, { ready: () => true, nativeIsolation: 'none' }, undefined, async () => undefined)
+  const worker = (() => ({ forUse: (actual: typeof use) => {
+    assert.deepEqual(actual, use)
+    return { call: async (method: string) => { methods.push(method); return { status: 200, body: { five_hour: { utilization: 20 } } } } }
+  } })) as never
+  const service = new SubscriptionService(repository, worker, { ready: () => true, nativeIsolation: 'verified_runtime' }, undefined, async () => undefined)
   await service.check(use)
-  assert.deepEqual(methods, ['prepare', 'quota'])
+  assert.deepEqual(methods, [sample.preparation, 'quota'])
   assert.equal(row.quota.windows[0].used, .2)
+  await service.check(use)
+  assert.deepEqual(methods, [sample.preparation, 'quota'], 'fresh allowance does not repeat custody or provider reads')
 })
 
 for (const route of ['codex_cpa', 'claude_cpa', 'codex_cli', 'claude_code_cli'] as const) {

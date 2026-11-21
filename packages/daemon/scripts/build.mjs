@@ -1,6 +1,11 @@
 import { appendFile, chmod, copyFile, cp, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+// Keep this build script inside the daemon's packaged source boundary.
+const repository = process.env.GITHUB_REPOSITORY_ID === '1427517699'
+  && [['alexj11324/Mikka', '183887963'], ['aspectly-labs/Mikka', '359279274']].some(([name, ownerId]) =>
+    process.env.GITHUB_REPOSITORY === name && process.env.GITHUB_REPOSITORY_OWNER_ID === ownerId)
+  ? process.env.GITHUB_REPOSITORY : 'alexj11324/Mikka'
 
 const root = fileURLToPath(new URL('../', import.meta.url))
 const source = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
@@ -17,7 +22,7 @@ const entryPoints = {
   mikka: 'bin/mikka.ts', main: 'src/main.ts', cli: 'src/cli.ts',
   client: 'src/rpc/client.ts', env: 'src/env.ts', paths: 'src/paths.ts',
   'http-link': 'src/server-link-http.ts', login: 'src/login.ts', log: 'src/log.ts',
-  sandbox: 'src/agents/sandbox.ts', coordinator: 'src/coordinator/index.ts',
+  sandbox: 'src/agents/sandbox.ts',
 }
 await build({
   absWorkingDir: root, entryPoints, outdir: out, bundle: true,
@@ -56,7 +61,7 @@ await writeFile(resolve(out, 'package.json'), `${JSON.stringify({
   gitHead: source.gitHead,
   type: 'module', private: false, license: source.license,
   engines: source.engines, bin: { mikka: './mikka.js' }, exports,
-  repository: { type: 'git', url: 'git+https://github.com/alexj11324/Mikka.git', directory: 'packages/daemon' },
+  repository: { type: 'git', url: `git+https://github.com/${repository}.git`, directory: 'packages/daemon' },
   publishConfig: { access: 'public', provenance: true }, dependencies,
 }, null, 2)}\n`)
 await chmod(resolve(out, 'mikka.js'), 0o755)

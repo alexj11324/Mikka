@@ -67,10 +67,11 @@ resumes blocked before launch; it does not add a recovery scheduler or retry
 legacy runs. Interrupted `finishing` stays blocked for explicit reconciliation
 and cannot automatically replay an uncertain publication.
 
-Heartbeats for receipted runs recheck the same source/access/capability boundary;
-the check and lease update share the same transaction and locked run, with a
-stop/lease CAS. Rejected runs are returned in `revoked` and receive no renewed lease. Existing
-nonreceipted lease behavior is unchanged. A device capability header is a
+There is no heartbeat renewal ([decision 2026-11-17-2215](decisions/2026-11-17-2215-device-session-no-heartbeat.md)):
+the claim and the receipt revalidation check the source/access/capability boundary,
+and a Team Skill withdrawal ends the affected leases directly. A source that loses
+eligibility while a run is already executing is not re-checked until its next
+revalidation. A device capability header is a
 compatibility marker, **not** a cryptographic binary attestation. The server
 cannot prevent an arbitrary old binary from executing its cached journal while
 fully offline; complete downgrade/worker attestation is still #214/#230 scope.

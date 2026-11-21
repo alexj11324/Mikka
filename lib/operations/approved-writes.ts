@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto'
+import { randomUUID } from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
 import { z } from 'zod'
 import { writeTransaction, type WriteRequestContext, type WriteActor } from './write-transaction'
@@ -10,14 +10,9 @@ import type { WriteProvider } from './write-contract'
 import { writeBindingSchema as bindingSchema, prepareWriteBinding } from './write-binding'
 import { lockWritePolicy } from './write-policy-store'
 import { withWritePolicy } from './policy-authorization'
+import { snapshotDigest as digest } from './write-target'
 import { approvedWriteChanged } from '../live/approved-writes'
 
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical)
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, canonical(v)]))
-  return value
-}
-const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex')
 export interface StoredWriteProposal { id: string; userId: string; action: string; input: Record<string, unknown>; status: string; operationBinding: z.infer<typeof bindingSchema>; intentKey: string; context: Record<string, unknown> | null; createdAt: Date }
 type Proposal = StoredWriteProposal
 export interface ApprovedWriteView {

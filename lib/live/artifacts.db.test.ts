@@ -5,7 +5,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import test, { mock } from 'node:test'
 import { Pool } from 'pg'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
 import { observePoolCommits } from '../db/commit-effects'
 import { artifactTargets } from './artifacts'
@@ -17,10 +17,17 @@ if (process.env.REQUIRE_DB === '1') assert.ok(url, 'REQUIRE_DB=1 needs PostgreSQ
 if (url) assert.ok(disposableDatabase(process.env, url), 'loopback *_e2e only')
 
 test('an artifact key reaches only its owner home, after the real artifact writers commit', { skip: !url, timeout: 180_000 }, async t => {
+  const wakes: string[] = []
+  const receive = async (userId: string) => { wakes.push(userId) }
+  const { coordinatorWakeTransport } = await import('../coordinator/wake-after-commit')
+  const previousWake = coordinatorWakeTransport.wake
+  coordinatorWakeTransport.wake = receive
+  t.after(() => { coordinatorWakeTransport.wake = previousWake })
+  t.mock.module(new URL('../coordinator/wake.ts', import.meta.url).href, { namedExports: { wakeCoordinator: receive } })
   const pending: (() => Promise<void>)[] = []
   const sent: { scope: LiveScope; events: LiveInvalidation[] }[] = []
-  const next = await import('next/server')
-  mock.module('next/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { pending.push(work) } } })
+  const next = await import('@/lib/server-runtime/server')
+  mock.module('@/lib/server-runtime/server', { namedExports: { ...next, after: (work: () => Promise<void>) => { pending.push(work) } } })
   const channelScopes = new Map<string, LiveScope>(), unexpected: string[] = []
   const previous = { url: process.env.DEVICE_GATEWAY_URL, secret: process.env.DEVICE_GATEWAY_PUSH_SECRET }
   process.env.DEVICE_GATEWAY_URL = 'https://gateway.example.invalid'
@@ -38,7 +45,7 @@ test('an artifact key reaches only its owner home, after the real artifact write
   })
   const admin = new Pool({ connectionString: url, max: 1 })
   const name = `artifact_live_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target = new URL(url!); target.pathname = `/${name}`
   const database = new Pool({ connectionString: target.toString(), max: 6 })
   observePoolCommits(database)
@@ -79,17 +86,24 @@ test('an artifact key reaches only its owner home, after the real artifact write
       assert.deepEqual(await artifactTargets(database, database, 'owner', artifactId), ownerHome(artifactId), 'the team and a peer sharing the home get nothing')
       assert.deepEqual(await artifactTargets(database, database, 'peer', artifactId), [])
       assert.deepEqual(await deliveries(), ownerHome(artifactId), 'creating it was one push')
+      assert.deepEqual(wakes.splice(0), ['owner'], 'one committed version wakes its owner once')
     })
 
     await t.test('a new version publishes after COMMIT, and nothing inside a rolled-back transaction', async () => {
       await assert.rejects(scope.run(() => db.transaction(outer => withDatabaseTransaction(outer, async () => {
         assert.ok(!('error' in await submit(artifactId)))
+        await drain()
+        assert.deepEqual(wakes, [], 'submitting a nested version cannot wake before its outer transaction commits')
         throw new Error('version rollback')
       }))), /version rollback/)
       assert.deepEqual(await deliveries(), [])
+      assert.deepEqual(wakes, [], 'a rolled-back version cannot wake the consumer')
       assert.equal((await database.query('SELECT "latestVersion" FROM artifacts WHERE id=$1', [artifactId])).rows[0].latestVersion, 1)
       assert.ok(!('error' in await scope.run(() => submit(artifactId))))
       assert.deepEqual(await deliveries(), ownerHome(artifactId))
+      assert.deepEqual(wakes.splice(0), ['owner'])
+      const events = await database.query(`SELECT "dedupeKey" FROM coordinator_events WHERE "userId"='owner' AND kind='artifact_submitted' ORDER BY "dedupeKey"`)
+      assert.deepEqual(events.rows.map(row => row.dedupeKey), [1, 2].map(version => `artifact_submitted:${artifactId}:${version}`))
     })
 
     await t.test('share links and deletion publish once; a no-op revoke and a foreign owner publish nothing', async () => {

@@ -21,8 +21,8 @@ disposable database use `acquireTestAccounts` in
 `scripts/test-accounts/session.mjs` and `pool.mjs`. Those harnesses provision
 owner/peer fixtures through normal email sign-up/sign-in and verify the real
 session. Follow their lease renewal, release and evidence auditing. Their
-results establish the isolated fixture path, while shared-team subscriptions
-require the shared-account check.
+results establish the isolated fixture path. Subscriptions serve their owner
+only (decision 2026-11-17-1400), so subscription checks use the account's own.
 
 The shared adapter implements `isolated-ci` for loopback application targets
 and `isolated-docker` for the separately bound Docker environment. Both keep
@@ -132,6 +132,77 @@ establish either subscription path. Record that implementation gap without
 making it an additional gate. The built-in Decision judge is separate from
 these user-selectable coding models and keeps its configured model.
 
+## Personal Workspace acceptance
+
+Follow the accepted [personal-workflow-first decision](https://github.com/alexj11324/Mikka/blob/74ca8e84cd323c24c479bf64937d696d53d32ffb/docs/design/decisions/2026-11-11-1400-personal-workflow-before-channels.md)
+in [#1875](https://github.com/alexj11324/Mikka/pull/1875), with the existing
+[glossary](design/glossary.md) for product terms.
+
+Use `scripts/acceptance/personal-workflow.mjs` to select an account's own personal
+Workspace explicitly. The existing shared acceptance drivers keep their team
+default. A personal request never falls back to a team or borrows its subscription.
+Use the existing `SMOKE_OWNER_EMAIL` / `SMOKE_OWNER_PASSWORD` binding for an
+authorized ordinary test account; do not copy the execution host's CLI identity.
+The existing account-pool runner can also supply its own generated credentials
+in process for an attested loopback environment. That path requires the private
+bound descriptor, matching compiled deployment SHA and database attestation; it does
+not admit ordinary account credentials on a production origin.
+
+The package command supplies the required `tsx` loader for the protocol TypeScript imports.
+Start with metadata readiness against the isolated local application:
+
+```sh
+corepack pnpm acceptance:personal \
+  --origin http://127.0.0.1:3000 --workspace PERSONAL_WORKSPACE_UUID
+```
+
+This selects the exact authorized `personal` choice, verifies the account's active
+admin membership, reads back the ordinary Workspace cookie and session, and
+restores the original selection before signing out. It reads subscription/model
+and local device/Agent metadata. It creates no Bot, profile, task, machine or
+provider lease. `ready_for_attempt` always carries `executionVerified: false`.
+It requires the existing `apiKeyAfterQuota` policy to be explicitly false and
+rechecks it before task creation; the driver preserves the setting. Enabled or
+unavailable policy metadata blocks the subscription attempt.
+The report contains closed status/error codes rather than account labels,
+credentials, device names or Agent instructions.
+
+An execution attempt requires an existing enabled, online local device, its
+matching Agent, source pins and one explicit harness:
+
+```sh
+corepack pnpm acceptance:personal \
+  --origin http://127.0.0.1:3000 --workspace PERSONAL_WORKSPACE_UUID \
+  --operation execute --harness codex --device-id DEVICE_UUID --agent-id CODEX_AGENT_UUID \
+  --expected-build APPLICATION_SHA --revision DRIVER_SHA
+```
+
+Run the independent Claude case with `--harness claude_code` and its originally
+bound Agent/subscription. Each command runs one case: Codex uses `gpt-6-luna` and
+Claude Code uses `claude-haiku-5-5`. A successful case does not cover the other
+subscription. There is no automatic model/provider fallback or retry. Personal
+execution cannot choose an implicit cloud machine. The device must advertise a
+successful native subscription preflight with the exact versions in
+`packages/daemon/harness/pins.json`; metadata readiness still cannot prove that
+the server can acquire a real provider lease or that a model call succeeded.
+The existing execution and native receipt checks establish that evidence.
+
+Add `--probe files --expected-worker-sha WORKER_SHA
+--expected-worker-source WORKER_SOURCE_SHA` to reuse the Files acceptance driver.
+Personal fixtures use the normal personal task action, without a Team. Its
+immutable installed-worker marker and native shell/file receipts remain required;
+a source daemon without that release installation cannot pass them. A single
+successful Files case reports `partial` and the required/verified harness lists.
+Both original subscriptions remain necessary for complete coverage.
+
+Readiness reports `startup_personal_runtime_unavailable` when the normal
+subscription endpoint cannot expose its configured backend,
+`startup_personal_subscription_missing` when the account has no matching source,
+`startup_personal_model_missing_or_ambiguous` for an absent or foreign fixed-model
+candidate, and separate device/native-runtime/Agent errors for a missing,
+disabled, offline or incompatible target. Record blocked cases as blocked;
+fixture metadata and empty harness lists do not prove native model execution.
+
 ## Shared production acceptance workspace
 
 验收工作区：**Acme Inc.**。**验收在这个工作区里做**。
@@ -146,6 +217,36 @@ subscription-sharing setup in
 Ordinary acceptance must not sign in as Alex. For production checks described
 below, use this shared-account team scope rather than an isolated account-pool
 lease. Keep the normal identity, membership and cleanup checks.
+
+### Issue #1918: authorized owned Codex Cloud MCP case
+
+For this case, Alex explicitly authorized the existing 2023 account and its
+own Codex `gpt-6-luna` subscription
+([decision](design/decisions/2026-11-11-1405-owned-codex-cloud-mcp-acceptance.md)).
+Run `scripts/acceptance/cloud-native-mcp.mjs` with the complete
+`MIKKA_TEST_ACCOUNT_EMAIL` / `MIKKA_TEST_ACCOUNT_PASSWORD` environment pair,
+mapped in memory from the existing Infisical `prod:/` `ALEX_TEST_EMAIL` /
+`ALEX_TEST_PASSWORD`. Keep `SMOKE_OWNER_*` unchanged.
+
+Pass `--expected-build`, `--expected-worker-sha`, `--expected-worker-source`
+and a unique `--output` path. The existing `VERCEL_TEAM_TOKEN` supplies the
+read-only published runtime configuration check. Without `--execute`, the command only prints
+its preparation contract and makes no network calls. Execution creates one
+normal cloud task on the owned Luna source, calls the configured public
+DeepWiki native MCP once, and verifies its paired Task CLI input/output,
+later handoff and root-owned worker release markers. The native shell proof
+reads the README and release markers; it uses the existing probe assignment
+policy and does not set the assignment's `readOnly` flag, which disables that
+shell. The task instructions prohibit writes, commits, pushes and messages.
+
+The report and adjacent `.fixture.jsonl` journal use private files and a new
+case ID. Cleanup targets only that case's MCP connection, Profile, task and
+machine, then restores and closes its sessions. The result records
+`actor: authorized_2023_codex` and `ownedScope.access: owner`. It does not
+replace the existing shared SMOKE Claude result or complete the two-model
+candidate publication gate. The production worker pins must already match
+the version being accepted. The account's normal `apiKeyAfterQuota` setting
+must be false; the driver checks it and preserves the setting.
 
 The one-time setup and the subsequent fixed-deployment production verification
 are recorded in [issue #1415 acceptance report](acceptance/issue-1415/final-report.md).
@@ -179,7 +280,7 @@ After the owning agent merges its PR ([dev workflow](dev-workflow.md) § 5):
 
 The [2026-11-07 production acceptance decision](design/decisions/2026-11-07-1400-production-acceptance-scope.md)
 calls for automatic sign-in, a Coordinator message and task dispatch after each
-Web deploy. The implemented `production-smoke.yml` job runs
+Web release. The implemented `production-smoke.yml` job runs
 `scripts/ops/production-smoke.mjs`, which signs in and reads the shell,
 capabilities and shared-team Coordinator runtime. `AGENTS.md` records that
 implementation and keeps messaging and dispatch in separate live acceptance

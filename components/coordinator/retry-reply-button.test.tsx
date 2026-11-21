@@ -17,6 +17,9 @@ const submitted: { text: string; context: { retryOf?: number } | undefined }[] =
 let chatItems: import('@/lib/coordinator/context').ChatItem[] = []
 let chatError: string | null = null
 let chatEnabled = false
+let streamStatus: 'idle' | 'resuming' = 'idle'
+let welcomeReply: unknown = { queued: true }
+let welcomeCalls = 0
 const modelPicks: (string | null)[] = []
 // A chat whose welcome failed: its read, the model menu's 可用, the refusal code and whether the tab is visible.
 let chatData: Record<string, unknown> | null = null
@@ -29,9 +32,27 @@ let pathname = '/mikka/en', search = ''
 let serverVersion: { build: string } = { build: 'fixture-current' }
 const notices: unknown[] = []
 const notes = [{ n: 1, kind: 'region' as const, url: 'https://example.com', label: 'fixture', note: 'keep this note', rect: { x: 0, y: 0, width: 1, height: 1, viewportWidth: 1, viewportHeight: 1 } }]
-let composer: { value: string; onChange: (value: string) => void; onSubmit: () => void }
+let composer: { sending?: boolean; editableWhileSending?: boolean; value: string; onChange: (value: string) => void; onSubmit: () => void }
 const plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>
 const nothing = () => null
+const artifactChat = { activeArtifactId: 'fixture-artifact', quote: null, clearQuote: nothing, openArtifact: nothing }
+mock.module(new URL('../../hooks/use-factory-questions.ts', import.meta.url).href, { namedExports: {
+  factoryQuestionUnavailable: () => null,
+  useFactoryQuestions: () => ({ questions: [], error: null, reload: nothing }),
+} })
+mock.module(new URL('../slots/thread.tsx', import.meta.url).href, { namedExports: {
+  ThreadScreen: (props: import('../slots/thread-contract').ThreadScreenProps) => {
+    composer = props.composer
+    const { entries } = props
+    return <div data-official-thread="">
+    {entries?.map(entry => entry.role === 'person' ? <div key={entry.id} data-testid={entry.status === 'failed' ? 'failed-message' : 'local-message'}>
+      {entry.text}{entry.attachments?.map(item => <span key={item.id}>{item.name}</span>)}{entry.deliveryMessage}
+      {entry.onRetry && <Button onClick={entry.onRetry}>Retry</Button>}
+    </div> : <div key={entry.id}>{entry.parts.map((part, i) =>
+      part.kind === 'error' ? <span key={i}>{part.text}{part.actions}</span> : null)}</div>)}
+  </div>
+  },
+} })
 // Portal primitives cache DOM availability on import; this fixture imports the
 // shared Button before happy-dom. Keep this unit focused on guard state; the
 // real portal is reviewed in the production-build screenshots.
@@ -41,10 +62,11 @@ mock.module(new URL('../ui/alert-dialog.tsx', import.meta.url).href, { namedExpo
 } })
 mock.module(new URL('../../app/actions/coordinator.ts', import.meta.url).href, { namedExports: {
   retryCoordinatorTurn: async () => { calls++; if (reply instanceof Error) throw reply; if (typeof reply === 'function') return reply(); return reply },
-  getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), syncCoordinatorChat: async () => ({}), coordinatorHistory: async () => ({}), stopCoordinatorTurn: async () => ({}), welcomeCoordinator: async () => ({}), coordinatorCitationSources: async () => ({}),
+  getCoordinatorChat: async () => ({}), pollCoordinatorChat: async () => ({}), syncCoordinatorChat: async () => ({}), coordinatorHistory: async () => ({}), stopCoordinatorTurn: async () => ({}),
+  welcomeCoordinator: async () => { welcomeCalls++; if (welcomeReply instanceof Error) throw welcomeReply; if (typeof welcomeReply === 'function') return welcomeReply(); return welcomeReply }, coordinatorCitationSources: async () => ({}),
 } })
 mock.module(new URL('../../app/actions/execution-settings.ts', import.meta.url).href, { namedExports: { getBotModelMenu: async () => ({}) } })
-mock.module('next-intl', { namedExports: { useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: (namespace: string) => (key: string) => `${namespace}.${key}` } })
 mock.module(new URL('../../lib/use-action-error.ts', import.meta.url).href, { namedExports: { useActionError: () => (key: string) => `Errors.${key}` } })
 mock.module(new URL('../../lib/billing/verification-client.ts', import.meta.url).href, { namedExports: { hostedRefusal: () => refusalCode } })
 mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExports: {
@@ -59,18 +81,19 @@ mock.module(new URL('../../lib/app-build.ts', import.meta.url).href, { namedExpo
   desktopBelowMinimum: () => false,
   readAppVersion: async () => { versionReads++; return serverVersion },
 } })
-mock.module('next/navigation', { namedExports: { usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) } })
+mock.module('@/lib/client-runtime/navigation', { namedExports: { usePathname: () => pathname, useSearchParams: () => new URLSearchParams(search) } })
 mock.module(new URL('../../i18n/navigation.ts', import.meta.url).href, { namedExports: { Link: plain, useRouter: () => ({ push: nothing }), usePathname: () => pathname } })
 mock.module('sonner', { namedExports: { toast: Object.assign((...args: unknown[]) => { notices.push(args) }, { error: nothing }) } })
 mock.module('swr', { defaultExport: (key: unknown) => Array.isArray(key) && key[0] === 'bot-model-menu' ? { data: menu, mutate: async () => {} } : ({ data: chatData ?? { items: chatItems, enabled: chatEnabled, working: false, error: chatError, artifacts: {} }, mutate: async () => {} }), namedExports: { useSWRConfig: () => ({ mutate: async () => {} }), unstable_serialize: (key: unknown) => JSON.stringify(key) } })
 mock.module(new URL('./use-coordinator-submit.ts', import.meta.url).href, { namedExports: { useCoordinatorSubmit: () => ({ submit: async (text: string, context?: { retryOf?: number }) => { submissions++; submitted.push({ text, context }); return { kind: 'accepted' } }, failureMessage: () => 'fixture failed' }) } })
-mock.module(new URL('./use-coordinator-agent.ts', import.meta.url).href, { namedExports: { useCoordinatorAgent: () => ({ replies: [], error: false, reconnect: nothing, status: 'idle', view: emptySessionView(), session: { sessionId: 'wrun_fixture' } }) } })
+mock.module(new URL('./use-coordinator-agent.ts', import.meta.url).href, { namedExports: { useCoordinatorAgent: () => ({ replies: [], error: false, reconnect: nothing, status: streamStatus, view: emptySessionView(), session: { sessionId: 'wrun_fixture' } }) } })
 mock.module(new URL('./chat-composer.tsx', import.meta.url).href, { namedExports: { ChatComposer: (props: { value: string; onChange: (value: string) => void; onSubmit: () => void; ref: Ref<HTMLTextAreaElement>; quote?: ReactNode }) => {
   composer = props
   return <div>{props.quote}<Textarea ref={props.ref} value={props.value} onChange={event => props.onChange(event.target.value)} /><Button onClick={props.onSubmit}>fixture-send</Button></div>
 } } })
 mock.module(new URL('../ui/message-scroller.tsx', import.meta.url).href, { namedExports: Object.fromEntries([
   ...['MessageScroller', 'MessageScrollerContent', 'MessageScrollerItem', 'MessageScrollerProvider', 'MessageScrollerViewport'].map(name => [name, plain]),
+  ['MessageScrollerItem', ({ children, 'data-testid': testId }: { children?: ReactNode; 'data-testid'?: string }) => <div data-testid={testId}>{children}</div>],
   ['MessageScrollerButton', nothing], ['useMessageScroller', () => ({ scrollToEnd: () => { scrollRequests++ } })],
 ]) })
 mock.module(new URL('../workspace/agent-interaction.tsx', import.meta.url).href, { namedExports: { AgentInteractionContext: createContext({}) } })
@@ -116,19 +139,19 @@ before(async () => {
   ;({ VersionGuard } = await import('../version-guard'))
   Object.defineProperty(browser.document, 'visibilityState', { configurable: true, get: () => visibility })
 })
-beforeEach(() => { chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; scrollRequests = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
+beforeEach(() => { streamStatus = 'idle'; welcomeCalls = 0; welcomeReply = { queued: true }; chatData = null; menu = undefined; refusalCode = null; visibility = 'visible'; calls = 0; currentBuild = true; buildCheck = async () => currentBuild; submissions = 0; scrollRequests = 0; submitted.length = 0; chatItems = []; chatError = null; chatEnabled = false; modelPicks.length = 0; removedNotes = 0; versionReads = 0; pageRefreshRequired = false; pathname = '/mikka/en'; search = ''; serverVersion = { build: 'fixture-current' }; notices.length = 0; reply = { queued: true }; container = browser.document.createElement('div') as unknown as HTMLDivElement; document.body.append(container); root = createRoot(container) })
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 after(() => browser.happyDOM.close())
 const render = async (onQueued = async () => {}) => { await act(async () => root.render(<RetryReplyButton botId={null} onQueued={onQueued} />)) }
 const click = async () => { await act(async () => (container.querySelector('button') as HTMLButtonElement).click()) }
 
-for (const live of [true, false]) test(`a ${live ? 'current' : 'historical'} API balance refusal opens the same Bot model picker without retrying`, async () => {
+for (const full of [true, false]) for (const live of [true, false]) test(`a ${live ? 'current' : 'historical'} API balance refusal opens the Bot model picker in ${full ? 'full' : 'embedded'} chat without retrying`, async () => {
   chatEnabled = true
   chatError = live ? 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: Insufficient Balance (request_id: 11111111-1111-4111-8111-111111111111)' : null
   chatItems = [{ id: 'fixture-balance-message', position: 84, from: 'person', text: 'fixture API balance check', tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:07:28Z', failure: { kind: 'failed', reason: 'balance' } }]
   const bot = { id: 'fixture-bot', name: 'fixture-bot' } as NonNullable<Parameters<typeof CoordinatorChat>[0]['bot']>
-  await act(async () => root.render(<CoordinatorChat bot={bot} onOpenIssue={nothing} userId="fixture-owner" />))
-  const notice = container.querySelector(`[data-message-failure="${live ? 'live' : 'past'}"]`)!
+  await act(async () => root.render(<CoordinatorChat embedded={full ? undefined : artifactChat} bot={bot} onOpenIssue={nothing} userId="fixture-owner" />))
+  const notice = container.querySelector(full ? '[data-official-thread]' : `[data-message-failure="${live ? 'live' : 'past'}"]`)!
   assert.ok(notice)
   assert.match(notice.textContent ?? '', /Coordinator.apiBalance/)
   assert.doesNotMatch(notice.textContent ?? '', /Common.retry|Coordinator.resend|request_id|doStreamStep|11111111|Billing/)
@@ -144,7 +167,7 @@ for (const live of [true, false]) test(`a ${live ? 'current' : 'historical'} clo
   chatEnabled = true
   chatError = live ? 'Step "step//@ai-sdk/workflow@2.0.80//doStreamStep" failed after 0 retries: cloud_quota_exhausted' : null
   chatItems = [{ id: 'fixture-cloud-quota', position: 86, from: 'person', text: 'fixture cloud quota', tools: [], threads: [], artifacts: [], createdAt: '2026-11-08T05:07:38Z', failure: { kind: 'failed', cloudCode: 'cloud_quota_exhausted' } }]
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   const notice = container.querySelector(`[data-message-failure="${live ? 'live' : 'past'}"]`)!
   assert.ok(notice)
   assert.match(notice.textContent ?? '', /RunErrors.cloud_quota_exhausted.default/)
@@ -163,7 +186,7 @@ test('a generic current reply failure retains its explicit retry action', async 
   chatEnabled = true
   chatError = 'model timed out'
   chatItems = [{ id: 'fixture-generic-message', position: 85, from: 'person', text: 'fixture generic check', tools: [], threads: [], artifacts: [], createdAt: '2026-11-05T03:08:00Z', failure: { kind: 'failed' } }]
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   const notice = container.querySelector('[data-message-failure="live"]')!
   assert.match(notice.textContent ?? '', /Coordinator.failedTitle/)
   assert.equal(notice.querySelector('button')?.textContent, 'Common.retry')
@@ -175,7 +198,7 @@ test('a generic current reply failure retains its explicit retry action', async 
 test('background chat catch-up preserves the reading position and an in-progress draft', async () => {
   const message = (position: number): import('@/lib/coordinator/context').ChatItem => ({ id: `fixture-person-${position}`, position, from: 'person', text: `message ${position}`, tools: [], threads: [], artifacts: [], createdAt: '2026-11-06T20:00:00Z' })
   chatItems = [message(1)]
-  const renderChat = () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />)
+  const renderChat = () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />)
   await act(async () => renderChat())
   await act(async () => composer.onChange('keep reading and editing'))
   const editor = container.querySelector('textarea')!
@@ -192,12 +215,12 @@ test('background chat catch-up preserves the reading position and an in-progress
 })
 
 test('an accepted send in this composer scrolls once; unrelated reads do not scroll again', async () => {
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   await act(async () => composer.onChange('a deliberate local send'))
   await act(async () => composer.onSubmit())
   assert.equal(submissions, 1)
   assert.equal(scrollRequests, 1)
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   assert.equal(scrollRequests, 1)
 })
 
@@ -221,7 +244,7 @@ test('existing window drafts migrate once and survive a chat remount in the scop
 for (const valid of [false, true]) test(`retrying a historical failure ${valid ? 'keeps retryOf in the submission' : 'keeps the original bubble when stale'}`, async () => {
   currentBuild = valid
   chatItems = [{ id: 'fixture-failed-message', position: 7, from: 'person', text: 'retry this original message', tools: [], threads: [], artifacts: [], createdAt: '2026-11-02T20:00:00Z', failure: { kind: 'failed' } }]
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   assert.match(container.textContent ?? '', /retry this original message/)
   await act(async () => container.querySelector<HTMLButtonElement>('[data-message-failure="past"] button')!.click())
   assert.equal(submissions, valid ? 1 : 0)
@@ -231,8 +254,9 @@ for (const valid of [false, true]) test(`retrying a historical failure ${valid ?
     assert.equal(container.querySelector('[data-message-failure="past"]'), null)
   } else {
     assert.match(container.textContent ?? '', /retry this original message/)
-    assert.ok(container.querySelector('[data-message-failure="past"]'))
-    assert.equal(container.querySelector('[data-testid="failed-message"]'), null)
+    assert.equal(container.querySelectorAll('[data-message-failure="past"]').length, 0)
+    assert.equal(container.querySelectorAll('[data-testid="failed-message"]').length, 1)
+    assert.match(container.querySelector('[data-testid="failed-message"]')!.textContent ?? '', /retry this original message/)
   }
 })
 
@@ -241,15 +265,18 @@ for (const valid of [true, false]) test(`parallel sends during a pending version
   let probes = 0
   const pending = new Promise<boolean>(resolve => { finish = resolve })
   buildCheck = () => { probes++; return pending }
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   await act(async () => composer.onChange('one immutable draft'))
   await act(async () => { composer.onSubmit(); composer.onSubmit() })
+  assert.equal(composer.value, '')
+  assert.match(container.querySelector('[data-testid="local-message"]')?.textContent ?? '', /one immutable draft/)
   assert.equal(probes, 1)
   assert.equal(submissions, 0)
   await act(async () => finish(valid))
   assert.equal(submissions, valid ? 1 : 0)
   if (!valid) {
-    assert.equal(composer.value, 'one immutable draft')
+    assert.equal(composer.value, '')
+    assert.match(container.querySelector('[data-testid="failed-message"]')?.textContent ?? '', /one immutable draft/)
     assert.equal(removedNotes, 0)
   }
   // The lock is released on both the stale early return and a completed send.
@@ -259,20 +286,57 @@ for (const valid of [true, false]) test(`parallel sends during a pending version
   assert.equal(submissions, valid ? 2 : 1)
 })
 
-test('a stale send leaves the composer draft, attached text and browser notes intact', async () => {
+test('two independent drafts are journaled before acknowledgement and reach Eve in order', async () => {
+  let release!: (valid: boolean) => void
+  const first = new Promise<boolean>(resolve => { release = resolve })
+  let probes = 0
+  buildCheck = () => ++probes === 1 ? first : Promise.resolve(true)
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => composer.onChange('First draft'))
+  await act(async () => { composer.onSubmit() })
+  await act(async () => composer.onChange('Second independent draft'))
+  await act(async () => composer.onSubmit())
+  assert.equal(composer.value, '')
+  assert.equal(container.querySelectorAll('[data-testid="local-message"]').length, 2)
+  assert.equal(submissions, 0)
+  await act(async () => release(true))
+  assert.deepEqual(submitted.map(command => command.text), ['First draft','Second independent draft'])
+})
+
+for (const bundled of [false, true]) test(`an offline renderer ${bundled ? 'submits through the bundled main process' : 'keeps the web message for explicit retry'}`, async t => {
+  Object.defineProperty(browser.navigator, 'onLine', { configurable: true, value: false })
+  if (bundled) Object.defineProperty(browser, 'mikka', { configurable: true, value: { bundled: {} } })
+  t.after(() => {
+    Reflect.deleteProperty(browser.navigator, 'onLine')
+    Reflect.deleteProperty(browser, 'mikka')
+  })
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => composer.onChange('deliver once'))
+  await act(async () => composer.onSubmit())
+  assert.equal(submissions, bundled ? 1 : 0)
+  if (bundled) assert.equal(submitted[0].text, 'deliver once')
+  else {
+    const failed = container.querySelector('[data-testid="failed-message"]')
+    assert.match(failed?.textContent ?? '', /deliver once/)
+    assert.ok(failed?.querySelector('button'))
+  }
+})
+
+test('a stale send moves its original text and attachments to the retry bubble and preserves browser notes', async () => {
   currentBuild = false
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   const draft = 'keep my draft\n\n[attached.txt]\nattached content'
   await act(async () => composer.onChange(draft))
   await act(async () => composer.onSubmit())
   assert.equal(submissions, 0)
-  assert.equal(composer.value, draft)
+  assert.equal(composer.value, '')
+  assert.match(container.querySelector('[data-testid="failed-message"]')?.textContent ?? '', /attached content/)
   assert.equal(removedNotes, 0)
   assert.match(container.textContent ?? '', /keep this note/)
-  assert.equal(container.querySelector('[data-testid="failed-message"]'), null)
+  assert.ok(container.querySelector('[data-testid="failed-message"] button'))
 })
 
-test('a stale send does not clear an artifact quote', async () => {
+test('a stale send keeps the immutable artifact quote on the pending message', async () => {
   currentBuild = false
   let cleared = 0
   const embedded = { quote: { artifactId: 'fixture-artifact', version: 1, kind: 'text' as const, text: 'keep this quote', label: 'fixture' }, clearQuote: () => { cleared++ }, openArtifact: nothing, activeArtifactId: 'fixture-artifact' }
@@ -280,8 +344,9 @@ test('a stale send does not clear an artifact quote', async () => {
   await act(async () => composer.onChange('keep the quote attached'))
   await act(async () => composer.onSubmit())
   assert.equal(submissions, 0)
-  assert.equal(cleared, 0)
-  assert.equal(composer.value, 'keep the quote attached')
+  assert.equal(cleared, 1)
+  assert.match(container.querySelector('[data-testid="failed-message"]')?.textContent ?? '', /fixture/)
+  assert.equal(composer.value, '')
 })
 
 test('required refresh raised before VersionGuard mounts still shows a prompt without document reload', async () => {
@@ -341,7 +406,7 @@ test('a confirmed enqueue survives a refresh error and cannot be submitted twice
 })
 
 test('words quoted from a reply wait above the draft, head the sent message as quote lines and then leave', async () => {
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   await act(async () => quoteReply('先把首页截图放大\n再换成深色'))
   assert.equal(container.querySelector('[data-slot="reply-quote-chip"]')?.textContent?.startsWith('先把首页截图放大'), true)
   await act(async () => composer.onChange('要整宽还是半宽？'))
@@ -352,7 +417,7 @@ test('words quoted from a reply wait above the draft, head the sent message as q
 
 test('a removed quote is not sent', async () => {
   quoteRemovals = 0
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   await act(async () => quoteReply('不要这段'))
   await act(async () => [...container.querySelectorAll('button')].find(button => button.textContent === 'fixture-remove-quote')!.click())
   assert.equal(quoteRemovals, 1)
@@ -366,7 +431,7 @@ test('a sent message that quotes a reply shows the quote above its words, and ev
     { id: 'fixture-reply', position: 1, from: 'coordinator', text: '**首页**已改好', tools: [], threads: [], artifacts: [], createdAt: '2026-11-03T04:00:00Z' },
     { id: 'fixture-person', position: 2, from: 'person', text: '> 首页已改好\n\n截图呢？', tools: [], threads: [], artifacts: [], createdAt: '2026-11-03T04:01:00Z' },
   ]
-  await act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await act(async () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />))
   assert.equal(container.querySelector('[data-slot="reply-quote"]')?.textContent, '首页已改好')
   assert.match(container.textContent ?? '', /截图呢？/)
   assert.doesNotMatch(container.textContent ?? '', /> 首页/)
@@ -396,7 +461,7 @@ const welcomeFailed = (error = 'Error: verification_required') => {
   chatData = { items: chatItems, enabled: true, working: false, error, artifacts: {} }
   refusalCode = error.includes('verification_required') ? 'verification_required' : error
 }
-const chat = () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />)
+const chat = () => root.render(<CoordinatorChat embedded={artifactChat} onOpenIssue={nothing} userId="fixture-owner" />)
 
 test('a failed welcome shows on the Bot\'s side in the chat, not only above the composer', async () => {
   welcomeFailed()
@@ -436,4 +501,64 @@ test('a hidden tab never retries the welcome', async () => {
   menu = { current: { id: 'mikka', available: true } }
   await act(async () => chat())
   assert.equal(calls, 0)
+})
+
+for (const failure of [new Error('private transport detail'), { error: 'authRequired' }]) test(`a welcome ${failure instanceof Error ? 'transport rejection' : 'action refusal'} stops the waiting line and offers a guarded explicit retry`, async () => {
+  chatEnabled = true
+  welcomeReply = failure
+  await act(async () => chat())
+  assert.equal(welcomeCalls, 1)
+  const notice = container.querySelector('[data-chat-failure="welcome-request"]')!
+  assert.ok(notice)
+  assert.doesNotMatch(container.textContent ?? '', /writingWelcome|private transport detail/)
+  const retry = notice.parentElement!.querySelector<HTMLButtonElement>('button')!
+  assert.equal(retry.textContent, 'Common.retry')
+  await act(async () => chat())
+  assert.equal(welcomeCalls, 1, 'rendering a failed welcome does not submit it again')
+  currentBuild = false
+  await act(async () => retry.click())
+  assert.equal(welcomeCalls, 1, 'stale-build retry keeps the existing page guard')
+  currentBuild = true
+  let finish!: (value: unknown) => void
+  welcomeReply = () => new Promise(resolve => { finish = resolve })
+  await act(async () => { retry.click(); retry.click() })
+  assert.equal(welcomeCalls, 2, 'one request even before the asynchronous build guard finishes')
+  assert.equal(retry.disabled, true)
+  await act(async () => finish({ queued: false }))
+  assert.equal(container.querySelector('[data-chat-failure="welcome-request"]'), null)
+})
+
+test('a rejected automatic welcome recovery retains its stored refusal and never rejects the render effect', async () => {
+  welcomeFailed(); menu = { current: { id: 'mikka', available: false } }
+  await act(async () => chat())
+  reply = new Error('private recovery transport detail')
+  menu = { current: { id: 'mikka', available: true } }
+  await act(async () => chat())
+  assert.equal(calls, 1)
+  assert.ok(container.querySelector('[data-message-failure="welcome"]'))
+  assert.doesNotMatch(container.textContent ?? '', /private recovery transport detail/)
+  await act(async () => chat())
+  assert.equal(calls, 1)
+})
+
+test('a reconnect keeps the first draft editable without sending or stopping the recovering turn', async () => {
+  chatEnabled = true
+  const show = () => act(async () => root.render(<CoordinatorChat onOpenIssue={nothing} userId="fixture-owner" />))
+  await show()
+  assert.equal(composer.sending, false)
+  streamStatus = 'resuming'
+  await show()
+  assert.equal(composer.sending, true)
+  assert.equal(composer.editableWhileSending, true)
+  await act(async () => composer.onChange('first reconnect draft'))
+  await act(async () => composer.onSubmit())
+  assert.equal(submissions, 0)
+  assert.equal(composer.value, 'first reconnect draft')
+  streamStatus = 'idle'
+  await show()
+  assert.equal(composer.sending, false)
+  assert.equal(composer.editableWhileSending, false)
+  await act(async () => composer.onSubmit())
+  assert.equal(submissions, 1)
+  assert.equal(submitted[0].text, 'first reconnect draft')
 })

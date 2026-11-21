@@ -57,6 +57,13 @@ export function useUnreadIndicators({ conversationId, items, rootRef, source = c
     sendNow: target => { if (!reporter.stopped) source.beacon(conversationId, target) },
   }), [conversationId, source])
 
+  // A hosted scroll surface can report its own visible tail through the same
+  // throttled, forward-only writer as the bare transcript.
+  const reportEnd = useCallback(() => {
+    const target = itemsRef.current.findLast(item => item.reportable)
+    if (target && document.visibilityState === 'visible') reporter.report(target)
+  }, [reporter])
+
   const reportablePositions = items.filter(item => item.reportable).map(item => item.position).join(',')
   useEffect(() => { source.observe?.(conversationId, reportablePositions ? reportablePositions.split(',').map(position => ({ position: Number(position) })) : []) }, [conversationId, source, reportablePositions])
 
@@ -154,6 +161,7 @@ export function useUnreadIndicators({ conversationId, items, rootRef, source = c
   const topCount = unreadBelowDivider(items, divider ?? null)
   const bottomCount = atBottom ? 0 : arrivedSinceLeftBottom(items, leftBottomAt)
   return {
+    reportEnd,
     divider: divider ?? null,
     topCount,
     showTop: dividerAbove && topCount > 0 && !topDismissed,

@@ -14,7 +14,7 @@ export default function BotTasks() {
   return (
     <View style={styles.screen}>
       <NavBar title={`${id === 'coordinator' ? 'Coordinator' : bot?.name ?? ''} 的任务`} />
-      <TaskList bot={bot?.id ?? ''} />
+      <TaskList bot={bot?.id ?? null} />
     </View>
   )
 }

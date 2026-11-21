@@ -1,7 +1,7 @@
 import { assertNoSecret, type SecretFingerprint } from '../credentials/fingerprint'
 import { credentialMasker, identityMasker, maskStreamStep, withCredentialMasking } from '../secrets/mask'
 
-type Block = {pending:string;text:string;sent:number;blocked:boolean}
+type Block = {pending:string;unreleased:string;blocked:boolean}
 /** A security projection of native eve lines. One source line remains one line,
  * so eve's own cursors, replay and React state remain authoritative. */
 export function maskEveStream(ownerId:string,fingerprints:SecretFingerprint[],startIndex=0) {
@@ -22,15 +22,17 @@ export function maskEveStream(ownerId:string,fingerprints:SecretFingerprint[],st
   function event(value:any) {
     if (value?.type === 'call.input') return {...value,data:{...value.data,delta:''}}
     if (value?.type === 'content.delta' && typeof value.data?.partId === 'string' && typeof value.data?.delta === 'string') {
-      const id=value.data.partId,block=blocks.get(id)??{pending:'',text:'',sent:0,blocked:false}
+      const id=value.data.partId,block=blocks.get(id)??{pending:'',unreleased:'',blocked:false}
       blocks.set(id,block)
       if (block.blocked) return {...value,data:{...value.data,delta:''}}
       const step=maskStreamStep(masker,block.pending,value.data.delta,false)
-      block.pending=step.pending;block.text+=step.release
-      try {assertNoSecret(ownerId,block.text.slice(Math.max(0,block.sent-holdback)),fingerprints)} catch {block.blocked=true}
-      const through=Math.max(block.sent,block.text.length-holdback)
-      const delta=block.blocked?'':block.text.slice(block.sent,through)
-      if (!block.blocked) block.sent=through
+      block.pending = step.pending
+      // Any newly completed fingerprint begins in the previous unreleased suffix or the new text.
+      const text = block.unreleased + step.release
+      try { assertNoSecret(ownerId,text,fingerprints) } catch { block.blocked = true }
+      const through = Math.max(0, text.length - holdback)
+      const delta = block.blocked ? '' : text.slice(0, through)
+      block.unreleased = block.blocked ? '' : text.slice(through)
       return {...value,data:{...value.data,delta}}
     }
     if (value?.type === 'content.completed') blocks.delete(value.data?.partId)

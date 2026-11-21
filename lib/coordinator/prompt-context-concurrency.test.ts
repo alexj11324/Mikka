@@ -6,7 +6,7 @@ import { DEFAULT_AGENT_DEFINITION } from '../agent-kit/builtin'
 import { executionInstructions } from '../agent-kit/execution-instructions'
 import { withCoordinatorPresentation } from './native-prompt'
 import { cachedContextLines, instructionsWithPersonal, promptWithCachedContext, type StoredMessage } from './context'
-import { SCHEDULE_INSTRUCTIONS } from '../schedules/contract'
+import { SCHEDULE_INSTRUCTIONS } from '../schedules/instructions'
 
 const owner = 'synthetic-prompt-owner', bot = '10000000-0000-4000-8000-000000000001'
 const snapshot = makeSnapshot('10000000-0000-4000-8000-000000000002', 1, DEFAULT_AGENT_DEFINITION, 'Synthetic frozen host policy', { harness: 'ai_sdk', model: 'synthetic' })
@@ -32,6 +32,7 @@ const forbidden = () => { throw new Error('No database, provider or tool effects
 const stub = (path: string, namedExports: Record<string, unknown>) => mock.module(new URL(path, import.meta.url).href, { namedExports })
 
 stub('./store.ts', { loadProductPromptContext: async () => ({ ...conversation, personalInstructions: personal, memoryEnabled: true }), saveSummary: forbidden })
+stub('./prompt-context.ts', { loadProductPromptContext: async () => ({ ...conversation, personalInstructions: personal, memoryEnabled: true }) })
 stub('../profile/memory.ts', { memoryForBotPrompt: async () => '' })
 stub('./bot-instructions.ts', { botInstructions: forbidden })
 stub('./personal-instructions.ts', { withPersonalInstructionText: async (...args: unknown[]) => {
@@ -45,7 +46,7 @@ stub('./github-context.ts', { githubPromptContext: async (...args: unknown[]) =>
 stub('../profile/store.ts', { profilePromptSection: async (...args: unknown[]) => { await enter('profile', args); return '' } })
 stub('./execution-context.ts', { executionContextParts: async (...args: unknown[]) => { await enter('execution', args); return facts } })
 stub('../personal-mailbox-config.ts', { personalMailboxEnabled: () => false })
-stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: forbidden })
+stub('../db/index.ts', { db: null, pool: null, withDatabaseClient: forbidden, withDatabaseTransaction: forbidden })
 stub('../issue-visibility.ts', { issueVisibility: forbidden })
 stub('../agent-runs.ts', { addRunMessage: forbidden, queueRun: forbidden, queueFactoryRun: forbidden, readRun: forbidden, requestRunStop: forbidden, visibleRuns: forbidden })
 stub('../search/index.ts', { webSearch: forbidden })
@@ -61,10 +62,10 @@ stub('../telegram/client.ts', { postTelegramText: forbidden })
 stub('../attention/store.ts', { recordDecision: forbidden, settleTurn: forbidden })
 stub('../../workflows/coordinator/tool-scope.ts', { assertNativeToolScope: forbidden })
 
-let prepareEveInstructions: typeof import('../../workflows/coordinator/steps')['prepareEveInstructions']
+let composeEveInstructions: typeof import('./product-instructions')['composeEveInstructions']
 before(async () => {
   overrideDeploymentSwitch('factoryRouting', false)
-  ;({ prepareEveInstructions } = await import('../../workflows/coordinator/steps'))
+  ;({ composeEveInstructions } = await import('./product-instructions'))
 })
 after(() => overrideDeploymentSwitch('factoryRouting', undefined))
 beforeEach(() => {
@@ -80,7 +81,7 @@ function expectedPrompt() {
 
 test('all independent prompt reads start before any completes, keeping bytes, scope and one call each', async () => {
   gates = { execution: deferred(), personal: deferred(), github: deferred() }
-  const pending = prepareEveInstructions(owner, bot, snapshot)
+  const pending = composeEveInstructions(owner, bot, snapshot)
   await firstStarted.promise
   try {
     // The old serial code starts only execution here. No sleeps or timing threshold.
@@ -102,11 +103,11 @@ test('all independent prompt reads start before any completes, keeping bytes, sc
 })
 
 test('a later turn reads current context again without caching or changing the frozen host', async () => {
-  const first = await prepareEveInstructions(owner, bot, snapshot)
+  const first = await composeEveInstructions(owner, bot, snapshot)
   assert.deepEqual(first, expectedPrompt())
   personal = 'Updated synthetic instruction'; github = 'Updated authorized repositories'
   facts = { models: 'Updated allowed models', live: 'Updated availability' }
-  const second = await prepareEveInstructions(owner, bot, snapshot)
+  const second = await composeEveInstructions(owner, bot, snapshot)
   assert.deepEqual(second, expectedPrompt())
   assert.notEqual(second, first)
   for (const reader of ['execution', 'personal', 'github'] as const) assert.equal(calls.filter(call => call.reader === reader).length, 2)
@@ -117,13 +118,13 @@ test('a later turn reads current context again without caching or changing the f
 
 test('an instruction read refusal is propagated unchanged without retry or a partial prompt', async () => {
   denied = new Error('Synthetic instruction read refusal')
-  await assert.rejects(prepareEveInstructions(owner, bot, snapshot), error => error === denied)
+  await assert.rejects(composeEveInstructions(owner, bot, snapshot), error => error === denied)
   assert.equal(calls.filter(call => call.reader === 'personal').length, 1)
 })
 
 test('Eve instructions keep frozen discovery grants and leave history to eve', async () => {
   const selected = { ...snapshot, effectiveTools: [] }
-  const instructions = await prepareEveInstructions(owner, bot, selected)
+  const instructions = await composeEveInstructions(owner, bot, selected)
   assert.deepEqual(calls.find(call => call.reader === 'github')?.args, [owner, { hosted: true, readOnly: false, effectiveTools: [] }, undefined, undefined, bot])
   assert.equal(typeof instructions, 'string')
   assert.doesNotMatch(instructions, /Synthetic request/)

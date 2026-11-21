@@ -62,6 +62,7 @@ export type DueTimerHolder = { runId: string; deploymentId: string }
 export const dueTimerTransport: {
   start?: (kind: DueKind) => Promise<unknown>
   holder?: (token: string) => Promise<DueTimerHolder | null>
+  latestDeployment?: () => Promise<string | undefined>
   cancel?: (runId: string) => Promise<unknown>
 } = {}
 
@@ -77,9 +78,17 @@ async function timerHolder(token: string): Promise<DueTimerHolder | null> {
   return ENDED.has(run.status) ? null : { runId, deploymentId: run.deploymentId }
 }
 
+async function latestTimerDeployment() {
+  if (dueTimerTransport.latestDeployment) return dueTimerTransport.latestDeployment()
+  const { getWorld } = await import('workflow/runtime')
+  const world = await getWorld()
+  return world.resolveLatestDeploymentId?.()
+}
+
 async function startDueTimer(kind: DueKind) {
   if (dueTimerTransport.start) return dueTimerTransport.start(kind)
   const [{ start }, { dueTimer }] = await Promise.all([import('workflow/api'), import('@/workflows/due-timer/workflow')])
+  if (process.env.VERCEL_DEPLOYMENT_ID) return start(dueTimer, [kind], { deploymentId: 'latest' })
   return start(dueTimer, [kind])
 }
 
@@ -110,7 +119,7 @@ const current = new Set<DueKind>()
 /**
  * A timer run is pinned to the deployment that started it and keeps that code
  * for its whole life (#1410). Every kind but production run recovery, which owns its handover (#1403): The first arm of each kind in a process on a newer
- * deployment cancels a run on another deployment and starts its successor here.
+ * deployment cancels a run on another deployment and starts its successor on the latest deployment.
  * The successor's first pass does whatever came due meanwhile. True when it
  * replaced one. Workflow API calls only, no database.
  */
@@ -119,8 +128,13 @@ export async function replaceStaleDueTimer(kind: DueKind): Promise<boolean> {
   if (!deploymentId || current.has(kind) || !workflowWakesEnabled() || ownsItsDeployment(kind)) return false
   const holder = await timerHolder(wakeTokens.dueTimer(kind))
   if (!holder) return false
-  current.add(kind)
-  if (holder.deploymentId === deploymentId) return false
+  if (holder.deploymentId === deploymentId) {
+    current.add(kind)
+    return false
+  }
+  // An older instance can still receive a request after a rollout. Only the
+  // latest deployment in this Workflow environment may replace another run.
+  if (await latestTimerDeployment() !== deploymentId) return false
   if (dueTimerTransport.cancel) await dueTimerTransport.cancel(holder.runId)
   else await (await import('workflow/api')).getRun(holder.runId).cancel({ cancelReason: `due timer replaced by deployment ${deploymentId}` })
   await startDueTimer(kind)

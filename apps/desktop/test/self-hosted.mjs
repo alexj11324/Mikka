@@ -1,14 +1,22 @@
 // Actual packaged Electron → actual disposable community image. The model is
 // explicitly synthetic; this is not Google OAuth or native-subscription proof.
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { readFile, rm, mkdir, stat, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { decode, encode } from '../../../lib/desktop-rpc/wire.ts'
 import { launchElectron } from './electron-launch.mjs'
 import { closeElectron, stopLocalDaemons } from './native-cleanup.mjs'
+import { verifyDesktopVersionHistory } from './self-hosted-version-history.mjs'
+import { verifyWorkspaceAutomation } from './self-hosted-automations.mjs'
+import { verifyPersonalDriveUploads } from './self-hosted-drive.mjs'
+import { verifyOrganizationLifecycle } from './self-hosted-organization.mjs'
+import { verifyConversationOrganization } from './self-hosted-conversations.mjs'
 import { waitForBundledSession } from './bundled-session.mjs'
+import { verifyInstalledProjectCheckout } from './self-hosted-project-checkout.mjs'
+import { prepareLinuxRepositoryDialog, verifyLinuxRepositoryDialog, verifyPickedRepository } from './native-repository-picker.mjs'
+import { readNativeStartup } from './native-startup.mjs'
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i
 export function validateSelfHostedDesktopTarget(value, env) {
@@ -21,16 +29,35 @@ export function validateSelfHostedDesktopTarget(value, env) {
   assert.ok(typeof value.ownerId === 'string' && value.ownerId.length > 0 && value.ownerId.length <= 128)
   assert.match(value.email ?? '', /^selfhost-[a-f0-9-]{36}@selfhost\.example\.test$/i)
   assert.ok(typeof value.password === 'string' && value.password.length >= 24 && value.password.length <= 200)
+  if (env.MIKKA_UI_OVERLAY_SHA || value.member) {
+    const member = value.member
+    assert.ok(member && typeof member.id === 'string' && member.id.length > 0 && member.id.length <= 128)
+    assert.match(member.email ?? '', /^selfhost-[a-f0-9-]{36}@selfhost\.example\.test$/i)
+    assert.ok(typeof member.password === 'string' && member.password.length >= 24 && member.password.length <= 200)
+    if (env.MIKKA_UI_OVERLAY_SHA) {
+      assert.match(member.invitation?.id ?? '', UUID)
+      assert.match(member.invitation?.organizationId ?? '', UUID)
+    }
+    assert.ok(member.id !== value.ownerId && member.email !== value.email && member.password !== value.password)
+  }
   assert.ok(env.RUNNER_TEMP && env.GITHUB_WORKSPACE && env.MIKKA_DESKTOP_EXECUTABLE)
 }
 
 async function main() {
   const directory = resolve(process.env.RUNNER_TEMP, 'mikka-selfhost-desktop')
   const privateFile = join(directory, 'session.json'), profile = join(directory, 'profile')
+  const protocolOnly = process.argv.includes('--protocol-only')
+  assert.deepEqual(process.argv.slice(2), protocolOnly ? ['--protocol-only'] : [])
+  const overlaySha = process.env.MIKKA_UI_OVERLAY_SHA
+  if (overlaySha) {
+    assert.match(overlaySha, /^[a-f0-9]{40}$/)
+    assert.equal(protocolOnly, false)
+  }
   const output = resolve('.artifacts/self-hosted/desktop')
   await mkdir(output, { recursive: true })
   const report = { schemaVersion: 1, revision: process.env.GITHUB_SHA, origin: 'http://localhost:3000',
     startedAt: new Date().toISOString(), status: 'running', checks: [],
+    scope: protocolOnly ? 'public-fixture-protocol' : 'complete-desktop', overlaySha: overlaySha ?? null,
     provider: 'synthetic-openai-compatible', realGoogleOAuth: false, subscriptionAcceptance: false,
     cleanup: { session: false, electron: false, daemon: false, privateFile: false } }
   let application, page, fixture, phase = 'private_fixture', failed
@@ -54,9 +81,27 @@ async function main() {
     await rm(privateFile); report.cleanup.privateFile = true
     const target = fixture.origin + '/mikka'
     phase = 'launch'
+    const linuxPicker = overlaySha && process.platform === 'linux' && process.env.MIKKA_TEST_X11_DIRECTORY_DIALOG === '1'
+      ? await prepareLinuxRepositoryDialog(profile) : null
     application = await launchElectron({ executablePath: process.env.MIKKA_DESKTOP_EXECUTABLE,
       args: [], cwd: fileURLToPath(new URL('../../..', import.meta.url)),
-      env: { ...process.env, MIKKA_USER_DATA_DIR: profile, MIKKA_DESKTOP_RENDERER: 'bundled' }, timeout: 90_000 })
+      env: { ...process.env, ...(linuxPicker ? { XDG_CONFIG_HOME: linuxPicker.config } : {}), MIKKA_USER_DATA_DIR: profile, MIKKA_DESKTOP_RENDERER: 'bundled' }, timeout: 90_000 })
+    if (overlaySha) {
+      phase = 'packaged_official_overlay'
+      const runtime = await application.evaluate(async ({ app }, expected) => {
+        const path = process.getBuiltinModule('node:path')
+        const fs = process.getBuiltinModule('node:fs')
+        const archive = app.getAppPath()
+        if (!app.isPackaged || archive !== path.join(process.resourcesPath, 'app.asar')) return null
+        const manifest = JSON.parse(fs.readFileSync(path.join(archive, 'dist', 'mikka-ui-overlay.json'), 'utf8'))
+        if (manifest.overlaySha !== expected) return null
+        return { app: app.getVersion(), electron: process.versions.electron, chromium: process.versions.chrome,
+          platform: process.platform, architecture: process.arch }
+      }, overlaySha)
+      assert.ok(runtime?.app && runtime.electron && runtime.chromium, 'the launched official application must contain the selected UI revision')
+      report.runtime = runtime
+      passed('packaged_official_overlay_matches_selected_revision')
+    }
     page = await application.firstWindow({ timeout: 90_000 })
     await page.waitForFunction(() => Boolean(window.mikka?.bundled))
     assert.equal(new URL(page.url()).protocol, 'mikka:')
@@ -97,7 +142,15 @@ async function main() {
     assert.equal(await page.evaluate(() => window.__selfHostedAcceptance.failed), false)
     passed('actual_builtin_live_ticket_and_socket')
     phase = 'chat_reply'
-    await rpc('coordinator.sendCoordinatorMessage', ['selfhost_turn_32', null, fixture.botId, randomUUID()])
+    const accepted = await page.evaluate(async input => {
+      const response = await fetch(`/mikka/api/agents/eve/v1/session?botId=${input.botId}`, {
+        method: 'POST', credentials: 'omit', headers: { 'content-type': 'application/json', 'x-mikka-submission-id': input.submissionId },
+        body: JSON.stringify({ message: 'selfhost_turn_32', clientContext: { expectedOwnerId: input.ownerId, expectedWorkspaceId: input.workspaceId } }),
+      })
+      return { status: response.status, body: await response.json() }
+    }, { botId: fixture.botId, ownerId: fixture.ownerId, workspaceId: fixture.workspaceId, submissionId: randomUUID() })
+    assert.equal(accepted.status, 202); assert.equal(accepted.body.ok, true)
+    assert.match(accepted.body.sessionId, /^wrun_/); assert.ok(accepted.body.deliveryId)
     const deadline = Date.now() + 60_000
     for (;;) {
       const before = await page.evaluate(() => window.__selfHostedAcceptance.chatEvents)
@@ -116,20 +169,59 @@ async function main() {
       state.unsubscribe(); await window.mikka.bundled.live.close(state.id)
       delete window.__selfHostedAcceptance
     })
-    await page.goto(`mikka://app/mikka/en/?bot=${fixture.botId}`, { waitUntil: 'domcontentloaded' })
+    phase = 'open_workspace'
+    assert.equal(bootstrap.onboarding, true, 'the new account still requires its ordinary first-run setup')
+    const workspace = new URL('mikka://app/mikka/en/')
+    workspace.searchParams.set('workspace', fixture.workspaceId)
+    // The public directory hosts the ordinary guide without loading the
+    // official-only bot overview. The full client opens the actual chat.
+    if (protocolOnly) workspace.searchParams.set('section', 'conversations')
+    else workspace.searchParams.set('bot', fixture.botId)
+    await page.goto(workspace.href, { waitUntil: 'domcontentloaded' })
     // A newly registered community account still has the ordinary first-run
     // overlay. A DOM-visible chat underneath it is not screenshot evidence.
     // Complete the real Skip setup action; never hide or remove the overlay.
-    phase = 'first_run_and_visible_chat'
+    phase = 'first_run_skip_button_visible'
     const skipSetup = page.getByRole('button', { name: 'Skip setup', exact: true })
     await skipSetup.waitFor({ state: 'visible' })
+    phase = 'first_run_dismissal'
     await skipSetup.click()
     await skipSetup.waitFor({ state: 'hidden' })
-    const reply = page.getByText('SELF_HOSTED_REPLY_32', { exact: false }).first()
-    await reply.waitFor({ state: 'visible' })
-    await reply.scrollIntoViewIfNeeded()
-    passed('normal_first_run_dismissed_and_reply_visible')
-    await page.screenshot({ path: join(output, 'self-hosted-chat.png'), animations: 'disabled' })
+    assert.equal((await rpc('desktop.bootstrap', [fixture.workspaceId])).onboarding, false,
+      'the real Skip setup action must persist for this account')
+    passed('normal_first_run_dismissed')
+    if (!protocolOnly) {
+      phase = 'fixture_reply_visible'
+      const reply = page.getByText('SELF_HOSTED_REPLY_32', { exact: false }).first()
+      await reply.waitFor({ state: 'visible' })
+      await reply.scrollIntoViewIfNeeded()
+      passed('normal_first_run_dismissed_and_reply_visible')
+      const screenshot = await page.screenshot({ path: join(output, 'self-hosted-chat.png'), animations: 'disabled' })
+      report.visibleChatScreenshotSha256 = createHash('sha256').update(screenshot).digest('hex')
+    }
+    if (overlaySha) {
+      phase = 'conversation_owner_member'
+      const controls = { page, fixture, rpc, passed, setPhase: value => { phase = value } }
+      const sharedWorkspace = await verifyConversationOrganization(controls)
+      await verifyOrganizationLifecycle({ ...controls, workspaceId: sharedWorkspace })
+      report.driveFolder = {}
+      report.driveUploads = []
+      await verifyPersonalDriveUploads({ ...controls, application, workspaceId: sharedWorkspace, directory, folderCheck: report.driveFolder, receipts: report.driveUploads })
+      report.versionAdmissions = await verifyDesktopVersionHistory(controls)
+      await verifyWorkspaceAutomation({ ...controls, workspaceId: sharedWorkspace })
+      phase = 'native_repository_picker'
+      if (linuxPicker) {
+        await verifyLinuxRepositoryDialog(page, linuxPicker, async (root, choose) => {
+          phase = 'project_checkout'
+          report.projectCheckout = await verifyInstalledProjectCheckout({ page, rpc, workspaceId: sharedWorkspace, root, choose })
+          passed('installed_project_choose_native_git_root_read_after_reload_and_clear')
+        })
+        passed('packaged_linux_gtk_selects_nested_git_roots_and_cancels_over_native_ipc')
+      } else {
+        await verifyPickedRepository(application, page, directory)
+        passed('packaged_repository_picker_resolves_origin_and_upstream_with_fixture_dialog_selection')
+      }
+    }
     phase = 'sign_out_and_return'
     await page.evaluate(() => window.mikka.bundled.signOut())
     assert.equal(await page.evaluate(() => window.mikka.bundled.session()), null)
@@ -140,6 +232,25 @@ async function main() {
     report.status = 'passed'
   } catch (error) {
     failed = error; report.status = 'failed'; report.failure = { phase, name: error instanceof Error ? error.name : 'UnknownError' }
+    if (page && fixture && ['open_workspace', 'first_run_skip_button_visible', 'first_run_dismissal', 'fixture_reply_visible'].includes(phase)) {
+      // Retain only observations about this generated fixture. Raw DOM, URLs,
+      // request bodies and exception messages can contain credentials.
+      report.failure.view = await page.evaluate(({ botId, workspaceId }) => {
+        const url = new URL(location.href)
+        return {
+          requestedWorkspace: url.searchParams.get('workspace') === workspaceId,
+          requestedBot: url.searchParams.get('bot') === botId,
+          english: document.documentElement.lang === 'en',
+          skipButtonPresent: [...document.querySelectorAll('button')].some(button => button.textContent.trim() === 'Skip setup'),
+          loading: Boolean(document.querySelector('[data-loading-placeholder]')),
+          offline: Boolean(document.querySelector('.desktop-offline')),
+          renderFailed: document.body.innerText.includes('This view could not open'),
+          composer: Boolean(document.querySelector('textarea[data-chat-composer]')),
+          expectedReply: document.body.innerText.includes('SELF_HOSTED_REPLY_32'),
+        }
+      }, { botId: fixture.botId, workspaceId: fixture.workspaceId }).catch(() => null)
+      report.failure.startup = await readNativeStartup(application, page).catch(() => null)
+    }
   } finally {
     if (page && !report.cleanup.session) {
       try { await page.evaluate(() => window.mikka?.bundled.signOut()); report.cleanup.session = true } catch { report.cleanup.session = false }
@@ -153,10 +264,12 @@ async function main() {
     if (report.cleanup.electron && report.cleanup.daemon) await rm(profile, { recursive: true, force: true })
     report.finishedAt = new Date().toISOString()
     const json = JSON.stringify(report, null, 2)
-    if (fixture) for (const secret of [fixture.password, fixture.email]) assert.ok(!json.includes(secret))
+    if (fixture) for (const secret of [fixture.password, fixture.email, fixture.member?.password, fixture.member?.email]) {
+      if (secret) assert.ok(!json.includes(secret))
+    }
     await writeFile(join(output, 'report.json'), json + '\n')
   }
-  console.log(JSON.stringify({ status: report.status, checks: report.checks, cleanup: report.cleanup, failure: report.failure }))
+  console.log(JSON.stringify({ scope: report.scope, overlaySha: report.overlaySha, status: report.status, checks: report.checks, cleanup: report.cleanup, failure: report.failure }))
   if (failed || report.status !== 'passed') process.exitCode = 1
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {

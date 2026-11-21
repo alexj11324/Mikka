@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { TraceIdRatioBasedSampler } from '@opentelemetry/sdk-trace-base'
-import { alignServerTimings, cleanupCase, createSessionClient, hasStartupInitialization, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
+import { alignServerTimings, cleanupCase, createSessionClient, dispatchThroughCoordinator, hasStartupInitialization, observeChunks, parseOptions, readProductionWorkerRelease, runCloudStartup, sampledRequestTrace,
   startupFailure, STARTUP_FAILURE_CODES, STARTUP_FAILURE_PHASES, watchRun } from './cloud-startup.mjs'
 import { mcpBusinessEvidence, readMcpHttpTiming, readRuntimeTiming, runtimeEvidence } from './cloud-startup-evidence.mjs'
 import { secretActionAllowed } from '../../lib/secrets/permissions.ts'
@@ -77,7 +77,8 @@ test('v3 requires an exact observed claim catalogue before accepting zero physic
 
 function fixture({ candidate = false, badEvidence = false, badBot = false, failDelete = false, stopRace = false, runtime = false, extraAuth = false, deferTerminal = false,
   wrongPayer = false, wrongScope = false, wrongProfile = false, wrongSource = false, ambiguousSource = false, withdrawShare = false, checkingMenu = false, remapCurrentId = false, fallbackMenu = false, failRestore = false,
-  workspaceRole = 'member', timingSecret = false, leaseAudit = false } = {}) {
+  workspaceRole = 'member', timingSecret = false, leaseAudit = false, ownedCodex = false, ownedChatMenu = 'own' } = {}) {
+  const caseWorkspace = ownedCodex ? personalWorkspace : workspace
   const calls = [], samples = [], profiles = new Map(), sockets = []
   let current, clock = epoch, profileCount = 0
   let chosenModel
@@ -93,7 +94,7 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         delta('PRIVATE_PROVIDER_OUTPUT STARTUP_'), delta(`OK_${sample.marker}`, 4100), ...(runtime ? [{ at: new Date(epoch + 6000).toISOString(),
           chunk: { type: 'finish', messageMetadata: { mikkaRuntimeTiming: (() => { const value = runtimeTiming(sample)
             if (extraAuth) { value.requests[0].endpoint = 'permission_check'; value.counts[0].endpoint = 'permission_check' }; return value })() } } }] : [])] : [stage('repository', 1000)],
-      live: { runs: [{ id: sample.runId, workspaceId: workspace }] } }
+      live: { runs: [{ id: sample.runId, workspaceId: caseWorkspace }] } }
     detail.thread.latestRunId = sample.runId
     detail.thread.attempts = [{ runId: sample.runId, status: detail.thread.status }]
     io.onDetail?.(sample, detail)
@@ -120,17 +121,19 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
       calls.push({ path, init })
       if (path === '/api/version') return json({ build: 'BUILD1' })
       if (path === '/api/auth/sign-in/email') {
-        assert.deepEqual(JSON.parse(init.body), { email: env.SMOKE_OWNER_EMAIL, password: env.SMOKE_OWNER_PASSWORD, rememberMe: false })
+        assert.deepEqual(JSON.parse(init.body), { email: ownedCodex ? 'alexjiang20232024@gmail.com' : env.SMOKE_OWNER_EMAIL,
+          password: ownedCodex ? 'PRIVATE_OWNED_PASSWORD' : env.SMOKE_OWNER_PASSWORD, rememberMe: false })
         return Response.json({}, { headers: { 'set-cookie': 'session=PRIVATE_COOKIE; Path=/; Secure; HttpOnly' } })
       }
       assert.match(init.headers.cookie ?? '', /session=PRIVATE_COOKIE/)
-      if (path === '/api/auth/get-session') return json({ user: { id: ownerId, email: env.SMOKE_OWNER_EMAIL } })
+      if (path === '/api/auth/get-session') return json({ user: { id: ownerId, email: ownedCodex ? 'alexjiang20232024@gmail.com' : env.SMOKE_OWNER_EMAIL } })
       if (path === '/api/auth/sign-out') return Response.json({}, { headers: { 'set-cookie': 'session=; Max-Age=0' } })
       if (path === '/api/workspace') {
         const selected = url.searchParams.get('workspace') ?? (/mikka-workspace=([^;]+)/.exec(init.headers.cookie)?.[1] ?? personalWorkspace)
         return json({ currentUserId: ownerId, workspace: { id: selected, kind: selected === workspace ? 'team' : 'personal' },
           role: selected === workspace ? workspaceRole : 'admin', choices: [{ id: personalWorkspace, kind: 'personal' }, { id: workspace, kind: 'team' }],
-          members: selected === workspace ? [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }] : [] })
+          members: selected === workspace ? [{ userId: adminId, email: 'alex@acme.aspectlylabs.com', role: 'admin', status: 'active' }]
+            : ownedCodex ? [{ userId: ownerId, role: 'admin', status: 'active' }] : [] })
       }
       if (path === `/api/bots/${botId}`) return json({ id: botId, name: badBot ? 'Other real work' : '测试1505 fixture' })
       if (path === '/api/rpc') {
@@ -156,19 +159,23 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         }
         if (action === 'model-order.getModelOrder') {
           const candidates = Object.entries(models).map(([harness, model], index) => ({ harness, model, provider: harness === 'codex' ? 'codex' : 'claude',
-            credentialOwnerId: wrongSource ? ownerId : adminId, source: { kind: 'subscription', connectionId: id(50 + index) } }))
+            credentialOwnerId: wrongSource ? adminId : ownerId, source: { kind: 'subscription', connectionId: id(50 + index) } }))
           if (ambiguousSource) candidates.push({ ...candidates[0], source: { kind: 'subscription', connectionId: id(59) } })
-          return rpc({ candidates })
+          return rpc({ candidates, entries: candidates.map((candidate, index) => ({ ...candidate, id: `entry-${index}` })) })
         }
         if (action === 'execution-settings.getBotModelMenu' || action === 'execution-settings.chooseBotModel') {
           assert.equal(args[0], botId)
+          const groups = Object.entries(models).map(([harness, modelId], index) => ({ kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: undefined,
+            options: [{ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] }))
+          const sharedGroups = groups.map((group, index) => ({ ...group, owner: 'Shared member', options: [{ ...group.options[0], id: id(70 + index) }] }))
+          const chatGroups = ownedChatMenu === 'shared' ? sharedGroups
+            : ownedChatMenu === 'both' ? [...sharedGroups, ...groups] : groups
           if (action === 'execution-settings.chooseBotModel') {
             if (withdrawShare) return rpc({ ok: false, error: 'executionAccountUnavailable' })
-            chosenModel = Object.entries(models).map(([harness, modelId], index) => ({ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' })).find(item => item.id === args[1])
+            chosenModel = chatGroups.flatMap(group => group.options).find(item => item.id === args[1])
             assert.ok(chosenModel)
           }
-          return rpc({ groups: Object.entries(models).map(([harness, modelId], index) => ({ kind: 'subscription', provider: harness === 'codex' ? 'codex' : 'claude', owner: 'Shared member',
-            options: [{ id: id(60 + index), modelId, provider: harness === 'codex' ? 'codex' : 'claude' }] })),
+          return rpc({ groups: chatGroups,
             current: chosenModel ? { ...chosenModel, ...(remapCurrentId ? { id: id(850) } : {}), ...(fallbackMenu ? { fallback: 'quota' } : {}),
               kind: 'subscription', chosen: true, available: !checkingMenu, availability: checkingMenu ? 'checking' : 'available' } : null })
         }
@@ -176,19 +183,6 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
           current = { issueId: id(100 + samples.length), runId: id(200 + samples.length), taskId: id(300 + samples.length),
             title: args[0].title, reads: 0, finished: false, workflowRunId: `wrun_TEST${samples.length}` }
           samples.push(current); return rpc({ issue: { id: current.issueId } })
-        }
-        if (action === 'coordinator.sendCoordinatorMessage') {
-          const input = JSON.parse(args[0].match(/参数如下：(.*)。使用/)[1])
-          assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, !leaseAudit)
-          assert.deepEqual(input.target, candidate ? { deviceId } : 'cloud')
-          assert.equal(input.model, undefined)
-          assert.deepEqual(args[4], candidate ? { kind: 'device', deviceId } : { $mikka: 'undefined' }, 'cloud chat must not assert the structured new-task destination')
-          assert.equal(args[8], input.profileId, 'the real human submission still selects the authorized profile')
-          current.dispatchInput = input; current.harness = profiles.get(input.profileId).harness; current.profileId = input.profileId
-          assert.equal(chosenModel?.modelId, models[current.harness], 'the coordinator must use the same explicitly chosen small subscription model')
-          current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
-          assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
-          return rpc({ queued: true })
         }
         if (action === 'coordinator.stopCoordinatorTurn') return rpc({ stopped: true })
         if (action === 'agents.pollIssueThreads') return rpc({ threads: [{ id: current.runId, ownedByCurrentUser: true }] })
@@ -212,13 +206,34 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         assert.fail(`unexpected RPC ${action}`)
       }
       if (path === '/api/factory/agent-profiles') {
-        const body = JSON.parse(init.body), profile = { ...body.profile, id: id(500 + ++profileCount), version: 1, digest: 'e'.repeat(64) }
-        assert.equal(body.workspaceId, workspace)
-        assert.equal(profile.model.source.kind, 'subscription'); assert.equal(profile.model.model, models[profile.harness])
+        const body = JSON.parse(init.body)
+        // The product saves an Agent 配置 as content only (decision 2026-11-15-1630).
+        assert.equal(body.workspaceId, caseWorkspace)
+        assert.equal(body.profile.model, undefined); assert.equal(body.profile.harness, undefined)
+        const profile = { ...body.profile, roles: [], harness: 'auto', model: { mode: 'inherit' }, id: id(500 + ++profileCount), version: 1, digest: 'e'.repeat(64) }
         profiles.set(profile.id, profile); return json({ profile })
       }
       if (path.startsWith('/api/factory/agent-profiles/')) { assert.equal(init.method, 'DELETE'); return json({ archived: true }) }
-      if (path === '/api/agents/eve/v1/session') return json({ ok: true, sessionId: current.workflowRunId })
+      if (path === '/api/agents/eve/v1/session') {
+        const body = JSON.parse(init.body)
+        if (body.message !== undefined) {
+          const input = JSON.parse(body.message.match(/参数如下：(.*)。使用/)[1])
+          assert.equal(input.repo, 'alexj11324/Mikka-handoff'); assert.equal(input.readOnly, !leaseAudit)
+          assert.deepEqual(input.target, candidate ? { deviceId } : 'cloud')
+          assert.deepEqual(body.clientContext.taskDestination, candidate ? { kind: 'device', deviceId, agentId } : undefined, 'cloud chat must not assert the structured new-task destination')
+          assert.equal(body.clientContext.profileId, input.profileId, 'the real human submission still selects the authorized profile')
+          current.dispatchInput = input; current.harness = chosenModel?.provider === 'codex' ? 'codex' : 'claude_code'; current.profileId = input.profileId
+          assert.equal(input.model, undefined)
+          assert.equal(chosenModel?.modelId, models[current.harness], 'the coordinator must use the same explicitly chosen small subscription model')
+          current.marker = input.note.match(/STARTUP_OK_([A-Za-z0-9_-]+)/)[1]
+          assert.match(init.headers.traceparent, /^00-[a-f0-9]{32}-[a-f0-9]{16}-01$/)
+          assert.equal(url.searchParams.get('botId'), botId)
+          assert.equal(body.clientContext.expectedOwnerId, ownerId); assert.equal(body.clientContext.expectedWorkspaceId, caseWorkspace)
+          assert.match(init.headers['x-mikka-submission-id'], /^[a-f0-9-]{36}$/)
+          return Response.json({ ok: true, sessionId: current.workflowRunId, deliveryId: init.headers['x-mikka-submission-id'] }, { status: 202 })
+        }
+        return json({ ok: true, sessionId: current.workflowRunId })
+      }
       if (/^\/api\/agents\/eve\/v1\/session\/[^/]+\/stream$/.test(path)) {
         const output = { runId: current.runId, arbitraryLongField: 'full output '.repeat(40), thread: 'new', placement: candidate ? { kind: 'device', deviceId } : { kind: 'cloud' } }
         return eveResponse([...nativeCall('stale', { issueId: id(999) }, undefined, 'staleDispatch'), ...nativeCall('call_1', current.dispatchInput, output)])
@@ -227,9 +242,9 @@ function fixture({ candidate = false, badEvidence = false, badBot = false, failD
         harness: current.harness, model: models[current.harness], credentialType: badEvidence ? 'api_key' : 'subscription',
         subscriptionRoute: current.harness === 'codex' ? 'codex_cli' : 'claude_code_cli', agentProfile: { profileId: current.profileId, version: 1, digest: wrongProfile ? 'f'.repeat(64) : profiles.get(current.profileId).digest, source: 'explicit' },
         executionIdentity: { version: 1, requester: ownerId, executionPrincipal: ownerId, botId, botOwner: ownerId, outputOwner: ownerId,
-          workspaceId: wrongScope ? personalWorkspace : workspace, personalResourcePolicy: 'requester_only',
-          billingAccount: { model: { kind: 'subscription', ownerId: wrongPayer ? ownerId : adminId, resourceId: id(800) }, runtime: { kind: candidate ? 'local_device' : 'e2b', ownerId, resourceId: candidate ? deviceId : ownerId } },
-          resourceBindings: [{ kind: 'device', id: deviceId, ownerId, access: 'owner' }, { kind: 'subscription', id: id(800), ownerId: adminId, access: 'workspace_share', revision: '2' }] } } })
+          workspaceId: wrongScope ? (ownedCodex ? workspace : personalWorkspace) : caseWorkspace, personalResourcePolicy: 'requester_only',
+          billingAccount: { model: { kind: 'subscription', ownerId: wrongPayer ? adminId : ownerId, resourceId: id(800) }, runtime: { kind: candidate ? 'local_device' : 'e2b', ownerId, resourceId: candidate ? deviceId : ownerId } },
+          resourceBindings: [{ kind: 'device', id: deviceId, ownerId, access: 'owner' }, { kind: 'subscription', id: id(800), ownerId, access: 'owner', revision: '2' }] } } })
       if (path === '/api/live/ticket') return json({ url: 'wss://live.example/v1/live/opaque/socket', protocol: 'PRIVATE_LIVE_TICKET', expiresAt: epoch + 300000 })
       if (path === '/api/factory/tasks') return json({ contractVersion: 1, issueId: current.issueId, tasks: [{ id: current.taskId, issueId: current.issueId }] })
       if (path === `/api/factory/tasks/${current.taskId}`) {
@@ -258,6 +273,27 @@ test('sampler IDs satisfy the installed 10% sampler, while invalid live configur
   assert.throws(() => createSessionClient('https://user:password@example.com'), /startup_origin_invalid/)
 })
 
+test('product canary pins both native subscriptions, exact production destination and source before session sign-in', async () => {
+  const args=['--task-provider','cloudflare','--runs','2','--mode','acceptance','--harness','both','--expected-build','build-pin','--revision','a'.repeat(40)]
+  const selected=options(args)
+  assert.equal(selected.taskProvider,'cloudflare')
+  assert.equal(selected.runs,2)
+  for (const extra of [['--origin','https://another.example'],['--harness','codex'],['--runs','3'],
+    ['--runtime-evidence','optional'],['--official-timing','disabled'],['--mode','baseline']]) {
+    assert.throws(()=>options([...args,...extra]),/startup_/)
+  }
+  let called=false
+  await assert.rejects(runCloudStartup({...selected,origin:'https://another.example'},{
+    env:{},fetchImpl:async()=>{called=true;throw Error('unexpected request')},
+  }),/startup_option_invalid/)
+  for (const override of [{taskProvider:undefined}, {actor:'owned_codex'}, {workspaceKind:'personal'}]) {
+    await assert.rejects(runCloudStartup({...selected,...override}, {
+      env:{}, verifyCompletedTask:async()=>{}, fetchImpl:async()=>{called=true;throw Error('unexpected request')},
+    }),/startup_/)
+  }
+  assert.equal(called,false)
+})
+
 test('startup failure projection is closed, preserves only bounded HTTP status, and unwraps native abort classes', () => {
   assert.equal(Object.isFrozen(STARTUP_FAILURE_CODES), true)
   assert.equal(Object.isFrozen(STARTUP_FAILURE_PHASES), true)
@@ -276,6 +312,64 @@ test('startup failure projection is closed, preserves only bounded HTTP status, 
 
 const oneCodexCandidate = () => parseOptions(['--mode', 'candidate', '--runs', '1', '--harness', 'codex',
   '--device-id', deviceId, '--agent-id', agentId, '--timeout-ms', '1000'], {})
+
+const ownedEnv = { MIKKA_TEST_ACCOUNT_EMAIL: 'alexjiang20232024@gmail.com', MIKKA_TEST_ACCOUNT_PASSWORD: 'PRIVATE_OWNED_PASSWORD' }
+const ownedCase = { ...options(['--harness', 'codex']), workspace: undefined, runs: 1, actor: 'authorized_2023_codex' }
+
+test('the explicitly authorized Codex actor uses its own Luna and personal workspace without claiming a shared SMOKE proof', async () => {
+  const io = fixture({ ownedCodex: true })
+  const fixtures = []
+  const report = await runCloudStartup(ownedCase, { env: ownedEnv, ...io, onFixture: async row => fixtures.push(row) })
+  assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
+  assert.equal(report.actor, 'authorized_2023_codex'); assert.equal(report.team, undefined)
+  assert.equal(report.workspace.kind, 'personal')
+  assert.equal(report.samples.length, 1)
+  const sample = report.samples[0]
+  assert.equal(sample.execution.model, 'gpt-6-luna'); assert.equal(sample.execution.harness, 'codex')
+  assert.equal(sample.execution.sharedScope, undefined)
+  assert.equal(sample.execution.ownedScope.access, 'owner'); assert.equal(sample.execution.ownedScope.verified, true)
+  assert.equal(sample.execution.ownedScope.requesterHash, sample.execution.ownedScope.payerHash)
+  assert.equal(sample.cleanup.status, 'passed'); assert.equal(report.cleanup.workspaceRestored, true)
+  assert.equal(io.calls.filter(call => call.path === '/api/factory/agent-profiles' && call.init.method === 'POST').length, 1)
+  assert.deepEqual(fixtures.map(row => row.kind), ['bot', 'profile', 'issue', 'run'])
+  assert.equal(fixtures.at(-1).id, sample.runId); assert.equal(fixtures.at(-1).issueId, sample.issueId)
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE|alexjiang|SMOKE_OWNER|workspace_share/)
+})
+
+test('the owned actor never invokes Claude or accepts another credential owner, payer or workspace', async () => {
+  await assert.rejects(runCloudStartup({ ...ownedCase, harness: 'both' }, { env: ownedEnv, fetchImpl: () => assert.fail('must reject before setup') }), /startup_owned_actor_model_invalid/)
+  for (const change of [{ wrongSource: true }, { wrongPayer: true }, { wrongScope: true }, { wrongProfile: true }]) {
+    const io = fixture({ ownedCodex: true, ...change })
+    const report = await runCloudStartup(ownedCase, { env: ownedEnv, ...io })
+    assert.equal(report.status, 'failed')
+    assert.equal(report.cleanup.workspaceRestored, true)
+    assert.equal(io.calls.filter(call => call.path === '/api/agents/eve/v1/session' && JSON.parse(call.init.body).message !== undefined).length <= 1, true)
+    assert.ok(report.samples.every(sample => sample.execution?.sharedScope === undefined))
+  }
+})
+
+test('an owned native profile does not authorize a Coordinator call through shared-only Luna', async () => {
+  const io = fixture({ ownedCodex: true, ownedChatMenu: 'shared' })
+  const report = await runCloudStartup(ownedCase, { env: ownedEnv, ...io })
+  assert.equal(io.calls.filter(call => call.path === '/api/factory/agent-profiles' && call.init.method === 'POST').length, 1, 'the native profile already selected an owned source')
+  assert.equal(report.status, 'failed')
+  assert.equal(report.samples[0].error, 'startup_own_chat_model_ambiguous')
+  assert.equal(report.samples[0].phase, 'chat_model_selection')
+  assert.equal(io.calls.filter(call => call.init.body?.includes('execution-settings.chooseBotModel')).length, 0)
+  assert.equal(io.calls.filter(call => call.path === '/api/agents/eve/v1/session' && JSON.parse(call.init.body).message !== undefined).length, 0)
+  assert.equal(io.samples.length, 0, 'no task is created before chat source ownership is verified')
+  assert.equal(report.cleanup.workspaceRestored, true)
+})
+
+test('the owned actor selects its own Luna when a shared Luna is listed first', async () => {
+  const io = fixture({ ownedCodex: true, ownedChatMenu: 'both' })
+  const report = await runCloudStartup(ownedCase, { env: ownedEnv, ...io })
+  assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
+  const choices = io.calls.filter(call => call.init.body?.includes('execution-settings.chooseBotModel')).map(call => JSON.parse(call.init.body).args)
+  assert.deepEqual(choices, [[botId, id(61)]], 'the Coordinator uses the owned catalogue binding, not the first shared match')
+  assert.equal(io.calls.filter(call => call.path === '/api/agents/eve/v1/session' && JSON.parse(call.init.body).message !== undefined).length, 1)
+  assert.equal(report.samples[0].execution.ownedScope.verified, true)
+})
 
 test('the selected dispatch refusal retains its code before queueing and still cleans the owned issue', async () => {
   const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
@@ -324,7 +418,7 @@ test('a fetch timeout wrapped by the session client preserves the coordinator-su
   const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
   let submitted = 0
   io.fetchImpl = (url, init) => {
-    if (url.pathname.endsWith('/api/rpc') && JSON.parse(init.body).action === 'coordinator.sendCoordinatorMessage') {
+    if (url.pathname.endsWith('/api/agents/eve/v1/session') && JSON.parse(init.body).message !== undefined) {
       submitted++; throw new DOMException('PRIVATE_AUTH_URL?token=PRIVATE_TOKEN', 'TimeoutError')
     }
     return original(url, init)
@@ -344,7 +438,7 @@ test('fixed pre-execution entry phases distinguish HTTP, API, RPC and action ref
     { action: 'execution-settings.getBotModelMenu', phase: 'chat_model_selection', body: { version: 1, ok: false }, code: 'startup_rpc_refused' },
     { action: 'execution-settings.getBotModelMenu', phase: 'chat_model_selection', body: { version: 1, ok: true, result: { error: 'PRIVATE_ACTION_REFUSAL' } }, code: 'startup_action_refused' },
     { action: 'issues.saveIssue', phase: 'issue_create', status: 403, code: 'startup_http_error' },
-    { action: 'coordinator.sendCoordinatorMessage', phase: 'coordinator_submit', status: 409, code: 'startup_http_error' },
+    { path: '/api/agents/eve/v1/session', phase: 'coordinator_submit', status: 409, code: 'startup_http_error' },
     { action: 'agents.pollIssueThreads', phase: 'thread_lookup', status: 502, code: 'startup_http_error' },
   ]
   for (const item of cases) {
@@ -394,7 +488,7 @@ test('profile validation and pre-sample build pin keep their own stage instead o
     return Response.json(value)
   }
   const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
-  assert.deepEqual(report.samples[0].failure, { phase: 'profile_validation', code: 'startup_profile_source_mismatch' })
+  assert.deepEqual(report.samples[0].failure, { phase: 'profile_validation', code: 'startup_profile_not_content_only' })
   assert.equal(io.samples.length, 0)
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_INVALID_PROFILE/)
   const pinned = await runCloudStartup({ ...oneCodexCandidate(), expectedBuild: 'EXPECTED_DIFFERENT_BUILD' }, { env, ...fixture({ candidate: true }) })
@@ -644,15 +738,15 @@ test('SMOKE chooses the verified team without fixed IDs and accepts checking quo
   const report = await runCloudStartup(parseOptions(['--timeout-ms', '1000'], {}), { env, ...io })
   assert.equal(report.status, 'awaiting_server_timings', JSON.stringify(report))
   assert.equal(report.cleanup.workspaceRestored, true)
-  assert.ok(report.samples.every(sample => sample.execution.identity.subscriptionAccess[0] === 'workspace_share'))
+  assert.ok(report.samples.every(sample => sample.execution.identity.subscriptionAccess[0] === 'owner'))
   await assert.rejects(runCloudStartup(options(), { env: { ACME_DEMO_EMAIL: env.SMOKE_OWNER_EMAIL, ACME_DEMO_PASSWORD: env.SMOKE_OWNER_PASSWORD }, ...io }), /startup_smoke_account_required/)
 })
 
-test('foreign payer, workspace or frozen profile cannot satisfy the shared subscription receipt', async () => {
+test('foreign payer, workspace or frozen profile cannot satisfy the own subscription receipt', async () => {
   for (const failure of [{ wrongPayer: true }, { wrongScope: true }, { wrongProfile: true }]) {
     const io = fixture(failure), report = await runCloudStartup(options(), { env, ...io })
     assert.equal(report.status, 'failed')
-    assert.ok(report.samples.every(sample => sample.error === 'startup_shared_subscription_identity_mismatch'))
+    assert.ok(report.samples.every(sample => sample.error === 'startup_own_subscription_identity_mismatch'))
     assert.ok(io.samples.every(sample => sample.cancelled && sample.deleted && sample.machineEnded))
     assert.equal(report.cleanup.workspaceRestored, true)
     assert.equal(io.calls.at(-1).path, '/api/auth/sign-out')
@@ -1031,8 +1125,8 @@ test('lease audit uses ordinary cloud placement and waits for a terminal reply a
   assert.deepEqual(report.samples.map(sample => sample.harness), ['claude_code', 'codex'])
   assert.ok(report.samples.every(sample => sample.requireTerminal && sample.requireReplyAfterTool
     && sample.replyVerifiedAfterTool && sample.lastStatus === 'stopped' && sample.cleanup.status === 'passed'))
-  const dispatches = io.calls.filter(call => call.path === '/api/rpc' && JSON.parse(call.init.body).action === 'coordinator.sendCoordinatorMessage')
-    .map(call => JSON.parse(JSON.parse(call.init.body).args[0].match(/参数如下：(.*)。使用/)[1]))
+  const dispatches = io.calls.filter(call => call.path === '/api/agents/eve/v1/session' && JSON.parse(call.init.body).message !== undefined)
+    .map(call => JSON.parse(JSON.parse(call.init.body).message.match(/参数如下：(.*)。使用/)[1]))
   assert.equal(dispatches.length, 2)
   for (const dispatch of dispatches) {
     assert.equal(dispatch.readOnly, false)
@@ -1908,4 +2002,69 @@ test('a native completed call carrying a refused business receipt never becomes 
   assert.equal(report.samples[0].runId, undefined)
   assert.equal(io.calls.some(call => call.action === 'agents.pollIssueThreads'), false)
   assert.doesNotMatch(JSON.stringify(report), /PRIVATE_RECEIPT/)
+})
+
+test('sponsored repository delivery binds the exact note, repository and writable dispatch to its owner', async () => {
+  const profileId = id(32), issueId = id(33), runId = id(34), now = () => epoch
+  const scope = { ownerId, workspaceId: workspace }
+  const note = 'Change only the approved fixture. Submit STARTUP_OK_pinned.'
+  async function dispatch(writable, mutate = value => value) {
+    const record = { sampleId: 'pinned', title: '测试 sponsored delivery', taskProvider: 'cloudflare' }
+    let input, text
+    const client = {
+      async rpc(action) {
+        if (action === 'issues.getIssue') return { issue: {id: issueId, title: record.title, userId: ownerId, workspaceId: workspace} }
+        if (action === 'agents.pollIssueThreads') return { threads: [{id: runId, ownedByCurrentUser: true}] }
+        assert.fail(action)
+      },
+      async request(path, init) {
+        if (init?.body && JSON.parse(init.body).message !== undefined) {
+          const body = JSON.parse(init.body)
+          text = body.message
+          assert.deepEqual(body.clientContext, { expectedOwnerId: ownerId, expectedWorkspaceId: workspace, profileId, taskDestination: { kind: 'cloud', provider: 'cloudflare' }, taskTitle: record.title })
+          input = { ...JSON.parse(text.match(/其余参数为 (.*)。使用该固定 Profile/)[1]), issueId }
+          return Response.json({ ok: true, sessionId: 'wrun_fixture', deliveryId: init.headers['x-mikka-submission-id'] }, { status: 202 })
+        }
+        if (path.includes('/stream?')) return eveResponse(nativeCall('bound', mutate(input), {runId, thread: 'new', placement: {kind: 'cloud'}}))
+        return Response.json({ok: true, sessionId: 'wrun_fixture'})
+      },
+    }
+    await dispatchThroughCoordinator(client, record, {botId, profileId, scope, timeoutMs: 1000,
+      ...(writable ? {probe: {sponsoredRepositoryDelivery: true, instructions: note}} : {})}, now)
+    return { text, input, record }
+  }
+  const original = await dispatch(false)
+  assert.equal(original.input.readOnly, true)
+  assert.match(original.text, /工作仅限读取该仓库的 README/)
+  const delivery = await dispatch(true)
+  assert.equal(delivery.input.readOnly, false)
+  assert.equal(delivery.record.runId, runId)
+  assert.equal(delivery.input.note, note)
+  assert.doesNotMatch(delivery.text, /工作仅限读取该仓库的 README/)
+  for (const change of [{repo: 'other/repository'}, {readOnly: true}, {note: note + ' unrelated changes'}]) {
+    await assert.rejects(dispatch(true, input => ({...input, ...change})), /fixture_scope_invalid/)
+  }
+})
+
+test('native admission refuses HTTP 200, malformed receipts and a different observed session', async () => {
+  for (const variant of ['status', 'receipt', 'session']) {
+    const io = fixture({ candidate: true, runtime: true }), original = io.fetchImpl
+    let submitted = 0
+    io.fetchImpl = async (url, init) => {
+      const response = await original(url, init)
+      if (url.pathname.endsWith('/api/agents/eve/v1/session') && JSON.parse(init.body).message !== undefined) {
+        submitted++
+        const receipt = await response.json()
+        return Response.json(variant === 'receipt' ? { queued: true } : { ...receipt, ...(variant === 'session' ? { sessionId: 'wrun_other' } : {}) },
+          { status: variant === 'status' ? 200 : 202 })
+      }
+      return response
+    }
+    const report = await runCloudStartup(oneCodexCandidate(), { env, ...io })
+    assert.equal(submitted, 1)
+    assert.deepEqual(report.samples[0].failure, variant === 'session'
+      ? { phase: 'coordinator_stream', code: 'startup_workflow_run_missing' }
+      : { phase: 'coordinator_submit', code: 'startup_response_invalid' })
+    assert.equal(report.samples[0].cleanup.status, 'passed')
+  }
 })

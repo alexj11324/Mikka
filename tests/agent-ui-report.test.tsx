@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { NextIntlClientProvider } from 'next-intl'
+import { NextIntlClientProvider } from '@/lib/intl/i18n-client'
 import { createParser } from '@openuidev/lang-core'
 import messages from '../messages/en.json'
 import chineseMessages from '../messages/zh-CN.json'
@@ -10,6 +10,8 @@ import { detectAgentUISource } from '../lib/agent-ui-source'
 import { actionPrompt, AgentGenerativeUI } from '../components/workspace/agent-generative-ui'
 import { ReplyBubbles } from '../components/workspace/agent-text-bubble'
 import { AgentCitationsContext } from '../components/workspace/agent-citations'
+import { TaskPresentationsContext } from '../hooks/use-task-collection'
+import { taskPresentation } from '../lib/task-presentation'
 
 const library = createAgentLibrary()
 const parser = createParser(library.toJSONSchema(), library.root)
@@ -194,9 +196,10 @@ test('A task chip is boxed with its state icon and code; a thread is its title i
     [task]: { kind: 'issue', id: task, number: 43, identifier: 'MIK-43', title: 'Move the chat to OpenUI', status: 'doing', priority: 'high' },
     [run]: { kind: 'run', id: run, agentName: 'Worker', harness: 'claude_code', status: 'running', issue: { id: task, number: 43, identifier: 'MIK-43', title: 'Move the chat to OpenUI' }, name: 'Fix the shell', summary: null, steps: 1, createdAt: '2026-11-01T00:00:00.000Z', finishedAt: null },
   } as const
-  const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages}><AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: () => {} }}>
+  const presentation = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, undefined, null, () => false)
+  const html = renderToStaticMarkup(<NextIntlClientProvider locale="en" messages={messages}><TaskPresentationsContext value={{ [task]: presentation }}><AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: () => {} }}>
     <AgentGenerativeUI response={`root = InlineText(["See ", TaskChip("${task}"), " and ", RunChip("${run}"), ", PR ", SourceChip("https://github.com/alexj11324/Mikka/pull/92", "Mikka#92")])`} isStreaming={false} onAction={() => {}} />
-  </AgentCitationsContext></NextIntlClientProvider>)
+  </AgentCitationsContext></TaskPresentationsContext></NextIntlClientProvider>)
   // Each chip from its opening tag to the next chip: an object chip is an inline span (R-15), so its end tag is ambiguous.
   const starts = [...html.matchAll(/<(?:button|a|span)[^>]*data-slot="inline-citation-trigger"/g)].map(match => match.index)
   const chips = starts.map((start, index) => html.slice(start, starts[index + 1] ?? html.length))
@@ -213,12 +216,15 @@ test('A task chip is boxed with its state icon and code; a thread is its title i
   assert.ok(!taskClass.some(name => /^h-\d/.test(name)), 'task chip takes the text\'s own height')
   const runClass = classes(runChip)
   assert.ok(runClass.includes('text-object-chip-foreground') && runClass.includes('bg-transparent'), 'a thread is in the citation link colour with no fill')
-  assert.doesNotMatch(runChip, /<svg/, 'a thread has no icon')
+  assert.match(runChip, /data-run-indicator="working"/, 'a running thread carries its one activity mark')
+  assert.equal(runChip.match(/<svg/g)?.length, 1)
   const text = (chip: string) => chip.replace(/<[^>]+>/g, '')
   assert.match(text(taskChip), /^MIK-43/)
-  assert.match(taskChip, /<svg/, 'a task chip has its state icon')
-  // A thread is the task's title without its code, so the code never repeats beside the task chip.
-  assert.match(text(runChip), /^Move the chat to OpenUI/)
+  assert.equal(taskChip.match(/<svg/g)?.length, 1, 'a task chip has one icon, its status')
+  assert.doesNotMatch(taskChip, /data-run-indicator/)
+  // A thread is named by its own short title (what it was asked), never its task's title or code (2026-11-13-1405).
+  assert.match(text(runChip), /^Fix the shell/)
+  assert.doesNotMatch(text(runChip), /Move the chat to OpenUI/)
   assert.doesNotMatch(text(runChip), /MIK-43/)
   const sourceClass = sourceChip.match(/class="([^"]*)"/)?.[1] ?? ''
   assert.match(sourceChip, /data-variant="source"/)
@@ -240,10 +246,12 @@ test('saved OpenUI, citation markers and oldest bare UUID references all use the
     `旧消息 [[issue:${task}]] / [[run:${run}]]：已开始运行，等待回答。`,
     `旧消息 ${task} / ${run}：已开始运行，等待回答。`,
   ]
+  const presentation = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } },
+    { runId: run, status: 'waiting_input', outcome: null }, null, () => false)
   for (const response of saved) {
-    const html = renderToStaticMarkup(<NextIntlClientProvider locale="zh-CN" messages={chineseMessages}><AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: () => {}, carded: new Set([run]) }}>
+    const html = renderToStaticMarkup(<NextIntlClientProvider locale="zh-CN" messages={chineseMessages}><TaskPresentationsContext value={{ [task]: presentation }}><AgentCitationsContext value={{ sources, previews: {}, onOpenIssue: () => {}, carded: new Set([run]) }}>
       <AgentGenerativeUI response={response} isStreaming={false} onAction={() => {}} />
-    </AgentCitationsContext></NextIntlClientProvider>)
+    </AgentCitationsContext></TaskPresentationsContext></NextIntlClientProvider>)
     const starts = [...html.matchAll(/<span[^>]*data-slot="inline-citation-trigger"/g)].map(match => match.index)
     assert.equal(starts.length, 2, response)
     const taskChip = html.slice(starts[0], starts[1])
@@ -251,12 +259,15 @@ test('saved OpenUI, citation markers and oldest bare UUID references all use the
     const visible = (value: string) => value.replace(/<[^>]+>/g, '')
     assert.match(visible(taskChip), /^ALEX-45/)
     assert.ok(!visible(taskChip).includes(title), 'the old long title is absent from the task chip')
-    assert.match(taskChip, /data-task-chip="waiting"/)
+    assert.match(taskChip, /data-task-chip="doing"/, 'the chip carries the status field')
+    assert.doesNotMatch(taskChip, /data-run-indicator=/, 'the chip has the status icon only')
+    assert.match(runLink, /data-run-indicator="waiting"/, 'waiting for the person is the conversation\'s mark, on its title')
     assert.match(runLink, /data-thread-link=""/)
     assert.match(runLink, /text-object-chip-foreground/)
     assert.match(runLink, /bg-transparent/)
-    assert.doesNotMatch(runLink, /<svg|data-citation-carded/)
-    assert.ok(visible(runLink).startsWith(title))
+    assert.doesNotMatch(runLink, /data-citation-carded/)
+    assert.ok(visible(runLink).startsWith('修复登录后的工作区前缀和'), 'the conversation is named by a bounded short title')
+    assert.ok(!visible(runLink).includes(title), 'never the full 20-character sentence')
     assert.ok(visible(html).includes('已开始运行，等待回答。'), 'historical model prose stays verbatim')
   }
 })

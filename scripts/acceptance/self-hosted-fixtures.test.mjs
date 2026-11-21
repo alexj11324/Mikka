@@ -12,7 +12,7 @@ const fixture = {
   DATABASE_URL: 'postgres://mikka:isolated@postgres:5432/mikka',
   SMTP_URL: 'smtp://mailpit:1025', S3_ENDPOINT: 'http://minio:9000', S3_BUCKET: 'mikka-selfhost-ci',
   S3_ACCESS_KEY_ID: 'selfhost-ci', S3_SECRET_ACCESS_KEY: Buffer.alloc(32, 1).toString('base64'), S3_REGION: 'us-east-1',
-  MIKKA_DEFAULT_MODEL_BASE_URL: 'http://model:8080/v1', MIKKA_DEFAULT_MODEL_API_KEY: 'synthetic-selfhost-only', MIKKA_DEFAULT_MODEL_ID: 'selfhost-ci',
+  MIKKA_LITELLM_URL: 'http://litellm:4000', MIKKA_LITELLM_MASTER_KEY: 'synthetic-selfhost-litellm',
 }
 
 test('Mailpit notifications coalesced as newline-delimited JSON in one WebSocket frame remain queued', async t => {
@@ -79,8 +79,8 @@ test('the mutating driver refuses public origins, remote databases, cloud creden
     { MIKKA_DATABASE_URL: 'postgres://mikka:isolated@production.example.test:5432/mikka' },
     { DATABASE_URL: 'postgres://mikka:isolated@postgres:5432/other' },
     { SMTP_URL: 'smtp://external.example.test:1025' }, { S3_ENDPOINT: 'https://storage.example.test' },
-    { MIKKA_DEFAULT_MODEL_BASE_URL: 'https://api.openai.com/v1' },
-    { MIKKA_DEFAULT_MODEL_API_KEY: 'real-key' }, { VERCEL: '1' }, { AI_GATEWAY_API_KEY: 'real-key' },
+    { MIKKA_LITELLM_URL: 'https://api.openai.com/v1' },
+    { MIKKA_LITELLM_MASTER_KEY: 'real-key' }, { VERCEL: '1' }, { AI_GATEWAY_API_KEY: 'real-key' },
     { GITHUB_APP_PRIVATE_KEY: 'real-key' }, { DEVICE_GATEWAY_URL: 'https://gateway.example.test' },
   ]) assert.throws(() => assertFixtureEnvironment({ ...fixture, ...overrides }))
 })
@@ -145,9 +145,15 @@ test('the isolated model supports ordinary and streaming OpenAI requests with ex
   assert.equal(JSON.parse(chunks[0].slice(6)).choices[0].delta.content, 'SELF_HOSTED_REPLY_02')
   assert.equal(JSON.parse(chunks[1].slice(6)).choices[0].finish_reason, 'stop')
   assert.equal(chunks[2], 'data: [DONE]')
+  const title = await call({ model: 'selfhost-ci', messages: [
+    { role: 'system', content: 'Answer with one JSON object only, no Markdown: {"title": "<short title>"}.' },
+    { role: 'user', content: '{"task":{"title":"Desktop conversation"}}' },
+  ] })
+  assert.equal(title.status, 200)
+  assert.deepEqual(JSON.parse((await title.json()).choices[0].message.content), { title: 'Desktop inbox review' })
   const refused = await call({ model: 'selfhost-ci', messages: [] }, 'Bearer other')
   assert.equal(refused.status, 400); await refused.body.cancel()
-  assert.deepEqual(await (await fetch(`${base}/evidence`)).json(), { synthetic: true, calls: 2, turns: ['01', '02'] })
+  assert.deepEqual(await (await fetch(`${base}/evidence`)).json(), { synthetic: true, calls: 3, turns: ['01', '02'] })
 })
 
 

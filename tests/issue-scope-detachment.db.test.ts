@@ -1,9 +1,9 @@
 import { seedFixtureWorkspace } from './helpers/task-workspace'
+import { registeredTask } from './helpers/registered-task'
 import { tokenWorkspace } from '../lib/tokens/principal'
 import { SCOPE_DATABASES } from '../scripts/scope-acceptance-policy.mjs'
 import { scopeSubtest, scopeResumeBootstrap } from './support/scope-acceptance.mjs'
 import './fixtures/scope-request-runtime.mjs'
-import 'next/dist/server/node-environment-baseline'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -78,32 +78,22 @@ test('provider policy preserves task tenancy and independent membership gates on
     linearRequestTimeout.ms = 2_000
     try { await callback() } finally { linearRequestTimeout.ms = 12_000 }
   }
-  const { AfterContext } = await import('next/dist/server/after/after-context')
-  const { workAsyncStorage } = await import('next/dist/server/app-render/work-async-storage.external')
-  const { workUnitAsyncStorage } = await import('next/dist/server/app-render/work-unit-async-storage.external')
-  const { createRequestStoreForAPI } = await import('next/dist/server/async-storage/request-store')
-  const { NextRequest } = await import('next/server')
-  // Native HTTP has no Next request context. Run the same after callbacks that
-  // Next runs when a request closes, and fail if an asynchronous effect fails.
+  const { createRequestScope, runRequestScope } = await import('../apps/api/src/context')
+  const { NextRequest } = await import('../lib/server-runtime/server')
+  // Run the request scope and its after queue the way the API dispatcher does,
+  // so a deferred effect that fails fails this test too.
   async function withRequestContext<T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) {
-    const waits: Promise<unknown>[] = [], errors: unknown[] = []
-    const closes: Array<() => void> = []
-    const afterContext = new AfterContext({ waitUntil: promise => { waits.push(promise) }, onClose: callback => { closes.push(callback) }, onTaskError: error => { errors.push(error) } })
-    const request = new NextRequest('http://127.0.0.1/mikka')
-    // Next 16.4 adds an optional HMR hash to the API request-store factory;
-    // supplying it also works with the local 16.1 acceptance dependencies.
-    const requestStore: ReturnType<typeof createRequestStoreForAPI> = Reflect.apply(createRequestStoreForAPI, undefined, [request, new URL(request.url), { tags: [], expirationsByCacheKind: new Map() }, undefined, undefined, undefined])
-    return workAsyncStorage.run({ afterContext } as NonNullable<ReturnType<typeof workAsyncStorage.getStore>>, () => workUnitAsyncStorage.run(requestStore, async () => {
+    const scope = createRequestScope(new NextRequest('http://127.0.0.1/mikka'))
+    return runRequestScope(scope, async () => {
       try { const result = await fn(); await beforeClose?.(); return result }
-      finally { for (const close of closes) close(); await Promise.all(waits); assert.deepEqual(errors, []) }
-    }))
+      finally { await scope.after.finish() }
+    })
   }
   const inWorkspace = <T>(userId: string, fn: () => Promise<T>, workspaceId: string = workspace) => actAs({ id: userId, [tokenWorkspace]: workspaceId }, fn)
   const action = <T>(fn: () => Promise<T>, beforeClose?: () => Promise<void>) => withRequestContext(() => inWorkspace(owner, fn), beforeClose)
   const { issueForUser } = await import('../lib/issue-access')
   const { readRun, queueRun, visibleRuns } = await import('../lib/agent-runs')
   const { issueRunToken, verifyRunToken } = await import('../lib/mcp/worker')
-  const { renewRunLeases } = await import('../lib/run-leases')
   const { completeRunForDevice, dispatchCompletedIssue } = await import('../lib/run-completion')
   const { persistRunCompletion, prepareRunPublication, publishRunResult } = await import('../lib/run-publications')
   const { authorizedClaimResponse } = await import('../lib/run-claim-response')
@@ -167,14 +157,14 @@ test('provider policy preserves task tenancy and independent membership gates on
     await pool.query(`drop index linear_sync_outbox_open_issue_key;
     create unique index linear_sync_outbox_open_issue_key on linear_sync_outbox("issueId") where status in ('queued','processing')`)
     await pool.query(await readFile(new URL('../drizzle/20261029043641_team_issue_creation_gate.sql',import.meta.url),'utf8'))
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Legacy failed-only task\',$3,\'todo\',\'normal\',\'workspace\',$4,\'bound\',\'explicit\')',[legacyFailed,owner,doc,workspace])
+    await registeredTask(pool, owner, workspace, legacyFailed, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Legacy failed-only task\',$3,\'todo\',\'normal\',\'workspace\',$4,\'bound\',\'explicit\')',[legacyFailed,owner,doc,workspace]))
     await pool.query('update linear_sync_outbox set status=\'failed\',attempts=8 where "issueId"=$1',[legacyFailed])
     assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and status=\'failed\'',[legacyFailed])).rows[0].n,1)
     fixtureIds.push(legacyFailed)
     // A synthetic legacy Linear-origin task imported before verified-target
     // migration, now on generation 2. The trusted migration derives the flag
     // from its immutable revision-1 Linear history; no fixture sets it directly.
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"scopeVersion",revision,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Legacy imported task\',$3,\'todo\',\'normal\',\'workspace\',2,1,$4,\'bound\',\'explicit\')',[legacyImported,owner,doc,workspace])
+    await registeredTask(pool, owner, workspace, legacyImported, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"scopeVersion",revision,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Legacy imported task\',$3,\'todo\',\'normal\',\'workspace\',2,1,$4,\'bound\',\'explicit\')',[legacyImported,owner,doc,workspace]))
     await pool.query('insert into issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id) values ($1,$2,$3,1,\'Legacy imported task\',$4,\'todo\',\'normal\',\'system\',\'linear\')',[randomUUID(),legacyImported,owner,doc])
     await pool.query('insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier") values ($1,$2,$3,$4,$2::uuid::text,\'MIK-legacy\')',[legacyLink,legacyImported,owner,sync])
     await pool.query('update linear_sync_outbox set status=\'done\' where "issueId"=$1',[legacyImported])
@@ -201,10 +191,10 @@ test('provider policy preserves task tenancy and independent membership gates on
   const claimHarnesses = JSON.stringify([{harness:'codex',installed:true,toolApproval:true}])
   const memberRemote = `https://github.com/mikka-ci/scope-member-${device}.git`
   const ownerRemote = `https://github.com/mikka-ci/scope-owner-${ownerDevice}.git`
-  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses) values ($1,$2,\'Synthetic\',$3,$4)', [device,member,DAEMON_PROTOCOL_VERSION,claimHarnesses])
+  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses,"sessionOpenedAt") values ($1,$2,\'Synthetic\',$3,$4,now())', [device,member,DAEMON_PROTOCOL_VERSION,claimHarnesses])
   await pool.query('insert into agents (id,"userId",harness,name,"deviceId") values ($1,$2,\'codex\',\'Synthetic\',$3)', [agent,member,device])
   await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl","baseBranch") values ($1,$2,$3,$4,$5,\'main\')', [repo,device,member,remoteKey(memberRemote),memberRemote])
-  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses) values ($1,$2,\'Synthetic owner\',$3,$4)', [ownerDevice,owner,DAEMON_PROTOCOL_VERSION,claimHarnesses])
+  await pool.query('insert into devices (id,"ownerId",name,"protocolVersion",harnesses,"sessionOpenedAt") values ($1,$2,\'Synthetic owner\',$3,$4,now())', [ownerDevice,owner,DAEMON_PROTOCOL_VERSION,claimHarnesses])
   await pool.query('insert into agents (id,"userId",harness,name,"deviceId") values ($1,$2,\'codex\',\'Synthetic owner\',$3)', [ownerAgent,owner,ownerDevice])
   await pool.query('insert into device_repos (id,"deviceId","userId","repoPath","remoteUrl") values ($1,$2,$3,$4,$5)', [ownerRepo,ownerDevice,owner,remoteKey(ownerRemote),ownerRemote])
   const deviceToken = `synthetic-${randomUUID()}`
@@ -215,9 +205,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   async function seed(id: string, remoteId = id, linked = true) {
     if (!fixtureIds.includes(id)) fixtureIds.push(id)
     const content = id === issue ? mainDoc : doc
-    const tx = await pool.connect()
-    try {
-      await tx.query('begin')
+    await registeredTask(pool, owner, workspace, id, async tx => {
       // These are explicit synthetic provider-origin rows. Keep every current
       // tenant/target trigger enabled; real new imports are exercised below.
       await tx.query("select set_config('mikka.linear_sync_source','linear',true)")
@@ -228,9 +216,7 @@ test('provider policy preserves task tenancy and independent membership gates on
       finally { document.destroy() }
       if(linked) await tx.query(`insert into linear_issue_links (id,"issueId","ownerId","teamSyncId","linearIssueId","linearIdentifier","externalTargetVerified","linearUpdatedAt") values ($1,$2,$3,$4,$5,'MIK-184',true,'2020-01-01T00:00:00Z')`,[randomUUID(),id,owner,sync,remoteId])
       await tx.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,owner])
-      await tx.query('commit')
-    } catch(error) { await tx.query('rollback'); throw error }
-    finally { tx.release() }
+    })
     if(linked) await pool.query('insert into linear_sync_outbox (id,"issueId","scopeVersion") values ($1,$2,1)',[randomUUID(),id])
   }
   const localFlip = async (id: string, revision = 1) => {
@@ -252,7 +238,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   const ownerToken = (await issueRunToken({id:ownerRun,userId:owner})).token
   async function withClaimServer(check: (origin: string)=>Promise<void>, runId = memberRun) {
     const server = createServer(async (incoming,outgoing) => {
-      const request = new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{'x-mikka-client-version':incoming.headers['x-mikka-client-version']?.toString()??'',authorization:incoming.headers.authorization??'',[REPO_ORIGIN_HEADER]:incoming.headers[REPO_ORIGIN_HEADER]?.toString()??''}})
+      const request = new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':incoming.headers['x-mikka-client-version']?.toString()??'',authorization:incoming.headers.authorization??'',[REPO_ORIGIN_HEADER]:incoming.headers[REPO_ORIGIN_HEADER]?.toString()??''}})
       try {
         const response = await claim.POST(request,{params:Promise.resolve({deviceId:device,runId})})
         outgoing.writeHead(response.status,Object.fromEntries(response.headers));outgoing.end(await response.text())
@@ -264,7 +250,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   }
   await scopeSubtest(t, 'context and stale classifier cannot publish a personal task without a user choice', async () => {
     const id=randomUUID();fixtureIds.push(id)
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values ($1,$2,\'Ship team work urgently\',$3,\'todo\',\'normal\',\'personal\',$4,\'bound\')',[id,owner,doc,workspace])
+    await registeredTask(pool, owner, workspace, id, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values ($1,$2,\'Ship team work urgently\',$3,\'todo\',\'normal\',\'personal\',$4,\'bound\')',[id,owner,doc,workspace]))
     await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,owner])
     const { judgeIssueScope }=await import('../lib/issue-scope-judge')
     for (const context of ['Telegram','the Mikka app','ambiguous team conversation']) await judgeIssueScope(id,context)
@@ -309,7 +295,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   })
   await scopeSubtest(t, 'the same native claim route succeeds while workspace access is still active', async () => {
     await withClaimServer(async origin=>{
-      const response=await fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
+      const response=await fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
       assert.equal(response.status,200,await response.clone().text())
       const claimed=await response.json()
       assert.equal(claimed.runId,memberRun)
@@ -333,12 +319,13 @@ test('provider policy preserves task tenancy and independent membership gates on
       const pid=(await blocker.query('select pg_backend_pid() pid')).rows[0].pid
       await withClaimServer(async origin=>{
         try {
-          responsePromise=fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
+          responsePromise=fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,[REPO_ORIGIN_HEADER]:'1'}})
           await waitFor(async()=>Boolean((await pool.query("select 1 from pg_stat_activity a where a.wait_event_type='Lock' and $1=any(pg_blocking_pids(a.pid))",[pid])).rowCount),'claim did not pause before token issuance')
           assert.equal((await pool.query('select status from agent_runs where id=$1',[run])).rows[0].status,'preparing')
           const preview=await inWorkspace(owner,()=>previewIssuePersonalScope(id))
           assert.ok('preview' in preview && preview.preview)
-          const changed=await inWorkspace(owner,()=>confirmIssuePersonalScope({id,revision:1,confirmation:preview.preview.confirmation}))
+          // A claimed run can advance the task to doing. Confirm the revision the owner actually previewed.
+          const changed=await inWorkspace(owner,()=>confirmIssuePersonalScope({id,revision:preview.preview.revision,confirmation:preview.preview.confirmation}))
           assert.ok('issue' in changed)
           await blocker.query('select pg_advisory_unlock($1)',[barrier]);held=false
           const response=await responsePromise
@@ -381,7 +368,8 @@ test('provider policy preserves task tenancy and independent membership gates on
   await scopeSubtest(t, 'concurrent clicks commit one revision, one tombstone, and cancel old outbox work', async () => {
     const original=await inWorkspace(owner,()=>issueScopeActions.getIssue(issue))
     assert.ok('issue' in original && original.issue)
-    const results = await Promise.all([localFlip(issue),localFlip(issue)])
+    const revision = original.issue.revision
+    const results = await Promise.all([localFlip(issue, revision),localFlip(issue, revision)])
     assert.equal(results.filter(result=>'issue' in result).length,1)
     assert.equal(results.filter(result=>'error' in result && result.error==='issueStale').length,1)
     const saved = results.find(result=>'issue' in result)!
@@ -389,8 +377,8 @@ test('provider policy preserves task tenancy and independent membership gates on
     assert.equal(saved.issue.identifier,original.issue.identifier,'provider policy must retain the existing task identifier')
     assert.equal(readIssueMetadata(saved.issue.content).number,12)
     const row = (await pool.query('select scope,"workspaceId","linearSyncPolicy","scopeSetBy","scopeConfidence",revision from issues where id=$1',[issue])).rows[0]
-    assert.deepEqual(row,{scope:'workspace',workspaceId:workspace,linearSyncPolicy:'disabled',scopeSetBy:'user',scopeConfidence:null,revision:2})
-    assert.equal((await pool.query('select count(*)::int n from issue_versions where "issueId"=$1',[issue])).rows[0].n,2)
+    assert.deepEqual(row,{scope:'workspace',workspaceId:workspace,linearSyncPolicy:'disabled',scopeSetBy:'user',scopeConfidence:null,revision:revision+1})
+    assert.equal((await pool.query('select count(*)::int n from issue_versions where "issueId"=$1',[issue])).rows[0].n,revision+1)
     assert.equal((await pool.query('select count(*)::int n from linear_issue_detachments where "issueId"=$1',[issue])).rows[0].n,1)
     assert.equal((await pool.query('select count(*)::int n from linear_issue_links where "issueId"=$1',[issue])).rows[0].n,0)
     assert.equal((await pool.query('select count(*)::int n from linear_sync_outbox where "issueId"=$1 and operation=\'sync\' and status<>\'done\'',[issue])).rows[0].n,0)
@@ -400,7 +388,6 @@ test('provider policy preserves task tenancy and independent membership gates on
     assert.ok(await readRun(member,memberRun))
     assert.ok((await visibleRuns(member,{issueId:issue})).some(run=>run.id===memberRun))
     assert.ok(await verifyRunToken(new Request('http://127.0.0.1/'),memberToken))
-    assert.ok((await renewRunLeases(device,[memberRun])).leases[memberRun])
     const generation=(await pool.query('select "scopeVersion" from issues where id=$1',[issue])).rows[0].scopeVersion
     await setMembership(member,'suspended')
     try {
@@ -411,12 +398,8 @@ test('provider policy preserves task tenancy and independent membership gates on
       assert.ok(await readRun(owner,ownerRun))
       assert.equal(Boolean(await verifyRunToken(new Request('http://127.0.0.1/'),memberToken)),false)
       assert.ok(await verifyRunToken(new Request('http://127.0.0.1/'),ownerToken))
-      const renewal = await renewRunLeases(device,[memberRun])
-      assert.deepEqual(renewal.revoked,[memberRun])
-      assert.ok((await renewRunLeases(ownerDevice,[ownerRun])).leases[ownerRun])
-      const row = (await pool.query('select status,"leaseExpiresAt","stopRequestedAt","workspaceId" from agent_runs where id=$1',[memberRun])).rows[0]
-      assert.equal(row.status,'preparing'); assert.ok(row.stopRequestedAt);assert.equal(row.workspaceId,workspace)
-      assert.ok(new Date(row.leaseExpiresAt).getTime()<=Date.now())
+      // There is no lease renewal to revoke at (decision 2026-11-17-2215): the
+      // membership writer (lib/workspace-admin/members.ts) stops the runs it affects.
       const runCount=(await pool.query('select count(*)::int n from agent_runs where "issueId"=$1',[issue])).rows[0].n
       await assert.rejects(queueRun(member,{issueId:issue,agentId:agent,repo:'https://github.com/mikka-ci/scope-fixture.git',model:'fixture-model'}),/issueNotFound/)
       await assert.rejects(issueRunToken({id:memberRun,userId:member}))
@@ -429,7 +412,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     try {
       await withClaimServer(async origin=>{
         assert.equal((await fetch(`${origin}/claim`,{method:'POST'})).status,401)
-        const response=await fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`}})
+        const response=await fetch(`${origin}/claim`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`}})
         assert.equal(response.status,409)
         assert.equal((await response.text()).includes('prompt'),false)
       })
@@ -441,7 +424,6 @@ test('provider policy preserves task tenancy and independent membership gates on
       assert.equal(await issueForUser(owner,issue),null)
       assert.equal(await readRun(owner,ownerRun),null)
       assert.equal(Boolean(await verifyRunToken(new Request('http://127.0.0.1/'),ownerToken)),false)
-      assert.deepEqual((await renewRunLeases(ownerDevice,[ownerRun])).revoked,[ownerRun])
       await assert.rejects(issueRunToken({id:ownerRun,userId:owner}))
       assert.ok(await issueForUser(member,issue),'another active member keeps the shared task')
     } finally { await setMembership(owner,'active') }
@@ -531,7 +513,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     fixtureIds.push(id)
     await pool.query('insert into "user" (id,name,email,"emailVerified","createdAt","updatedAt") values ($1,\'Complete owner\',$2,true,now(),now())',[localOwner,`${localOwner}@example.invalid`])
     await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,\'Complete owner\',$3,\'member\',\'active\')',[workspace,localOwner,`${localOwner}@example.invalid`])
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Unlinked completion fixture\',$3,\'todo\',\'normal\',\'workspace\',$4,\'bound\',\'explicit\')',[id,localOwner,doc,workspace])
+    await registeredTask(pool, localOwner, workspace, id, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,\'Unlinked completion fixture\',$3,\'todo\',\'normal\',\'workspace\',$4,\'bound\',\'explicit\')',[id,localOwner,doc,workspace]))
     await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,localOwner])
     await pool.query('insert into agent_runs (id,"userId","issueId","agentId","deviceId",status) values ($1,$2,$3,$4,$5,\'running\')',[run,member,id,agent,device])
     const prepared=Promise.withResolvers<void>(),release=Promise.withResolvers<void>()
@@ -539,7 +521,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     const server=createServer(async(incoming,outgoing)=>{
       const chunks:Buffer[]=[];for await(const chunk of incoming) chunks.push(Buffer.from(chunk))
       const body=Buffer.concat(chunks).toString()
-      const request=new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{'x-mikka-client-version':incoming.headers['x-mikka-client-version']?.toString()??'',authorization:incoming.headers.authorization??''},body})
+      const request=new Request(`http://127.0.0.1${incoming.url}`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':incoming.headers['x-mikka-client-version']?.toString()??'',authorization:incoming.headers.authorization??''},body})
       request.json=async()=>{prepared.resolve();await release.promise;return JSON.parse(body)}
       try {const response=await withRequestContext(()=>complete.POST(request,{params:Promise.resolve({runId:run})}));outgoing.writeHead(response.status);outgoing.end(await response.text())}
       catch(error) {handlerErrors.push(error);outgoing.writeHead(500);outgoing.end('Completion failed')}
@@ -549,7 +531,7 @@ test('provider policy preserves task tenancy and independent membership gates on
     try {
       const origin=`http://127.0.0.1:${(server.address() as {port:number}).port}`
       const report={summary:'Synthetic verified completion',filesChanged:[],verify:{status:'passed'},openQuestions:[],nextStep:null}
-      responsePromise=fetch(`${origin}/complete`,{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,'content-type':'application/json'},body:JSON.stringify({stopReason:'submitted',report})})
+      responsePromise=fetch(`${origin}/complete`,{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`,'content-type':'application/json'},body:JSON.stringify({stopReason:'submitted',report})})
       await prepared.promise
       const changed=await inWorkspace(localOwner,()=>setIssueScope({id,revision:1,scope:'personal'}))
       assert.ok('issue' in changed)
@@ -639,7 +621,11 @@ test('provider policy preserves task tenancy and independent membership gates on
     const fixtureWorkspace=scope==='workspace'?workspace:await seedFixtureWorkspace(pool,issueOwner)
     if(withIssue) {
       fixtureIds.push(id)
-      await pool.query(`insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,'Completion fixture',$3,'todo','normal',$4,$5,'bound',$6)`,[id,issueOwner,doc,scope,fixtureWorkspace,scope==='workspace'?'explicit':'disabled'])
+      await registeredTask(pool, issueOwner, fixtureWorkspace, id, client => client.query(`insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState","linearSyncPolicy") values ($1,$2,'Completion fixture',$3,'todo','normal',$4,$5,'bound',$6)`,[id,issueOwner,doc,scope,fixtureWorkspace,scope==='workspace'?'explicit':'disabled']))
+      // A real task has a creation revision. Later changes to synchronization with the same status
+      // must compare against that original version, so only an actual human status transition blocks review.
+      await pool.query(`insert into issue_versions (id,"issueId","userId",revision,title,content,status,priority,actor_type,actor_id)
+        select $2,id,"userId",revision,title,content,status,priority,'user',"userId" from issues where id=$1`, [id,randomUUID()])
       if(withTeam && scope==='workspace') await pool.query('insert into mikka_team_issues ("issueId","teamId","workspaceId","userId") values ($1,$2,$3,$4)',[id,team,workspace,issueOwner])
     }
     await pool.query(`insert into agent_runs (id,"userId","issueId","workspaceId","agentId","deviceId",status,kind,"leaseExpiresAt") values ($1,$2,$3,$4,$5,$6,'running',$7,$8)`,[run,actor,withIssue?id:null,fixtureWorkspace,actor===owner?ownerAgent:agent,actor===owner?ownerDevice:device,kind,new Date(Date.now()+RUN_LEASE_MS)])
@@ -834,12 +820,20 @@ test('provider policy preserves task tenancy and independent membership gates on
       }
       await locker.query('commit')
       const completed=await finishing;assert.ok(completed)
-      assert.ok('issue' in await privatizing)
+      // Completing the run commits review as a task revision. A concurrent edit that observed revision 1
+      // must be rejected before the owner can retire synchronization on the fresh revision.
+      assert.deepEqual(await privatizing, { error: 'issueStale' })
+      const observed = await inWorkspace(member, () => previewIssuePersonalScope(fixture.id))
+      assert.ok('preview' in observed && observed.preview)
+      const retired = await inWorkspace(member, () => confirmIssuePersonalScope({
+        id: fixture.id, revision: observed.preview.revision, confirmation: observed.preview.confirmation,
+      }))
+      assert.ok('issue' in retired && retired.issue)
       assert.equal((await pool.query('select status from agent_runs where id=$1',[fixture.run])).rows[0].status,'succeeded')
       assert.deepEqual((await pool.query('select status,scope from issues where id=$1',[fixture.id])).rows[0],{status:'review',scope:'workspace'})
       let dispatched=0
       assert.equal(await dispatchCompletedIssue(completed,()=>{dispatched++}),false)
-      assert.ok('issue' in await promoteExistingIssueForUser(member,{requestId:randomUUID(),issueId:fixture.id,revision:2,teamId:team,expectedTeamId:team}))
+      assert.ok('issue' in await promoteExistingIssueForUser(member,{requestId:randomUUID(),issueId:fixture.id,revision:retired.issue.revision,teamId:team,expectedTeamId:team}))
       await pool.query('update issues set status=\'doing\' where id=$1',[fixture.id])
       assert.equal(await dispatchCompletedIssue(completed,()=>{dispatched++}),false)
       assert.equal(dispatched,0)
@@ -864,7 +858,7 @@ test('provider policy preserves task tenancy and independent membership gates on
       assert.equal(Boolean(await verifyRunToken(new Request('http://127.0.0.1/'),token)),false)
       assert.equal(await completeRunForDevice(control.actor,{id:fixture.run,issueId:fixture.id},{stopReason:'error'}),null)
       assert.equal((await pool.query('select count(*)::int n from coordinator_events where "runId"=$1',[fixture.run])).rows[0].n,1)
-      if(control.actor===member) assert.equal((await complete.POST(new Request('http://127.0.0.1/complete',{method:'POST',headers:{'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`},body:'invalid-json'}),{params:Promise.resolve({runId:fixture.run})})).status,204)
+      if(control.actor===member) assert.equal((await complete.POST(new Request('http://127.0.0.1/complete',{method:'POST',headers:{'x-mikka-device-session': '1', 'x-mikka-client-version':'0.0.456',authorization:`Bearer ${deviceToken}`},body:'invalid-json'}),{params:Promise.resolve({runId:fixture.run})})).status,204)
     }
     const orphan=await completionFixture(owner,owner,'personal','implement',false)
     const completed=await completeRunForDevice(owner,{id:orphan.run,issueId:null},{stopReason:'error'})
@@ -1148,7 +1142,7 @@ test('provider policy preserves task tenancy and independent membership gates on
   })
   await scopeSubtest(t, 'no verified Linear target means promotion, editing, old claims and manual retry cannot publish',async()=>{
     const id=randomUUID();fixtureIds.push(id)
-    await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values ($1,$2,\'Explicit team control\',$3,\'todo\',\'normal\',\'personal\',$4,\'bound\')',[id,owner,doc,workspace])
+    await registeredTask(pool, owner, workspace, id, client => client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId","ownershipState") values ($1,$2,\'Explicit team control\',$3,\'todo\',\'normal\',\'personal\',$4,\'bound\')',[id,owner,doc,workspace]))
     const before=provider.requests.length
     assert.deepEqual(await action(()=>setIssueScope({id,revision:1,scope:'workspace'})),{error:'issueScopeTeamRequired'})
     const result=await promoteExistingIssueForUser(owner,{requestId:randomUUID(),issueId:id,revision:1,teamId:team,expectedTeamId:null})

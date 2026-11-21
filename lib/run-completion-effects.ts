@@ -144,15 +144,33 @@ export async function reconcileFactoryAfterCompletion(db: Queryable, userId: str
   return reconciled
 }
 
+/** Only a committed terminal receipt can wake the next owner message. */
+export async function wakeThreadDelivery(userId: string, runId: string) {
+  const { pool } = await import('./db')
+  const { deliverQueuedThreadReply } = await import('./thread-delivery-queue')
+  try { await deliverQueuedThreadReply(pool, userId, runId) }
+  catch { console.warn('Queued thread reply could not be delivered', { runId }) }
+}
+
 /** Shared after-commit hook for every path that ends a run outside the daemon
  * completion transaction (claim rejection, lease loss/retry, stop request).
- * Call only after the ending write committed. Default-off and never throws. */
+ * Call after commit. The review lease follows the run even when Factory is off. */
 export async function afterRunEnded(userId: string, runId: string, reconcileFor: FactoryReconcileFor = defaultReconcileFor) {
   // An ended run is due for its outcome, and its task machine for parking, now (#1212).
   armDueTimerSoon('run-recovery')
-  if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
+  await wakeThreadDelivery(userId, runId)
   try {
     const { pool } = await import('./db')
+    // Normal native completion retains a review lease; stop/lost scope must
+    // close it even when Factory is disabled. A failed close stays due.
+    try {
+      const { reconcileReviewSessions } = await import('./coding-workspace/review-sessions')
+      await reconcileReviewSessions(pool, { runIds: [runId] })
+    } catch {
+      armDueTimerSoon('run-recovery')
+      console.warn('Run review close deferred', { code: 'review_close_unacknowledged' })
+    }
+    if (!deploymentSwitch('factoryRouting') || !deploymentSwitch('factoryLifecycle')) return 0
     return await reconcileFactoryAfterCompletion(pool, userId, runId, reconcileFor)
   } catch (error) {
     console.warn('factory run-end reconcile deferred to Coordinator fallback', { runId, error: error instanceof Error ? error.constructor.name : typeof error })

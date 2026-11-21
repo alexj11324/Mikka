@@ -1,21 +1,23 @@
 import 'server-only'
 import { deploymentSwitch } from '@/lib/deployment-switches'
 import { cloudComputerRunsEnabled } from '@/lib/cloud-computer-flag'
-import { freezeHostedModelSelection, resolveFrozenHostedModel } from '@/lib/subscription-model-snapshot'
+import { freezeHostedModelSelection } from '@/lib/subscription-model-snapshot'
 import { authorizeSubscriptionWorkspace, subscriptionRuntime } from '@/lib/subscription-runtime'
-import { generateText, streamText, isStepCount } from 'ai'
+import {asSchema} from 'ai'
+import {makeSnapshot} from './definition'
+import {createEvaluationBinding,type EvaluationPlan} from '../eve/evaluation-store'
+import {runEveEvaluation} from '../eve/evaluation-client'
+import {assertEveScope} from '../eve/scope'
 import { createCoordinatorRegistry } from '@/workflows/coordinator/tools'
 import { COORDINATOR_MODEL } from '@/lib/coordinator/model'
 import { COORDINATOR_INSTRUCTIONS } from '@/lib/coordinator/instructions'
 import { botInstructions } from '@/lib/coordinator/bot-instructions'
 import { executionInstructions, executionHostInstructions } from './execution-instructions'
-import { CORE_EVAL_CASES, runEvalSuite, compareReports, type EvalCase, type EvalTrace, type ToolObservation } from './evals'
-import { evaluationTools } from './eval-fixtures'
+import { CORE_EVAL_CASES, runEvalSuite, compareReports, type EvalCase, type EvalTrace } from './evals'
 import { judgeLiveTrace } from './semantic-judge'
 import { caseFromFailure } from './improvement'
 import { selectRegisteredTools } from './registry'
 import { AgentKitError, type AgentKitStore, type AgentScope } from './store'
-import { completedEvaluationReply } from './eval-generation'
 
 /** Live means real inference with synthetic, inert tools, not real-account or native-CLI acceptance. */
 export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, proposalId: string, requestId: string, mode: 'fixture' | 'live') {
@@ -30,28 +32,27 @@ export async function evaluateProposal(store: AgentKitStore, scope: AgentScope, 
   if (job.replayed) return { ...job.evaluation,replayed:true }
   const cases = [...CORE_EVAL_CASES,...job.evidence.slice(0,3).map(caseFromFailure)]
   try {
-    // Same host path as the AI SDK Coordinator, captured once for both revisions.
-    // This hosted-model comparison is still not native CC/Codex acceptance.
+    // Eve owns each isolated evaluation session and its model/tool loop.
+    // Product comparison and activation still use the same frozen model grant.
     const run = async (testCase: EvalCase, definition: typeof job.baseline.definition, signal: AbortSignal): Promise<EvalTrace> => {
       if (mode === 'fixture') {
         // Plumbing smoke test only; the activation gate always rejects fixture reports.
         return { text:testCase.expectedOutcome === 'answered' ? `Fixture response: ${testCase.mustMention.join(' ')}` : testCase.expectedOutcome === 'blocked' ? 'Cannot complete this task without the missing prerequisite.' : 'Awaiting approval.',outcome:testCase.expectedOutcome,tools:testCase.requiredTools.map(name => ({ name,outcome:testCase.expectedOutcome === 'blocked' ? 'error' : testCase.expectedOutcome === 'approval_required' ? 'approval_pending' : 'ok',authorized:false,effectPerformed:false })) }
       }
-      const observations: ToolObservation[] = []
-      const registry = selectRegisteredTools(createCoordinatorRegistry(scope.ownerId,botId,undefined,{ coordinator,computerEnabled:cloudComputerRunsEnabled() }),definition.tools)
-      const tools = evaluationTools(registry,testCase,observations,definition)
       if (!job.execution) throw new AgentKitError('agentEvaluationSnapshotMissing')
-      const frozenRuntime = job.execution.snapshot.runtime
-      const resolvedModel = await resolveFrozenHostedModel(scope,frozenRuntime,dependencies,signal)
-      let failed=false
-      const options = {
-        model:resolvedModel,
-        instructions:executionInstructions({ ...job.execution.snapshot, definition }) + '\n\nEvaluation response format: end with only JSON {"text":"your grounded answer","outcome":"answered|blocked|approval_required"}. Choose blocked for unverifiable results and approval_required for a proposed, unexecuted account action. All tools are inert evaluation fixtures.',
-        prompt:testCase.input,tools,stopWhen:isStepCount(5),abortSignal:signal,maxOutputTokens:1400,maxRetries:0,onError:()=>{failed=true},
+      const version=definition===job.baseline.definition?job.baseline:job.candidate
+      const snapshot=makeSnapshot(version.id,version.version,definition,job.execution.snapshot.hostInstructions,job.execution.snapshot.runtime)
+      const registry=selectRegisteredTools(createCoordinatorRegistry(scope.ownerId,botId,undefined,{coordinator,computerEnabled:cloudComputerRunsEnabled()}),definition.tools)
+      const plan:EvaluationPlan={scope,snapshot,testCase,
+        instructions:executionInstructions(snapshot)+'\n\nEvaluation response format: return JSON {"text":"your grounded answer","outcome":"answered|blocked|approval_required"}. Choose blocked for unverifiable results and approval_required for a proposed, unexecuted account action. All tools are inert evaluation fixtures.',
+        tools:await Promise.all(Object.entries(registry).map(async([name,tool])=>({name,description:typeof tool.description==='string'?tool.description:name,inputSchema:await asSchema(tool.inputSchema).jsonSchema as Record<string,unknown>}))),
       }
-      const result = frozenRuntime.modelSelection ? streamText(options) : await generateText(options)
-      const reply = await completedEvaluationReply(result,signal,()=>failed)
-      return { ...reply,tools:observations }
+      const {pool}=await import('../db')
+      const bot=(await pool.query<{workspaceId:string}>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2',[botId,scope.ownerId])).rows[0]
+      if(!bot)throw new AgentKitError('agentScopeNotFound',404)
+      const eveScope=await assertEveScope({ownerId:scope.ownerId,botId,workspaceId:bot.workspaceId,surface:'web'})
+      const bindingId=await createEvaluationBinding(pool,eveScope,job.evaluation.id,version.id,plan)
+      return await runEveEvaluation(eveScope,bindingId,plan,signal)
     }
     const judge: typeof judgeLiveTrace = async (input, signal) => {
       const [{ hostedBillingScope }, { executionWorkspace }] = await Promise.all([import('../abuse/context'), import('../execution-settings')])

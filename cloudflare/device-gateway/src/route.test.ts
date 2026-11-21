@@ -96,3 +96,19 @@ test('a refused status request does not create or wake a Durable Object', async 
   const response = await handleRequest(new Request(`https://gateway.test/v1/devices/${deviceId}/status`), gateway)
   assert.equal(response.status, 401)
 })
+
+test('malformed percent-encoded device IDs return 400 before waking a Durable Object', async () => {
+  const gateway: GatewayEnv = {
+    GATEWAY_PUSH_SECRET: secret,
+    DEVICE_SESSION: { getByName: () => { throw new Error('invalid device ID reached a session') } },
+  }
+  for (const encoded of ['%', '%FF', '%E0%A4%A', '%2F']) {
+    for (const path of ['status', 'push', 'socket']) {
+      const response = await handleRequest(new Request(`https://gateway.test/v1/devices/${encoded}/${path}`, {
+        method: path === 'push' ? 'POST' : 'GET',
+        headers: { authorization: `Bearer ${secret}`, upgrade: 'websocket' },
+      }), gateway)
+      assert.equal(response.status, 400, `${encoded} / ${path} must be rejected without a session`)
+    }
+  }
+})

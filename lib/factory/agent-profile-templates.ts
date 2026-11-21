@@ -77,7 +77,7 @@ export function agentProfileTemplateDefinition(id: AgentProfileTemplateId, copy:
   if (!template) throw new Error('agentProfileTemplateUnknown')
   return {
     name: copy.name.slice(0, 80), description: copy.description.slice(0, 600),
-    roles: [...template.roles], enabled: true, harness: 'auto', model: { mode: 'inherit' },
+    roles: [], enabled: true, harness: 'auto', model: { mode: 'inherit' },
     instructions: template.instructions, skills: [...template.skills],
   }
 }

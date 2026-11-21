@@ -1,27 +1,28 @@
 import assert from 'node:assert/strict'
 import { createHash, generateKeyPairSync, randomBytes, randomUUID, sign } from 'node:crypto'
-import test, { mock } from 'node:test'
+import test from 'node:test'
 import { Pool } from 'pg'
 import { dbUrl, seedWorkspace } from './support/workspace-admin-db'
 import { TestAccountPool } from '../scripts/test-accounts/pool.mjs'
 import { authAppleOptions, requireAppleSignInNonce } from '../lib/auth-config'
 import { SESSION_OPTIONS } from '../lib/fresh-session'
 import { DESKTOP_SESSION_CACHE_HEADER, desktopSessionCacheAfter, validDesktopSessionCache } from '../lib/desktop-rpc/session-cache'
+import { createRequestScope, runRequestScope } from '../apps/api/src/context'
 
-// Real Better Auth and PostgreSQL. Next's cookie store and Apple's public-key
-// endpoint are fixture IO; Apple tokens are signed locally.
+// Real Better Auth and PostgreSQL. Apple's public-key endpoint is fixture IO;
+// Apple tokens are signed locally. Requests run through the production
+// boundary — a request scope whose cookie journal commits to the response — so
+// the cookie plugin is exercised exactly as it runs in the application.
 test('authentication writes tenant-bound durable intent and withholds every new credential when audit fails', { skip: !dbUrl }, async t => {
   const database = new Pool({ connectionString: dbUrl, max: 5 })
   assert.ok((await database.query("SELECT to_regclass('workspace_audit_outbox') AS name")).rows[0].name, 'tracked workspace migrations must be applied by normal setup')
-  const cookieWrites: unknown[] = []
-  mock.module('next/headers.js', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ set: (...args: unknown[]) => cookieWrites.push(args) }) } })
-  const [{ betterAuth }, { createAuthMiddleware }, { nextCookies }, { auditAuthentication }, { deliverWorkspaceAudits }, { pool }, { workspacePool }] = await Promise.all([
-    import('better-auth'), import('better-auth/api'), import('better-auth/next-js'), import('../lib/audit/authentication'), import('../lib/audit/delivery'), import('../lib/db'), import('../lib/workspace-db'),
+  const [{ betterAuth }, { createAuthMiddleware }, { mikkaCookies }, { auditAuthentication }, { deliverWorkspaceAudits }, { pool }, { workspacePool }] = await Promise.all([
+    import('better-auth'), import('better-auth/api'), import('../lib/auth-cookies'), import('../lib/audit/authentication'), import('../lib/audit/delivery'), import('../lib/db'), import('../lib/workspace-db'),
   ])
   const origin = 'http://localhost:3187', password = `fixture-${randomBytes(20).toString('hex')}`, email = `audit-login-${randomUUID()}@example.invalid`
   const auth = betterAuth({ baseURL: origin, basePath: '/mikka/api/auth', database, secret: randomBytes(32).toString('hex'),
     socialProviders: { apple: authAppleOptions({ MIKKA_EDITION: 'cloud' })! },
-    emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, plugins: [nextCookies()],
+    emailAndPassword: { enabled: true }, trustedOrigins: [origin], logger: { disabled: true }, plugins: [mikkaCookies()],
     session: SESSION_OPTIONS,
     hooks: { before: createAuthMiddleware(async ctx => { requireAppleSignInNonce(ctx) }), after: createAuthMiddleware(async ctx => { await auditAuthentication(ctx); desktopSessionCacheAfter(ctx) }) },
   })
@@ -48,7 +49,18 @@ test('authentication writes tenant-bound durable intent and withholds every new 
       return await deliverWorkspaceAudits({ main: database, workspace: database })
     } finally { await holder.query('ROLLBACK'); holder.release() }
   }
-  const post = (body: unknown) => auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/email`, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'x-mikka-client': 'desktop' }, body: JSON.stringify(body) }))
+  // The transport boundary from apps/api/src/application.ts: the handler runs
+  // inside a request scope, then its cookie journal is committed.
+  const send = (request: Request) => {
+    const scope = createRequestScope(request)
+    return runRequestScope(scope, async () => {
+      const response = await auth.handler(request)
+      const headers = new Headers(response.headers)
+      scope.cookies.commit(headers)
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers })
+    })
+  }
+  const post = (body: unknown) => send(new Request(`${origin}/mikka/api/auth/sign-in/email`, { method: 'POST', headers: { origin, 'content-type': 'application/json', 'x-mikka-client': 'desktop' }, body: JSON.stringify(body) }))
   await t.test('wrong passwords name an attempted subject, never a forged authenticated actor or client-selected tenant', async () => {
     const denied = await post({ email, password: 'wrong-fixture-password', userId: 'forged-actor', workspaceId: workspaces[2] })
     assert.equal(denied.status, 401)
@@ -88,7 +100,7 @@ test('authentication writes tenant-bound durable intent and withholds every new 
     const sink = (await database.query('SELECT id FROM workspace_audit_events WHERE id=ANY($1::uuid[])', [own])).rows
     assert.equal(sink.length, 4)
   })
-  await t.test('actual Better Auth HTTP and nextCookies API paths publish no credential on an outbox error', async () => {
+  await t.test('actual Better Auth HTTP and cookie-plugin API paths publish no credential on an outbox error', async () => {
     const name = `auth_audit_source_${randomUUID().replaceAll('-', '')}`
     const sessions = () => database.query('SELECT count(*)::int AS n FROM session WHERE "userId"=$1', [userId]).then(result => result.rows[0].n)
     const before = await sessions(), oldEvents = (await events()).length, logs: unknown[] = [], original = console.error
@@ -99,9 +111,11 @@ test('authentication writes tenant-bound durable intent and withholds every new 
       assert.equal(response.headers.getSetCookie().length, 0)
       assert.equal(response.headers.has(DESKTOP_SESSION_CACHE_HEADER), false, 'withheld sign-in must not expose a reusable native proof')
       const body = await response.json(); assert.equal(body.code, 'AUTH_AUDIT_UNAVAILABLE'); assert.equal(Object.hasOwn(body, 'token'), false)
-      cookieWrites.length = 0
-      await assert.rejects(auth.api.signInEmail({ body: { email, password }, headers: new Headers({ origin }) }), { statusCode: 503 })
-      assert.equal(cookieWrites.length, 0)
+      const refused = createRequestScope(new Request(`${origin}/mikka/api/auth/sign-in/email`, { method: 'POST', headers: { origin } }))
+      await assert.rejects(runRequestScope(refused, () => auth.api.signInEmail({ body: { email, password }, headers: refused.headers })), { statusCode: 503 })
+      const refusedCookies = new Headers()
+      refused.cookies.commit(refusedCookies)
+      assert.deepEqual(refusedCookies.getSetCookie(), [], 'a refused sign-in writes no session cookie')
       assert.equal(await sessions(), before); assert.equal((await events()).length, oldEvents)
       // Refused authentication keeps the same response during an audit outage.
       assert.equal((await post({ email, password: 'wrong-fixture-password' })).status, 401)
@@ -149,7 +163,7 @@ test('authentication writes tenant-bound durable intent and withholds every new 
       iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 300 })).toString('base64url')
     const unsigned = `${header}.${payload}`
     const token = `${unsigned}.${sign('RSA-SHA256', Buffer.from(unsigned), privateKey).toString('base64url')}`
-    const postNative = () => auth.handler(new Request(`${origin}/mikka/api/auth/sign-in/social`, {
+    const postNative = () => send(new Request(`${origin}/mikka/api/auth/sign-in/social`, {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-skip-oauth-proxy': 'true' },
       body: JSON.stringify({ provider: 'apple', idToken: { token, nonce } }),
     }))
@@ -169,7 +183,6 @@ test('authentication writes tenant-bound durable intent and withholds every new 
     const beforeSessions = await sessions(), beforeFailure = (await events()).length
     await database.query(`ALTER TABLE workspace_audit_outbox ADD CONSTRAINT ${name} CHECK("workspaceId"<>'${workspaces[0]}'::uuid) NOT VALID`)
     try {
-      cookieWrites.length = 0
       const denied = await postNative()
       assert.equal(denied.status, 503)
       const withheld = await denied.json()
@@ -177,7 +190,7 @@ test('authentication writes tenant-bound durable intent and withholds every new 
       assert.equal(Object.hasOwn(withheld, 'token'), false)
       assert.equal(denied.headers.getSetCookie().length, 0)
       assert.equal(denied.headers.has(DESKTOP_SESSION_CACHE_HEADER), false)
-      assert.equal(cookieWrites.length, 0)
+      assert.deepEqual(denied.headers.getSetCookie(), [], 'a refused native sign-in writes no session cookie')
       assert.equal(await sessions(), beforeSessions)
       assert.equal((await events()).length, beforeFailure)
     } finally { await database.query(`ALTER TABLE workspace_audit_outbox DROP CONSTRAINT ${name}`) }

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -87,7 +87,7 @@ export function CloudSettings({ personal = false, userKey, workspaceId }: { pers
         </NativeSelect></SettingRow>
         <SettingRow title={t('serverKey')}>
           <div className="flex w-full items-center gap-2">
-            <Input type="password" autoComplete="off" aria-label={t('serverKey')} value={serverKey} onChange={event => setServerKey(event.target.value)} disabled={pending} />
+            <Input className="h-(--control-sm)" type="password" autoComplete="off" aria-label={t('serverKey')} value={serverKey} onChange={event => setServerKey(event.target.value)} disabled={pending} />
             <Button variant="secondary" size="sm" disabled={pending || !serverKey.trim()} onClick={() => void write('connect', { action: 'key', key: serverKey.trim() })}>{t('save')}</Button>
           </div>
         </SettingRow>

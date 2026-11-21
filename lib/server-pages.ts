@@ -3,10 +3,14 @@
  * to bypass the existing API, session or workspace authorization. */
 export type ServerPageKind = 'authentication' | 'github'
 
+export function isInvitationPath(path: string): boolean {
+  return /^\/(?:invite|organization-invite)\/[a-f0-9]{64}$/.test(path)
+}
+
 export function serverPageKind(url: URL): ServerPageKind | null {
   const path = url.pathname.replace(/^\/mikka(?=\/|$)/, '').replace(/^\/(?:en|zh-CN)(?=\/|$)/, '') || '/'
   if (['/sign-in', '/sign-up', '/forgot-password', '/reset-password', '/verify-email', '/device', '/oauth/consent', '/workspaces/new'].includes(path)
-    || /^\/invite\/[a-f0-9]{64}$/.test(path) || /^\/a\/[^/]+$/.test(path)
+    || isInvitationPath(path) || /^\/a\/[^/]+$/.test(path)
     || /^\/w\/[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(path)) return 'authentication'
   if (path !== '/' || url.searchParams.get('section') !== 'plugins' || url.searchParams.get('app') !== 'github') return null
   const keys = [...url.searchParams.keys()]
@@ -21,7 +25,7 @@ export function serverPageKind(url: URL): ServerPageKind | null {
 /** Only a document served by the local backend sets this marker. A selected
  * remote server's discovery/bootstrap can never put the official app into it;
  * desktop/iOS documents do not carry the marker either. */
-export function serverDocumentKind(): ServerPageKind | null {
+export function serverDocumentKind(): ServerPageKind | 'status' | null {
   const kind = typeof document === 'undefined' ? undefined : document.documentElement?.dataset.mikkaServerPage
-  return kind === 'authentication' || kind === 'github' ? kind : null
+  return kind === 'authentication' || kind === 'github' || kind === 'status' ? kind : null
 }

@@ -9,8 +9,6 @@ import { requestDevicePolicyIssuer } from '@/lib/agent-tool-approval/local-cloud
 import { signedPolicySnapshotSchema } from '@mikka/protocol/policy-snapshot'
 import { verifyPolicySnapshot } from '@mikka/protocol/node-policy-snapshot'
 
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
 const headers = {'cache-control':'no-store'}
 async function handle(request: Request, {params}: {params:Promise<{runId:string}>}) {
   const caller = await authenticateDevice(request)

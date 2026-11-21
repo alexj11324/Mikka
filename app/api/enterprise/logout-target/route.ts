@@ -4,7 +4,6 @@ import { governanceResponse } from '@/lib/governance/http'
 import { organizationAccountSession } from '@/lib/enterprise/http'
 import { enterpriseLogoutTarget } from '@/lib/enterprise/logout-target'
 
-export const runtime = 'nodejs'
 
 export const GET = freshSessionRoute(async (request: Request) => governanceResponse(async () => {
   const session = await organizationAccountSession(request)

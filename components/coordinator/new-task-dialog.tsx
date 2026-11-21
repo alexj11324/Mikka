@@ -1,283 +1,233 @@
 'use client'
 
-import { useEffect, useRef, useState, useId } from 'react'
-import { useTranslations } from 'next-intl'
-import useSWR, { useSWRConfig } from 'swr'
+import { useEffect, useRef, useState } from 'react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import useSWR from 'swr'
 import { toast } from 'sonner'
-import { ChevronRight, KeyRound, Laptop, Paperclip } from 'lucide-react'
-import { listDevices } from '@/app/actions/agents'
 import { listBots } from '@/app/actions/bots'
-import { issueCreationAvailable } from '@/app/actions/coordinator'
-import { useCoordinatorSubmit } from './use-coordinator-submit'
-import type { TaskDestination } from '@/lib/task-destination'
-import { TEXT_ATTACHMENT_ACCEPT, textAttachment } from '@/lib/text-attachment'
-import { Alert, AlertTitle } from '@/components/ui/alert'
+import { getNewTaskOptions } from '@/app/actions/issue-metadata'
+import { useActionError } from '@/lib/use-action-error'
+import { backlogTaskDraft } from '@/lib/task-create-form'
+import { TASK_TITLE_MAX } from '@/lib/task-title-input'
+import type { CreateAccess, CreateAssignee } from '@/lib/task-create-command'
+import type { IssueLabel } from '@/lib/issue-metadata'
+import { TEXT_ATTACHMENT_ACCEPT } from '@/lib/text-attachment'
+import { TASK_FILE_MAX_BYTES, TASK_FILE_MAX_COUNT } from '@/lib/task-attachments/contract'
+import { withBasePath } from '@/lib/base-path'
+import { dueDatePresets } from '@/lib/task-due-presets'
+import { AccessChangeDialog } from '@/components/workspace/issue-metadata-controls'
+import { ISSUE_PRIORITIES, ISSUE_STATUSES, type IssueStatus } from '@/components/workspace/issue-properties'
+import { TaskStatusIcon, useTaskStatusLabel } from '@/components/workspace/task-state-icon'
+import { PriorityIcon } from '@/components/workspace/priority-icon'
+import { PersonAvatar } from '@/components/person-avatar'
+import { BotAvatar } from '@/components/nav/bot-avatar'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
-import { useTaskWorkspace } from '@/hooks/use-task-workspace'
-import { TaskWorkspace } from '@ui-slot/task-workspace'
-import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
-import { DeviceIcon } from '@/components/devices/device-icon'
-import { useComputer } from '@/hooks/use-computer'
-import { cn } from '@/lib/utils'
-import { machineDot, type PickerMachine } from '@/lib/machine-picker'
-import { defaultTaskMachine, pickedTaskDestination, taskMachineUsable } from '@/lib/new-task-placement'
-import { settingsRead } from '@/lib/settings-read'
-import type { getModelOrder } from '@/app/actions/model-order'
-import { E2BKeyDialog, useOwnE2BKey } from '@/components/settings/e2b-key-dialog'
-import { usePresence } from '@/lib/use-presence'
-import { BotAvatar, CoordinatorAvatar } from '@/components/nav/bot-avatar'
 import { newTaskBotChoices } from '@/lib/new-task-bot'
-import { useOpenerFocus } from '@/hooks/use-focus-return'
-import { useChatFiles } from '@/components/chat/use-chat-files'
-import { ChatFileCards } from '@/components/chat/chat-file-cards'
-import { CHAT_FILE_ACCEPT } from '@mikka/protocol/chat-attachments'
-import { taskProfileSelectable, useAgentProfiles } from '@/components/settings/factory-profiles-data'
-import { TaskProfileNotice, TaskProfilePicker, useTaskProfileChoices } from './task-profile-picker'
-import * as newTaskSlot from '@ui-slot/new-task'
-import type { NewTaskMachine } from '@/components/slots/new-task-contract'
+import { usePersonalProjectPicker } from './personal-project-picker'
+import { useTaskDictation } from './use-task-dictation'
+import { NewTask } from '@ui-slot/new-task'
+import { TaskWorkspace } from '@ui-slot/task-workspace'
+import { useTaskWorkspace } from '@/hooks/use-task-workspace'
+import type { NewTaskProps } from '@/components/slots/new-task-contract'
 
 const MAX_LENGTH = 8000
 /** The task's short title column. */
-const TITLE_MAX = 60
+const TITLE_MAX = TASK_TITLE_MAX
 
-type Machine = PickerMachine & { label: string; status?: string }
+type Priority = (typeof ISSUE_PRIORITIES)[number]['value']
 
-/** A machine's icon with its state dot (`machineDot`), and the state in words for screen readers. */
-function MachineIcon({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
-  const t = useTranslations('Shell.newTaskDialog')
-  const tStatus = useTranslations('Computer.status')
-  const e2b = useTranslations('Settings.secrets.e2b')
-  const { data: state } = useComputer(machine.cloud && machine.usable ? cloudBotId : null)
-  const dot = machineDot(machine, state)
-  if (machine.cloud) return <DeviceIcon kind="cloud" state={dot} label={!machine.usable ? `E2B API Key ${e2b('missing')}` : state ? tStatus(state.machine === 'error' ? 'failed' : state.machine) : t('cloud')} />
-  return <DeviceIcon kind="personal" state={dot} label={machine.status ?? (machine.usable ? t('online') : t('offline'))} />
-}
-
-function MachineLabel({ machine, cloudBotId }: { machine: Machine; cloudBotId: string | undefined }) {
-  const t = useTranslations('Shell.newTaskDialog')
-  return <><MachineIcon machine={machine} cloudBotId={cloudBotId} /><span className={cn('min-w-0 flex-1 truncate pr-3', !machine.usable && 'text-muted-foreground')}>{machine.label}</span>
-    {machine.cloud && !machine.usable && <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><KeyRound aria-hidden="true" className="size-3" />{t('addE2BKey')}</span>}
-    {!machine.cloud && !machine.usable && machine.status && <span className="shrink-0 text-xs text-muted-foreground">{machine.status}</span>}</>
+/** The picked Assignee choice's `value` (`user:<id>` / `bot:<id>`) as the create command carries it. */
+function assigneeOf(value: string | null): CreateAssignee | null {
+  const [kind, ...rest] = value?.split(':') ?? []
+  const id = rest.join(':')
+  return (kind === 'user' || kind === 'bot') && id ? { kind, id } : null
 }
 
 /**
- * 新建任务 the Comma way: say what needs doing in a sentence, on which machine and
- * for which bot, and that bot (the Coordinator by default) turns it into the task (title, status, assignee…). The
- * request goes into the Coordinator conversation, where its reply shows up. A UI layer's new-task slot draws the
- * window instead (docs/ui-overlay.md); the data, state and sending stay here.
+ * 新建任务, Capy's way (decision 2026-11-19-2110): the window only registers a task, with its title, description,
+ * Status, Priority, Assignee, Due date, Labels, Access, files and 语音; nothing is dispatched. Assigning a Bot wakes it
+ * in its own chat and the Bot decides whether to start work; a person starts work themselves from the task's Start work.
+ * A UI layer's new-task slot draws the window (docs/ui-overlay.md); the data, state and sending stay here.
  */
-export function NewTaskDialog({ open, onOpenChange, onSent, project, workspaceId, initialText = '' }: {
+export function NewTaskDialog({ open, onOpenChange, project: pageProject, projectId: pageProjectId, readerId, workspaceId, teamId, onCreated, onAdded, initialBotId, initialText = '' }: {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSent?: () => void
+  onCreated?: (taskId: string) => void
+  /** 继续新建: a task was created and the window stays; the page re-reads the task lists it shows (onCreated is not called). */
+  onAdded?: () => void
+  /** Opened from a Bot's chat: the task is assigned to that Bot, which wakes it. */
+  initialBotId?: string
   /** Project page the request came from. */
   project?: string | null
+  projectId?: string
+  readerId?: string
   workspaceId?: string
+  teamId?: string
   /** Keys typed before the dialog finished opening. */
   initialText?: string
 }) {
   const t = useTranslations('Shell.newTaskDialog')
-  const tShell = useTranslations('Shell')
-  const tDevices = useTranslations('Devices')
   const tCommon = useTranslations('Common')
-  const locationT = useTranslations('Settings.modelOrder')
-  const { submit: submitMessage, failureMessage } = useCoordinatorSubmit()
-  const { mutate } = useSWRConfig()
+  const tIssue = useTranslations('Issue')
+  const projectPicker = usePersonalProjectPicker(open && !pageProjectId ? readerId : undefined, workspaceId)
+  const projectId = pageProjectId ?? projectPicker.project?.id
+  const project = pageProjectId ? pageProject : projectPicker.project?.name
+  const tBoard = useTranslations('Shell.board')
+  const actionError = useActionError()
+  const pending = useRef(false)
+  const createRequests = useRef(new Map<string, string>())
   const [draft, setDraft] = useState('')
-  // 标题 (optional): written by the person, the task gets exactly it; empty, the Bot writes one.
+  // 标题: required (Create only stays disabled without it); the task gets exactly what the person wrote.
   const [title, setTitle] = useState('')
-  const descriptionRef = useRef<HTMLTextAreaElement>(null)
   const [sending, setSending] = useState(false)
-  const [picked, setPicked] = useState<string | null>(null)
-  const profiles = useAgentProfiles(workspaceId, open, picked ? picked === 'cloud' ? { location: 'cloud' } : { location: 'local', deviceId: picked } : undefined)
-  const [profilePick, setProfilePick] = useState<{ workspaceId: string; id: string } | null>(null)
-  const profileId = profilePick?.workspaceId === workspaceId ? profilePick?.id : undefined
-  const profileAllowed = !profileId || (!profiles.error && taskProfileSelectable(profileId, profiles.data))
-  const openerFocus = useOpenerFocus(open)
-  const [coordinatorUnavailable, setCoordinatorUnavailable] = useState(false)
-  const tCoordinator = useTranslations('Coordinator')
-  const { data: available = true } = useSWR(open ? 'issue-creation-available' : null, () => issueCreationAvailable())
-  const fileRef = useRef<HTMLInputElement>(null)
-  const composed = useRef<{ key: string; message: string; taskTitle?: string; taskDestination?: TaskDestination; workspaceId: string } | null>(null)
-  const fileId = useId()
-  // The task is created in the workspace the Coordinator runs in: the one shown now. A dialog
-  // opened for another workspace (another tab switched) is a mismatch, never a silent retarget.
+  // 继续新建: after a create the window stays, cleared, for the next one.
+  const [more, setMore] = useState(false)
+  // 状态 and Priority: Todo and Normal by default, as the board's backlog entry has them.
+  const [status, setStatus] = useState<IssueStatus>('todo')
+  const [priority, setPriority] = useState<Priority>('normal')
+  const statusLabel = useTaskStatusLabel()
+  const [assignee, setAssignee] = useState<string | null>(initialBotId ? `bot:${initialBotId}` : null)
+  const [dueDate, setDueDate] = useState<string | null>(null)
+  const [labels, setLabels] = useState<IssueLabel[]>([])
+  const [access, setAccess] = useState<'workspace' | 'members'>('workspace')
+  const [accessMembers, setAccessMembers] = useState<string[]>([])
+  const [files, setFiles] = useState<File[]>([])
+  const [accessChange, setAccessChange] = useState<{ fingerprint: string; tasks: number } | null>(null)
+
+  const { data: options } = useSWR(open && workspaceId ? ['new-task-options', workspaceId] : null, () => getNewTaskOptions(workspaceId!))
+  // The task is created in the workspace shown now: the dialog's `workspaceId` prop is the captured target; the
+  // account menu's fresh read must still confirm it before anything is sent (#1661, never a silent retarget).
   const target = useTaskWorkspace(workspaceId)
   const workspace = target.state.status === 'ready' ? target.state.workspace : null
-  // Creating needs a workspace read and confirmed: never while it loads, after a read error, or on a mismatch.
-  const workspaceReady = workspace !== null
-
-  const { data: devices = [] } = useSWR(open ? 'devices' : null, listDevices)
-  const { data: placement } = useSWR(open ? ['settings:model-order', 'current'] : null, () => settingsRead<Awaited<ReturnType<typeof getModelOrder>>>('model-order'))
-  const order = placement && !placement.error ? placement : undefined
   const { data: bots = [] } = useSWR(open ? 'bots' : null, listBots)
-  // 交给: the bot the request goes to (usability review T4). The Coordinator by default; a picked bot gets it
-  // in its own chat, creates the task and dispatches it, so the board shows that bot on the card.
-  const [botPick, setBotPick] = useState<string | null>(null)
   const botChoices = newTaskBotChoices(bots)
-  const handler = botChoices.find(bot => bot.id === botPick) ?? null
-  // The task runs on Mikka Cloud on the computer of the bot it goes to.
-  const cloudBotId = handler?.id ?? (bots.find(bot => bot.coordinator) ?? bots[0])?.id
-  const attachments = useChatFiles(draft, setDraft, cloudBotId ? { kind: 'bot', id: cloudBotId } : undefined, sending)
-  // The menu's availability comes from the same dispatch planner as Settings. The default inherits
-  // 运行位置 (会先用: the cloud, a server or a computer); only a destination the person explicitly picks becomes a fixed task destination.
-  const e2bKey = useOwnE2BKey(open)
-  const cloud: Machine = { value: 'cloud', label: t('cloud'), cloud: true, usable: e2bKey.configured !== false }
-  const quotaUnchecked = order?.entries.some(entry => entry.block?.reason === 'checking')
-  const own: Machine[] = devices.map(item => ({ value: item.id, label: item.name, usable: taskMachineUsable(item, order?.readyDeviceIds ?? []),
-    status: !item.enabled ? t('notParticipating') : !item.online ? item.lastSeenAt ? t('offline') : tDevices('neverOnline') : !order ? t('loadingPlacement') : !order.readyDeviceIds.includes(item.id) ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('online') }))
-  const machines: Machine[] = [cloud, ...own]
-  const inherited = defaultTaskMachine(machines, order)
-  const defaults: Machine = { value: 'auto', label: order ? `${t('workspaceDefault')} · ${inherited?.label ?? locationT(order.location)}` : t('workspaceDefault'),
-    cloud: inherited?.cloud === true, usable: inherited?.usable ?? false, status: inherited?.status ?? (inherited?.usable ? t('online') : order ? quotaUnchecked ? t('quotaUnchecked') : t('modelUnavailable') : t('loadingPlacement')) }
-  const device = machines.find(item => item.value === picked) ?? defaults
-  // Picking Mikka Cloud without a key opens 填入 E2B Key; once saved, the task goes to the cloud.
-  const [addingKey, setAddingKey] = useState(false)
-  const keyDialog = usePresence(addingKey)
-  function pick(value: string) {
-    if (value === 'auto') { setPicked(null); return }
-    if (value === cloud.value && !cloud.usable) { setAddingKey(true); return }
-    setPicked(value)
-  }
+  const dictation = useTaskDictation(text => setDraft(current => current.trim() ? `${current.trimEnd()}\n${text}` : text),
+    failure => toast.error(t(`dictationFailed.${failure}`)))
   useEffect(() => { if (open && initialText) setDraft(current => current || initialText) }, [open, initialText])
 
-  async function attach(files: File[]) {
-    if (cloudBotId) { attachments.add(files); return }
-    let next = draft
-    for (const file of files) {
-      const block = await textAttachment(file, MAX_LENGTH - next.length - 2)
-      if (!block) { toast.error(tShell('attachUnsupported', { max: MAX_LENGTH })); continue }
-      next = next.trim() ? `${next.trimEnd()}\n\n${block}` : block
+  function attach(picked: File[]) {
+    const next = [...files]
+    for (const file of picked) {
+      if (!file.size || file.size > TASK_FILE_MAX_BYTES || next.length >= TASK_FILE_MAX_COUNT) { toast.error(t('fileRejected', { name: file.name })); continue }
+      next.push(file)
     }
-    setDraft(next)
+    setFiles(next)
   }
 
-  async function submit() {
+  /** The task exists; its files go up through the task's own attachments route. A failed one leaves the task as is. */
+  async function upload(taskId: string, pickedFiles: File[]) {
+    for (const file of pickedFiles) {
+      const body = new FormData()
+      body.set('file', file)
+      const response = await fetch(withBasePath(`/api/tasks/${encodeURIComponent(taskId)}/attachments?id=${crypto.randomUUID()}`), { method: 'POST', body }).catch(() => null)
+      if (!response?.ok) toast.error(t('fileFailed', { name: file.name }))
+    }
+  }
+
+  async function submit(confirmedFingerprint?: string) {
     const name = title.trim()
     const text = draft.trim() || name
-    // Creating needs a workspace read and confirmed, not merely a workspace id (#1661).
-    if (!text || sending || attachments.locked || !available || !profileAllowed || !workspace) return
+    const accessCommand: CreateAccess | undefined = access === 'members' ? { kind: 'members', memberIds: accessMembers } : undefined
+    const properties = { assignee: assigneeOf(assignee), dueDate, labels, access: accessCommand }
+    const fingerprint = JSON.stringify([workspaceId, teamId, projectId, name, text, status, priority, properties])
+    const confirmAccess = confirmedFingerprint === fingerprint
+    if (!name || !workspaceId || pending.current || projectPicker.pending || dictation.state !== 'idle') return
+    pending.current = true
     setSending(true)
-    setCoordinatorUnavailable(false)
     try {
-      const key = JSON.stringify([text, name, picked, project ?? null, handler?.id ?? null, profileId ?? null])
-      if (composed.current?.key !== key) {
-        const destination = pickedTaskDestination(picked)
-        const context = [destination && device && t('contextDevice', { device: device.label }), project && t('contextProject', { project })].filter(Boolean).join(t('contextSeparator'))
-        // Captured once per composed request; a retry of the same request keeps the same workspace.
-        composed.current = { key, message: context ? t('promptWithContext', { context, text }) : t('prompt', { text }),
-          ...(name ? { taskTitle: name } : {}),
-          ...(destination ? { taskDestination: destination } : {}), workspaceId: workspace.id }
-      }
-      const captured = composed.current.workspaceId
       // One fresh read must confirm the captured workspace is still the one shown before anything is sent.
-      const confirmed = await target.confirm(captured)
-      if (confirmed.status === 'mismatch') { composed.current = null; toast.error(t('workspaceChanged')); return }
+      const confirmed = await target.confirm(workspaceId)
+      if (confirmed.status === 'mismatch') { toast.error(t('workspaceChanged')); return }
       if (confirmed.status !== 'ready') { toast.error(t('workspaceUnconfirmed'), { action: { label: tCommon('retry'), onClick: () => { void submit() } } }); return }
-      // The captured id goes as expectedWorkspaceId: the server refuses the create if its trusted selection differs.
-      // It is a check, never a selector; the global selection is not changed for this submit.
-      const outcome = await submitMessage(composed.current.message, { taskDestination: composed.current.taskDestination, botId: handler?.id ?? null, profileId, taskTitle: composed.current.taskTitle, expectedWorkspaceId: captured })
-      if (outcome.kind === 'rejected' && outcome.error === 'coordinatorUnavailable') { setCoordinatorUnavailable(true); return }
-      // The server's trusted selection is no longer the captured one (a switch after the check): the same refusal as a mismatch.
-      if (outcome.kind === 'rejected' && outcome.error === 'workspaceAccessDenied') { composed.current = null; toast.error(t('workspaceChanged')); return }
-      if (outcome.kind !== 'accepted') { const message = failureMessage(outcome); if (message) toast.error(message); return }
+    } catch { toast.error(t('workspaceUnconfirmed')); return }
+    try {
+      const requestId = createRequests.current.get(fingerprint) ?? crypto.randomUUID()
+      createRequests.current.set(fingerprint, requestId)
+      const { createTaskOnly } = await import('@/app/actions/issues')
+      const result = await createTaskOnly({ version: 1, intent: 'create_only', workspaceId, requestId, ...(teamId ? { teamId } : {}), ...(projectId ? { projectId } : {}), ...(confirmAccess ? { confirmAccess: true } : {}),
+        ...backlogTaskDraft(name, text, status), priority,
+        ...(properties.assignee ? { assignee: properties.assignee } : {}), ...(dueDate ? { dueDate } : {}), ...(labels.length ? { labels } : {}), ...(accessCommand ? { access: accessCommand } : {}) })
+      if (result.error && 'confirmable' in result && result.confirmable) { setAccessChange({ fingerprint, tasks: Number(result.params?.tasks ?? 1) }); return }
+      // The server's trusted selection is no longer the captured one (a switch after the check): a mismatch refusal.
+      if (result.error === 'workspaceAccessDenied') { toast.error(t('workspaceChanged')); return }
+      if (result.error || !('taskId' in result)) { toast.error(actionError(result.error)); return }
+      createRequests.current.delete(fingerprint)
+      const pickedFiles = files
       setDraft('')
       setTitle('')
-      setPicked(null)
-      setProfilePick(null)
-      composed.current = null
+      setFiles([])
+      await upload(result.taskId, pickedFiles)
+      if (more) { toast.success(t('createdTask', { identifier: result.identifier })); onAdded?.(); return }
       onOpenChange(false)
-      onSent?.()
-      void mutate('coordinator-chat')
+      onCreated?.(result.taskId)
     } catch {
       toast.error(t('failed'))
     } finally {
+      pending.current = false
       setSending(false)
     }
   }
 
-  const profileChoices = useTaskProfileChoices({ workspaceId, value: profileId ?? null, data: profiles.data })
-  const keyDialogNode = keyDialog.value && <E2BKeyDialog open={keyDialog.open} onOpenChangeComplete={keyDialog.onOpenChangeComplete} configured={false} onClose={changed => { setAddingKey(false); if (changed) { void e2bKey.mutate(); setPicked(cloud.value) } }} />
-  const NewTask = newTaskSlot.NewTask ?? null
-  if (NewTask) {
-    const machineNote = (machine: Machine) => machine.cloud && !machine.usable ? t('addE2BKey') : !machine.cloud && !machine.usable ? machine.status : undefined
-    const slotMachine = (machine: Machine, group: NewTaskMachine['group']): NewTaskMachine => ({ value: machine.value, label: machine.label, icon: <MachineIcon machine={machine} cloudBotId={cloudBotId} />, usable: machine.usable, note: machineNote(machine), group })
-    const notices = <>
-      <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />
-      {!available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
-      {coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
-    </>
-    return <>
-      {open && <NewTask onClose={() => onOpenChange(false)} project={project} title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={attachments.text} onText={attachments.edit} maxLength={MAX_LENGTH}
-        files={attachments.files.length || attachments.pending.length ? <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} /> : null}
-        onAttach={files => { void attach(files) }} accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT}
-        machines={[slotMachine(defaults, 'default'), slotMachine(cloud, 'cloud'), ...own.map(item => slotMachine(item, 'own'))]} machine={picked ?? 'auto'} onMachine={pick}
-        bots={botChoices.length > 0 ? [{ id: null, name: 'Coordinator', avatar: <CoordinatorAvatar size="row" /> }, ...botChoices.map(bot => ({ id: bot.id, name: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> }))] : []}
-        bot={handler?.id ?? null} onBot={setBotPick}
-        profile={{ ...profileChoices, value: profileId ?? 'auto', onChange: id => setProfilePick(id !== 'auto' && workspaceId ? { workspaceId, id } : null), disabled: sending || !workspaceId }}
-        notices={notices} sending={sending} canSubmit={available && profileAllowed && !!(draft.trim() || title.trim()) && !attachments.locked} onSubmit={() => { void submit() }} />}
-      {keyDialogNode}
-    </>
+  const TaskWindow = open ? NewTask : null
+  if (open && !TaskWindow) throw new Error('Required product UI export missing: new-task.NewTask')
+  // The window's context line: the Project the task goes to, and — when the page does not fix one — the Projects the
+  // person may switch to. A workspace with nothing to choose shows no picker at all, and none of it gates submission.
+  const projects = !pageProjectId && !projectPicker.error && projectPicker.data?.organizationId && projectPicker.data.projects.length
+    ? { choices: projectPicker.data.projects.map(item => ({ value: item.id, label: item.name })), value: projectPicker.project?.id ?? '',
+      onChange: (value: string) => { void projectPicker.choose(value || null) }, disabled: sending || projectPicker.pending, noneLabel: tBoard('noProject') }
+    : undefined
+  const statuses: NewTaskProps['status'] = { choices: ISSUE_STATUSES.map(item => ({ value: item.value, label: statusLabel(item.value), mark: <TaskStatusIcon status={item.value} /> })),
+    value: status, onChange: value => setStatus(ISSUE_STATUSES.find(item => item.value === value)?.value ?? 'todo'), disabled: sending }
+  const priorityLabel = (value: string) => tIssue.has(`priority.${value}` as never) ? tIssue(`priority.${value}` as never) : value
+  const priorities: NewTaskProps['priority'] = { choices: ISSUE_PRIORITIES.map(item => ({ value: item.value, label: priorityLabel(item.value), mark: <PriorityIcon priority={item.value} /> })),
+    value: priority, onChange: value => setPriority(ISSUE_PRIORITIES.find(item => item.value === value)?.value ?? 'normal'), disabled: sending }
+  const members = options?.members ?? []
+  const assignees: NewTaskProps['assignee'] = {
+    choices: [
+      ...members.map(person => ({ value: `user:${person.id}`, kind: 'user' as const, label: person.name, avatar: <PersonAvatar name={person.name} image={person.image} size="row" /> })),
+      ...botChoices.map(bot => ({ value: `bot:${bot.id}`, kind: 'bot' as const, label: bot.name, avatar: <BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /> })),
+    ],
+    value: assignee, onChange: setAssignee, disabled: sending,
   }
-
-  return <Dialog open={open} onOpenChange={onOpenChange}>
-    <DialogContent className="gap-3 p-5 sm:max-w-2xl" closeLabel={tCommon('close')} finalFocus={openerFocus}>
-      <div className="flex flex-wrap items-center gap-2 pr-8 text-sm">
-        <TaskWorkspace variant="create" workspace={workspace} state={target.state} onRetry={target.retry} />
-        {device
-          ? <Select value={picked ?? 'auto'} onValueChange={value => { if (value) pick(value) }} items={[defaults, ...machines].map(({ value, label }) => ({ value, label }))}>
-            <SelectTrigger size="sm" className="h-7 min-w-32 max-w-56 gap-1.5 rounded-full px-2.5" aria-label={t('device')}><MachineIcon machine={device} cloudBotId={cloudBotId} /><SelectValue className="min-w-0 truncate" /></SelectTrigger>
-            <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-60">
-              <SelectGroup><SelectItem value="auto"><MachineLabel machine={defaults} cloudBotId={cloudBotId} /></SelectItem></SelectGroup>
-              <SelectGroup><SelectItem value={cloud.value}><MachineLabel machine={cloud} cloudBotId={cloudBotId} /></SelectItem></SelectGroup>
-              {own.length > 0 && <SelectGroup><SelectLabel>{tDevices('thisMachine')}</SelectLabel>{own.map(item => <SelectItem key={item.value} value={item.value}><MachineLabel machine={item} cloudBotId={cloudBotId} /></SelectItem>)}</SelectGroup>}
-            </SelectContent>
-          </Select>
-          : <span className="flex h-7 items-center gap-1.5 rounded-full bg-control px-2.5 text-muted-foreground"><Laptop aria-hidden="true" className="size-3.5" />{order ? t('noDevice') : t('loadingPlacement')}</span>}
-        {botChoices.length > 0 && <Select value={handler?.id ?? 'coordinator'} onValueChange={value => setBotPick(value && value !== 'coordinator' ? value : null)} items={[{ value: 'coordinator', label: 'Coordinator' }, ...botChoices.map(bot => ({ value: bot.id, label: bot.name }))]}>
-          <SelectTrigger size="sm" className="h-7 min-w-28 max-w-48 gap-1.5 rounded-full px-2.5" aria-label={t('bot')}>{handler ? <BotAvatar id={handler.id} color={handler.color} shape={handler.shape} size="row" /> : <CoordinatorAvatar size="row" />}<SelectValue className="min-w-0 truncate" /></SelectTrigger>
-          <SelectContent align="start" alignItemWithTrigger={false} className="w-auto min-w-48">
-            <SelectGroup>
-              <SelectItem value="coordinator"><CoordinatorAvatar size="row" /><span className="min-w-0 flex-1 truncate pr-3">Coordinator</span></SelectItem>
-              {botChoices.map(bot => <SelectItem key={bot.id} value={bot.id}><BotAvatar id={bot.id} color={bot.color} shape={bot.shape} size="row" /><span className="min-w-0 flex-1 truncate pr-3">{bot.name}</span></SelectItem>)}
-            </SelectGroup>
-          </SelectContent>
-        </Select>}
-        <TaskProfilePicker workspaceId={workspaceId} value={profileId ?? null} onChange={id => setProfilePick(id && workspaceId ? { workspaceId, id } : null)} data={profiles.data} disabled={sending} />
-        {/* The chevron and the title wrap together, so the chevron never ends a line on its own. */}
-        <span className="flex items-center gap-2 whitespace-nowrap"><ChevronRight aria-hidden="true" className="size-3.5 text-muted-foreground" />
-        <DialogTitle className="text-sm font-medium">{t('title')}</DialogTitle></span>
-        {project && <span className="flex h-7 max-w-40 items-center rounded-full bg-control px-2.5 text-xs text-muted-foreground"><span className="truncate">{project}</span></span>}
-      </div>
-      <DialogDescription className="sr-only">{t('description')}</DialogDescription>
-      <TaskProfileNotice value={profileId ?? null} data={profiles.data} error={profiles.error} onRetry={() => { void profiles.mutate() }} />
-      <FieldGroup onDragOver={event => { if (Array.from(event.dataTransfer.types).includes('Files')) { event.preventDefault(); event.dataTransfer.dropEffect = sending ? 'none' : 'copy' } }} onDrop={event => { if (event.dataTransfer.files.length) { event.preventDefault(); void attach(Array.from(event.dataTransfer.files)) } }} onPaste={event => { if (event.clipboardData.files.length) { event.preventDefault(); void attach(Array.from(event.clipboardData.files)) } }}>
-        <Field>
-          <ChatFileCards files={attachments.files} pending={attachments.pending} onRemove={attachments.remove} onRetry={attachments.retry} />
-          <FieldLabel htmlFor="new-task-name" className="sr-only">{t('titleLabel')}</FieldLabel>
-          <Input id="new-task-name" autoFocus value={title} maxLength={TITLE_MAX} disabled={sending} placeholder={t('titlePlaceholder')} className="h-auto border-0 bg-transparent px-0 text-lg font-medium shadow-none focus-visible:ring-0" onChange={event => setTitle(event.target.value)} onKeyDown={event => {
-            if (event.key !== 'Enter' || event.nativeEvent.isComposing) return
-            event.preventDefault()
-            if (event.metaKey || event.ctrlKey) void submit(); else descriptionRef.current?.focus()
-          }} />
-          <FieldLabel htmlFor="new-issue-title" className="sr-only">{t('label')}</FieldLabel>
-          <Textarea ref={descriptionRef} id="new-issue-title" value={attachments.text} maxLength={MAX_LENGTH} disabled={sending} placeholder={t('placeholder')} className="min-h-28 resize-none border-0 px-0 text-base shadow-none focus-visible:ring-0 bg-transparent" onChange={event => attachments.edit(event.target.value)} onKeyDown={event => {
-            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) { event.preventDefault(); void submit() }
-          }} />
-        </Field>
-      </FieldGroup>
-      <FieldGroup className="sr-only w-px"><Field><FieldLabel htmlFor={fileId}>{tShell('attach')}</FieldLabel><Input ref={fileRef} id={fileId} type="file" accept={cloudBotId ? CHAT_FILE_ACCEPT : TEXT_ATTACHMENT_ACCEPT} multiple className="sr-only" tabIndex={-1} onChange={event => { void attach(Array.from(event.target.files ?? [])); event.target.value = '' }} /></Field></FieldGroup>
-      {!available && <p className="text-sm text-muted-foreground">{t('unavailable')}</p>}
-      {coordinatorUnavailable && <Alert variant="destructive"><AlertTitle>{tCoordinator('unavailable', { name: 'Coordinator' })}</AlertTitle></Alert>}
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon-sm" className="rounded-full" aria-label={tShell('attach')} disabled={sending} onClick={() => fileRef.current?.click()}><Paperclip data-icon="inline-start" /></Button>
-        <Button size="sm" className="ml-auto bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90" disabled={!available || !profileAllowed || !(draft.trim() || title.trim()) || sending || attachments.locked || !workspaceReady} aria-keyshortcuts="Control+Enter Meta+Enter" onClick={() => { void submit() }}>{sending ? t('sending') : t('create')}</Button>
-      </div>
-      {keyDialogNode}
-    </DialogContent>
-  </Dialog>
+  const presets = dueDatePresets(new Date())
+  const dates: NewTaskProps['dueDate'] = { value: dueDate, onChange: setDueDate, disabled: sending, presets: [
+    { value: presets.today, label: t('due.today') }, { value: presets.tomorrow, label: t('due.tomorrow') },
+    { value: presets.endOfWeek, label: t('due.endOfWeek') }, { value: presets.inOneWeek, label: t('due.inOneWeek') },
+  ] }
+  const knownLabels = [...new Map([...(options?.labels ?? []), ...labels].map(label => [label.name.toLowerCase(), label])).values()]
+  const labelChoices: NewTaskProps['labels'] = { choices: knownLabels, value: labels.map(label => label.name), disabled: sending,
+    onToggle: name => setLabels(current => current.some(label => label.name === name) ? current.filter(label => label.name !== name)
+      : [...current, knownLabels.find(label => label.name === name) ?? { name, color: 'gray' as const }].slice(0, 12)),
+    onCreate: name => { const value = name.trim().slice(0, 40); if (value && !labels.some(label => label.name.toLowerCase() === value.toLowerCase())) setLabels(current => [...current, { name: value, color: 'gray' as const }].slice(0, 12)) } }
+  // Only specific people needs someone else to name: a personal space has only its owner.
+  const others = members.filter(person => person.id !== options?.viewerId)
+  const accessChoice: NewTaskProps['access'] = others.length ? { value: access, onChange: setAccess, workspaceLabel: t('accessWorkspace'), disabled: sending,
+    members: others.map(person => ({ value: person.id, label: person.name, avatar: <PersonAvatar name={person.name} image={person.image} size="row" /> })),
+    picked: accessMembers, onToggleMember: id => setAccessMembers(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]) } : undefined
+  const fileList = files.length ? <ul className="flex flex-wrap gap-1.5">
+    {files.map((file, index) => <li key={`${file.name}:${index}`} className="flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs">
+      <span className="max-w-48 truncate">{file.name}</span>
+      <Button type="button" variant="ghost" size="icon" className="size-5" aria-label={t('removeFile', { name: file.name })} disabled={sending}
+        onClick={() => setFiles(current => current.filter((_, at) => at !== index))}>×</Button>
+    </li>)}
+  </ul> : null
+  return <>
+    {TaskWindow && <TaskWindow onClose={() => onOpenChange(false)} project={project} projects={projects} status={statuses} priority={priorities}
+      assignee={assignees} dueDate={dates} labels={labelChoices} access={accessChoice}
+      dictation={dictation.available ? { state: dictation.state, onStart: dictation.start, onStop: dictation.stop, disabled: sending } : undefined}
+      title={title} onTitle={setTitle} titleMax={TITLE_MAX} text={draft} onText={setDraft} maxLength={MAX_LENGTH}
+      files={fileList} onAttach={attach} accept={`${TEXT_ATTACHMENT_ACCEPT},image/*,application/pdf`}
+      machines={[]} machine="auto" onMachine={() => {}} bots={[]} bot={null} onBot={() => {}}
+      agent={{ value: null, choices: [], onChange: () => {}, disabled: true }}
+      profile={{ choices: [], value: 'auto', label: '', onChange: () => {}, disabled: true }}
+      intent="create_only" more={{ checked: more, onChange: setMore }} notices={<TaskWorkspace variant="create" workspace={workspace} state={target.state} onRetry={target.retry} />} sending={sending}
+      canSubmit={!projectPicker.pending && Boolean(workspaceId) && !!title.trim() && dictation.state === 'idle' && workspace !== null}
+      onSubmit={() => { void submit() }} />}
+    {accessChange && <AccessChangeDialog change={accessChange} pending={sending} onCancel={() => setAccessChange(null)} onConfirm={async () => {
+      const current = accessChange
+      setAccessChange(null)
+      await submit(current.fingerprint)
+      return true
+    }} />}
+  </>
 }

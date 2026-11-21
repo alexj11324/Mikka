@@ -311,14 +311,15 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
   let releasePending = () => {}
   try {
     await scoped.query(await readFile(new URL('../../drizzle/20261023213851_group_conversations.sql', import.meta.url),'utf8'))
+    await scoped.query(await readFile(new URL('../../drizzle/20261118120000_conversation_model_device.sql', import.meta.url),'utf8'))
     const migration = await readFile(new URL('../../drizzle/20261029043634_group_turns.sql', import.meta.url),'utf8')
     await Promise.all([scoped.query(migration),scoped.query(migration)]); await scoped.query(migration)
     await scoped.query(await readFile(new URL('../../drizzle/20261031153511_group_bot_members.sql', import.meta.url), 'utf8'))
     await scoped.query(await readFile(new URL('../../drizzle/20261103220300_group_decision_quality.sql', import.meta.url), 'utf8'))
     // Minimal real agent_runs columns used by the bridge; full tracked schema
     // bootstrap is an independent gate in the same ephemeral-PG17 CI job.
-    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid, "failureDetails" jsonb, "agentDefinition" jsonb, origin text)`)
-    await scoped.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text, "lastSeenAt" timestamptz); CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz, "updatedAt" timestamptz); CREATE TABLE coordinator_bots ("ownerId" text, "workspaceId" uuid, "botId" uuid)` )
+    await scoped.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY,"userId" text NOT NULL,"workspaceId" uuid,"agentId" uuid NOT NULL,kind text NOT NULL,status text NOT NULL,"startedAt" timestamptz,"leaseExpiresAt" timestamptz,"finishedAt" timestamptz,"updatedAt" timestamptz DEFAULT now(), "createdAt" timestamptz DEFAULT now(), "issueId" uuid, "deviceId" uuid, "botId" uuid, "failureDetails" jsonb, "agentDefinition" jsonb, origin text, "originRef" jsonb)`)
+    await scoped.query(`CREATE TABLE agents (id uuid PRIMARY KEY, "userId" text NOT NULL, name text NOT NULL); CREATE TABLE devices (id uuid PRIMARY KEY, "ownerId" text, "lastSeenAt" timestamptz, "sessionOpenedAt" timestamptz, "sessionClosedAt" timestamptz); CREATE TABLE coordinator_sessions ("userId" text, "botId" uuid, "leaseHolder" text, "leaseUntil" timestamptz, "updatedAt" timestamptz); CREATE TABLE coordinator_bots ("ownerId" text, "workspaceId" uuid, "botId" uuid)` )
     // The current active-agent reader resolves public Bot names before its
     // legacy execution-name fallback. Keep those real SQL dependencies present.
     await scoped.query(`CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text NOT NULL,"workspaceId" uuid,name text NOT NULL,color text,shape text);
@@ -374,9 +375,19 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const root = await send(id,'first')
     let unblock!: () => void, entered!: () => void
     const waiting = new Promise<void>(r => { entered=r }), release = new Promise<void>(r => { unblock=r })
-    const blocked: GroupRuntime = {...runtime,async generate(agent,input) { entered(); await release; return runtime.generate(agent,input) }}
+    const claims: string[] = []
+    let initialClaims: string[] | undefined
+    const blocked: GroupRuntime = { ...runtime,
+      async authorized(w,u) { claims.push(u); return runtime.authorized(w,u) },
+      async agents(owner,ids,client) {
+        initialClaims ??= [...claims]
+        return runtime.agents(owner,ids,client)
+      },
+      async generate(agent,input) { entered(); await release; return runtime.generate(agent,input) },
+    }
     releasePending = unblock
     const running = processGroupTurn(scoped,id,blocked); await waiting
+    assert.deepEqual(initialClaims,['owner'], 'the sender who created this group is authorized once for the initial roster')
     // Match #79 9760e912's existing owner + working + live lease predicate.
     const activeRuns = async (owner = 'owner', now = new Date()) => (await scoped.query(`SELECT id,"agentId","userId","workspaceId",kind FROM agent_runs WHERE "userId"=$1 AND status IN ('preparing','running','waiting_input','finishing') AND "leaseExpiresAt">$2`, [owner,now])).rows
     const active = await activeRuns()
@@ -527,6 +538,14 @@ test('PG17: API atomic queue, migration repeat/concurrency, group lock, FIFO, ro
     const revoked = await send(id,'revoked workspace',[a])
     await assert.rejects(processGroupTurn(scoped,id,{...runtime,async authorized() {return false},async generate() {assert.fail('revoked actor must not generate')}}),/no_longer_authorized/)
     assert.equal((await scoped.query('SELECT status FROM group_turns WHERE "messageId"=$1',[revoked])).rows[0].status,'failed')
+    const peerTurn = await handleGroup(scoped,directory,{...base,userId:'member',resource:'messages',id,body:JSON.stringify({body:'group creator lost access'})},true)
+    assert.equal(peerTurn.status,201)
+    const principals: string[] = []
+    await assert.rejects(processGroupTurn(scoped,id,{ ...runtime,
+      async authorized(w,u) { assert.equal(w,workspaceId); principals.push(u); return u === 'member' },
+      async agents() { assert.fail('an unauthorized creator cannot supply group actors') },
+    }),/group_actor_no_longer_authorized/)
+    assert.deepEqual(principals,['member','owner'])
     // 停止: a member stops while a reply generates; the reply in flight is aborted and nothing is posted, the turn reads stopped.
     const stoppedRoot = await send(id,'stopped mid reply',[a])
     let aborted = false

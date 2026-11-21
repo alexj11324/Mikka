@@ -224,4 +224,3 @@ test('a navigation interruption never bypasses the next fresh lease check', asyn
   assert.equal(checks, 2)
   assert.equal(attempts, 1)
 })
-

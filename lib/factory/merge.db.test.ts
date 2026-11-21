@@ -56,8 +56,6 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
   try {
     // The candidate's run opened the PR (run_publications); skill candidates have their own table.
     await pool.query(`
-      ALTER TABLE factory_candidates ADD COLUMN "runId" uuid;
-      CREATE TABLE run_publications ("runId" uuid PRIMARY KEY,"userId" text NOT NULL,"pullRequest" jsonb);
       CREATE TABLE improvement_skill_candidates ("factoryTaskId" uuid,"candidateId" uuid,"userId" text);
     `);
     await pool.query(await readFile(new URL("../../drizzle/20261101121000_factory_merges.sql", import.meta.url), "utf8"));
@@ -68,15 +66,14 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       ALTER TABLE factory_tasks ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now(), ADD COLUMN route jsonb;
       ALTER TABLE factory_attempts ADD COLUMN reason text;
       CREATE TABLE issue_versions (id uuid PRIMARY KEY,"issueId" uuid NOT NULL,"userId" text NOT NULL,
-        revision integer NOT NULL,title text,content jsonb,status text,priority text,actor_type text,actor_id text);
+        revision integer NOT NULL,title text,content jsonb,status text,priority text,actor_type text,actor_id text,"createdAt" timestamptz NOT NULL DEFAULT now());
     `);
 
     let nextPull = 418;
     async function prepared(pr = `https://github.com/alexj11324/Mikka/pull/${nextPull++}`) {
       const x = await f.prepare();
-      const runId = randomUUID();
-      await pool.query('UPDATE factory_candidates SET "runId"=$1 WHERE id=$2', [runId, x.task.candidateId]);
-      await pool.query('INSERT INTO run_publications VALUES ($1,$2,$3)', [runId, actor.userId, JSON.stringify({ url: pr, state: "open" })]);
+      await pool.query(`UPDATE run_publications SET "pullRequest"="pullRequest"||$2::jsonb
+        WHERE "runId"=(SELECT "runId" FROM factory_candidates WHERE id=$1)`, [x.task.candidateId,JSON.stringify({url:pr,state:'open'})]);
       const github = fakeGitHub();
       github.setHead(x.candidate.sha);
       const merges = createFactoryMerges(pool, f.authorize, f.store, github.port);
@@ -86,6 +83,21 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       return { ...x, pr, github, merges, accept, taskState: task, rows };
     }
     const refused = (code: string) => (e: unknown) => e instanceof FactoryMergeRefused && e.code === code;
+
+    await t.test('a direct repository acceptance cannot merge before visual evidence and public PR acknowledgement are ready',async()=>{
+      for (const missing of ['visual','publication'] as const) {
+        const x=await prepared();
+        if (missing==='visual') await pool.query(`DELETE FROM run_captures WHERE "runId"=(SELECT "runId" FROM factory_candidates WHERE id=$1)`,[x.task.candidateId]);
+        else await pool.query(`UPDATE run_publications SET status='failed' WHERE "runId"=(SELECT "runId" FROM factory_candidates WHERE id=$1)`,[x.task.candidateId]);
+        let credentialReads=0;
+        await assert.rejects(x.merges.accept(actor,{binding:x.approval.binding,eventId:randomUUID()},async()=>{credentialReads++;return TOKEN;}),
+          (error:unknown)=>error instanceof FactoryError && error.code===(missing==='visual'?'factory_visual_evidence_required':'factory_public_evidence_required'));
+        assert.deepEqual(await x.taskState(),{stage:'approval',status:'blocked'});
+        assert.equal(credentialReads,0);
+        assert.equal(x.github.calls.length,0);
+        assert.equal((await x.rows()).length,0);
+      }
+    });
 
     async function preparedDeliverable(kind: 'report' | 'deliverable' = 'report') {
       const x = await prepared();
@@ -125,6 +137,23 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       assert.equal((await x.receipts()).length, 1);
       assert.equal((await x.history()).length, 1);
       assert.equal((await x.issue()).revision, before.revision + 1);
+    });
+
+    await t.test('acceptance advances a lagging task while preserving a later human status change', async () => {
+      const lagging = await preparedDeliverable();
+      await pool.query(`UPDATE issues SET status='doing' WHERE id=$1`, [lagging.task.issueId]);
+      assert.equal((await lagging.accept(randomUUID(), null)).status, 'accepted');
+      assert.equal((await lagging.issue()).status, 'done');
+      assert.equal((await lagging.history())[0].actor_id, actor.userId);
+
+      const held = await preparedDeliverable();
+      await pool.query(`INSERT INTO issue_versions (id,"issueId","userId",revision,status,actor_type,actor_id)
+        VALUES (gen_random_uuid(),$1,$2,1,'review','system','fixture'), (gen_random_uuid(),$1,$2,2,'todo','user',$2)`,
+        [held.task.issueId, actor.userId]);
+      await pool.query(`UPDATE issues SET status='todo',revision=2 WHERE id=$1`, [held.task.issueId]);
+      assert.equal((await held.accept(randomUUID(), null)).status, 'accepted');
+      assert.equal((await held.issue()).status, 'todo');
+      assert.equal((await held.history()).length, 2);
     });
 
     await t.test('a failure writing issue history rolls back acceptance, Factory state and issue completion together', async () => {
@@ -648,16 +677,23 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       // Real PG, lifecycle/park and merge writers; only provider I/O and live
       // transport are fixtures. Signature admission has its own route tests.
       await pool.query(`
-        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid;
-        ALTER TABLE run_publications ADD COLUMN "issueId" uuid, ADD COLUMN "updatedAt" timestamptz DEFAULT now();
+        ALTER TABLE agent_runs ADD COLUMN "pauseReason" text, ADD COLUMN "deviceTokenId" uuid,
+          ADD COLUMN "retryOf" uuid, ADD COLUMN "continuesRunId" uuid, ADD COLUMN "agentId" uuid,
+          ADD COLUMN "createdAt" timestamptz NOT NULL DEFAULT now();
+        ALTER TABLE run_publications ADD COLUMN "updatedAt" timestamptz DEFAULT now();
         CREATE TABLE bots (id uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid);
+        CREATE TABLE computer_run_bindings ("runId" uuid PRIMARY KEY,"botId" uuid,"ownerId" text);
+        CREATE TABLE bot_cloud_runtimes ("agentId" uuid,"botId" uuid,"ownerId" text);
         CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"revokedAt" timestamptz);
         CREATE TABLE suggestion_executions ("runId" uuid,status text,"endedAt" timestamptz);
         CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"workspaceId" uuid,"issueId" uuid,
-          "sandboxId" text,state text,"deviceId" uuid,epoch integer NOT NULL DEFAULT 1,"operationId" uuid,
+          "sandboxId" text,"snapshotId" text NOT NULL,state text,"deviceId" uuid,epoch integer NOT NULL DEFAULT 1,"operationId" uuid,
           "workerLeaseId" uuid,"workerLeaseUntil" timestamptz,"lastActiveAt" timestamptz NOT NULL DEFAULT now(),
           "runningSince" timestamptz,"computeSeconds" bigint NOT NULL DEFAULT 0,
+          "snapshotState" text NOT NULL DEFAULT 'none',"snapshotOperationId" uuid,"filesystemSnapshotId" text,"restoreStartedAt" timestamptz,
           "lifecycleAt" timestamptz DEFAULT now(),lifecycle jsonb NOT NULL DEFAULT '{}');
+        CREATE TABLE coding_review_sessions ("runId" uuid,"taskId" uuid,"ownerId" text,"workspaceId" uuid,"deviceId" uuid,
+          "sandboxId" text,"machineEpoch" bigint,"machineOperationId" uuid,"revokedAt" timestamptz,"expiresAt" timestamptz);
         CREATE TABLE IF NOT EXISTS mikka_workspaces (id uuid PRIMARY KEY,"userId" text,kind text);
         CREATE TABLE IF NOT EXISTS mikka_workspace_members ("workspaceId" uuid,"userId" text,status text);
         CREATE TABLE IF NOT EXISTS mikka_team_issues ("issueId" uuid,"workspaceId" uuid);
@@ -687,8 +723,8 @@ test("acceptance merges the PR as the person", { skip: !db, timeout: 180000 }, a
       await pool.query('UPDATE run_publications SET "runId"=$2,"issueId"=$3 WHERE "pullRequest"->>\'url\'=$1', [x.pr, runId, x.task.issueId]);
       await pool.query(`UPDATE agent_runs SET "deviceId"=$2,report=report||'{"safePoint":{"session":"exited","checkpoint":"unavailable"}}' WHERE id=$1`, [runId, deviceId]);
       await pool.query('INSERT INTO device_tokens VALUES ($1,$2,NULL)', [tokenId, deviceId]);
-      await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId","issueId","sandboxId",state,"deviceId","runningSince")
-        VALUES ($1,$2,$3,$4,$5,'running',$6,now()-interval '1 minute')`, [runId, actor.userId, workspaceId, x.task.issueId, sandboxId, deviceId]);
+      await pool.query(`INSERT INTO thread_machines ("runId","ownerId","workspaceId","issueId","sandboxId","snapshotId",state,"deviceId","runningSince")
+        VALUES ($1,$2,$3,$4,$5,'desktop','running',$6,now()-interval '1 minute')`, [runId, actor.userId, workspaceId, x.task.issueId, sandboxId, deviceId]);
       const runs = async () => (await pool.query('SELECT * FROM agent_runs WHERE "issueId"=$1 ORDER BY id', [x.task.issueId])).rows;
       const machine = async () => (await pool.query('SELECT * FROM thread_machines WHERE "runId"=$1', [runId])).rows[0];
       const beforeRuns = await runs(), pending: (() => Promise<void>)[] = [];

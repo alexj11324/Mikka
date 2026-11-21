@@ -19,6 +19,11 @@ test('cloud deletion fences only this owner and requires acknowledged machine/sn
   const ownRun = await seedRun(database, { userId: owner, agentId: ownAgent, status: 'running' }), peerRun = await seedRun(database, { userId: peer, agentId: peerAgent, status: 'running' })
   await database.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [ownRun, ownerDevice]); await database.query('UPDATE agent_runs SET "deviceId"=$2 WHERE id=$1', [peerRun, peerDevice])
   await database.query('INSERT INTO workspace_snapshots("workspaceId","ownerId","sourceRevision","lockDigest","snapshotId") VALUES($1,$2,\'fixture\',\'fixture\',$3)', [ws.id, owner, ownSnapshot])
+  // A task machine's filesystem snapshot is owner-created; its `snapshotId` is
+  // only the template/image name and must never be deleted as a snapshot.
+  const filesystemSnapshot = `fixture-filesystem-${randomUUID()}`, threadRun = await seedRun(database, { userId: owner, agentId: ownAgent, status: 'succeeded' })
+  await database.query(`INSERT INTO thread_machines("runId","workspaceId","ownerId","snapshotId","operationId",state,"filesystemSnapshotId","snapshotState")
+    VALUES($1,$2,$3,'codex',$4,'paused',$5,'ready')`, [threadRun, ws.id, owner, randomUUID(), filesystemSnapshot])
   const kills: string[] = [], deleted: string[] = [], ended: string[][] = []
   let fail = true
   const runtime: AccountCloudProvider = {
@@ -33,7 +38,8 @@ test('cloud deletion fences only this owner and requires acknowledged machine/sn
   assert.ok((await database.query('SELECT "revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [ownerDevice])).rows[0].revokedAt)
   assert.equal((await database.query('SELECT "revokedAt" FROM device_tokens WHERE "boundDeviceId"=$1', [peerDevice])).rows[0].revokedAt, null)
   assert.equal((await database.query('SELECT "sandboxId" FROM cloud_machines WHERE "workspaceId"=$1 AND "ownerId"=$2', [ws.id, owner])).rows[0].sandboxId, ownSandbox, 'failed remote cleanup retains its mapping')
-  assert.deepEqual(deleted.sort(), [ownSnapshot, historical].sort())
+  assert.deepEqual(deleted.sort(), [ownSnapshot, historical, filesystemSnapshot].sort())
+  assert.ok(!deleted.includes('codex'), 'a template snapshotId is not a provider snapshot')
   fail = false
   assert.deepEqual(await cleanupOwnedCloudMachines(owner, database, runtime), [])
   assert.deepEqual(kills, [ownSandbox, ownSandbox]); assert.deepEqual(ended[0], [ownRun])

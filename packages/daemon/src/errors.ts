@@ -38,19 +38,46 @@ export class ServerUnreachableError extends DaemonError {
   }
 }
 
-export class RunNotPinnedHereError extends DaemonError {
-  /** The server refused the claim because this daemon is too old (code `daemonUpgradeRequired`). */
-  readonly upgradeRequired: boolean
+/**
+ * The server refused this daemon's version: 426 `daemonUpgradeRequired` from
+ * any device route, or gateway close 4001 (decision 2026-11-17-2215). The
+ * daemon stops using the server until it is updated. It is a
+ * `ServerUnreachableError`, so run output and receipts are kept for the
+ * updated daemon instead of being dropped as refused.
+ */
+export class DaemonUpgradeRequiredError extends ServerUnreachableError {
   /** The release the refusing server names, when it names one. */
   readonly latest?: string
-  constructor(runId: string, upgradeRequired = false, latest?: string) {
+  constructor(latest?: string) {
+    super("daemonUpgradeRequired")
+    this.message = "This daemon is too old for the server; update it."
+    this.latest = latest
+  }
+}
+
+/** The server has no device gateway (503 `deviceGatewayRequired`), so it has no devices. */
+export class DeviceGatewayRequiredError extends ServerUnreachableError {
+  constructor() {
+    super("deviceGatewayRequired")
+    this.message = "The server has no device gateway."
+  }
+}
+
+/** A claim needs an open device session (409 `deviceSessionRequired`): redial the socket first. */
+export class DeviceSessionRequiredError extends ServerUnreachableError {
+  constructor() {
+    super("deviceSessionRequired")
+    this.message = "The server has no open session for this device."
+  }
+}
+
+export class RunNotPinnedHereError extends DaemonError {
+  constructor(runId: string) {
     super(
       DAEMON_RPC_ERRORS.runNotPinnedHere,
       `Run "${runId}" is pinned to another device`,
       { runId }
     )
-    this.upgradeRequired = upgradeRequired
-    this.latest = latest
   }
 }
 

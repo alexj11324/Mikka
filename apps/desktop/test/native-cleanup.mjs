@@ -11,9 +11,10 @@ function navigationContextLost(error) {
 
 async function bounded(promise, milliseconds, message) {
   let timer
+  const timeout = message instanceof Error ? message : new Error(message)
   try {
     return await Promise.race([promise, new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(message)), milliseconds)
+      timer = setTimeout(() => reject(timeout), milliseconds)
     })])
   } finally { clearTimeout(timer) }
 }
@@ -88,9 +89,9 @@ async function processStopped(pid) {
   return false
 }
 
-function remainingTime(deadline, maximum = 20_000) {
+function remainingTime(deadline, maximum = 20_000, timeoutCode = 'NATIVE_DAEMON_EXIT_TIMEOUT') {
   const remaining = deadline - Date.now()
-  if (remaining <= 0) throw new Error('NATIVE_DAEMON_EXIT_TIMEOUT')
+  if (remaining <= 0) throw new Error(timeoutCode)
   return Math.min(remaining, maximum)
 }
 
@@ -119,14 +120,16 @@ async function recordedPid(directory) {
   return pid
 }
 
-async function proveNotRunning(directory, pid, refused = false) {
+async function shutdownState(directory, pid, refused = false) {
   // The production lock publishes this PID before device state is read. Its
   // socket disappears before final flush, so absence/refusal alone is unsafe.
-  if (pid !== null) return processStopped(pid)
+  if (pid !== null) return await processStopped(pid) ? 'stopped' : 'running'
   let locked = false
   try { await lstat(join(directory, 'daemon.lock')); locked = true } catch (error) { if (error.code !== 'ENOENT') throw error }
-  if (refused || locked) throw new Error('NATIVE_DAEMON_STOP_UNPROVEN')
-  return true
+  // acquireLock publishes the PID after obtaining the lock. Release removes
+  // the PID before awaiting lock removal. Either brief window looks exactly
+  // like a stale unowned lock until this same profile changes.
+  return refused || locked ? 'unproven' : 'stopped'
 }
 
 async function socketExists(socketPath) {
@@ -137,16 +140,17 @@ async function socketExists(socketPath) {
   return true
 }
 
-async function connectForCleanup(connect, directory, deadline, protocolVersion) {
+async function connectForCleanup(connect, directory, deadline, { protocolVersion, timeoutCode = 'NATIVE_DAEMON_EXIT_TIMEOUT' } = {}) {
+  const budget = remainingTime(deadline, 20_000, timeoutCode)
   let accepting = true
   const connecting = connect(directory, { name: 'mikka-native-acceptance-cleanup', version: '1' }, {
-    drainOnMismatch: false, protocolVersion, timeoutMs: remainingTime(deadline, 3000),
+    drainOnMismatch: false, protocolVersion, timeoutMs: Math.min(budget, 3000),
   }).then(client => {
     // A late hello must not retain a client after the cleanup deadline.
     if (!accepting) client.close()
     return client
   })
-  try { return await bounded(connecting, remainingTime(deadline), 'NATIVE_DAEMON_EXIT_TIMEOUT') } finally { accepting = false }
+  try { return await bounded(connecting, budget, timeoutCode) } finally { accepting = false }
 }
 
 /** Drain only the exact profiles created by this harness. The daemon secret
@@ -163,7 +167,9 @@ export async function stopLocalDaemons(profiles) {
     const deadline = Date.now() + 20_000
     let pid = await recordedPid(directory)
     const socketPath = join(directory, 'daemon.sock')
+    let unproven = false
     while (true) {
+      if (Date.now() >= deadline) throw new Error(unproven ? 'NATIVE_DAEMON_STOP_UNPROVEN' : 'NATIVE_DAEMON_EXIT_TIMEOUT')
       const currentPid = await recordedPid(directory)
       if (currentPid !== null) { assertDaemonPid(currentPid, pid); pid ??= currentPid }
       let client
@@ -171,7 +177,10 @@ export async function stopLocalDaemons(profiles) {
       if (await socketExists(socketPath)) {
         try {
           try {
-            client = await connectForCleanup(connectDaemonInDataDir, directory, deadline)
+            // The filesystem checks above can outlast the final poll. Preserve the last
+            // observation while no PID has appeared to establish process ownership.
+            const timeoutCode = unproven && pid === null ? 'NATIVE_DAEMON_STOP_UNPROVEN' : 'NATIVE_DAEMON_EXIT_TIMEOUT'
+            client = await connectForCleanup(connectDaemonInDataDir, directory, deadline, { timeoutCode })
           } catch (error) {
             if (!isProtocolMismatch(error)) throw error
             // Inspect the authenticated PID before any drain. Reconnect using
@@ -180,7 +189,7 @@ export async function stopLocalDaemons(profiles) {
             assertDaemonPid(error.data?.pid, pid)
             const protocolVersion = error.data?.protocolVersion
             assert.ok(Number.isSafeInteger(protocolVersion) && protocolVersion > 0, 'Native daemon protocol version is invalid')
-            client = await connectForCleanup(connectDaemonInDataDir, directory, deadline, protocolVersion)
+            client = await connectForCleanup(connectDaemonInDataDir, directory, deadline, { protocolVersion })
           }
         } catch (error) {
           if (isNoDaemon(error) && error.code !== 'ENOENT') refused = true
@@ -191,13 +200,27 @@ export async function stopLocalDaemons(profiles) {
         try {
           assertDaemonPid(client.hello.pid, pid)
           assertDaemonPid(client.hello.pid, await recordedPid(directory))
-          const closed = new Promise(resolve => client.onClose(resolve))
+          let connectionClosed = false
+          const closed = new Promise(resolve => client.onClose(() => { connectionClosed = true; resolve() }))
           const drainBudget = remainingTime(deadline, 5000)
-          await bounded(client.request('daemon.drain'), drainBudget, 'NATIVE_DAEMON_DRAIN_TIMEOUT')
-          await bounded(closed, remainingTime(deadline), 'NATIVE_DAEMON_SOCKET_CLOSE_TIMEOUT')
-          // Socket close precedes outbox/tracing shutdown in the real daemon.
-          // Prove actual process exit within this same cleanup deadline.
-          await waitForExit(client.hello.pid, deadline)
+          const drainTimeout = new Error('NATIVE_DAEMON_DRAIN_TIMEOUT')
+          let drainFailure
+          const drain = client.request('daemon.drain').catch(error => { drainFailure = { error }; throw error })
+          try {
+            try { await bounded(drain, drainBudget, drainTimeout) } catch (error) {
+              // Preserve the full response window, including queued RPC errors.
+              // Only this timer and an observed authenticated close may advance
+              // to exact-PID exit proof; closure alone cannot authorize cleanup.
+              if (error !== drainTimeout || !connectionClosed) throw error
+            }
+            await bounded(closed, remainingTime(deadline), 'NATIVE_DAEMON_SOCKET_CLOSE_TIMEOUT')
+            // Socket close precedes outbox/tracing shutdown in the real daemon.
+            // Prove actual process exit within this same cleanup deadline.
+            await waitForExit(client.hello.pid, deadline)
+          } catch (error) { throw drainFailure ? drainFailure.error : error }
+          // Do not discard a real RPC/parse rejection received while awaiting
+          // process exit. Our own dispose occurs only after this check.
+          if (drainFailure) throw drainFailure.error
         } finally { client.close() }
         break
       }
@@ -205,8 +228,10 @@ export async function stopLocalDaemons(profiles) {
       // observing the exact profile within the existing exit budget so a late
       // listener receives the normal authenticated drain request.
       pid ??= await recordedPid(directory)
-      if (await proveNotRunning(directory, pid, refused)) break
-      await new Promise(resolve => setTimeout(resolve, remainingTime(deadline, 100)))
+      const state = await shutdownState(directory, pid, refused)
+      if (state === 'stopped') break
+      unproven = state === 'unproven'
+      await new Promise(resolve => setTimeout(resolve, Math.max(0, Math.min(deadline - Date.now(), 100))))
     }
   }
   return { profilesStopped: true }

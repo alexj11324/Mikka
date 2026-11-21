@@ -29,7 +29,7 @@ test('the timestamp is the first 10 characters, and reads back exactly', () => {
   assert.throws(() => ulid(1.5), /driveIdTimeInvalid/)
 })
 
-test('a later time sorts later as text, which is why a version list can order by id', () => {
+test('a later time sorts later as text regardless of the random suffix', () => {
   const early = ulid(1_700_000_000_000, ones), late = ulid(1_700_000_001_000, zeros)
   assert.ok(late > early, `${late} > ${early}`)
   // The timestamp alone decides across milliseconds, whatever the random part is.

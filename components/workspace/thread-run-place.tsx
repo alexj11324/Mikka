@@ -1,16 +1,16 @@
 'use client'
 
-import { useEffect } from 'react'
-import useSWR from 'swr'
-import { useFormatter, useNow, useTranslations } from 'next-intl'
-import { Cloud, Copy, Laptop, Server } from 'lucide-react'
+import { useFormatter, useNow, useTranslations } from '@/lib/intl/i18n-client'
+import { Cloud, Copy, Laptop, Server } from '@/components/icons'
 import { toast } from 'sonner'
-import { getThreadMachine } from '@/app/actions/agents'
+import { useThreadMachine } from '@/hooks/use-thread-run-reads'
 import { Button } from '@/components/ui/button'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { HarnessMark, harnessName } from '@/components/labels/entity-labels'
 import { cloudShortId, machineDot, machineStateWord, systemLabel, type ThreadMachine, type ThreadMachineKind } from '@/lib/thread-machine'
+import { markOfValue, stateMarkTone } from '@/lib/state-mark'
+import { statusDots } from '@/lib/status-appearance'
 import { cn } from '@/lib/utils'
 
 const KIND_ICONS: Record<ThreadMachineKind, typeof Cloud> = { cloud: Cloud, laptop: Laptop, server: Server }
@@ -23,9 +23,9 @@ export function useMachineName() {
     : machine.name || t(`kinds.${machine.kind}`)
 }
 
-/** The status dot (R-24): green while it can work, red on error, grey otherwise. */
+/** The status dot (R-24): the colour of the machine's own mark, so it agrees with the run mark on the same row. */
 function Dot({ dot, corner }: { dot: ReturnType<typeof machineDot>; corner?: boolean }) {
-  return <span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full bg-muted-foreground/50', dot === 'running' && 'bg-success', dot === 'failed' && 'bg-destructive', corner && 'absolute -top-0.5 -right-0.5 ring-2 ring-background')} />
+  return <span aria-hidden="true" className={cn('size-1.5 shrink-0 rounded-full', statusDots[stateMarkTone(markOfValue(dot))], corner && 'absolute -top-0.5 -right-0.5 ring-2 ring-background')} />
 }
 
 /** The device type icon with its status dot on the top right (R-24, R-74). */
@@ -91,9 +91,7 @@ export function MachineDetails({ machine }: { machine: ThreadMachine }) {
 export function ThreadRunPlace({ issueId, runId, status, harness, botName }: { issueId: string | null; runId: string; status: string; harness?: string; botName?: string }) {
   const t = useTranslations('ThreadRunPlace')
   const threads = useTranslations('IssueThreads')
-  const { data: machine, mutate } = useSWR(['thread-machine', issueId, runId], () => getThreadMachine(issueId, runId), { revalidateOnFocus: false })
-  // A cloud machine pauses or ends with its run; read again when the run's state moves.
-  useEffect(() => { void mutate() }, [status, mutate])
+  const { data: machine } = useThreadMachine(issueId, runId, status)
   const name = useMachineName()
   const agent = harness ? harnessName(harness) : null
   return <span className="flex shrink-0 items-center gap-0.5" data-slot="thread-run-place">
@@ -105,7 +103,7 @@ export function ThreadRunPlace({ issueId, runId, status, harness, botName }: { i
       <HoverCardContent align="start" className="w-72 p-3"><MachineDetails machine={machine} /></HoverCardContent>
     </HoverCard>}
     {harness && agent && <Tooltip>
-      <TooltipTrigger render={<span tabIndex={0} className="flex size-7 items-center justify-center rounded-md outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" />}><HarnessMark harness={harness} /></TooltipTrigger>
+      <TooltipTrigger render={<span role="img" tabIndex={0} aria-label={botName ? `${agent} · ${botName}` : agent} className="flex size-7 items-center justify-center rounded-md outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" />}><HarnessMark harness={harness} /></TooltipTrigger>
       <TooltipContent side="bottom">{botName ? `${agent} · ${botName} ${threads('dispatched')}` : agent}</TooltipContent>
     </Tooltip>}
   </span>

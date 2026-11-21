@@ -29,6 +29,7 @@
  */
 
 type Env = Record<string, string | undefined>
+import { deploymentStage } from './deployment-stage.mjs'
 import { posthogConfig } from './posthog-config'
 import { isCloudEdition } from './edition'
 
@@ -119,7 +120,7 @@ export const PRODUCTION_SWITCH_DEFAULTS: Readonly<Record<DeploymentSwitch, boole
  * production only.
  */
 export function deploymentName(env: Env = process.env): string {
-  return env.VERCEL_ENV === 'production' || env.VERCEL_ENV === 'preview' ? env.VERCEL_ENV : env.VERCEL_ENV ? 'development' : 'local'
+  return deploymentStage(env) ?? 'local'
 }
 
 /** The one identity every switch is evaluated for. */
@@ -157,7 +158,7 @@ function testOverrides(): Map<string, boolean> | undefined {
  * test files may import it (deployment-switches.test.ts checks both).
  */
 export function overrideDeploymentSwitch(name: DeploymentSwitch, value: boolean | undefined, env: Env = process.env): void {
-  if (env.VERCEL || env.VERCEL_ENV || env.NODE_ENV === 'production') throw new Error('overrideDeploymentSwitch is for tests only')
+  if (deploymentStage(env) || env.VERCEL || env.NODE_ENV === 'production') throw new Error('overrideDeploymentSwitch is for tests only')
   const holder = globalThis as { [OVERRIDES]?: Map<string, boolean> }
   const map = holder[OVERRIDES] ??= new Map()
   if (value === undefined) map.delete(name)

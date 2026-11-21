@@ -1,32 +1,26 @@
 'use client'
 
-import { useState } from 'react'
-import { useTranslations } from 'next-intl'
-import { Bot, FileDiff, FolderClosed, ListTodo, Plus, RotateCw, Search, SquarePen, Users } from 'lucide-react'
+import { useContext, useMemo, useState } from 'react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { Bot, FileDiff, FolderClosed, ListTodo, Plus, RotateCw, Search, SquarePen, Users } from '@/components/icons'
 import type { listIssues } from '@/app/actions/issues'
 import type { listProjects } from '@/app/actions/projects'
 import type { Thread } from '@/app/actions/task-runs'
 import { threadSearchHits } from '@/lib/thread-search'
-import { threadName, ThreadMark } from './thread-list'
+import { threadName } from './thread-list'
 import type { BotView } from '@/app/actions/bots'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/reui/badge'
-import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList, CommandShortcut } from '@/components/ui/command'
-import { Kbd, KbdGroup } from '@/components/ui/kbd'
-import { Spinner } from '@/components/ui/spinner'
-import { statusTone, type StatusTone } from '@/lib/status-appearance'
+import type { StatusTone } from '@/lib/status-appearance'
 import { ShortcutKeys } from '@/components/shortcut-keys'
 import type { SavedAgentSession } from '@/lib/agent-history'
 import { matchesQuery, mergeById, type SiteSearchItem } from '@/lib/site-search'
 import { useSiteSearch, type ListedSource } from '@/hooks/use-site-search'
 import type { ChatTarget } from './bot-list'
-import * as searchSlot from '@ui-slot/search'
-import type { SearchLead, SearchPaletteProps, SearchRow, SearchSection } from '@/components/slots/search-contract'
-import { cn } from '@/lib/utils'
-import { LetterAvatar } from './letter-avatar'
-import { BotAvatar, CoordinatorAvatar } from './bot-avatar'
-import { FieldError } from '@/components/ui/field'
-import { localTaskState, type TaskState } from '@/hooks/use-bot-tasks'
+import { SearchPalette } from '@ui-slot/search'
+import type { SearchPaletteProps, SearchRow, SearchSection } from '@/components/slots/search-contract'
+import type { TaskState } from '@/lib/task-state'
+import { TaskPresentationsContext, useWorkspaceTaskPresentations } from '@/hooks/use-task-collection'
+import { useLiveScope } from '@/hooks/use-live-key'
 
 type Issue = Awaited<ReturnType<typeof listIssues>>[number]
 type Project = Awaited<ReturnType<typeof listProjects>>[number]
@@ -35,9 +29,8 @@ type GroupHit = Extract<SiteSearchItem, { type: 'group' }>
 type HistoryHit = Extract<SiteSearchItem, { type: 'history' }>
 
 /** A task state's badge tone: waiting is the person's turn, blocked and failed need help, the rest are calm. */
-const TASK_STATE_TONE = { waiting: 'warning', blocked: 'destructive', failed: 'destructive', running: 'info', queued: 'neutral', todo: 'neutral', idle: 'neutral', done: 'success', canceled: 'neutral', duplicate: 'neutral' } as const satisfies Record<TaskState, StatusTone>
+const TASK_STATE_TONE = { waiting: 'warning', blocked: 'destructive', failed: 'destructive', running: 'info', queued: 'neutral', todo: 'neutral', done: 'success', canceled: 'neutral', duplicate: 'neutral' } as const satisfies Record<TaskState, StatusTone>
 
-const STATUS_BADGES = { neutral: 'outline', warning: 'warning-light', info: 'info-light', success: 'success-light', destructive: 'destructive-light', focus: 'focus-light' } as const satisfies Record<StatusTone, string>
 
 /** The search pill centered in the window bar (Comma's shell); it opens the results below it. */
 export function SearchPill({ onSearch }: { onSearch: () => void }) {
@@ -91,20 +84,16 @@ const QUERY_MAX_LENGTH = 400
  */
 export function GlobalSearch(props: GlobalSearchProps) {
   const palette = useSearchPalette(props)
-  const Layer = searchSlot.SearchPalette ?? null
-  if (Layer) return <Layer {...palette} />
-  return <SearchDialog {...palette} />
+  return <SearchPalette {...palette} />
 }
 
 /** The palette as data: what is listed for the query, in order, and what picking each row does. */
 function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sessions, coordinatorLine, issues, projects, threads = [], workspaceId, onChat, onNewBot, onIssue, onProject, onThread, onCreateIssue, reviewTaskId = null, onReview }: GlobalSearchProps): SearchPaletteProps {
   const t = useTranslations('Shell')
   const tNav = useTranslations('Nav')
-  const tIssue = useTranslations('Issue')
   const [query, setQuery] = useState('')
   const search = useSiteSearch(query, workspaceId)
   const text = query.trim()
-  const statusLabel = (value: string) => tIssue.has(`status.${value}` as never) ? tIssue(`status.${value}` as never) : value
   const sessionName = (title: string) => tNav('archivedConversation', { title: title || tNav('untitledConversation') })
   function pick(action: () => void) { onOpenChange(false); action() }
   const shown = (value: string) => !text || matchesQuery(value, text)
@@ -113,16 +102,31 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
   // The Coordinator has its own entry above; its bot row is not listed again.
   const botRows = bots.filter(bot => !bot.coordinator && shown(bot.name))
   const historyRows = mergeById(
-    sessions.filter(session => shown(`${sessionName(session.title)} ${session.preview ?? ''}`)),
+    search.serverHistory ? [] : sessions.filter(session => shown(`${sessionName(session.title)} ${session.preview ?? ''}`)),
     search.state.history.items.filter((item): item is HistoryHit => item.type === 'history'),
   )
   const groupRows = search.state.groups.items.filter((item): item is GroupHit => item.type === 'group')
+  const presentations = useContext(TaskPresentationsContext)
+  const scope = useLiveScope()
+  const remoteTasks = useMemo(() => search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'), [search.state.tasks.items])
+  // The workspace already reads its loaded issues. Only hits outside that collection need another batch.
+  const extraTasks = useMemo(() => {
+    if (!workspaceId) return []
+    const loaded = new Set(issues.map(issue => issue.id))
+    return remoteTasks.filter(hit => !loaded.has(hit.id)).map(hit => ({ id: hit.id, workspaceId }))
+  }, [issues, remoteTasks, workspaceId])
+  const extra = useWorkspaceTaskPresentations(scope?.ownerId ?? '', workspaceId ?? undefined, null, extraTasks, open && !!scope?.ownerId && scope.workspaceId === workspaceId)
   const taskRows: (Issue | TaskHit)[] = mergeById(
-    issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
-    search.state.tasks.items.filter((item): item is TaskHit => item.type === 'task'),
+    search.serverTasks ? [] : issues.filter(issue => shown(`${issue.identifier ?? ''} ${issue.title}`)),
+    remoteTasks,
   )
-  const threadRows = onThread ? threadSearchHits(threads, text, thread => threadName(thread, issues, tNav('untitledConversation')), new Set(taskRows.map(row => row.id))) : []
-  const projectRows = projects.filter(project => shown(`${project.name} ${project.summary}`))
+  const taskIds = new Set(taskRows.map(row => row.id))
+  // Threads have an owner-wide reader. Keep its standalone rows, but do
+  // not enrich them from Task metadata withheld by the workspace source.
+  const deniedTasks = search.workspaceDenied ? new Set(issues.filter(issue => issue.workspaceId === workspaceId).map(issue => issue.id)) : null
+  const visibleThreads = deniedTasks ? threads.filter(thread => !thread.issueId || !deniedTasks.has(thread.issueId)) : threads
+  const threadRows = onThread ? threadSearchHits(visibleThreads, text, thread => threadName(thread, search.serverTasks ? [] : issues, tNav('untitledConversation')), taskIds) : []
+  const projectRows = search.workspaceDenied ? [] : projects.filter(project => shown(`${project.name} ${project.summary}`))
   const actions = [
     // i18n-ignore: bilingual search keywords, not rendered
     { value: '新建任务 create issue new task', icon: Plus, label: t('newTask'), run: onCreateIssue },
@@ -132,13 +136,13 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
     { value: '新建 bot create new bot', icon: Bot, label: t('newBot.title'), run: onNewBot },
   ].filter(action => shown(`${action.value} ${action.label}`))
   // 「审阅 #N」 (#1732): the current task's, and with a query any matching task that has a pull request.
-  const reviewRows = onReview ? issues.filter(issue => issue.id === reviewTaskId || (text && issue.metadata.pullRequests?.length))
+  const reviewRows = onReview ? issues.filter(issue => (!search.serverTasks || taskIds.has(issue.id)) && (issue.id === reviewTaskId || (text && issue.metadata.pullRequests?.length)))
     .map(issue => ({ id: issue.id, label: t('reviewTask', { identifier: issue.identifier ?? issue.title }), value: `review ${issue.id} ${issue.identifier ?? ''} ${issue.title}` }))
     .filter(row => shown(`${row.value} ${row.label}`)) : []
   const coordinatorShown = shown(coordinatorValue)
 
   const failed = search.sources.filter(source => search.state[source].status === 'error' || search.state[source].error)
-  const authLost = failed.some(source => search.state[source].error === 'authRequired')
+  const authLost = search.authRequired || failed.some(source => search.state[source].error === 'authRequired')
   const resultCount = (coordinatorShown ? 1 : 0) + botRows.length + historyRows.length + groupRows.length + taskRows.length + threadRows.length + projectRows.length + actions.length + reviewRows.length
   const announce = search.searching ? t('search.searching')
     : search.query.kind === 'tooLong' ? t('search.tooLong')
@@ -176,13 +180,8 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
     { id: 'tasks', heading: t('groups.tasks'), rows: taskRows.length ? [
       ...taskRows.map(row => {
         const assignee = 'metadata' in row ? row.metadata.assignee?.name : null
-        // The task's one state, as its card, panel row and board read it (localTaskState), not the bare board
-        // status: a done run whose PR waits says Needs review here too (UI audit work-04). A server hit without
-        // its metadata keeps the board status.
-        const task = 'metadata' in row ? localTaskState(row, threads.find(thread => thread.issueId === row.id)) : null
-        const status = task
-          ? { label: task.reason ? t(`panel.task.reason.${task.reason}`) : t(`panel.task.state.${task.state}`), tone: TASK_STATE_TONE[task.state] }
-          : { label: statusLabel(row.status), tone: statusTone(row.status) }
+        const task = presentations[row.id] ?? extra.items[row.id]
+        const status = task && { label: task.reason ? t(`panel.task.reason.${task.reason}`) : t(`panel.task.state.${task.state}`), tone: TASK_STATE_TONE[task.state] }
         return { key: `issue ${row.id}`, label: row.title, identifier: row.identifier ?? undefined, detail: assignee ?? undefined, status, lead: { kind: 'icon', icon: ListTodo }, select: () => { if (onIssue(row.id)) onOpenChange(false) } } satisfies SearchRow
       }),
       ...moreRow('tasks'),
@@ -195,65 +194,12 @@ function useSearchPalette({ open, onOpenChange, onOpenChangeComplete, bots, sess
       select: () => { for (const source of failed) search.retry(source) },
     }] } satisfies SearchSection] : []),
   ]
-  const sections = listed.filter(section => section.rows.length > 0)
+  const sections = authLost ? [] : listed.filter(section => section.rows.length > 0)
 
   return {
     open, onOpenChange, onOpenChangeComplete, query, onQueryChange: setQuery, maxLength: QUERY_MAX_LENGTH, sections,
-    searching: search.searching, announce: text ? announce : '',
-    empty: !search.searching && resultCount === 0 ? (search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')) : null,
+    searching: search.searching, announce: text && !authLost ? announce : '',
+    empty: !authLost && !search.searching && resultCount === 0 ? (search.query.kind === 'tooLong' ? t('search.tooLong') : t('searchEmpty')) : null,
     authError: authLost ? t('search.authRequired') : null,
   }
-}
-
-function RowLead({ lead }: { lead: SearchLead }) {
-  switch (lead.kind) {
-    case 'coordinator': return <CoordinatorAvatar size="search" />
-    case 'bot': return <BotAvatar id={lead.id} color={lead.color} shape={lead.shape} size="search" />
-    case 'letter': return <LetterAvatar name={lead.name} size="search" />
-    case 'thread': return <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted"><ThreadMark size="row" /></span>
-    case 'icon': return <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"><lead.icon /></span>
-    case 'glyph': return <lead.icon />
-  }
-}
-
-/** The open-source palette: reUI's command dialog over the sections. */
-function SearchDialog({ open, onOpenChange, onOpenChangeComplete, query, onQueryChange, maxLength, sections, searching, announce, empty, authError }: SearchPaletteProps) {
-  const t = useTranslations('Shell')
-  const tCopy = useTranslations('FeatureCopy')
-  const tCommon = useTranslations('Common')
-
-
-  // Rows sit in their group's JSX (lint-ui composition/group).
-  const group = (section: SearchSection) => <CommandGroup key={section.id} heading={section.heading}>{section.rows.map(item => item.lead.kind === 'glyph'
-    ? <CommandItem key={item.key} value={item.key} disabled={item.disabled} onSelect={item.select} className={cn((item.busy !== undefined || item.trailing) && 'text-muted-foreground')}>
-      {item.busy ? <Spinner role="presentation" aria-hidden="true" /> : <RowLead lead={item.lead} />}{item.label}
-      {item.trailing && <CommandShortcut className="tracking-normal">{item.trailing}</CommandShortcut>}
-    </CommandItem>
-    : <CommandItem key={item.key} value={item.key} disabled={item.disabled} onSelect={item.select} className="gap-3 py-2">
-      <RowLead lead={item.lead} />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate font-medium">{item.identifier && <><span className="text-muted-foreground tabular-nums">{item.identifier}</span> </>}{item.label}</span>
-        {item.detail && <span className="truncate text-xs text-muted-foreground">{item.detail}</span>}
-      </span>
-      {item.status && <CommandShortcut className="tracking-normal"><Badge variant={STATUS_BADGES[item.status.tone]} size="sm">{item.status.label}</Badge></CommandShortcut>}
-    </CommandItem>)}</CommandGroup>
-
-  return <CommandDialog open={open} onOpenChange={onOpenChange} onOpenChangeComplete={onOpenChangeComplete} title={t('searchLabel')} description={t('searchDescription')} className="top-[max(1rem,calc(50svh-15rem))] translate-y-0 max-md:top-[max(1rem,env(safe-area-inset-top))] sm:max-w-xl">
-    {/* Filtering is ours: server hits must not be dropped by cmdk's client-side match. */}
-    {/* The active row is a step of the text colour, so it reads on white and on the dark popover alike (bg-muted equals the dark popover). */}
-    <Command shouldFilter={false} className="**:data-[selected=true]:bg-foreground/[0.08]">
-      <CommandInput className="text-base text-ellipsis md:text-sm" aria-label={t('searchLabel')} placeholder={t('searchPlaceholder')} value={query} onValueChange={onQueryChange} maxLength={maxLength} />
-      <p role="status" aria-live="polite" className="sr-only">{announce}</p>
-      {/* The dialog's top edge stays put and its height follows the results (Linear, Raycast): no blank block under one empty line. */}
-      <CommandList aria-busy={searching} className="max-h-[min(26rem,60svh)] scroll-fade-y">
-        {sections.filter(section => section.id !== 'retry').map(group)}
-        {/* Both lines are announced by the status region above, so the listbox stays options only for screen readers. */}
-        {searching && <div aria-hidden="true" className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground"><Spinner role="presentation" aria-hidden="true" className="size-3.5" />{t('search.searching')}</div>}
-        {empty && <p aria-hidden="true" className="py-6 text-center text-sm">{empty}</p>}
-        {authError ? <FieldError className="px-3 py-2 text-xs">{authError}</FieldError> : sections.filter(section => section.id === 'retry').map(group)}
-      </CommandList>
-      {/* The list ends on this bar, not mid-row; the keys are the ones issue-search names. */}
-      <div aria-hidden="true" className="flex items-center gap-4 bg-muted/30 px-4 py-2.5 text-xs text-muted-foreground max-md:hidden"><span className="flex items-center gap-1.5"><KbdGroup><Kbd>↑</Kbd><Kbd>↓</Kbd></KbdGroup>{tCopy('c_70b20820')}</span><span className="flex items-center gap-1.5"><Kbd>Enter</Kbd>{tCopy('c_65fc81e1')}</span><span className="ml-auto flex items-center gap-1.5"><Kbd>Esc</Kbd>{tCommon('close')}</span></div>
-    </Command>
-  </CommandDialog>
 }

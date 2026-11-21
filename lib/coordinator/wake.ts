@@ -9,7 +9,9 @@ import { runTriageBatch, TRIAGE_BATCH_BUDGET_MS } from './triage-batch'
 import { pool } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
 import { coordinatorBot } from './coordinator-bot'
+import { COORDINATOR_WAKE_SCOPES_SQL } from './wake-recovery'
 import { deliverRunCompletion } from './run-completion-delivery'
+import { verifiedCiSuiteTransport } from './ci-suite-transport'
 
 
 /**
@@ -32,6 +34,10 @@ export async function triageInbox(userId: string, botId: string): Promise<void> 
     claim: event => claimTriageAttempt(event, scope),
     deliverUser: event => setEventTier(event.id, 'attention', scope),
     deliverCompletion: event => deliverRunCompletion(pool, event, scope, workspacePool),
+    // Signed-webhook, source-bound CI result is transport, not another model
+    // decision. The Bot sees it as a new turn after the outbox commits.
+    deliverCiSuite: event => verifiedCiSuiteTransport(event)
+      ? setEventTier(event.id, 'result', scope) : Promise.resolve(false),
     classify: async (event, signal) => {
       const result = await hostedBillingScope.run({workspaceId:await executionWorkspace(userId,botId),ownerId:userId},()=>invokeDecision('triage', triageInput(event), triageQuestions(event), signal))
       return { tier: tierFromDecision(result?.answers.get('tier')), execution: result?.execution ?? null }
@@ -68,14 +74,18 @@ export async function wakeCoordinator(userId: string): Promise<void> {
 /** Product outbox delivery only. eve owns turn queueing, retry and recovery. */
 async function wakeChat(scope: { userId: string; botId: string }) {
   await triageInbox(scope.userId,scope.botId)
-  const [{rows: events},{rows: bots}] = await Promise.all([
-    pool.query<{id:string}>(`SELECT id FROM coordinator_events WHERE "userId"=$1 AND "botId"=$2 AND "deliveredAt" IS NULL AND (kind='user_message' OR (tier IS NOT NULL AND tier<>'background')) ORDER BY "createdAt",id LIMIT 50`,[scope.userId,scope.botId]),
-    pool.query<{workspaceId:string}>('SELECT "workspaceId" FROM bots WHERE id=$1 AND "ownerId"=$2',[scope.botId,scope.userId]),
-  ])
-  if (!bots[0]) return 'deferred' as const
-  const {sendEveEvent} = await import('../eve/server-client')
-  for (const event of events) await sendEveEvent({ownerId:scope.userId,botId:scope.botId,workspaceId:bots[0].workspaceId,surface:'web'},event.id)
-  return events.length ? 'started' as const : 'deferred' as const
+  const { rows: events } = await pool.query<{ id: string; workspaceId: string }>(`
+    SELECT e.id, b."workspaceId" FROM coordinator_events e
+    JOIN bots b ON b.id = e."botId" AND b."ownerId" = e."userId"
+    WHERE e."userId" = $1 AND e."botId" = $2 AND e."deliveredAt" IS NULL
+      AND (e.kind = 'user_message' OR (e.tier IS NOT NULL AND e.tier <> 'background'))
+    ORDER BY e."createdAt", e.id LIMIT 50`, [scope.userId, scope.botId])
+  if (!events.length) return 'deferred' as const
+  const { sendEveEvent } = await import('../eve/server-client')
+  for (const event of events) {
+    await sendEveEvent({ ownerId: scope.userId, botId: scope.botId, workspaceId: event.workspaceId, surface: 'web' }, event.id)
+  }
+  return 'started' as const
 }
 
 /** Compatibility entry for previously queued wake deadlines; no turn lease survives. */
@@ -87,7 +97,7 @@ export async function recoverWakeDeadline(ticket: import('./wake-recovery').Wake
 /** Existing source-outbox reconciliation; never inspects or restarts an eve workflow. */
 export async function retryCoordinatorWakes(deadline = Date.now()+45_000) {
   const counts = {due:0,started:0,deferred:0,failed:0,exhausted:0,interrupted:0}
-  const scopes = (await pool.query<{userId:string;botId:string}>(`SELECT DISTINCT "userId","botId" FROM coordinator_events WHERE "deliveredAt" IS NULL AND "botId" IS NOT NULL AND (kind='user_message' OR tier IS NULL OR tier<>'background')`)).rows
+  const scopes = (await pool.query<{userId:string;botId:string}>(COORDINATOR_WAKE_SCOPES_SQL)).rows
   counts.due = scopes.length
   for (const scope of scopes) {
     if (Date.now()>=deadline || !await coordinatorEnabled(scope.userId,scope.botId)) {counts.deferred++;continue}

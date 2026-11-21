@@ -33,6 +33,20 @@ test('saved secret split across content chunks cannot leave, including after rec
     assert.deepEqual(await project(lines,1,secret),whole.slice(1))
   }finally{if(prior===undefined)delete process.env.BETTER_AUTH_SECRET;else process.env.BETTER_AUTH_SECRET=prior}
 })
+test('a long part preserves native progress and the fingerprint window on reconnect', async t => {
+  t.mock.property(process, 'env', {...process.env, BETTER_AUTH_SECRET:'local-only-fingerprint-fixture-key-for-native-progress'})
+  const secret = 'ordinary saved fixture'
+  const text = 'one ordinary sentence. '.repeat(4)
+  const prefix = Array.from({length:64}, () => delta(text))
+  const whole = await project([...prefix, complete(text.repeat(64))], 0, secret)
+  const released = whole.slice(0,-1).map(line => line.progress.data.delta).join('')
+  assert.equal(released, text.repeat(64).slice(0,-(secret.length-1)))
+  const lines = [...prefix, ...Array.from(secret, character => delta(character)), complete(text.repeat(64)+secret)]
+  const projected = await project(lines, 0, secret)
+  assert.equal(projected.slice(0,-1).map(line => line.progress.data.delta).join(''), text.repeat(64))
+  assert.equal(projected.at(-1).facts[0].data.value, '[redacted]')
+  assert.deepEqual(await project(lines, prefix.length, secret), projected.slice(prefix.length))
+})
 test('native partial tool arguments stay private and committed previews are masked',async()=>{
   const lines=[{progress:{type:'call.input',data:{callId:'call',name:'tool',delta:'secret-in-progress'}}},{at:'2026-11-11T00:00:00Z',facts:[{type:'call.requested',data:{callId:'call',input:{authorization:'Bearer sk-fixture_abcdefghijklmnopqrstuvwxyz123456789'},owner:{turnId:'turn'},capability:{kind:'tool',name:'tool'}}}]}]
   const out=await project(lines)

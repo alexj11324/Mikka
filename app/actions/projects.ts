@@ -1,6 +1,6 @@
 'use server'
-import { getTranslations } from 'next-intl/server'
-import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
+import { getTranslations } from '@/lib/intl/i18n-server'
+import { and, asc, desc, eq, getTableColumns, inArray, ne, sql } from 'drizzle-orm'
 import { z } from 'zod'
 import { ActionFailureError } from '@/lib/action-error'
 import { withDatabaseOperation } from '@/lib/db/egress-sample'
@@ -58,7 +58,19 @@ async function readProject(tx: ProjectTransaction | typeof projectDb, reader: Pa
 async function projectsInContext(workspaceId?: string) {
   return withDatabaseOperation('/actions/projects/list', async () => {
     const context = await projectContext(workspaceId)
-    return (await accessibleProjects(context.user, projectDb, context.workspaceId)).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    const rows = await accessibleProjects(context.user, projectDb, context.workspaceId)
+    const taskIds = [...new Set(rows.flatMap(row => row.issueIds))]
+    const statuses = new Map<string, string>()
+    for (let offset = 0; offset < taskIds.length; offset += batchSize) {
+      const visible = await db.select({ id: issues.id, status: issues.status }).from(issues)
+        .where(and(inArray(issues.id, taskIds.slice(offset, offset + batchSize)),
+          issueVisibilityPredicate(context.user.id, { allowedIds: [], workspaceIds: [context.workspaceId] })))
+      for (const task of visible) statuses.set(task.id, task.status)
+    }
+    return rows.map(project => {
+      const visible = project.issueIds.filter(id => statuses.has(id))
+      return { ...project, taskCounts: { total: visible.length, done: visible.filter(id => statuses.get(id) === 'done').length } }
+    }).toSorted((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
   })
 }
 
@@ -94,7 +106,7 @@ async function persistProject(input: unknown, partial: boolean) {
       }
       const parsed = projectInput.safeParse(merged)
       if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? i18nText('Errors.projectCheckFields') }
-      const { id, revision, workspaceId: _workspaceId, leadUserId: _leadUserId, memberIds: _memberIds, ...values } = parsed.data
+      const { id, revision, expectedVisibility, workspaceId: _workspaceId, leadUserId: _leadUserId, memberIds: _memberIds, ...values } = parsed.data
       if (parsed.data.workspaceId && parsed.data.workspaceId !== context.workspaceId) throw new ActionFailureError('workspaceAccessDenied')
       const people = projectPeople(parsed.data, context.user.id)
       await lockPeople(tx, context.workspaceId, people)
@@ -122,7 +134,7 @@ async function persistProject(input: unknown, partial: boolean) {
         // A new Project becomes a content resource only after its canonical row
         // exists. The nested APP commit can leave an unreachable policy if this
         // Workspace transaction later fails, never an unguarded Project.
-        if (!existing) await registerProjectAccess(context.user, nextId, context.workspaceId)
+        if (!existing) await registerProjectAccess(context.user, nextId, context.workspaceId, expectedVisibility)
         await tx.delete(projectMembers).where(eq(projectMembers.projectId, nextId))
         for (let offset = 0; offset < people.memberIds.length; offset += batchSize) {
           await tx.insert(projectMembers).values(people.memberIds.slice(offset, offset + batchSize).map(userId => ({ projectId: nextId, workspaceId: context.workspaceId, userId })))
@@ -141,6 +153,21 @@ async function persistProject(input: unknown, partial: boolean) {
 
 export async function saveProject(input: z.input<typeof projectInput>) { return persistProject(input, false) }
 export async function updateProjectProperties(input: { id: string; revision: number; changes: ProjectChanges; workspaceId?: string }) { return persistProject(input, true) }
+
+/** Both Project and Task editors invalidate the same Task revision after a membership change. */
+async function recordProjectTaskChanges(application: Parameters<Parameters<typeof db.transaction>[0]>[0], taskIds: string[], actorId: string) {
+  const saved = await application.update(issues)
+    .set({ revision: sql`${issues.revision} + 1`, updatedAt: new Date() })
+    .where(inArray(issues.id, taskIds)).returning()
+  if (saved.length !== taskIds.length) throw new ActionFailureError('issueOutdated')
+  await application.insert(issueVersions).values(saved.map(task => ({
+    id: crypto.randomUUID(), issueId: task.id, userId: task.userId, revision: task.revision,
+    title: task.title, content: task.content, status: task.status, priority: task.priority,
+    ...activityActor(actorId),
+  })))
+  for (const task of saved) await issueListChanged(application, task.id)
+  return saved
+}
 
 export async function moveIssueToProject(input: { issueId: string; revision: number; projectId: string | null; workspaceId?: string; confirmAccess?: boolean }) {
   const i18nText = await getTranslations()
@@ -192,17 +219,13 @@ export async function moveIssueToProject(input: { issueId: string; revision: num
           await tx.update(projects).set({ revision: project.revision + 1, updatedAt: new Date() }).where(eq(projects.id, project.id))
           await emitProjectChange(tx, project.id, context.user.id, i18nText(project.id === parsed.data.projectId ? 'Projects.activity.tasksAdded' : 'Projects.activity.tasksRemoved'))
         }
-        // The canonical relationship commits in the Workspace DB. APP keeps an
-        // optimistic-concurrency/version event, without a second project-name store.
-        const [saved] = await application.update(issues).set({ revision: task.revision + 1, updatedAt: new Date() }).where(and(eq(issues.id, task.id), eq(issues.revision, task.revision))).returning()
-        if (!saved) throw new ActionFailureError('issueOutdated')
-        await application.insert(issueVersions).values({ id: crypto.randomUUID(), issueId: saved.id, userId: saved.userId, revision: saved.revision, title: saved.title, content: saved.content, status: saved.status, priority: saved.priority, ...activityActor(context.user.id) })
-        await issueListChanged(application, saved.id)
+        const [saved] = await recordProjectTaskChanges(application, [task.id], context.user.id)
         return saved
       })
     })
     return { issue: await issueView(result) }
   } catch (error) {
+    if (error instanceof ActionFailureError && error.code === 'issueOutdated') return { error: error.code }
     if (error instanceof ActionFailureError && error.confirmable) return { error: error.code, params: error.params, confirmable: error.confirmable }
     return { error: error instanceof ActionFailureError ? i18nText(`Errors.${error.code}`) : i18nText('Errors.projectMoveFailed') }
   }
@@ -215,7 +238,9 @@ export async function listProjectEvents(id: string, workspaceId?: string) {
   if (!reference) throw new ActionFailureError('projectNotFound')
   return withResourceAccess(context.user, reference, 'canReadContent', async () => {
     await readProject(projectDb, context.user, context.workspaceId, id)
-    return projectDb.select().from(projectEvents).where(eq(projectEvents.projectId, id)).orderBy(desc(projectEvents.createdAt)).limit(100)
+    return projectDb.select({ ...getTableColumns(projectEvents), actorName: workspaceMembers.name }).from(projectEvents)
+      .leftJoin(workspaceMembers, and(eq(workspaceMembers.workspaceId, context.workspaceId), eq(workspaceMembers.userId, projectEvents.userId), eq(workspaceMembers.status, 'active')))
+      .where(eq(projectEvents.projectId, id)).orderBy(desc(projectEvents.createdAt)).limit(100)
   })
 }
 
@@ -263,7 +288,9 @@ export async function setProjectIssues(input: { id: string; revision: number; is
         }
         await tx.update(projects).set({ revision: current.revision + 1, updatedAt: new Date() }).where(eq(projects.id, current.id))
         await emitProjectChange(tx, current.id, context.user.id, i18nText('FeatureCopy.c_310e5541', { value0: ids.length }))
-        for (const id of changed) await issueListChanged(application, id)
+        for (let offset = 0; offset < changed.length; offset += batchSize) {
+          await recordProjectTaskChanges(application, changed.slice(offset, offset + batchSize), context.user.id)
+        }
         return { project: await readProject(tx, context.user, context.workspaceId, current.id), error: undefined }
       }))
     })

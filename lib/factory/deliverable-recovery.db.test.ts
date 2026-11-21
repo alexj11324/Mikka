@@ -1,6 +1,7 @@
 import { seedFixtureWorkspace } from '../../tests/helpers/task-workspace';
 import { bindFixtureWorkspaceDatabase } from '../../tests/helpers/workspace-database';
 import { createLegacyFactoryStore as createFactoryStore } from '../../tests/helpers/factory-legacy';
+import { addFactoryVisualEvidence } from '../../tests/helpers/factory-visual-evidence';
 import { createFactoryStore as createCurrentFactoryStore } from './store';
 // Real isolated PostgreSQL contracts. The VM observation and Harness reports
 // below are explicit synthetic fixtures, never live-provider acceptance.
@@ -11,7 +12,7 @@ import { gzipSync } from 'node:zlib'
 import { readFile, readdir } from 'node:fs/promises'
 import { Pool, type PoolClient } from 'pg'
 import { orderMigrations } from '../../scripts/migration-order.mjs'
-import { dropTestDatabase } from '../../tests/support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from '../../tests/support/drop-test-database'
 import { applyApprovalMode, defaultRunPolicy } from '@mikka/protocol/agent-policy'
 
 import { createFactoryDispatch, defaultFactoryDispatchAdapters, factoryBinding, type FactoryQueue } from './dispatch'
@@ -27,7 +28,6 @@ import { factoryEventId } from './event-id'
 import { retainedDeliverableForRecovery, type ObserveRetainedDeliverable, type RetainedDeliverableScope, type RetainedDeliverableSnapshot } from './deliverable-recovery'
 import { readDeliverableSnapshotReceipt, resolveFactoryCandidateSha } from './deliverable-snapshot'
 import { createRetainedDeliverableObserver, type RetainedDeliverableRuntime } from '../cloud-computer/retained-deliverable'
-import { observePoolCommits } from '../db/commit-effects'
 
 const url = process.env.E2E_DATABASE_URL
 if (url) {
@@ -44,11 +44,10 @@ const patch = Buffer.from(`diff --git a/DELIVERY.txt b/DELIVERY.txt\nnew file mo
 test('legacy delivery snapshot recovery binds a fresh live observation without rewriting the successful producer or failed review', { skip: !url, timeout: 180_000 }, async t => {
   const admin = new Pool({ connectionString: url, max: 1 })
   const database = `factory_snapshot_${randomUUID().replaceAll('-', '')}_e2e`
-  await admin.query(`CREATE DATABASE "${database}" TEMPLATE template0`)
+  await createTestDatabase(admin, database, 'template0')
   const target = new URL(url!)
   target.pathname = '/' + database
   const pool = new Pool({ connectionString: target.toString(), max: 8 })
-  observePoolCommits(pool)
   const closeWorkspace = await bindFixtureWorkspaceDatabase(pool)
   const flags = { routing: process.env.MIKKA_FACTORY_ROUTING_ENABLED, lifecycle: process.env.MIKKA_FACTORY_LIFECYCLE_ENABLED }
   try {
@@ -65,7 +64,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       await seedFixtureWorkspace(pool, 'owner', 'team', workspaceId)
       await pool.query(`INSERT INTO issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState",scope) VALUES ($1,'owner','Synthetic legacy delivery','{"type":"doc","content":[]}','todo','normal',$2,'bound','workspace')`, [issueId, workspaceId])
       await pool.query(`INSERT INTO bots(id,"workspaceId","ownerId",name) VALUES($1,$2,'owner','Fixture Bot')`, [botId, workspaceId])
-      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses) VALUES($1,'owner','Fixture cloud','cloud',now(),'[{"harness":"codex","installed":true}]')`, [deviceId])
+      await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"lastSeenAt",harnesses,"sessionOpenedAt") VALUES($1,'owner','Fixture cloud','cloud',now(),'[{"harness":"codex","installed":true}]',now())`, [deviceId])
       await pool.query(`INSERT INTO agents(id,"userId",name,harness,"deviceId") VALUES($1,'owner',$3,'codex',$2)`, [agentId, deviceId, `Fixture Codex ${agentId}`])
       await pool.query(`INSERT INTO device_repos(id,"deviceId","userId","repoPath") VALUES($1,$2,'owner',$3)`, [repoId, deviceId, repoPath])
       // The database suite exercises check admission, not provider startup.
@@ -86,6 +85,8 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       const routed = await store.route('owner', { issueId, sourceEventId, eventId: randomUUID(), rationale: 'Synthetic completed native continuation', missingInformation: [], missingPermissions: [], needsSpec: false })
       const producer = await executeDispatch('owner', { binding: factoryBinding(routed.task), agentId, deviceRepoId: repoId })
       const producerRunId = producer.runId, producerAttemptId = producer.task.attemptId
+      const captureId = await addFactoryVisualEvidence(pool, producerRunId)
+      await pool.query(`UPDATE run_captures SET "createdAt"=now()-interval '119 minutes',"updatedAt"=now()-interval '119 minutes' WHERE id=$1`, [captureId])
       await pool.query(`UPDATE agent_runs SET status='succeeded',"stopReason"='submitted',"sessionId"='original-native-session',"startedAt"=now()-interval '2 hours',"finishedAt"=now()-interval '118 minutes',"worktreePath"=$2,report=$3 WHERE id=$1`,
         [producerRunId, worktreePath, JSON.stringify({ sourceCommit: base, summary: 'Original completed report remains unchanged.', verify: { status: 'not_run' } })])
       const clock = Date.now()
@@ -242,6 +243,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       try {
         const accepted = await approvalEvidence(client, result.task)
         assert.deepEqual(accepted.manifest.artifacts.map(a => a.stage), ['execute'])
+        assert.deepEqual(accepted.captures.map(a => a.runId), [f.producerRunId])
         assert.equal(accepted.manifest.artifacts[0].deliverableSnapshotSha, head)
         assert.equal(accepted.manifest.reviewHistory?.length, 1)
         assert.equal(accepted.manifest.reviewHistory![0].candidateId, f.oldCandidateId)
@@ -250,6 +252,43 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
         assert.ok(accepted.evidence.every(a => a.candidateId === candidate.id))
       } finally { client.release() }
       assert.deepEqual(await f.historical(), before)
+    })
+
+    await t.test('Owner snapshot retry refuses missing producer media before creating a candidate or handing off', async () => {
+      const f = await fixture(true)
+      await pool.query('DELETE FROM run_captures WHERE "runId"=$1', [f.producerRunId])
+      const before = await f.historical()
+      const service = f.human()
+      const response = await handleFactory(service, f.request)
+      assert.equal(response.status, 409)
+      assert.ok(response.body && typeof response.body === 'object' && 'error' in response.body)
+      assert.equal(response.body.error, 'factory_visual_evidence_required')
+      const blocked = await f.store.read('owner', f.task.id)
+      assert.equal(blocked.task.stage, 'review')
+      assert.equal(blocked.task.status, 'blocked')
+      assert.equal(blocked.task.candidateId, f.oldCandidateId)
+      assert.equal(blocked.task.attemptId, f.oldReviewAttemptId)
+      assert.equal(blocked.candidates.length, 1)
+      assert.equal(blocked.attempts.filter(a => a.stage === 'approval').length, 0)
+      assert.equal(blocked.refusal?.code, 'factory_visual_evidence_required')
+      const current = blocked.attempts.find(a => a.id === f.oldReviewAttemptId)!
+      assert.deepEqual(current.output.evidenceGate, { code: 'factory_visual_evidence_required', candidateId: f.oldCandidateId })
+      const after = await f.historical()
+      for (const key of ['runs', 'questions', 'candidate', 'receipts'] as const) assert.deepEqual(after[key], before[key])
+      assert.deepEqual(after.attempts.filter(a => a.row.id !== f.oldReviewAttemptId), before.attempts.filter(a => a.row.id !== f.oldReviewAttemptId))
+      const previousAttempt = before.attempts.find(a => a.row.id === f.oldReviewAttemptId)!.row
+      const blockedAttempt = after.attempts.find(a => a.row.id === f.oldReviewAttemptId)!.row
+      assert.deepEqual(blockedAttempt, { ...previousAttempt, output: { ...previousAttempt.output, evidenceGate: current.output.evidenceGate } },
+        'only the current attempt receives the refusal; its prior result remains unchanged')
+      const receipt = (await pool.query('SELECT request,result FROM factory_events WHERE "taskId"=$1 AND "eventId"=$2', [f.task.id, f.request.body.eventId])).rows[0]
+      assert.equal(receipt.request.kind, 'owner_deliverable_snapshot_recovery')
+      assert.equal(receipt.result.snapshotRecovery, undefined)
+      assert.equal(receipt.result.task.status, 'blocked')
+      assert.deepEqual(f.counts(), { observedCount: 1, releaseCount: 1, dispatchCount: 0, startCount: 0 })
+      const machine = (await pool.query('SELECT state,"workerLeaseId","workerLeaseUntil" FROM thread_machines WHERE "runId"=$1', [f.oldReviewId])).rows[0]
+      assert.deepEqual(machine, { state: 'paused', workerLeaseId: null, workerLeaseUntil: null })
+      assert.deepEqual(await handleFactory(service, f.request), response, 'the refused retry replays without another VM observation')
+      assert.deepEqual(f.counts(), { observedCount: 1, releaseCount: 1, dispatchCount: 0, startCount: 0 })
     })
 
     await t.test('Owner Retry uses the original producer, makes one immutable receipt and independent candidate, and reaches real approval gates', async () => {
@@ -296,6 +335,7 @@ test('legacy delivery snapshot recovery binds a fresh live observation without r
       try {
         const accepted = await approvalEvidence(client, ready)
         assert.deepEqual(accepted.manifest.artifacts.map(entry => entry.stage), ['execute', 'review', 'verify'])
+        assert.deepEqual(accepted.captures.map(entry => entry.runId), [f.producerRunId])
         const producerEvidence = accepted.manifest.artifacts[0]
         assert.equal(producerEvidence.runId, f.producerRunId)
         assert.equal(producerEvidence.completionRecoveryEventId, f.completionEventId)

@@ -17,3 +17,15 @@ test('a failed, signalled or unspawnable scheduler never passes the unit lane', 
   assert.throws(()=>main('core',{CI_UNITS:'[]'}),/unitSelectionRequired/)
   assert.throws(()=>main('core',{CI_UNITS:'["ci-unregistered"]'}),/invalidUnitSelection/)
 })
+
+test('current and older trusted selectors schedule the docs classifier suite once', () => {
+  for (const selection of [['ci-core-6'], ['ci-core-6', 'ci-core-7'], ['ci-core-7'], ['*']]) {
+    const result = main('core', { CI_UNITS: JSON.stringify(selection) }, (_command, args) => {
+      const targets = args[args.indexOf('-t') + 1].split(',')
+      assert.equal(targets.filter(target => target === 'core-7').length, 1)
+      assert.ok(!targets.includes('core-6'))
+      return { status: 0 }
+    })
+    assert.equal(result, 0)
+  }
+})

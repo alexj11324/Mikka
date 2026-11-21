@@ -9,6 +9,7 @@ Migration: `drizzle/20261029213936_settings_preferences.sql`. Every new column h
 | `user_preferences` | `sendKey` | `'enter'` | `'enter'` or `'modEnter'` |
 | `user_preferences` | `personalInstructions` | `''` | The person's instructions for the Coordinator and their Bots, at most 2000 characters |
 | `user_preferences` | `dailySuggestions` | `true` | 每日建议 (the 08:00 briefing) |
+| `user_preferences` | `organizationInvitationEmails` | `true` | Send organization invitation emails to this account’s verified address when the installation enables invitation mail. Invites remain available in the recipient’s invitation list. |
 | `user_preferences` | `suggestionSources` | `{}` | `{ app: false }` for each Composio app turned off as a source; a missing app is on |
 | `user_time_zones` | `source` | `'auto'` | `'auto'` (browser/IP decides) or `'manual'` (picked in Settings) |
 | `user_time_zones` | `detectedTimeZone` | null, backfilled from `timeZone` for existing rows | The zone the browser or IP last reported |

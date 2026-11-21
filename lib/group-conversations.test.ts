@@ -1,8 +1,10 @@
+import '../tests/support/server-only.mjs'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { observePoolCommits } from './db/commit-effects'
 import { groupDirectory } from './group-conversations-directory'
 import { handleGroup, type GroupRequest } from './group-conversations-store'
 import { disposableDatabase } from '../tests/helpers/e2e-target.mjs'
@@ -47,10 +49,12 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
   await pool.query(`CREATE SCHEMA "${reverseSchema}"`)
   console.log(`Retaining synthetic group test schema ${reverseSchema} at ${new Date().toISOString()}`)
   const scoped = new Pool({ connectionString: dbURL, max: 16, options: `-c search_path=${schema}` })
+  observePoolCommits(scoped)
   try {
     const migration = await readFile(new URL('../drizzle/20261023213851_group_conversations.sql', import.meta.url), 'utf8')
     await Promise.all([scoped.query(migration), scoped.query(migration)])
     await scoped.query(migration) // production retry / coexistence with #69
+    await scoped.query(await readFile(new URL('../drizzle/20261118120000_conversation_model_device.sql', import.meta.url), 'utf8'))
     const reads = await readFile(new URL('../tests/fixtures/conversation-reads-69.sql', import.meta.url), 'utf8')
     await scoped.query(reads) // this migration first, then #69
     // Exercise the reverse migration order in a second retained schema.
@@ -58,6 +62,9 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     try {
       await reverse.query(reads) // #69 first, then this migration
       await reverse.query(migration)
+      // Every later additive migration has to land in both orders, or the catalog comparison below fails on
+      // a column only one of the two schemas ever received.
+      await reverse.query(await readFile(new URL('../drizzle/20261118120000_conversation_model_device.sql', import.meta.url), 'utf8'))
       // Compare both orders at the catalog level, including table columns,
       // defaults, constraints and index keys. Each pool resolves its own schema.
       const catalog = async (target: Pool) => {
@@ -83,6 +90,11 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
         ['conversation_links','conversation_members','conversation_messages','conversation_reads','conversations'])
       assert.deepEqual(reverseCatalog, forwardCatalog, 'both migration orders must produce equivalent columns, constraints and indexes')
     } finally { await reverse.end() }
+    // The catalog comparison above deliberately proves the two historical
+    // migration orders. Exercise today's handler only after its later
+    // standalone-conversation migration has also upgraded this isolated schema.
+    await scoped.query(await readFile(new URL('../drizzle/20261113180454_standalone_bot_conversations.sql', import.meta.url), 'utf8'))
+    await scoped.query('CREATE TABLE chat_preferences (LIKE public.chat_preferences INCLUDING ALL)')
     const run = (changes: Partial<GroupRequest>) => handleGroup(scoped, directory, { ...base, ...changes })
     for (const input of [undefined, '{', JSON.stringify({ workspaceId, title: '', members: [] }), JSON.stringify({ workspaceId: randomUUID(), title: 'foreign' }), JSON.stringify({ workspaceId, title: 'private', members: [{ memberType: 'agent', memberId: privateAgent }] })]) {
       assert.ok([404, 422].includes((await run({ method: 'POST', body: input })).status))
@@ -139,6 +151,18 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     assert.equal((await run({ id, resource: 'members', method: 'DELETE', body: JSON.stringify({ memberType: 'user', memberId: 'owner' }) })).status, 422)
     assert.equal((await run({ id, resource: 'members', method: 'POST', body: JSON.stringify({ memberType: 'user', memberId: 'member' }) })).status, 200)
     assert.equal((await run({ id, resource: 'messages', userId: 'member' })).status, 200)
+    const changeAsMember = (method: 'POST' | 'DELETE', memberType: 'user' | 'agent' | 'bot', memberId: string) =>
+      run({ id, resource: 'members', method, userId: 'member', body: JSON.stringify({ memberType, memberId }) })
+    assert.equal((await changeAsMember('DELETE', 'user', 'owner')).status, 403)
+    assert.equal((await changeAsMember('DELETE', 'agent', ownAgent)).status, 403)
+    assert.equal((await changeAsMember('DELETE', 'bot', 'member')).status, 403)
+    assert.equal((await changeAsMember('DELETE', 'user', 'member')).status, 200)
+    assert.equal((await run({ id, resource: 'messages', userId: 'member' })).status, 404)
+    assert.equal(((await run({ userId: 'member' })).body as typeof list).conversations.length, 0)
+    assert.equal((await changeAsMember('POST', 'user', 'member')).status, 404)
+    assert.equal((await changeAsMember('DELETE', 'user', 'member')).status, 404)
+    assert.equal((await run({ id, resource: 'members', method: 'POST', body: JSON.stringify({ memberType: 'user', memberId: 'member' }) })).status, 200)
+    assert.equal((await run({ id, resource: 'messages', userId: 'member' })).status, 200)
     // Removal commits while a send waits on the conversation lock: sender must recheck.
     const removal = await scoped.connect()
     await removal.query('BEGIN')
@@ -173,6 +197,17 @@ test('Postgres17 migration, atomic history, pagination, unread counts, membershi
     await scoped.query('UPDATE conversations SET "lastPosition"=9007199254740992 WHERE id=$1', [id])
     assert.equal(((await send('big')).body as typeof firstMessage).position, '9007199254740993')
     assert.equal(((await run({})).body as typeof list).conversations[0].lastMessage.position, '9007199254740993')
+    const separate = await run({ method: 'POST', body: JSON.stringify({ workspaceId, title: 'Idempotent sends', members: [] }) })
+    assert.equal(separate.status, 201)
+    const replay = (body: string, extra: Record<string, unknown>) => run({ id: (separate.body as { id: string }).id, resource: 'messages', method: 'POST', body: JSON.stringify({ body, ...extra }) })
+    const cmd = { requestId: randomUUID(), expectedWorkspaceId: workspaceId, expectedOwnerId: 'owner' }
+    // A single immutable operation can race or lose every response; it advances the group only once.
+    const attempts = await Promise.all(Array.from({ length: 8 }, () => replay('same id, one group message', cmd)))
+    assert.deepEqual(attempts.map(attempt => attempt.status).sort(), [200, 200, 200, 200, 200, 200, 200, 201])
+    assert.equal(new Set(attempts.map(attempt => (attempt.body as { id: string }).id)).size, 1)
+    assert.equal((await replay('changed content', cmd)).status, 409)
+    assert.equal((await replay('same id, one group message', { ...cmd, expectedOwnerId: 'member' })).status, 403)
+    assert.equal((await replay('same id, one group message', { ...cmd, expectedWorkspaceId: randomUUID() })).status, 403)
   } finally {
     await scoped.end()
     await pool.end()

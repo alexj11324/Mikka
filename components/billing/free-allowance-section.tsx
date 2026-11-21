@@ -1,10 +1,12 @@
 'use client'
 
-import { useTranslations } from 'next-intl'
-import { ArrowUpRight, LoaderCircle } from 'lucide-react'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import { ArrowUpRight } from '@/components/icons'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
-import { SettingRow, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { Button } from '@/components/ui/button'
+import { FieldError } from '@/components/ui/field'
+import { Spinner } from '@/components/ui/spinner'
 import type { FreeAllowanceState } from '@/hooks/settings/use-billing'
 
 export { cardVerificationKey } from '@/hooks/settings/use-billing'
@@ -17,14 +19,20 @@ export { cardVerificationKey } from '@/hooks/settings/use-billing'
  */
 export function FreeAllowanceSection({ allowance }: { allowance: FreeAllowanceState }) {
   const t = useTranslations('Billing.allowance')
+  const common = useTranslations('Common')
   const { confirming, redirecting, verify } = allowance
   const data = allowance.status
+  if (allowance.error) return <SettingsSection id="billing-free-allowance" title={t('section')}>
+    {allowance.reload
+      ? <SettingsSaveError message={allowance.error} retryLabel={common('retry')} onRetry={allowance.reload} />
+      : <FieldError>{allowance.error}</FieldError>}
+  </SettingsSection>
   if (!data || (data.status === 'verified' && !confirming)) return null
   const pending = confirming || data.status === 'pending'
   return <SettingsSection id="billing-free-allowance" title={t('section')}>
     <SettingRow title={t('title')} description={t.rich('description', { mark: () => <MikkaMarkSmall />, model: chunks => <span className="inline-flex items-center gap-1">{chunks}</span> })}>
       {pending
-        ? <span role="status" className="flex items-center gap-1.5 text-muted-foreground"><LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />{t('pending')}</span>
+        ? <span role="status" className="flex items-center gap-1.5 text-muted-foreground"><Spinner aria-hidden="true" className="size-3.5" />{t('pending')}</span>
         : data.status === 'unavailable'
           // BIL-5 also draws a disabled 验证; a control that does nothing fails interaction/no-dead-control, so only the state shows.
           ? <span role="status" className="text-muted-foreground">{t('unavailable')}</span>

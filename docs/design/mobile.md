@@ -67,7 +67,8 @@ Bot and schedule. A search hit or chat dispatch card also opens the task.
 A task's detail has its number, title, property chips directly on the page,
 description and **活动**, oldest first. The creation uses a muted dot and
 each attempt its result icon on the continuous timeline. + 评论 opens the
-web task for writing a comment; there is no native comment write route.
+web task for writing a comment. The status and priority row opens the same
+authorized web detail, where the task’s existing permissions govern edits.
 
 A task has **one conversation** joining every attempt oldest first. Opening
 an attempt scrolls to its section, while opening the conversation normally
@@ -184,6 +185,7 @@ precedent. Figma frames 07, 07a–07e.
 | Account: avatar, name, email → 个人资料 (photo, name; email read-only) | top → 07a | Comma iOS Account row → Profile; Claude (name + email); ChatGPT (avatar + name). None shows the sign-in provider |
 | 工作区 | top → 07b | Comma iOS workspace picker; ChatGPT 工作空间 |
 | 通知 (value 开/关) | top → 07c | ChatGPT, Claude, Comma (Comma shows On/Off on the row) |
+| 已注册的推送设备 | 07c | The signed-in person’s active Expo registrations show their platform, known device name, registration update date and matching login session. |
 | 主动消息 | 07c | Claude Code "Push when Claude decides"; Comma "Proactive messages" |
 | 需要你决策 / 待审阅 / 线程完成 | 07c | Claude Code "Push when actions required"; Cursor (needs input, finished, ready for review); Replit; GitHub Mobile per-type toggles |
 | 每日简报 | 07c | ChatGPT notifications "Tasks" (scheduled-task results) |
@@ -195,6 +197,7 @@ precedent. Figma frames 07, 07a–07e.
 | 语言 (opens iOS Settings) | top | Comma iOS |
 | 版本 | top | Comma iOS Version; ChatGPT 关于. Shows the version, the build and, when an update is running, when it was published (「1.0.0 (6) · 10-31 22:51」) |
 | 隐私政策 | top; also available before sign-in | Opens the existing public `https://aspectlylabs.com/privacy` page |
+| 组织（网页版） | top, paired cloud UI | Opens the existing Organization settings for the selected workspace after browser account confirmation. The web section handles invitations, domain admission and role-specific controls. |
 | 删除账户 | 个人资料 | Opens the existing account settings through the signed web handoff; the web page owns deletion confirmation |
 | 退出登录 | top, last | ChatGPT, Claude, Comma |
 | Push not deliverable (only when it fails) | top, first | Comma iOS |
@@ -262,7 +265,7 @@ linked in Where it lives. An accepted frame alone is not runtime evidence.
   installed app, removed on sign-out. A Coordinator or bot reply to Mikka's own
   events (never to the person's message, never a quiet reply) is pushed when
   the settings allow it: 需要你决策 for events that need the person (handed-over
-  matters included), 线程完成 for finished runs, 每日简报 for the 08:00
+  matters included), 待审阅 for a reply classified as ready for review, 线程完成 for finished runs, 每日简报 for the 08:00
   briefing (`lib/push-reasons.ts`, `lib/mobile-push.ts`). A verification code
   stays in the app chat; its push only says one came. A card is pushed as its
   words (`lib/openui-lang.ts`). Registering needs the EAS project id

@@ -3,7 +3,6 @@ import { withRequestLog } from '@/lib/request-log'
 import { authSignInMethods } from '@/lib/auth-config'
 import { cloudConnected } from '@/lib/cloud-services/runtime'
 
-export const dynamic = 'force-dynamic'
 
 /** Called before sign-in. The fixed /mikka mount is declared in the response;
  * desktop clients probing a bare origin retry this mount without redirects. */

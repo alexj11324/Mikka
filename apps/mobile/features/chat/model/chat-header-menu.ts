@@ -18,7 +18,7 @@ export function taskSymbol(task: Pick<Task, 'group' | 'status' | 'blocked' | 'st
  * first, then 进行中 and 待办, a few of them; 已完成 only when nothing else is left.
  */
 export function menuTasks(tasks: readonly Task[] | null | undefined, botId: string | null | undefined, limit = MENU_TASKS): Task[] {
-  const own = (tasks ?? []).filter(task => botId && task.bot?.id === botId)
+  const own = (tasks ?? []).filter(task => botId && (task.dispatchedBy === botId || task.bot?.id === botId))
   const rank = (task: Task) => TASK_GROUPS.findIndex(group => group.id === groupOf(task))
   const open = own.filter(task => groupOf(task) !== 'done').sort((a, b) => rank(a) - rank(b))
   return (open.length ? open : own).slice(0, limit)

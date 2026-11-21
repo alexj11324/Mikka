@@ -1,10 +1,9 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { withRequestLog } from '@/lib/request-log'
 
 import { APP_BUILD, minDesktopVersion } from '@/lib/app-build'
 import { MIN_MOBILE_BUILD, MOBILE_UPDATE_URL } from '@/lib/mobile-min-build'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * The build this deployment serves, so an open page can tell it is out of

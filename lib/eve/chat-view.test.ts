@@ -46,6 +46,8 @@ test('native Client targets the standard protocol with the Bot on every request'
 test('only closed public codes become send errors', () => {
   assert.deepEqual(coordinatorSendFailure(new ClientError(401, '{"code":"authRequired"}')), { kind: 'authRequired' })
   assert.deepEqual(coordinatorSendFailure(new ClientError(500, '{"error":"private provider response"}')), { kind: 'uncertain' })
+  assert.deepEqual(coordinatorSendFailure(new ClientError(403, '{"code":"workspaceAccessDenied"}')), { kind: 'rejected', error: 'workspaceAccessDenied' })
+  assert.deepEqual(coordinatorSendFailure(new ClientError(429, '{"code":"private provider response"}')), { kind: 'rejected', error: 'rateLimited' })
   assert.deepEqual(coordinatorSendFailure(new ClientError(403, '{"code":"private provider response"}')), { kind: 'rejected', error: 'generic' })
 })
 

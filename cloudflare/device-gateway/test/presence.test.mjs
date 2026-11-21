@@ -4,7 +4,7 @@ import { registerHooks } from 'node:module'
 import { after, beforeEach, mock, test } from 'node:test'
 
 // Execute the actual DeviceSession with only the Cloudflare storage/socket/RPC
-// boundaries replaced. The real workerd upgrade and 90s alarm are also covered
+// boundaries replaced. The real workerd upgrade and 40s alarm are also covered
 // by runtime.test.mjs; this clock makes the lifecycle races deterministic.
 registerHooks({ resolve(specifier, context, next) {
   if (specifier === 'cloudflare:workers') return { shortCircuit: true, url: 'data:text/javascript,export class DurableObject { constructor(ctx, env) { this.ctx = ctx; this.env = env } }' }
@@ -129,11 +129,11 @@ test('active tabs receive one home fanout on connect, disconnect and reconnect; 
   assert.equal(device.values.has('presence-v1'), false)
 })
 
-test('90s silence expires naturally; auto-pong on the same open socket recovers only while watched', async () => {
+test('40s silence (the daemon\'s 30s limit plus one 10s ping) expires naturally; auto-pong on the same open socket recovers only while watched', async () => {
   const f = fixture(), device = await f.open(deviceId), live = await f.open(`live:${channel}`, '?presence=1')
   await watch(live, [[deviceId, true, 0]])
-  assert.equal(device.ctx.storage.alarmAt, now + 90_000)
-  now += 90_000
+  assert.equal(device.ctx.storage.alarmAt, now + 40_000)
+  now += 40_000
   await device.stub.alarm()
   assert.equal((await device.stub.status()).online, false)
   assert.deepEqual(keys(live.socket), expectedKeys)
@@ -150,11 +150,10 @@ test('90s silence expires naturally; auto-pong on the same open socket recovers 
 test('healthy auto-pongs move the observed expiry without sending keys or waking unobserved devices', async () => {
   const f = fixture(), device = await f.open(deviceId), live = await f.open(`live:${channel}`, '?presence=1')
   await watch(live, [[deviceId, true, 0]])
-  now += 30_000; device.ctx.pongs.set(device.socket, now)
-  now += 30_000; device.ctx.pongs.set(device.socket, now)
-  now += 30_000; await device.stub.alarm()
+  for (let ping = 0; ping < 4; ping++) { now += 10_000; device.ctx.pongs.set(device.socket, now) }
+  await device.stub.alarm()
   assert.deepEqual(keys(live.socket), [])
-  assert.equal(device.ctx.storage.alarmAt, now + 60_000)
+  assert.equal(device.ctx.storage.alarmAt, now + 40_000)
   await unwatch(live)
   assert.equal(device.ctx.storage.alarmAt, null)
 })
@@ -266,7 +265,7 @@ test('failed fanout retries only the key delivery and clears an obsolete retry a
   await close(device)
   assert.equal(device.ctx.storage.alarmAt, now + 30_000)
   now += 10_000; await f.open(deviceId)
-  assert.equal(device.ctx.storage.alarmAt, now + 90_000, 'a reverted state cannot leave a past retry causing an alarm loop')
+  assert.equal(device.ctx.storage.alarmAt, now + 40_000, 'a reverted state cannot leave a past retry causing an alarm loop')
   live.stub.presenceChanged = deliver
   await close(live)
   assert.equal(device.ctx.storage.alarmAt, null)

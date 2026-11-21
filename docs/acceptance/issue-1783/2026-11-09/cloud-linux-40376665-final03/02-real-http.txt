@@ -1,0 +1,33 @@
+Mikka issue #1783 | Real Vite/Nitro HTTP: activity, media, report and scope
+Revision: 40376665ac416ce2228c08b60d7ea8cee97a3de6
+Started: 2026-11-09T15:37:51.117Z
+Cloud Linux / real isolated PostgreSQL / synthetic fixtures
+No live model or external GitHub acceptance is claimed.
+
+
+[1/1] $ /usr/local/bin/node --import ./scripts/server-test.mjs --import tsx --test --test-reporter=spec tests/factory-activity-http.db.test.ts
+▶ real Vite/Nitro HTTP: authenticated activity, all-run media, immutable versions and historical video posters
+  ✔ real route manifest returns all 24 attempts and every submitted version with base-path-safe links (175.950685ms)
+  ✔ anonymous and another authenticated workspace member cannot read task-owned originals or render covers (76.993426ms)
+  ✔ cookie workspace selection cannot cross the task-detail boundary (198.134003ms)
+  ✔ all-run originals retain byte ranges while a same-owner unrelated run remains inaccessible (149.168871ms)
+  ✔ a historical recording produces a real JPEG over HTTP and subsequently reuses its cached bytes (244.501584ms)
+  ✔ real browser token creation grants same-workspace HTTP media and rejects another workspace PAT (1009.490189ms)
+  ✔ live task-detail boundaries revoke even already-cached cover access after source or membership changes (404.738106ms)
+✔ real Vite/Nitro HTTP: authenticated activity, all-run media, immutable versions and historical video posters (33968.626938ms)
+ℹ {"revision":"40376665ac416ce2228c08b60d7ea8cee97a3de6","origin":"http://127.0.0.1:46697","database":"activity_http_5ebba9f739954e639dc042c7e3c8f6d9_e2e","runtime":"Vite+Nitro","authentication":"leased Better Auth cookie sessions and browser-created PATs","attempts":24,"taskMedia":25,"externalTransportAttempts":0,"modelRunsStarted":0,"serverStdoutBytes":15703,"serverStderrBytes":4311}
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 34340.805226
+
+Command exit: 0; PASS; {"total":8,"passed":8,"failed":0,"skipped":0}
+
+Real Vite/Nitro HTTP: activity, media, report and scope
+Revision: 40376665ac416ce2228c08b60d7ea8cee97a3de6
+RESULT: PASS | commands 1/1
+Finished: 2026-11-09T15:38:28.566Z

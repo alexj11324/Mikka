@@ -1,10 +1,13 @@
 'use client'
 
 import useSWR, { unstable_serialize } from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
+import type { SharedResourceKind } from '@/lib/db/governance-schema'
 import { withBasePath } from '@/lib/base-path'
+import { authClient } from '@/lib/auth-client'
+import { ORGANIZATION_MODEL_PROVIDERS } from '@/lib/governance/policy'
 import { GovernanceRequestError, governanceKey, type GovernanceDetail } from '@/hooks/settings/use-workspace-governance'
-import { useLiveKey } from '@/hooks/use-live-key'
+import { useLiveKey, useLiveKeys } from '@/hooks/use-live-key'
 
 /**
  * Enterprise v1 (#1608 P2, #1642 「Claude 界面交接」): the Organization a Shared
@@ -17,7 +20,18 @@ import { useLiveKey } from '@/hooks/use-live-key'
 
 export type OrganizationRole = 'owner' | 'admin' | 'member'
 export type OrganizationListItem = { id: string; name: string; role: OrganizationRole }
-export type OrganizationMember = { organizationId: string; userId: string; role: OrganizationRole; status: 'active' | 'suspended'; name: string; email: string; createdAt: string; updatedAt: string }
+export type JoinableOrganization = Pick<OrganizationListItem, 'id' | 'name'>
+export type OrganizationDomain = { id: string; domain: string }
+export type OrganizationMember = { organizationId: string; userId: string; role: OrganizationRole; status: 'active' | 'suspended'; name: string; email: string; image?: string | null; createdAt: string; updatedAt: string }
+/** Organization membership only; invitations never confer Workspace/Project access. */
+export type OrganizationInvitation = {
+  id: string; email: string; createdBy: string; status: 'pending' | 'accepted' | 'revoked'
+  createdAt: string; expiresAt: string
+}
+export type OrganizationInvitationOutcome =
+  | { email: string; created: true; id: string; path: string }
+  | { email: string; created: false; reason: 'duplicate' | 'alreadyMember' | 'pending' }
+type ReceivedOrganizationInvitation = { id: string; organizationName: string; expiresAt: string }
 export type OrganizationAuditEvent = {
   id: string; organizationId?: string; actorId: string; action: string; result: 'success' | 'denied' | 'failure'
   correlationId?: string; targetId: string | null; metadata: Record<string, string | number | boolean | null>; createdAt: string
@@ -54,7 +68,7 @@ export type ProviderConfigured = { providerId: string; dns: { type: 'TXT'; name:
 export type ScimCredential = { id: string; token: string; baseURL: string }
 
 export type SharingRule = 'allow' | 'approval_required' | 'deny'
-export const MODEL_PROVIDERS = ['vercel-gateway', 'zerocat', 'openai-subscription', 'anthropic-subscription', 'api-key'] as const
+export const MODEL_PROVIDERS = ORGANIZATION_MODEL_PROVIDERS
 export type ModelProvider = typeof MODEL_PROVIDERS[number]
 export type ResourcePolicy = {
   modelCredentialSharing: SharingRule; mcpSharing: SharingRule
@@ -66,7 +80,7 @@ export type ResourcePolicy = {
   revision: number
 }
 export type ResourceApproval = {
-  id: string; organizationId: string; workspaceId: string; kind: 'subscription' | 'api_key' | 'mcp'; resourceId: string
+  id: string; organizationId: string; workspaceId: string; kind: SharedResourceKind; resourceId: string
   ownerId: string; status: 'pending' | 'approved' | 'denied'; decidedBy: string | null; createdAt: string; updatedAt: string
 }
 export type ResourcePolicyState = { policy: ResourcePolicy; approvals: ResourceApproval[] }
@@ -108,6 +122,7 @@ export function useOrganizationErrorText() {
 
 export const organizationsKey = ['organizations'] as const
 export const organizationKey = (id: string) => ['organization', id] as const
+export const organizationInvitationsKey = (id: string) => ['organization-invitations', id] as const
 export const identityKey = (id: string) => ['organization-identity', id] as const
 export const policyKey = (id: string) => ['organization-policy', id] as const
 
@@ -118,7 +133,7 @@ export const policyKey = (id: string) => ['organization-policy', id] as const
  * what they changed.
  */
 export function useOrganizationLive(workspaceId: string, organizationId: string | null | undefined) {
-  const keys = [governanceKey(workspaceId), organizationsKey, ...(organizationId ? [organizationKey(organizationId), identityKey(organizationId), policyKey(organizationId)] : [])]
+  const keys = [governanceKey(workspaceId), organizationsKey, ...(organizationId ? [organizationKey(organizationId), organizationInvitationsKey(organizationId), identityKey(organizationId), policyKey(organizationId)] : [])]
   useLiveKey('workspace_settings', workspaceId, keys.map(key => unstable_serialize(key)), workspaceId, { minIntervalMs: 2_000 })
 }
 
@@ -127,9 +142,40 @@ export function useOrganizations(enabled = true) {
   return useSWR(enabled ? organizationsKey : null, () => request<{ organizations: OrganizationListItem[] }>('/api/organizations').then(value => value.organizations), swr)
 }
 
+export function useArchivedOrganizations() {
+  const { data, isPending } = authClient.useSession()
+  return useSWR(isPending || !data ? null : ['archived-organizations', data.user.id, data.session.id],
+    () => request<{ organizations: Pick<OrganizationListItem, 'id' | 'name'>[] }>('/api/organizations?archived=true').then(value => value.organizations))
+}
+
+export function useJoinableOrganizations() {
+  const { data, isPending } = authClient.useSession()
+  // Desktop projects the public identity without emailVerified. The API checks the current verified email.
+  return useSWR(isPending || !data || data.user.emailVerified === false ? null : ['joinable-organizations', data.user.id, data.user.email],
+    () => request<{ organizations: JoinableOrganization[] }>('/api/me/joinable-organizations').then(value => value.organizations))
+}
+
+export function useReceivedOrganizationInvitations() {
+  const { data, isPending } = authClient.useSession()
+  return useSWR(isPending || !data || data.user.emailVerified === false ? null : ['received-organization-invitations', data.user.id, data.user.email, data.session.id],
+    () => request<{ invitations: ReceivedOrganizationInvitation[] }>('/api/me/invitations').then(value => value.invitations))
+}
+
+export function useOrganizationDomains(organizationId: string) {
+  const { data, isPending } = authClient.useSession()
+  return useSWR(isPending || !data ? null : ['organization-domains', organizationId, data.user.id],
+    () => request<{ domains: OrganizationDomain[] }>(org(organizationId, '/allowed-domains')).then(value => value.domains))
+}
+
 /** Members, bound workspaces, seats and recent events. 403 for anyone who is not an Organization owner or admin. */
 export function useOrganizationSummary(organizationId: string | null | undefined) {
   return useSWR(organizationId ? organizationKey(organizationId) : null, ([, id]) => request<OrganizationSummary>(org(id)), swr)
+}
+
+/** Uses Organization membership, not Workspace admin privilege. No polling. */
+export function useOrganizationInvitations(organizationId: string | null | undefined) {
+  return useSWR(organizationId ? organizationInvitationsKey(organizationId) : null,
+    ([, id]) => request<{ invitations: OrganizationInvitation[] }>(org(id, '/invitations')).then(value => value.invitations), swr)
 }
 
 export function useOrganizationIdentity(organizationId: string | null | undefined) {
@@ -140,7 +186,31 @@ export function useOrganizationPolicy(organizationId: string | null | undefined)
   return useSWR(organizationId ? policyKey(organizationId) : null, ([, id]) => request<ResourcePolicyState>(org(id, '/policy')), swr)
 }
 
+export function useOrganizationServiceKeys(organizationId: string, after: string | undefined, workspaceIds: readonly string[]) {
+  const key = ['organization-service-keys', organizationId, after ?? ''] as const
+  const result = useSWR(key, () => organizationApi.serviceKeys(organizationId, after), swr)
+  const subscriptions = workspaceIds.map(id => ({ kind: 'workspace_settings' as const, id, workspaceId: id }))
+  useLiveKeys(subscriptions, [unstable_serialize(key)], undefined, { minIntervalMs: 2_000 })
+  return result
+}
+
+export type OrganizationServiceKey = {
+  id: string; name: string | null; workspaceId: string; serviceIdentityId: string; serviceIdentityName: string; expiresAt: string | null
+}
+
 export const organizationApi = {
+  acceptReceivedInvitation: (invitationId: string) =>
+    send<{ organizationId: string; joined: true }>('/api/organization-invitations/accept', 'POST', { invitationId }),
+  addDomain: (id: string, domain: string) =>
+    send<{ domain: OrganizationDomain }>(org(id, '/allowed-domains'), 'POST', { domain }),
+  removeDomain: (id: string, domainId: string) =>
+    send<{ removed: true }>(org(id, '/allowed-domains/' + encodeURIComponent(domainId)), 'DELETE'),
+  joinByDomain: (id: string) =>
+    send<{ organizationId: string; joined: true; role: OrganizationRole }>(org(id, '/join-by-domain'), 'POST'),
+  serviceKeys: (id: string, after?: string) => request<{ keys: OrganizationServiceKey[]; nextCursor: string | null }>(
+    org(id, '/api-keys') + (after ? '?' + new URLSearchParams({ after }) : '')),
+  nameServiceKey: (id: string, keyId: string, name: string) =>
+    send<{ id: string; name: string }>(org(id, '/api-keys/' + encodeURIComponent(keyId)), 'PATCH', { name }),
   create: (name: string) => send<OrganizationListItem>('/api/organizations', 'POST', { name }),
   rename: (id: string, name: string) => send<{ organization: OrganizationSummary['organization'] }>(org(id), 'PATCH', { name }),
   /** Owner only; needs every workspace unbound and every provider and SCIM connection closed first. */
@@ -148,6 +218,13 @@ export const organizationApi = {
   /** Binding needs both Organization admin and admin of that workspace. */
   bind: (id: string, workspaceId: string) => send<{ attached: true }>(org(id, '/workspaces'), 'POST', { workspaceId }),
   unbind: (id: string, workspaceId: string) => send<{ detached: true }>(org(id, '/workspaces'), 'DELETE', { workspaceId }),
+  /** All emails invite an ordinary Organization Member only, never a Workspace member. */
+  inviteMembers: (id: string, emails: string[]) =>
+    send<{ outcomes: OrganizationInvitationOutcome[] }>(org(id, '/invitations'), 'POST', { emails }),
+  revokeInvitation: (id: string, invitationId: string) =>
+    send<{ revoked: true }>(org(id, '/invitations'), 'DELETE', { invitationId }),
+  acceptInvitation: (token: string) =>
+    send<{ organizationId: string; joined: true; role: 'member' }>('/api/organization-invitations/accept', 'POST', { token }),
   /** An existing account, chosen by ID; an email match alone adds no one. */
   addMember: (id: string, userId: string, role: OrganizationRole) => send<{ member: OrganizationMember }>(org(id, '/members'), 'POST', { userId, role }),
   setRole: (id: string, userId: string, role: OrganizationRole) => send<{ updated: true }>(org(id, '/members'), 'PATCH', { userId, role }),
@@ -167,6 +244,12 @@ export const organizationApi = {
 
   setPolicy: (id: string, policy: Omit<ResourcePolicy, 'revision'>) => send<ResourcePolicyState>(org(id, '/policy'), 'PATCH', policy),
   decide: (id: string, approvalId: string, status: 'approved' | 'denied') => send<{ decided: true }>(org(id, '/approvals'), 'PATCH', { id: approvalId, status }),
+
+  listAuditEvents: (id: string, filters: { cursor?: string; order?: 'asc' | 'desc'; actor?: string; userId?: string; family?: string; from?: string; to?: string; q?: string; limit?: number } = {}) => {
+    const query = new URLSearchParams({ view: 'events' })
+    for (const [name, value] of Object.entries(filters)) if (value !== undefined) query.set(name, String(value))
+    return request<{ events: OrganizationAuditEvent[]; nextCursor: string | null }>(`${org(id, '/audit-log')}?${query}`)
+  },
 
   /** Freezes the events in range for fifteen minutes; each page rechecks admin access and integrity. */
   createAuditExport: (id: string, range: { from?: string; until?: string }) => send<{ manifest: AuditManifest; events: OrganizationAuditEvent[] }>(org(id, '/audit-log'), 'POST', range),

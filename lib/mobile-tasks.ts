@@ -1,22 +1,29 @@
 import 'server-only'
 import { withTaskDevicePresence } from './task-state-presence'
-import { taskStateOf } from './task-state'
+import { attemptStateOf, taskStateOf } from './task-state'
 import { taskStateRunColumns } from './task-state-query'
 import { readCompactRunFailure } from './run-failure-projection'
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { agents, agentRuns, bots, devices, issues, issueVersions, users, runPublications } from '@/lib/db/schema'
+import { agents, agentRuns, bots, devices, issues, issueDocuments, users, runPublications, RUN_OUTCOMES } from '@/lib/db/schema'
 import { issueForUser } from '@/lib/issue-access'
 import { withIssueWorkspace } from '@/lib/issue-scope-authorization'
 import { tokenWorkspace } from '@/lib/tokens/principal'
 import { enterprisePrincipal } from '@/lib/enterprise/principal'
 import { taskIdentifiers } from '@/lib/task-identifier-server'
-import { readIssueMetadata } from '@/lib/issue-metadata'
-import { displayTaskTitle } from '@/lib/short-title'
+import { githubPullRequestKey, readIssueMetadata, taskWorkOwner } from '@/lib/issue-metadata'
+import { taskRelationKinds } from './issue-relations'
+import { taskPullConversations } from './task-work-pulls'
 import { issueContentToMarkdown } from '@/lib/linear-sync/markdown'
 import { runBotId } from '@/lib/run-bot-name'
 import { taskSchedule, taskScheduleLabels, taskScheduleView } from '@/lib/task-block-runs'
 import { enrichActivityActors } from '@/lib/activity-actor-server'
+import { taskActivityVersions } from './task-activity-versions'
+import { taskActivityFacts } from './task-activity-timeline'
+import { taskDocumentStageComments } from './task-stage-comments'
+import { deriveIssueActivity } from './issue-activity'
+import { actAs } from './acting-user'
+import { isThreadRun, threadQuestionView, latestConversationRun } from '@/lib/issue-threads'
 import { mobileTaskActivity } from '@/lib/mobile-task-view'
 import { issueVisibility, type IssueReader } from '@/lib/issue-visibility'
 import { taskBlock } from '@/lib/task-blocked'
@@ -25,26 +32,64 @@ import { taskReviewSourceHint } from '@/lib/coding-workspace/task-review/summary
 
 /** Locate the persisted tenant through the full reader, then hold fresh
  * membership and re-read every projection. Cookie/default choices are not pins. */
-export async function mobileTask(user: Exclude<IssueReader, string>, id: string, explicitWorkspaceId?: string) {
+export async function mobileTask(user: Exclude<IssueReader, string>, id: string, explicitWorkspaceId?: string, includeWork = false) {
   const candidate = await issueForUser(user, id, false, db, { withoutBody: true })
   if (!candidate || candidate.ownershipState !== 'bound' || !candidate.workspaceId
     || (explicitWorkspaceId !== undefined && candidate.workspaceId !== explicitWorkspaceId)) return null
   const workspaceId = candidate.workspaceId
-  return withIssueWorkspace(user, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask({
-    ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal],
-  }, workspaceId, id))
+  const reader = { ...user, [tokenWorkspace]: workspaceId, [enterprisePrincipal]: user[enterprisePrincipal] }
+  const read = () => withIssueWorkspace(reader, workspaceId, { issueId: id, action: 'canReadContent' }, () => readMobileTask(reader, workspaceId, id))
+  if (!includeWork) return read()
+  const { withTaskWorkspace } = await import('./task-workspace')
+  const { readTaskWork } = await import('./task-work-read')
+  // Hold the tenant across both canonical reads. Recheck the task ACL on the
+  // final document read before returning shared web/mobile work to the caller.
+  return withTaskWorkspace(reader, workspaceId, async () => {
+    const { presentation, factory } = await readTaskWork(reader, workspaceId, id)
+    if (!presentation) return null
+    const { listIssueConnections } = await import('@/app/actions/issue-operations')
+    const connected = await actAs(reader, () => listIssueConnections(id))
+    const current = connected.find(row => row.id === id)
+    const connections = connected.flatMap(row => {
+      const kinds = current ? taskRelationKinds(current, row) : []
+      return kinds.length ? [{ id: row.id, identifier: row.identifier, title: row.title, kinds }] : []
+    })
+    const { listIssueThreads } = await import('@/app/actions/agents')
+    const threads = await actAs(reader, () => listIssueThreads(id))
+    const conversations = threads.filter(isThreadRun).map(thread => {
+      const view = threadQuestionView(thread)
+      const outcome = RUN_OUTCOMES.find(outcome => outcome === view.outcome) ?? null
+      const state = attemptStateOf({ runId: view.runId, status: view.waiting ? 'waiting_input' : view.status, outcome, pauseReason: view.pauseReason })
+      const source = thread.detail
+      return { id: thread.id, ownerName: thread.ownerName, state, stopping: view.stopping,
+        detail: source ? { createdAt: thread.createdAt, agentId: source.agentId, attemptIds: (thread.attempts ?? []).map(attempt => attempt.runId), name: source.name, agent: source.profile?.name || source.agentName, observedModel: source.observedModel ?? null, summary: source.summary } : null }
+    })
+    const sources = taskPullConversations(threads, factory)
+    const pullRequests = (presentation.pullRequests ?? []).map(pull => {
+      const source = sources.get(githubPullRequestKey(pull.url))
+      return source ? { ...pull, sourceConversationId: source.id } : pull
+    })
+    const detail = await read()
+    if (!detail) return null
+    return { ...detail, task: { ...detail.task, status: presentation.primaryStatus, group: presentation.group,
+      state: presentation.state, reason: presentation.reason, blockedBy: presentation.blockedBy,
+      ...(factory ? { factoryTaskId: factory.task.id } : {}) },
+      work: { version: 1 as const, connections, conversations, linkedChats: presentation.linkedChats ?? [], pullRequests },
+      ...(factory ? { factoryEvents: factory.events } : {}) }
+  })
 }
 
 async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: string, id: string) {
   const issue = await issueForUser(user, id)
   if (!issue || issue.ownershipState !== 'bound' || issue.workspaceId !== workspaceId) return null
   const metadata = readIssueMetadata(issue.content)
+  const owner = taskWorkOwner(metadata)
   const blockerIds = metadata.blockedByIds ?? []
   const visibleBlockers = blockerIds.length ? await issueVisibility(user, false, workspaceId, db, { onlyIssueIds: blockerIds }) : null
-  const [identifiers, runs, [decoration], versions, labels, blockers] = await Promise.all([
+  const [identifiers, runs, [decoration], versions, [document], labels, blockers] = await Promise.all([
     taskIdentifiers([{ id, ownerId: issue.userId, scope: issue.scope, number: metadata.number, issuedIdentifier: issue.issuedIdentifier }]),
     db.select({ ...taskStateRunColumns, pullRequest: runPublications.pullRequest,
-      createdAt: agentRuns.createdAt,
+      kind: agentRuns.kind, createdAt: agentRuns.createdAt,
       harness: sql<string>`coalesce(${agentRuns.agentDefinition}->>'harness', ${agents.harness})`,
       model: sql<string | null>`${agentRuns.agentDefinition}->>'model'`,
       bot: { id: bots.id, name: bots.name, color: bots.color, shape: bots.shape },
@@ -59,15 +104,24 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     db.select({ schedule: taskSchedule(issues.id, user.id, workspaceId), owner: users.name, codingReview: taskReviewSourceHint }).from(issues)
       .leftJoin(users, eq(users.id, issues.userId))
       .where(and(eq(issues.id, id), eq(issues.workspaceId, workspaceId), eq(issues.ownershipState, 'bound'))),
-    db.select({ actorType: issueVersions.actorType, actorId: issueVersions.actorId }).from(issueVersions)
-      .where(and(eq(issueVersions.issueId, id), eq(issueVersions.userId, issue.userId)))
-      .orderBy(asc(issueVersions.revision)).limit(1),
+    db.select().from(taskActivityVersions(db, id, issue.userId)),
+    db.select({ state: issueDocuments.state, stageComments: taskDocumentStageComments(issueDocuments.issueId, workspaceId) }).from(issueDocuments)
+      .where(and(eq(issueDocuments.issueId, id), eq(issueDocuments.userId, issue.userId))),
     taskScheduleLabels(),
     visibleBlockers ? db.select({ id: issues.id, status: issues.status, userId: issues.userId, scope: issues.scope, content: issues.content, issuedIdentifier: issues.issuedIdentifier }).from(issues)
       .where(and(inArray(issues.id, blockerIds), visibleBlockers.predicate)) : [],
   ])
   const reviews = await taskReviewSummaries(user, decoration?.codingReview ? [id] : [], workspaceId)
-  const [creation] = await enrichActivityActors(versions, issue.userId)
+  const history = deriveIssueActivity(await enrichActivityActors(versions, issue.userId), [], Infinity)
+  const creation = history.find(event => event.kind === 'created')
+  const { loadIssueDocument, readIssueThreads } = await import('./linear-sync/document')
+  const doc = document ? loadIssueDocument(document.state, issue.content) : null
+  let timeline
+  try {
+    const threads = doc ? readIssueThreads(doc) : []
+    timeline = taskActivityFacts(history, threads, document?.stageComments)
+  }
+  finally { doc?.destroy() }
   const task = { ...issue, metadata }
   const attempts = (await withTaskDevicePresence(runs)).map(run => ({ ...run, failureDetails: readCompactRunFailure(run.failureDetails) }))
   const newest = attempts[0]
@@ -84,12 +138,15 @@ async function readMobileTask(user: Exclude<IssueReader, string>, workspaceId: s
     : newest?.location === 'cloud' ? { kind: 'cloud' as const, name: 'Cloud' } : null
   return {
     task: {
-      id, identifier: identifiers.get(id) ?? null, title: displayTaskTitle({ ...issue, shortTitle: issue.shortTitleFrom === issue.title ? issue.shortTitle : null }), description: issueContentToMarkdown(issue.content).trim() || null,
+      id, identifier: identifiers.get(id) ?? null, title: issue.title, description: issueContentToMarkdown(issue.content, { mentionLabels: true }).trim() || null,
+      workOwner: owner ? { kind: owner.kind, name: owner.name } : null,
       status: issue.status, priority: issue.priority, ...taskStateOf(task, newest, { block, schedule }), bot: newest?.bot ?? null,
+      replyRunId: latestConversationRun(runs),
       agent: newest ? { harness: newest.harness, model: newest.model } : null, place, schedule,
       review: reviews.get(id) ?? null,
     },
+    timeline,
     activity: mobileTaskActivity(task, attempts, { by: creation?.actor ? creation.actor.name : decoration?.owner ?? null, createdAt: issue.createdAt }),
-    live: { workspaceId },
+    live: { workspaceId, factoryActivityVersion: 1 as const },
   }
 }

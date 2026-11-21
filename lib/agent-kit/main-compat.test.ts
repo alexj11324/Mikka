@@ -44,12 +44,10 @@ function identityFixtureQuery(raw: string, args: unknown[]) {
  if(sql==='SELECT "ownerId",kind,enabled FROM devices WHERE id=$1') {
   assert.deepEqual(args, [deviceId]); return fixtureRows([{ ownerId: owner, kind: 'cloud', enabled: true }])
  }
- if(sql===compactSql(`SELECT b."ownerId",b."workspaceId",b."connectionRevision"::text AS revision,b."modelId",b.route,
-      EXISTS (SELECT 1 FROM workspace_subscription_shares s WHERE s."ownerId"=b."ownerId" AND s."workspaceId"=$2 AND s."allowOthers"
-      AND NOT EXISTS (SELECT 1 FROM workspace_personal_policies p WHERE p."workspaceId"=$2 AND NOT p.subscriptions)) AS shared
+ if(sql===compactSql(`SELECT b."ownerId",b."workspaceId",b."connectionRevision"::text AS revision,b."modelId",b.route
       FROM byos_bindings b JOIN byos_connections c ON c.id=b."connectionId" AND c."ownerId"=b."ownerId"
       AND c.state='connected' AND NOT c.paused AND c.epoch=b."connectionRevision" WHERE b.id=$1`)) {
-  assert.deepEqual(args, [binding.id, workspace]); return fixtureRows([{ ownerId: owner, workspaceId: workspace, revision: String(binding.connectionRevision), modelId: binding.modelId, route: binding.route, shared: false }])
+  assert.deepEqual(args, [binding.id]); return fixtureRows([{ ownerId: owner, workspaceId: workspace, revision: String(binding.connectionRevision), modelId: binding.modelId, route: binding.route }])
  }
  if(sql==='SELECT 1 FROM user_e2b_keys WHERE "userId"=$1 UNION ALL SELECT 1 FROM workspace_e2b_keys WHERE "createdBy"=$1 LIMIT 1') {
   assert.deepEqual(args, [owner]); return fixtureRows([{}])
@@ -60,6 +58,8 @@ function identityFixtureQuery(raw: string, args: unknown[]) {
 // This suite substitutes device authentication and DB IO to test only claim
 // snapshot composition. Real credential admission is covered by revocation DB tests.
 stub('../device-route.ts',{withDeviceRoute:<T>(handler:T)=>handler})
+// The claiming device holds its gateway session (decision 2026-11-17-2215).
+stub('../device-session.ts',{deviceSessionHeld:async()=>true})
 let selectIndex=0
 let mismatch: string|undefined
 let currentRun: {id:string;userId:string;workspaceId:string|null;agentId:string;deviceId:string;deviceRepoId:string;issueId:string;baseBranch:null;kind:string;prompt:string;agentDefinition:ReturnType<typeof frozen>|null;status:string;stopRequestedAt:Date|null;leaseExpiresAt:Date|null}
@@ -190,9 +190,9 @@ stub('../db/index.ts',{
 afterEach(()=>{assert.equal(applicationLease,false,'claim always releases its APP client');assert.equal(memberLease,false,'the outer Workspace lease always closes')})
 const cliPolicy: ReturnType<typeof defaultRunPolicy>={...defaultRunPolicy(),permissions:{...defaultRunPolicy().permissions,network:'deny',install_dependency:'deny',git_push:'deny'},networkAllow:['cli-policy.invalid']}
 let cliReadOnly=false
-stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
+stub('../device-link.ts',{authenticateDevice:async()=>({userId:owner,scopeDeviceId:deviceId,scopeWorkspaceId:workspace}),ownedDevice:async()=>({enabled:true,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]}),ownedDeviceWithReport:async()=>({enabled:true,sessionOpenedAt:new Date(),sessionClosedAt:null,protocolVersion,kind:cloud?'cloud':'local',computerUse:{installed:localCapable,version:null},harnesses:[{harness:'codex',installed:true,toolApproval:true,subscriptionBroker:true,computerBroker:true}]})})
 const modelAdmissionCheck=mock.fn(async(_scope:{workspaceId:string;ownerId:string},_model:string,_signal?:AbortSignal)=>undefined)
-stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck})
+stub('../model-admission/runtime.ts',{assertUnmanagedModelTransport:modelAdmissionCheck,assertSubscriptionModelTransport:modelAdmissionCheck,assertLiteLLMModelTransport:modelAdmissionCheck})
 stub('../agent-tool-approval/policy-store.ts',{readCliRunPolicy:async()=>({policy:{...cliPolicy,...(cliReadOnly?{readOnly:true}:{})},revision:'a'.repeat(64),workspaceIds:[workspace]})})
 stub('../mcp/worker.ts',{issueRunToken:async()=>{if(stopDuringToken)currentRun.stopRequestedAt=new Date();if(revokeDuringToken)memberActive=false;return {token:'synthetic-only'}}})
 stub('../personal-mailbox-runtime.ts',{personalWorkerMailboxAdvertised:async()=>[]})
@@ -220,8 +220,7 @@ stub('../computer/native-run-binding.ts',{nativeRunBinding:scopedBinding})
 // Skill assignment SQL, terminal fences and native binding CAS have their own
 // PostgreSQL composition regressions; do not initialize auth/provider services here.
 stub('../factory/server.ts',{
- guardExecutionRun:async()=>{throw Error('Mocked ordinary claim must not execute a transaction callback')},
- claimFactoryCheckRun:async()=>{throw Error('No Factory check in this fixture')},factoryQuestions:{},
+ factoryQuestions:{},
 })
 stub('../self-improvement/server.ts',{
  skillAssignments:{preflight:async()=>undefined,recordClaim:async()=>undefined},
@@ -289,7 +288,7 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    if(sql==='SELECT subscriptions FROM workspace_personal_policies WHERE "workspaceId"=$1'){
     assert.deepEqual(args,[workspace]);return fixtureRows([])
    }
-   const keyColumns='id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi"'
+   const keyColumns='id,"ownerId",provider,name,"baseUrl",protocol,last4,models,"modelsError","responsesApi",features'
    if(sql===`SELECT ${keyColumns},to_jsonb(model_api_keys)->'modelSettings' AS "modelSettings" FROM model_api_keys WHERE "ownerId"=$1 ORDER BY "createdAt",id`){
     assert.deepEqual(args,[owner]);return fixtureRows([])
    }
@@ -314,8 +313,8 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    if(sql==='INSERT INTO computer_run_bindings ("runId","botId","workspaceId","ownerId") VALUES ($1,$2,$3,$4)'){
     assert.ok(insertedRunId);assert.deepEqual(args,[insertedRunId,botId,workspace,owner]);return fixtureRows([])
    }
-   if(sql===`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state) VALUES ($1,$2,$3,$4,'pending',$5,'starting') ON CONFLICT DO NOTHING`){
-    assert.ok(insertedRunId);assert.equal(args.length,5);assert.deepEqual(args.slice(0,4),[insertedRunId,workspace,owner,botId]);assert.match(String(args[4]),/^[0-9a-f-]{36}$/)
+   if(sql===`INSERT INTO thread_machines ("runId","workspaceId","ownerId","botId","snapshotId","operationId",state,"issueId") VALUES ($1,$2,$3,$4,$5,$6,'starting',$7) ON CONFLICT DO NOTHING`){
+    assert.ok(insertedRunId);assert.equal(args.length,7);assert.deepEqual(args.slice(0,5),[insertedRunId,workspace,owner,botId,'pending']);assert.match(String(args[5]),/^[0-9a-f-]{36}$/);assert.equal(args[6],null)
     return fixtureRows([])
    }
    throw new Error(`Unexpected cloud queue SQL: ${sql}`)
@@ -328,7 +327,8 @@ function cloudQueueFixture(instructions='Review',priorRun?:Record<string,unknown
    assert.equal(compactSql(raw),compactSql(`SELECT repo."repoPath",repo."remoteUrl",a.harness,
         CASE WHEN source.id IS NULL THEN repo."baseBranch"
           WHEN source."agentDefinition"->'projectExecution' IS NOT NULL THEN source."agentDefinition"->'projectExecution'->>'baseBranch'
-          ELSE source."baseBranch" END AS "baseBranch"
+          ELSE source."baseBranch" END AS "baseBranch",
+        CASE WHEN source."agentDefinition"#>>'{projectExecution,environment,chosen}'='true' THEN source."agentDefinition"#>>'{projectExecution,environment,id}' END AS "chosenEnvironmentId"
       FROM device_repos repo JOIN agents a ON a.id=$2 AND a."userId"=$3
       JOIN issues i ON i.id=$4 AND i."workspaceId"=$5 AND i."ownershipState"='bound'
       LEFT JOIN agent_runs source ON source.id=$6 AND source."userId"=$3 AND source."issueId"=i.id AND source."workspaceId"=i."workspaceId"

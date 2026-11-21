@@ -46,3 +46,14 @@ test('cron has a 370-day lookahead; leap day works when it is within the window'
   assert.throws(() => cron('0 0 29 2 *', '2026-03-01T00:00:00Z'), /noNextExecution/)
   assert.throws(() => cron('0 0 31 4 *', '2026-01-01T00:00:00Z'), /invalidCron/)
 })
+
+test('a daily time that repeats when clocks go back is found for the editor to ask about', async () => {
+  const { dailyTimeRepeats, nextTime } = await import('./time')
+  const from = new Date('2026-11-15T00:00:00Z')
+  assert.equal(dailyTimeRepeats('01:30', 'America/New_York', from), true)
+  assert.equal(dailyTimeRepeats('02:30', 'Europe/Berlin', from), true)
+  assert.equal(dailyTimeRepeats('09:00', 'America/New_York', from), false)
+  assert.equal(dailyTimeRepeats('01:30', 'Asia/Shanghai', from), false)
+  assert.equal(dailyTimeRepeats('01:30', 'UTC', from), false)
+  assert.equal(nextTime({ title: 'Manual', timezone: 'UTC', timing: { kind: 'manual' }, task: { kind: 'reminder', text: 'x' }, misfire: 'skip', maxLatenessMinutes: 5 }, from, true), null)
+})

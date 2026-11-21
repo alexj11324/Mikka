@@ -4,7 +4,9 @@ import { Pool, type PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { pool, withDatabaseClient } from '@/lib/db'
 import { workspacePool } from '@/lib/workspace-db'
+import { observePoolCommits, withoutCommitEffectsForRestore } from '@/lib/db/commit-effects'
 import { artifactStorage, deleteArtifactObject } from '@/lib/artifacts/storage'
+import { DRIVE_STORAGE_PREFIX, driveStorageKey } from '@/lib/drive/blobs'
 import { auditDigest } from '@/lib/audit/integrity'
 import { accountStorageKeys, deleteMainAccountData, deleteWorkspaceData, freezeProjectRetention, freezeTaskRetention, planWorkspaces, type Plan } from './delete'
 import type { AccountCleanupReport } from './cleanup-result'
@@ -30,7 +32,11 @@ export interface AccountDeletionOptions {
   /** Restore-only preservation decision from the independently retained current journal. */
   replayPlan?: Plan
 }
-const targets = (o: AccountDeletionOptions) => ({ main: o.mainPool ?? pool, workspace: o.workspacePool ?? workspacePool })
+const targets = (o: AccountDeletionOptions) => {
+  if (o.mainPool) observePoolCommits(o.mainPool)
+  if (o.workspacePool) observePoolCommits(o.workspacePool)
+  return { main: o.mainPool ?? pool, workspace: o.workspacePool ?? workspacePool }
+}
 const hashEmail = (email: string) => createHash('sha256').update(email.trim().toLowerCase()).digest('hex')
 const lockKey = (subject: string) => `mikka-account-write:${subject}`
 
@@ -168,7 +174,11 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       await lease.query('UPDATE account_deletion_jobs SET stage=\'external_pending\',"updatedAt"=now() WHERE id=$1', [id])
       let report: AccountCleanupReport
       try {
-        const result = await withDatabaseClient(lease, () => (options.externalCleanup ?? cleanupAccountConnections)(job.subjectUserId, main))
+        // The plan frozen in prepare() names the workspaces that go, so their paid plans are
+        // cancelled here, before any row this job removes can make the charge unreachable.
+        const result = await withDatabaseClient(lease, () => options.externalCleanup
+          ? options.externalCleanup(job.subjectUserId, main)
+          : cleanupAccountConnections(job.subjectUserId, main, { id, client: lease }, job.plan?.solo ?? []))
         report = Array.isArray(result) ? { blockedReasons: result, warnings: [] } : result
       } catch { report = { blockedReasons: ['external_cleanup_failed'], warnings: [] } }
       assertHeld()
@@ -219,10 +229,12 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
           const objects = await accountStorageKeys(client, job.subjectUserId, retained)
           const notBefore = !options.deleteObject && artifactStorage() === 'inline' ? (options.now?.() ?? new Date()) : objects.notBefore
           assertHeld()
-          await deleteMainAccountData(client, job.subjectUserId, retained)
+          // Capture the object handoff before DELETE triggers run. Both the receipt and
+          // the row removals still become visible together at the existing APP commit.
           await client.query('UPDATE account_deletion_jobs SET stage=\'main_deleted\',plan=$4,"pendingObjects"=$2,"storageNotBefore"=$3,"blockedReasons"=\'[]\',"updatedAt"=now() WHERE id=$1',
             [id, JSON.stringify(objects.keys), notBefore, JSON.stringify(retained)])
           assertHeld()
+          await deleteMainAccountData(client, job.subjectUserId, retained)
           return retained
         })
         assertHeld()
@@ -255,7 +267,12 @@ export async function resumeAccountDeletion(id: string, options: AccountDeletion
       const remove = options.deleteObject ?? (async (key: string) => { if (artifactStorage() === 'r2') await deleteArtifactObject(key) })
       for (const key of job.pendingObjects) {
         assertHeld()
-        try { await remove(key) }
+        // Older jobs could have captured another owner's Drive object. Its
+        // canonical storage key still identifies the owner after the APP sweep.
+        const digest = key.slice(-64)
+        const owned = !key.startsWith(DRIVE_STORAGE_PREFIX)
+          || (/^[a-f0-9]{64}$/.test(digest) && key === driveStorageKey(job.subjectUserId, digest))
+        try { if (owned) await remove(key) }
         catch {
           await lease.query('UPDATE account_deletion_jobs SET stage=\'storage_pending\',"blockedReasons"=\'["object_cleanup_failed"]\',"updatedAt"=now() WHERE id=$1', [id])
           return await load(lease, id)
@@ -347,7 +364,12 @@ export async function applyAccountDeletionManifest(manifest: AccountDeletionMani
       return retained
     })
     // Managed custody cleanup completed in the current journal; its warnings preserve upstream exceptions. Restore replays only local deletion against explicit isolated targets.
-    await resumeAccountDeletion(source.id, { ...options, externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }), replayPlan })
+    await withoutCommitEffectsForRestore([options.mainPool, options.workspacePool], () => resumeAccountDeletion(source.id, {
+      ...options,
+      externalCleanup: async () => ({ blockedReasons: [], warnings: source.warnings ?? [] }),
+      deleteObject: options.deleteObject ?? (async () => { throw new Error('accountDeletionRestoreObjectTargetRequired') }),
+      replayPlan,
+    }))
   }
   const remaining = (await options.mainPool.query('SELECT id FROM account_deletion_jobs WHERE id=ANY($1::uuid[]) AND stage<>\'completed\'', [[...ids]])).rows
   if (remaining.length) throw new Error('accountDeletionRestoreCleanupPending')

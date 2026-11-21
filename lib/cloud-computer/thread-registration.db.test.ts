@@ -20,13 +20,13 @@ test('registration completion requires the fresh token, device and current lease
     await pool.query(`CREATE TABLE agent_runs (id uuid PRIMARY KEY, "userId" text, status text, "stopRequestedAt" timestamptz, report jsonb);
       CREATE TABLE devices (id uuid PRIMARY KEY,"ownerId" text,"lastSeenAt" timestamptz);
       CREATE TABLE device_tokens (id uuid PRIMARY KEY,"boundDeviceId" uuid,"tokenHash" text,"revokedAt" timestamptz,"lastUsedAt" timestamptz);
-      CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"deviceId" uuid,"workerLeaseId" uuid,"workerLeaseUntil" timestamptz,state text,"lastActiveAt" timestamptz,"runningSince" timestamptz,"lifecycleAt" timestamptz,lifecycle jsonb,"issueId" uuid,"sandboxId" text,epoch int,"computeSeconds" bigint)`)
+      CREATE TABLE thread_machines ("runId" uuid PRIMARY KEY,"ownerId" text,"deviceId" uuid,"workerLeaseId" uuid,"workerLeaseUntil" timestamptz,state text,"lastActiveAt" timestamptz,"runningSince" timestamptz,"lifecycleAt" timestamptz,lifecycle jsonb,"issueId" uuid,"sandboxId" text,epoch int,"computeSeconds" bigint,"restoreStartedAt" timestamptz)`)
     const reset = async () => {
       await pool.query('TRUNCATE agent_runs,devices,device_tokens,thread_machines')
       await pool.query("INSERT INTO agent_runs VALUES ($1,'owner','queued',NULL,NULL)", [run])
       await pool.query("INSERT INTO devices VALUES ($1,'owner',$2)", [device, new Date(started.getTime()+1)])
       await pool.query('INSERT INTO device_tokens VALUES ($1,$2,$3,NULL,$4)', [token, device, hash, new Date(started.getTime()+1)])
-      await pool.query(`INSERT INTO thread_machines VALUES ($1,'owner',$2,$3,now()+interval '1 minute','starting',NULL,NULL,NULL,'{}',NULL,'vm',7,0)`, [run, device, lease])
+      await pool.query(`INSERT INTO thread_machines VALUES ($1,'owner',$2,$3,now()+interval '1 minute','starting',NULL,NULL,NULL,'{}',NULL,'vm',7,0,NULL)`, [run, device, lease])
     }
     const finish = async (maintenance?: { status: 'succeeded'|'failed'|'stopped'|'cancelled'; stopRequestedAt: string|null }) => {
       const client = await pool.connect()

@@ -8,7 +8,8 @@ const stub=(path:string,namedExports:Record<string,unknown>)=>mock.module(new UR
 stub('../subscription-runtime.ts',{authorizeSubscriptionWorkspace:forbidden,subscriptionRuntime:forbidden})
 stub('../coordinator/bot-instructions.ts',{botInstructions:forbidden})
 stub('../../workflows/coordinator/tools.ts',{createCoordinatorRegistry:forbidden})
-mock.module('ai',{namedExports:{generateText:forbidden,streamText:forbidden,isStepCount:forbidden}})
+stub('../eve/evaluation-client.ts',{runEveEvaluation:forbidden})
+stub('../eve/evaluation-store.ts',{createEvaluationBinding:forbidden})
 
 test('live evaluation remains disabled and refuses before store, model or custody access',async()=>{
   // This test never enables the live-eval flag.

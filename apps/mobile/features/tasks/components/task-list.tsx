@@ -3,26 +3,55 @@ import { useState } from 'react'
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { ChevronDown, ChevronRight } from 'lucide-react-native'
-import { Spinner } from '@/components/icons'
+import { ChevronDown, ChevronRight, ListTodo } from 'lucide-react-native'
 import { ReadNotice } from '@/components/ReadNotice'
 import { Text } from '@/components/Text'
 import { underBar } from '@/components/NavBar'
 import { displayTitle } from '@/lib/display-title'
 import { shortWhen } from '@/lib/clock'
 import type { Task, TaskGroup } from '@/lib/types'
+import { ApiError } from '@/lib/api'
+import { apiCache } from '@/lib/api-cache'
+import { withholdsCachedRead } from '@/lib/api-read-state'
+import { useTaskContinuation } from '../../../../../lib/hooks/use-task-continuation'
+import type { TaskListPageInput } from '../../../../../lib/task-list-page'
 import { useLiveApi, useRefresh } from '@/lib/useApi'
 import { tasksLive } from '@/lib/live-keys'
 import { useHome } from '@/lib/home'
 import { tap } from '@/lib/haptics'
 import { colors, LIST_INSET, ROW_SURFACE_INSET, SPACE } from '@/lib/theme'
+import { EmptyState, ListLoading } from '@/shared/components/empty-state'
 import { rowState, taskListRows, type TaskFilter, type TaskListRow } from '../model/task-groups'
+import { readPresentedTasks } from '../model/task-presentation-read'
 import { BOARD_LABEL, GROUP_LABEL, STATE_LABEL, TaskGroupIcon, TaskStateIcon } from './task-icons'
 
 /** The person's tasks (GET /api/mobile/tasks), read again when a task or one of its threads changes (the live channel). */
-export function useTasks(enabled = true) {
+export function useTasks(enabled = true, botId?: string | null) {
   const home = useHome().data
-  return useLiveApi<{ tasks: Task[] }>(enabled ? '/api/mobile/tasks' : null, () => tasksLive(home?.live?.workspaceId, home?.workspace.id))
+  const selected = home?.workspace.id
+  // Omitting botId opens workspace Tasks. A Bot route with no resolved identity has no collection yet.
+  const path = botId === undefined ? '/api/mobile/tasks'
+    : botId && selected ? '/api/mobile/tasks?' + new URLSearchParams({ workspaceId: selected, dispatchedBy: botId }) : null
+  const list = useLiveApi<{ tasks: Task[]; workspaceId: string; next?: TaskListPageInput['after'] | null }>(enabled ? path : null,
+    list => tasksLive(home?.live?.workspaceId, list?.workspaceId ?? home?.workspace.id, list?.tasks.map(task => task.id)), readPresentedTasks)
+  const paging = useTaskContinuation(list.data?.tasks ?? [], list.data, list.data?.next ?? null, async after => {
+    const workspaceId = list.data!.workspaceId
+    const context = apiCache.context()
+    const revision = path && apiCache.revision(path)
+    const params = new URLSearchParams({ workspaceId, after: after.id, updatedAt: after.updatedAt, ...(botId ? { dispatchedBy: botId } : {}) })
+    const page = await readPresentedTasks('/api/mobile/tasks?' + params).catch(async error => {
+      if (error instanceof ApiError) {
+        if (error.status === 409) await list.reload()
+        if (path && revision === apiCache.revision(path) && withholdsCachedRead(error.status)) {
+          apiCache.revoke(path, context, error)
+        }
+      }
+      throw error
+    })
+    if (page.workspaceId !== workspaceId) throw new Error('workspaceAccessDenied')
+    return { items: page.tasks, next: page.next ?? null }
+  })
+  return { ...list, paging }
 }
 
 /**
@@ -30,12 +59,12 @@ export function useTasks(enabled = true) {
  * 待办 · 已完成, each under a grey rounded bar with its count that folds it; 已完成 starts folded. `bot` keeps one
  * bot's tasks (its 资料 page).
  */
-export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFilter; bot?: string; bottom?: number }) {
+export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFilter; bot?: string | null; bottom?: number }) {
   const insets = useSafeAreaInsets()
-  const { data, error, loading, reload } = useTasks()
+  const { data, error, loading, reload, paging } = useTasks(true, bot)
   const refresh = useRefresh(reload)
   const [toggled, setToggled] = useState<ReadonlySet<TaskGroup>>(new Set())
-  const tasks = bot ? (data?.tasks ?? []).filter(task => task.bot?.id === bot) : data?.tasks ?? []
+  const tasks = bot === undefined ? paging.items : paging.items.filter(task => bot && (task.dispatchedBy === bot || task.bot?.id === bot))
   const rows = taskListRows(tasks, toggled, filter)
   const toggle = (id: TaskGroup) => setToggled(current => {
     const next = new Set(current)
@@ -51,12 +80,22 @@ export function TaskList({ filter = 'all', bot, bottom = 24 }: { filter?: TaskFi
       refreshControl={<RefreshControl {...refresh} />}
       contentContainerStyle={{ paddingBottom: insets.bottom + bottom }}
       ListHeaderComponent={<ReadNotice error={error} hasData={Boolean(data)} label={mobileMessages.Nav.tasks} onRetry={reload} />}
-      ListEmptyComponent={loading && !data ? <View style={styles.center}><Spinner /></View> : error ? undefined : <Text style={styles.empty}>{mobileMessages.MobileCore.noTasks}</Text>}
+      ListFooterComponent={<TaskListContinuation paging={paging} />}
+      ListEmptyComponent={loading && !data ? <ListLoading /> : error ? undefined : <EmptyState icon={<ListTodo size={20} color={colors.secondary} strokeWidth={1.8} />} title={mobileMessages.MobileCore.noTasks} />}
       renderItem={({ item }) => item.kind === 'section'
         ? <TaskGroupBar id={item.id} count={item.count} folded={item.folded} onToggle={() => toggle(item.id)} />
         : <TaskRowView task={item.task} />}
     />
   )
+}
+
+/** Tasks and Search continue the same authorized collection on an explicit tap. */
+export function TaskListContinuation({ paging }: { paging: ReturnType<typeof useTasks>['paging'] }) {
+  if (!paging.hasMore) return null
+  return <Pressable accessibilityRole="button" accessibilityState={{ busy: paging.loading, disabled: paging.loading }}
+    disabled={paging.loading} onPress={() => void paging.loadMore()} style={styles.center}>
+    <Text>{paging.loading ? mobileMessages.Shell.search.loadingMore : paging.failed ? mobileMessages.Common.retry : mobileMessages.HostedTasks.loadMore}</Text>
+  </Pressable>
 }
 
 /** A group's header (Comma 15): its icon, name and count in the secondary colour on the page, no fill (Alex 2026-11-08:
@@ -104,7 +143,6 @@ export function TaskRowView({ task }: { task: Task }) {
  * the first row's padding alone (about 12–15 pt) under the bar. */
 const styles = StyleSheet.create({
   center: { paddingTop: 40, alignItems: 'center' },
-  empty: { textAlign: 'center', color: colors.secondary, marginTop: 40, fontSize: 15 },
   bar: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 40, marginHorizontal: ROW_SURFACE_INSET, marginTop: SPACE.section - SPACE.rowY, marginBottom: 0, paddingHorizontal: LIST_INSET - ROW_SURFACE_INSET, borderRadius: 10, borderCurve: 'continuous' },
   barTitle: { fontSize: 15, lineHeight: 20, fontWeight: '600', color: colors.secondary },
   barCount: { fontSize: 15, lineHeight: 20, color: colors.secondary, fontVariant: ['tabular-nums'] },

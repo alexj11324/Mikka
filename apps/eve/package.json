@@ -8,6 +8,7 @@
     "dev": "eve dev --no-ui --host 127.0.0.1 --port 3002"
   },
   "dependencies": {
+    "@workflow/world-postgres": "5.2.0",
     "eve": "1.0.0-rc.9"
   }
 }

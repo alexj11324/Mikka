@@ -33,6 +33,12 @@ function fixture(decision:'allow'|'ask'|'deny'='ask',early?:unknown) {
 test('Ask uses native approval without executing; an exact owner response sends once',async()=>{
   const f=fixture()
   assert.equal((await f.bridge.review(call))?.status,'user-approval')
+  // Values recorded before the shared digest was used. Existing stored approvals must replay.
+  assert.deepEqual([...f.records], [['8505ac4f74f6f8e3e7867a3ec13efa1bf2a643ffc7cc474370f628f26459374f', {
+    callDigest:'bfb67ebb985eea7dd2dd9d319f4ebf56348d46e2891fa598e94c0220e9c3972d',
+    planDigest:'f058d6fd51f072776796cbc61675ec995861ef8b5edc3412df2089dbc53dbb47',
+    decision:'ask',status:'prepared',
+  }]])
   assert.equal(f.sends(),0)
   assert.deepEqual(f.audits,[])
   await assert.rejects(f.bridge.execute(call),/writeApprovalRequired/)

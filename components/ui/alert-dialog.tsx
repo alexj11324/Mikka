@@ -141,13 +141,22 @@ function AlertDialogDescription({
   )
 }
 
+/**
+ * The confirm action. It defaults to `destructive`: most confirm dialogs guard
+ * something that cannot be undone (delete, revoke, disconnect, leave), and a call
+ * site that forgets the variant must fail towards the louder red, not towards a
+ * calm blue button that deletes. A dialog confirming a benign write says
+ * `variant="default"` itself.
+ */
 function AlertDialogAction({
   className,
+  variant = "destructive",
   ...props
 }: React.ComponentProps<typeof Button>) {
   return (
     <Button
       data-slot="alert-dialog-action"
+      variant={variant}
       className={cn(className)}
       {...props}
     />

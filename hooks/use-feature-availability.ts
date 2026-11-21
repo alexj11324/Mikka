@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useSyncExternalStore } from 'react'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import posthog from 'posthog-js'
 import { computerMock } from '@/lib/computer/client'
 import { computerAcceptancePreview, computerProductionEnabled, featureAvailability, gatedFeatureEnabled, gatedFeatures, killSwitches, productionFlagDefault, upcomingFeatures, type GatedFeature, type UpcomingFeature } from '@/lib/feature-flags'

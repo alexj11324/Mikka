@@ -12,7 +12,7 @@ export interface Workspace { id: string; name: string }
 /** The person's own state for a chat on the home list (lib/chat-preferences.ts on the server). Absent from a server older than it. */
 export interface ChatOwnState { hidden?: boolean; markedUnread?: boolean; pinOrder?: number | null; listOrder?: number | null }
 
-export interface HomeBot extends ChatOwnState { id: string; name: string; color: string; shape: string; /** Plain text; an empty string is a card with no words. */ line: string | null; at: string | null; working: boolean; pinned?: boolean; /** The person's Coordinator: the app draws it pinned on top, not as a row. */ coordinator?: boolean; /** Its threads waiting on the person. */ waiting?: number }
+export interface HomeBot extends ChatOwnState { unreadCount?: number; id: string; name: string; color: string; shape: string; /** Plain text; an empty string is a card with no words. */ line: string | null; at: string | null; working: boolean; pinned?: boolean; /** The person's Coordinator: the app draws it pinned on top, not as a row. */ coordinator?: boolean; /** Its threads waiting on the person. */ waiting?: number }
 
 export interface Home {
   user: Person
@@ -44,6 +44,8 @@ export interface RunSource {
 export type CitationSource = IssueSource | RunSource
 
 export interface ChatItem {
+  /** Personal message identity on the authorized transcript. Older servers may omit it. */
+  submissionId?: string
   /** eve mirror identity; native replay is hidden once this historical row arrives. */
   streamId?: string
   id?: string
@@ -100,8 +102,9 @@ export type ChatFailure = (
 /** Reactions on a message, by emoji (lib/reactions.ts on the server). */
 export interface Reaction { emoji: string; count: number; mine: boolean }
 
-/** A group chat in 对话 (GET /api/conversations). */
+/** A group chat in 线程 (GET /api/conversations). */
 export interface GroupSummary {
+  creationPurpose?: 'group' | 'conversation'
   id: string
   title: string
   createdAt: string
@@ -119,6 +122,7 @@ export interface GroupMember { id: string; name: string; memberType: 'user' | 'a
 
 /** GET /api/conversations/<id>/messages: newest first. */
 export interface GroupPage {
+  readRevision?: number
   messages: GroupMessage[]
   nextBefore: string | null
   agentStatus: { agentId: string | null; botId: string | null; status: string } | null
@@ -128,6 +132,7 @@ export interface GroupPage {
 }
 
 export interface Thread {
+  unread?: boolean
   id: string
   name: string
   status: ThreadStatus
@@ -172,14 +177,17 @@ export type ThreadItem =
 
 /** A thread paused because its subscription ran out (the web's ThreadQuotaPausedCard). */
 export interface ThreadPaused { runId: string; subscription: 'claude' | 'codex'; plan: string | null; resetsAt: string | null; keyReady: boolean }
-export interface ThreadDetail { /** Each run's live channel (lib/live/panels.ts threadLiveReferences); absent from a server older than it. */ live?: { runs: { id: string; workspaceId: string | null }[] }; thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
+export interface ThreadDetail { liveRunId?: string; composerModel?: { selectedModel: string | null; servedModel: string | null } | null; versionAnchors?: Record<string,{runId:string;key:string;operation:'edit'|'rerun'}>; readReceipts?: { id: string; through: string | null; revision: number; unread: boolean }[]; delivery?: import('../../../lib/thread-delivery').ThreadDeliveryView; issueId?: string | null; canReply?: boolean; confirmedSubmissionIds?: string[]; /** Each run's live channel (lib/live/panels.ts threadLiveReferences); absent from a server older than it. */ live?: { runs: { id: string; workspaceId: string | null }[] }; thread: Thread; active: boolean; /** Generating or running, not waiting for an answer: only then does the composer's button stop. */ working?: boolean; paused?: ThreadPaused | null; summary: string | null; error: string | null; items: ThreadItem[] }
 
 export interface Suggestion { id: string; source: Source; action: string; title: string; url: string | null; actor: string | null; occurredAt: string }
 export interface Suggestions { groups: { source: Source; items: Suggestion[] }[] }
 
 /** Why a task is 受阻 (lib/task-blocked.ts on the web): its newest thread, a task it waits on (`blocker`, its number), or the person's flag. */
 export type TaskBlockReason = 'question' | 'quota' | 'run' | 'failed' | 'dependency' | 'flagged'
-export interface Task { id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string
+export interface Task {
+  /** Server-verified dispatch history on a scoped list; the latest Bot may differ. */
+  dispatchedBy?: string
+  id: string; identifier: string | null; title: string; status: string; priority: string; owner: string | null; updatedAt: string
   /** Absent from a server older than 受阻. */
   blocked?: { reason: TaskBlockReason; blocker: string | null } | null
   /** Its list group from its current thread (R-52, 2026-11-07); absent from an older server (features/tasks/model/task-groups.ts). */
@@ -200,7 +208,7 @@ export interface Task { id: string; identifier: string | null; title: string; st
 export type TaskState = 'waiting' | 'failed' | 'blocked' | 'running' | 'queued'
 /** The API's `state`: the four attempt states, or the board status of an open or closed task. */
 export type ServerTaskState = TaskState | 'todo' | 'done' | 'canceled' | 'duplicate'
-export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'blocked_by' | 'flagged'
+export type TaskReason = 'needs_input' | 'approval' | 'pr_review' | 'blocked' | 'quota' | 'offline' | 'blocked_by' | 'flagged'
 
 /** 待处理 · 进行中 · 待办 · 已完成 (decisions/2026-11-07-2045-tasks-only-threads-inside.md). */
 export type TaskGroup = 'pending' | 'running' | 'todo' | 'done'
@@ -221,7 +229,18 @@ export type TaskActivity =
 
 /** GET /api/mobile/tasks/:id (lib/mobile-tasks.ts on the server): the task's detail and its 活动, newest first. */
 export interface TaskDetail {
+  /** The same authorized work projection as the official task page, available on new servers. */
+  work?: { version: 1
+    connections?: { id: string; identifier: string | null; title: string; kinds: ('child' | 'parent' | 'duplicate' | 'blockedBy' | 'blocks' | 'related')[] }[]
+    conversations?: { id: string; ownerName: string | null; detail: { createdAt?: string; agentId?: string | null; attemptIds?: string[]; name: string; agent: string; observedModel: string | null; summary: string | null } | null
+      state: 'running' | 'paused' | 'done' | 'failed' | 'blocked' | 'replaced'; stopping: boolean }[]
+    linkedChats: { id: string; title: string }[]; pullRequests: { url: string; title?: string; state: 'open' | 'draft' | 'merged' | 'closed'; additions?: number; deletions?: number; sourceConversationId?: string }[] }
   task: Pick<Task, 'id' | 'identifier' | 'title' | 'status' | 'priority' | 'group' | 'state' | 'reason' | 'blockedBy'> & {
+    /** Human-facing owner on servers that project the task’s canonical assignment. */
+    workOwner?: { kind: 'member' | 'agent' | 'bot' | 'profile'; name: string } | null
+    /** Authorized conversation head, null for read-only evidence. Absent on older servers. */
+    replyRunId?: string | null
+    factoryTaskId?: string
     bot: TaskBot | null
     schedule: TaskSchedule | null
     description: string | null
@@ -232,17 +251,24 @@ export interface TaskDetail {
     /** A factory task's flow: its stage, what it needs from the person, 审阅's verdict (2026-11-04-2200). Not sent yet. */
     flow?: import('../features/tasks/model/task-flow').TaskFlow | null
   }
+  /** Canonical, oldest-first history and discussions. Absent on older servers. */
+  timeline?: import('../../../lib/task-activity-timeline').TaskActivityFact[]
+  /** Raw, authorized receipts from the selected Factory response. The UI decodes its supported DTO version. */
+  factoryEvents?: unknown[]
   activity: TaskActivity[]
   /** The channel its task and run keys arrive on. */
-  live?: { workspaceId: string }
+  live?: { workspaceId: string; factoryActivityVersion?: 1 }
 }
 
 export interface Preferences {
+  /** Older servers do not offer a personal conversation archive interval. */
+  archiveIdleAfterDays?: number
   proactive: boolean
   pushDecide: boolean
   pushReview: boolean
   pushFinished: boolean
   pushBriefing: boolean
+  organizationInvitationEmails?: boolean
   pushWhen: 'always' | 'away'
   memoryEnabled: boolean
   /** The web composer's send key; mobile keeps its own keyboard behaviour. */
@@ -254,6 +280,9 @@ export interface Preferences {
 }
 
 export interface Settings {
+  /** Older and community servers do not advertise the official personal Files page. */
+  organizationSettingsAvailable?: boolean
+  personalFilesAvailable?: boolean
   /** Fresh finance entry scope; absent on older servers. */
   billingScope?: { kind: 'workspace' | 'organization'; id: string } | null
   user: Person
@@ -261,7 +290,8 @@ export interface Settings {
   workspaces: Workspace[]
   preferences: Preferences
   memory: string
-  apps: { app: Source; connected: boolean; account: string | null }[]
+  /** Every app with an active account (any Composio toolkit), and Linear. */
+  apps: { app: string; connected: boolean; account: string | null }[]
 }
 
 /** A run as people name it on a card or a chip: its task's title, never the task's key (#1386). */
@@ -285,10 +315,12 @@ export interface StoreCatalog {
   apps: { id: string; name: string; description: string; iconUrl: string | null }[]
   popular: string[]
   latest: string[]
+  /** Composio's categories, largest first, each with its apps in usage order; absent on older servers. */
+  categories?: { id: string; name: string; apps: string[] }[]
 }
 
 /** The person's connected accounts (GET /api/integrations/composio). */
-export interface ComposioAccounts { configured: boolean; accounts: { id: string; toolkit: string; status: string; alias: string | null; email: string | null }[] }
+export interface ComposioAccounts { configured: boolean; accounts: { id: string; toolkit: string; status: string; enabled?: boolean; alias: string | null; email: string | null }[] }
 
 /** 插件 › 技能: one page of skills.sh (GET /api/skills/search). */
 export interface SkillsPage { data: { id: string; name: string; source: string; installs: number; url: string }[]; hasMore: boolean }

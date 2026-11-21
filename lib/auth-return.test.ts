@@ -17,6 +17,7 @@ test('allows supported local destinations with validated settings context', () =
   assert.equal(safeAuthReturn(`/settings/members?workspace=${workspaceId}&invite=1`), `/settings/members?workspace=${workspaceId}&invite=1`)
   assert.equal(safeAuthReturn(`/?issue=${issueId}`), `/?issue=${issueId}`)
   assert.equal(safeAuthReturn(`/invite/${'a'.repeat(64)}`), `/invite/${'a'.repeat(64)}`)
+  assert.equal(safeAuthReturn(`/organization-invite/${'b'.repeat(64)}`), `/organization-invite/${'b'.repeat(64)}`)
   assert.equal(safeAuthReturn('/devices'), '/settings?section=devices')
   assert.equal(safeAuthReturn('/device'), '/device')
   assert.equal(safeAuthReturn('/device?user_code=ABCD-EFGH'), '/device?user_code=ABCD-EFGH')
@@ -26,6 +27,10 @@ test('allows supported local destinations with validated settings context', () =
 })
 
 test('rejects external redirects, unsupported settings state, and malformed context', () => {
+  assert.equal(safeAuthReturn('/organization-invite/' + 'b'.repeat(63)), '/')
+  assert.equal(safeAuthReturn('/organization-invite/' + 'B'.repeat(64)), '/')
+  assert.equal(safeAuthReturn('/organization-invite/' + 'b'.repeat(64) + '?next=https://attacker.example'), '/')
+  assert.equal(safeAuthReturn('/organization-invite/' + 'b'.repeat(64) + '/extra'), '/')
   assert.equal(safeAuthReturn('/w/design-team?next=https://attacker.example'), '/')
   assert.equal(safeAuthReturn('/w/a'), '/')
   assert.equal(safeAuthReturn('//attacker.example'), '/')
@@ -89,4 +94,10 @@ test('returns to an app page under 设置 › 连接, and only there', () => {
   assert.equal(safeAuthReturn('/settings?section=connections&app=hubspot'), '/settings?section=connections&app=hubspot')
   assert.equal(safeAuthReturn('/settings?section=connections&app=Not%20A%20Slug'), '/')
   assert.equal(safeAuthReturn('/settings?section=account&app=github'), '/')
+})
+
+test('Slack handoff accepts only the single opaque parameter at the same-origin start route', () => {
+  const token='a'.repeat(43),path='/api/integrations/slack/connect?intent='+token
+  assert.equal(safeAuthReturn(path),path)
+  for (const value of [path+'&next=https://example.invalid',path+'&intent='+token,path+'!',path.replace('slack','other')]) assert.equal(safeAuthReturn(value),'/')
 })

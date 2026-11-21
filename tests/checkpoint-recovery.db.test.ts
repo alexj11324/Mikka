@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
 import test from 'node:test'
 import { Pool } from 'pg'
+import { observePoolCommits } from '../lib/db/commit-effects'
 import { runCheckpointReceiptSchema, type RunCheckpoint, type RunCheckpointReceipt } from '@mikka/protocol/device'
 import { emptyRunReport } from '@mikka/protocol/run'
 
@@ -18,6 +19,7 @@ if (process.env.REQUIRE_DB === '1' && !connection) throw new Error('Checkpoint D
 
 test('checkpoint recovery availability persists through the actual authenticated route', { skip: !connection, timeout: 60_000 }, async t => {
   const pool = new Pool({ connectionString: connection, max: 4 })
+  observePoolCommits(pool)
   const { POST } = await import('../app/v1/runs/[runId]/checkpoint/route')
   const { issueDeviceToken } = await import('../lib/device-link')
   const userId = `checkpoint-${randomUUID()}`, runId = randomUUID(), deviceId = randomUUID(), agentId = randomUUID()
@@ -27,10 +29,14 @@ test('checkpoint recovery availability persists through the actual authenticated
   await pool.query('INSERT INTO agents (id,"userId","deviceId",harness,name) VALUES ($1,$2,$3,\'codex\',\'Checkpoint worker\')', [agentId, userId, deviceId])
   await pool.query('INSERT INTO agent_runs (id,"userId","agentId","deviceId","workspaceId",status,"leaseExpiresAt") VALUES ($1,$2,$3,$4,$6,\'running\',$5)', [runId, userId, agentId, deviceId, new Date(Date.now() + 300_000), workspaceId])
   const token = await issueDeviceToken(userId)
-  t.after(async () => { await pool.end(); await (await import('../lib/db')).pool.end() })
+  t.after(async () => {
+    await (await import('../lib/builtin-gateway/runtime')).builtinGateway()?.stop()
+    await pool.end()
+    await (await import('../lib/db')).pool.end()
+  })
   const checkpoint = { baseCommit: 'a'.repeat(40), patch: gzipSync(Buffer.from('initial patch fixture\n')).toString('base64'), files: 1, takenAt: '2099-01-01T00:00:00Z' }
   const uploadFor = (id: string, value: RunCheckpoint = checkpoint) => POST(new Request(`http://localhost/mikka/v1/runs/${id}/checkpoint`, {
-    method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(value),
+    method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: JSON.stringify(value),
   }), { params: Promise.resolve({ runId: id }) })
   const upload = (value: RunCheckpoint = checkpoint) => uploadFor(runId, value)
   const acknowledge = async (id: string, value: RunCheckpoint = checkpoint) => {
@@ -90,7 +96,7 @@ test('checkpoint recovery availability persists through the actual authenticated
     await pool.query('INSERT INTO "user" (id,name,email,"emailVerified","createdAt","updatedAt") VALUES ($1,$1,$2,true,now(),now())', [peer, `${peer}@example.invalid`])
     const peerToken = await issueDeviceToken(peer)
     const response = await POST(new Request(`http://localhost/mikka/v1/runs/${runId}/checkpoint`, {
-      method: 'POST', headers: { 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${peerToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ ...checkpoint, files: 9 }),
+      method: 'POST', headers: { 'x-mikka-device-session': '1', 'x-mikka-client-version': '0.0.456', authorization: `Bearer ${peerToken}`, 'content-type': 'application/json' }, body: JSON.stringify({ ...checkpoint, files: 9 }),
     }), { params: Promise.resolve({ runId }) })
     assert.equal(response.status, 409)
     assert.equal((await stored()).files, 1)

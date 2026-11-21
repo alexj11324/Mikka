@@ -1,10 +1,7 @@
 import 'server-only'
 import { randomUUID } from 'node:crypto'
-import type { Pool, PoolClient } from 'pg'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { pool } from '@/lib/db'
-import { workspacePool } from '@/lib/workspace-db'
-import { WorkspaceError } from '@/lib/workspace-access'
+import { auditDatabases, connectAuditDatabases, requireAuditAdmin } from './database'
 import { auditWindow, type AuditScope } from './cursor'
 import { recordAudit } from './record'
 import { auditDigest, auditExportRecords, type AuditExportManifest, type AuditExportRecord } from './integrity'
@@ -17,28 +14,20 @@ export class AuditExportError extends Error {
 }
 type ExportEvent = AuditEventView & { actorId: string | null; targetId: string | null; createdAtMicros: string }
 type RawEvent = Omit<ExportEvent, 'createdAt'> & { createdAt: Date }
-type Targets = { main: Pool; workspace: Pool }
-const targets = (): Targets => ({ main: pool, workspace: workspacePool })
 const columns = `id, "createdAt", (extract(epoch from "createdAt")*1000000)::bigint::text AS "createdAtMicros",
  "actorType", "actorId", "actorName", action, category, "targetType", "targetId", "targetLabel", metadata,
  host(ip) AS ip, "geoCity"`
 const view = (row: RawEvent): ExportEvent => ({ ...row, createdAt: row.createdAt.toISOString() })
 
-async function admin(tx: PoolClient, actorId: string, workspaceId: string) {
-  const row = (await tx.query<{ name: string }>(`SELECT m.name FROM mikka_workspaces w JOIN mikka_workspace_members m ON m."workspaceId"=w.id
-    WHERE w.id=$1 AND m."userId"=$2 AND m.status='active' AND m.role='admin' FOR SHARE OF w,m`, [workspaceId, actorId])).rows[0]
-  if (!row) throw new WorkspaceError('workspaceAccessDenied')
-  return row
-}
 
 /** A stable, bounded snapshot. Oversized exports fail explicitly instead of returning a partial CSV. */
-export async function createAuditExport(actorId: string, workspaceId: string, filter: 'all' | 'security', now = new Date(), cap = AUDIT_EXPORT_MAX, database = targets(), scope: Pick<AuditScope, 'categories' | 'from' | 'until'> = {}) {
+export async function createAuditExport(actorId: string, workspaceId: string, filter: 'all' | 'security', now = new Date(), cap = AUDIT_EXPORT_MAX, database = auditDatabases(), scope: Pick<AuditScope, 'categories' | 'from' | 'until'> = {}) {
   if (!Number.isSafeInteger(cap) || cap < 1 || cap > AUDIT_EXPORT_MAX) throw new RangeError('Invalid audit export limit')
-  const ws = await database.workspace.connect(), app = await database.main.connect()
+  const { ws, app } = await connectAuditDatabases(database)
   try {
     await ws.query('BEGIN')
     await ws.query('SELECT pg_advisory_xact_lock_shared(hashtextextended($1,0))', [`mikka-audit-retention:${workspaceId}`])
-    const actor = await admin(ws, actorId, workspaceId)
+    const actor = await requireAuditAdmin(ws, actorId, workspaceId)
     await app.query('BEGIN ISOLATION LEVEL REPEATABLE READ')
     const { since: from, until } = auditWindow(scope, now)
     const selected = (await app.query<RawEvent>(`SELECT ${columns} FROM workspace_audit_events
@@ -65,12 +54,12 @@ export async function createAuditExport(actorId: string, workspaceId: string, fi
 }
 
 /** Resume an export by its immutable ID; every page rechecks admin authority and row digests. */
-export async function readAuditExportPage(actorId: string, workspaceId: string, exportId: string, offset = 0, limit = 100, now = new Date(), database = targets()) {
+export async function readAuditExportPage(actorId: string, workspaceId: string, exportId: string, offset = 0, limit = 100, now = new Date(), database = auditDatabases()) {
   if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 1000) throw new RangeError('Invalid audit page')
   const ws = await database.workspace.connect()
   try {
     await ws.query('BEGIN')
-    await admin(ws, actorId, workspaceId)
+    await requireAuditAdmin(ws, actorId, workspaceId)
     const saved = (await ws.query<{ manifest: AuditExportManifest; records: AuditExportRecord[] }>(`SELECT manifest,records FROM workspace_audit_exports WHERE id=$1 AND "workspaceId"=$2 AND "expiresAt">$3`, [exportId, workspaceId, now])).rows[0]
     if (!saved) throw new AuditExportError('auditExportUnavailable', 404)
     if (saved.records.length !== saved.manifest.count || auditDigest(saved.records) !== saved.manifest.digest) throw new AuditExportError('auditExportChanged', 409)

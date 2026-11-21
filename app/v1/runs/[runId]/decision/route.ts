@@ -5,7 +5,6 @@ import { authenticateDevice } from '@/lib/device-link'
 import { decide } from '@/lib/coordinator/decide'
 
 type ServerDecisionAnswer = { type: 'predicate'; name: string; probability: number } | { type: 'choice'; name: string; choice: string }
-export const dynamic = 'force-dynamic'
 const name = z.string().regex(/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/)
 const instructions = z.string().min(1).max(4000)
 const payload = z.object({

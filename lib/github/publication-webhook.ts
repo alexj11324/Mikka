@@ -1,9 +1,12 @@
 import 'server-only'
 import type { Pool } from 'pg'
 import { z } from 'zod'
+import { githubPullRequestKey } from '@/lib/issue-metadata'
 import { pool } from '@/lib/db'
 import { factoryCommitted } from '@/lib/live/factory'
 import { pullRequestStatusChanged } from '@/lib/live/pull-requests'
+import { issueListChanged, runListChanged } from '@/lib/live/lists'
+import { ADVANCE_MERGED_TASKS } from '@/lib/task-status-advance'
 import { reviewCheckEvent } from './review-checks'
 
 const pullRequestEvent = z.object({
@@ -18,6 +21,8 @@ const pullRequestEvent = z.object({
     changed_files: z.number().int().nonnegative().optional(),
     head: z.object({ sha: z.string().regex(/^[a-f0-9]{40,64}$/i), ref: z.string().min(1).max(1024).optional() }).optional(),
     updated_at: z.iso.datetime({ offset: true }).optional(),
+    created_at: z.iso.datetime({ offset: true }).optional(),
+    user: z.object({ login: z.string().max(100) }).nullable().optional(),
   }),
 })
 
@@ -34,8 +39,8 @@ export async function invalidatePublishedPullReview(payload: unknown, database: 
   if (pull.html_url !== url) return
   const { rows } = await database.query<{ issueId: string }>(`SELECT DISTINCT p."issueId" FROM run_publications p
     JOIN agent_runs r ON r.id=p."runId" AND r."userId"=p."userId" AND r."issueId"=p."issueId"
-    WHERE p.status='published' AND p."remoteKey"=$1 AND p."pullRequest"->>'url'=$2 AND p."issueId" IS NOT NULL LIMIT 50`,
-  [`v2/github.com/${repository.full_name.toLowerCase()}`, url])
+    WHERE p.status='published' AND p."remoteKey"=$1 AND lower(rtrim(p."pullRequest"->>'url','/'))=$2 AND p."issueId" IS NOT NULL LIMIT 50`,
+  [`v2/github.com/${repository.full_name.toLowerCase()}`, githubPullRequestKey(url)])
   await pullRequestStatusChanged(database, rows.map(row => row.issueId))
 }
 
@@ -47,7 +52,7 @@ export async function invalidatePublishedPullReview(payload: unknown, database: 
  */
 const RECORD_LINE_COUNTS = `
 WITH delivered AS (
-  SELECT DISTINCT "issueId" FROM run_publications WHERE "pullRequest"->>'url'=$1
+  SELECT DISTINCT "issueId" FROM run_publications WHERE lower(rtrim("pullRequest"->>'url','/'))=$1
 ), locked AS MATERIALIZED (
   -- Match publication settlement's issue-before-publication lock order.
   SELECT i.id FROM issues i JOIN delivered d ON d."issueId"=i.id ORDER BY i.id FOR UPDATE OF i
@@ -55,16 +60,16 @@ WITH delivered AS (
   -- Recheck the exact metadata after obtaining the publication lock. A newer
   -- webhook can run between the two statements; its line counts must win.
   SELECT p."issueId" FROM run_publications p JOIN locked i ON i.id=p."issueId"
-  WHERE p."pullRequest"->>'url'=$1 AND p."pullRequest" @> $3::jsonb FOR SHARE OF p
+  WHERE lower(rtrim(p."pullRequest"->>'url','/'))=$1 AND p."pullRequest" @> $3::jsonb FOR SHARE OF p
 ), target AS (
   SELECT i.id FROM issues i WHERE i.id IN (SELECT "issueId" FROM current) AND EXISTS (
     SELECT 1 FROM jsonb_array_elements(coalesce(i.content #> '{attrs,mikka,pullRequests}','[]'::jsonb)) e
-    WHERE rtrim(e->>'url','/')=$1 AND (e->'additions' IS DISTINCT FROM $2::jsonb->'additions' OR e->'deletions' IS DISTINCT FROM $2::jsonb->'deletions')
+    WHERE lower(rtrim(e->>'url','/'))=$1 AND (e->'additions' IS DISTINCT FROM $2::jsonb->'additions' OR e->'deletions' IS DISTINCT FROM $2::jsonb->'deletions')
   )
   FOR UPDATE OF i
 ), saved AS (
   UPDATE issues i SET content=jsonb_set(i.content,'{attrs,mikka,pullRequests}',(
-      SELECT jsonb_agg(CASE WHEN rtrim(e->>'url','/')=$1 THEN e || $2::jsonb ELSE e END ORDER BY n)
+      SELECT jsonb_agg(CASE WHEN lower(rtrim(e->>'url','/'))=$1 THEN e || $2::jsonb ELSE e END ORDER BY n)
       FROM jsonb_array_elements(i.content #> '{attrs,mikka,pullRequests}') WITH ORDINALITY AS list(e,n))),
     revision=i.revision+1, "updatedAt"=now()
   FROM target WHERE i.id=target.id
@@ -89,7 +94,7 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
         'headSha',$2::text,'complete',CASE WHEN p."pullRequest"#>>'{reviewChecks,headSha}'=$2 THEN coalesce((p."pullRequest"#>>'{reviewChecks,complete}')::boolean,false) ELSE false END,
         'updatedAt',greatest(coalesce(p."pullRequest"#>>'{reviewChecks,updatedAt}',''),$4::jsonb->>'at'),
         'entries',(CASE WHEN p."pullRequest"#>>'{reviewChecks,headSha}'=$2 THEN coalesce(p."pullRequest"#>'{reviewChecks,entries}','{}'::jsonb) ELSE '{}'::jsonb END)||jsonb_build_object($3::text,$4::jsonb))),"updatedAt"=now()
-      WHERE starts_with(p."pullRequest"->>'url',$1) AND p."pullRequest"->>'headSha'=$2
+      WHERE starts_with(lower(p."pullRequest"->>'url'),$1) AND p."pullRequest"->>'headSha'=$2
         AND (p."pullRequest"#>>'{reviewChecks,headSha}' IS DISTINCT FROM $2 OR p."pullRequest"#>ARRAY['reviewChecks','entries',$3] IS NULL
           OR (p."pullRequest"#>>ARRAY['reviewChecks','entries',$3,'id'])::numeric<($4::jsonb->>'id')::numeric
           OR ((p."pullRequest"#>>ARRAY['reviewChecks','entries',$3,'id'])::numeric=($4::jsonb->>'id')::numeric
@@ -99,7 +104,7 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
       RETURNING p."runId",p."userId"
     ) SELECT DISTINCT t.id FROM saved p JOIN factory_candidates c ON c."runId"=p."runId"
       JOIN factory_tasks t ON t.id=c."taskId" AND t."candidateId"=c.id AND t."userId"=p."userId"`,
-    [`https://github.com/${delta.repository}/pull/`, delta.headSha, delta.key, JSON.stringify(delta.check)])
+    [`https://github.com/${delta.repository.toLowerCase()}/pull/`, delta.headSha, delta.key, JSON.stringify(delta.check)])
     await Promise.all(rows.map(task => factoryCommitted(task.id)))
     return
   }
@@ -111,14 +116,16 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
   const before = transition?.before?.toLowerCase() ?? null
   const url = `https://github.com/${repository.full_name}/pull/${pr.number}`
   if (pr.html_url !== url) return
+  const key = githubPullRequestKey(url)
   const state = pr.merged_at ? 'merged' : pr.state === 'closed' ? 'closed' : pr.draft ? 'draft' : 'open'
   const lines = pr.additions !== undefined && pr.deletions !== undefined ? { additions: pr.additions, deletions: pr.deletions } : null
   const patch = JSON.stringify({ title: pr.title, state, ...lines,
     ...(pr.changed_files === undefined ? {} : { changedFiles: pr.changed_files }),
     ...(pr.head ? { headSha: pr.head.sha.toLowerCase(), ...(pr.head.ref ? { branch: pr.head.ref } : {}) } : {}),
-    ...(pr.updated_at ? { githubUpdatedAt: new Date(pr.updated_at).toISOString() } : {}) })
-  const { rows } = await database.query<{ id: string | null; issueId: string | null; changed: boolean }>(`WITH matched AS (
-      SELECT "runId","userId","issueId" FROM run_publications WHERE "pullRequest"->>'url'=$1
+    ...(pr.updated_at ? { githubUpdatedAt: new Date(pr.updated_at).toISOString() } : {}),
+    ...(pr.user?.login ? { author: pr.user.login } : {}), ...(pr.created_at ? { createdAt: new Date(pr.created_at).toISOString() } : {}) })
+  const { rows } = await database.query<{ id: string | null; issueId: string | null; runId: string; changed: boolean }>(`WITH matched AS (
+      SELECT "runId","userId","issueId" FROM run_publications WHERE lower(rtrim("pullRequest"->>'url','/'))=$1
         AND (NOT $2::jsonb ? 'githubUpdatedAt' OR coalesce("pullRequest"->>'githubUpdatedAt','')<=$2::jsonb->>'githubUpdatedAt')
         AND ($3::text IS NULL OR "pullRequest"->>'headSha' IS NULL OR "pullRequest"->>'headSha' IN ($3,$2::jsonb->>'headSha'))
         AND ($3::text IS NOT NULL OR "pullRequest"->>'headSha' IS NULL OR NOT $2::jsonb ? 'headSha' OR "pullRequest"->>'headSha'=$2::jsonb->>'headSha'
@@ -128,23 +135,31 @@ export async function refreshPublishedPullRequest(event: string, payload: unknow
       UPDATE run_publications SET "pullRequest"=(CASE
         WHEN $2::jsonb ? 'headSha' AND "pullRequest"->>'headSha' IS DISTINCT FROM $2::jsonb->>'headSha'
         THEN "pullRequest"-'reviewChecks'-'additions'-'deletions'-'changedFiles' ELSE "pullRequest" END) || $2::jsonb,"updatedAt"=now()
-      WHERE "pullRequest"->>'url'=$1 AND NOT "pullRequest" @> $2::jsonb
+      WHERE lower(rtrim("pullRequest"->>'url','/'))=$1 AND NOT "pullRequest" @> $2::jsonb
         AND "runId" IN (SELECT "runId" FROM matched)
         AND (NOT $2::jsonb ? 'githubUpdatedAt' OR coalesce("pullRequest"->>'githubUpdatedAt','')<=$2::jsonb->>'githubUpdatedAt')
         AND ($3::text IS NULL OR "pullRequest"->>'headSha' IS NULL OR "pullRequest"->>'headSha' IN ($3,$2::jsonb->>'headSha'))
         AND ($3::text IS NOT NULL OR "pullRequest"->>'headSha' IS NULL OR NOT $2::jsonb ? 'headSha' OR "pullRequest"->>'headSha'=$2::jsonb->>'headSha'
           OR coalesce("pullRequest"->>'githubUpdatedAt','')<coalesce($2::jsonb->>'githubUpdatedAt','~')) RETURNING "runId"
-    ) SELECT DISTINCT t.id,p."issueId",(s."runId" IS NOT NULL) AS changed FROM matched p
+    ) SELECT DISTINCT t.id,p."issueId",p."runId",(s."runId" IS NOT NULL) AS changed FROM matched p
       LEFT JOIN saved s ON s."runId"=p."runId"
       LEFT JOIN factory_candidates c ON c."runId"=p."runId"
       LEFT JOIN factory_tasks t ON t.id=c."taskId" AND t."candidateId"=c.id AND t."userId"=p."userId"`,
-    [url, patch, before])
+    [key, patch, before])
   if (!rows.length) return
   const tasks = [...new Set(rows.flatMap(row => row.id && row.changed ? [row.id] : []))].map(id => ({ id }))
+  // Directory pages subscribe to their existing owner-scoped thread list. No PR payload is broadcast.
+  await Promise.all([...new Set(rows.filter(row => row.changed).map(row => row.runId))].map(id => runListChanged(database, id, true)))
   // The PR badge on each task it was delivered on asks GitHub again (#1212); the state itself never crosses.
   await pullRequestStatusChanged(database, rows.flatMap(row => row.issueId ? [row.issueId] : []))
+  // 已完成 once the last PR Mikka delivered on a task is merged: forward only, and a status the person set since the
+  // work began is kept (lib/task-status-advance.ts). A redelivery finds the task already there and changes nothing.
+  if (state === 'merged') {
+    const moved = await database.query<{ id: string }>(ADVANCE_MERGED_TASKS, [key, 'pull-request-merged'])
+    for (const task of moved.rows) await issueListChanged(database, task.id)
+  }
   try {
-    if (lines) await database.query(RECORD_LINE_COUNTS, [url, JSON.stringify(lines), patch])
+    if (lines) await database.query(RECORD_LINE_COUNTS, [key, JSON.stringify(lines), patch])
   } finally {
     // This webhook writer uses autocommitted queries. Even if the optional line-count
     // sync fails, the delivery's title/state is committed and its open view must refresh.

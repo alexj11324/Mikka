@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type MouseEvent } from 'react'
 import useSWR, { unstable_serialize } from 'swr'
-import { useFormatter, useTranslations } from 'next-intl'
+import { useFormatter, useTranslations } from '@/lib/intl/i18n-client'
 import { toast } from 'sonner'
-import { ChevronDown, Download, Globe, History, MessageSquare, SquareDashedMousePointer, X } from 'lucide-react'
+import { ChevronDown, Download, Globe, History, MessageSquare, SquareDashedMousePointer, X } from '@/components/icons'
 import { getArtifact, getArtifactText } from '@/app/actions/artifacts'
 import { openConnectedAsset } from '@/lib/web-connection/assets'
 import { Badge } from '@/components/ui/badge'
@@ -159,6 +159,7 @@ export function ArtifactViewer({ artifactId, onArtifactChange, onClose, bot, quo
   return <Dialog open onOpenChange={open => { if (!open) onClose() }}>
     <DialogContent ref={windowRef} initialFocus={windowRef} instant showCloseButton={false} aria-describedby={undefined}
       className="flex h-[min(53.75rem,calc(100dvh-2rem))] w-[min(80rem,calc(100vw-2rem))] max-w-none flex-col gap-0 overflow-hidden p-0 shadow-2xl ring-0 sm:max-w-none">
+      {/* control-size-exempt: a 52px title bar holding one 24px version chip; not a toolbar of controls. */}
       <header className="relative flex h-13 shrink-0 items-center gap-2 px-4">
         <a ref={downloadRef} href={versionPath(artifactId, version, 'download')} download className="hidden" tabIndex={-1} aria-hidden="true">{t('download')}</a>
         {visible && <ArtifactKindIcon kind={visible.kind} className="size-4 shrink-0 text-muted-foreground" />}

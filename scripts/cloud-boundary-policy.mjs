@@ -29,8 +29,6 @@ const legacy = (rule, text, reason, hits = 1) => ({ rule, fingerprint: fingerpri
 export const cloudBoundaryAllowlist = {
   'lib/mobile-push-delivery.ts': [legacy('cloud/privileged-expo-delivery', 'https://exp.host/--/api/v2/push',
     'Existing first-party push delivery and receipt checks remain public under PR #1559 § 8; this shared base serves only this deployment, while community clients call the separate cloud relay.')],
-  'scripts/dev-local/services.mjs': [legacy('cloud/service-route', '/v1/decisions',
-    'Existing deterministic local API/CLI acceptance fixture under /gateway; it neither proxies a hosted model nor meters another server.')],
 }
 
 const name = node => node && (ts.isIdentifier(node) || ts.isStringLiteral(node)) ? node.text : null

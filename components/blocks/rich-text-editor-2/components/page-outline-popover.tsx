@@ -13,7 +13,7 @@ import {
   RichTextOutlineList,
   type RichTextOutlineEntry,
 } from "./rich-text-outline"
-import { TableOfContentsIcon } from "lucide-react"
+import { TableOfContents } from "@/components/icons"
 
 interface PageOutlinePopoverProps {
   editor: Editor | null
@@ -44,7 +44,7 @@ export function PageOutlinePopover({
           />
         }
       >
-        <TableOfContentsIcon aria-hidden="true" />
+        <TableOfContents aria-hidden="true" />
       </PopoverTrigger>
       {/* The caret moves to the chosen heading, so focus returns to the page. */}
       <PopoverContent

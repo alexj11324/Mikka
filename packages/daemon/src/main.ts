@@ -1,18 +1,20 @@
 import type { AnonymousCodexCandidate } from './anonymous-codex-spare'
 import type { AnonymousClaudeCandidate } from './anonymous-claude-spare'
 import { captureRunFailure } from "@mikka/protocol/run-failure"
-import { coordinatorCapable } from "./coordinator/runner"
 // Daemon boot, shared by every mode (ADR 0004): started by the desktop app,
 // headless `mikka daemon`, and `tsx watch` in dev.
 //
 //   lock data dir -> secret -> journal / outbox / worktrees -> RPC socket
-//   -> resume journaled runs -> loop: lease + watchdog check, then the
-//      server link (register, allow-list refresh, heartbeat with run
-//      progress and lease renewal, flush outbox, claim pinned runs, prune
-//      worktrees)
-//   -> commands loop: long-polls the server for messages people send the
-//      device's running agents and for stop requests, and hands them to
-//      the runs' sessions (ADR 0018)
+//   -> resume journaled runs -> the device session (decision 2026-11-17-2215):
+//      register, take a gateway ticket and hold its WebSocket. On open and on
+//      every `work` push, one pass reads commands and run control (handing
+//      messages and stops to the runs' sessions, ADR 0018), sends a report if
+//      something changed, runs device commands, reads repositories, flushes
+//      the outbox, claims queued runs and prunes worktrees. A dropped socket
+//      is redialed with backoff; nothing polls the server.
+//   -> local timer: lease deadline + watchdog, harness rescan, model probe,
+//      held device commands and changed checkpoints. It sends nothing unless
+//      something changed and the session is open.
 import { randomBytes, randomUUID } from "node:crypto"
 import {
   chmodSync,
@@ -28,16 +30,15 @@ import { fileURLToPath } from "node:url"
 
 import {
   COMMANDS_MAX_SKIP,
-  COMMANDS_MAX_SKIP_DEVICE_COMMANDS,
-  COMMANDS_MAX_WAIT_SECONDS,
   DAEMON_PROTOCOL_VERSION,
   DAEMON_RPC_ERRORS,
   daemonRpc,
-  FS_REQUESTS_MAX_WAIT_SECONDS,
   isTerminalRunState,
   type DaemonStatus,
+  type DeviceManagementCommand,
+  type DeviceReport,
+  type DeviceReportResult,
   type Flavor,
-  type FsResult,
   type Harness,
   type HarnessInfo,
   unknownQuotaReport,
@@ -57,12 +58,14 @@ import { CAPTURES_DIR, CaptureUploader } from "./captures"
 import { runVerify } from "./agents/verify"
 import { NoSandbox, type AgentSandbox } from "./agents/sandbox"
 import { buildChildEnv } from "./env"
-import { browseFolder, verifyExpectedOrigin } from "./fs-browse"
+import { verifyExpectedOrigin } from "./fs-browse"
 import {
   DaemonError,
+  DaemonUpgradeRequiredError,
+  DeviceGatewayRequiredError,
+  DeviceSessionRequiredError,
   InvalidIdError,
   RunNotFoundError,
-  RunNotPinnedHereError,
   ServerUnreachableError,
 } from "./errors"
 import { readJson, writeFileAtomic, writeJsonAtomic } from "./fs-util"
@@ -79,6 +82,7 @@ import { createLocalSubscriptionRunner } from "./subscription-local-runner"
 import { preflightLocalSubscription } from "./subscription-preflight"
 import { logCodedError } from "@mikka/protocol/coded-error"
 import { isSafeId } from "./ids"
+import { acquireCloudWorkspaceControl } from './runs/workspace-control'
 import { acquireLock } from "./lock"
 import { closeLogger, createLogger, type Logger } from "./log"
 import { Outbox } from "./outbox"
@@ -91,12 +95,9 @@ import { judgeComputerAction, noServerDecision } from "./decision-judgments"
 import type { ServerDecide } from "./server-decision"
 import { RpcServer, type RpcHandlers } from "./rpc/server"
 import { RunJournal } from "./runs/journal"
-import {
-  baseReport,
-  RunSupervisor,
-  type SupervisorDeps,
-} from "./runs/supervisor"
-import { DeviceGatewayClosedError, openDeviceGateway, runDeviceGateway } from "./device-gateway"
+import { baseReport } from "./runs/publication"
+import { RunSupervisor, type SupervisorDeps } from "./runs/supervisor"
+import { DEVICE_GATEWAY_UPDATE_REQUIRED_CODE, DeviceGatewayClosedError, DeviceSession, type DeviceSessionVerdict } from "./device-gateway"
 import { deviceRepoSchema } from "@mikka/protocol"
 import type { DeviceRepo, MemoryServer, ServerLink } from "./server-link"
 import { SessionRejectedError } from "./server-link-http"
@@ -113,8 +114,8 @@ import { createHostedBotRunner } from "./subscription-hosted-runner"
 import { ComputerBroker } from "./computer/broker.mjs"
 import { detectComputerDriver, executeDriver, type ComputerDriver } from "./computer/driver.mjs"
 import { createHostedComputerExecutor, type CredentialExecutorAuthority } from "./computer/credential-executor"
-import { pollWebComputerReviews } from "./computer/web-review"
-import { DeviceWorkSignal, type PushedWait } from "./device-work-signal"
+import { followWebComputerReviews } from "./computer/web-review"
+import { DeviceWorkSignal } from "./device-work-signal"
 import { localComputerMcp } from "./computer/local-grant.mjs"
 
 export * from "./server-link"
@@ -133,7 +134,8 @@ export interface DaemonOptions {
   mockSpeed?: number
   fixturesDir?: string
   log?: Logger
-  heartbeatMs?: number
+  /** Jitter for the session's redial backoff (tests). */
+  random?: () => number
   /** Watchdog limit without progress (default 10 minutes). */
   stallMs?: number
   /** Finished worktrees older than this are removed. */
@@ -168,6 +170,8 @@ export interface DaemonOptions {
   anonymousClaudeCandidate?: AnonymousClaudeCandidate; anonymousCodexCandidate?: AnonymousCodexCandidate
   /** Linux-only operator mode; no native/local credential source is opened. */
   hostedSubscriptions?: boolean
+  /** Private task-image entry only. Registration has completed on the server. */
+  taskRegistered?: () => void
   /** Trusted acceptance launcher only; opt in to persisted run/CLI diagnostics. */
   collectCliTiming?: boolean
   /** Only the trusted E2B runner is allowed to select its isolated socket. */
@@ -179,8 +183,6 @@ export interface DaemonOptions {
   /** Trusted infrastructure only. Omit until the persistent action authority,
    * live target fence, and credential service are installed together. */
   credentialExecutorAuthority?: CredentialExecutorAuthority
-  /** Long-poll wait for run commands, seconds (default 25; tests shorten). */
-  commandsWaitSeconds?: number
   /** Called once the daemon stopped after `daemon.drain`. */
   onDrained?: () => void
   /**
@@ -228,6 +230,17 @@ export function loadDeviceFile(raw: unknown): DeviceFile {
 const HARNESS_RESCAN_MS = 5 * 60_000
 /** How often the CLIs are asked again for their models; 重新检测 asks at once. */
 const MODEL_PROBE_MS = 6 * 60 * 60_000
+/** The local timer: lease deadline and watchdog, rescans, held device commands. No request. */
+const LOCAL_CHECK_MS = 5_000
+/** How often the local timer looks for changed checkpoints; an unchanged tree sends nothing. */
+const CHECKPOINT_SCAN_MS = 15_000
+/** A cloud worker asks for its next token this long before the current one expires. */
+const CLOUD_CREDENTIAL_ROTATE_BEFORE_MS = 60 * 60_000
+/** setTimeout's ceiling; a later deadline re-arms when it fires. */
+const MAX_TIMER_MS = 2 ** 31 - 1
+
+/** What `daemon status` says about the device session (decision 2026-11-17-2215). */
+export type DaemonSessionState = "signed_out" | "connecting" | "open" | "update_required" | "gateway_required"
 
 /** The authenticated claim grants a computer to this run on this device.
  * A shared subscription can have a different payer. Existing signed policy
@@ -256,16 +269,12 @@ export class Daemon {
   private device: DeviceFile = {}
   private harnesses: HarnessInfo[] = []
   private server: DaemonStatus["server"] = "unregistered"
-  private timer: NodeJS.Timeout | null = null
-  private tick: Promise<void> = Promise.resolve()
   private updating = false
   private claimsInFlight = 0
-  /** Shared by the heartbeat, commands poll and RPC so one run has one claim. */
+  /** Shared by session passes and RPC so one run has one claim. */
   private claims = new Map<string, ReturnType<Daemon['claimAndStartInternal']>>()
-  /** The newest release a server named; the commands poll sends it so the same news does not end every poll. */
+  /** The newest release a server named; each commands read sends it. */
   private knownLatest: string | undefined
-  /** Device commands the commands poll already handed over; the heartbeat carries them out. */
-  private polledDeviceCommands: string[] = []
   private maintenance: Promise<void> | null = null
   private updateVersion: string | undefined
   private draining = false
@@ -277,25 +286,37 @@ export class Daemon {
   private registered = false
   /** Run ids the server sent that were refused as unsafe (reported once). */
   private refusedRuns = new Set<string>()
-  /** Runs the commands poll reported queued: being claimed, or failed until the next heartbeat retries them. */
+  /** Runs a commands read reported queued: being claimed, or failed until the next pass retries them. */
   private queuedClaims = new Map<string, "claiming" | "failed">()
   private quota: QuotaPoller | null = null
-  /** Ends the commands long-poll when the daemon stops. */
-  private commandsAbort = new AbortController()
-  /** The push socket is open. An idle device does not heartbeat the database. */
-  private gatewayLive = false
-  /** The server's last gateway ticket said it pushes run control (#1212). */
-  private runControlPush = false
+  /** Aborts the daemon's own requests (claims, reads) when it stops. */
+  private lifetime = new AbortController()
+  /** The device session: its socket is the daemon's only standing link to the server. */
+  private session: DeviceSession | null = null
+  /** The session socket is open. */
+  private sessionOpen = false
+  /** Set when the daemon cannot use this server: it must update, or the server has no gateway. */
+  private blocked: "update_required" | "gateway_required" | null = null
+  /** The release a 426 or npm named for a daemon that must update. */
+  private requiredVersion: string | undefined
   /** Gateway pushes for computer reviews (and other non-run-control waits). */
   private readonly workSignal = new DeviceWorkSignal()
-  /** The server said it has no gateway. Do not ask again on every long-poll. */
-  private gatewayUnavailable = false
-  private gatewayFailures = 0
-  private gatewayRetryAt = 0
-  private deviceReceiptsVersion = 0
-  private deviceReceiptsAcknowledged = 0
-  private commandsLoop: Promise<void> = Promise.resolve()
-  private fsLoop: Promise<void> = Promise.resolve()
+  /** The last report the server took, as sent; a report goes out only when this changes. */
+  private lastReport: string | undefined
+  /** The socket opened since the last report: send one even if nothing changed. */
+  private reportOnOpen = false
+  /** A device command waiting to run (until idle, or until its runs end). */
+  private heldDeviceCommand: DeviceManagementCommand | undefined
+  private heldCommandPass: Promise<void> | null = null
+  /** The cloud worker's token expires within the hour: the next report asks for its successor. */
+  private rotationDue = false
+  private rotationTimer: NodeJS.Timeout | null = null
+  private localTimer: NodeJS.Timeout | null = null
+  private lastCheckpointScan = 0
+  private checkpointScan: Promise<void> | null = null
+  /** Resolved when a credential arrives (`device.setCredential`). */
+  private credentialArrived = new Set<() => void>()
+  private deviceType: "laptop" | "server" | undefined
   private reviewAbort: AbortController | null = null
   private reviewLoop: Promise<void> = Promise.resolve()
   private cloudComputerBroker: ComputerBroker | null = null
@@ -303,29 +324,21 @@ export class Daemon {
   private localComputerBroker: ComputerBroker | null = null
   /** Messages handed to an agent whose delivery the server has not taken yet. */
   private unacked = new Set<string>()
+  private refusedSteers = new Set<string>()
   /** Runs this daemon already started cancelling for a stop request. */
   private stopping = new Set<string>()
   /** Runs this daemon has ended, whose end the server may not have yet. */
   private ended = new Set<string>()
-  /** The server pass in flight; the next one starts after it. */
-  private syncing: Promise<void> = Promise.resolve()
+  /** The server work in flight (a pass, a registration, a report); the next one starts after it. */
+  private syncing: Promise<unknown> = Promise.resolve()
   private initialRunHint?: string
   /** An early claim must retain the first sync's complete repository settings. */
   private initialRepositorySync?: { runId: string; ready: Promise<void>; repository?: Promise<DeviceRepo | undefined>; received?: (repo?: DeviceRepo) => void }
-  /** Cuts the poll loop's pause short (the device just registered). */
-  private wakeCommands: (() => void) | null = null
 
   constructor(private readonly options: DaemonOptions) {
     this.paths = daemonPaths(options.dataDir)
     this.log = options.log ?? createLogger({ dir: this.paths.logs })
     this.initialRunHint = options.initialRunId
-    // A cloud computer runs the daemon built with this deployment, whose server
-    // pushes every run-control write (notifyRunControl). Off the gateway (no
-    // ticket yet, a refused ticket, a dropped socket) its runs use the 20 s
-    // fallback, never the 1 s check kept for older self-hosted servers: stops
-    // still arrive at once through the commands long poll, which the same
-    // write wakes, and each provider request checks its own authority.
-    this.runControlPush = Boolean(options.hostedSubscriptions)
   }
 
   async start() {
@@ -368,12 +381,12 @@ export class Daemon {
       this.options.retainResources,
       runId => this.journal.get(runId)?.assignment.traceContext,
     )
-    this.worktrees = new WorktreeManager(paths.worktrees, this.options.retainResources)
-    this.repositories = new RepositoryCache(paths.repos, undefined, this.options.retainResources)
+    this.worktrees = new WorktreeManager(this.options.taskRegistered ? '/workspace/worktrees' : paths.worktrees, this.options.retainResources)
+    this.repositories = new RepositoryCache(this.options.taskRegistered ? '/workspace/repos' : paths.repos, undefined, this.options.retainResources)
     // Hosted subscriptions start their CLIs through the hosted runner.
     this.sandbox = this.options.hostedSubscriptions ? null : await this.createAgentSandbox()
-    // Before its first gateway session, too (runControlPush in the constructor).
-    if (this.runControlPush) this.options.link.setRunControlMode?.('fallback')
+    // Any route's 426 stops the daemon before its next request.
+    this.options.link.onUpgradeRequired?.(latest => this.enterUpdateRequired(latest))
     if (this.stopped) throw new Error("daemon stopped during startup")
     if (!this.options.hostedSubscriptions && this.sandbox) this.localComputerDriver = await detectComputerDriver()
     if (this.localComputerDriver && this.options.link.syncComputerReviews) {
@@ -508,6 +521,9 @@ export class Daemon {
         : this.realAdapters()),
     ]))
     this.supervisor = new RunSupervisor({
+      acquireWorkspaceControl: this.options.e2bContainerRuntime || this.options.taskRegistered
+        ? (assignment, signal, onLost) => acquireCloudWorkspaceControl({ runId: assignment.runId, deviceId: assignment.deviceId, signal, onLost })
+        : undefined,
       collectCliTiming: this.options.collectCliTiming,
       journal: this.journal,
       adapterStateDir: this.paths.adapterState,
@@ -520,6 +536,7 @@ export class Daemon {
       startCredential: hosted?.start,
       prepareSubscription: hosted?.prepare,
       prepareRunMailbox: this.options.link.prepareRunMailbox?.bind(this.options.link),
+      prepareRunDrive: this.options.link.prepareRunDrive?.bind(this.options.link),
       prepareRunToolApproval: this.options.link.prepareRunToolApproval?.bind(this.options.link),
       prepareRunGitHub: hosted ? undefined : (assignment, signal, onCredential) => prepareLocalGitHub(assignment, {
         stateDir: join(this.paths.adapterState, 'github'), link: this.options.link, signal, onCredential,
@@ -616,6 +633,8 @@ export class Daemon {
           }),
       },
     })
+    // No session yet: resumed runs must see the socket open within the local grace.
+    this.supervisor.sessionClosed()
 
     this.rpc = new RpcServer({
       socketPath: paths.socket,
@@ -646,6 +665,7 @@ export class Daemon {
       ...this.modelReports.get(info.harness),
       // The run's live gate stops a revoked run; Codex also verifies its
       // pinned interface at initialize.
+      ...(info.harness === "codex" && info.installed ? { activeTurnSteer: true as const } : {}),
       toolApproval: this.supportsToolApproval(info),
       coordinator: false,
     })) : await Promise.all(supported.map(info => this.localHarnessReport(info)))
@@ -674,112 +694,322 @@ export class Daemon {
       },
       "daemon started"
     )
-    this.schedule(0)
-    this.commandsLoop = this.pollCommands()
+    this.startSession()
     // The CLIs' own model lists, in the background: a first install downloads the pinned CLI.
-    if (this.modelProbeOn() && !preloadedModels) void this.probeModels().then(changed => { if (changed) return this.syncWithServer() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
-    // No folder-request poll: the app adds repositories by path and never queues one
-    // (app/v1/devices/[deviceId]/fs/requests), and each idle poll was a database read.
+    if (this.modelProbeOn() && !preloadedModels) void this.probeModels().then(changed => { if (changed) return this.reportNow() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
     return this
   }
 
+  /** The local timer and the device session; nothing else talks to the server unasked. */
+  private startSession() {
+    // Local only: the lease deadline, the watchdog, rescans and held commands.
+    this.localTimer = setInterval(() => this.localTick(), LOCAL_CHECK_MS)
+    this.localTimer.unref?.()
+    this.session = new DeviceSession({
+      ticket: signal => this.sessionTicket(signal),
+      open: this.options.link.openDeviceGateway?.bind(this.options.link),
+      onOpen: () => this.onSessionOpen(),
+      onClose: (error, opened) => this.onSessionClose(error, opened),
+      onWorkAvailable: () => { this.options.link.invalidateRunControls?.(); this.workSignal.notify() },
+      onWork: () => this.sessionPass(),
+      verdict: error => this.sessionVerdict(error),
+      random: this.options.random,
+    })
+    void this.session.start()
+  }
+
+  /** Runs `work` after the server work already in flight, never alongside it. */
+  private serialized<T>(work: () => Promise<T>): Promise<T> {
+    const run = this.syncing.then(work)
+    this.syncing = run.catch(() => undefined)
+    return run
+  }
+
   /**
-   * Long-polls the server for messages and stop requests for this device's
-   * runs (ADR 0018). Delivery is at least once: a message is acked after
-   * its session took it, so a crash in between hands it over again.
+   * The next socket's ticket: waits for a credential, registers when needed,
+   * then asks the server. This is the only request the session makes while
+   * the socket is down, once per redial.
    */
-  private async pollCommands() {
-    const { link } = this.options
-    const signal = this.commandsAbort.signal
-    const wait = this.options.commandsWaitSeconds ?? COMMANDS_MAX_WAIT_SECONDS
-    let backoff = 1_000
-    while (!this.stopped) {
-      const deviceId = this.device.deviceId
-      const credential = this.device.credential
-      try {
-        if (!this.registered || !deviceId) {
-          await this.pauseCommands(1_000, signal)
-          continue
-        }
-        if (this.unacked.size > 0) {
-          // One notice may contain several mailbox IDs; keep ACK requests
-          // within the protocol bound even when input and notices arrive together.
-          const ids = [...this.unacked].slice(0, 500)
-          await link.ackCommands(deviceId, ids)
-          for (const id of ids) this.unacked.delete(id)
-        }
-        // The push socket is the idle path. A missing gateway, or one that
-        // refuses the connection, falls through to the long-poll below.
-        if (await this.holdGateway(deviceId, signal)) {
-          backoff = 1_000
-          continue
-        }
-        if (this.stopped || signal.aborted) return
-        // An uninstall heartbeat queues stop on the next event-loop turn.
-        // Do not send another unauthorized command request in that gap and
-        // erase the grace credential before the service receives its receipt.
-        if (this.draining && this.supervisor.heartbeatRuns().length === 0) return
-        // Runs being stopped or already ended would come back on every
-        // answer; leaving them out lets the poll wait for new commands.
-        // So are queued runs this daemon refused or failed to claim: the
-        // heartbeat retries those, and the poll must not answer them again.
-        const failedClaims = [...this.queuedClaims].flatMap(([id, state]) => state === "failed" ? [id] : [])
-        const skipRuns = [...failedClaims, ...this.refusedRuns, ...this.stopping, ...this.ended].slice(
-          0,
-          COMMANDS_MAX_SKIP
-        )
-        const started = performance.now()
-        let queued: string[] = []
-        let news = false
-        const commands = await link.fetchCommands(deviceId, wait, {
-          signal,
-          workspaceSkip: [...this.workspaceReads],
-          onWorkspaceRequests: requests => { news = true; this.answerWorkspaceRequests(deviceId, requests) },
-          skipRuns,
-          onQueuedRuns: (runIds) => { queued = runIds },
-          updates: { daemonLatest: this.knownLatest ?? DAEMON_VERSION, skipDeviceCommands: this.polledDeviceCommands },
-          onUpdates: ({ daemonVersions, deviceCommands }) => {
-            const known = this.knownLatest
-            this.learnRelease(daemonVersions?.latest)
-            news ||= this.knownLatest !== known
-            this.checkAutoUpdate()
-            const fresh = deviceCommands.filter(command => !this.polledDeviceCommands.includes(command.id))
-            if (fresh.length === 0) return
-            news = true
-            this.polledDeviceCommands = [...this.polledDeviceCommands, ...fresh.map(command => command.id)].slice(-COMMANDS_MAX_SKIP_DEVICE_COMMANDS)
-            // A person asked for this now: the heartbeat path carries it out, without waiting for its timer.
-            void this.syncWithServer().catch(() => undefined)
-          },
-        })
-        if (this.stopped || signal.aborted) return
-        backoff = 1_000
-        const acted = await this.applyCommands(commands)
-        // A new run starts now instead of on the next heartbeat; then poll
-        // again at once. Runs already being claimed only wait for that claim.
-        if (queued.length > 0) {
-          if (this.claimQueued(queued)) continue
-          await this.pauseCommands(500, signal)
-          continue
-        }
-        if (this.unacked.size > 0) continue // ack right away
-        // The poll ended early for news this daemon now has; the next one waits for stops and messages at once.
-        if (news) continue
-        if (commands.length === 0 && !signal.aborted) {
-          const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
-          if (remaining > 0) await this.pauseCommands(remaining, signal)
-        }
-        // A message for a run with no session yet (still preparing): retry
-        // shortly instead of spinning on the same answer.
-        if (commands.length > 0 && !acted) await this.pauseCommands(500, signal)
-      } catch (error) {
-        if (this.stopped || signal.aborted) return
-        if (error instanceof SessionRejectedError) this.rejectDeviceSession(credential)
-        if (!(error instanceof ServerUnreachableError))
-          this.log.warn({ err: error }, "fetching run commands failed")
-        await this.pauseCommands(backoff, signal)
-        backoff = Math.min(backoff * 2, 30_000)
-      }
+  private async sessionTicket(signal: AbortSignal) {
+    while (!this.device.credential) {
+      this.server = "unregistered"
+      await new Promise<void>(resolve => {
+        const done = () => { this.credentialArrived.delete(done); signal.removeEventListener("abort", done); resolve() }
+        this.credentialArrived.add(done)
+        signal.addEventListener("abort", done, { once: true })
+      })
+      if (signal.aborted) throw new DeviceGatewayClosedError()
     }
+    const credential = this.device.credential
+    await this.serialized(async () => { if (!this.registered || !this.device.deviceId) await this.register(credential) })
+    if (signal.aborted) throw new DeviceGatewayClosedError()
+    const ticket = await this.options.link.deviceGateway(this.device.deviceId!, signal)
+    this.armRotation(ticket.cloudCredentialExpiresAt)
+    return ticket
+  }
+
+  private onSessionOpen() {
+    this.sessionOpen = true
+    this.reportOnOpen = true
+    if (this.blocked === "gateway_required") {
+      this.blocked = null
+      this.log.info("the server has a device gateway again")
+    }
+    this.supervisor.sessionOpened()
+    this.workSignal.setConnected(true)
+    // A push may have been lost while the socket was down: every live run checks again.
+    this.options.link.invalidateRunControls?.()
+    this.log.info({ device_id: this.device.deviceId }, "device session open")
+  }
+
+  private onSessionClose(error: unknown, opened: boolean) {
+    const wasOpen = this.sessionOpen
+    this.sessionOpen = false
+    this.workSignal.setConnected(false)
+    this.supervisor.sessionClosed()
+    if (this.server === "online") this.server = "offline"
+    if (this.stopped || this.blocked === "update_required") return
+    if (wasOpen || opened) this.log.warn({ err: error }, "device session closed; redialing")
+    else if (!(error instanceof ServerUnreachableError)) this.log.warn({ err: error }, "device session could not open; redialing")
+  }
+
+  /** What a lost socket means: stop for good, wait the longest, or redial with backoff. */
+  private sessionVerdict(error: unknown): DeviceSessionVerdict {
+    if (this.stopped) return "stop"
+    if (error instanceof DaemonUpgradeRequiredError) {
+      this.enterUpdateRequired(error.latest)
+      return "stop"
+    }
+    if (error instanceof DeviceGatewayClosedError && error.code === DEVICE_GATEWAY_UPDATE_REQUIRED_CODE) {
+      this.enterUpdateRequired()
+      return "stop"
+    }
+    if (this.blocked === "update_required") return "stop"
+    if (error instanceof DeviceGatewayRequiredError) {
+      // A server without a gateway has no devices. Ask again slowly in case it gains one.
+      if (this.blocked !== "gateway_required")
+        this.log.error("the server has no device gateway, so this device cannot work with it; retrying every 30 s")
+      this.blocked = "gateway_required"
+      this.server = "offline"
+      return "slow"
+    }
+    if (error instanceof SessionRejectedError) this.rejectDeviceSession(this.device.credential)
+    return "redial"
+  }
+
+  /**
+   * One pass on open or on a push. A failure the server caused closes the
+   * socket and the redial retries it; a refused session closes it until
+   * someone signs in again.
+   */
+  private async sessionPass() {
+    const failure = await this.serialized(() => this.syncPass())
+    if (failure instanceof ServerUnreachableError || failure instanceof SessionRejectedError) throw failure
+  }
+
+  /**
+   * Terminal until the daemon is updated (decision 2026-11-17-2215): a 426
+   * from any route or a gateway close 4001. Stops dialing and claiming; a
+   * managed install updates itself as soon as no run is left.
+   */
+  private enterUpdateRequired(latest?: string) {
+    if (this.blocked === "update_required") {
+      if (latest && !this.requiredVersion) void this.findRequiredUpdate(latest)
+      return
+    }
+    this.blocked = "update_required"
+    this.server = "offline"
+    this.sessionOpen = false
+    this.workSignal.setConnected(false)
+    this.supervisor?.sessionClosed()
+    this.log.error({ version: DAEMON_VERSION, latest: latest ?? null },
+      "this daemon is too old for the server and stopped connecting; update it (npm install -g @aspectlylabs/mikka@latest, or update Mikka Desktop)")
+    void this.session?.stop()
+    void this.findRequiredUpdate(latest)
+  }
+
+  /** A managed install learns the release to install: from the refusal, else from npm (the server no longer answers this daemon). */
+  private async findRequiredUpdate(latest: string | undefined) {
+    const runtime = this.options.autoUpdate
+    if (!runtime) {
+      this.log.error("automatic updates are off for this daemon; update it by hand")
+      return
+    }
+    const version = latest ?? await runtime.latest?.().catch(() => undefined)
+    if (!newerStableVersion(version, DAEMON_VERSION)) {
+      this.log.error({ latest: version ?? null }, "no newer daemon release is known; update it by hand")
+      return
+    }
+    this.requiredVersion = version
+    this.log.warn({ version }, "installing the required daemon update once no run is active")
+    this.learnRelease(version)
+    this.checkAutoUpdate()
+  }
+
+  /** Local only: nothing here sends a request unless something changed and the session is open. */
+  private localTick() {
+    if (this.stopped) return
+    this.supervisor.check()
+    this.rescanHarnesses()
+    if (this.requiredVersion) this.offerUpdate(this.requiredVersion)
+    this.checkAutoUpdate()
+    // A held device command runs once its wait is over (no run left, or idle).
+    const held = this.heldDeviceCommand
+    if (held && this.sessionOpen && !this.heldCommandPass && (held.kind === "uninstall" ? this.supervisor.activeRunIds().length === 0 : this.maintenanceIdle()))
+      this.heldCommandPass = this.syncWithServer().finally(() => { this.heldCommandPass = null })
+    const save = this.options.link.checkpointRun?.bind(this.options.link)
+    if (save && this.sessionOpen && this.registered && !this.checkpointScan && Date.now() - this.lastCheckpointScan >= CHECKPOINT_SCAN_MS) {
+      this.lastCheckpointScan = Date.now()
+      this.checkpointScan = this.supervisor.saveCheckpoints(save)
+        .catch((err: unknown) => { this.log.warn({ err }, "checkpoint save failed") })
+        .finally(() => { this.checkpointScan = null })
+    }
+  }
+
+  /**
+   * One timer at the cloud worker's token expiry minus an hour: the next
+   * report asks for the next token. A deadline, not a poll.
+   */
+  private armRotation(expiresAt: string | undefined) {
+    if (!expiresAt || !this.options.cloudComputer || this.stopped) return
+    const at = Date.parse(expiresAt) - CLOUD_CREDENTIAL_ROTATE_BEFORE_MS
+    if (!Number.isFinite(at)) return
+    if (this.rotationTimer) clearTimeout(this.rotationTimer)
+    const fire = () => {
+      if (Date.now() < at) { this.rotationTimer = setTimeout(fire, Math.min(at - Date.now(), MAX_TIMER_MS)); this.rotationTimer.unref(); return }
+      this.rotationTimer = null
+      this.rotationDue = true
+      void this.reportNow(true)
+    }
+    this.rotationTimer = setTimeout(fire, Math.min(Math.max(0, at - Date.now()), MAX_TIMER_MS))
+    this.rotationTimer.unref()
+  }
+
+  /** Sends a report now when something changed (or a rotation is due), between passes. */
+  private reportNow(rotation = false): Promise<void> {
+    if (this.stopped || this.blocked === "update_required" || (!this.sessionOpen && !rotation)) return Promise.resolve()
+    return this.serialized(async () => {
+      const credential = this.device.credential
+      const deviceId = this.device.deviceId
+      if (!credential || !deviceId || !this.registered) return
+      const result = await this.sendReport(deviceId, credential)
+      if (result?.deviceCommands?.length && this.sessionOpen) void this.syncWithServer()
+    }).catch((err: unknown) => {
+      if (!(err instanceof ServerUnreachableError)) this.log.warn({ err }, "device report failed")
+    })
+  }
+
+  /** What the report says now; only a change (or a new socket) sends it. */
+  private async reportFields(): Promise<DeviceReport> {
+    const quotas = this.quota?.snapshot().quotas
+    return {
+      completedDeviceCommands: this.device.completedDeviceCommands ?? [],
+      failedDeviceCommands: this.device.failedDeviceCommands ?? [],
+      harnesses: this.harnesses,
+      computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
+      runner: await this.runnerReport(),
+      ...(this.deviceType ? { deviceType: this.deviceType } : {}),
+      worktreeDiskBytes: await this.worktrees.diskUsage(),
+      ...(quotas ? { quotas } : {}),
+      ...(this.options.autoUpdate ? { updateFailure: reportedUpdateFailure(this.updateStateFile, DAEMON_VERSION) } : {}),
+    }
+  }
+
+  /** Sends the report when it changed, after a socket opened, or with a due rotation; applies the answer. */
+  private async sendReport(deviceId: string, credential: string): Promise<DeviceReportResult | undefined> {
+    const fields = await this.reportFields()
+    const key = JSON.stringify(fields)
+    if (!this.reportOnOpen && !this.rotationDue && key === this.lastReport) return undefined
+    const rotation = this.rotationDue
+    const result = await this.options.link.report(deviceId, { ...fields, ...(rotation ? { rotateCloudCredential: true as const } : {}) })
+    this.lastReport = key
+    this.reportOnOpen = false
+    await this.applyReportResult(result, credential, rotation)
+    return result
+  }
+
+  private async applyReportResult(result: DeviceReportResult, credential: string, rotation: boolean) {
+    this.learnRelease(result.daemonVersions?.latest)
+    this.checkAutoUpdate()
+    this.holdDeviceCommands(result.deviceCommands ?? [])
+    if (this.options.cloudComputer && result.cloudCredential && this.device.credential === credential) {
+      // Persist, then switch the link at once: the old token ends within the hour.
+      this.saveDevice({ credential: result.cloudCredential })
+      this.revokeLocalComputerGrants()
+      this.registered = false
+      this.rotationDue = false
+      await this.register(result.cloudCredential)
+    } else if (rotation && !result.cloudCredential) {
+      this.log.warn("the server named no next cloud token; asking again on the next session")
+    }
+    this.armRotation(result.cloudCredentialExpiresAt)
+  }
+
+  /** A device command from the server waits here until the next pass runs it. */
+  private holdDeviceCommands(commands: readonly DeviceManagementCommand[]) {
+    for (const command of commands) {
+      if (this.device.completedDeviceCommands?.includes(command.id) || this.device.failedDeviceCommands?.some(failure => failure.id === command.id)) continue
+      if (this.heldDeviceCommand?.id === command.id) continue
+      this.heldDeviceCommand ??= command
+    }
+  }
+
+  /**
+   * Runs the held device command when it can run. Uninstall drains: it waits
+   * for the runs to end (the local timer passes again), confirms its receipt
+   * and stops the daemon. Returns true when the pass should end here.
+   */
+  private async runHeldDeviceCommand(deviceId: string, credential: string): Promise<boolean> {
+    const command = this.heldDeviceCommand
+    if (!command) return false
+    if (this.device.completedDeviceCommands?.includes(command.id) || this.device.failedDeviceCommands?.some(failure => failure.id === command.id)) {
+      this.heldDeviceCommand = undefined
+      return false
+    }
+    if (command.kind === 'uninstall') {
+      // Draining takes no new run; the runs still going keep reading their stops and messages.
+      this.draining = true
+      if (this.supervisor.activeRunIds().length > 0) return false
+      this.heldDeviceCommand = undefined
+      this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+      try {
+        await this.sendReport(deviceId, credential)
+      } catch {
+        // Receipt was persisted locally. The server's fixed expiry covers a lost response.
+        this.log.warn('Could not confirm uninstall receipt')
+      }
+      // Stop outside the current pass: stop() waits for it.
+      setImmediate(() => { void this.stop().then(() => uninstallService(() => {
+        this.saveDevice({ credential: undefined })
+        rmSync(this.paths.secret, { force: true })
+      })).catch(() => { this.options.onDrained?.() }) })
+      return true
+    }
+    if (command.kind !== 'redetect' && !this.maintenanceIdle()) return false
+    this.heldDeviceCommand = undefined
+    try {
+      if (command.kind === 'redetect') {
+        await this.redetectHarnesses()
+        this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+        await this.sendReport(deviceId, credential)
+      } else {
+        this.startMaintenance(async () => {
+          await restartService(command.kind === 'update', () => {
+            if (this.stopped) throw new Error('Daemon stopped during update')
+            this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
+          }, undefined, () => !this.stopped)
+        }, () => {
+          this.saveDevice({ completedDeviceCommands: [], failedDeviceCommands: [{ id: command.id, error: 'Device command failed; check daemon service logs.' }] })
+          void this.reportNow()
+        })
+      }
+    } catch (err) {
+      if (err instanceof ServerUnreachableError) throw err
+      // Do not leak npm output or host details through the management API.
+      this.saveDevice({ completedDeviceCommands: [], failedDeviceCommands: [{ id: command.id, error: 'Device command failed; check daemon service logs.' }] })
+      this.log.warn({ command_id: command.id, err }, 'Device command failed')
+    }
+    return false
   }
 
   /** One read after a push, or right after the socket opens. Wait is zero: the signal already arrived. */
@@ -793,162 +1023,24 @@ export class Daemon {
       onWorkspaceRequests: requests => this.answerWorkspaceRequests(deviceId, requests),
       skipRuns,
       onQueuedRuns: (runIds) => { queued = runIds },
-      updates: { daemonLatest: this.knownLatest ?? DAEMON_VERSION, skipDeviceCommands: this.polledDeviceCommands },
+      updates: { daemonLatest: this.knownLatest ?? DAEMON_VERSION },
       onUpdates: ({ daemonVersions, deviceCommands }) => {
         this.learnRelease(daemonVersions?.latest)
         this.checkAutoUpdate()
-        const fresh = deviceCommands.filter(command => !this.polledDeviceCommands.includes(command.id))
-        if (fresh.length === 0) return
-        this.polledDeviceCommands = [...this.polledDeviceCommands, ...fresh.map(command => command.id)].slice(-COMMANDS_MAX_SKIP_DEVICE_COMMANDS)
-        void this.syncWithServer().catch(() => undefined)
+        this.holdDeviceCommands(deviceCommands)
       },
     })
     if (this.stopped || signal.aborted) return
     await this.applyCommands(commands)
     if (queued.length > 0) this.claimQueued(queued)
-    // A held socket never returns to pollCommands' ACK step. Confirm delivery
-    // here, retaining IDs on failure so the fallback retries without redelivery.
-    while (this.unacked.size > 0 && !signal.aborted) {
+    // Confirm delivery, retaining IDs on failure so the next read retries without redelivery.
+    while ((this.unacked.size > 0 || this.refusedSteers.size > 0) && !signal.aborted) {
       const ids = [...this.unacked].slice(0, 500)
-      await this.options.link.ackCommands(deviceId, ids)
+      const refused = [...this.refusedSteers].slice(0, 500)
+      if (refused.length) await this.options.link.ackCommands(deviceId, ids, refused)
+      else await this.options.link.ackCommands(deviceId, ids)
       for (const id of ids) this.unacked.delete(id)
-    }
-  }
-
-  /**
-   * Stay on the device's push socket until it drops. Failed and short-lived
-   * sessions cool down independently of the responsive long-poll fallback.
-   */
-  private async holdGateway(deviceId: string, signal: AbortSignal) {
-    const mint = this.options.link.deviceGateway
-    if (!mint || this.gatewayUnavailable || performance.now() < this.gatewayRetryAt) return false
-    let openedAt: number | undefined
-    let failure: unknown
-    // The connect span ends when the socket opens, or with the error that kept it from opening.
-    let gatewayOpened: (() => void) | undefined
-    let gatewayFailed: ((error: unknown) => void) | undefined
-    const connection = new AbortController()
-    const abort = () => connection.abort()
-    signal.addEventListener("abort", abort, { once: true })
-    if (signal.aborted) connection.abort()
-    try {
-      const ticket = await mint.call(this.options.link, deviceId, connection.signal)
-      // Only a server that pushes every run-control write lets live runs drop
-      // their periodic check; an older one keeps the one-second check.
-      this.runControlPush = ticket.runControl === 'push' || Boolean(this.options.hostedSubscriptions)
-      this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
-      this.workSignal.setPushedWaits((['computerReviews', 'coordinatorResults'] as const satisfies readonly PushedWait[]).filter(wait => ticket[wait] === 'push'))
-      if (!ticket.url || !ticket.protocol) { this.gatewayUnavailable = true; return false }
-      if (signal.aborted) return false
-      const socket = openDeviceGateway(ticket.url, ticket.protocol)
-      void daemonTracer.span("daemon.gateway.connect", { "mikka.gateway.mode": this.runControlPush ? "push" : "legacy" }, () => new Promise<void>((resolve, reject) => {
-        gatewayOpened = resolve
-        gatewayFailed = reject
-      }), { root: true }).catch(() => undefined)
-      await runDeviceGateway(socket, {
-        signal: connection.signal,
-        onOpen: () => {
-          gatewayOpened?.()
-          openedAt = performance.now()
-          this.gatewayLive = true
-          if (this.runControlPush) this.options.link.setRunControlMode?.('push')
-          this.workSignal.setConnected(true)
-        },
-        onWorkAvailable: () => { this.options.link.invalidateRunControls?.(); this.workSignal.notify() },
-        onWork: async () => {
-          await this.pullSignaledWork(deviceId, connection.signal)
-          if (connection.signal.aborted || this.stopped) return
-          await this.syncWithServer()
-          // Idle push mode removed the timer. Work can create a run, so it
-          // must restore recurring lease renewals, not only heartbeat once.
-          if (!connection.signal.aborted && !this.stopped)
-            this.schedule(this.gatewayIdle() ? null : (this.options.heartbeatMs ?? 15_000))
-        },
-      })
-    } catch (error) {
-      failure = error
-      if (!this.stopped && !signal.aborted) {
-        this.log.warn({ err: error }, "device gateway disconnected; using long-poll fallback")
-        // Removed devices may still heartbeat once to receive uninstall.
-        // Let that path handle auth before a command 401 clears credentials.
-        if (error instanceof SessionRejectedError) await this.syncWithServer().catch(() => undefined)
-      }
-    } finally {
-      gatewayFailed?.(failure ?? new DeviceGatewayClosedError())
-      connection.abort()
-      signal.removeEventListener("abort", abort)
-      this.gatewayLive = false
-      this.options.link.setRunControlMode?.(this.runControlPush ? 'fallback' : 'legacy')
-      this.options.link.invalidateRunControls?.()
-      this.workSignal.setConnected(false)
-      if (!this.stopped && !signal.aborted && !this.gatewayUnavailable) {
-        // Merely opening is not recovery: a flapping server must not reset
-        // backoff. Stable sessions start again at the shortest retry delay.
-        if (openedAt !== undefined && performance.now() - openedAt >= 60_000) this.gatewayFailures = 0
-        this.gatewayFailures = Math.min(this.gatewayFailures + 1, 5)
-        const ceiling = Math.min(60_000, 5_000 * 2 ** (this.gatewayFailures - 1))
-        const delay = failure instanceof DeviceGatewayClosedError && failure.code === 4000
-          ? 60_000 : ceiling * (0.8 + Math.random() * 0.2)
-        this.gatewayRetryAt = performance.now() + delay
-        // Idle push mode clears the timer. Resume it once after disconnect,
-        // preserving a pending or in-flight heartbeat during fallback/active
-        // work: repeated gateway failures must not postpone lease renewals.
-        if (this.timer === null) this.schedule(this.options.heartbeatMs ?? 15_000)
-      }
-    }
-    return false
-  }
-
-  /**
-   * Answers the app's folder requests for the repository picker (ADR 0037):
-   * a second long-poll next to the run commands, so a slow folder never
-   * delays a stop.
-   */
-  private async pollFolderRequests() {
-    const { link } = this.options
-    if (!link.fetchFsRequests || !link.answerFsRequest) return
-    const signal = this.commandsAbort.signal
-    const wait = this.options.commandsWaitSeconds ?? FS_REQUESTS_MAX_WAIT_SECONDS
-    let backoff = 1_000
-    while (!this.stopped) {
-      const deviceId = this.device.deviceId
-      const credential = this.device.credential
-      try {
-        if (!this.registered || !deviceId) {
-          await this.pauseCommands(1_000, signal)
-          continue
-        }
-        const started = performance.now()
-        const requests = await link.fetchFsRequests(
-          deviceId,
-          wait,
-          { signal }
-        )
-        if (this.stopped || signal.aborted) return
-        backoff = 1_000
-        // Some servers return an empty queue without honoring the long-poll wait.
-        if (requests.length === 0 && !signal.aborted) {
-          const remaining = Math.max(1_000, wait * 1_000) - (performance.now() - started)
-          if (remaining > 0) await this.pauseCommands(remaining, signal)
-        }
-        await Promise.all(
-          requests.map(async ({ id, ...request }) => {
-            const result = await browseFolder(request).catch((): FsResult => ({
-              ok: false,
-              code: "failed",
-              message: "Could not read that folder.",
-            }))
-            await link.answerFsRequest!(deviceId, id, result)
-          })
-        )
-      } catch (error) {
-        if (this.stopped || signal.aborted) return
-        if (error instanceof SessionRejectedError) this.rejectDeviceSession(credential)
-        if (!(error instanceof ServerUnreachableError))
-          this.log.warn({ err: error }, "answering folder requests failed")
-        await this.pauseCommands(backoff, signal)
-        backoff = Math.min(backoff * 2, 30_000)
-      }
+      for (const id of refused) this.refusedSteers.delete(id)
     }
   }
 
@@ -956,7 +1048,7 @@ export class Daemon {
   private claimQueued(runIds: string[]): boolean {
     let started = false
     for (const runId of runIds) {
-      if (this.draining || this.updating || this.stopped) break
+      if (this.draining || this.updating || this.stopped || this.blocked) break
       if (this.queuedClaims.has(runId) || this.refusedRuns.has(runId) || this.journal.get(runId)) continue
       this.queuedClaims.set(runId, "claiming")
       started = true
@@ -968,27 +1060,13 @@ export class Daemon {
         (error: unknown) => {
           if (this.initialRepositorySync?.runId === runId) this.initialRepositorySync.received?.()
           this.queuedClaims.set(runId, "failed")
+          // The server has no open session for this device: redial, and the reopened socket claims again.
+          if (error instanceof DeviceSessionRequiredError) { this.session?.redial(); return }
           this.log.warn({ run_id: runId, err: error }, "could not start run")
         }
       )
     }
     return started
-  }
-
-  /** Waits `ms`, or less if the daemon stops or the device registers. */
-  private pauseCommands(ms: number, signal: AbortSignal): Promise<void> {
-    if (signal.aborted) return Promise.resolve()
-    return new Promise((resolve) => {
-      const done = () => {
-        clearTimeout(timer)
-        signal.removeEventListener("abort", done)
-        this.wakeCommands = null
-        resolve()
-      }
-      const timer = setTimeout(done, ms)
-      signal.addEventListener("abort", done, { once: true })
-      this.wakeCommands = done
-    })
   }
 
   /** Hands commands to the runs' sessions; true when any took effect. */
@@ -1014,7 +1092,7 @@ export class Daemon {
         })
       // Stop commands keep their existing independent path while bounded file
       // IO runs. Neither content nor absolute paths enter the daemon logs.
-      void reading.then(receipt => answer.call(this.options.link, deviceId, request.id, receipt, { expiresAt: request.expiresAt, signal: this.commandsAbort.signal }))
+      void reading.then(receipt => answer.call(this.options.link, deviceId, request.id, receipt, { expiresAt: request.expiresAt, signal: this.lifetime.signal }))
         .catch(() => { this.log.warn({ request_id: request.id }, 'workspace read delivery failed') })
         .finally(() => this.workspaceReads.delete(request.id))
     }
@@ -1026,6 +1104,27 @@ export class Daemon {
       const entry = this.journal.get(command.runId)
       // Not a run of this daemon (yet), or one that already ended.
       if (!entry) continue
+      if (command.kind === "steer") {
+        const id = command.messageId
+        const prior = entry.steerReceipts?.[id]
+        if (prior === "accepted") { this.unacked.add(id); continue }
+        if (prior || isTerminalRunState(entry.state)) { this.refusedSteers.add(id); continue }
+        // Commit the attempt before the external call. The previous turn may
+        // have ended while the daemon was disconnected. Never send it again.
+        const record = (outcome: "starting" | "accepted" | "refused") => this.journal.update(command.runId,
+          { steerReceipts: { ...this.journal.get(command.runId)?.steerReceipts, [id]: outcome } })
+        record("starting")
+        try {
+          await this.supervisor.send(command.runId, command.text, "steer")
+          record("accepted")
+          this.unacked.add(id)
+        } catch {
+          record("refused")
+          this.refusedSteers.add(id)
+        }
+        acted = true
+        continue
+      }
       if (isTerminalRunState(entry.state)) {
         // The server cancelled a run this daemon had parked on a question:
         // nothing runs there, so its leftovers can go.
@@ -1105,7 +1204,8 @@ export class Daemon {
   /** Advertise only a checked local runner, replacing any old readiness or failure. */
   private async localHarnessReport(info: HarnessInfo): Promise<HarnessInfo> {
     const report: HarnessInfo = { ...info, ...this.modelReports.get(info.harness),
-      toolApproval: this.supportsToolApproval(info), coordinator: coordinatorCapable(info) }
+      ...(info.harness === "codex" && info.installed ? { activeTurnSteer: true as const } : {}),
+      toolApproval: this.supportsToolApproval(info), coordinator: false }
     delete report.subscriptionBroker
     delete report.subscriptionModelCatalogue
     delete report.subscriptionPreflight
@@ -1185,18 +1285,21 @@ export class Daemon {
     return this.probingModels
   }
 
-  /** Notice an agent installed after startup without spawning anything per tick. */
+  /**
+   * Notice an agent installed after startup without spawning anything per
+   * tick: the local timer calls this, and only a changed result is reported.
+   */
   private rescanHarnesses() {
     const now = Date.now()
     if (this.modelProbeOn() && !this.probingModels && now - this.lastModelProbe >= MODEL_PROBE_MS) {
-      void this.probeModels().then(changed => { if (changed) return this.syncWithServer() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
+      void this.probeModels().then(changed => { if (changed) return this.reportNow() }).catch((err: unknown) => { this.log.warn({ err }, "model probe failed") })
     }
     if (this.options.hostedSubscriptions || this.options.harnesses || this.rescanning || now - this.lastHarnessScan < HARNESS_RESCAN_MS) return
     this.lastHarnessScan = now
     if (harnessFingerprint(this.harnessStore()) === this.harnessPrint) return
     this.rescanning = true
     void this.redetectHarnesses()
-      .then(() => this.syncWithServer())
+      .then(() => this.reportNow())
       .catch((err: unknown) => { this.log.warn({ err }, "harness rescan failed") })
       .finally(() => { this.rescanning = false })
   }
@@ -1338,34 +1441,13 @@ export class Daemon {
   }
 
   private saveDevice(patch: Partial<DeviceFile>) {
-    if (patch.completedDeviceCommands || patch.failedDeviceCommands) this.deviceReceiptsVersion++
     this.device = { ...this.device, ...patch }
     writeJsonAtomic(this.paths.device, this.device)
   }
 
-  /** Idle on the push socket: no runs, nothing waiting to upload. The database can sleep. */
-  private gatewayIdle() {
-    return this.gatewayLive && this.server === "online" && this.supervisor.heartbeatRuns().length === 0
-      && this.queuedClaims.size === 0 && this.unacked.size === 0 && this.outbox.pending() === 0 && !this.draining && !this.updating
-      && this.deviceReceiptsVersion === this.deviceReceiptsAcknowledged
-  }
-
-  private schedule(delay: number | null) {
-    if (this.stopped) return
-    if (this.timer) clearTimeout(this.timer)
-    if (delay === null) { this.timer = null; return }
-    this.timer = setTimeout(() => {
-      // Runs past their lease or watchdog limit stop even while offline.
-      this.supervisor.check()
-      this.tick = this.syncWithServer().finally(() =>
-        this.schedule(this.gatewayIdle() ? null : (this.options.heartbeatMs ?? 15_000))
-      )
-    }, delay)
-    this.timer.unref()
-  }
-
   private async register(credential: string) {
     const { workspaceId, deviceId: knownDeviceId } = this.device
+    this.deviceType ??= process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : process.env.MIKKA_DEVICE_TYPE === "laptop" ? "laptop" : await detectDeviceType()
     const { deviceId, tracing } = await daemonTracer.span("daemon.registration", {}, async () => this.options.link.registerDevice(
       credential,
       {
@@ -1375,7 +1457,7 @@ export class Daemon {
         arch: arch(),
         daemonVersion: DAEMON_VERSION,
         protocolVersion: DAEMON_PROTOCOL_VERSION,
-        deviceType: process.env.MIKKA_DEVICE_TYPE === "server" ? "server" : process.env.MIKKA_DEVICE_TYPE === "laptop" ? "laptop" : await detectDeviceType(),
+        deviceType: this.deviceType,
         harnesses: this.harnesses,
         computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
         runner: await this.runnerReport(),
@@ -1396,6 +1478,7 @@ export class Daemon {
     const computerBroker = this.localComputerBroker ?? this.cloudComputerBroker ?? this.options.computerBroker
     if (computerBroker && !this.options.link.syncComputerReviews) throw new Error("Computer review transport unavailable")
     this.registered = true
+    if (this.options.hostedSubscriptions && !this.stopped) this.options.taskRegistered?.()
     if (this.options.hostedSubscriptions && this.options.e2bContainerRuntime && workspaceId && !this.stopped) {
       try { writeCloudRegistration(this.paths.dataDir, deviceId, workspaceId, credential) }
       catch { this.log.warn({ event: 'cloud_registration_notice_failed' }, 'Cloud registration notification unavailable') }
@@ -1404,30 +1487,29 @@ export class Daemon {
       this.reviewAbort?.abort()
       const abort = new AbortController()
       this.reviewAbort = abort
-      this.reviewLoop = pollWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal, undefined, this.workSignal)
+      this.reviewLoop = followWebComputerReviews(computerBroker, deviceId, this.options.link, abort.signal, this.workSignal, () => this.session?.redial())
     }
-    this.wakeCommands?.()
   }
 
   /**
-   * One pass of the server link loop; safe to call any time. Passes run one
-   * after another: overlapping ones would register two devices, or let an
-   * older pass's repo list overwrite a newer one.
+   * One pass of the server link; safe to call any time. The session runs one
+   * on every socket open and every push. Passes run one after another:
+   * overlapping ones would register two devices, or let an older pass's repo
+   * list overwrite a newer one.
    */
   syncWithServer(): Promise<void> {
-    const pass = this.syncing.then(() => this.syncPass())
-    this.syncing = pass.catch(() => undefined)
-    return pass
+    return this.serialized(() => this.syncPass()).then(() => undefined)
   }
 
-  private async syncPass() {
-    if (this.stopped) return
+  /** Returns what made the pass fail, if anything; the session redials on a server failure. */
+  private async syncPass(): Promise<unknown> {
+    if (this.stopped || this.blocked === "update_required") return undefined
     this.checkAutoUpdate()
     const { link } = this.options
     const { credential, workspaceId } = this.device
     if (!credential) {
       this.server = "unregistered"
-      return
+      return undefined
     }
     const initialRunId = this.initialRunHint
     let resolveRepositories: (() => void) | undefined, rejectRepositories: ((error: unknown) => void) | undefined
@@ -1454,116 +1536,55 @@ export class Daemon {
         this.initialRunHint = undefined
         if (!this.claimQueued([initialRunId])) this.initialRepositorySync?.received?.()
       }
-      // Lease renewal still precedes repository/discovery work; the hinted
-      // claim above runs concurrently without delaying this heartbeat.
-      const quotas = this.quota?.snapshot().quotas
-      const receiptsVersion = this.deviceReceiptsVersion
-      const heartbeat = {
-        completedDeviceCommands: this.device.completedDeviceCommands,
-        failedDeviceCommands: this.device.failedDeviceCommands,
-        harnesses: this.harnesses,
-        computerUse: { installed: Boolean(this.localComputerDriver), version: this.localComputerDriver?.version ?? null },
-        runner: await this.runnerReport(),
-        runs: this.supervisor.heartbeatRuns(),
-        worktreeDiskBytes: await this.worktrees.diskUsage(),
-        ...(quotas ? { quotas } : {}),
-        ...(this.options.autoUpdate ? { updateFailure: reportedUpdateFailure(this.updateStateFile, DAEMON_VERSION) } : {}),
-      }
-      const { leases, revoked, cloudCredential, deviceCommands, daemonVersions, taskSecrets } = await link.heartbeat(deviceId, heartbeat)
-      this.deviceReceiptsAcknowledged = receiptsVersion
-      this.learnRelease(daemonVersions?.latest)
-      this.supervisor.renewLeases(leases)
-      if (revoked) this.supervisor.revokeLeases(revoked)
-      this.supervisor.renewTaskSecrets(taskSecrets)
-      if (this.options.cloudComputer && cloudCredential && this.device.credential === credential) {
-        // Persist before switching transport. Keep the current token valid
-        // through this pass; the next pass registers with the replacement.
-        this.saveDevice({ credential: cloudCredential })
-        this.revokeLocalComputerGrants()
-        this.registered = false
-      }
-      this.rescanHarnesses()
-      const command = deviceCommands?.[0]
-      if (command?.kind === 'uninstall') {
-        this.draining = true
-        if (this.supervisor.heartbeatRuns().length === 0) {
-          this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
-          try {
-            await link.heartbeat(deviceId, { ...heartbeat, runs: [], completedDeviceCommands: [command.id], failedDeviceCommands: [] })
-          } catch {
-            // Receipt was persisted locally. The server's fixed expiry covers a lost response.
-            this.log.warn('Could not confirm uninstall receipt')
-          }
-          // Stop outside the current sync: stop() waits for this heartbeat tick.
-          setImmediate(() => { void this.stop().then(() => uninstallService(() => {
-            this.saveDevice({ credential: undefined })
-            rmSync(this.paths.secret, { force: true })
-          })).catch(() => { this.options.onDrained?.() }) })
-        }
-        return
-      }
-      if (command && !this.device.completedDeviceCommands?.includes(command.id) && !this.device.failedDeviceCommands?.some(failure => failure.id === command.id)) {
-        if (command.kind === 'redetect' || this.maintenanceIdle()) {
-          try {
-            if (command.kind === 'redetect') {
-              await this.redetectHarnesses()
-              this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
-              // Queue an immediate heartbeat after this sync pass, without re-entering it.
-              void this.syncWithServer().catch(() => undefined)
-            } else {
-              this.startMaintenance(async () => {
-                await restartService(command.kind === 'update', () => {
-                  if (this.stopped) throw new Error('Daemon stopped during update')
-                  this.saveDevice({ completedDeviceCommands: [command.id], failedDeviceCommands: [] })
-                }, undefined, () => !this.stopped)
-              }, () => {
-                this.saveDevice({ completedDeviceCommands: [], failedDeviceCommands: [{ id: command.id, error: 'Device command failed; check daemon service logs.' }] })
-              })
-            }
-          } catch (err) {
-            // Do not leak npm output or host details through the management API.
-            this.saveDevice({ completedDeviceCommands: [], failedDeviceCommands: [{ id: command.id, error: 'Device command failed; check daemon service logs.' }] })
-            this.log.warn({ command_id: command.id, err }, 'Device command failed')
-          }
-        }
-      }
-      // Work in progress leaves the machine, so another can take over.
-      const checkpointRun = link.checkpointRun?.bind(link)
-      if (checkpointRun) await this.supervisor.saveCheckpoints(checkpointRun)
+      // Once per socket, and whenever something changed since the last one.
+      // First: a removed device's report still receives its uninstall, which
+      // runs before a commands read could refuse the session.
+      await this.sendReport(deviceId, credential)
+      if (await this.runHeldDeviceCommand(deviceId, credential)) return undefined
+      // Messages, stops, workspace reads, queued runs and device commands.
+      await this.pullSignaledWork(deviceId, this.lifetime.signal)
+      if (await this.runHeldDeviceCommand(deviceId, credential)) return undefined
       // A complete claim projection replaces only this initial discovery.
-      // Heartbeat, revocation, rotation, uninstall and checkpoints remain above.
+      // Commands, the report and device commands remain above.
       const initialRepository = await this.initialRepositorySync?.repository
       this.saveDevice({ repos: initialRepository ? [initialRepository] : await link.listRepos(deviceId) })
       resolveRepositories?.()
       this.server = "online"
       await this.outbox.flushAll()
       // Resume only reservations already made while a run was live. Do not
-      // hold the heartbeat or recreate uploads after a run has ended.
+      // hold the pass or recreate uploads after a run has ended.
       for (const entry of this.journal.all()) if (isTerminalRunState(entry.state)) void this.captureUploader.flush(entry.assignment.runId, true)
-      if (!this.draining && !this.updating && !this.stopped) {
+      if (!this.draining && !this.updating && !this.stopped && !this.blocked) {
         // A receipted run blocked while offline may resume only after its
         // server authorization is available; no second recovery scheduler.
         await this.supervisor.resumeAll(true)
-        // Claims that failed after the commands poll reported them are retried here.
+        // Claims that failed after a commands read reported them are retried here.
         for (const [runId, state] of this.queuedClaims) if (state === "failed") this.queuedClaims.delete(runId)
         for (const runId of await link.pendingRuns(deviceId)) {
           if (this.refusedRuns.has(runId) || this.queuedClaims.has(runId)) continue
-          await this.claimAndStart(runId).catch((error: unknown) =>
+          await this.claimAndStart(runId).catch((error: unknown) => {
+            // No open session on the server: this pass ends and the socket is redialed.
+            if (error instanceof DeviceSessionRequiredError || error instanceof DaemonUpgradeRequiredError) throw error
             this.log.warn({ run_id: runId, err: error }, "could not start run")
-          )
+          })
         }
       }
       await this.pruneWorktrees()
       await this.sweepEmptyRuns()
+      return undefined
     } catch (error) {
       rejectRepositories?.(error)
-      if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) return
+      if (this.device.credential !== credential || this.device.workspaceId !== workspaceId) return undefined
       this.server = "offline"
-      if (error instanceof SessionRejectedError) {
+      if (error instanceof DaemonUpgradeRequiredError) {
+        this.enterUpdateRequired(error.latest)
+      } else if (error instanceof SessionRejectedError) {
+        if (await this.collectUninstall(credential)) return undefined
         this.rejectDeviceSession(credential)
       } else if (!(error instanceof ServerUnreachableError)) {
         this.log.error({ err: error }, "server sync failed")
       }
+      return error
     } finally {
       // Early exits (including uninstall) cannot release a claim with missing
       // setup/copyFiles. Already-resolved/rejected promises remain unchanged.
@@ -1572,8 +1593,30 @@ export class Daemon {
     }
   }
 
-  /** A refused credential stops its local work as well as future polling.
-   * The supervisor cancels immediately and applies its bounded CLI kill grace. */
+  /**
+   * A removed device's credential reaches only its report, which carries its
+   * uninstall (decision 2026-11-17-2215). A push can arrive with nothing
+   * changed to report, so before giving the session up, ask the report once.
+   * True when an uninstall is now held: it runs here or, while runs drain,
+   * from the local timer.
+   */
+  private async collectUninstall(credential: string): Promise<boolean> {
+    const deviceId = this.device.deviceId
+    if (!deviceId || this.device.credential !== credential) return false
+    try {
+      this.reportOnOpen = true
+      await this.sendReport(deviceId, credential)
+    } catch {
+      return false
+    }
+    if (this.heldDeviceCommand?.kind !== "uninstall") return false
+    await this.runHeldDeviceCommand(deviceId, credential)
+    return true
+  }
+
+  /** A refused credential stops its local work as well as the session until
+   * someone signs in again. The supervisor cancels immediately and applies
+   * its bounded CLI kill grace. */
   private rejectDeviceSession(credential: string | undefined) {
     // An old in-flight request cannot sign out a newly connected credential.
     if (!credential || this.device.credential !== credential) return
@@ -1593,25 +1636,18 @@ export class Daemon {
     if (this.draining || this.updating || this.stopped) {
       throw new DaemonError(DAEMON_RPC_ERRORS.draining, "Daemon is draining")
     }
+    // A daemon that must update, or a server without a gateway, takes no work.
+    if (this.blocked === "update_required") throw new DaemonUpgradeRequiredError(this.requiredVersion)
+    if (this.blocked === "gateway_required") throw new DeviceGatewayRequiredError()
     const existing = this.claims.get(runId)
     if (existing) return await existing
     this.claimsInFlight++
     const claim = this.claimAndStartInternal(runId)
     this.claims.set(runId, claim)
-    let upgradeRequired = false
     try { return await claim }
-    catch (error) {
-      if (error instanceof RunNotPinnedHereError && error.upgradeRequired) {
-        this.log.warn({ run_id: runId }, 'server requires a newer daemon; updating when idle')
-        this.learnRelease(error.latest)
-        upgradeRequired = true
-      }
-      throw error
-    }
     finally {
       this.claims.delete(runId)
       this.claimsInFlight--
-      if (upgradeRequired) this.checkAutoUpdate()
     }
   }
 
@@ -1630,7 +1666,7 @@ export class Daemon {
     const repositoriesReady = initialSync?.ready
     let assignment: RunAssignment
     try { assignment = await daemonTracer.span("daemon.run.lease", { "mikka.run.id_hash": runIdHash(runId) }, async span => {
-      const claimed = await this.options.link.claimRun(deviceId, runId, this.commandsAbort.signal, initialSync?.received ? { initialRepository: true } : undefined)
+      const claimed = await this.options.link.claimRun(deviceId, runId, this.lifetime.signal, initialSync?.received ? { initialRepository: true } : undefined)
       span.set("mikka.harness", claimed.harness)
       return claimed
     }, { root: true }) }
@@ -1802,8 +1838,21 @@ export class Daemon {
     await this.worktrees.prune(finished, retentionMs)
   }
 
-  status(): DaemonStatus {
+  /** The device session as `daemon status` shows it. */
+  sessionState(): DaemonSessionState {
+    if (this.blocked) return this.blocked
+    if (!this.device.credential) return "signed_out"
+    return this.sessionOpen ? "open" : "connecting"
+  }
+
+  /**
+   * `session` is outside `daemonStatusSchema`, whose `server` has no state for
+   * "update required" yet; a client that parses with the schema drops it.
+   */
+  status(): DaemonStatus & { session: DaemonSessionState; requiredVersion: string | null } {
     return {
+      session: this.sessionState(),
+      requiredVersion: this.requiredVersion ?? null,
       daemonVersion: DAEMON_VERSION,
       protocolVersion: DAEMON_PROTOCOL_VERSION,
       pid: process.pid,
@@ -1849,7 +1898,9 @@ export class Daemon {
         this.revokeLocalComputerGrants()
         this.registered = false
         this.registrationTraceContext = traceContext
-        void daemonTracer.withContext(traceContext, () => this.syncWithServer())
+        // A new session for the new credential, now: it registers, then opens its socket.
+        for (const arrived of [...this.credentialArrived]) arrived()
+        this.session?.redial(true)
         return { ok: true as const }
       },
       "device.clearCredential": () => {
@@ -1861,6 +1912,7 @@ export class Daemon {
         this.revokeLocalComputerGrants()
         this.registered = false
         this.server = "unregistered"
+        this.session?.redial(true)
         return { ok: true as const }
       },
       "runs.start": (raw) => {
@@ -1914,7 +1966,7 @@ export class Daemon {
   /** Graceful stop: active runs stay journaled and resume on next start. */
 
   private maintenanceIdle() {
-    return !this.stopped && !this.draining && !this.updating && this.claimsInFlight === 0 && this.supervisor.heartbeatRuns().length === 0
+    return !this.stopped && !this.draining && !this.updating && this.claimsInFlight === 0 && this.supervisor.activeRunIds().length === 0
   }
 
   private startMaintenance(work: () => Promise<void>, failed: () => void = () => {}) {
@@ -1929,7 +1981,7 @@ export class Daemon {
 
   private get updateStateFile() { return join(this.paths.dataDir, 'auto-update.json') }
 
-  /** A server named this release (heartbeat, commands poll or refused claim); older servers name none. */
+  /** A server named this release (a report answer, a commands read, a 426), or npm did for a refused daemon. */
   private learnRelease(latest: string | undefined) {
     if (newerStableVersion(latest, this.knownLatest ?? DAEMON_VERSION)) this.knownLatest = latest
     this.offerUpdate(latest)
@@ -1941,7 +1993,7 @@ export class Daemon {
     if (updateAllowed(this.updateStateFile, latest)) this.updateVersion = latest
   }
 
-  /** Installs the release a server named once no run or claim is active; called again by every heartbeat. */
+  /** Installs the named release once no run or claim is active; the local timer calls it again. */
   private checkAutoUpdate() {
     const runtime = this.options.autoUpdate
     if (!runtime || this.draining || this.updating || !this.updateVersion || !this.maintenanceIdle()) return
@@ -1954,16 +2006,23 @@ export class Daemon {
       if (this.stopped) return
       code = 'restart_failed'
       await restartService(false, () => {}, undefined, () => !this.stopped)
-    }, () => { recordUpdateFailure(this.updateStateFile, version, code) })
+    }, () => {
+      recordUpdateFailure(this.updateStateFile, version, code)
+      // Nothing beats any more: tell the server once, now that it changed.
+      void this.reportNow()
+    })
   }
 
   /**
-   * `daemon.update`: ask the server now (one heartbeat, which names its release)
-   * instead of waiting for the next one; never npm. The install still waits for idle.
+   * `daemon.update`: ask the server now (one pass, whose commands read names
+   * its release) instead of waiting for a push. A daemon the server refused
+   * asks npm instead. The install still waits for idle.
    */
   private async requestUpdate(): Promise<"unmanaged" | "current" | "waiting" | "installing"> {
     if (!this.options.autoUpdate) return "unmanaged"
-    if (!this.updating && !this.updateVersion) await this.syncWithServer().catch(() => undefined)
+    if (this.blocked === "update_required") {
+      if (!this.updating && !this.updateVersion) await this.findRequiredUpdate(this.requiredVersion)
+    } else if (!this.updating && !this.updateVersion && this.sessionOpen) await this.syncWithServer().catch(() => undefined)
     this.checkAutoUpdate()
     return this.updating ? "installing" : this.updateVersion ? "waiting" : "current"
   }
@@ -1978,16 +2037,18 @@ export class Daemon {
     this.localComputerBroker?.suspend()
     await this.starting?.catch(() => undefined)
     await this.maintenance
-    if (this.timer) clearTimeout(this.timer)
+    if (this.localTimer) clearInterval(this.localTimer)
+    if (this.rotationTimer) clearTimeout(this.rotationTimer)
     await this.quota?.stop()
-    this.commandsAbort.abort()
+    this.lifetime.abort()
+    for (const arrived of [...this.credentialArrived]) arrived()
+    await this.session?.stop()
     this.reviewAbort?.abort()
     await this.reviewLoop.catch(() => undefined)
-    await this.commandsLoop.catch(() => undefined)
-    await this.fsLoop.catch(() => undefined)
-    await this.tick
-    // The commands poll starts claims outside the heartbeat tick. Abort their
-    // HTTP requests and settle them before stopping the run supervisor.
+    await this.syncing
+    await this.checkpointScan
+    // A commands read starts claims outside the pass. Abort their HTTP
+    // requests and settle them before stopping the run supervisor.
     await Promise.allSettled(this.claims.values())
     await this.rpc?.close()
     try {

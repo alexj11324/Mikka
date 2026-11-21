@@ -3,8 +3,8 @@ import type { ActionErrorCode, ActionErrorParams, ActionResult } from './action-
 export class ActionFailureError extends Error {
   constructor(readonly code: ActionErrorCode, readonly params?: ActionErrorParams,
     /** The caller may replay this exact action with `confirmAccess: true`. */
-    readonly confirmable?: true) {
-    super(code)
+    readonly confirmable?: true, options?: ErrorOptions) {
+    super(code, options)
     this.name = 'ActionFailureError'
   }
 }

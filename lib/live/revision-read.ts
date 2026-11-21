@@ -2,7 +2,7 @@ import 'server-only'
 import type { LiveKind } from './events'
 import type { LiveRef, LiveRevisions } from './revisions'
 import type { LiveScope } from './scope'
-import { readBatchOwnerRevisions } from '../desktop-rpc/read-batch-context'
+import { readBatchOwnerRevisions, readBatchWorkspaceRevisions } from '../desktop-rpc/read-batch-context'
 
 /** `scope` undefined: the home was not resolved here; ownerListRead reads it as before. */
 export type BegunListRead = { scope?: LiveScope | null; revisions: LiveRevisions }
@@ -30,5 +30,9 @@ export async function beginOwnerListRead(ownerId: string, kinds: readonly LiveKi
 
 /** The caller has authorized this effective workspace before reading its list. */
 export async function beginWorkspaceListRead(ownerId: string, workspaceId: string, kinds: readonly LiveKind[]): Promise<BegunListRead> {
-  return { scope: { ownerId, workspaceId }, revisions: await readRevisions(kinds.map(kind => ({ kind, id: workspaceId }))) }
+  const scope = { ownerId, workspaceId }
+  try {
+    const { pool } = await import('../db/request-scope')
+    return { scope, revisions: await readBatchWorkspaceRevisions(pool, kinds.map(kind => ({ kind, id: workspaceId })), scope) }
+  } catch (error) { unavailable(error); return { scope, revisions: {} } }
 }

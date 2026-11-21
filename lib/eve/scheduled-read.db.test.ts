@@ -19,6 +19,8 @@ test('eve scheduled turns retain the persisted read-only authority and original 
     await pool.query(`INSERT INTO mikka_workspaces(id,"userId",name) VALUES($1,$2,'Eve schedule test')`, [workspaceId, ownerId])
     await pool.query(`INSERT INTO mikka_workspace_members("workspaceId","userId",name,email,role) VALUES($1,$2,'Owner',$3,'admin')`, [workspaceId, ownerId, `${ownerId}@example.invalid`])
     await pool.query(`INSERT INTO bots(id,"ownerId","workspaceId",name) VALUES($1,$2,$3,'Eve schedule test')`, [botId, ownerId, workspaceId])
+    // A chat runs only on a model the person chose (no 「Mikka 默认」, decision 2026-11-15-1900).
+    await pool.query(`INSERT INTO bot_model_choices("ownerId","workspaceId","botKey","creditsModel") VALUES($1,$2,$3,'deepseek/deepseek-v4.1-flash')`, [ownerId, workspaceId, botId])
     await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload,tier) VALUES($1,$2,$3,'run_report',$5,$4,'attention')`, [eventId, ownerId, botId, { source: 'schedule_due', allowedActions: ['dispatch_run'], text: 'Forged payload is not authority' }, eventId])
     await pool.query(`INSERT INTO user_schedules(id,owner_id,workspace_id,bot_id,source_event_id,request_id,definition,request_definition,status) VALUES($1,$2,$3,$4,$5,$7,$6,$6,'active')`, [scheduleId, ownerId, workspaceId, botId, eventId, definition, scheduleId])
     await pool.query(`INSERT INTO schedule_occurrences(id,schedule_id,version,due_at,definition,status,execution_decision,operation_id,event_id,attempts,next_retry_at,lease_token,lease_until) VALUES($1,$2,1,now(),$3,'running','execute',$4,$5,1,now(),$6,now()+interval '5 minutes')`, [occurrenceId, scheduleId, definition, randomUUID(), eventId, leaseToken])
@@ -48,6 +50,8 @@ test('eve scheduled turns retain the persisted read-only authority and original 
       const { readFile } = await import('node:fs/promises')
       await pool.query(await readFile(new URL('../../drizzle/20261112030100_eve_sessions.sql', import.meta.url), 'utf8'))
       await pool.query(await readFile(new URL('../../drizzle/20261112030200_eve_settlements.sql', import.meta.url), 'utf8'))
+      const { ContextContainer, contextStorage } = await import(new URL('./context/container.js', import.meta.resolve('eve')).href)
+      const { turnRequest } = await import('./runtime')
       const { default: hook } = await import('../../apps/eve/agent/hooks/product')
       const { handleEveProductRequest } = await import('./product-gateway')
       const { emptySessionView } = await import('eve/events')
@@ -57,7 +61,10 @@ test('eve scheduled turns retain the persisted read-only authority and original 
       await registerSession(nativeScope, rootId)
       await registerSession(nativeScope, childId)
       const rootContext = { session: { id: rootId, auth: { current: { ...scopeAuth(nativeScope), attributes: { ...scopeAuth(nativeScope).attributes, sourceEventId: eventId } } } } }
-      await hook.events['turn.started']!({ data: { turnId: 'root-turn' } } as never, rootContext as never)
+      await contextStorage.run(new ContextContainer(), async () => {
+        await hook.events['turn.started']!({ data: { turnId: 'root-turn' } } as never, rootContext as never)
+        assert.deepEqual(turnRequest.get().scheduledRead, expected)
+      })
       const childContext = { session: { id: childId, parent: { sessionId: rootId, turn: { id: 'root-turn' } }, auth: { current: scopeAuth(nativeScope) } }, view: emptySessionView() }
       const originalFetch = globalThis.fetch, originalSecret = process.env.BETTER_AUTH_SECRET
       process.env.BETTER_AUTH_SECRET = 'isolated-eve-schedule-host-key-thirty-two-characters'
@@ -65,7 +72,10 @@ test('eve scheduled turns retain the persisted read-only authority and original 
       try {
         for (const outcome of ['completed', 'failed']) {
           const turnId = 'child-turn-' + outcome
-          await hook.events['turn.started']!({ data: { turnId } } as never, childContext as never)
+          await contextStorage.run(new ContextContainer(), async () => {
+            await hook.events['turn.started']!({ data: { turnId } } as never, childContext as never)
+            assert.deepEqual(turnRequest.get().scheduledRead, expected)
+          })
           assert.equal((await pool.query('SELECT source_event_id FROM eve_turn_sources WHERE session_id=$1 AND turn_id=$2', [childId, turnId])).rows[0].source_event_id, eventId)
           assert.deepEqual(await loadScheduledRead(scope, eventId), expected)
           await hook.events['turn.settled']!({ data: { turnId, outcome } } as never, childContext as never)

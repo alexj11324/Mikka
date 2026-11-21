@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'nitro'
 import type { ModuleOptions as WorkflowOptions } from 'workflow/nitro'
 import { configuredDeploymentId } from '../../lib/deployment-id.mjs'
+import { deploymentStage } from '../../lib/deployment-stage.mjs'
 import { apiAliases } from './compat-aliases.mjs'
 import { nodeRuntimePackages, productWorkflowDirectories, routeFunctionRules, workflowNodeExternals } from './build-contract.mjs'
 import { publicAssetConfiguration } from './public-assets.mjs'
@@ -11,6 +12,7 @@ import { builtinServices } from './builtin-services-module.mjs'
 import { workflowDevelopmentAliases } from './workflow-development-aliases.mjs'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
+const stage = deploymentStage()
 const revision = process.env.MIKKA_BUILD_REVISION || process.env.VERCEL_GIT_COMMIT_SHA || execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
 if (!/^[a-f0-9]{40}$/.test(revision)) throw new Error('API_BUILD_SHA_REQUIRED')
 const build = process.env.NEXT_PUBLIC_MIKKA_BUILD || process.env.VERCEL_DEPLOYMENT_ID || revision
@@ -43,7 +45,7 @@ export default defineConfig({
     'process.env.MIKKA_BASE_PATH': JSON.stringify('/mikka'),
     'process.env.NEXT_PUBLIC_MIKKA_BUILD': JSON.stringify(build),
     'process.env.MIKKA_TEST_BUILD_SHA': JSON.stringify(process.env.MIKKA_TEST_DEPLOYMENT_SHA ?? ''),
-    'process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT': JSON.stringify(process.env.VERCEL_ENV ?? ''),
+    'process.env.NEXT_PUBLIC_COMPUTER_DEPLOYMENT': JSON.stringify(stage ?? ''),
   },
   sourcemap: false,
   compatibilityDate: '2026-11-05',

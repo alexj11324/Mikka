@@ -7,10 +7,11 @@
     "dev": "vite",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test scripts/*.test.mjs"
+    "test": "node --test --test-concurrency=1 scripts/*.test.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "6.2.1",
+    "lightningcss": "1.33.0",
     "typescript": "5.9.3",
     "vite": "8.3.6"
   }

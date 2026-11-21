@@ -11,7 +11,7 @@ import { wakeCoordinatorAfterCommit } from './coordinator/wake-after-commit'
 type Executor = Pick<typeof db, 'insert' | 'execute'>
 
 /**
- * Writes the event once; a repeat with the same dedupe key is ignored. The
+ * Returns the stored event ID on insertion. A repeated dedupe key returns no ID. The
  * event names its chat's bot itself (CoordinatorEventInput.botId); nothing is
  * resolved here, so run completion, recovery and publication never depend on
  * the Coordinator lookup.
@@ -28,4 +28,5 @@ export async function recordCoordinatorEvent(executor: Executor, event: Coordina
   if (event.runId && ['run_finished', 'run_retried', 'run_credential_switched', 'run_quota_paused', 'run_question', 'run_blocked'].includes(event.kind)) {
     await runListChanged(executor, event.runId)
   }
+  return inserted[0].id
 }

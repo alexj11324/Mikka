@@ -8,7 +8,7 @@ import {
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model"
 import type { Transaction } from "@tiptap/pm/state"
 import type { Editor } from "@tiptap/react"
-import { useTranslations } from "next-intl"
+import { useTranslations } from "@/lib/intl/i18n-client"
 import { cn } from "cn"
 
 import { Button } from "@/components/ui/button"

@@ -2,8 +2,8 @@
 
 These checks prevent idle polling and distinguish useful work from successful
 empty responses. They reuse daemon and unit tests, Vercel observability and
-the existing operational logs. The minute Worker keeps its current cadence and two-minute
-dispatch/due-work objectives in [observability.md](observability.md).
+the existing operational logs. Company monitor definitions, response objectives and deployment procedures
+are maintained through the [private operations entry](README.md).
 
 ## Executable client budgets
 
@@ -25,8 +25,9 @@ cadences must not be restored. The daemon rows remain separate source contracts.
 | Settings, including the legacy initial settings entry | Zero background task/thread/board/chat reads over 36 seconds, including focus and online events | Same browser spec |
 | Return from settings | Exactly one immediate refresh for each action, then the normal 60-second budget | Same browser spec |
 | Leave the workspace document | Zero further workspace reads over 30 seconds | Same browser spec |
-| Idle device with the push gateway | No command poll and no database heartbeat while no run is held; one command read on connect and on each `work` signal; the 30-second `ping` is answered by the Durable Object | `packages/daemon/test/device-gateway.node-test.ts`, `cloudflare/device-gateway/src/route.test.ts` |
-| Empty command long-poll (fallback without a gateway) | One requested cycle in total, normally 25 seconds; early responses wait only the remainder; configured zero has a one-second minimum | `packages/daemon/test/commands-polling.test.ts` |
+| Idle device holding its session | No timed request at all: no heartbeat, no command poll; one report and one command read after the socket opens and a command read on each `work` signal; the 10-second `ping` is answered by the gateway without a database write | `packages/daemon/test/device-gateway.node-test.ts`, `cloudflare/device-gateway/src/route.test.ts` |
+| Device session open or close | One `devices` update per report from the gateway, plus the lease extension (open) or lease end (close) of that device's live runs | `lib/device-session.db.test.ts` |
+| Socket down | Only redials of the socket, 0.5 to 30 seconds with jitter; no long poll and no claims | Daemon tests |
 | Queued commands | Process immediately; command acknowledgments do not wait for an idle cycle | Same daemon tests |
 | Consecutive transport failures | Existing exponential waits of 1, 2, 4, 8, 16, 30 seconds, capped at 30; success resets the backoff | Same daemon tests |
 | Stop or disconnect | Cancel idle/retry waits; ignore late command results on shutdown; no next request or server queue query after cancellation | Daemon tests and `app/v1/devices/[deviceId]/commands/route.test.ts` |
@@ -39,55 +40,38 @@ scheduling around completed requests; lower bounds catch a broken refresh path.
 Settings' own reads are outside the background workspace budget. These are
 bounded regression checks, not a global request throttle.
 
-The daemon learns about new work from the device gateway
-(`cloudflare/device-gateway`, one Durable Object per device over a hibernating
-WebSocket). The server posts an empty signal (`lib/device-gateway-notify.ts`)
-after it commits the work; the daemon then reads it through
-`GET /v1/devices/:deviceId/commands`. `GET /v1/devices/:deviceId/gateway` gives
-the daemon its socket ticket. When `DEVICE_GATEWAY_URL` or
-`DEVICE_GATEWAY_PUSH_SECRET` is unset, or the socket does not open, the daemon
-falls back to the command long-poll. The current server route subscribes to
-PostgreSQL notifications before its initial read and waits through
-`deviceWorkSubscription`. A lost or unavailable subscription uses the bounded
-`longPollIdleCheck` fallback. The route performs a final read at its deadline. See the
-[decision](../design/decisions/2026-11-03-2030-device-push-gateway.md).
+A daemon is usable only while it holds its device gateway socket
+(`cloudflare/device-gateway`, one Durable Object per device, or the self-hosted
+built-in gateway); the open socket is the device session. The gateway reports
+`connected` and `disconnected` to `POST /v1/internal/device-sessions/:deviceId`
+(`lib/device-session.ts`), which records presence on `devices` and extends or
+ends the leases of the device's runs. The server posts an empty `work` signal
+(`lib/device-gateway-notify.ts`) after it commits work; the daemon then reads it
+through `GET /v1/devices/:deviceId/commands`, which answers at once and never
+waits. Changes on the device go once to `POST /v1/devices/:deviceId/report`,
+which renews nothing. `GET /v1/devices/:deviceId/gateway` gives the daemon its
+socket ticket; a server without a gateway answers 503 `deviceGatewayRequired`
+and has no devices. There is no heartbeat and no long-poll fallback. The
+run-recovery cron (every 15 minutes) asks the gateway about devices that hold
+leased runs while the database still holds their session open, so a lost
+`disconnected` report cannot keep a run alive. See the
+[decision](../design/decisions/2026-11-17-2215-device-session-no-heartbeat.md).
 
 Current daemons no longer poll `GET /v1/devices/:deviceId/fs/requests`. The
 route still answers an authenticated empty list for older daemons. Existing
 daemon installations must upgrade to receive these changes. Web deployment
 alone does not update them.
 
-## Native Vercel monitors
+## Runtime resource monitors
 
-[runtime-monitors.json](runtime-monitors.json) records the configured definitions
-for project `mikka`. All four enable team-owner notifications. These initial
-thresholds are project policy and should be calibrated against observed traffic.
-The built-in Test Notification reached the owner's Vercel Web inbox on
-2026-10-31; Email was enabled, but mailbox receipt was not checked. This
-verifies notification routing, not a real threshold firing/recovery cycle.
-The temporary test monitor was deleted after the check.
+Company monitor definitions, provider resource IDs and notification receipts
+are maintained through the [private operations entry](README.md).
 
-| Monitor | Evaluation | Native ID |
-| --- | --- | --- |
-| CPU and invocation anomalies | Built-in Fluid CPU or function-invocation usage anomaly, minimum medium severity | `ar_01a191b3-4420-70ac-b1dd-165cef7af618` |
-| Idle filesystem polling budget | More than 18 invocations per request path in five minutes, filesystem-request route only, across environments | `ar_01a191b3-4940-70d8-9658-85028d732d26` |
-| Route CPU total anomaly | Production, 15-minute CPU sum per route, above three standard deviations, with at least 10,000 ms CPU | `ar_01a191b3-55e0-72c7-81a5-e5df7c11ed17` |
-| CPU per invocation anomaly | Production, 15-minute CPU sum / invocation count per route, above three standard deviations, with at least 10,000 ms total CPU | `ar_01a191b3-661a-7059-8626-8656bbf8429d` |
+Invocation counts and CPU must use the same route, deployment and time window.
+Process-wide CPU under concurrent execution cannot attribute a single request;
+telemetry aggregates do not by themselves reconcile a provider bill.
 
-Current daemons do not call the filesystem-request route, so this monitor now
-catches older daemons. At their 25-second idle cadence, such a client normally
-starts about 12–13 requests in five minutes; 18 allows a small restart burst. Commands are excluded
-from this absolute count alert because useful queued commands can return
-immediately. On an alert, identify the deployment, route, environment and client
-version; inspect request counts, CPU per invocation and outcomes together. Check
-whether an old daemon is still polling before changing a production endpoint.
-
-CPU comes from Vercel's function-invocation CPU metric, with invocation counts
-from the same scope and window. Process-wide CPU differences cannot attribute a
-single request under concurrent Fluid execution. These observability aggregates
-do not reconcile the entire bill: the October investigation found about 245
-billed CPU minutes versus 139.4 route-attributed minutes. The gap remains
-unexplained and must not be reported as measured savings.
+On Cloudflare, compare API application CPU and peak instance memory in the same five-minute windows as HTTP route templates, status, request volume and paired p50/p95 latency. Record background and concurrent work as part of application usage. The CPU per observed HTTP request ratio is a deployment-pressure diagnostic. It does not identify a request's CPU. A 15-minute anomaly check keeps missing observations distinct from verified recovery. For the legacy filesystem budget, the origin logs give a deduplicated observed count across devices. With incomplete origin coverage, 18 or fewer observed starts leave the per-device budget unknown. More than 18 starts across all devices prompts investigation. A per-device breach requires separate evidence for one device in the same five-minute window.
 
 ## Explicit outcomes and collection coverage
 
@@ -104,47 +88,22 @@ missing pairs and unmarked legacy lines stay unknown; malformed timestamps are
 reported separately. Empty ratio uses classified outcomes as its denominator;
 coverage uses observed invocations. No classified samples means a null ratio.
 
-`scripts/ops/runtime-outcomes.mjs` reads the last 15 minutes of Vercel log events
-for the active immutable production deployment, then rechecks the alias. It
-stores only the three instrumented route templates and aggregate counts in
-`runtime-outcomes-report/report.json` and `summary.md`. Collection is explicitly
-`best_effort`: provider retention and timestamp pagination boundaries can omit
-events. Reported exclusions, truncation or exhausted pagination are incomplete
-collection, not a healthy zero. No samples are insufficient, with null ratios.
-Use the native invocation metric for total traffic. The existing
-`/api/cron/ops-monitor` remains the database signal collector; its successful
-response alone does not establish runtime-log collection or notification
-delivery. A 100% empty filesystem ratio is expected; combine empty outcomes with
-excess request rate or CPU before treating them as a fault.
+Collection is explicitly `best_effort`: provider retention and pagination can
+omit events. Exclusions, truncation or exhausted pagination mean incomplete
+collection. No classified samples produce null ratios, not a healthy zero.
+Use provider invocation metrics for total traffic; a successful collector
+response alone does not establish complete logs or notification delivery.
+The private runbook describes the company's collector invocation and artifacts.
 
 ## Deployment comparison and response
 
-`scripts/ops/deployment-regression.mjs` runs in the existing Production smoke
-workflow after deployments and on quarter-hour follow-ups. It uses the existing
-Infisical workload identity and Vercel token. API smoke retains its daily,
-deployment and manual cadence; the comparison job needs no install or wait loop.
+Company deployment comparisons, operational thresholds and rollback steps
+are maintained through the [private operations entry](README.md).
 
-The report pins current and previous production deployment IDs, Git SHAs and
-alias activation. It compares aligned, end-exclusive five-minute windows before
-and after activation, excluding at least two minutes of warmup. Both CPU and
-invocation queries use the same production deployment, route and HTTP-status
-groups. Alias/deployment state is checked again after collection.
+Comparisons require a fixed deployment, aligned time windows, compatible
+traffic groups and enough samples. Missing samples are `insufficient`; changed
+traffic is `not_comparable`. Neither result proves improvement. Source tests,
+configured definitions, workflow completion and actual runtime observations
+establish different layers of evidence.
 
-The initial policy requires at least 20 invocations per group, matching groups,
-traffic volume within 2× and group shares within 20 percentage points. A CPU
-regression exceeds both 2× and 100 ms per invocation. A server-error-rate rise
-above five percentage points is a regression and cannot be presented as a CPU
-improvement. Missing windows or samples are `insufficient`; changed traffic
-groups or mix can be `not_comparable`. Neither state proves acceptance.
-
-Reports include JSON and a job summary; regression fails the comparison job.
-An operator inspects the route evidence, verifies the previous deployment's
-health and database migration compatibility, then uses the report's exact
-`vercel rollback` candidate if appropriate. Automatic rollback is disabled
-because migration compatibility is unverified. No alert automatically pauses
-the project, daemon, scheduler or business queues. Verify the same failing
-metric and production smoke after any rollback.
-
-Source tests, configured monitor definitions and workflow success cover
-different layers. Record the exact CI revision, deployed SHA, aggregate report
-and actual firing/recovery or runtime evidence before claiming live acceptance.
+The same Cloudflare Container observation measures completed login, chat and API requests using the existing 99% success target and 10-second p95 threshold. A request still open after 120 seconds counts as a timeout. Select one complete 15-minute quarter at least 120 seconds in the past. Its single bounded log read includes the following two minutes for completions only. Requests that start in that grace interval belong to the next quarter. CPU, memory, database attribution and route profiles keep their original quarter boundaries. A source with no eligible starts or no observed latency leaves those alert IDs unassessed when notifying the existing internal sink.

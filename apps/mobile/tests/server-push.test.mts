@@ -8,7 +8,11 @@ const cloud: SavedAccount = { id: 'legacy', user: { id: 'same-id', name: 'A', em
 const self: SavedAccount = { ...cloud, id: '1', server: { ...cloud.server, url: 'https://self.example/mikka' } }
 let current = cloud, changed: () => void = () => {}, state = 'unknown'
 let token: () => Promise<{ data: string }> = async () => ({ data: 'ExpoPushToken[fixture]' })
-let request: (method: string, account: SavedAccount) => Promise<void> = async () => {}
+class ApiError extends Error {
+  status: number
+  constructor(status: number) { super(); this.status = status }
+}
+let request: (method: string, account: SavedAccount, path?: string) => Promise<void | {id: string}> = async () => {}
 const stored = new Map<string, string>()
 mock.module('react-native', { namedExports: { AppState: { addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'ios' } } })
 mock.module('expo-constants', { defaultExport: { expoConfig: { extra: { eas: { projectId: 'fixture-project' } } } } })
@@ -20,8 +24,8 @@ mock.module('expo-secure-store', { namedExports: {
   deleteItemAsync: async (key: string) => { stored.delete(key) },
 } })
 mock.module(new URL('../lib/api.ts', import.meta.url).href, { namedExports: {
-  apiConnection: () => ({ account: current }),
-  api: (_path: string, init: { method: string }, connection: { account: SavedAccount }) => request(init.method, connection.account),
+  ApiError, apiConnection: () => ({ account: current }),
+  api: (_path: string, init: { method: string }, connection: { account: SavedAccount }) => request(init.method, connection.account, _path),
 } })
 mock.module(new URL('../lib/config.ts', import.meta.url).href, { namedExports: { currentAccount: () => current, onServerChange: (listener: () => void) => { changed = listener } } })
 mock.module(new URL('../lib/push-state.ts', import.meta.url).href, { namedExports: { pushState: () => state, setPushState: (next: string) => { state = next } } })
@@ -138,4 +142,23 @@ test('an old confirmation is redone on the next return to the front, never on a 
     await refreshPush()
     assert.deepEqual(requests, ['POST', 'POST'])
   } finally { now.mock.restore() }
+})
+
+test('sign-out removes the confirmed installation by ID and does not retry a missing binding by token', async () => {
+  for (const status of [204, 404, 405]) {
+    current = cloud; changed(); stored.clear()
+    const paths: string[] = []
+    const id = 'f2000000-0000-4000-a000-000000000001'
+    token = async () => ({ data: 'ExpoPushToken[fixture]' })
+    request = async (method, _account, path) => {
+      if (method === 'POST') return { id }
+      assert.ok(path)
+      paths.push(path)
+      if (path?.endsWith(id) && status !== 204) throw new ApiError(status)
+    }
+    assert.equal(await refreshPush(), 'registered')
+    await unregisterPush()
+    assert.deepEqual(paths, ['/api/mobile/push-tokens/' + id, ...(status === 405 ? ['/api/mobile/push-tokens'] : [])])
+    assert.equal(stored.size, 0)
+  }
 })

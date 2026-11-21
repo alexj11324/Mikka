@@ -14,7 +14,7 @@ const database = new URL(process.env.E2E_DATABASE_URL ?? '')
 assert.ok(['postgres:', 'postgresql:'].includes(database.protocol) && ['localhost', '127.0.0.1', '[::1]'].includes(database.hostname)
   && database.pathname === '/mikka_e2e' && !database.search && !database.hash, 'FRESH_OWNED_LOOPBACK_MIKKA_E2E_REQUIRED')
 assert.ok(!process.env.VERCEL && !process.env.VERCEL_ENV, 'DEPLOYED_ENVIRONMENT_FORBIDDEN')
-assert.ok(!['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'DEEPSEEK_API_KEY', 'E2B_API_KEY', 'COMPOSIO_API_KEY', 'POSTHOG_SECRET_KEY', 'RESEND_API_KEY', 'ZEROCAT_API_KEY']
+assert.ok(!['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'DEEPSEEK_API_KEY', 'E2B_API_KEY', 'COMPOSIO_API_KEY', 'POSTHOG_SECRET_KEY', 'RESEND_API_KEY', 'ZEROCAT_API_KEY', 'AI_GATEWAY_API_KEY', 'MIKKA_LITELLM_MASTER_KEY']
   .some(key => Boolean(process.env[key])), 'LIVE_SERVICE_CREDENTIALS_FORBIDDEN')
 assert.ok(!['GH_TOKEN', 'GITHUB_TOKEN', 'GH_ENTERPRISE_TOKEN', 'GITHUB_ENTERPRISE_TOKEN'].some(key => Boolean(process.env[key])), 'HOST_GITHUB_CREDENTIALS_FORBIDDEN')
 const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim()
@@ -30,7 +30,7 @@ const env = { ...process.env, NODE_OPTIONS: '', NODE_ENV: 'development', CI: '',
   MIKKA_TEST_DEPLOYMENT_SHA: revision, MIKKA_TEST_ENVIRONMENT_FILE: join(directory, 'environment.json'),
   MIKKA_TRACE_EVIDENCE_DIR: directory, MIKKA_MVP_RESOURCE_INDEX: join(directory, 'retained-resources.jsonl'),
   NEXT_PUBLIC_POSTHOG_KEY: 'phc_trace_fixture_1512', MIKKA_TRACE_SAMPLE_RATE: '1',
-  MIKKA_TRACE_ENDPOINT: 'http://127.0.0.1:3196/i/v1/traces', AI_GATEWAY_API_KEY: '',
+  MIKKA_TRACE_ENDPOINT: 'http://127.0.0.1:3196/i/v1/traces', MIKKA_LITELLM_MASTER_KEY: '',
 }
 async function run(label, args, additions = {}) {
   console.info(`trace-acceptance ${label}`)
@@ -54,7 +54,7 @@ try {
   await run('schema', ['--import', 'tsx', 'scripts/setup-e2e-db.mjs'])
   await run('bootstrap', ['--import', 'tsx', 'scripts/test-accounts/bootstrap.mjs', '--output', env.MIKKA_TEST_ENVIRONMENT_FILE])
   await run('chain', ['--import', 'tsx', '--import', pathToFileURL(join(root, 'tests/mvp/trace-preload.mjs')).href, 'tests/mvp/trace-chain.mjs'],
-    { AI_GATEWAY_API_KEY: 'mvp-synthetic-decisions' })
+    { MIKKA_LITELLM_MASTER_KEY: 'mvp-synthetic-decisions', MIKKA_LITELLM_URL: 'http://127.0.0.1:3191/litellm' })
 } catch (error) {
   console.error(JSON.stringify({ traceAcceptance: 'failed', code: /^[A-Z_]+$/.test(error?.message ?? '') ? error.message : 'TRACE_RUNNER_FAILED', revision,
     privateLogDirectory }))

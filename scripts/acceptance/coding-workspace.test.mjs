@@ -16,7 +16,7 @@ const key = 'v2/github.com/alexj11324/mikka-handoff'
 function fixture(harness = 'claude_code', changes = {}) {
   const calls = [], scope = { ownerId: 'fixture-user', workspaceId: id(2), botId: id(3) }
   const record = { sampleId: `fixture_${harness}`, harness, runId: id(harness === 'codex' ? 11 : 1), issueId: id(harness === 'codex' ? 14 : 4), title: '测试 1721 fixture',
-    execution: { deviceId: id(5), credentialType: 'subscription', harness, model: models[harness], sharedScope: { verified: true } },
+    execution: { deviceId: id(5), credentialType: 'subscription', harness, model: models[harness], ownerScope: { verified: true } },
     status: 'execution_proved_awaiting_server_timing', replyVerifiedAfterTool: true }
   const identity = { version: 1, runId: record.runId, repoId: id(6), deviceId: id(5), workspaceId: scope.workspaceId,
     ownerId: scope.ownerId, repositoryKey: key, bindingId: 'e'.repeat(64) }

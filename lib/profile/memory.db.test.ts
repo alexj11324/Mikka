@@ -66,6 +66,8 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
       issueIds: [], revision: 1,
     })
     await db.insert(schema.bots).values({ id: botId, ownerId: owner, workspaceId: wsA, name: 'Memory consumer' })
+    // A chat runs only on a model the person chose (no 「Mikka 默认」, decision 2026-11-15-1900).
+    await db.insert(schema.botModelChoices).values({ ownerId: owner, workspaceId: wsA, botKey: botId, creditsModel: 'deepseek/deepseek-v4.1-flash' })
     await db.insert(schema.coordinatorSessions).values({ userId: owner, botId })
 
     const requestId = randomUUID()
@@ -127,13 +129,16 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
 
     await t.test('native Eve prompt usage follows its owned source turn and survives retries without a legacy lease', async () => {
       const { registerSession, scopeAuth } = await import('../eve/scope')
+      const { ContextContainer, contextStorage } = await import(new URL('./context/container.js', import.meta.resolve('eve')).href)
       const { default: hook } = await import('../../apps/eve/agent/hooks/product')
       const sourceId = randomUUID(), sessionId = 'wrun_memory_' + randomUUID(), turnId = 'turn_1'
       const nativeScope = { ownerId: owner, botId, workspaceId: wsA, surface: 'web' as const }
       await db.insert(schema.coordinatorEvents).values({ id: sourceId, userId: owner, botId, kind: 'user_message', dedupeKey: sourceId, payload: { text: 'Synthetic native memory request' } })
       await registerSession(nativeScope, sessionId)
       const auth = scopeAuth(nativeScope)
-      await hook.events['turn.started']!({ data: { turnId } } as never, { session: { id: sessionId, auth: { current: { ...auth, attributes: { ...auth.attributes, sourceEventId: sourceId } } } } } as never)
+      await contextStorage.run(new ContextContainer(), async () => {
+        await hook.events['turn.started']!({ data: { turnId } } as never, { session: { id: sessionId, auth: { current: { ...auth, attributes: { ...auth.attributes, sourceEventId: sourceId } } } } } as never)
+      })
       await db.update(schema.coordinatorSessions).set({ leaseHolder: null }).where(eq(schema.coordinatorSessions.botId, botId))
       assert.equal((await db.select({ deliveredAt: schema.coordinatorEvents.deliveredAt }).from(schema.coordinatorEvents).where(eq(schema.coordinatorEvents.id, sourceId)))[0].deliveredAt, null, 'native instructions may precede HTTP admission acknowledgement')
       const nativeTurn = { sessionId, turnId }
@@ -141,7 +146,9 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
       assert.equal((await memory.readMemoryView(owner, wsA)).facts.find(item => item.id === manual)?.usedCount, 4)
       await memory.memoryForBotPrompt(owner, botId, true, nativeTurn)
       assert.equal((await memory.readMemoryView(owner, wsA)).facts.find(item => item.id === manual)?.usedCount, 4, 'the same native prompt retry has one use')
-      await hook.events['turn.started']!({ data: { turnId: 'turn_2' } } as never, { session: { id: sessionId, auth: { current: { ...auth, attributes: { ...auth.attributes, sourceEventId: sourceId } } } } } as never)
+      await contextStorage.run(new ContextContainer(), async () => {
+        await hook.events['turn.started']!({ data: { turnId: 'turn_2' } } as never, { session: { id: sessionId, auth: { current: { ...auth, attributes: { ...auth.attributes, sourceEventId: sourceId } } } } } as never)
+      })
       await db.update(schema.coordinatorSessions).set({ leaseHolder: null }).where(eq(schema.coordinatorSessions.botId, botId))
       await memory.memoryForBotPrompt(owner, botId, true, { sessionId, turnId: 'turn_2' })
       assert.equal((await memory.readMemoryView(owner, wsA)).facts.find(item => item.id === manual)?.usedCount, 5, 'another turn in the same native session has its own use')
@@ -204,6 +211,22 @@ pgTest('memory: manual idempotency, real provenance/usage, review, scoped reads/
     assert.equal(await memory.recordMemoryFactUsage(owner, wsA,
       { ...event, eventId: randomUUID() }, [manual!]), 0, 'project fact cannot leak into generic thread')
     assert.equal(await memory.removeMemoryFact(owner, wsA, manual!), false, 'hidden project fact cannot be removed from A')
+    const visible = await memory.addMemoryFact(owner, wsA, {
+      requestId: randomUUID(), kind: 'preference', subject: 'Visible correction candidate', scope: { kind: 'global', ids: [] },
+    })
+    assert.ok(visible)
+    assert.equal(await memory.mayCorrectMemoryFact(owner, wsA, visible!, 'Own fact'), false, 'a correction cannot merge a hidden fact into this workspace')
+    assert.equal((await memory.readMemoryView(owner, wsA)).facts.find(item => item.id === visible)?.subject, 'Visible correction candidate', 'refusal leaves the persisted fact unchanged')
+    assert.equal((await memory.readMemoryView(owner, personal)).facts.find(item => item.id === manual)?.subject, 'Own fact', 'a refused deletion leaves the hidden fact unchanged')
+    const survivor = await memory.addMemoryFact(owner, wsA, {
+      requestId: randomUUID(), kind: 'preference', subject: 'Existing visible memory', scope: { kind: 'global', ids: [] },
+    })
+    assert.ok(survivor)
+    assert.equal(await memory.mayCorrectMemoryFact(owner, wsA, visible!, 'Existing visible memory'), true)
+    assert.equal(await profile.correctFact(owner, visible!, 'Existing visible memory'), true)
+    const merged = await memory.readMemoryView(owner, wsA)
+    assert.equal(merged.facts.some(fact => fact.id === visible), false, 'a successful duplicate correction removes the edited id')
+    assert.equal(merged.facts.find(fact => fact.id === survivor)?.subject, 'Existing visible memory', 'the existing visible fact survives the merge')
     assert.equal(await memory.removeMemoryFact(owner, personal, manual!), true)
     assert.equal(await memory.removeMemoryFact(owner, personal, manual!), true, 'delete retried is idempotent')
     const [scrubbed] = await db.select().from(schema.userFacts).where(eq(schema.userFacts.id, manual!))

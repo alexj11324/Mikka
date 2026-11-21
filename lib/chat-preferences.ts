@@ -1,6 +1,7 @@
 import 'server-only'
 import { pool } from '@/lib/db'
 import { botChatChanged } from '@/lib/live/chats'
+import { groupChatChanged } from '@/lib/live/groups'
 import { groupListReadChanged } from '@/lib/live/lists'
 
 /** The person's own state for one chat: 置顶, 通知, hidden from the home list, marked unread, and its drag order. */
@@ -39,14 +40,18 @@ async function pinFull(userId: string, chatKey: string): Promise<boolean> {
   return Number(rows[0]?.count ?? 0) >= MAX_PINNED_CHATS
 }
 
-async function writePreference(userId: string, chatKey: string, change: ChatChange, pinnedDefault: boolean) {
+async function writePreference(userId: string, chatKey: string, change: ChatChange, pinnedDefault: boolean, group = false) {
   // A first change keeps a chat pinned by default (the Coordinator) unless it is the pin itself.
-  await pool.query(`INSERT INTO chat_preferences ("userId","chatKey",pinned,muted,hidden,"markedUnread")
+  await pool.query(`WITH manual_revision AS (
+    INSERT INTO conversation_reads AS r ("userId","conversationId","unreadRevision")
+    SELECT $1,$2,1 WHERE $8::boolean AND $6::boolean
+    ON CONFLICT ("userId","conversationId") DO UPDATE SET "unreadRevision"=r."unreadRevision"+1
+  ) INSERT INTO chat_preferences ("userId","chatKey",pinned,muted,hidden,"markedUnread")
     VALUES ($1,$2,COALESCE($3::boolean,$7::boolean),COALESCE($4::boolean,false),COALESCE($5::boolean,false),COALESCE($6::boolean,false))
     ON CONFLICT ("userId","chatKey") DO UPDATE SET pinned=COALESCE($3::boolean,chat_preferences.pinned), muted=COALESCE($4::boolean,chat_preferences.muted),
       hidden=COALESCE($5::boolean,chat_preferences.hidden), "markedUnread"=COALESCE($6::boolean,chat_preferences."markedUnread"),
       "pinOrder"=CASE WHEN $3::boolean IS FALSE THEN NULL ELSE chat_preferences."pinOrder" END, "updatedAt"=now()`,
-    [userId, chatKey, change.pinned ?? null, change.muted ?? null, change.hidden ?? null, change.markedUnread ?? null, pinnedDefault])
+    [userId, chatKey, change.pinned ?? null, change.muted ?? null, change.hidden ?? null, change.markedUnread ?? null, pinnedDefault, group])
 }
 
 /**
@@ -66,8 +71,11 @@ export async function setChatPreference(userId: string, botId: string, change: C
 export async function setGroupPreference(userId: string, conversationId: string, change: Omit<ChatChange, 'muted'>): Promise<'ok' | 'notFound' | 'pinLimit'> {
   if (!await inGroup(userId, conversationId)) return 'notFound'
   if (change.pinned && await pinFull(userId, conversationId)) return 'pinLimit'
-  await writePreference(userId, conversationId, change, false)
+  await writePreference(userId, conversationId, change, false, true)
   await groupListReadChanged(pool, conversationId, userId)
+  // An already open transcript must read the new personal revision before
+  // it can acknowledge the end. Other members' read positions did not move.
+  if (change.markedUnread) await groupChatChanged(pool, conversationId, userId)
   return 'ok'
 }
 

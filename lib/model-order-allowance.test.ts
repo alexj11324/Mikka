@@ -6,7 +6,7 @@ import type { OrderCandidate, OrderEntry } from './model-order-plan'
 const scope = { ownerId: 'requester', workspaceId: 'workspace' }
 const entry: OrderEntry = { id: 'selected', harness: 'claude_code', model: 'claude-haiku-5-5',
   source: { kind: 'subscription', connectionId: 'connection' } }
-let credentialOwner = scope.ownerId, memberAllowed = true, shareAllowed = true, stale = true
+let credentialOwner = scope.ownerId, memberAllowed = true, stale = true
 const calls: string[] = []
 const quota = () => ({ vendor: 'claude_code', source: 'official', status: 'ok', plan: 'Pro',
   observedAt: new Date(Date.now() - (stale ? 61_000 : 0)).toISOString(),
@@ -20,9 +20,6 @@ mock.module(new URL('./subscription-runtime.ts', import.meta.url).href, { namedE
     assert.equal(signal.aborted, false); stale = false
   },
 }) } })
-mock.module(new URL('./personal-policy.ts', import.meta.url).href, { namedExports: {
-  othersMayUse: async () => { calls.push('share'); return shareAllowed },
-} })
 mock.module(new URL('./model-provider-health.ts', import.meta.url).href, { namedExports: {
   providerHealthStates: async () => new Map(), providerSourceKey: () => 'subscription:connection',
 } })
@@ -34,7 +31,7 @@ const query = { query: async (sql: string) => {
 } } as unknown as Pool
 const read = () => credentialStates(query, scope, [entry],
   [{ ...entry, name: entry.model, provider: 'claude', credentialOwnerId: credentialOwner } as OrderCandidate & { provider: string; credentialOwnerId: string }], undefined, { probe: 'always' })
-beforeEach(() => { calls.length = 0; credentialOwner = scope.ownerId; memberAllowed = true; shareAllowed = true; stale = true })
+beforeEach(() => { calls.length = 0; credentialOwner = scope.ownerId; memberAllowed = true; stale = true })
 
 test('forced startup refresh uses allowance after its original owner checks', async () => {
   const state = await read()
@@ -42,11 +39,11 @@ test('forced startup refresh uses allowance after its original owner checks', as
   assert.deepEqual([...calls], ['member', 'workspace', 'allowance'])
 })
 
-test('shared startup still checks requester, payer and the share before allowance', async () => {
+test("a teammate's subscription is never read or refreshed for the requester", async () => {
   credentialOwner = 'payer'
   const state = await read()
-  assert.equal(state.get(entry.id)?.credential.usable, true)
-  assert.deepEqual([...calls], ['share', 'member', 'workspace', 'share', 'allowance', 'share'])
+  assert.equal(state.get(entry.id)?.credential.usable, false)
+  assert.deepEqual([...calls], [])
 })
 
 test('membership denial cannot start either allowance or Settings usage', async () => {
@@ -54,13 +51,6 @@ test('membership denial cannot start either allowance or Settings usage', async 
   const state = await read()
   assert.equal(state.get(entry.id)?.credential.usable, false)
   assert.deepEqual([...calls], ['member'])
-})
-
-test('share withdrawal cannot start allowance or switch to the requester account', async () => {
-  credentialOwner = 'payer'; shareAllowed = false
-  const state = await read()
-  assert.equal(state.get(entry.id)?.credential.usable, false)
-  assert.deepEqual([...calls], ['share', 'share'])
 })
 
 test('each completed forced refresh still performs a fresh allowance call', async () => {

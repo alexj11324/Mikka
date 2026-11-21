@@ -52,8 +52,11 @@ async function changed(executor: object, key: string, resolve: (database: Databa
   }))
 }
 
-export const groupChatChanged = (executor: object, conversationId: string) =>
-  changed(executor, conversationId, (database, workspace) => groupChatTargets(database, workspace, conversationId))
+export const groupChatChanged = (executor: object, conversationId: string, readerId?: string) =>
+  changed(executor, readerId ? `${conversationId}:reader:${readerId}` : conversationId, async (database, workspace) => {
+    const targets = await groupChatTargets(database, workspace, conversationId)
+    return readerId ? targets.filter(target => target.scope.ownerId === readerId) : targets
+  })
 
 /** A reaction was set or cleared: the group chats holding these messages re-read (a bot chat's are its owner's own). */
 export const groupMessagesChanged = (executor: object, messageIds: readonly string[]) =>

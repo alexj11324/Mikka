@@ -2,11 +2,14 @@ import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import { registerHooks } from 'node:module'
 import { after, before, mock, test } from 'node:test'
-import { act, type ReactNode } from 'react'
+import { act, useLayoutEffect, type ReactNode } from 'react'
 import { Window } from 'happy-dom'
 import { LIVE_KINDS } from '../lib/live/events'
 import { BOT_COLORS, BOT_SHAPES, DEFAULT_BOT_COLOR, DEFAULT_BOT_SHAPE } from '../lib/bot-shapes'
 import { issueWithMetadata } from '../lib/issue-metadata'
+import { taskPresentation } from '../lib/task-presentation'
+import type { BoardScreenProps } from '../components/slots/board-contract'
+import type { ThreadScreenProps } from '../components/slots/thread-contract'
 
 // Idle request budget (#1212): each main page's real client component, real SWR with the app's defaults
 // (components/swr-defaults.tsx) and a healthy live channel, over one idle, visible minute on fake timers.
@@ -47,6 +50,28 @@ mock.module(new URL('components/nav/bot-avatar.tsx', root).href, { namedExports:
   BOT_MOOD_SECONDS: { idle: 2.4, thinking: 2.6, wink: 1.6, exclaim: 2, sleep: 2.4, wide: 1.8, hexagon: 1.6, burst: 2.6 }, colorFor: () => DEFAULT_BOT_COLOR,
   COORDINATOR_AVATAR: { color: 'encre', shape: 'cercle' }, CoordinatorAvatar: avatar, BotAvatar: avatar,
 } })
+
+// Keep the real Task controller, document reader and open run during the budget measurement.
+let BudgetThreadPanel: typeof import('../components/workspace/issue-thread-panel').IssueThreadPanel
+mock.module(new URL('components/slots/task-conversation.tsx', root).href, { namedExports: {
+  TaskConversation: ({ issueId, runId }: import('../components/slots/task-conversation-contract').TaskConversationProps) =>
+    <BudgetThreadPanel issueId={issueId} runId={runId} bare />,
+} })
+mock.module(new URL('components/slots/task-detail.tsx', root).href, { namedExports: {
+  TaskDetailFrame: (props: import('../components/slots/task-detail-contract').TaskDetailFrameProps) =>
+    <section><h1>{props.title}</h1>{props.description({ afterDescription: null, activity: () => null })}{props.panel}{props.dialogs}</section>,
+} })
+// Keep the real, closed NewTaskDialog and its reads; only its required visual
+// export is supplied, as with the other official slots in this public fixture.
+mock.module(new URL('components/slots/new-task.tsx', root).href, { namedExports: { NewTask: () => null } })
+
+// The full Bot container still owns all measured reads. Its official slot only paints data.
+let observeThread: ((props: ThreadScreenProps) => void) | undefined
+mock.module(new URL('components/slots/thread.tsx', root).href, { namedExports: { ThreadScreen: (props: ThreadScreenProps) => {
+  useLayoutEffect(() => { observeThread?.(props) })
+  return <section>{props.entries?.map(entry => <div key={entry.id}>{entry.role === 'person' ? entry.text : entry.parts.map((part, i) =>
+    part.kind === 'text' ? <span key={i}>{part.node || part.text}</span> : null)}</div>)}</section>
+} } })
 
 // Feature flags come from PostHog, not from Mikka's server.
 mock.module('posthog-js', { defaultExport: { getFeatureFlag: () => undefined, onFeatureFlags: () => () => {}, capture: () => {}, isFeatureEnabled: () => false } })
@@ -115,6 +140,14 @@ before(async () => {
     if (value !== undefined) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value: typeof value === 'function' && !/^[A-Z]/.test(key) ? (value as (...args: unknown[]) => unknown).bind(browser) : value })
   }
   for (const [key, value] of Object.entries({ window: browser, requestAnimationFrame: timers.requestAnimationFrame, cancelAnimationFrame: timers.cancelAnimationFrame, WebSocket: FakeSocket, IS_REACT_ACT_ENVIRONMENT: true })) Object.defineProperty(globalThis, key, { configurable: true, writable: true, value })
+  // The official board supplies the layout. Mount the real toolbar, card menus
+  // and their subscriptions while the public-only fixture renders their props.
+  const board = await import('../components/slots/board')
+  const { Button } = await import('../components/ui/button')
+  mock.module('@ui-slot/board', { namedExports: { ...board,
+    BoardScreen: ({ cards, tools, wrapCard, onOpen }: BoardScreenProps) => <>{tools}<ul>{cards.map(card =>
+      <li key={card.id} data-board-task={card.id} data-task-state={card.state?.kind}>{wrapCard(card.id, <Button onClick={() => onOpen(card.id)}>{card.title}</Button>)}</li>)}</ul></>,
+  } })
   // happy-dom has no Web Animations; Base UI asks for running animations before it unmounts a popup.
   const elementPrototype = browser.Element.prototype as unknown as { getAnimations?: () => unknown[] }
   elementPrototype.getAnimations ??= () => []
@@ -138,18 +171,19 @@ async function advance(ms: number, step = 100) {
   for (let elapsed = 0; elapsed < ms; elapsed += step) await act(async () => { mock.timers.tick(Math.min(step, ms - elapsed)); await flush() })
 }
 
-async function measure(page: ReactNode) {
+async function measure(page: ReactNode, beforeFirstRead?: () => Promise<void>) {
   const { createRoot } = await import('react-dom/client')
   const { SWRConfig } = await import('swr')
   const { SWRDefaults } = await import('../components/swr-defaults')
   const { LiveProvider } = await import('../hooks/use-live-key')
-  const { NextIntlClientProvider } = await import('next-intl')
+  const { NextIntlClientProvider } = await import('@/lib/intl/i18n-client')
   const { SidebarProvider } = await import('../components/ui/sidebar')
   const messages = (await import('../messages/en.json')).default
   const container = browser.document.createElement('div') as unknown as HTMLElement; document.body.append(container)
   const view = createRoot(container)
   calls.clear(); missing.clear(); sockets.length = 0
   await act(async () => { view.render(<NextIntlClientProvider locale="en" timeZone="UTC" messages={messages}><SWRDefaults><SWRConfig value={{ provider: () => new Map() }}><LiveProvider ownerId={OWNER} workspaceId={WORKSPACE}><SidebarProvider>{page}</SidebarProvider></LiveProvider></SWRConfig></SWRDefaults></NextIntlClientProvider>) })
+  await beforeFirstRead?.()
   // The first load settles: reads, the live ticket and its catch-up read after the socket opens.
   await advance(5_000, 50)
   calls.clear()
@@ -159,10 +193,11 @@ async function measure(page: ReactNode) {
   // Dialogs and sheets render in a portal on the body.
   const text = document.body.textContent ?? ''
   const chatLoadFailure = Boolean(document.querySelector('[data-chat-failure=load]'))
+  const boardStates = new Map(Array.from(document.querySelectorAll<HTMLElement>('[data-board-task]'), item => [item.dataset.boardTask, item.dataset.taskState ?? null] as const))
   await act(async () => { view.unmount() }); container.remove()
   // Nothing a page left scheduled may fire into the next page's count.
   fakeClock(Date.now())
-  return { idle, missing: new Set(missing), sockets: open, text, chatLoadFailure }
+  return { idle, missing: new Set(missing), sockets: open, text, chatLoadFailure, boardStates }
 }
 
 const OWNER = '10000000-0000-4000-8000-000000000001'
@@ -180,7 +215,7 @@ const noop = () => {}
 const AT = '2026-11-05T08:00:00.000Z'
 const live = { ownerId: OWNER, workspaceId: OWNER_HOME }
 const doc = (text: string) => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] })
-const issue = (id: string, title: string, status = 'todo') => ({ ...issueWithMetadata({ id, userId: OWNER, title, content: doc(title), status, priority: 'normal', scope: 'workspace' as const, scopeVersion: 1, linearSyncBlocked: false, scopeSetBy: 'user' as const, scopeConfidence: null, revision: 3, createdAt: new Date(AT), updatedAt: new Date(AT) }), identifier: 'MIK-7', linearTargetVerified: false })
+const issue = (id: string, title: string, status = 'todo') => ({ ...issueWithMetadata({ id, userId: OWNER, workspaceId: WORKSPACE, title, content: doc(title), status, priority: 'normal', scope: 'workspace' as const, scopeVersion: 1, linearSyncBlocked: false, scopeSetBy: 'user' as const, scopeConfidence: null, revision: 3, createdAt: new Date(AT), updatedAt: new Date(AT) }), identifier: 'MIK-7', linearTargetVerified: false })
 const CHAT_VERSION = '0123456789abcdef0123456789abcdef'
 const chat = { botId: BOT, enabled: true, version: CHAT_VERSION, working: false, error: null, cursor: 2, sources: {}, artifacts: {}, persistedStreamIds: [], live, items: [
   { id: 'm1', position: 1, from: 'person', text: 'Can you fix the sign-in redirect?', tools: [], threads: [], artifacts: [], createdAt: AT },
@@ -192,12 +227,23 @@ const thread = { id: RUN, status: 'running', outcome: null, stopping: false, cre
 const person = { id: OWNER, name: 'Ada', email: 'ada@example.invalid', image: null }
 const user = { id: OWNER, name: 'Ada', email: 'ada@example.invalid' }
 Object.assign(fixtures, {
+  'agents.pollTaskDetail': (id: unknown, known: unknown) => ({ ...(known === CHAT_VERSION ? { viewerId: OWNER, unchanged: true, version: CHAT_VERSION } : { viewerId: OWNER, issue: issue(String(id), 'Fix sign-in redirect'), version: CHAT_VERSION }), taskWork: {
+    viewerId: OWNER, threads: [thread], live: { workspaceId: WORKSPACE }, connections: [], work: null,
+    activity: { version: CHAT_VERSION, items: [], positions: [] },
+  } }),
   'issues.getIssue': (id: unknown) => ({ issue: issue(String(id), 'Fix sign-in redirect') }),
   'issues.pollIssue': (id: unknown, known: unknown) => known === CHAT_VERSION ? { viewerId: OWNER, unchanged: true, version: CHAT_VERSION } : { viewerId: OWNER, issue: issue(String(id), 'Fix sign-in redirect'), version: CHAT_VERSION },
   'issues.pollIssueVersionSummaries': () => ({ viewerId: OWNER, snapshot: { version: CHAT_VERSION, items: [], positions: [] } }),
   'issues.listIssueVersions': () => [],
   'issue-operations.getDeletedIssue': () => null,
   'issue-operations.listIssueConnections': () => [],
+  'task-domain.getTaskPresentations': (input: { workspaceId: string; issueIds: string[] }) => ({
+    version: 1, workspaceId: input.workspaceId, items: Object.fromEntries(input.issueIds.map(id => [
+      id, taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, undefined, null, () => false),
+    ])),
+  }),
+  'teams.listTeams': () => [],
+  'team-relations.getIssueTeam': () => null,
   // The authorized live scope each read returns (app/actions/collaboration.ts, agents.ts).
   'collaboration.exchangeDocument': () => ({ version: 'v1', workspaceId: WORKSPACE }),
   'collaboration.listMembers': () => ({ members: [{ ...person, id: MEMBER, name: 'Grace', email: 'grace@example.invalid', createdAt: new Date(AT) }], owner: person, currentUserId: OWNER, isOwner: true, live: { workspaceId: WORKSPACE } }),
@@ -215,6 +261,11 @@ Object.assign(fixtures, {
   'agents.listAgents': () => [{ id: AGENT, name: 'Claude Code', description: '', instructions: '', harness: 'claude_code', deviceId: DEVICE, deviceName: 'Ada’s MacBook' }],
   'teams.listTeams': () => [],
   'linear-sync.getLinearBoardSync': () => ({ synced: false }),
+  'task-runs.listConversationSidebar': () => ({ [BOT]: { more: false, items: [{
+    id: RUN, issueId: ISSUE, identifier: null, title: 'Fix sign-in redirect', at: AT,
+    pulls: [{ url: PULL_REQUEST, state: 'merged' }],
+    pinned: false, state: 'working', status: 'doing', harness: 'claude_code',
+  }] } }),
   'task-runs.pollTaskRuns': () => ({ items: [{ issueId: ISSUE, runId: RUN, issueTitle: 'Fix sign-in redirect', agentId: AGENT, agentName: 'Claude Code', status: 'running', outcome: null, error: null, finishedAt: null, bot: null, harnesses: ['claude_code'] }], live }),
   'execution-settings.getBotModelMenu': () => ({ groups: [{ kind: 'subscription', provider: 'claude', plan: 'Max', credentialLabel: 'ada@example.invalid', options: [{ id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude' }] }],
     current: { id: 'binding-1', modelId: 'claude-sonnet-4-6', provider: 'claude', kind: 'subscription', chosen: false, available: true } }),
@@ -223,6 +274,25 @@ Object.assign(fixtures, {
   'coordinator.getCoordinatorChat': () => chat,
   'coordinator.pollBotChatSummaries': () => ({ items: { [BOT]: { at: AT, text: 'Done: the redirect is fixed.' } }, live }),
   'artifacts.getArtifactText': () => '# Release notes\n\nSign-in redirect fixed.',
+})
+const AUTOMATION = 'b0000000-0000-4000-8000-000000000001'
+const automation = { id: AUTOMATION, owner_id: OWNER, owner_name: 'Ada', workspace_id: WORKSPACE, bot_id: null, visibility: 'workspace' as const, status: 'active' as const, version: 2, next_at: '2026-11-06T14:00:00.000Z',
+  definition: { title: 'Morning triage', timezone: 'America/New_York', timing: { kind: 'cron' as const, expression: '0 9 * * 1-5' }, task: { kind: 'dispatch_task' as const, botId: BOT, prompt: 'Triage new issues' }, misfire: 'skip' as const, maxLatenessMinutes: 30, maxConcurrent: 1 } }
+Object.assign(fixtures, {
+  'task-list.listUnreadTaskIds': () => [],
+  'task-list.countTaskListViews': () => ({ forYou: 0, assigned: 0, created: 0, mentioned: 0, all: 0 }),
+  'automations.listAutomations': () => ({ schedules: [automation], nextCursor: null }),
+  'automations.getAutomation': () => ({ automation }),
+  'automations.automationHistory': () => ({ occurrences: [{ id: 'c0000000-0000-4000-8000-000000000001', due_at: AT, started_at: AT, finished_at: AT, status: 'succeeded', attempts: 1, error: null, result: { id: ISSUE, title: 'Fix sign-in redirect', identifier: 'MIK-7' } }] }),
+  'bots.listWorkspaceBots': () => ({ bots: [{ id: BOT, name: 'Scout', color: 'bleu', shape: 'galet' }] }),
+  'bots.listBots': () => bots,
+  'bots.listBotsForWorkspace': (workspaceId: unknown) => workspaceId === WORKSPACE ? bots : [],
+  'automations.automationUsage': () => ({ timezone: 'America/New_York', maxRunsPerDay: 5, days: [{ day: '2026-11-05', runs: 2, skipped: 0, tasks: 2, costMicroUsd: 420000 }] }),
+  'bots.getWorkspaceBotDefaults': () => ({ defaultModel: null, defaultRepository: null, models: [], repositories: ['v2/github.com/acme/web'] }),
+  // The editor's Environment choice (one read when it opens).
+  // Runs as' choices (one read when the editor opens).
+  'automations.automationRunAsChoices': () => ({ members: [{ id: OWNER, name: 'Ada' }] }),
+  'project-resources.listProjectResources': () => ({ policy: { mode: 'inherit', repositoryKeys: [], revision: 0 }, environments: [], repositories: [], environmentBindings: [] }),
 })
 // A bodyless native create prewarms the mapped session without starting a turn.
 // The public v27 protocol reports tail -1 until its first delivery; resume catches up and closes while idle.
@@ -234,12 +304,15 @@ routes['/api/auth/get-session'] = () => ({ user: { ...person, emailVerified: tru
 routes['/api/workspace/switcher'] = () => ({ workspace: { id: WORKSPACE, name: 'Mikka' }, live, accounts: [{ id: OWNER, email: person.email, choices: [{ id: OWNER_HOME, name: 'Personal', kind: 'personal' }, { id: WORKSPACE, name: 'Mikka', kind: 'team' }] }] })
 routes['/api/pending-actions'] = () => new Response('[]', { headers: { 'content-type': 'application/json', 'x-mikka-viewer': OWNER, 'x-mikka-observed-at': AT } })
 routes['/api/approved-writes'] = () => ({ enabled: false })
+routes['/api/factory/agent-profiles'] = () => ({ profiles: [], catalog: { models: [], skills: [] }, availability: {} })
 // Sub-agent login prompts: one read on mount, then only on a subagent_events push.
 routes['/api/computer/events'] = url => ({ events: [], cursor: url.searchParams.get('after') ?? '0', hasMore: false })
 routes['/api/conversations'] = url => ({ conversations: [], viewerId: OWNER, workspaceId: url.searchParams.get('workspaceId') })
+routes['/api/factory/questions'] = () => ({ questions: [] })
 routes['/api/factory/tasks'] = () => ({ tasks: [], liveWorkspaceId: WORKSPACE })
 routes['/api/conversations/:id/read'] = () => ({ lastReadMessageId: 'm2', lastReadPosition: 2, unreadCount: 0 })
 routes['/api/settings/model-order'] = () => ({ deviceModels: { [DEVICE]: ['claude-sonnet-4-6'] } })
+routes['/api/settings/issue-states'] = () => ({ states: [], canEdit: false })
 const GROUP = '90000000-0000-4000-8000-000000000001'
 const groupMessage = (position: number, authorType: 'user' | 'bot', body: string) => ({ id: `90000000-0000-4000-8000-00000000000${position + 1}`, conversationId: GROUP, position: String(position), authorType, authorId: authorType === 'user' ? OWNER : BOT, body, mentions: [], replyToId: null, createdAt: AT })
 // A bot is answering: the case that used to re-read the chat every 2.5 s.
@@ -257,7 +330,7 @@ const boardIssue = (id: string, title: string, status: string) => ({ id, ownerId
   createdAt: new Date(AT), updatedAt: new Date(AT), identifier: `MIK-${id.slice(-1)}`, teamId: null, metadata: { ...issue(id, title).metadata, assignee: { kind: 'member' as const, id: OWNER, name: 'Ada', image: null } }, checklist: { total: 0, checked: 0, percentage: 0 } })
 const boardIssues = [boardIssue(ISSUE, 'Fix sign-in redirect', 'doing'), boardIssue('30000000-0000-4000-8000-000000000002', 'Write release notes', 'todo'), boardIssue('30000000-0000-4000-8000-000000000003', 'Rotate the preview key', 'done')]
 const bots = [{ id: '50000000-0000-4000-8000-000000000000', name: 'Coordinator', color: 'encre', shape: 'cercle', coordinator: true }, { id: BOT, name: 'Scout', color: 'bleu', shape: 'galet' }]
-const listedThread = { id: RUN, botId: BOT, source: null, agentName: 'Scout', issueId: ISSUE, prompt: 'Fix the sign-in redirect', status: 'running' as const, error: null, createdAt: AT, updatedAt: AT, lastReply: 'Looking at the redirect handler.', lastReplyAt: AT, outcome: null, harness: 'claude_code' }
+const listedThread = { id: RUN, botId: BOT, pullState: 'merged' as const, source: null, agentName: 'Scout', issueId: ISSUE, prompt: 'Fix the sign-in redirect', status: 'running' as const, error: null, createdAt: AT, updatedAt: AT, lastReply: 'Looking at the redirect handler.', lastReplyAt: AT, outcome: null, harness: 'claude_code' }
 
 /** Each page's top-level client component, as the app mounts it, with fixture props. */
 /** Words each page shows once loaded, so a crash or a skeleton cannot pass as an idle page. */
@@ -267,18 +340,25 @@ const shows: Record<string, string[]> = {
   'bot-chat': ['Can you fix the sign-in redirect?', 'Done: the redirect is fixed.'],
   devices: ['Ada’s MacBook'],
   'artifact-viewer': ['Release notes', 'Sign-in redirect fixed.'],
-  'nav-bot-list': ['Scout'],
+  'nav-bot-list': ['Scout', 'Fix sign-in redirect', 'blocked', 'merged'],
   'group-chat': ['Who can fix the sign-in redirect?', 'Looking into the redirect now.'],
   'subscription-settings': ['ada@example.invalid'],
   'pull-request-badge': ['#81'],
+  automations: ['Morning triage', 'Scout'],
+  'automation-editor': ['Scout', 'MIK-7'],
 }
 const pages: Record<string, () => Promise<ReactNode>> = {
   board: async () => {
     const { BoardPage } = await import('../components/workspace/board-page')
-    return <BoardPage issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
+    const { TaskPresentationsContext } = await import('../hooks/use-task-collection')
+    const failed = taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, { runId: RUN, status: 'failed', outcome: null }, null, () => false)
+    return <TaskPresentationsContext.Provider value={{ [ISSUE]: failed }}>
+      <BoardPage presentationRead={{ isLoading: false, mutate: async () => undefined }} issues={boardIssues as never} userId={OWNER} onOpen={noop} onUpdated={async () => {}} onBusyChange={noop} />
+    </TaskPresentationsContext.Provider>
   },
   // A task with a running thread open on the right, its relations and its members (the members dialog's body).
   'task-detail': async () => {
+    ;({ IssueThreadPanel: BudgetThreadPanel } = await import('../components/workspace/issue-thread-panel'))
     const { TaskDetail } = await import('../components/workspace/task-detail')
     const { IssueMembers } = await import('../components/workspace/issue-members')
     return <><TaskDetail id={ISSUE} thread={RUN} origin="Board" user={user} navigation={{ index: 0, total: 1, onOpen: noop }} onOpen={noop} onSaved={noop} onDirty={noop} onClose={noop} onDeleted={noop} onRegisterFlush={noop} /><IssueMembers id={ISSUE} /></>
@@ -297,8 +377,14 @@ const pages: Record<string, () => Promise<ReactNode>> = {
     return <ArtifactViewer artifactId={ARTIFACT} onArtifactChange={noop} onClose={noop} bot={{ name: 'Scout', avatar: null }} quotes={[]} chat={() => null} />
   },
   'nav-bot-list': async () => {
-    const { BotList } = await import('../components/nav/bot-list')
-    return <BotList bots={bots} workspaceId={WORKSPACE} threads={[listedThread]} issues={boardIssues as never} active={{ kind: 'coordinator' }} onOpen={noop} onNewBot={noop} rail={null} onRail={noop} user={user} onSettings={noop} onSignOut={noop} signingOut={false} />
+    const presentations = { [ISSUE]: { ...taskPresentation({ status: 'doing', metadata: { pullRequests: [] } }, undefined, null, () => false),
+      state: 'blocked' as const, reason: 'blocked_by' as const, botDispatches: [{ botId: BOT, runId: RUN, harness: 'claude_code', name: 'Scout' }] } }
+    const { useChatNav } = await import('../components/nav/bot-list')
+    function ChatNavigation() {
+      const { entries } = useChatNav({ bots, workspaceId: WORKSPACE, threads: [listedThread], issues: boardIssues.map(issue => ({ ...issue, workspaceId: WORKSPACE })) as never, presentations, active: { kind: 'coordinator' }, userId: user.id })
+      return <>{entries.map(entry => <span key={entry.id}>{entry.avatar}{entry.name}{entry.work?.map(row => <span key={row.id}>{row.fullName} {row.state} {row.pullState}</span>)}</span>)}</>
+    }
+    return <ChatNavigation />
   },
   'group-chat': async () => {
     const { GroupChatView } = await import('../components/workspace/group-chat-view')
@@ -314,6 +400,16 @@ const pages: Record<string, () => Promise<ReactNode>> = {
     const { IssuePullRequestLink } = await import('../components/workspace/issue-pull-request-link')
     return <IssuePullRequestLink issueId={ISSUE} pr={{ url: PULL_REQUEST, state: 'open' }} />
   },
+  // 自动化: the list, and one automation with its history; both read again only on a schedule_list push.
+  automations: async () => {
+    const { AutomationsPage } = await import('../components/automations/automations-page')
+    // The page opens on 我的, so the reader is the fixture's creator (owner_id) for the row to be in the list.
+    return <AutomationsPage userId={OWNER} workspaceId={WORKSPACE} href={id => `?section=automations&automation=${id}`} onOpen={noop} onAskBot={noop} />
+  },
+  'automation-editor': async () => {
+    const { AutomationEditor } = await import('../components/automations/automation-editor')
+    return <AutomationEditor workspaceId={WORKSPACE} userId={OWNER} id={AUTOMATION} onOpen={noop} onBack={noop} />
+  },
 }
 
 type Budget = { max: number; tracking?: string; why?: string }
@@ -328,12 +424,37 @@ test('the budget file lists exactly the measured pages, and every allowance name
   }
 })
 
+test('a user submission renders with its stable pending id before the first Bot history response', async () => {
+  let rendered!: ThreadScreenProps
+  observeThread = props => { rendered = props }
+  const text = 'Send while the first chat read is outstanding'
+  try {
+    await measure(await pages['bot-chat'](), async () => {
+      assert.equal(rendered.entries, null, 'the transcript is still loading')
+      await act(async () => { rendered.composer.onChange(text) })
+      assert.equal(rendered.composer.value, text)
+      await act(async () => { rendered.composer.onSubmit() })
+      assert.equal(rendered.composer.value, '')
+      const entries: ThreadScreenProps['entries'] = (() => rendered)().entries
+      const person = entries?.filter(row => row.role === 'person').filter(row => row.text === text)
+      assert.equal(person?.length, 1)
+      assert.equal(person?.[0]?.status, 'sending')
+      assert.match(person?.[0]?.id ?? '', /^[0-9a-f-]{36}$/)
+      assert.ok(document.body.textContent?.includes(text))
+    })
+  } finally { observeThread = undefined }
+})
+
 for (const [name, page] of Object.entries(pages)) test(`${name}: an idle, visible minute stays within its request budget`, { timeout: 60_000 }, async () => {
   const result = await measure(await page())
   measured[name] = Object.fromEntries([...result.idle].sort(([a], [b]) => a.localeCompare(b)))
   assert.deepEqual([...result.missing], [], 'every read the page makes has a fixture, so no failure retries are counted')
   assert.equal(result.chatLoadFailure, false, 'the native chat session must be healthy before its idle budget is accepted')
   for (const words of shows[name]) assert.ok(result.text.includes(words), `${name} shows “${words}”`)
+  if (name === 'board') {
+    assert.equal(result.boardStates.get(ISSUE), 'blocked', 'the Board uses the authorized failed Run projection')
+    assert.equal(result.boardStates.get(boardIssues[2]!.id), null, 'a card with no authorized presentation shows no inferred execution state')
+  }
   assert.equal(result.sockets.open, result.sockets.opened, 'every live channel the page opened is still connected')
   const allowed = budgets.pages[name] ?? {}
   const over = [...result.idle].filter(([call, calls]) => calls > (allowed[call]?.max ?? 0)).map(([call, calls]) => `${call}: ${calls} calls, budget ${allowed[call]?.max ?? 0}`)

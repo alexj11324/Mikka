@@ -75,7 +75,7 @@ async function openCoordinator(page: Page) {
 }
 
 // The sidebar previews the last message too, so look inside the conversation only.
-const conversation = (page: Page) => page.getByRole('region', { name: '与 Coordinator 的对话', exact: true })
+const conversation = (page: Page) => page.getByRole('region', { name: 'Coordinator 线程', exact: true })
 const divider = (page: Page) => page.locator('[data-unread-divider]')
 const topPill = (page: Page) => page.locator('[data-unread-pill="up"]')
 const bottomPill = (page: Page) => page.locator('[data-unread-pill="down"]')

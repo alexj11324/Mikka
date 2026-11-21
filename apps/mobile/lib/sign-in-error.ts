@@ -1,10 +1,12 @@
-import messages from '../../../messages/zh-CN.json'
+import { mobileMessages } from './messages'
 
 /**
  * The sign-in screen's line for a failed sign-in, by better-auth's error code
  * (copy.md C-08: say what went wrong). Rate limits come as HTTP 429.
+ * The copy defaults to the device's catalog, not the Chinese one: an English
+ * phone must not get a Chinese refusal.
  */
-export function signInErrorLine(error: { code?: string; status?: number } | null | undefined, copy = messages.Auth): string {
+export function signInErrorLine(error: { code?: string; status?: number } | null | undefined, copy = mobileMessages.Auth): string {
   if (error?.status === 429) return copy.signInRefusal.signInRateLimited
   switch (error?.code) {
     case 'INVALID_EMAIL_OR_PASSWORD':

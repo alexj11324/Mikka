@@ -10,6 +10,14 @@ import { connectKind, type ConnectKind } from './connect-kind'
 export type StoreCategory = { id: string; name: string }
 /** `connect`: one click (managed), the person's own credentials, nothing to connect, or not connectable from Mikka yet. */
 export type StoreApp = { id: string; name: string; description: string; iconUrl: string | null; categories: StoreCategory[]; createdAt: string | null; connect: ConnectKind }
+/** A clearly equivalent API-key variant (e.g. ahrefs_mcp → ahrefs) when Composio exposes exactly one. */
+export function findCredentialAlternative(app: Pick<StoreApp, 'id' | 'connect'>, apps: readonly Pick<StoreApp, 'id' | 'name' | 'connect'>[]) {
+  if (app.connect !== 'oauthSetupRequired') return null
+  const provider = (id: string) => id.replace(/_(?:mcp|basic|api)$/i, '')
+  const matches = apps.filter(candidate => candidate.id !== app.id && candidate.connect === 'credentials' && provider(candidate.id) === provider(app.id))
+  return matches.length === 1 ? { id: matches[0].id, name: matches[0].name } : null
+}
+
 export type StoreCatalog = {
   /** In Composio's usage order (`sort_by=usage`), most used first. */
   apps: StoreApp[]
@@ -70,6 +78,26 @@ export function storeSections(apps: StoreApp[]): StoreCatalog {
   }
   const categories = [...byCategory.values()].sort((a, b) => b.apps.length - a.apps.length || a.name.localeCompare(b.name))
   return { apps, popular: apps.slice(0, SECTION_SIZE).map(app => app.id), latest, categories }
+}
+
+/**
+ * Apps to offer first where a page suggests connecting a few (onboarding): Composio's most used apps
+ * that connect in one click, in its usage order, then any the person already connected. Live data only.
+ */
+export function suggestedConnectApps(catalog: Pick<StoreCatalog, 'apps' | 'popular'> | null | undefined, count: number, connected: readonly string[] = []): StoreApp[] {
+  if (!catalog) return []
+  const byId = new Map(catalog.apps.map(app => [app.id, app]))
+  const ordered = [...catalog.popular.flatMap(id => byId.get(id) ?? []), ...catalog.apps]
+  const picked: StoreApp[] = []
+  for (const app of ordered) {
+    if (picked.length >= count) break
+    if (app.connect === 'managed' && !picked.some(item => item.id === app.id)) picked.push(app)
+  }
+  for (const id of connected) {
+    const app = byId.get(id)
+    if (app && !picked.some(item => item.id === id)) picked.push(app)
+  }
+  return picked
 }
 
 export async function fetchStoreCatalog(list: ToolkitLister): Promise<StoreCatalog> {

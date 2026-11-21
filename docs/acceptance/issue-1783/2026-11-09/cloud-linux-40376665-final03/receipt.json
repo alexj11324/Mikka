@@ -1,0 +1,446 @@
+{
+  "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "codeTree": "297bb45ee8e60d4e6a29735e5e8e1fceae9d3741",
+  "branch": "HEAD",
+  "startedAt": "2026-11-09T15:36:02.164Z",
+  "environment": {
+    "os": "Vercel Sandbox cloud Linux",
+    "node": "v24.22.1",
+    "pnpm": "10.34.3",
+    "ffmpeg": "ffmpeg version 8.0.1-3ubuntu2 Copyright (c) 2000-2025 the FFmpeg developers",
+    "database": "mikka_e2e|127.0.0.1|17.11 (Ubuntu 17.11-1.pgdg26.04+2)",
+    "display": "Xvfb 1600x1000x24",
+    "capture": "real x11grab terminal execution",
+    "externalServices": "synthetic fixtures; no live provider execution",
+    "captureProcessor": {
+      "toolchain": "ffmpeg-static-b6.1.1-linux-x64-e7e7fb30477f-4f231a1960d8",
+      "binaries": {
+        "ffmpeg": "/opt/mikka/runtime/capture-tools/ffmpeg-static-b6.1.1-linux-x64-e7e7fb30477f-4f231a1960d8/ffmpeg",
+        "ffprobe": "/opt/mikka/runtime/capture-tools/ffmpeg-static-b6.1.1-linux-x64-e7e7fb30477f-4f231a1960d8/ffprobe"
+      },
+      "ffmpeg": "ffmpeg version 7.0.2-static https://johnvansickle.com/ffmpeg/  Copyright (c) 2000-2024 the FFmpeg developers",
+      "ffprobe": "ffprobe version 7.0.2-static https://johnvansickle.com/ffmpeg/  Copyright (c) 2007-2024 the FFmpeg developers"
+    }
+  },
+  "stages": [
+    {
+      "id": "01-postgresql-gates",
+      "title": "PostgreSQL: evidence gates and completion ordering",
+      "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+      "startedAt": "2026-11-09T15:36:03.604Z",
+      "finishedAt": "2026-11-09T15:37:22.316Z",
+      "exitCode": 0,
+      "results": [
+        {
+          "command": [
+            "/usr/local/bin/node",
+            "--test-force-exit",
+            "--experimental-test-module-mocks",
+            "--import",
+            "./tests/support/server-only.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "--test-concurrency=1",
+            "--test-reporter=spec",
+            "lib/captures/video-evidence.db.test.ts",
+            "lib/captures/publication.db.test.ts",
+            "lib/factory/checks.db.test.ts",
+            "lib/factory/approval.db.test.ts",
+            "lib/factory/merge.db.test.ts",
+            "tests/run-publications.db.test.ts",
+            "lib/factory/activity-artifacts.db.test.ts",
+            "lib/factory/task-media.db.test.ts"
+          ],
+          "cwd": "/vercel/Mikka",
+          "startedAt": "2026-11-09T15:36:04.818Z",
+          "finishedAt": "2026-11-09T15:37:20.501Z",
+          "atMs": 76897,
+          "durationMs": 75683,
+          "exitCode": 0,
+          "tests": {
+            "total": 202,
+            "passed": 202,
+            "failed": 0,
+            "skipped": 0
+          },
+          "accepted": true
+        }
+      ],
+      "finalScreenAtMs": 80512,
+      "terminalExitCode": 0,
+      "recordingStartedAt": "2026-11-09T15:36:02.740Z",
+      "rawProbe": {
+        "format": {
+          "duration": "83.133333",
+          "size": "56168960"
+        }
+      },
+      "video": {
+        "durationMs": 83167,
+        "size": 3034543,
+        "steps": [],
+        "processing": {
+          "version": 1,
+          "originalDurationMs": 83133,
+          "originalSize": 56168960,
+          "originalSha256": "31a18945461b8fb92f4b39d7d91772b5706ea8d90bd790f98965b1c8fad663ce",
+          "trimmedMs": 0,
+          "retainedMs": 83133,
+          "windows": [
+            {
+              "startMs": 0,
+              "endMs": 83133
+            }
+          ],
+          "width": 960,
+          "height": 600
+        }
+      }
+    },
+    {
+      "id": "02-real-http",
+      "title": "Real Vite/Nitro HTTP: activity, media, report and scope",
+      "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+      "startedAt": "2026-11-09T15:37:51.117Z",
+      "finishedAt": "2026-11-09T15:38:28.566Z",
+      "exitCode": 0,
+      "results": [
+        {
+          "command": [
+            "/usr/local/bin/node",
+            "--import",
+            "./scripts/server-test.mjs",
+            "--import",
+            "tsx",
+            "--test",
+            "--test-reporter=spec",
+            "tests/factory-activity-http.db.test.ts"
+          ],
+          "cwd": "/vercel/Mikka",
+          "startedAt": "2026-11-09T15:37:52.336Z",
+          "finishedAt": "2026-11-09T15:38:26.741Z",
+          "atMs": 35624,
+          "durationMs": 34405,
+          "exitCode": 0,
+          "tests": {
+            "total": 8,
+            "passed": 8,
+            "failed": 0,
+            "skipped": 0
+          },
+          "accepted": true
+        }
+      ],
+      "finalScreenAtMs": 39249,
+      "terminalExitCode": 0,
+      "recordingStartedAt": "2026-11-09T15:37:50.261Z",
+      "rawProbe": {
+        "format": {
+          "duration": "41.733333",
+          "size": "2253519"
+        }
+      },
+      "video": {
+        "durationMs": 41733,
+        "size": 399219,
+        "steps": [],
+        "processing": {
+          "version": 1,
+          "originalDurationMs": 41733,
+          "originalSize": 2253519,
+          "originalSha256": "c60619c86f81ce351de7efe6e6dd215e5754ec6837b46ff4dbc764721295f136",
+          "trimmedMs": 0,
+          "retainedMs": 41733,
+          "windows": [
+            {
+              "startMs": 0,
+              "endMs": 41733
+            }
+          ],
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "id": "03-cli-daemon-ffmpeg",
+      "title": "Real MCP CLI, daemon finalization and FFmpeg readback",
+      "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+      "startedAt": "2026-11-09T15:38:38.712Z",
+      "finishedAt": "2026-11-09T15:38:56.337Z",
+      "exitCode": 0,
+      "results": [
+        {
+          "command": [
+            "/usr/local/bin/node",
+            "node_modules/vitest/vitest.mjs",
+            "run",
+            "test/captures.test.ts",
+            "test/terminal-checkpoint.test.ts",
+            "test/publication-cancel.test.ts",
+            "test/server-link-http.test.ts",
+            "--reporter=verbose"
+          ],
+          "cwd": "/vercel/Mikka/packages/daemon",
+          "startedAt": "2026-11-09T15:38:39.927Z",
+          "finishedAt": "2026-11-09T15:38:46.175Z",
+          "atMs": 7463,
+          "durationMs": 6248,
+          "exitCode": 0,
+          "tests": {
+            "total": 91,
+            "passed": 91,
+            "failed": 0,
+            "skipped": 0
+          },
+          "accepted": true
+        },
+        {
+          "command": [
+            "/usr/local/bin/node",
+            "--test",
+            "--test-reporter=spec",
+            "packages/daemon/test/capture-video.node-test.mjs"
+          ],
+          "cwd": "/vercel/Mikka",
+          "startedAt": "2026-11-09T15:38:47.990Z",
+          "finishedAt": "2026-11-09T15:38:50.148Z",
+          "atMs": 11436,
+          "durationMs": 2158,
+          "exitCode": 0,
+          "tests": {
+            "total": 10,
+            "passed": 10,
+            "failed": 0,
+            "skipped": 0
+          },
+          "accepted": true
+        },
+        {
+          "command": [
+            "/usr/local/bin/node",
+            "/vercel/validation/issue-1783-harness/oversize-readback.mjs",
+            "/vercel/Mikka",
+            "/vercel/validation/issue-1783-2026-11-09-40376665ac41-final-03/ffmpeg-readback"
+          ],
+          "cwd": "/vercel/Mikka",
+          "startedAt": "2026-11-09T15:38:51.961Z",
+          "finishedAt": "2026-11-09T15:38:54.524Z",
+          "atMs": 15812,
+          "durationMs": 2563,
+          "exitCode": 0,
+          "tests": null,
+          "accepted": true
+        }
+      ],
+      "finalScreenAtMs": 19426,
+      "terminalExitCode": 0,
+      "recordingStartedAt": "2026-11-09T15:38:37.824Z",
+      "rawProbe": {
+        "format": {
+          "duration": "22.066667",
+          "size": "12300966"
+        }
+      },
+      "video": {
+        "durationMs": 22067,
+        "size": 1987184,
+        "steps": [],
+        "processing": {
+          "version": 1,
+          "originalDurationMs": 22067,
+          "originalSize": 12300966,
+          "originalSha256": "8989f9ab6bb972501268ed1b7e986e8c78106950755f57f6e5f5279214ed6841",
+          "trimmedMs": 0,
+          "retainedMs": 22067,
+          "windows": [
+            {
+              "startMs": 0,
+              "endMs": 22067
+            }
+          ],
+          "width": 1280,
+          "height": 800
+        }
+      }
+    },
+    {
+      "id": "04-activity-registration",
+      "title": "Real capture upload, versioned reports and activity GET readback",
+      "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+      "startedAt": "2026-11-09T15:39:04.678Z",
+      "finishedAt": "2026-11-09T15:39:55.263Z",
+      "exitCode": 0,
+      "results": [
+        {
+          "command": [
+            "/usr/local/bin/node",
+            "--import",
+            "./scripts/server-test.mjs",
+            "--import",
+            "tsx",
+            "/vercel/validation/issue-1783-harness/register-readback.mjs",
+            "/vercel/Mikka",
+            "/vercel/validation/issue-1783-2026-11-09-40376665ac41-final-03",
+            "40376665ac416ce2228c08b60d7ea8cee97a3de6"
+          ],
+          "cwd": "/vercel/Mikka",
+          "startedAt": "2026-11-09T15:39:05.896Z",
+          "finishedAt": "2026-11-09T15:39:53.439Z",
+          "atMs": 48761,
+          "durationMs": 47543,
+          "exitCode": 0,
+          "tests": null,
+          "accepted": true
+        }
+      ],
+      "finalScreenAtMs": 52385,
+      "terminalExitCode": 0,
+      "recordingStartedAt": "2026-11-09T15:39:03.835Z",
+      "rawProbe": {
+        "format": {
+          "duration": "54.933333",
+          "size": "4778511"
+        }
+      },
+      "video": {
+        "durationMs": 54933,
+        "size": 583864,
+        "steps": [],
+        "processing": {
+          "version": 1,
+          "originalDurationMs": 54933,
+          "originalSize": 4778511,
+          "originalSha256": "810986e681253ff060b4bc1a9d88c037a0f9294568d68e5f98c0c2acab546a1f",
+          "trimmedMs": 0,
+          "retainedMs": 54933,
+          "windows": [
+            {
+              "startMs": 0,
+              "endMs": 54933
+            }
+          ],
+          "width": 1280,
+          "height": 800
+        }
+      }
+    }
+  ],
+  "finishedAt": "2026-11-09T15:40:06.415Z",
+  "exitCode": 0,
+  "files": {
+    "01-postgresql-gates-result.png": {
+      "size": 327149,
+      "sha256": "f288566d9489a6f6f12db49931b17d5460e6d56a14f02fa7555d8de6d248e92a"
+    },
+    "01-postgresql-gates-running.png": {
+      "size": 496085,
+      "sha256": "f4118b470db617486db19a485e652f8b9c55b32454bf29a86b49aac66cbfe72b"
+    },
+    "01-postgresql-gates-start.png": {
+      "size": 179625,
+      "sha256": "09c18fd971113918faaf14f5483bffbbd5d1c1679c735914594edd58d4bee84d"
+    },
+    "01-postgresql-gates.json": {
+      "size": 1328,
+      "sha256": "0ef7852a4dffec649e2d19108b4403e5578d332f401d4c53b90313e4f2b6061f"
+    },
+    "01-postgresql-gates.mp4": {
+      "size": 3034543,
+      "sha256": "73adfd61b515213863cc0480e6914d21b6f8acffa0ac27f3d3aeacd14be4d381"
+    },
+    "01-postgresql-gates.recorder.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "01-postgresql-gates.txt": {
+      "size": 35696,
+      "sha256": "5784f42f0e7d251d5fe03b970175c48f53499f25d49d3cf80f2aa44572c8d6a2"
+    },
+    "02-real-http-result.png": {
+      "size": 609102,
+      "sha256": "dc9fcd573e9188e2e224e5597335c4a1fd2aee5087d1b6ce702177267d2a15de"
+    },
+    "02-real-http-running.png": {
+      "size": 219454,
+      "sha256": "277e331e2f301e23a0ddc3cace6c199384994b7cf604a03e1367f9c903ee343a"
+    },
+    "02-real-http-start.png": {
+      "size": 211574,
+      "sha256": "7e3ea6fae1d2b6b158212c20ac5bd41b3de27aca3939c834bb6e5b0a160573d0"
+    },
+    "02-real-http.json": {
+      "size": 897,
+      "sha256": "b0c6521fdbfb1fe62496815ba105caa3fbf5b3553288fb7e5a4d4078ad578f0f"
+    },
+    "02-real-http.mp4": {
+      "size": 399219,
+      "sha256": "0ca7f46aa54e67d9ff607bb9b85012f80e15fdd7fb50c4d35578eb5ee96f3981"
+    },
+    "02-real-http.recorder.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "02-real-http.txt": {
+      "size": 2211,
+      "sha256": "68524c2d83a81484df0028b85ebbe883d5bf8bef63cef051056c44f7993425ab"
+    },
+    "03-cli-daemon-ffmpeg-result.png": {
+      "size": 784213,
+      "sha256": "7b3092db7b2547186df3828f2bc6946a1e6e696eafa7712297dcd69a16bdee6a"
+    },
+    "03-cli-daemon-ffmpeg-running.png": {
+      "size": 604741,
+      "sha256": "8efc935e80b59b077710b532e3da4264dfb95ff7bed16da0faec9383b0e5579a"
+    },
+    "03-cli-daemon-ffmpeg-start.png": {
+      "size": 231990,
+      "sha256": "451e4cb395461538f087b5b502b802b57fb027f751754e67c4ea0b7a40feb9d3"
+    },
+    "03-cli-daemon-ffmpeg.json": {
+      "size": 1977,
+      "sha256": "eb4fecdd76c36f7fc2d3c435ee9b36aa186b35d89591aa44b425e5e5704626b4"
+    },
+    "03-cli-daemon-ffmpeg.mp4": {
+      "size": 1987184,
+      "sha256": "5327fb73cd3baa29e72ef798632702ba57523858009488aa856146f7029b48e7"
+    },
+    "03-cli-daemon-ffmpeg.recorder.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "03-cli-daemon-ffmpeg.txt": {
+      "size": 15146,
+      "sha256": "350dea9e81e1b01024a7ff5bd1c04988b677412c4f297e3ae4eaf6615700c3a1"
+    },
+    "04-activity-registration-result.png": {
+      "size": 827975,
+      "sha256": "66257bb5fb6a7e54cfdb9eddbf77693b4550955eb1e0bf40c74b0ced34cb8b64"
+    },
+    "04-activity-registration-running.png": {
+      "size": 296339,
+      "sha256": "aecfa8841819599163bc98b012ffde2d0bb6b28c0e0da5b7504822d1044af283"
+    },
+    "04-activity-registration-start.png": {
+      "size": 270466,
+      "sha256": "0b3f73ed1b235c36f33532c7c564feb5dc63f266bb64834afd4c9d21838c924c"
+    },
+    "04-activity-registration.json": {
+      "size": 952,
+      "sha256": "20a90ea6a377eeacb0e743b2c3e220db03f37663e41babf498fd28070a6d22eb"
+    },
+    "04-activity-registration.mp4": {
+      "size": 583864,
+      "sha256": "8c05ca6a04b0c649f65332792dd7214d1f68670b4fdfb9dd6384fe10df1433bd"
+    },
+    "04-activity-registration.recorder.txt": {
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "04-activity-registration.txt": {
+      "size": 2885,
+      "sha256": "8361bc243b54deb0afaaf5e5efbcda3ffb5a2c50924a036764ff386d6073ddba"
+    }
+  }
+}

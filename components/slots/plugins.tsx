@@ -1,6 +1,6 @@
-// The default plugins slot (docs/ui-overlay.md): none. The rail's 插件 page is today's store
-// (components/plugins/plugins-view.tsx); a layer that draws its own page exports a component here.
-import type { ComponentType } from 'react'
 import type { PluginsPageProps } from './plugins-contract'
 
-export const PluginsPage: ComponentType<PluginsPageProps> | null = null
+/** Public build-time contract. The official renderer links the provider. */
+export function PluginsPage(_props: PluginsPageProps): never {
+  throw new Error('UI_SLOT_REQUIRES_OFFICIAL_CLIENT: plugins')
+}

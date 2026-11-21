@@ -6,7 +6,7 @@ import { join } from "node:path";
 import {
   createVercelClient,
   MIKKA_VERCEL,
-} from "../../lib/factory/vercel-publication";
+} from "./factory-vercel-publication";
 
 /** Real loopback HTTP protocol substitute. This is not a Vercel deployment. */
 export async function vercelProtocolFixture() {

@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import { createHash } from 'node:crypto'
 import { attestDeployedTarget } from '../acceptance/deployed-target.mjs'
-import { PROJECT, TEAM, PRODUCTION_ALIAS } from '../ops/deployment-regression.mjs'
 import { encode, decode } from '../../lib/desktop-rpc/wire.ts'
 import { runMobileDaemonProof, newEnrollmentCredential } from './production-mobile-daemon.mjs'
 import { CORE_MODE, CORE_WORKFLOW, CORE_ISSUES, attestCoreProduction } from '../acceptance/self-hosted-production-target.mjs'
@@ -246,16 +245,16 @@ function fixture(options = {}) {
       return response({ deviceId: NEW_DEVICE, workspaceId: WORKSPACE })
     }
     if (path === '/mikka/v1/devices/' + NEW_DEVICE + '/gateway') {
-      assert.equal(options.core, true); assert.equal(method, 'GET'); assert.equal(newDevice.enabled, false)
+      assert.ok(options.core || options.releaseSocket); assert.equal(method, 'GET'); assert.equal(newDevice.enabled, false)
       return response({ url: 'wss://mikka-gateway.aspectlylabs.com/v1/devices/' + NEW_DEVICE + '/socket', protocol: ticketProtocol(),
         runControl: 'push', computerReviews: 'push', coordinatorResults: 'push' })
     }
-    if (path === '/mikka/v1/devices/' + NEW_DEVICE + '/heartbeat') {
+    if (path === '/mikka/v1/devices/' + NEW_DEVICE + '/report') {
       assert.equal(newDevice.enabled, false)
-      assert.deepEqual(body.runs, [])
       assert.deepEqual(body.harnesses, [])
+      // The fake server stands in for the device session as well (the gateway socket).
       newDevice.seen = clock; newDevice.online = true
-      return response({ leases: {}, revoked: [], deviceCommands: [], daemonVersions: { min: '0.0.456' } })
+      return response({ deviceCommands: [], daemonVersions: { min: '0.0.456' } })
     }
     assert.fail('Unexpected path: ' + path)
   }
@@ -272,6 +271,39 @@ function noSensitiveReport(report) {
     'unrelated-admin@example.invalid', 'transport-error-'])
     assert.equal(value.includes(secret), false, 'closed report must omit identities, credentials and raw error')
 }
+
+test('externally pinned source, overlay and provider bracket the same authenticated device cleanup', async () => {
+  for (const provider of ['vercel', 'cloudflare']) {
+    for (const mismatch of [null, 'source-before', 'provider-before', 'overlay-after']) {
+      const f = fixture({ releaseSocket:true })
+      const releaseWitness = { provider, source:'a'.repeat(40), overlay:'b'.repeat(40), driver:'c'.repeat(40) }
+      const env = {SMOKE_OWNER_EMAIL:ENV.SMOKE_OWNER_EMAIL, SMOKE_OWNER_PASSWORD:ENV.SMOKE_OWNER_PASSWORD}
+      let reads = 0
+      const report = await f.run({ env, releaseWitness, socketFactory:f.socketFactory, fetchImpl:async (url, init) => {
+        if (new URL(url).pathname !== '/mikka/api/version') return f.fetchImpl(url, init)
+        reads++
+        assert.equal(init.redirect, 'error')
+        const expected = mismatch === 'provider-before' ? provider !== 'vercel' : provider === 'vercel'
+        return response({build:mismatch === 'source-before' ? 'd'.repeat(40) : releaseWitness.source,
+          overlaySha:mismatch === 'overlay-after' && reads === 2 ? 'e'.repeat(40) : releaseWitness.overlay},
+        200, expected ? {'x-vercel-id':'fixture'} : {'cf-ray':'fixture'})
+      } })
+      assert.equal(report.status, mismatch ? 'fail' : 'pass')
+      if (mismatch?.endsWith('before')) {
+        assert.equal(reads, 1)
+        assert.equal(f.requests.length, 0)
+      } else {
+        assert.equal(reads, 2)
+        assert.equal(report.checks.deviceGateway, true)
+        assert.equal(f.sockets.length, 1)
+        assert.equal(f.sockets[0].readyState, 3)
+        assert.ok(Object.values(report.cleanup).every(Boolean))
+        assert.equal(report.client.sourceRevision, releaseWitness.driver)
+      }
+      noSensitiveReport(report)
+    }
+  }
+})
 
 test('real source HTTP client proves mobile owner, enroll, disabled heartbeat, revoke and normal offline removal', async () => {
   const f = fixture()
@@ -519,18 +551,15 @@ function deployedFixture(business, originalEnv, { changed = () => false } = {}) 
   const env = { ...originalEnv, MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target',
     GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main',
     GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/issue1415-deployed-production.yml@refs/heads/main',
-    GITHUB_RUN_ID: '99', GITHUB_RUN_ATTEMPT: '1', WEB_DEPLOY_RUN_ID: '51',
-    VERCEL_DEPLOYMENT_ID: 'dpl_transport', VERCEL_TEAM_TOKEN: 'SYNTHETIC_VERCEL_READ_TOKEN' }
+    GITHUB_RUN_ID: '99', GITHUB_RUN_ATTEMPT: '1' }
   const repository = { full_name: 'alexj11324/Mikka', owner: { login: 'alexj11324' } }
-  const event = { repository, inputs: { application_sha: env.APPLICATION_SHA,
-    web_run_id: env.WEB_DEPLOY_RUN_ID, deployment_id: env.VERCEL_DEPLOYMENT_ID } }
+  const event = { repository, inputs: { application_sha: env.APPLICATION_SHA } }
   const api = 'https://api.github.com/repos/alexj11324/Mikka'
   const metadata = []
   const now = business.now ?? Date.now
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input)
-    if (url.origin === 'https://api.github.com' || url.origin === 'https://api.vercel.com'
-      || url.pathname === '/mikka/api/version') {
+    if (url.origin === 'https://api.github.com' || url.pathname === '/mikka/api/version') {
       metadata.push(url.pathname)
       assert.equal(init.method, 'GET')
       assert.equal(new Headers(init.headers).has('cookie'), false)
@@ -542,29 +571,10 @@ function deployedFixture(business, originalEnv, { changed = () => false } = {}) 
           head_sha: env.GITHUB_SHA, status: 'in_progress', conclusion: null })
         if (url.href === api + '/issues/1415') return Response.json({ number: 1415, url: url.href,
           repository_url: api, state: 'open' })
-        if (url.href === api + '/actions/runs/51') return Response.json({ id: 51, run_attempt: 1,
-          url: url.href, name: 'Web deploy', path: '.github/workflows/web-deploy.yml',
-          repository, head_repository: repository, event: 'push', head_branch: 'main',
-          head_sha: env.APPLICATION_SHA, status: 'completed', conclusion: 'success' })
-        if (url.pathname.endsWith('/actions/runs/51/attempts/1/jobs')) return Response.json({
-          total_count: 1, jobs: [{ id: 61, run_id: 51, name: 'deploy', head_sha: env.APPLICATION_SHA,
-            status: 'completed', conclusion: 'success', steps: [
-              'Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
-              'Verify the public production version before releasing the deployment queue',
-            ].map(name => ({ name, status: 'completed', conclusion: 'success' })) }] })
         assert.fail('Unexpected metadata path')
       }
-      if (url.origin === 'https://api.vercel.com') {
-        assert.equal(new Headers(init.headers).get('authorization'), 'Bearer ' + env.VERCEL_TEAM_TOKEN)
-        if (url.pathname.startsWith('/v4/aliases/')) return Response.json({
-          alias: PRODUCTION_ALIAS, projectId: PROJECT, deploymentId: changed() ? 'dpl_changed' : env.VERCEL_DEPLOYMENT_ID,
-          updatedAt: 1 })
-        if (url.pathname === '/v13/deployments/' + env.VERCEL_DEPLOYMENT_ID) return Response.json({
-          id: env.VERCEL_DEPLOYMENT_ID, projectId: PROJECT, teamId: TEAM, readyState: 'READY',
-          target: 'production', gitSource: { sha: env.APPLICATION_SHA } })
-        assert.fail('Unexpected deployment path')
-      }
-      return Response.json({ build: env.APPLICATION_SHA })
+      // A redeployment of another build is the drift a live build check observes.
+      return Response.json({ build: changed() ? 'f'.repeat(40) : env.APPLICATION_SHA })
     }
     return business.fetchImpl(input, init)
   }
@@ -583,8 +593,6 @@ test('deployed target mobile proof keeps the real driver client distinct from th
   assert.equal(report.client.version, '0.0.1')
   assert.equal(report.client.protocolVersion, 3)
   assert.equal(report.targetMode, 'deployed-target')
-  assert.equal(report.webDeployRunId, 51); assert.equal(report.webAttempt, 1)
-  assert.equal(report.deploymentId, 'dpl_transport')
   assert.ok(target.metadata.filter(path => path.endsWith('/actions/runs/99')).length >= 3)
   assert.equal(target.metadata.some(path => path.endsWith('/git/ref/heads/main')), false)
   assert.ok(Object.values(report.cleanup).every(Boolean))
@@ -680,34 +688,24 @@ test('mobile requires the switched cookie readback and the actual home to identi
 
 function coreFixture(business, { changed = () => false, recover = false } = {}) {
   const env = { ...ENV, MIKKA_ACCEPTANCE_TARGET_MODE: CORE_MODE, GITHUB_REPOSITORY_OWNER: 'alexj11324',
-    GITHUB_EVENT_NAME: 'workflow_run', GITHUB_REF: 'refs/heads/main', GITHUB_RUN_ATTEMPT: '1',
+    GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main', GITHUB_RUN_ATTEMPT: '1',
     GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/' + CORE_WORKFLOW + '@refs/heads/main' }
   const repository = { full_name: 'alexj11324/Mikka', owner: { login: 'alexj11324' } }
   const api = 'https://api.github.com/repos/alexj11324/Mikka'
-  const release = { id: 51, run_attempt: 1, url: api + '/actions/runs/51', name: 'Web deploy', path: '.github/workflows/web-deploy.yml',
-    repository, head_repository: repository, event: 'push', head_branch: 'main', head_sha: env.GITHUB_SHA,
-    status: 'completed', conclusion: 'success' }
-  const event = { action: 'completed', repository, workflow_run: release }
+  const event = { repository }
   const fetchImpl = async (input, init) => {
     const url = new URL(input), headers = new Headers(init.headers)
     if (url.origin === 'https://api.github.com') {
       assert.equal(init.method, 'GET'); assert.equal(headers.has('cookie'), false)
       assert.equal(headers.get('authorization'), 'Bearer ' + env.GH_TOKEN)
       if (url.href === api + '/actions/runs/17') return response({ id: 17, run_attempt: 1, repository, head_repository: repository,
-        url: url.href, path: CORE_WORKFLOW, event: 'workflow_run', head_branch: 'main', head_sha: env.GITHUB_SHA,
+        url: url.href, path: CORE_WORKFLOW, event: 'workflow_dispatch', head_branch: 'main', head_sha: env.GITHUB_SHA,
         status: 'in_progress', conclusion: null })
       if (url.pathname.includes('/issues/')) {
         const number = Number(url.pathname.split('/').at(-1)); assert.ok(CORE_ISSUES.includes(number))
         return response({ number, url: url.href, repository_url: api, state: number === 1826 && !recover ? 'closed' : 'open' })
       }
       if (url.href === api + '/git/ref/heads/main') return response({ ref: 'refs/heads/main', object: { type: 'commit', sha: changed() ? 'c'.repeat(40) : env.GITHUB_SHA } })
-      if (url.href === release.url) return response(release)
-      if (url.href === release.url + '/attempts/1/jobs?per_page=100') return response({ total_count: 1, jobs: [{
-        id: 61, name: 'deploy', run_id: 51, head_sha: env.GITHUB_SHA, status: 'completed', conclusion: 'success',
-        steps: ['Verify the official runtime stays on the cloud edition', 'Build (runs migrations last, as the Vercel build did)',
-          'Upload the prebuilt output to production', 'Verify the public production version before releasing the deployment queue']
-          .map(name => ({ name, status: 'completed', conclusion: 'success' })),
-      }] })
       assert.fail('Unexpected core target metadata')
     }
     if (url.pathname === '/mikka/api/version') {
@@ -720,7 +718,7 @@ function coreFixture(business, { changed = () => false, recover = false } = {}) 
     proof: () => attestCoreProduction({ env, event, fetchImpl, now: business.now }) }
 }
 
-test('core workflow_run composes real source daemon HTTP, current target guards, both sockets and exact cleanup', async () => {
+test('core main dispatch composes real source daemon HTTP, current target guards, both sockets and exact cleanup', async () => {
   for (const cloudComputer of [false, true]) {
     const f = fixture({ core: true, cloudComputer }), target = coreFixture(f)
     const report = await f.run({ ...target, attestation: await target.proof() })

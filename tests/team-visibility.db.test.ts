@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import test from 'node:test'
+import test, { mock } from 'node:test'
 import type { RunFailure } from '@mikka/protocol/run-failure'
 import { disposableDatabase } from './helpers/e2e-target.mjs'
+import { nextTaskListCursor } from '../lib/task-list-page'
+import { measured, readMetrics } from './helpers/read-metrics'
 
 // No business/local database fallback, including when REQUIRE_DB is unset.
 const url = process.env.E2E_DATABASE_URL
@@ -10,7 +12,18 @@ const authorized = disposableDatabase()
 if (url && !authorized) throw new Error('Visibility DB tests require a loopback *_e2e database')
 if (process.env.REQUIRE_DB === '1' && !authorized) throw new Error('Visibility database tests cannot skip in required CI')
 
-test('real API/core visibility: immutable tenant, optional Team, provider scope and suspension', { skip: !authorized }, async () => {
+test('real API/core visibility: immutable tenant, optional Team, provider scope and suspension', { skip: !authorized }, async t => {
+  // Server actions need a Next request boundary even when actAs pins a valid workspace.
+  // Supply only the browser transport; authentication and ACL still use the real fixture DB.
+  const request = mock.module('@/lib/server-runtime/headers', { namedExports: {
+    headers: async () => new Headers(),
+    cookies: async () => ({ get: () => undefined }),
+  } })
+  t.after(() => request.restore())
+  const intl = await import('@/lib/intl/i18n-server')
+  const locale = mock.module('@/lib/intl/i18n-server', { namedExports: { ...intl, getLocale: async () => 'en',
+    getTranslations: async () => Object.assign((key: string) => key, { has: () => true }) } })
+  t.after(() => locale.restore())
   const { Pool } = await import('pg')
   const { drizzle } = await import('drizzle-orm/node-postgres')
   const pool = new Pool({ connectionString: url, max: 2 })
@@ -24,8 +37,10 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
   const { readRun, visibleRuns, addRunMessage, requestRunStop } = await import('../lib/agent-runs')
   const tools = await import('../lib/mcp/tools')
   const actions = await import('../lib/mcp/actions')
+  const { listTeamMembers } = await import('../app/actions/teams')
   const { citationSources } = await import('../lib/coordinator/store')
   const { issuePropertyChoices } = await import('../lib/issue-property-choices')
+  const { registeredTask } = await import('./helpers/registered-task')
   const owner = `visibility-owner-${randomUUID()}`, member = `visibility-member-${randomUUID()}`, foreign = `visibility-foreign-${randomUUID()}`
   const workspace = randomUUID(), otherWorkspace = randomUUID(), personalWorkspace = randomUUID(), team = randomUUID(), otherTeam = randomUUID()
   const shared = randomUUID(), personal = randomUUID(), foreignIssue = randomUUID(), unlinked = randomUUID()
@@ -38,7 +53,8 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     for (const [w,u] of [[workspace,owner],[workspace,member],[otherWorkspace,foreign],[personalWorkspace,owner]]) await pool.query('insert into mikka_workspace_members ("workspaceId","userId",name,email,role,status) values ($1,$2,$2,$3,\'member\',\'active\')', [w,u,`${u}@example.invalid`])
     for (const [id,w,u] of [[team,workspace,owner],[otherTeam,otherWorkspace,foreign]]) await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Visibility\',\'VIS\')', [id,w,u])
     for (const [id,u,scope,label,tenant] of [[shared,owner,'workspace','shared-label',workspace],[personal,owner,'personal','secret-label',personalWorkspace],[foreignIssue,foreign,'workspace','foreign-label',otherWorkspace],[unlinked,owner,'workspace','invite-label',workspace]]) {
-      await pool.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId") values ($1,$2,$3,$4,\'doing\',\'normal\',$5,$6)', [id,u,id,doc(label),scope,tenant])
+      await registeredTask(pool, u, tenant, id, client =>
+        client.query('insert into issues (id,"userId",title,content,status,priority,scope,"workspaceId") values ($1,$2,$3,$4,\'doing\',\'normal\',$5,$6)', [id,u,id,doc(label),scope,tenant]))
       await pool.query('insert into issue_members ("issueId","userId","memberId") values ($1,$2,$3)', [id,u,member])
     }
     // A stale Team/invitation cannot override a task's stored personal tenant.
@@ -60,6 +76,10 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.equal((await issueForUser(member,shared))?.id,shared)
     assert.equal(await issueForUser(member,foreignIssue),null)
     assert.equal((await issueForUser(member,unlinked))?.id,unlinked,'a Team is optional inside the authorized workspace')
+    const teamCount = (id: string, tenant: string) => scoped(id, tenant, () => listTeamMembers(team, tenant, true))
+    assert.equal((await teamCount(member, workspace)).taskCount, 1, 'a stale Team link from another tenant is not counted')
+    assert.equal((await scoped(member, workspace, () => listTeamMembers(team, workspace))).taskCount, undefined)
+    await assert.rejects(teamCount(foreign, otherWorkspace))
     // Exhaust the application pool as concurrent Factory transactions do.
     const scope = createRequestDatabaseScope(url!)
     await scope.run(async () => {
@@ -88,6 +108,18 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
       assert.equal(await readRun(user,privateRun),null)
       assert.equal(await readRun(user,orphanRun),null)
     }
+    await t.test('MCP stop uses the same owner and workspace checks as the stop operation', async subtest => {
+      const deniedAtAction = await measured(() => scoped(owner, personalWorkspace,
+        () => actions.stopRun(owner, sharedRun)))
+      const deniedAtRuntime = await measured(() => scoped(owner, personalWorkspace,
+        () => assert.rejects(requestRunStop(owner, sharedRun), /workspaceAccessDenied/)))
+      assert.deepEqual(deniedAtAction.value, { error: 'workspaceAccessDenied' })
+      assert.deepEqual(await scoped(foreign, otherWorkspace, () => actions.stopRun(foreign, sharedRun)), { error: 'runNotFound' })
+      assert.equal((await pool.query('SELECT "stopRequestedAt" FROM agent_runs WHERE id=$1', [sharedRun])).rows[0].stopRequestedAt, null)
+      subtest.diagnostic(JSON.stringify({ mcpStatements: deniedAtAction.statements, runtimeStatements: deniedAtRuntime.statements }))
+      assert.ok(deniedAtRuntime.statements > 0)
+      assert.equal(deniedAtAction.statements, deniedAtRuntime.statements, 'the transport adds no second owner lookup')
+    })
     await assert.rejects(tools.getIssue(owner, shared), /workspaceAccessDenied/, 'an unscoped MCP call cannot aggregate memberships')
     assert.equal(await scoped(owner, personalWorkspace, () => tools.getIssue(owner, shared)), null, 'the same account cannot read a task outside its selected tenant')
     assert.equal((await scoped(owner, personalWorkspace, () => tools.listIssues(owner, {}))).some(row => row.id === shared), false)
@@ -98,6 +130,53 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.equal((await readRun(owner,sharedRun))?.messages.length,1)
     assert.equal((await readRun(owner,sharedRun))?.run.report?.summary,'secret-report')
     assert.deepEqual((await readRun(owner,sharedRun))?.run.failureDetails, failureDetails)
+    await t.test('MCP reads its latest five events independently of transcript history', async subtest => {
+      const latest = Array.from({ length: 5 }, (_, i) => ({ index: i + 1, text: 'Latest event' }))
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk)
+        SELECT gen_random_uuid(),$1,100+i,chunk FROM jsonb_array_elements($2::jsonb) WITH ORDINALITY AS e(chunk,i)`, [sharedRun, JSON.stringify(latest)])
+      const recent = () => scoped(owner, workspace, () => tools.getRun(owner, sharedRun))
+      await recent()
+      const small = await measured(recent)
+      assert.deepEqual(small.value?.recentEvents.map(line => JSON.parse(line)), latest)
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk)
+        SELECT gen_random_uuid(),$1,i,jsonb_build_object('text',repeat('x',8192)) FROM generate_series(2,33) AS i`, [sharedRun])
+      await pool.query(`INSERT INTO run_messages(id,"runId","userId",text) VALUES(gen_random_uuid(),$1,$2,repeat('y',8192))`, [sharedRun, owner])
+      const large = await measured(recent)
+      subtest.diagnostic(JSON.stringify({ shortHistory: readMetrics(small), longHistory: readMetrics(large) }))
+      assert.deepEqual(large.value, small.value)
+      assert.equal(large.resultBytes, small.resultBytes, 'older events and unrequested human messages never leave Postgres')
+      assert.deepEqual((await scoped(member, workspace, () => tools.getRun(member, sharedRun)))?.recentEvents, [])
+      const full = await readRun(owner, sharedRun)
+      assert.equal(full?.chunks.length, 38)
+      assert.equal(full?.messages.length, 2)
+      await pool.query('DELETE FROM run_chunks WHERE "runId"=$1 AND seq>1', [sharedRun])
+      await pool.query('DELETE FROM run_messages WHERE "runId"=$1 AND length(text)=8192', [sharedRun])
+    })
+    await t.test('MCP run lists and nested issue run summaries do not transfer report bodies', async subtest => {
+      const read = () => scoped(owner, workspace, async () => ({
+        list: await tools.listRuns(owner, { issueId: shared }),
+        nested: (await tools.getIssue(owner, shared))?.runs,
+      }))
+      await read()
+      const before = await measured(read)
+      await pool.query(`UPDATE agent_runs SET report = report || jsonb_build_object('opaqueReport', repeat('r',32768))
+        WHERE id=$1`, [sharedRun])
+      try {
+        const after = await measured(read)
+        subtest.diagnostic(JSON.stringify({ normal: readMetrics(before), largeReport: readMetrics(after) }))
+        assert.deepEqual(after.value, before.value)
+        assert.equal(after.value.list[0]?.id, sharedRun)
+        assert.equal(after.value.nested?.[0]?.id, sharedRun)
+        assert.equal(after.value.list[0]?.stopReason, 'secret-stop')
+        const peer = await scoped(member, workspace, () => tools.listRuns(member, { issueId: shared, activeOnly: true }))
+        assert.equal(peer[0]?.id, sharedRun)
+        assert.equal(peer[0]?.agent, 'codex')
+        assert.equal(peer[0]?.stopReason, null)
+        assert.equal(after.resultBytes, before.resultBytes, 'status-only projections never read a full report')
+      } finally {
+        await pool.query(`UPDATE agent_runs SET report = report - 'opaqueReport' WHERE id=$1`, [sharedRun])
+      }
+    })
     const ownBrief = await visibleRuns(owner, { issueId: shared, brief: true })
     assert.equal(ownBrief[0].failureDetails?.code, 'run_api_key_invalid')
     assert.doesNotMatch(JSON.stringify(ownBrief[0].failureDetails), /secret-provider-message|APIError/)
@@ -116,10 +195,19 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.deepEqual((await scoped(member, workspace, () => tools.listRuns(member,{issueId:shared}))).map(run=>run.id),[sharedRun])
     assert.ok(await scoped(member, workspace, () => tools.getRun(member,sharedRun)))
     assert.equal(await scoped(member, workspace, () => actions.getRunEvents(member,{runId:sharedRun})),null)
+    await t.test('run event pages use the same current tenant as owner run detail', async () => {
+      const page = (workspaceId: string, after?: number) => scoped(owner, workspaceId,
+        () => actions.getRunEvents(owner, { runId: sharedRun, limit: 1, after }))
+      const first = await page(workspace)
+      assert.equal(first?.events[0]?.seq, 1)
+      assert.deepEqual((await page(workspace, 1))?.events, [])
+      assert.equal(await page(personalWorkspace), null)
+      await assert.rejects(actions.getRunEvents(owner, { runId: sharedRun }), /workspaceAccessDenied/)
+    })
     await assert.rejects(addRunMessage(member,{runId:sharedRun,text:'must not send'}))
     await assert.rejects(requestRunStop(member,sharedRun), /runNotFound/)
     assert.equal((await pool.query('select "stopRequestedAt" from agent_runs where id=$1',[sharedRun])).rows[0].stopRequestedAt,null)
-    const choices = await issuePropertyChoices(member)
+    const choices = await issuePropertyChoices(member, workspace, db)
     assert.equal(Object.hasOwn(choices, 'agents'), false, 'task properties do not list execution identities, including your own')
     assert.deepEqual(choices.labels.map(row=>row.name).sort(),['invite-label','shared-label'])
     assert.equal(await readRun(foreign,sharedRun),null)
@@ -127,9 +215,48 @@ test('real API/core visibility: immutable tenant, optional Team, provider scope 
     assert.equal(JSON.stringify(citations).includes('private-agent'),false)
     assert.equal(citations[personal],undefined)
     assert.equal(citations[sharedRun]?.kind,'run')
+    // A Team whose rows fall outside the global top 100 must still load its
+    // own first page, traverse its own cursor, and reject foreign-Team anchors.
+    const overflowTeam = randomUUID()
+    const overflowIds: string[] = []
+    try {
+      await pool.query('insert into mikka_teams (id,"workspaceId","userId",name,identifier) values ($1,$2,$3,\'Overflow\',\'OVER\')', [overflowTeam,workspace,owner])
+      const generated = await pool.query<{ id: string; title: string }>(`insert into issues(id,"userId","workspaceId","ownershipState",scope,title,content,status,priority,"updatedAt")
+        select gen_random_uuid(), $1, $2, 'bound', 'workspace', tag || n,
+          '{"type":"doc"}'::jsonb,'todo','normal',
+          case when tag='Overflow' then '2030-01-01'::timestamptz else '2020-01-01'::timestamptz end + n * interval '1 microsecond'
+        from (select 'Overflow' as tag, generate_series(1,105) n union all
+          select 'Target' as tag, generate_series(1,102) n) batch returning id,title`, [owner,workspace])
+      overflowIds.push(...generated.rows.map(row => row.id))
+      await pool.query(`insert into mikka_team_issues ("issueId","teamId","workspaceId","userId")
+        select task.id, case when task.title like 'Overflow%' then $2::uuid else $3::uuid end, $4::uuid, $5
+        from unnest($1::uuid[], $6::text[]) task(id,title)`,
+        [overflowIds, overflowTeam,team,workspace,owner,generated.rows.map(row => row.title)])
+      const { listWorkspaceIssues, listWorkspaceTaskPage } = await import('../app/actions/issues')
+      const list = await scoped(owner,workspace,() => listWorkspaceIssues(workspace))
+      assert.equal(list.length,100)
+      assert.equal(list.some(issue => issue.id === shared),false,'global page excludes the older target Team')
+      const first = await scoped(member,workspace,() => listWorkspaceTaskPage({ workspaceId: workspace, teamId: team, after: null }))
+      assert.equal(first.items.length,100)
+      assert.ok(first.items.some(issue => issue.id === shared),'the Team can read its own older Task')
+      assert.ok(first.items.every(issue => issue.teamId === team))
+      const last = await scoped(member,workspace,() => listWorkspaceTaskPage({ workspaceId: workspace, teamId: team, after: first.next! }))
+      assert.equal(last.items.length,3)
+      assert.equal(last.next,null)
+      assert.equal(new Set([...first.items,...last.items].map(issue => issue.id)).size,103)
+      const globalCursor = nextTaskListCursor(list)!
+      const stale = await scoped(member,workspace,() => listWorkspaceTaskPage({ workspaceId: workspace, teamId: team, after: globalCursor }))
+      assert.equal(stale.reset,true,'a cursor from another Team is never a valid Team page anchor')
+      await assert.rejects(scoped(member,workspace,() => listWorkspaceTaskPage({ workspaceId: workspace, teamId: otherTeam, after: null })), /teamNotFound/)
+    } finally {
+      await pool.query('delete from mikka_team_issues where "issueId"=any($1::uuid[])',[overflowIds])
+      await pool.query('delete from issues where id=any($1::uuid[])',[overflowIds])
+      await pool.query('delete from mikka_teams where id=$1',[overflowTeam])
+    }
     // Revoke after a successful read: no per-request/global positive cache.
     await pool.query('update mikka_workspace_members set status=\'suspended\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])
     assert.equal(await issueForUser(member,shared),null)
+    await assert.rejects(teamCount(member, workspace))
     assert.equal(await scoped(member, workspace, () => tools.getRun(member,sharedRun)),null)
     assert.deepEqual(await visibleRuns(member,{issueId:shared}),[])
     await pool.query('update mikka_workspace_members set status=\'active\' where "workspaceId"=$1 and "userId"=$2',[workspace,member])

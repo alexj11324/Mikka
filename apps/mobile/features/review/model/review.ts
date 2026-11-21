@@ -25,11 +25,14 @@ export const DENIAL: Record<ReviewDenialReason, string> = {
   not_owner_send: '只有任务负责人可以发给 Agent',
   not_owner_terminal: '只有任务负责人可以用终端',
   github_permission: 'GitHub 权限不足，没能合并',
+  review_unavailable: '当前审阅操作不可用',
 }
 export const denial = (reason: string | undefined, fallback: string) => (reason && reason in DENIAL ? DENIAL[reason as ReviewDenialReason] : fallback)
 export const CANNOT_SEND = DENIAL.not_owner_send
 export const CANNOT_MERGE = DENIAL.not_owner_merge
 
+export const VERSIONED_READ_ONLY = '此版本目前仅支持查看'
+export const usesVersionedReview = (summary: ReviewSummary) => summary.reviewRef !== undefined
 export const isMerged = (summary: ReviewSummary) => summary.pr?.state === 'merged'
 
 /**
@@ -41,15 +44,15 @@ export function summaryParts(summary: ReviewSummary, short = false) {
   const merged = isMerged(summary)
   return {
     pr: summary.pr ? `PR #${summary.pr.number}` : null,
-    files: short && summary.pr ? null : `${summary.files} 个文件`,
-    additions: `+${summary.additions}`,
-    deletions: `−${summary.deletions}`,
+    files: summary.files === null || (short && summary.pr) ? null : `${summary.files} 个文件`,
+    additions: summary.additions === null ? null : `+${summary.additions}`,
+    deletions: summary.deletions === null ? null : `−${summary.deletions}`,
     status: merged ? '已合并'
-      : summary.checks.failed ? `${summary.checks.failed} 项${short ? '' : '检查'}失败`
+      : summary.checks?.failed ? `${summary.checks.failed} 项${short ? '' : '检查'}失败`
       : summary.running ? '运行中'
-      : summary.checks.pending ? '检查中'
-      : summary.checks.passed ? '检查通过' : null,
-    failed: !merged && summary.checks.failed > 0,
+      : summary.checks?.pending ? '检查中'
+      : summary.checks?.passed ? '检查通过' : null,
+    failed: !merged && !!summary.checks?.failed,
   }
 }
 
@@ -61,14 +64,15 @@ export const summaryLabel = (summary: ReviewSummary) => {
 
 /** The check row at the top of R2: 「1 项检查失败 · 5 项通过」. */
 export function checksLine(checks: ReviewSummary['checks']) {
-  return [checks.failed ? `${checks.failed} 项检查失败` : null, checks.passed ? `${checks.passed} 项通过` : null, checks.pending ? `${checks.pending} 项进行中` : null]
+  if (checks === null) return '尚无检查数据'
+  return [checks.neutral ? `${checks.neutral} 项中性` : null, checks.failed ? `${checks.failed} 项检查失败` : null, checks.passed ? `${checks.passed} 项通过` : null, checks.pending ? `${checks.pending} 项进行中` : null]
     .filter(Boolean).join(' · ') || '没有检查'
 }
 
 /** The source line when the machine was reclaimed (R12), or null while the machine serves the diff. */
 export function sourceLine(source: ReviewDiffSource, when: (iso: string) => string) {
   if (!source.reclaimed) return null
-  return `机器已回收，显示的是${source.kind === 'pr' ? ' PR ' : '最后一次检查点'}的改动 · ${when(source.at)}`
+  return `机器已回收，显示的是${source.kind === 'pr' ? ' PR ' : source.kind === 'commit' ? '提交' : source.kind === 'machine' ? '工作树' : '最后一次检查点'}的改动 · ${when(source.at)}`
 }
 
 /** The floating bar's words: 「2 条评论 · ios-unit 失败」, or null when nothing is in the batch (写修改意见…). */

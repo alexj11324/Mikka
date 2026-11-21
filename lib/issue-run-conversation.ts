@@ -61,12 +61,28 @@ export type ThreadStage = { stage: 'repository' | 'worktree' | 'agent_start'; ms
 const THREAD_STAGES = new Set<ThreadStage['stage']>(['repository', 'worktree', 'agent_start'])
 
 /** One tool call in a folded "N steps" line: its name, the one input that says what it did, and whether it failed. */
-export type ThreadStep = { id: string; name: string; detail: string | null; failed: boolean; output?: string; ms?: number }
+export type ThreadStep = { id: string; name: string; detail: string | null; failed: boolean; command?: string; output?: string; exitCode?: number | null; ms?: number }
 
 /** Claude Code's `Bash`, Codex's `bash`/`shell` and Cursor's `execute` run a command; every other step is a tool (as iOS
  * apps/mobile/features/tasks/model/thread-steps.ts counts them, #1770). */
 const COMMAND_STEPS = new Set(['bash', 'shell', 'execute'])
 export const isCommandStep = (step: Pick<ThreadStep, 'name'>) => COMMAND_STEPS.has(step.name.toLowerCase())
+
+/** Codex records its combined output and exit code in a single result. */
+function commandResult(value: unknown) {
+  if (value && typeof value === 'object' && 'output' in value && typeof value.output === 'string'
+    && 'exitCode' in value && (value.exitCode === null || (typeof value.exitCode === 'number' && Number.isInteger(value.exitCode)))) {
+    return { output: value.output, exitCode: value.exitCode }
+  }
+  return null
+}
+
+/** The terminal panel shows captured text. Other readers still receive the original result preview. */
+export function threadStepOutput(step: Pick<ThreadStep, 'output' | 'exitCode'>) {
+  const output = step.output
+  if (!output || step.exitCode === undefined) return output
+  try { return commandResult(JSON.parse(output))?.output ?? output } catch { return output }
+}
 
 /** A folded steps row's counts: 「已运行 2 条命令 · 调用了 1 个工具」. */
 export function threadStepCounts(steps: readonly Pick<ThreadStep, 'name'>[]) {
@@ -79,7 +95,7 @@ const STEP_DETAIL_MAX = 200
 const STEP_OUTPUT_END_CHARS = 4096
 
 /** Stored chunks already mask workspace/owner secrets; reapply credential patterns before cutting. */
-function stepOutput(output: unknown): string | undefined {
+function stepText(output: unknown): string | undefined {
   if (output === undefined || output === null) return undefined
   const masked = maskDeep(output, credentialMasker)
   const text = typeof masked === 'string' ? masked : JSON.stringify(masked, null, 2)
@@ -150,6 +166,9 @@ export function threadItems(
       if (typeof chunk.delta === 'string') item.text += chunk.delta
     } else if (chunk.type === 'tool-input-available') {
       const step: ThreadStep = { id: String(chunk.toolCallId ?? index), name: typeof chunk.toolName === 'string' && chunk.toolName ? chunk.toolName : 'tool', detail: stepDetail(chunk.input), failed: false }
+      if (isCommandStep(step) && chunk.input && typeof chunk.input === 'object' && 'command' in chunk.input && typeof chunk.input.command === 'string' && chunk.input.command.trim()) {
+        step.command = stepText(chunk.input.command)
+      }
       calls.set(step.id, step)
       if (last?.kind === 'steps') { last.count += 1; last.steps.push(step) }
       else items.push({ kind: 'steps', id: `steps:${index}`, count: 1, steps: [step], at: time })
@@ -158,8 +177,13 @@ export function threadItems(
       if (step) {
         if (chunk.type === 'tool-output-error') step.failed = true
         else {
-          const output = stepOutput(chunk.output)
+          const output = stepText(chunk.output)
           if (output !== undefined) step.output = output
+          const code = isCommandStep(step) ? commandResult(chunk.output)?.exitCode : undefined
+          if (code !== undefined) {
+            step.exitCode = code
+            step.failed = code !== null && code !== 0
+          }
         }
         // `at` is the batch's insert time, not tool execution time. Historical chunks stay unknown.
         if (typeof chunk.toolDurationMs === 'number' && Number.isFinite(chunk.toolDurationMs) && chunk.toolDurationMs >= 0) step.ms = chunk.toolDurationMs

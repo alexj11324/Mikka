@@ -39,6 +39,9 @@ type oauthSecret struct {
 	Device      *DeviceAttempt `json:"device,omitempty"`
 	Verifier    string         `json:"verifier"`
 	OperationID string         `json:"operationId"`
+	// Redirect is the attempt's redirect_uri when it is not the provider's
+	// default (Claude's code page for web and phones).
+	Redirect string `json:"redirect,omitempty"`
 	// Only the owning session can recover this encrypted presentation. SQL
 	// retains its state hash, never the raw state or the private provider code.
 	Start *OAuthStart `json:"start,omitempty"`
@@ -56,7 +59,23 @@ func randomCode() string {
 	return base64.RawURLEncoding.EncodeToString(b[:])
 }
 
+// The provider's own Exchange uses its default redirect; an attempt that
+// authorized with another one exchanges through this.
+type redirectExchanger interface {
+	ExchangeWithRedirect(ctx context.Context, code, state, verifier, redirect string) (*core.Auth, error)
+}
+
 func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) (OAuthStart, error) {
+	return w.StartOAuthWith(ctx, epoch, sessionID, "")
+}
+
+// StartOAuthWith starts a sign-in. redirect "code" sends Claude's return to
+// Claude Code's code page (web, phones); "" keeps localhost, which only the
+// desktop app catches.
+func (w *Worker) StartOAuthWith(ctx context.Context, epoch int64, sessionID, redirect string) (OAuthStart, error) {
+	if redirect != "" && redirect != "code" {
+		return OAuthStart{}, ErrUnsupported
+	}
 	if w.ExecutionOnly || w.Secrets == nil {
 		return OAuthStart{}, ErrUnsupported
 	}
@@ -87,6 +106,17 @@ func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) 
 		return OAuthStart{}, ErrUnsupported
 	}
 	parsed, err := url.Parse(authURL)
+	redirectURI := ""
+	if err == nil && redirect == "code" && w.Scope.Provider == "claude" {
+		if _, ok := w.OAuth.(redirectExchanger); !ok {
+			return OAuthStart{}, ErrUnsupported
+		}
+		redirectURI = claudeCodePageURI
+		q := parsed.Query()
+		q.Set("redirect_uri", redirectURI)
+		parsed.RawQuery = q.Encode()
+		authURL = parsed.String()
+	}
 	if err != nil || parsed.Scheme != "https" || parsed.User != nil || parsed.Host == "" || parsed.Query().Get("state") != state || parsed.Query().Get("code_challenge_method") != "S256" {
 		return OAuthStart{}, ErrUnsupported
 	}
@@ -99,7 +129,7 @@ func (w *Worker) StartOAuth(ctx context.Context, epoch int64, sessionID string) 
 	}
 	name := "mikka-byos-" + newID()
 	start := OAuthStart{Flow: "callback_handoff", State: state, AuthorizationURL: authURL, Revision: op.Epoch, ExpiresAt: op.Deadline}
-	raw, _ := json.Marshal(oauthSecret{Scope: w.Scope, SessionHash: hashText(sessionID), Verifier: verifier, OperationID: op.OperationID, Start: &start})
+	raw, _ := json.Marshal(oauthSecret{Scope: w.Scope, SessionHash: hashText(sessionID), Verifier: verifier, OperationID: op.OperationID, Redirect: redirectURI, Start: &start})
 	if err = createArtifact(ctx, w.Repo, w.Secrets, op, "oauth", name, raw); err != nil {
 		_ = w.Repo.Fail(context.WithoutCancel(ctx), op, "publication_failed")
 		return OAuthStart{}, ErrStore
@@ -195,11 +225,18 @@ func (w *Worker) CompleteOAuth(ctx context.Context, sessionID, state, code strin
 	if json.Unmarshal(raw, &attempt) != nil || attempt.Scope != w.Scope || attempt.SessionHash != hashText(sessionID) || attempt.OperationID != opID || len(attempt.Verifier) != 43 {
 		return fail(ErrIntegrity)
 	}
-	return w.publishOAuth(ctx, op, code, state, attempt.Verifier)
+	return w.publishOAuth(ctx, op, code, state, attempt.Verifier, attempt.Redirect)
 }
-func newOAuthManager(w *Worker, op Operation, code, state, verifier string) func(context.Context) error {
+func newOAuthManager(w *Worker, op Operation, code, state, verifier, redirect string) func(context.Context) error {
 	return func(ctx context.Context) error {
 		manager := sdkauth.NewManager(w.store(&op), scopedAuthenticator{codeAuthenticator{w.Scope.Provider, func(ctx context.Context) (*core.Auth, error) {
+			if redirect != "" {
+				exchanger, ok := w.OAuth.(redirectExchanger)
+				if !ok {
+					return nil, ErrUnsupported
+				}
+				return exchanger.ExchangeWithRedirect(ctx, code, state, verifier, redirect)
+			}
 			return w.OAuth.Exchange(ctx, code, state, verifier)
 		}}, w.Scope})
 		_, _, err := manager.Login(ctx, w.Scope.Provider, &config.Config{}, &sdkauth.LoginOptions{NoBrowser: true})

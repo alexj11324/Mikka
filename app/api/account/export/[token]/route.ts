@@ -1,8 +1,7 @@
 import { auth } from '@/lib/auth'
-import { buildAccountExport, claimExport } from '@/lib/account/export'
+import { buildAccountExport, claimExport, isExportCurrent } from '@/lib/account/export'
 import { accountExportBody, accountExportFiles } from '@/lib/account/export-files'
 
-export const dynamic = 'force-dynamic'
 
 const privateHeaders = { 'cache-control': 'private, no-store', 'referrer-policy': 'no-referrer', 'x-content-type-options': 'nosniff' }
 
@@ -21,7 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ toke
   const files = await accountExportFiles(session.user.id)
   const assertCurrent = async () => {
     const current = await auth.api.getSession({ headers: request.headers, query: { disableCookieCache: true, disableRefresh: true } })
-    if (current?.user.id !== session.user.id || !await claimExport(session.user.id, token)) throw new Error('Account export authorization expired')
+    if (current?.user.id !== session.user.id || !await isExportCurrent(session.user.id, token)) throw new Error('Account export authorization expired')
   }
   return new Response(accountExportBody(data, files, session.user.id, { assertCurrent, signal: request.signal }), {
     headers: {

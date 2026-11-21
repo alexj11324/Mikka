@@ -153,6 +153,32 @@ test('PG: Enterprise live authority fences existing capabilities, old tickets an
     assert.fail('the real PG backend never waited for the authority lock')
   }
 
+  await t.test('Inbox invalidations use the live membership gate and skip the database when delivery is disabled', async t => {
+    const { inboxChanged } = await import('../inbox/runtime')
+    const { workspacePool } = await import('../workspace-db')
+    const direct = t.mock.method(workspacePool, 'query')
+    const sent: string[] = []
+    t.mock.method(globalThis, 'fetch', async (input: URL | RequestInfo, init?: RequestInit) => {
+      sent.push(String(input))
+      assert.deepEqual(JSON.parse(String(init?.body)), [{ kind: 'issue_list', id: personal }, { kind: 'pending_actions', id: personal }])
+      return new Response(null, { status: 200 })
+    })
+    const url = process.env.DEVICE_GATEWAY_URL
+    try {
+      delete process.env.DEVICE_GATEWAY_URL
+      await inboxChanged(member.id, personal)
+      assert.equal(direct.mock.callCount(), 0, 'disabled delivery has no preliminary membership query')
+      assert.deepEqual(sent, [])
+    } finally {
+      process.env.DEVICE_GATEWAY_URL = url
+    }
+    await inboxChanged(owner.id, personal)
+    assert.deepEqual(sent, [], 'a foreign personal workspace cannot emit an invalidation')
+    await inboxChanged(member.id, personal)
+    assert.deepEqual(sent, [`${url}/v1/live/${liveChannelId(personalScope)}/push`])
+    assert.equal(direct.mock.callCount(), 0, 'the live transaction holds the authoritative membership check')
+  })
+
   await t.test('first binding serializes the last ambient send and persists a tombstone even when the old Worker refuses control', async () => {
     const ambient = liveChannelId(scope)
     assert.equal(await channel(ordinarySession), ambient)

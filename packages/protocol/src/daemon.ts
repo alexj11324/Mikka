@@ -14,6 +14,7 @@
 // Naming (firm): the machine running the daemon is a `device`; an agent is
 // identified only by its `harness`. "runtime" means a JS runtime, nothing else.
 import { z } from "zod"
+import { TERMINAL_RUN_STATES } from "./run-state"
 import { sanitizeTraceContext } from './trace-context'
 
 import { harnessInfoSchema, harnessSchema } from "./harness"
@@ -25,6 +26,8 @@ import {
   type RunReport,
   type RunStopReason,
 } from "./run"
+
+export { TERMINAL_RUN_STATES, isTerminalRunState } from "./run-state"
 
 /** Bumped on any breaking change to the local RPC methods below. */
 export const DAEMON_PROTOCOL_VERSION = 3
@@ -43,25 +46,10 @@ export const RUN_STATES = [
   "running",
   "waiting_input",
   "finishing",
-  "succeeded",
-  /** Ended without success or failure: the turn ended, a question, a blocker. */
-  "stopped",
-  "failed",
-  "cancelled",
+  ...TERMINAL_RUN_STATES,
 ] as const
 export const runStateSchema = z.enum(RUN_STATES)
 export type RunState = z.infer<typeof runStateSchema>
-
-export const TERMINAL_RUN_STATES: readonly RunState[] = [
-  "succeeded",
-  "stopped",
-  "failed",
-  "cancelled",
-]
-
-export function isTerminalRunState(state: RunState): boolean {
-  return TERMINAL_RUN_STATES.includes(state)
-}
 
 /**
  * Why a run stopped (owned by ./run). Every terminal transition carries one.
@@ -151,6 +139,15 @@ export const daemonStatusSchema = z.object({
   /** Holds a device credential (it may still be refused by the server). */
   signedIn: z.boolean(),
   server: z.enum(["online", "offline", "unregistered"]),
+  /**
+   * The device session (decision 2026-11-17-2215). `update_required`: the
+   * server refused this daemon version; it does nothing until it is updated.
+   * `gateway_required`: the server has no device gateway, so it has no devices.
+   * Absent from older daemons.
+   */
+  session: z.enum(["signed_out", "connecting", "open", "update_required", "gateway_required"]).optional(),
+  /** With `update_required`: the oldest version the server accepts, if it said. */
+  requiredVersion: z.string().max(40).nullable().optional(),
   harnesses: z.array(harnessInfoSchema),
   runs: z.array(runSummarySchema),
   /** Bytes used by run worktrees under the daemon's data dir. */

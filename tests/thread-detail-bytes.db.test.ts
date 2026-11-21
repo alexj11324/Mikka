@@ -33,14 +33,14 @@ async function measured<T>(work: () => Promise<T>) {
 test('an open thread\'s later reads leave its prompt and report in the database and show the same thread', { skip: !enabled, timeout: 120_000 }, async t => {
   const { pool } = await import('../lib/db')
   const { withActivitySession } = await import('./fixtures/activity-runtime.mjs')
-  const { getIssueThread } = await import('../app/actions/agents')
+  const { getIssueThread, getOlderIssueThread, getIssueThreadContext } = await import('../app/actions/agents')
   const { mergeThreadChunks } = await import('../lib/issue-run-conversation')
   const owner = `thread-detail-${randomUUID()}`
   const agent = randomUUID(), issue = randomUUID(), run = randomUUID()
   // A long prompt whose name is on its third line, and a report with large fields beside its summary.
   const prompt = `\n\n\`\`\`\n**Fix** the checkout rounding\n${'Context line with details. '.repeat(1_500)}`
   const instructions = '\n\nINTERNAL_HOST_GUIDANCE 🔍 must stay out of the user message.'
-  const report = { summary: '  Fixed the rounding.  ', files: 'diff '.repeat(8_000), notes: 'note '.repeat(4_000) }
+  const report = { runtime: { observedModel: 'observed-fixture' }, summary: '  Fixed the rounding.  ', files: 'diff '.repeat(8_000), notes: 'note '.repeat(4_000) }
   const as = <T>(work: () => Promise<T>) => withActivitySession(owner, work) as Promise<T>
   const chunk = (seq: number) => pool.query('insert into run_chunks(id,"runId",seq,chunk) values($1,$2,$3,$4)', [randomUUID(), run, seq, JSON.stringify({ type: 'text-delta', id: 't1', delta: `part ${seq} ` })])
   try {
@@ -48,6 +48,7 @@ test('an open thread\'s later reads leave its prompt and report in the database 
     await pool.query('insert into agents(id,"userId",name,harness) values($1,$2,$3,$4)', [agent, owner, 'Fixture agent', 'codex'])
     await pool.query('insert into issues(id,"userId",title,content,status,priority,"workspaceId","ownershipState") values($1,$2,$3,$4,$5,$6,$7,\'bound\')', [issue, owner, 'Checkout task', JSON.stringify({ type: 'doc', content: [] }), 'doing', 'normal', await seedFixtureWorkspace(pool, owner)])
     await pool.query('insert into agent_runs(id,"userId","issueId","agentId",status,prompt,report,"promptTaskStart","promptTaskLength") values($1,$2,$3,$4,$5,$6,$7,0,$8)', [run, owner, issue, agent, 'running', prompt + instructions, JSON.stringify(report), Array.from(prompt).length])
+    await pool.query(`UPDATE agent_runs SET "agentDefinition"=jsonb_build_object('model','selected-fixture') WHERE id=$1`, [run])
     for (let seq = 1; seq <= 3; seq++) await chunk(seq)
 
     const first = await measured(() => as(() => getIssueThread(issue, run)))
@@ -55,6 +56,7 @@ test('an open thread\'s later reads leave its prompt and report in the database 
     assert.equal(first.value.thread.detail?.name, 'Fix the checkout rounding')
     assert.equal(first.value.thread.detail?.summary, 'Fixed the rounding.')
     assert.equal(first.value.promptOmitted, undefined)
+    assert.deepEqual(first.value.context?.composerModel, { selected: 'selected-fixture', served: 'observed-fixture' })
     assert.ok(first.bytes < prompt.length + JSON.stringify(report).length / 4, `the report's other fields stay in the database: ${first.bytes} B`)
 
     await chunk(4)
@@ -74,6 +76,75 @@ test('an open thread\'s later reads leave its prompt and report in the database 
     // A cursor the server cannot continue from reads everything again, prompt included.
     const stale = await as(() => getIssueThread(issue, run, { ...first.value.chunkCursor!, seq: 999 } as never))
     if (!stale.chunksAppend) assert.equal(stale.thread.prompt, prompt)
+    await t.test('the recent page is bounded across messages and chunks, and cursors recover both directions', async () => {
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt")
+        SELECT gen_random_uuid(),$1,n,jsonb_build_object('type','text-delta','id',n::text,'delta','event '||n), now()
+        FROM generate_series(5,1204) n`, [run])
+      const messageId = randomUUID()
+      await pool.query(`INSERT INTO run_messages(id,"runId","userId",text,"createdAt") VALUES ($1,$2,$3,'latest person message',now())`, [messageId, run, owner])
+      const initial = await as(() => getIssueThread(issue, run, { kind: 'history' }))
+      assert.equal(initial.chunks.length + initial.messages.length, 500)
+      assert.equal(initial.messages.at(-1)?.id, messageId)
+      assert.equal(initial.context, undefined)
+      assert.deepEqual(initial.composerModel, first.value.context?.composerModel)
+      assert.ok((await as(() => getIssueThreadContext(issue, run))).used > 0)
+      assert.ok(initial.historyPage?.before)
+      assert.ok(initial.historyPage.latest)
+      const history = [initial.chunks]
+      let before: import('../lib/thread-history').ThreadHistoryPosition | null = initial.historyPage.before
+      while (before) {
+        const older = await as(() => getOlderIssueThread(issue, run, before!))
+        assert.ok(older.chunks.length + older.messages.length <= 500)
+        history.unshift(older.chunks)
+        before = older.before
+      }
+      assert.equal(history.flat().length, 1204)
+      assert.equal(new Set(history.flat().map(row => row.chunk.delta)).size, 1204)
+      await chunk(1205)
+      const position = { chain: initial.historyPage.chain, count: initial.historyPage.count, position: initial.historyPage.latest }
+      const next = await as(() => getIssueThread(issue, run, { kind: 'history', after: position }))
+      assert.equal(next.historyPage?.append, true)
+      assert.equal(next.promptOmitted, true)
+      assert.deepEqual(next.chunks.map(row => row.chunk.delta), ['part 1205 '])
+      await pool.query(`INSERT INTO run_chunks(id,"runId",seq,chunk,"createdAt") VALUES(gen_random_uuid(),$1,1206,'{"type":"text-delta","delta":"late event"}',now()-interval '1 day')`, [run])
+      const reset = await as(() => getIssueThread(issue, run, { kind: 'history', after: position }))
+      assert.equal(reset.historyPage?.append, false)
+      assert.ok(reset.historyPage.before)
+      await assert.rejects(as(() => getOlderIssueThread(null, run, initial.historyPage!.before!)))
+    })
+    await t.test('only the claiming device and current native session can change a live Composer model', async () => {
+      const { issueDeviceToken, hashDeviceToken } = await import('../lib/device-link')
+      const { CLIENT_VERSION_HEADER } = await import('@mikka/protocol/version')
+      const { SOURCE_DAEMON_VERSION } = await import('@mikka/protocol/device')
+      const { PATCH } = await import('../app/v1/runs/[runId]/route')
+      const device = randomUUID()
+      const token = await issueDeviceToken(owner, 'Native model observation')
+      const other = await issueDeviceToken(owner, 'Other device credential')
+      const read = async () => (await as(() => getIssueThread(issue, run))).context?.composerModel
+      const patch = (credential: string, sessionId: string, observedModel: string) => PATCH(new Request(
+        'http://localhost/v1/runs/' + run, { method: 'PATCH', headers: { authorization: 'Bearer '+credential,
+          'x-mikka-device-session': '1', [CLIENT_VERSION_HEADER]: SOURCE_DAEMON_VERSION, 'content-type':'application/json' },
+          body: JSON.stringify({ state:'running', sessionId, observedModel }) }), { params: Promise.resolve({ runId: run }) })
+      try {
+        await pool.query(`INSERT INTO devices(id,"ownerId",name,kind,"deviceType") VALUES($1,$2,'QA','local','laptop')`,[device,owner])
+        await pool.query(`UPDATE agent_runs SET "deviceId"=$2, "deviceTokenId"=(SELECT id FROM device_tokens WHERE "tokenHash"=$3),
+          "sessionId"='native',status='waiting_input' WHERE id=$1`,[run,device,hashDeviceToken(token)])
+        assert.equal((await patch(other, 'native', 'wrong-device')).status, 204)
+        assert.equal((await patch(token, 'previous', 'wrong-session')).status, 204)
+        assert.equal((await read())?.served, 'observed-fixture')
+        assert.equal((await patch(token, 'native', 'daemon-model')).status, 204)
+        assert.deepEqual(await read(), { selected:'selected-fixture',served:'daemon-model' })
+        assert.equal((await patch(token, 'native', 'daemon-model')).status, 204)
+        assert.equal((await pool.query('SELECT status FROM agent_runs WHERE id=$1',[run])).rows[0].status,'waiting_input')
+        await pool.query("UPDATE agent_runs SET status='succeeded' WHERE id=$1",[run])
+        assert.equal((await patch(token, 'native', 'late')).status, 204)
+        assert.equal((await read())?.served,'daemon-model')
+      } finally {
+        await pool.query('UPDATE agent_runs SET "deviceTokenId"=NULL,"deviceId"=NULL WHERE id=$1',[run])
+        await pool.query('DELETE FROM device_tokens WHERE "userId"=$1',[owner])
+        await pool.query('DELETE FROM devices WHERE id=$1',[device])
+      }
+    })
     t.diagnostic(JSON.stringify({ promptChars: prompt.length, reportJsonBytes: JSON.stringify(report).length, firstReadJsonBytes: first.bytes, laterReadJsonBytes: later.bytes }))
   } finally {
     await pool.query('delete from run_chunks where "runId"=$1', [run])

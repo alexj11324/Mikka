@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { test } from 'node:test'
-import { InvalidAuthorization, parseSubscriptionStart, planName, subscriptionListSchema, subscriptionSignInState } from './subscription-ui'
+import { InvalidAuthorization, claudeShowsCode, parseSubscriptionStart, planName, subscriptionListSchema, subscriptionSignInState } from './subscription-ui'
 
 test('subscription consent opens only the fixed provider page for its own flow', () => {
   const state = 'a'.repeat(43)
@@ -16,6 +16,13 @@ test('subscription consent opens only the fixed provider page for its own flow',
   assert.throws(() => parseSubscriptionStart({ error: 'subscription_unavailable' }, 'codex'), InvalidAuthorization)
   const claude = { ...base, flow: 'callback_handoff', authorizationUrl: `https://claude.ai/oauth/authorize?code=true&client_id=x&response_type=code&redirect_uri=http%3A%2F%2Flocalhost%3A54545%2Fcallback&scope=user%3Aprofile&code_challenge=y&code_challenge_method=S256&state=${state}` }
   assert.equal(parseSubscriptionStart(claude, 'claude').flow, 'callback_handoff')
+  assert.equal(claudeShowsCode(claude.authorizationUrl), false, 'localhost: the desktop app catches it')
+  // Web and phones: Claude Code's own code page (MANUAL_REDIRECT_URL), which shows a code to paste.
+  const page = { ...claude, authorizationUrl: claude.authorizationUrl.replace('http%3A%2F%2Flocalhost%3A54545%2Fcallback', 'https%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback') }
+  assert.equal(parseSubscriptionStart(page, 'claude').flow, 'callback_handoff')
+  assert.equal(claudeShowsCode(page.authorizationUrl), true)
+  for (const redirect of ['https%3A%2F%2Fevil.test%2Foauth%2Fcode%2Fcallback', 'https%3A%2F%2Fplatform.claude.com%2Fother', 'http%3A%2F%2Fplatform.claude.com%2Foauth%2Fcode%2Fcallback'])
+    assert.throws(() => parseSubscriptionStart({ ...claude, authorizationUrl: claude.authorizationUrl.replace('http%3A%2F%2Flocalhost%3A54545%2Fcallback', redirect) }, 'claude'), InvalidAuthorization, redirect)
   assert.throws(() => parseSubscriptionStart({ ...claude, state: 'b'.repeat(43) }, 'claude'), InvalidAuthorization)
   assert.throws(() => parseSubscriptionStart({ ...claude, authorizationUrl: claude.authorizationUrl.replace('claude.ai', 'claude.ai.evil.test') }, 'claude'), InvalidAuthorization)
 })

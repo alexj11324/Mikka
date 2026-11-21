@@ -1,6 +1,6 @@
 # 按任务难度自动选模型
 
-- **Status:** accepted scope from issue #1329; implementation review 2026-11-05
+- **Status:** retired 2026-11-15 by [decision 1630](decisions/2026-11-15-1630-agent-profile-is-a-role.md). Kept for runs frozen with a routing snapshot; not current behaviour.
 - **GitHub:** [#1329](https://github.com/alexj11324/Mikka/issues/1329)
 - **Owner thread:** issue #1329 implementation
 - **Changed:** 2026-11-06, [judge model strength and effort only](decisions/2026-11-06-1640-model-routing-judges-tier-and-effort.md)

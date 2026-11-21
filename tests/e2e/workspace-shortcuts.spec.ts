@@ -18,7 +18,7 @@ for (const { platform, modifier } of [
     await page.keyboard.press('Escape')
     await expect(page.getByRole('button', { name: '全局搜索', exact: true }).locator('[data-slot="kbd"]')).toHaveCount(2)
     await expectItems(page.getByRole('button', { name: '全局搜索', exact: true }).locator('[data-slot="kbd"]'), [modifier, 'K'])
-    await rail(page, '看板').click()
+    await rail(page, '任务').click()
     const create = await openCreateIssue(page)
     await expect(create.getByRole('button', { name: '创建任务', exact: true })).toHaveAttribute('aria-keyshortcuts', 'Control+Enter Meta+Enter')
     await page.keyboard.press('Escape')

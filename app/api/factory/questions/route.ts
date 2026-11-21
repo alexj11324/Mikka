@@ -1,10 +1,9 @@
 import { factoryHumanWorkspaceResponse } from '@/lib/factory/workspace-http';
 import { humanSessionHeaders } from '@/lib/desktop-rpc/handler';
-import { NextResponse } from 'next/server';
+import { NextResponse } from '@/lib/server-runtime/server';
 import { auth } from '@/lib/api-auth';
 import { factoryLifecycleEnabled, factoryRuntimeForBot } from '@/lib/factory/runtime';
 import { handleFactoryQuestionList } from '@/lib/factory/questions/ask-user';
-export const dynamic = 'force-dynamic';
 /** GET /api/factory/questions[?taskId=|?runId=] — pending questions in AskUserQuestion shape. */
 export async function GET(request: Request) {
   if (!factoryLifecycleEnabled()) return NextResponse.json({error:'factoryLifecycleUnavailable'},{status:404});

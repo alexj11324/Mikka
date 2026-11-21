@@ -2,16 +2,14 @@ import assert from 'node:assert/strict'
 import { mock, test } from 'node:test'
 import { createHmac } from 'node:crypto'
 import { createMikkaSlackChannel } from '../lib/slack/eve-channel.ts'
-import { slackInboundIdentity, slackRouting } from '../lib/slack/eve-routing.ts'
-import { slackConfig } from '../lib/slack/config.ts'
 
 const env = {
-  SLACK_BOT_TOKEN: 'test-only-bot-token', SLACK_SIGNING_SECRET: 'test-only-signing-secret',
-  SLACK_APP_ID: 'A123', SLACK_TEAM_ID: 'T123', SLACK_BOT_USER_ID: 'U123',
-  SLACK_USER_BINDINGS: '{"U456":"owner-a","U789":"owner-b"}',
-  SLACK_WATCHED_CHANNELS: '["C123"]',
+  SLACK_SIGNING_SECRET: 'test-only-signing-secret',
+  SLACK_APP_ID: 'A123',
 }
 const workspaceId = '00000000-0000-4000-8000-000000000001'
+const linkId = '00000000-0000-4000-8000-000000000007'
+const installationId = '00000000-0000-4000-8000-000000000004'
 const botId = '00000000-0000-4000-8000-000000000002'
 const event = (id, text, patch = {}) => ({
   type: 'event_callback', api_app_id: 'A123', team_id: 'T123', event_id: `Ev${id}`,
@@ -19,17 +17,22 @@ const event = (id, text, patch = {}) => ({
   event: { type: 'message', channel: 'C123', channel_type: 'channel', user: 'U456', text,
     ts: `1700000000.00000${id}`, ...patch },
 })
-function signed(payload) {
-  const body = JSON.stringify(payload), timestamp = String(Math.floor(Date.now() / 1000))
+function signed(payload, interaction = false) {
+  const json = JSON.stringify(payload)
+  const body = interaction ? new URLSearchParams({ payload: json }).toString() : json
+  const timestamp = String(Math.floor(Date.now() / 1000))
   const signature = 'v0=' + createHmac('sha256', env.SLACK_SIGNING_SECRET).update(`v0:${timestamp}:${body}`).digest('hex')
   return new Request('http://localhost/eve/v1/slack', { method: 'POST', body, headers: {
-    'content-type': 'application/json', 'x-slack-request-timestamp': timestamp, 'x-slack-signature': signature,
+    'content-type': interaction ? 'application/x-www-form-urlencoded' : 'application/json', 'x-slack-request-timestamp': timestamp, 'x-slack-signature': signature,
   } })
 }
-function harness({ respond = false, failure = false } = {}) {
+function harness({ respond = false, failure = false, channelEnv = env } = {}) {
   const sends = [], classifications = [], scopes = [], api = [], addresses = [], tasks = []
   const channel = createMikkaSlackChannel({
-    env: () => env,
+    env: () => channelEnv,
+    binding: async (app, team, sender) => app==='A123' && team==='T123' && ['U456','U789'].includes(sender)
+      ? { installationId, linkId, ownerId:sender==='U456'?'owner-a':'owner-b',workspaceId,teamId:team,slackUserId:sender,botUserId:'U123',watched:['C123'] } : null,
+    token: async scope => { assert.equal(scope.installationId,installationId); return 'unit-only-bot-token' },
     resolveScope: async (ownerId, selected) => { scopes.push([ownerId, selected]); return { ownerId, botId, workspaceId } },
     shouldJoin: async (scope, text) => { classifications.push([scope, text]); if (failure) throw new Error('provider unavailable'); return respond },
     recordSource: async () => '00000000-0000-4000-8000-000000000003',
@@ -53,8 +56,8 @@ function harness({ respond = false, failure = false } = {}) {
     resolveSession: async () => undefined,
     waitUntil: task => tasks.push(task), params: {}, requestIp: '127.0.0.1',
   }
-  return { sends, classifications, scopes, api, addresses, async post(payload) {
-    const response = await route.handler(signed(payload), args)
+  return { sends, classifications, scopes, api, addresses, async post(payload, interaction = false) {
+    const response = await route.handler(signed(payload, interaction), args)
     await Promise.all(tasks.splice(0))
     return response
   }, route, args }
@@ -64,6 +67,20 @@ test('signed URL verification does no DB, model or Slack API work', async () => 
   const h = harness()
   const response = await h.post({ type: 'url_verification', challenge: 'test-challenge' })
   assert.deepEqual(await response.json(), { challenge: 'test-challenge' })
+  assert.deepEqual([h.scopes, h.api, h.classifications, h.sends], [[], [], [], []])
+})
+
+test('an app can verify its URL before a team installs the bot', async () => {
+  const h = harness({ channelEnv: { SLACK_SIGNING_SECRET: env.SLACK_SIGNING_SECRET } })
+  const challenge = { type: 'url_verification', challenge: 'before-installation' }
+  const response = await h.post(challenge)
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { challenge: challenge.challenge })
+  const tampered = signed(challenge)
+  tampered.headers.set('x-slack-signature', 'v0=' + '0'.repeat(64))
+  assert.equal((await h.route.handler(tampered, h.args)).status, 401)
+  assert.equal((await h.post(event('1', 'help'))).status, 503)
+  assert.equal((await harness({ channelEnv: {} }).post(challenge)).status, 503)
   assert.deepEqual([h.scopes, h.api, h.classifications, h.sends], [[], [], [], []])
 })
 
@@ -112,8 +129,8 @@ test('direct mention uses native eve delivery, bounded identity and stable webho
   const { options, address } = h.sends[0]
   assert.equal(options.idempotencyKey, 'slack:T123:Ev1')
   assert.equal(options.auth.principalId, 'owner-a')
-  assert.deepEqual(options.auth.attributes, { botId, workspaceId, surface: 'slack', slackUserId: 'U456', sourceEventId: '00000000-0000-4000-8000-000000000003' })
-  assert.deepEqual(JSON.parse(address), ['owner-a', workspaceId, 'C123:1700000000.000001'])
+  assert.deepEqual(options.auth.attributes, { botId, workspaceId, surface: 'slack', slackUserId: 'U456', teamId:'T123',installationId, linkId, sourceEventId: '00000000-0000-4000-8000-000000000003' })
+  assert.deepEqual(JSON.parse(address), ['owner-a', workspaceId, linkId, 'C123:1700000000.000001'])
   assert.equal(options.history, undefined)
   await h.post(payload)
   assert.equal(h.sends.length, 1, 'native eve rejects repeated provider event ids')
@@ -127,24 +144,23 @@ test('relevant ambient input joins only its thread and each bound owner has a di
   assert.equal(h.classifications.length, 2)
   assert.equal(h.sends[0].options.state.quiet, true)
   assert.notEqual(h.sends[0].address, h.sends[1].address)
-  assert.equal(JSON.parse(h.sends[0].address)[2], 'C123:1700000000.999999')
+  assert.equal(JSON.parse(h.sends[0].address)[3], 'C123:1700000000.999999')
   assert.equal(h.sends[1].options.auth.principalId, 'owner-b')
 })
 
-test('channel workspace selection is operator configuration and malformed selection fails closed', () => {
-  assert.deepEqual(slackRouting({ SLACK_WATCHED_CHANNELS: '["C123"]', SLACK_CHANNEL_WORKSPACES: JSON.stringify({ C123: workspaceId }) }), { watched: ['C123'], workspaces: { C123: workspaceId } })
-  for (const invalid of ['not-json', '["C123"]', '{"C123":"other-tenant"}']) assert.equal(slackRouting({ SLACK_CHANNEL_WORKSPACES: invalid }), null)
-  assert.equal(slackRouting({ SLACK_WATCHED_CHANNELS: '["not-a-channel"]' }), null)
-})
-
-test('signed interaction callbacks still require bound owner and installed workspace', () => {
-  const config = slackConfig(env)
-  const callback = { type: 'block_actions', api_app_id: 'A123', team: { id: 'T123' }, user: { id: 'U456' }, channel: { id: 'C123' } }
-  assert.deepEqual(slackInboundIdentity(config, callback), { ownerId: 'owner-a', channelId: 'C123' })
-  assert.equal(slackInboundIdentity(config, { ...callback, user: { id: 'U999' } }), null)
-  assert.equal(slackInboundIdentity(config, { ...callback, team: { id: 'T999' } }), null)
-  const modal = { ...callback, type: 'view_submission', channel: undefined, view: { private_metadata: JSON.stringify({ channelId: 'C123', requestId: 'request-test' }) } }
-  assert.deepEqual(slackInboundIdentity(config, modal), { ownerId: 'owner-a', channelId: 'C123' })
+test('signed interactions require the current installation and workspace member', async () => {
+  const callback = { type: 'block_actions', api_app_id: 'A123', team: { id: 'T123' }, user: { id: 'U456' }, channel: { id: 'C123' }, actions: [] }
+  const modal = { ...callback, type: 'view_submission', channel: undefined, view: { private_metadata: JSON.stringify({ channelId: 'C123' }) } }
+  for (const payload of [callback, modal]) {
+    const allowed = harness()
+    await allowed.post(payload, true)
+    assert.deepEqual(allowed.scopes, [['owner-a', workspaceId]])
+    for (const patch of [{ user: { id: 'U999' } }, { team: { id: 'T999' } }]) {
+      const denied = harness()
+      assert.equal((await denied.post({ ...payload, ...patch }, true)).status, 204)
+      assert.deepEqual([denied.scopes, denied.sends, denied.api], [[], [], []])
+    }
+  }
 })
 
 let decisionAnswer = 'respond'
@@ -168,4 +184,27 @@ test('eve decision screening retains the existing model billing and admission bo
   assert.equal(await shouldJoinSlack(scope, 'Good morning'), false)
   decisionAnswer = null
   await assert.rejects(shouldJoinSlack(scope, 'Help'), /decisionProviderUnavailable/)
+})
+
+test('a signed event callback is handed to 自动化 with Slack’s own body and signature; a reaction still answers Eve as before', async t => {
+  const forwarded = []
+  t.mock.method(globalThis, 'fetch', async (input, init) => {
+    forwarded.push({ url: String(input), body: String(init.body), headers: new Headers(init.headers) })
+    return new Response(null, { status: 200 })
+  })
+  const h = harness({ channelEnv: { ...env, SLACK_AUTOMATIONS_FORWARD_URL: 'https://app.example.test/mikka/api/webhooks/slack/automations' } })
+  const payload = { type: 'event_callback', api_app_id: 'A123', team_id: 'T123', event_id: 'Ev1', event: { type: 'reaction_added', user: 'U456', reaction: 'eyes', item: { type: 'message', channel: 'C123', ts: '1.2' } } }
+  const request = signed(payload)
+  const response = await h.route.handler(request.clone(), h.args)
+  assert.equal(response.status, 204)
+  assert.equal(forwarded.length, 1)
+  assert.equal(forwarded[0].url, 'https://app.example.test/mikka/api/webhooks/slack/automations')
+  assert.equal(forwarded[0].body, JSON.stringify(payload))
+  assert.equal(forwarded[0].headers.get('x-slack-signature'), request.headers.get('x-slack-signature'))
+  assert.equal(forwarded[0].headers.get('x-slack-request-timestamp'), request.headers.get('x-slack-request-timestamp'))
+  forwarded.length = 0
+  assert.equal((await harness().post(payload)).status, 204)
+  assert.equal(forwarded.length, 0, 'unset, nothing is handed off')
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('app unreachable') })
+  assert.equal((await h.post(payload)).status, 204, 'a failed hand-off never holds up Slack')
 })

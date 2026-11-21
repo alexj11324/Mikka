@@ -172,3 +172,20 @@ export function pullRequestsOf(threads: readonly Omit<GroupedThread, 'createdAt'
   }
   return rows
 }
+
+/**
+ * What a bot is doing, for 概览's rows: tasks by their newest thread, and its PRs that are not merged. The two rows
+ * never count one thing twice: a task that waits only because its PR awaits review is the PR row's (等待审查), so
+ * 等你处理 is what asks for the person otherwise, a question, an answer the judge found missing, an unjudged run.
+ */
+export function botGlance(threads: readonly GroupedThread[], issues: readonly (PrIssue & GroupIssue)[]): { running: number; waiting: number; pullRequests: { review: number; running: number } } {
+  const grouped = groupThreads(threads, id => issues.find(item => item.id === id))
+  const rows = pullRequestsOf(threads, issues)
+  const inReview = new Set(rows.filter(row => row.group === 'review').map(row => row.issueId))
+  const asksDirectly = (thread: GroupedThread) => thread.status === 'waiting_input' || thread.outcome === 'needs_input'
+  return {
+    running: grouped.running.length,
+    waiting: grouped.waiting.filter(thread => asksDirectly(thread) || !thread.issueId || !inReview.has(thread.issueId)).length,
+    pullRequests: { review: rows.filter(row => row.group === 'review').length, running: rows.filter(row => row.group === 'running').length },
+  }
+}

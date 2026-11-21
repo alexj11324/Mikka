@@ -4,6 +4,7 @@
 - Source: Alex, in the MVP acceptance session: 「E2B 是一次任务完成之后就不再使用的，但相关文件还是要存储，避免后续可能还会再开 follow up。任务跟沙箱机器应该是强绑定。不能一个任务用完之后，另外一个任务接着去用，这是不允许的。」 and 「免费和暂停能保留多久就保留多久，如果收费就不保留。」
 - Rule: —
 - Replaces: one new sandbox per run, killed when the run ends
+- Superseded by: [2026-11-10-1600-thread-filesystem-snapshots](2026-11-10-1600-thread-filesystem-snapshots.md) for the sentence "Per-task snapshots are not used: E2B documents no price or retention for them." The rest of this decision remains in force.
 
 A task's cloud runs share one E2B sandbox. The task's first run starts it
 from the workspace snapshot. When a run of an open task ends, the sandbox is

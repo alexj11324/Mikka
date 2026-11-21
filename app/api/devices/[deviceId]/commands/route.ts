@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { pool } from '@/lib/db'
 import { auth } from '@/lib/api-auth'

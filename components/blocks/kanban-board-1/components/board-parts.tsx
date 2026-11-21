@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { BoardCardProps, BoardColumnFrameProps, BoardHiddenLaneProps } from '@/components/slots/board-contract'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 
 /** A board column's frame (R-25): the header with the status, its count and the ⋯ menu, then the droppable list. */
 export function BoardColumnView({ label, icon, count, menu, children }: BoardColumnFrameProps) {

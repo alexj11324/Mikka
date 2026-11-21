@@ -12,7 +12,7 @@ const at = (path: string) => new URL(path, import.meta.url).href
 const browser = new Window({ url: 'https://fixture.example/' })
 const notices = new Map<string, { action?: { onClick: (event: Event) => void } }>()
 const translate = (namespace: string) => (key: string) => `${namespace}.${key}`
-mock.module('next-intl', { namedExports: { useTranslations: translate, useFormatter: () => ({ relativeTime: () => 'now' }), useNow: () => new Date('2026-11-07T00:00:00Z') } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: translate, useFormatter: () => ({ relativeTime: () => 'now' }), useNow: () => new Date('2026-11-07T00:00:00Z') } })
 mock.module('sonner', { namedExports: { toast: {
   error: (_message: string, options: { id: string; action?: { onClick: (event: Event) => void } }) => { notices.set(options.id, options) },
   dismiss: (id: string) => { notices.delete(id) },

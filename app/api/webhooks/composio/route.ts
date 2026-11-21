@@ -4,7 +4,6 @@ import { verifyComposioWebhook } from '@/lib/composio-webhook'
 import { composioNotification } from '@/lib/suggestions/notification'
 import { ingestNotifications } from '@/lib/suggestions/store'
 
-export const runtime = 'nodejs'
 
 async function handlePOST(request: Request) {
   const apiKey = process.env.COMPOSIO_API_KEY

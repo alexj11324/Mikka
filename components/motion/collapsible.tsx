@@ -1,7 +1,7 @@
 "use client";
 // beui.dev/components/motion/collapsible
 
-import { ChevronDown } from "lucide-react";
+import { ChevronDown } from "@/components/icons";
 import { type HTMLMotionProps, isValidMotionProp, motion, useReducedMotion } from "motion/react";
 import {
   cloneElement,

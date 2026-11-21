@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto'
 import test from 'node:test'
 import { encode, decode } from '../../lib/desktop-rpc/wire.ts'
 import { attestDeployedTarget } from './deployed-target.mjs'
-import { PROJECT, TEAM, PRODUCTION_ALIAS } from '../ops/deployment-regression.mjs'
 import { ORIGIN, OPS_REF, productionMcpGuard, runProductionMcpProof } from './mcp-production.mjs'
 import { authorizeMcpSession } from '../../tests/support/mcp-closeout-session.mjs'
 
@@ -55,8 +54,8 @@ function fixture(options = {}) {
       }
       if (url.pathname.endsWith('/actions/workflows/web-deploy.yml/runs')) return json({ workflow_runs: [{
         id: 51, run_attempt: 1, head_sha: APP, head_branch: 'main', event: 'push',
-        path: '.github/workflows/web-deploy.yml', repository: { full_name: 'alexj11324/Mikka' },
-        head_repository: { full_name: 'alexj11324/Mikka' }, status: 'completed', conclusion: 'success',
+        path: '.github/workflows/web-deploy.yml', repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } },
+        head_repository: { id: 1427517699, full_name: 'alexj11324/Mikka', owner: { id: 183887963 } }, status: 'completed', conclusion: 'success',
       }] })
       if (url.pathname.endsWith('/actions/runs/51/attempts/1/jobs')) return json({ total_count: 1, jobs: [{
         name: 'deploy', head_sha: APP, status: 'completed', conclusion: 'success',
@@ -328,18 +327,15 @@ function deployedFixture(business, originalEnv, { changed = () => false } = {}) 
   const env = { ...originalEnv, MIKKA_ACCEPTANCE_TARGET_MODE: 'deployed-target',
     GITHUB_REPOSITORY_OWNER: 'alexj11324', GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_REF: 'refs/heads/main',
     GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/issue1415-deployed-production.yml@refs/heads/main',
-    GITHUB_RUN_ID: '99', GITHUB_RUN_ATTEMPT: '1', WEB_DEPLOY_RUN_ID: '51',
-    VERCEL_DEPLOYMENT_ID: 'dpl_transport', VERCEL_TEAM_TOKEN: 'SYNTHETIC_VERCEL_READ_TOKEN' }
+    GITHUB_RUN_ID: '99', GITHUB_RUN_ATTEMPT: '1' }
   const repository = { full_name: 'alexj11324/Mikka', owner: { login: 'alexj11324' } }
-  const event = { repository, inputs: { application_sha: env.APPLICATION_SHA,
-    web_run_id: env.WEB_DEPLOY_RUN_ID, deployment_id: env.VERCEL_DEPLOYMENT_ID } }
+  const event = { repository, inputs: { application_sha: env.APPLICATION_SHA } }
   const api = 'https://api.github.com/repos/alexj11324/Mikka'
   const metadata = []
   const now = business.now ?? Date.now
   const fetchImpl = async (input, init = {}) => {
     const url = new URL(input)
-    if (url.origin === 'https://api.github.com' || url.origin === 'https://api.vercel.com'
-      || url.pathname === '/mikka/api/version') {
+    if (url.origin === 'https://api.github.com' || url.pathname === '/mikka/api/version') {
       metadata.push(url.pathname)
       assert.equal(init.method, 'GET')
       assert.equal(new Headers(init.headers).has('cookie'), false)
@@ -351,29 +347,10 @@ function deployedFixture(business, originalEnv, { changed = () => false } = {}) 
           head_sha: env.GITHUB_SHA, status: 'in_progress', conclusion: null })
         if (url.href === api + '/issues/1415') return Response.json({ number: 1415, url: url.href,
           repository_url: api, state: 'open' })
-        if (url.href === api + '/actions/runs/51') return Response.json({ id: 51, run_attempt: 1,
-          url: url.href, name: 'Web deploy', path: '.github/workflows/web-deploy.yml',
-          repository, head_repository: repository, event: 'push', head_branch: 'main',
-          head_sha: env.APPLICATION_SHA, status: 'completed', conclusion: 'success' })
-        if (url.pathname.endsWith('/actions/runs/51/attempts/1/jobs')) return Response.json({
-          total_count: 1, jobs: [{ id: 61, run_id: 51, name: 'deploy', head_sha: env.APPLICATION_SHA,
-            status: 'completed', conclusion: 'success', steps: [
-              'Build (runs migrations last, as the Vercel build did)', 'Upload the prebuilt output to production',
-              'Verify the public production version before releasing the deployment queue',
-            ].map(name => ({ name, status: 'completed', conclusion: 'success' })) }] })
         assert.fail('Unexpected metadata path')
       }
-      if (url.origin === 'https://api.vercel.com') {
-        assert.equal(new Headers(init.headers).get('authorization'), 'Bearer ' + env.VERCEL_TEAM_TOKEN)
-        if (url.pathname.startsWith('/v4/aliases/')) return Response.json({
-          alias: PRODUCTION_ALIAS, projectId: PROJECT, deploymentId: changed() ? 'dpl_changed' : env.VERCEL_DEPLOYMENT_ID,
-          updatedAt: 1 })
-        if (url.pathname === '/v13/deployments/' + env.VERCEL_DEPLOYMENT_ID) return Response.json({
-          id: env.VERCEL_DEPLOYMENT_ID, projectId: PROJECT, teamId: TEAM, readyState: 'READY',
-          target: 'production', gitSource: { sha: env.APPLICATION_SHA } })
-        assert.fail('Unexpected deployment path')
-      }
-      return Response.json({ build: env.APPLICATION_SHA })
+      // A redeployment of another build is the drift a live build check observes.
+      return Response.json({ build: changed() ? 'f'.repeat(40) : env.APPLICATION_SHA })
     }
     return business.fetchImpl(input, init)
   }
@@ -389,13 +366,11 @@ test('deployed MCP accepts a different real manual driver only after the immutab
   assert.equal(report.applicationSha, APP); assert.equal(report.driverRevision, SOURCE)
   assert.notEqual(report.applicationSha, report.driverRevision)
   assert.equal(report.sourceRevision, report.driverRevision)
-  assert.equal(report.webDeployRunId, 51); assert.equal(report.webAttempt, 1)
-  assert.equal(report.deploymentId, 'dpl_transport')
   assert.equal(target.metadata.some(path => path.endsWith('/git/ref/heads/main')), false)
   assert.equal(report.registrationAttempts, 1)
   assert.equal(report.toolsInvoked, 0); assert.equal(report.modelCalls, 0)
   assert.equal(report.cleanup.unresolvedResources, false)
-  for (const value of [...f.privateValues, target.env.VERCEL_TEAM_TOKEN]) assert.equal(JSON.stringify(report).includes(value), false)
+  for (const value of f.privateValues) assert.equal(JSON.stringify(report).includes(value), false)
 })
 
 test('deployed MCP rejects a foreign attestation before reading owner credentials or registration', async () => {

@@ -1,8 +1,8 @@
 'use client'
 
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { Check, ChevronDown, Circle, Loader2, TerminalSquare, X } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { Check, ChevronDown, Circle, SquareTerminal, X } from '@/components/icons'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { LOCAL_RECONNECT, LOCAL_TARGET, type SshInstallState } from '@mikka/protocol/bridge'
 import type { DeviceView } from '@/app/actions/agents'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Field, FieldGroup, FieldLabel, FieldError } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Item, ItemGroup, ItemSeparator } from '@/components/ui/item'
+import { Spinner } from '@/components/ui/spinner'
 import { bridgeFromWindow, type MikkaWindow } from '@/lib/platform/detect'
 import { cn } from '@/lib/utils'
 import { addedHost, stepStates, visibleSteps, type StepState } from '@/lib/device-ssh-view'
@@ -19,8 +20,8 @@ import { DaemonCommandList } from './connect-device-dialog'
 function StepIcon({ state }: { state: StepState }) {
   if (state === 'done') return <Check aria-hidden="true" className="size-4 text-success-foreground" />
   if (state === 'failed') return <X aria-hidden="true" className="size-4 text-destructive-foreground" />
-  if (state === 'running') return <Loader2 aria-hidden="true" className="size-4 animate-spin text-muted-foreground" />
-  return <Circle aria-hidden="true" className="size-4 text-muted-foreground/60" />
+  if (state === 'running') return <Spinner aria-hidden="true" className="text-muted-foreground" />
+  return <Circle aria-hidden="true" className="size-4 text-tertiary" />
 }
 
 /** #540 adds host details, the key type and cancel to the preload contract; older desktops send aliases only. */
@@ -164,7 +165,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
                   <Item role="option" aria-selected={active} aria-disabled={exists || undefined} size="sm"
                     render={<Button variant="ghost" disabled={exists} onClick={() => { setSelected(host); setOther('') }} />}
                     className={cn('h-auto w-full justify-start gap-2.5 rounded-none px-3 py-2.5 font-normal', active && 'bg-muted')}>
-                    <TerminalSquare aria-hidden="true" className="text-muted-foreground" />
+                    <SquareTerminal aria-hidden="true" className="text-muted-foreground" />
                     <span className="flex min-w-0 flex-1 flex-col text-left">
                       <span className="truncate text-sm">{host}</span>
                       {address && <span className="truncate font-mono text-xs text-muted-foreground">{address}</span>}
@@ -183,7 +184,7 @@ export function SshAddDialog({ open, onOpenChange, devices, onAdded }: {
           {startError && <FieldError className="text-xs">{t('startFailed')}</FieldError>}
           {/* The fallback for a computer without SSH: run the three commands there. */}
           <Button variant="ghost" size="sm" className="-mx-2 self-start text-muted-foreground" aria-expanded={manual} onClick={() => setManual(value => !value)}>
-            {t('manual')}<ChevronDown data-icon="inline-end" className={cn('transition-transform duration-200 motion-reduce:transition-none', manual && 'rotate-180')} />
+            {t('manual')}<ChevronDown data-icon="inline-end" className={cn('transition-transform duration-(--motion-base) motion-reduce:transition-none', manual && 'rotate-180')} />
           </Button>
           {manual && <DaemonCommandList />}
         </div>

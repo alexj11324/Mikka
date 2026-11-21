@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { taskPresentation } from './task-presentation'
+import { boardActivityState, taskPresentation } from './task-presentation'
 
 const issue = { status: 'doing' as const, metadata: { pullRequests: [] } }
 test('Run success is execution evidence; it cannot complete a coding task', () => {
@@ -83,4 +83,12 @@ test('a plan queues an open task and neither Run success nor a receipt rewrites 
       { stage: 'completed', completion }, () => false)
     assert.deepEqual([closed.state, closed.reason, closed.group, closed.needsAction, closed.blockedReason], ['done', null, 'done', null, null])
   }
+})
+
+test('the card hides a dismissed request and shows a visible teammate question', () => {
+  const issue = { status: 'todo', metadata: {pullRequests: []} } as const
+  const task = taskPresentation(issue, {runId:'run',status:'waiting_input',outcome:'needs_input'}, null, () => false)
+  assert.equal(boardActivityState({ ...task, inboxReason: null }).state, 'todo')
+  assert.equal(task.state, 'waiting')
+  assert.equal(boardActivityState({ ...task, state:'todo', inboxReason:'needsReply' }).reason, 'needs_input')
 })

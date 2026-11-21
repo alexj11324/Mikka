@@ -173,17 +173,17 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
   wait = sleep, readerFactory = managedReader, attestation } = {}) {
   const guard = productionGuard(env, event), deployed = guard.targetMode === 'deployed-target'
   const report = { version: 1, purpose: 'workflow-migration-production', issue: 1415,
-    applicationSha: guard.applicationSha, driverRevision: guard.driverRevision, webDeployRunId: guard.webDeployRunId,
+    applicationSha: guard.applicationSha, driverRevision: guard.driverRevision,
     status: 'running', normalSessionObserved: false, teamAdminMembershipVerified: false, sessionClosed: false, submissionCount: 0, cleanupSubmissionCount: 0,
     sdkMutations: 0, cronRequests: 0, databaseWritesByDriver: 0, providerLoginTested: false,
     startedAt: new Date(now()).toISOString(), futureScheduleConfirmedAbsent: false }
   if (deployed) Object.assign(report, { targetMode: guard.targetMode, driverRunId: guard.driverRunId,
-    driverRunAttempt: guard.driverRunAttempt, deploymentId: guard.deploymentId })
+    driverRunAttempt: guard.driverRunAttempt })
   let proof
   try { proof = deployed ? await assertDeployedTarget({ env, event, attestation, fetchImpl, now })
     : await attestProductionReadCache({ env, event, fetchImpl, now, issueNumber: 1415 }) }
   catch (error) { return { ...report, ...(deployed ? publicTargetFailure(error) : { status: 'blocked', code: 'attestation_failed' }) } }
-  if (deployed) Object.assign(report, { targetBefore: proof, webAttempt: proof.webAttempt, webDeployJobId: proof.webDeployJobId })
+  if (deployed) Object.assign(report, { targetBefore: proof })
   if (!proof.readable) return { ...report, status: 'skipped', code: 'issue_closed' }
   const email = env.SMOKE_OWNER_EMAIL, password = env.SMOKE_OWNER_PASSWORD, token = env.VERCEL_TEAM_TOKEN
   check(isSmokeAccountEmail(email) && typeof password === 'string' && password.length > 0, 'account_required')
@@ -192,16 +192,19 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
   const marker = 'm1415-' + randomUUID().replaceAll('-', '').slice(0, 12)
   const at = new Date(Math.ceil(now() / 1000) * 1000 + 180_000).toISOString()
   const definition = reminderDefinition(marker, at)
-  let closeSession = false, owner, chat, baseline = 0, etag, schedule, occurrence, timerId, managed, deploymentId
-  const request = async (path, body, cleanup = false) => {
-    check(isTeamWorkspaceReadPath(path) || path === CHAT || path.startsWith(CHAT + '?') || ['/mikka/api/version', '/mikka/api/auth/get-session',
+  let closeSession = false, owner, workspaceId, chat, baseline = 0, etag, schedule, occurrence, timerId, managed, deploymentId
+  const request = async (path, body, cleanup = false, extraHeaders = {}) => {
+    const eveSend = !!chat?.botId && path === '/mikka/api/agents/eve/v1/session?botId=' + encodeURIComponent(chat.botId)
+    check(eveSend || isTeamWorkspaceReadPath(path) || path === CHAT || path.startsWith(CHAT + '?') || ['/mikka/api/version', '/mikka/api/auth/get-session',
       '/mikka/api/auth/sign-in/email', '/mikka/api/auth/sign-out', '/mikka/api/rpc'].includes(path), 'http_failed')
-    check(body === undefined || path === CHAT || path.endsWith('/sign-in/email') || path.endsWith('/sign-out')
+    check(body === undefined || eveSend && body.clientContext?.expectedOwnerId === owner
+      && body.clientContext?.expectedWorkspaceId === workspaceId
+      && /^[a-f0-9-]{36}$/i.test(extraHeaders['x-mikka-submission-id'] ?? '') || path.endsWith('/sign-in/email') || path.endsWith('/sign-out')
       || path === '/mikka/api/rpc' && (isTeamWorkspaceSwitchRequest(body)
         || body.version === DESKTOP_RPC_VERSION && body.action === 'coordinator.coordinatorHistory'
         && Array.isArray(body.args) && body.args.length === 3 && body.args[0] === chat?.botId
         && Number.isSafeInteger(body.args[1]) && body.args[1] >= baseline && body.args[2] === 1), 'http_failed')
-    const url = new URL(path, ORIGIN), headers = new Headers({ origin: ORIGIN, 'cache-control': 'no-store' })
+    const url = new URL(path, ORIGIN), headers = new Headers({ origin: ORIGIN, 'cache-control': 'no-store', ...extraHeaders })
     const cookie = cookies.header(url); if (cookie) headers.set('cookie', cookie)
     if (body !== undefined) headers.set('content-type', 'application/json')
     if (path === '/mikka/api/rpc') headers.set('x-mikka-rpc', '1')
@@ -264,21 +267,23 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
   const submit = async (text, cleanup = false) => {
     if (!cleanup) await pin()
     if (cleanup) report.cleanupSubmissionCount++; else report.submissionCount++
-    const value = await json(CHAT, { text, submissionId: randomUUID() }, cleanup)
-    check(value.status === 202 && value.value.queued === true && value.value.enabled === true, 'submission_failed')
+    const response = await request('/mikka/api/agents/eve/v1/session?botId=' + encodeURIComponent(chat.botId),
+      { message: text, clientContext: { expectedOwnerId: owner, expectedWorkspaceId: workspaceId } }, cleanup,
+      { 'x-mikka-submission-id': randomUUID() })
+    const value = await response.json().catch(() => null)
+    check(response.status === 202 && value?.ok === true && /^wrun_[A-Za-z0-9_-]+$/.test(value.sessionId ?? '')
+      && typeof value.deliveryId === 'string' && value.deliveryId.length > 0, 'submission_failed')
   }
   try {
     const read = path => vercelRead(path, { token, fetchImpl })
     const alias = activeAlias(await read('/v4/aliases/' + PRODUCTION_ALIAS))
-    if (deployed && alias.deploymentId !== guard.deploymentId) throw new DeployedTargetError('target_changed', { detail: 'alias' })
     const deployment = await read('/v13/deployments/' + encodeURIComponent(alias.deploymentId))
     if (deployed) {
       const project = deployment.projectId ?? deployment.project?.id
       const source = deployment.gitSource?.sha ?? deployment.meta?.githubCommitSha
-      if (project !== PROJECT || (deployment.projectId && deployment.project?.id && deployment.projectId !== deployment.project.id)
-        || source !== guard.applicationSha || (deployment.meta?.githubCommitSha && deployment.meta.githubCommitSha !== source)
-        || deployment.readyState !== 'READY' || deployment.target !== 'production')
-        throw new DeployedTargetError('target_changed', { detail: 'deployment' })
+      check(project === PROJECT && (!deployment.projectId || !deployment.project?.id || deployment.projectId === deployment.project.id)
+        && source === guard.applicationSha && (!deployment.meta?.githubCommitSha || deployment.meta.githubCommitSha === source)
+        && deployment.readyState === 'READY' && deployment.target === 'production', 'deployment_mismatch')
     } else {
     check(deployment.projectId === PROJECT && (deployment.gitSource?.sha ?? deployment.meta?.githubCommitSha) === guard.applicationSha
       && deployment.readyState === 'READY' && deployment.target === 'production', 'deployment_mismatch')
@@ -290,7 +295,7 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
     closeSession = true
     await json('/mikka/api/auth/sign-in/email', { email, password })
     await session(); report.normalSessionObserved = true
-    Object.assign(report, await selectTeamWorkspace({ ownerId: owner,
+    Object.assign(report, await selectTeamWorkspace({ ownerId: owner, onSelected: selected => { workspaceId = selected.workspaceId },
       json: async (path, body) => (await json(path, body)).value }))
     await poll()
     check(chat.enabled === true, 'coordinator_disabled'); check(chat.working === false, 'coordinator_busy')
@@ -335,7 +340,6 @@ export async function runWorkflowMigrationProof({ env = process.env, event, fetc
             report.operationHash = hash(occurrence.operationId)
             await session(); await pin()
             const current = activeAlias(await read('/v4/aliases/' + PRODUCTION_ALIAS))
-            if (deployed && current.deploymentId !== guard.deploymentId) throw new DeployedTargetError('target_changed', { detail: 'alias' })
             check(current.deploymentId === deploymentId, 'deployment_mismatch')
             report.status = 'pass'
             break

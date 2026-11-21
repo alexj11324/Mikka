@@ -1,6 +1,14 @@
 # Linear two-way sync
 
-The integration maps one Linear team to one Mikka account. New issues and changes to already linked issues sync in both directions. The Neon inbox records signed webhook deliveries before responding; an outbox trigger captures app edits in the same transaction as the issue or collaboration write. The Mikka app and OAuth callback remain on Vercel; a Cloudflare Worker receives Linear webhooks and drains the durable inbox and outbox through Hyperdrive.
+The integration maps one Linear team to one Mikka workspace. The team sync (`linear_team_syncs.workspaceId`) belongs to the workspace; a member's personal Linear connection is only the credential that establishes it and never authorizes another workspace's sync. Every sync, dispatch and issue write is scoped to that team's workspace, and the same team cannot be enabled in another workspace. New issues and changes to already linked issues sync in both directions. The Neon inbox records signed webhook deliveries before responding; an outbox trigger captures app edits in the same transaction as the issue or collaboration write. The Mikka app and OAuth callback remain on Vercel; a Cloudflare Worker receives Linear webhooks and drains the durable inbox and outbox through Hyperdrive.
+
+The settings page reads, enables and pauses team sync in the workspace displayed in that window, including when another tab changes the account’s selected workspace.
+
+## Thread origin and write-back
+
+Target contract: a Linear issue that starts work creates one thread in the team's Mikka workspace and records the Linear team, issue id and triggering event as its origin. The thread's final reply, PR link and status are written back to the same Linear issue. Issue-field and comment sync below do not start another thread.
+
+Current behavior: a linked issue's fields and comments sync in both directions, and its Mikka thread messages are mirrored as Linear comments (`lib/linear-sync/comment-sync.ts`); a Linear event does not start a thread.
 
 ## Global PostHog switch
 
@@ -114,7 +122,8 @@ Set these server-only environment variables in the Mikka app and the Linear sync
 | `LINEAR_CLIENT_SECRET` | OAuth code and refresh-token exchange; set in both deployments |
 | `LINEAR_TOKEN_ENCRYPTION_KEY` | 32 random bytes encoded as 64 hex characters; encrypts OAuth tokens stored in Neon; set in both deployments |
 | `LINEAR_WEBHOOK_SECRET` | Linear OAuth application's webhook signing secret; set on the Worker |
-| `CRON_SECRET` | Protects `/mikka/api/cron/linear-sync`; set on the Worker and app if Vercel Cron is also enabled |
+| `LINEAR_AUTOMATIONS_FORWARD_URL` | The app's `https://<host>/mikka/api/webhooks/linear/automations`; set on the Worker so Issue and Comment deliveries also reach 自动化 Linear triggers (the app checks the signature again with its own `LINEAR_WEBHOOK_SECRET`). Unset, Linear starts no automations. |
+| `CRON_SECRET` | Authenticates HTTP calls to `/mikka/api/cron/linear-sync`. Cloudflare Cron Triggers invoke `scheduled()` directly. |
 | `LINEAR_REDIRECT_URL` | Optional exact callback URL override; required on any non-production deployment so its OAuth state is not stored in Production (Mikka's branches have no Vercel Preview) |
 | `HYPERDRIVE` binding | Cloudflare Hyperdrive connection to the same Neon branch used by the app |
 | `NEXT_PUBLIC_POSTHOG_KEY` | Existing public PostHog project token; set in both deployments; missing means sync stays off |
@@ -123,7 +132,7 @@ Generate an encryption key with `openssl rand -hex 32`. Never commit the generat
 
 The suggestions schedules (daily briefings and the webhook backfill) run on a separate Worker; see [suggestions schedules](suggestions-cron.md).
 
-`cloudflare/linear-sync/wrangler.jsonc` binds the Worker to `linear-sync.aspectlylabs.com` and runs its recovery sweep daily at 04:00 UTC. Before deployment, create a Hyperdrive configuration for the target Neon branch, add its ID as the `HYPERDRIVE` binding, and set the Worker secrets above. For local development, the Worker uses its own request-scoped PostgreSQL pool and closes it after each webhook, batch, or scheduled run. Issue writes on Vercel and webhook receipts on Cloudflare still dispatch durable work immediately; the scheduled sweep recovers work interrupted by deployments, timeouts, or provider errors.
+`cloudflare/linear-sync/wrangler.jsonc` binds the Worker to `linear-sync.aspectlylabs.com` and runs its recovery sweep daily at 04:00 UTC. The native [scheduled handler](https://developers.cloudflare.com/workers/runtime-apis/handlers/scheduled/) returns the batch promise so Cron Trigger history records failed invocations. Before deployment, create a Hyperdrive configuration for the target Neon branch, add its ID as the `HYPERDRIVE` binding, and set the Worker secrets above. For local development, the Worker uses its own request-scoped PostgreSQL pool and closes it after each webhook, batch, or scheduled run. Issue writes on Vercel and webhook receipts on Cloudflare still dispatch durable work immediately; the scheduled sweep recovers work interrupted by deployments, timeouts, or provider errors.
 
 ## Synced data
 

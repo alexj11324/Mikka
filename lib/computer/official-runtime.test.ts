@@ -17,7 +17,7 @@ test('a bootstrap names the immutable source and checks a receipt instead of tru
   const sandbox = { commands: { run: async (command: string) => { calls.push(command); return { stdout: calls.length === 1 ? '' : env.MIKKA_CLOUD_WORKER_SHA } } } } as never
   await bootstrapOfficialInstance(sandbox, 'codex', env, async () => 'printf controlled-fixture')
   assert.ok(calls[0].includes(`bash -s -- ${env.MIKKA_CLOUD_WORKER_SOURCE_COMMIT} ${env.MIKKA_CLOUD_WORKER_SHA} codex`))
-  assert.equal(calls[1], 'cat /opt/mikka/worker-source-sha')
+  assert.equal(calls[1], 'python3 /opt/mikka/runtime/ingress-v1/guard.py verify >/dev/null && cat /opt/mikka/worker-source-sha')
   await assert.rejects(bootstrapOfficialInstance({ commands: { run: async () => ({ stdout: 'wrong receipt' }) } } as never, 'desktop', env, async () => ''), /receipt mismatch/)
 })
 

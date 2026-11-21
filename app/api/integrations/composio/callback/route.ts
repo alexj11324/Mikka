@@ -1,5 +1,5 @@
 import { noteLogUser, withRequestLog } from '@/lib/request-log'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from '@/lib/server-runtime/server'
 import { afterJob } from '@/lib/background'
 import { auth, authBaseURL } from '@/lib/auth'
 import { BASE_PATH, withBasePath } from '@/lib/base-path'

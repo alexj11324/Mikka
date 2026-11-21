@@ -27,5 +27,5 @@ export async function loadEveRetrySource(scope:EveScope,position:number):Promise
 
 export async function eveTaskRequestSource(scope:EveScope,id:string,payload:Record<string,unknown>) {
   const root=await eveOriginalRequestSource(scope,id,payload)
-  return root.payload.taskDestination||root.payload.profileId||root.payload.taskTitle?root.id:undefined
+  return root.payload.taskCommand||root.payload.taskDestination||root.payload.profileId||root.payload.taskTitle?root.id:undefined
 }

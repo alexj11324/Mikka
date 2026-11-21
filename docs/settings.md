@@ -41,11 +41,29 @@ The section list is `SETTINGS_SECTIONS` in `lib/settings-sections.ts`; the
 sidebar, URL parsing and page body all read it.
 
 - **Personal (account):** Account, Security, Preferences, Notifications, Memory, Connections, 模型与订阅 (subscriptions, API keys, 运行位置 and 优先使用的模型; it replaced API 与订阅 and Bot 与 Agents), Secrets and logins, Data and privacy, Devices. The same in every workspace. Personal access tokens are built but hidden (`unbuilt`).
-- **Workspace:** General, App & run permissions, Members, Teams, Team permissions (admins), Secrets and environment, Audit log (admins), Usage, Billing, Mikka Cloud (server administrators). A personal workspace has its own workspace settings ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
+- **Workspace:** General, App & run permissions, Members, Teams, Team permissions (admins), Secrets and environment, Run environments, Audit log (admins), Usage, Billing, Mikka Cloud (server administrators). A personal workspace has its own workspace settings ([decision 2026-11-02-0216](design/decisions/2026-11-02-0216-personal-workspace-has-workspace-settings.md), with the full table).
 
 Account and Security hold how the person signs in, including linking Google
 to the Mikka account. Connections holds connected apps (Gmail, Calendar,
 Notion, Slack, Linear, Telegram), even when the app is a Google one.
+
+## Run environments
+
+Settings › Run environments edits the Workspace resources used by task admission.
+A personal Workspace has the same environment editor as a shared Workspace.
+Administrators can create, edit, archive and restore environments; members can
+read the admitted configuration. Setup commands and copied files require the
+explicit setup approval. Editing those steps clears that approval.
+
+Project defaults use the existing Project resource bindings. A repository's
+explicit environment still takes precedence. Changing a default preserves
+repository overrides and the Project's other admitted environments. Revision
+conflicts offer a fresh read before the person retries.
+
+Admission resolves the Project through `workspace_project_tasks` and freezes
+its environment configuration into the Run. Later edits never rewrite that
+snapshot. Archiving blocks new admission to that environment; restoration
+creates a new revision and makes fresh admission possible again.
 
 ## Why
 

@@ -1,6 +1,7 @@
 import { readFile, realpath, stat } from 'node:fs/promises'
 import { extname, join, sep } from 'node:path'
-import { allowedApiPath, normalizedRendererPath, RENDERER_CSP, RENDERER_ORIGIN, rendererAssetPath } from './bundled-policy'
+import { allowedApiPath, DRIVE_BLOB_UPLOAD, normalizedRendererPath, RENDERER_CSP, RENDERER_ORIGIN, rendererAssetPath } from './bundled-policy'
+import { DRIVE_MAX_FILE_BYTES } from '../../../../lib/drive/contract'
 import type { BundledAuth } from './bundled-auth'
 
 const TYPES: Record<string, string> = {
@@ -22,22 +23,28 @@ function failure(status: number, error: string): Response {
   return new Response(JSON.stringify({ error }), { status, headers: localHeaders('application/json') })
 }
 
-export async function boundedRequestBody(request: Request): Promise<ArrayBuffer | undefined> {
+async function boundedRequestBody(request: Request, driveUpload: boolean): Promise<ArrayBuffer | Blob | undefined> {
   if (request.method === 'GET' || request.method === 'HEAD' || !request.body) return undefined
+  const limit = driveUpload ? DRIVE_MAX_FILE_BYTES : MAX_UPLOAD
   const declared = Number(request.headers.get('content-length'))
-  if (Number.isFinite(declared) && declared > MAX_UPLOAD) throw new Error('upload_too_large')
+  if (Number.isFinite(declared) && declared > limit) throw new Error('upload_too_large')
   const reader = request.body.getReader()
+  // Keep large uploads as immutable Blob parts; fetch can read them without
+  // flattening the whole file into a second contiguous buffer in the main process.
   const chunks: Uint8Array[] = []
+  const fileParts: Blob[] = []
   let bytes = 0
   try {
     for (;;) {
       const { done, value } = await reader.read()
       if (done) break
       bytes += value.byteLength
-      if (bytes > MAX_UPLOAD) { await reader.cancel(); throw new Error('upload_too_large') }
-      chunks.push(value)
+      if (bytes > limit) { await reader.cancel(); throw new Error('upload_too_large') }
+      if (driveUpload) fileParts.push(new Blob([value]))
+      else chunks.push(value)
     }
   } finally { reader.releaseLock() }
+  if (driveUpload) return new Blob(fileParts)
   const result = new Uint8Array(bytes)
   let offset = 0
   for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.byteLength }
@@ -63,12 +70,13 @@ export function bundledProtocol(root: string, auth: Pick<BundledAuth, 'request'>
       // artifact frames and external BrowserPane frames cannot borrow main auth.
       const initiator = (request as Request & { initiatorOrigin?: string }).initiatorOrigin
       if ((initiator !== undefined && initiator !== RENDERER_ORIGIN) || (origin && origin !== RENDERER_ORIGIN) || request.headers.get('sec-fetch-site') === 'cross-site' || !allowedApiPath(path, request.method)) return failure(403, 'desktop_route_denied')
+      const driveUpload = DRIVE_BLOB_UPLOAD.test(path)
       try {
         const headers = new Headers()
         request.headers.forEach((value, key) => { if (REQUEST_HEADERS.has(key)) headers.set(key, value) })
         const locale = request.headers.get('x-mikka-locale')
         if (locale === 'en' || locale === 'zh-CN') headers.set('x-mikka-locale', locale)
-        const body = await boundedRequestBody(request)
+        const body = await boundedRequestBody(request, driveUpload)
         const response = await auth.request(`${path}${url.search}`, { method: request.method, headers, body, signal: request.signal })
         if (response.status >= 300 && response.status < 400 && response.status !== 304) return failure(502, 'desktop_redirect_denied')
         const output = localHeaders()
@@ -93,7 +101,12 @@ export function bundledProtocol(root: string, auth: Pick<BundledAuth, 'request'>
           })
         }
         return new Response(request.method === 'HEAD' ? null : stream, { status: response.status, statusText: response.statusText, headers: output })
-      } catch (error) { return failure(error instanceof Error && error.message === 'upload_too_large' ? 413 : 503, 'desktop_backend_unavailable') }
+      } catch (error) {
+        if (error instanceof Error && error.message === 'upload_too_large') {
+          return failure(413, driveUpload ? 'drive_limit_exceeded' : 'desktop_backend_unavailable')
+        }
+        return failure(503, 'desktop_backend_unavailable')
+      }
     }
     if (request.method !== 'GET' && request.method !== 'HEAD') return failure(405, 'method_not_allowed')
     let pathOnDisk = rendererAssetPath(root, url.pathname)

@@ -1,11 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextResponse } from '@/lib/server-runtime/server'
 import { z } from 'zod'
 import { auth } from '@/lib/api-auth'
 import { runEvidence } from '@/lib/captures/store'
 import { withBasePath } from '@/lib/base-path'
 import { runOutsideToken } from '@/lib/tokens/scope'
 
-export const dynamic = 'force-dynamic'
 
 /**
  * `GET /api/runs/:runId/evidence`: what one of the person's threads

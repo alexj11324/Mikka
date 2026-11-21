@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import useSWR from 'swr'
-import { useTranslations } from 'next-intl'
+import { useTranslations } from '@/lib/intl/i18n-client'
 import { listSharedLinks, requestDataExport } from '@/app/actions/account'
 import { stopSharingArtifact } from '@/app/actions/artifacts'
 import { useActionError } from '@/lib/use-action-error'

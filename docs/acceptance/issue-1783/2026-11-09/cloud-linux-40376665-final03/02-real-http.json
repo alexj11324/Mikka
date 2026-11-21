@@ -1,0 +1,36 @@
+{
+  "id": "02-real-http",
+  "title": "Real Vite/Nitro HTTP: activity, media, report and scope",
+  "codeCommit": "40376665ac416ce2228c08b60d7ea8cee97a3de6",
+  "startedAt": "2026-11-09T15:37:51.117Z",
+  "finishedAt": "2026-11-09T15:38:28.566Z",
+  "exitCode": 0,
+  "results": [
+    {
+      "command": [
+        "/usr/local/bin/node",
+        "--import",
+        "./scripts/server-test.mjs",
+        "--import",
+        "tsx",
+        "--test",
+        "--test-reporter=spec",
+        "tests/factory-activity-http.db.test.ts"
+      ],
+      "cwd": "/vercel/Mikka",
+      "startedAt": "2026-11-09T15:37:52.336Z",
+      "finishedAt": "2026-11-09T15:38:26.741Z",
+      "atMs": 35624,
+      "durationMs": 34405,
+      "exitCode": 0,
+      "tests": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "skipped": 0
+      },
+      "accepted": true
+    }
+  ],
+  "finalScreenAtMs": 39249
+}

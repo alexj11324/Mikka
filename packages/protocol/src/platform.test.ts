@@ -44,6 +44,7 @@ function bridge(overrides: Partial<MikkaBridge> = {}): MikkaBridge {
         server: null,
       }),
       pickRepo: async () => ({ status: "cancelled" }),
+      agentLogins: async () => ({ claudeCode: { login: "missing", plan: null }, codex: { login: "missing", plan: null } }),
     },
     quota: { get: async () => ({ status: "unknown" }) as never },
     preview: { html: async () => "mikka-preview://preview" },

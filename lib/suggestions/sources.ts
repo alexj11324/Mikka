@@ -161,8 +161,7 @@ export async function bootstrapSuggestions(userId: string, app: 'composio' | 'li
       : (await read('Composio', () => ensureComposioTriggers(userId, { force: true }))).includes('gmail') && await gmailOn() ? await read('Gmail', () => currentGmail(userId)) : []
     // What was already there goes into the first briefing, not to the Coordinator one by one.
     await ingestNotifications(notifications, { route: false })
-    // Loaded here so the webhook routes that import this module do not pull in the Coordinator workflow.
-    if (await writeFirstBriefing(userId, await manualTimeZone(userId) ?? timeZone)) await (await import('@/lib/coordinator/wake')).wakeCoordinator(userId)
+    await writeFirstBriefing(userId, await manualTimeZone(userId) ?? timeZone)
   } catch (error) {
     console.error('First briefing failed', error instanceof Error ? error.message : error)
   }

@@ -1,13 +1,12 @@
 import { test, expect } from "vitest";
 import { harnessInfoSchema } from "./harness";
-import { deviceHeartbeatSchema, deviceManagementCommand } from "./device";
-test("old harness and heartbeat payloads remain valid", () => {
+import { deviceManagementCommand, deviceReportSchema } from "./device";
+test("old harness payloads remain valid in a device report", () => {
   const harness = { harness: "codex", installed: true, version: null };
   expect(harnessInfoSchema.parse(harness)).toEqual(harness);
   expect(
-    deviceHeartbeatSchema.parse({
+    deviceReportSchema.parse({
       harnesses: [harness],
-      runs: [],
       worktreeDiskBytes: 0,
     }).harnesses,
   ).toEqual([harness]);

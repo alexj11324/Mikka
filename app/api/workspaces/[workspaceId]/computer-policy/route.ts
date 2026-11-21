@@ -3,22 +3,27 @@ import { cloudComputerTasksEnabled } from '@/lib/cloud-computer-flag'
 import { auth, apiWorkspaceAllowed } from '@/lib/api-auth'
 import { pool } from '@/lib/db'
 import { workspaceDb } from '@/lib/workspace-db'
-import { requireWorkspace } from '@/lib/workspace-access'
+import { requireWorkspace, WorkspaceError } from '@/lib/workspace-access'
 import { ComputerStore } from '@/lib/computer/store'
 import { createComputerPolicyHandler } from '@/lib/computer/policy-route'
 
-export const runtime = 'nodejs'
 export const maxDuration = 120
 const handle = createComputerPolicyHandler({
   enabled: () => cloudComputerTasksEnabled(),
   store: new ComputerStore(pool),
-  authorize: async (request, workspaceId, admin) => {
+  withMember: async (request, workspaceId, admin, operation) => {
     const session = await auth.api.getSession({ headers: request.headers })
     if (!session?.user || !apiWorkspaceAllowed(session, workspaceId)) return null
     try {
-      const member = await workspaceDb.transaction(tx => requireWorkspace(tx, workspaceId, session.user.id, admin))
-      return { canEdit: member.membership.role === 'admin' }
-    } catch { return null }
+      return await workspaceDb.transaction(async tx => {
+        const { membership } = await requireWorkspace(tx, workspaceId, session.user.id, admin)
+        // Keep the workspace role authoritative through the application database commit.
+        return operation(membership.role === 'admin')
+      })
+    } catch (error) {
+      if (error instanceof WorkspaceError) return null
+      throw error
+    }
   },
 })
 type Context = { params: Promise<{ workspaceId: string }> }

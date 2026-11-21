@@ -1,33 +1,50 @@
 name: E2B serialized runtime publication
 # The caller holds e2b-official-runtime-release for this entire workflow,
-# including subscriptions, Web publication and cleanup.
+# including template publication and cleanup. Every gate checks
+# the dispatched Cloudflare promotion receipt; there is no other Web publisher.
 on:
   workflow_call:
+    inputs:
+      cloudflare_receipt:
+        description: The caller's verified Cloudflare promotion receipt
+        type: string
+        required: true
+      source_sha:
+        description: The commit that receipt shows Cloudflare serving; its worker is built and published
+        type: string
+        required: true
 permissions:
   contents: read
+env:
+  MIKKA_RUNTIME_SOURCE: ${{ inputs.source_sha }}
 jobs:
   recheck:
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
       contents: read
+      issues: read
       actions: read
     outputs:
       skip: ${{ steps.history.outputs.skip }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Refuse an obsolete source before runtime validation
-        run: node scripts/release/web-deploy.mjs main
+      - name: Recheck the promoted Cloudflare Web after entering the release queue
+        run: node scripts/release/cloudflare-promoted-web.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_RECEIPT: ${{ inputs.cloudflare_receipt }}
       - name: Recheck failures after entering the serialized release queue
         id: history
-        run: node scripts/e2b/runtime-inputs.mjs
+        run: node scripts/e2b/runtime-inputs.mjs recheck
         env:
           GITHUB_TOKEN: ${{ github.token }}
           RETRY_REASON: ${{ github.event.inputs.reason }}
@@ -39,36 +56,39 @@ jobs:
       contents: read
       id-token: write
     uses: ./.github/workflows/e2b-template.yml
-  # Do not take web-deploy-production here: the matching Web job needs that
-  # queue to finish its GitHub build and upload while this read-only job waits.
+    with:
+      source_sha: ${{ inputs.source_sha }}
+  # Cloudflare must still serve this exact commit after the paid candidate build.
   await-web:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 95
     permissions:
       contents: read
+      issues: read
       actions: read
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Await this source's actual Web build and public version
-        run: node scripts/release/web-deploy.mjs await-web
+      - name: Recheck the promoted Cloudflare Web after the real candidate build
+        run: node scripts/release/cloudflare-promoted-web.mjs
         env:
           GITHUB_TOKEN: ${{ github.token }}
-  subscriptions:
+          CLOUDFLARE_RECEIPT: ${{ inputs.cloudflare_receipt }}
+  templates:
     needs: [validate, await-web]
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    concurrency:
-      group: production-smoke-owner-acceptance
-      cancel-in-progress: false
-      queue: max
     permissions:
       contents: read
+      issues: read
+      actions: read
       id-token: write
     outputs:
       release-artifact-id: ${{ steps.release.outputs.artifact-id }}
@@ -77,14 +97,12 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
-      - name: Refuse an obsolete source before real subscription work
-        run: node scripts/release/web-deploy.mjs main
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - name: Require one immutable candidate artifact reference
         run: node scripts/e2b/runtime-report.mjs reference
         env:
@@ -119,51 +137,23 @@ jobs:
           secret-path: /vercel
           secret-name: E2B_API_KEY
           include-imports: false
-      - name: Read the authorized acceptance account email
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /
-          secret-name: SMOKE_OWNER_EMAIL
-          include-imports: false
-      - name: Read the authorized acceptance account password
-        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
-        with:
-          method: oidc
-          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
-          oidc-audience: mikka-infisical
-          project-id: 89850d6a-f020-4936-863e-df77380dfe40
-          env-slug: prod
-          secret-path: /
-          secret-name: SMOKE_OWNER_PASSWORD
-          include-imports: false
-      - name: Require real Claude Code and Codex subscriptions on the private candidates
-        run: node scripts/e2b/validate-template-subscriptions.mjs "$RUNNER_TEMP/e2b-candidates/candidates.json" "$RUNNER_TEMP/accepted.json" "$RUNNER_TEMP/subscription-diagnostics.json"
-      - name: Preserve closed diagnostics and any accepted subscription proof
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: e2b-template-subscription-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ runner.temp }}/subscription-diagnostics.json
-            ${{ runner.temp }}/accepted.json
-          if-no-files-found: warn
-          retention-days: 7
+      - name: Take the built candidates as the release (build-time checks only; E2B runs on the user's own key)
+        run: cp "$RUNNER_TEMP/e2b-candidates/candidates.json" "$RUNNER_TEMP/accepted.json"
+      - name: Recheck the promoted Cloudflare Web before making accepted templates public
+        run: node scripts/release/cloudflare-promoted-web.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_RECEIPT: ${{ inputs.cloudflare_receipt }}
       - name: Make only fully accepted candidates public
         id: publish
         run: |
-          node scripts/release/web-deploy.mjs main
           node --input-type=module - "$RUNNER_TEMP/accepted.json" <<'JS'
           import { readFileSync } from 'node:fs'
           import { join } from 'node:path'
           import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportStep, templateModelsDigest } from './scripts/e2b/runtime-report.mjs'
           reportStep(() => {
             const report = JSON.parse(readFileSync(process.argv[2]))
-            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
+            const expected = { sourceCommit: process.env.MIKKA_RUNTIME_SOURCE, workerSha: process.env.SOURCE_SHA,
               runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
             assertReportIdentity(report, expected)
             const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {
@@ -180,7 +170,7 @@ jobs:
           import { assertCandidatePreserved, assertReportIdentity, readRuntimeReport, reportDigest, reportStep, TEMPLATE_KINDS } from './scripts/e2b/runtime-report.mjs'
           reportStep(() => {
             const bytes = readFileSync(process.argv[2]), report = JSON.parse(bytes)
-            const expected = { sourceCommit: process.env.GITHUB_SHA, workerSha: process.env.SOURCE_SHA,
+            const expected = { sourceCommit: process.env.MIKKA_RUNTIME_SOURCE, workerSha: process.env.SOURCE_SHA,
               runId: process.env.GITHUB_RUN_ID, runAttempt: process.env.GITHUB_RUN_ATTEMPT }
             assertReportIdentity(report, expected)
             const candidate = readRuntimeReport(join(process.env.RUNNER_TEMP, 'e2b-candidates/candidates.json'), {
@@ -204,22 +194,18 @@ jobs:
           path: ${{ runner.temp }}/release.json
           if-no-files-found: error
           retention-days: 7
-  publish:
-    needs: [validate, await-web, subscriptions]
-    permissions:
-      contents: read
-      id-token: write
-    uses: ./.github/workflows/web-deploy.yml
-    with:
-      runtime-refresh: true
-      runtime-worker-sha: ${{ needs.validate.outputs.source-sha }}
-      runtime-template-models-sha256: ${{ needs.validate.outputs.template-models-sha256 }}
-      runtime-template-ids: ${{ needs.subscriptions.outputs.template-ids }}
-      runtime-release-artifact-id: ${{ needs.subscriptions.outputs.release-artifact-id }}
-      runtime-release-sha256: ${{ needs.subscriptions.outputs.release-sha256 }}
+      - name: Verify the Cloudflare release evidence and final public Web
+        run: |
+          node scripts/e2b/runtime-report.mjs reference
+          node scripts/release/cloudflare-promoted-web.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CLOUDFLARE_RECEIPT: ${{ inputs.cloudflare_receipt }}
+          RUNTIME_REPORT_ARTIFACT_ID: ${{ steps.release.outputs.artifact-id }}
+          RUNTIME_REPORT_SHA256: ${{ steps.publish.outputs.release-sha256 }}
   cleanup:
-    needs: [recheck, validate, await-web, subscriptions, publish]
-    if: always() && github.repository == 'alexj11324/Mikka' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.recheck.result == 'success' && needs.recheck.outputs.skip != 'true'
+    needs: [recheck, validate, await-web, templates]
+    if: always() && (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.recheck.result == 'success' && needs.recheck.outputs.skip != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -228,6 +214,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - name: Install the pinned cleanup SDK
         run: |
@@ -271,8 +259,8 @@ jobs:
           retention-days: 7
 
   remember-failure:
-    needs: [recheck, validate, subscriptions, cleanup]
-    if: always() && (needs.validate.result == 'failure' || needs.subscriptions.result == 'failure')
+    needs: [recheck, validate, templates, cleanup]
+    if: always() && (needs.validate.result == 'failure' || needs.templates.result == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -281,6 +269,8 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
+          # The served commit may precede this run's main; its worker inputs come from git.
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:

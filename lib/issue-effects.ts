@@ -14,6 +14,7 @@ export async function runIssueEffect(effect: IssueEffect) {
   switch (effect.kind) {
     case 'sync': return (await import('@/lib/linear-sync/worker')).processLinearIssueOutbox(effect.issueId)
     case 'scope': return (await import('@/lib/issue-scope-judge')).judgeIssueScope(effect.issueId, 'the Mikka app')
+    // A receipt from an older writer may still have this pending effect.
     case 'wake': return (await import('@/lib/coordinator/wake')).wakeCoordinator(effect.userId)
   }
 }

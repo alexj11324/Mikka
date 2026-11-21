@@ -1,8 +1,7 @@
 'use client'
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 
 import { useRef, useState, type FormEvent } from 'react'
-import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { createWorkspace } from '@/app/actions/workspace'
 import { getPathname } from '@/i18n/navigation'
@@ -13,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from '@/components/ui/input-group'
+import { Spinner } from '@/components/ui/spinner'
 
 export function CreateWorkspaceForm() {
   const i18nText = useTranslations();
@@ -62,6 +62,6 @@ export function CreateWorkspaceForm() {
       </Field>
     </FieldGroup>
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-    <Button type="submit" size="lg" disabled={pending || !name.trim() || !slug.trim()}>{pending && <Loader2 className="animate-spin" data-icon="inline-start" />}{pending ? i18nText("Invite.creating") : i18nText("FeatureCopy.c_d92d1b8d")}</Button>
+    <Button type="submit" size="lg" disabled={pending || !name.trim() || !slug.trim()}>{pending && <Spinner data-icon="inline-start" aria-hidden="true" />}{pending ? i18nText("Invite.creating") : i18nText("FeatureCopy.c_d92d1b8d")}</Button>
   </form>
 }

@@ -23,7 +23,7 @@ function fixture(shared: boolean) {
   const query = async (sql: string, values: unknown[]) => {
     calls.push(sql)
     if (sql.includes('JOIN byos_connections c')) {
-      assert.ok(sql.includes('JOIN agents a') && sql.includes('c.epoch=b."connectionRevision"') && sql.includes('workspace_subscription_shares'))
+      assert.ok(sql.includes('JOIN agents a') && sql.includes('c.epoch=b."connectionRevision"') && !sql.includes('workspace_subscription_shares'))
       assert.ok(sql.includes('b."ownerId"=$6') && sql.includes('b."workspaceId"=$5'))
       assert.deepEqual(values, [userId, agentId, 'codex_cli', binding.id, workspaceId, binding.ownerId, 'codex'])
       const valid = state.present && state.share && state.agentOwned && state.connected && !state.paused && state.epoch === binding.connectionRevision
@@ -37,19 +37,24 @@ function fixture(shared: boolean) {
   return { binding, calls, state, pool: { query } as unknown as Pick<Pool, 'query'> }
 }
 
-for (const shared of [false, true]) test(`native ${shared ? 'shared' : 'own'} execution combines its final binding and connection read`, async () => {
-  const f = fixture(shared)
+test('native own execution combines its final binding and connection read', async () => {
+  const f = fixture(false)
   assert.deepEqual(await nativeRunBinding(f.pool, userId, agentId, 'codex', workspaceId, f.binding.id), f.binding)
   assert.equal(f.calls.length, 2)
-  assert.deepEqual(members, shared ? [userId, 'payor'] : [])
+  assert.deepEqual(members, [])
 })
 
-for (const changed of ['present', 'share', 'agentOwned', 'connected', 'epoch'] as const) test(`native execution rereads ${changed} after both membership checks`, async () => {
+test("a teammate's subscription binding never schedules the requester's native run", async () => {
   const f = fixture(true)
-  afterMember = () => { if (members.length === 2) { if (changed === 'epoch') f.state.epoch++; else f.state[changed] = false } }
   assert.equal(await nativeRunBinding(f.pool, userId, agentId, 'codex', workspaceId, f.binding.id), null)
-  assert.deepEqual(members, [userId, 'payor'])
-  assert.equal(f.calls.length, 2)
+  assert.equal(f.calls.length, 1)
+  assert.deepEqual(members, [])
+})
+
+for (const changed of ['present', 'agentOwned', 'connected', 'epoch'] as const) test(`native execution rereads ${changed} in its final read`, async () => {
+  const f = fixture(false)
+  if (changed === 'epoch') f.state.epoch++; else f.state[changed] = false
+  assert.equal(await nativeRunBinding(f.pool, userId, agentId, 'codex', workspaceId, f.binding.id), null)
 })
 
 test('a native scheduling history read still exposes an unavailable selection for existing callers', async () => {

@@ -26,3 +26,19 @@ export function nextWhen(iso: string) {
   const date = days === 1 ? mobileMessages.MobileCore.tomorrow : mobileLocale === 'zh-CN' ? `${d.getMonth() + 1}月${d.getDate()}日` : dateFormat.format(d)
   return `${date} ${clockTime(iso)}`
 }
+
+/**
+ * How long ago, as Capy's activity log says it: 「刚刚」, 「5 分钟前」, 「3 小时前」, 「2 天前」; a month or more is its date.
+ * A clock ahead of the phone's reads as now.
+ */
+export function agoWhen(iso: string, now = Date.now()) {
+  const at = Date.parse(iso)
+  if (!Number.isFinite(at)) return ''
+  const minutes = Math.floor(Math.max(0, now - at) / 60_000)
+  const words = mobileMessages.MobileCore.ago
+  if (minutes < 1) return words.now
+  if (minutes < 60) return words.minutes.replace('{count}', String(minutes))
+  if (minutes < 24 * 60) return words.hours.replace('{count}', String(Math.floor(minutes / 60)))
+  const days = Math.floor(minutes / (24 * 60))
+  return days < 30 ? words.days.replace('{count}', String(days)) : shortWhen(iso)
+}

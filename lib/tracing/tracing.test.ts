@@ -13,7 +13,7 @@ import { afterJob, cronJob } from '@/lib/background'
 import { describeSample, withDatabaseOperation } from '@/lib/db/egress-sample'
 import { manageDatabasePool } from '@/lib/db/pool-lifecycle'
 import { currentRoute, routeScope } from './labels'
-import { traceSampleRate, traceSettings } from './config'
+import { traceEnvironment, traceSampleRate, traceSettings } from './config'
 import { EXPORT_PAUSE_MS, SafeExporter, createPgInstrumentation, createTracerProvider } from './node'
 import { normalizeStatement, sanitizeAttributes, scrubString, statementId } from './sanitize'
 import { approximateBytes, clientKindFor, pgResponseHook } from './spans'
@@ -280,10 +280,16 @@ describe('server tracing', () => {
 })
 
 describe('sampling and settings', () => {
-  test('tests, CI and builds never trace; 10% by default; 1 allowed in dev', () => {
+  test('an explicit deployment stage labels traces without enabling Vercel platform behavior', () => {
+    assert.equal(traceEnvironment({ MIKKA_DEPLOYMENT_STAGE: 'production' }), 'production')
+    assert.equal(traceEnvironment({ MIKKA_DEPLOYMENT_STAGE: 'preview', VERCEL_ENV: 'production' }), 'preview')
+    assert.equal(traceEnvironment({ MIKKA_DEPLOYMENT_STAGE: 'development', VERCEL_ENV: 'production' }), 'dev')
+    assert.throws(() => traceEnvironment({ MIKKA_DEPLOYMENT_STAGE: 'prod' }), /MIKKA_DEPLOYMENT_STAGE_INVALID/)
+    assert.equal(traceSampleRate({ MIKKA_DEPLOYMENT_STAGE: 'production', CI: 'true' }), 0, 'CI remains untraced')
+  })
+  test('tests and CI never trace; 10% by default; 1 allowed in dev', () => {
     assert.equal(traceSampleRate({ NODE_ENV: 'test', MIKKA_TRACE_SAMPLE_RATE: '1' }), 0)
     assert.equal(traceSampleRate({ CI: 'true', MIKKA_TRACE_SAMPLE_RATE: '1' }), 0)
-    assert.equal(traceSampleRate({ NEXT_PHASE: 'phase-production-build' }), 0)
     assert.equal(traceSampleRate({ VERCEL: '1', CI: '1', VERCEL_ENV: 'production' }), 0.1)
     assert.equal(traceSampleRate({}), 0.1)
     assert.equal(traceSampleRate({ NODE_ENV: 'development', MIKKA_TRACE_SAMPLE_RATE: '1' }), 1)
@@ -357,6 +363,7 @@ describe('helpers', () => {
     assert.equal(scrubString('fetch POST https://api.example.com/v1/a?key=k#frag'), 'fetch POST https://api.example.com/v1/a')
     assert.equal(scrubString('from bob@example.com at 10.1.2.3 or 2001:db8::1'), 'from [email] at [ip] or [ip]')
     assert.equal(scrubString('/v1/devices/[deviceId]/commands'), '/v1/devices/[deviceId]/commands')
+    assert.equal(scrubString('POST /mikka/api/webhooks/automations/mwh_AbC-d_123'), 'POST /mikka/api/webhooks/automations/mwh_[key]', 'an automation webhook key never leaves the process')
   })
 
   test('a multi-statement result sums its rows and keeps the last command', () => {

@@ -4,7 +4,8 @@ import type { SandboxConnection } from 'eve/sandbox/provider'
 
 type Entry={path:string;kind:'directory'|'file'|'symlink';mode:number;mtime:number;content?:string;target?:string}
 export type ScratchSnapshot={version:1;entries:Entry[];env:Record<string,string>}
-export type ScratchMutation=<T>(work:(snapshot:ScratchSnapshot)=>Promise<{snapshot:ScratchSnapshot;value:T}>)=>Promise<T>
+export type ScratchMutationResult<T> = {value:T; snapshot?:ScratchSnapshot}
+export type ScratchMutation=<T>(work:(snapshot:ScratchSnapshot)=>Promise<ScratchMutationResult<T>>)=>Promise<T>
 const maxBytes=64*1024*1024
 // Eve's native workspace boundary uses GNU realpath's -e -z protocol.
 // This command resolves only the virtual filesystem supplied by JustBash.
@@ -55,12 +56,12 @@ async function capture(fs:InMemoryFs,bash:Bash):Promise<ScratchSnapshot> {
  * operation commits independently; an idle connection owns no database client. */
 export function scratchConnection(mutate:ScratchMutation):SandboxConnection {
   const processes=new Set<{controller:AbortController;done:Promise<unknown>}>()
-  const change=<T>(work:(fs:InMemoryFs,bash:Bash)=>Promise<T>,signal?:AbortSignal)=>mutate(async snapshot=>{
+  const access=<T>(mode:'read'|'write',work:(fs:InMemoryFs,bash:Bash)=>Promise<T>,signal?:AbortSignal)=>mutate(async snapshot=>{
     signal?.throwIfAborted()
     const {fs,bash}=await restore(snapshot)
     const value=await work(fs,bash)
     signal?.throwIfAborted()
-    return {snapshot:await capture(fs,bash),value}
+    return mode === 'write' ? {snapshot:await capture(fs,bash),value} : {value}
   })
   const stop=async()=>{for(const p of processes)p.controller.abort();await Promise.allSettled([...processes].map(p=>p.done))}
   return {
@@ -70,15 +71,15 @@ export function scratchConnection(mutate:ScratchMutation):SandboxConnection {
       if(stdin)throw new Error('The JustBash sandbox does not support streaming stdin.')
       const controller=new AbortController(),abort=()=>controller.abort(signal?.reason)
       signal?.addEventListener('abort',abort,{once:true})
-      const done=change(async(_fs,bash)=>bash.exec(command,{cwd:workingDirectory,env,signal:controller.signal}),controller.signal)
+      const done=access('write',async(_fs,bash)=>bash.exec(command,{cwd:workingDirectory,env,signal:controller.signal}),controller.signal)
       const active={controller,done};processes.add(active)
       void done.finally(()=>{processes.delete(active);signal?.removeEventListener('abort',abort)}).catch(()=>{})
       const stream=(kind:'stdout'|'stderr')=>new ReadableStream<Uint8Array>({start(c){void done.then(result=>{const bytes=kind==='stdout'?Buffer.from(latin1FromBytes(stdoutAsBytes(result)),'latin1'):new TextEncoder().encode(result.stderr);if(bytes.length)c.enqueue(bytes);c.close()},error=>c.error(error))}})
       return {stdout:stream('stdout'),stderr:stream('stderr'),wait:async()=>({exitCode:(await done).exitCode}),kill:async()=>{controller.abort();await done.catch(()=>{})}}
     },
-    readFile:({path,signal})=>change(async fs=>await fs.exists(path)?fs.readFileBuffer(path):null,signal),
-    writeFiles:({files,signal})=>change(async fs=>{for(const file of files){await fs.mkdir(posix.dirname(file.path),{recursive:true});await fs.writeFile(file.path,file.content)}},signal),
-    removePath:({path,force,recursive,signal})=>change(fs=>fs.rm(path,{force,recursive}),signal),
+    readFile:({path,signal})=>access('read',async fs=>await fs.exists(path)?fs.readFileBuffer(path):null,signal),
+    writeFiles:({files,signal})=>access('write',async fs=>{for(const file of files){await fs.mkdir(posix.dirname(file.path),{recursive:true});await fs.writeFile(file.path,file.content)}},signal),
+    removePath:({path,force,recursive,signal})=>access('write',fs=>fs.rm(path,{force,recursive}),signal),
     stop,close:stop,
   }
 }

@@ -12,7 +12,7 @@ import { pendingActions } from '@/lib/db/schema'
 import { proposeAppToolCall } from '@/lib/pending-action-store'
 import { isToolkitSlug, OWN_INTEGRATIONS } from '@/lib/composio-accounts'
 import { composioToolkitLister, isNoAuthToolkit } from '@/lib/plugins/catalog'
-import { MAX_RUN_APP_TOOLS, runAppTool, type RunAppScope } from '@/lib/run-app-mcp'
+import { MAX_RUN_APP_TOOLS, runAppCall, runAppTool, type RunAppScope } from '@/lib/run-app-mcp'
 import type { NativeWriteReview } from './operations/native-write-review'
 
 type Client = NonNullable<ReturnType<typeof getComposio>>
@@ -90,8 +90,22 @@ export function runAppEntry(scope: RunAppScope) {
     return execute(call, accountId)
   }
   return {
-    list: async () => (await client.tools.getRawComposioTools({ toolkits: [scope.toolkit], limit: MAX_RUN_APP_TOOLS }) as AppTool[])
-      .flatMap(tool => runAppTool(tool, scope.toolkit) ?? []),
-    call: (tool: string, args: Record<string, unknown>) => callAppTool(deps, { toolkit: scope.toolkit, tool, arguments: args }),
+    list: async () => {
+      const [tools, accounts] = await Promise.all([
+        client.tools.getRawComposioTools({ toolkits: [scope.toolkit], limit: MAX_RUN_APP_TOOLS }) as Promise<AppTool[]>,
+        deps.resolveAccount(scope.toolkit),
+      ])
+      return tools.flatMap(tool => runAppTool(tool, scope.toolkit, accounts) ?? [])
+    },
+    call: async (tool: string, args: Record<string, unknown>) => {
+      let definition: AppTool
+      try { definition = await deps.getTool(tool) } catch { return { error: 'integrationToolNotFound' } }
+      if (definition.slug !== tool || !runAppTool(definition, scope.toolkit)) return { error: 'integrationToolNotFound' }
+      const input = runAppCall(definition, scope.toolkit, args)
+      if (!input) return { error: 'invalidIntegrationInput' }
+      // Resolve the current tool once. The existing owner/account selection,
+      // policy, pinned version and per-use run checks remain in callAppTool.
+      return callAppTool({ ...deps, getTool: async slug => slug === definition.slug ? definition : deps.getTool(slug) }, input)
+    },
   }
 }

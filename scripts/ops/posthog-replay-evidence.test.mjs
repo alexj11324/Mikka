@@ -199,3 +199,17 @@ test('a later failed read replaces an old success receipt and unknown metadata s
   assert.equal((await receipt(cwd)).status, 'failed')
   assert.equal((await receipt(cwd)).snapshot, undefined)
 })
+
+test('an oversized response releases its stream and preserves the refusal reason', async t => {
+  const cwd = await temporaryDirectory(t)
+  let cancelled = false
+  const body = new ReadableStream({
+    start(controller) { controller.enqueue(new Uint8Array(1024 * 1024 + 1)) },
+    cancel() { cancelled = true; return new Promise(() => {}) },
+  })
+  const fake = recordingFetch([new Response(body)])
+  await assert.rejects(replayEvidence({ ...target, timeoutMs: 1000 }, { cwd, key, fetchImpl: fake.fetchImpl }),
+    error => error.code === 'response_too_large' && error.phase === 'metadata')
+  assert.equal(cancelled, true)
+  assert.equal(body.locked, false)
+})

@@ -1,8 +1,8 @@
 'use client'
 
 import { useRef, useState, type FormEvent } from 'react'
-import { useLocale, useTranslations } from 'next-intl'
-import { Ellipsis, EyeIcon, EyeOffIcon, LockIcon, Plus } from 'lucide-react'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
+import { Ellipsis, Eye, EyeOff, Lock, Plus } from '@/components/icons'
 import type { SavedLogin } from '@/lib/settings/saved-logins'
 import { useSavedLoginEditor, useSavedLoginUsage, useSavedLogins, withoutScheme } from '@/hooks/settings/use-secrets'
 import { MikkaMarkSmall } from '@/components/brand/mikka-mark'
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@/components/ui/input-group'
 import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Spinner } from '@/components/ui/spinner'
-import { SettingsLoading, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
+import { SettingsLoading, SettingsSaveError, SettingsSection, settingsSectionAction } from '@/components/settings/primitives'
 import { relativeTime } from '@/lib/relative-time'
 import { usePresence } from '@/lib/use-presence'
 import { cn } from '@/lib/utils'
@@ -29,6 +29,7 @@ type Editing = { kind: 'new' } | { kind: 'password'; login: SavedLogin }
  */
 export function SavedLoginsSettings() {
   const t = useTranslations('Settings.logins')
+  const common = useTranslations('Common')
   const locale = useLocale()
   const saved = useSavedLogins()
   const { logins, deleteError, remove } = saved
@@ -43,7 +44,7 @@ export function SavedLoginsSettings() {
   return <>
     <SettingsSection id="saved-logins-heading" title={t('heading')} action={logins.length > 0 ? <Button {...settingsSectionAction} onClick={add}>{t('add')}</Button> : undefined}>
       {isLoading && <SettingsLoading label={t('loading')} rows={3} bare />}
-      {error && <FieldError className="px-5 py-3">{t('loadError')}</FieldError>}
+      {error && <SettingsSaveError message={t('loadError')} retryLabel={common('retry')} onRetry={() => { void saved.reload() }} />}
       {!isLoading && !error && logins.length === 0 && <div className="flex flex-col items-start gap-3 px-5 py-6">
         <p className="text-sm text-muted-foreground">{t('empty')}</p>
         <Button type="button" variant="secondary" size="sm" onClick={add}><Plus data-icon="inline-start" />{t('add')}</Button>
@@ -137,14 +138,14 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
             <InputGroup>
               <InputGroupInput ref={passwordField} id="saved-login-password" type={reveal ? 'text' : 'password'} autoComplete="new-password" spellCheck={false} aria-invalid={error ? true : undefined} value={password} onChange={event => { setPassword(event.target.value); setError(null) }} disabled={pending} />
               <InputGroupAddon align="inline-end">
-                <InputGroupButton size="icon-xs" aria-label={reveal ? card('hidePassword') : card('showPassword')} aria-pressed={reveal} onClick={() => setReveal(value => !value)}>{reveal ? <EyeOffIcon /> : <EyeIcon />}</InputGroupButton>
+                <InputGroupButton size="icon-xs" aria-label={reveal ? card('hidePassword') : card('showPassword')} aria-pressed={reveal} onClick={() => setReveal(value => !value)}>{reveal ? <EyeOff /> : <Eye />}</InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
             {error && <FieldError>{error}</FieldError>}
           </Field>
         </FieldGroup>
         <SheetFooter className="flex-row items-center">
-          <span className="mr-auto flex items-center gap-1 text-xs text-muted-foreground"><LockIcon className="size-3" />{card('securedBy')}<MikkaMarkSmall />Mikka</span>
+          <span className="mr-auto flex items-center gap-1 text-xs text-muted-foreground"><Lock className="size-3" />{card('securedBy')}<MikkaMarkSmall />Mikka</span>
           <Button type="button" variant="outline" disabled={pending} onClick={() => onClose(false)}>{t('cancel')}</Button>
           <Button type="submit" disabled={pending || !ready}>{pending ? <Spinner data-icon="inline-start" /> : null}{t('save')}</Button>
         </SheetFooter>
@@ -155,10 +156,11 @@ function LoginSheet({ editing, open, onOpenChangeComplete, onClose }: { editing:
 
 function UsageList({ id }: { id: string }) {
   const t = useTranslations('Settings.logins')
+  const common = useTranslations('Common')
   const locale = useLocale()
-  const { uses, loading: isLoading, failed: error } = useSavedLoginUsage(id)
+  const { uses, loading: isLoading, failed: error, reload } = useSavedLoginUsage(id)
   if (isLoading) return <SettingsLoading label={t('usageLoading')} rows={2} bare />
-  if (error) return <FieldError>{t('usageError')}</FieldError>
+  if (error) return <SettingsSaveError message={t('usageError')} retryLabel={common('retry')} onRetry={() => { void reload() }} />
   if (uses.length === 0) return <p className="text-sm text-muted-foreground">{t('usageEmpty')}</p>
   return <div className="flex max-h-80 flex-col divide-y divide-border overflow-auto">
     {uses.map(use => <div key={use.id} className="flex flex-col gap-0.5 py-2.5">

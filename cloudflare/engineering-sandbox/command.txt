@@ -1,0 +1,36 @@
+const { mkdir, mkdtemp, writeFile, readFile } = await import('node:fs/promises')
+const { dirname } = await import('node:path')
+const { spawn } = await import('node:child_process')
+let input = ''
+for await (const chunk of process.stdin) input += chunk
+const { files, workload } = JSON.parse(input)
+const { tmpdir } = await import('node:os')
+const root = await mkdtemp(tmpdir() + '/mikka-test-')
+for (const file of files) {
+  await mkdir(root + '/' + dirname(file.path), { recursive: true })
+  await writeFile(root + '/' + file.path, file.text)
+}
+const suite = workload === 'postgres-policy' ? '/opt/mikka-engineering/pg17.test.mjs' : files[0].path
+const child = spawn(process.execPath, ['--test', '--test-reporter=tap', suite], {
+  cwd: root, env: { PATH: '/usr/local/bin:/usr/bin:/bin', HOME: '/tmp' }, stdio: ['ignore', 'pipe', 'pipe'],
+})
+let log = Buffer.alloc(0)
+let bytes = 0
+function collect(chunk) {
+  bytes += chunk.length
+  log = Buffer.concat([log, chunk]).subarray(-24000)
+}
+child.stdout.on('data', collect)
+child.stderr.on('data', collect)
+const exitCode = await new Promise((resolve, reject) => {
+  child.once('error', reject)
+  child.once('close', (status) => resolve(status ?? 1))
+})
+async function counter(name) {
+  try { return (await readFile('/sys/fs/cgroup/' + name, 'utf8')).trim() }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error }
+}
+process.stdout.write(JSON.stringify({
+  exitCode, node: process.version, output: log.toString(), outputTruncated: bytes > log.length,
+  cpuStat: await counter('cpu.stat'), memoryBytes: await counter('memory.current'),
+}))

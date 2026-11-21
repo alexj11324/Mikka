@@ -31,7 +31,7 @@ async function getArtifactText(id: string, version: number) {
   return texts.get(key) ?? null
 }
 const translate = (key: string) => key
-mock.module('next-intl', { namedExports: { useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'now' }) } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'en', useTranslations: () => translate, useFormatter: () => ({ dateTime: () => 'now' }) } })
 mock.module('sonner', { namedExports: { toast: {
   error: (_message: string, options: { id: string; action?: { onClick: (event: Event) => void } }) => { notices.set(options.id, options) },
   dismiss: (id: string) => { notices.delete(id) },

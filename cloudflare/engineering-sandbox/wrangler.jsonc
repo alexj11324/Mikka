@@ -1,0 +1,24 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "mikka-engineering-sandbox",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "preview_urls": false,
+  "limits": { "cpu_ms": 1000 },
+  "durable_objects": {
+    "bindings": [
+      { "name": "RUNS", "class_name": "EngineeringRun" },
+      { "name": "CAPACITY", "class_name": "EngineeringCapacity" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["EngineeringRun", "EngineeringCapacity"] }],
+  "containers": [{
+    "name": "mikka-engineering-sandbox",
+    "class_name": "EngineeringRun",
+    "scheduling_policy": "durable_object",
+    "images": {
+      "postgres": { "dockerfile": "./postgres/Dockerfile", "build_context": "./postgres" }
+    }
+  }]
+}

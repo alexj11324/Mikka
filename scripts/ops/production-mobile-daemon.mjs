@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // One bounded normal-owner production API proof. It runs no daemon service,
 // agents, model calls, cloud machines or SQL. Credentials never enter reports.
+import { readRendererActions } from '../../lib/renderer-actions.mjs'
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
@@ -128,8 +129,10 @@ async function normalDeploymentGate({ env, fetchImpl }) {
 }
 
 export async function runMobileDaemonProof({ env = process.env, event, attestation, fetchImpl = fetch, now = Date.now,
-  wait = delay, clientLoader = repositoryClient, deploymentGate = normalDeploymentGate, socketFactory, recoveryAnchor } = {}) {
+  wait = delay, clientLoader = repositoryClient, deploymentGate = normalDeploymentGate, socketFactory, recoveryAnchor,
+  releaseWitness } = {}) {
   const core = env.MIKKA_ACCEPTANCE_TARGET_MODE === CORE_MODE
+  const deployed = env.MIKKA_ACCEPTANCE_TARGET_MODE === 'deployed-target'
   const report = { version: 1, scope: 'production-mobile-and-source-daemon-http', status: 'fail',
     applicationSha: SHA.test(env.APPLICATION_SHA ?? '') ? env.APPLICATION_SHA : null,
     runnerSha: SHA.test(env.GITHUB_SHA ?? '') ? env.GITHUB_SHA : null,
@@ -148,6 +151,10 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     Object.assign(report.cleanup, { liveSocketClosed: true, deviceSocketClosed: true })
     report.boundaries = { modelRequestsByDriver: 0, cloudComputerBoots: 0, databaseAccessByDriver: false,
       browserExercised: false, providerLoginExercised: false, quotaEnforcementExercised: false, settlementExercised: false }
+  }
+  if (releaseWitness) {
+    report.checks.deviceGateway = false
+    report.cleanup.deviceSocketClosed = true
   }
   const jar = responseCookieJar(now)
   const marker = (core ? 'selfhost-core-' : 'm1415-wire-') + randomUUID()
@@ -170,11 +177,27 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     ...(cleanupResponse?.phase === phase ? { http: cleanupResponse.http } : {}) })
   }
   const verifyDeployment = async () => {
+    if (releaseWitness) {
+      check(!core && !deployed && SHA.test(releaseWitness.source) && SHA.test(releaseWitness.overlay)
+        && SHA.test(releaseWitness.driver) && ['vercel','cloudflare'].includes(releaseWitness.provider),
+      'configuration_invalid')
+      const response = await fetchImpl(ORIGIN + BASE + '/api/version', {
+        redirect: 'error', cache: 'no-store', headers: { 'cache-control': 'no-store' }, signal: AbortSignal.timeout(15_000),
+      })
+      check(response.ok && !response.redirected, 'deployment_mismatch')
+      const version = await response.json()
+      check(version.build === releaseWitness.source && version.overlaySha === releaseWitness.overlay
+        && (releaseWitness.provider === 'vercel' ? response.headers.has('x-vercel-id')
+          : !response.headers.has('x-vercel-id') && response.headers.has('cf-ray')), 'deployment_mismatch')
+      Object.assign(report, { targetMode:'release-witness', applicationSha:version.build,
+        overlaySha:version.overlaySha, provider:releaseWitness.provider, driverRevision:releaseWitness.driver })
+      report.client.sourceRevision = releaseWitness.driver
+      return
+    }
     if (core) {
       targetProof = await assertCoreProductionTarget({ env, event, attestation: targetProof, fetchImpl, now })
       Object.assign(report, { targetMode: CORE_MODE, applicationSha: targetProof.applicationSha,
         driverRevision: targetProof.driverRevision, driverRunId: targetProof.driverRunId, driverRunAttempt: targetProof.driverRunAttempt,
-        webDeployRunId: targetProof.webDeployRunId, webAttempt: targetProof.webAttempt, webDeployJobId: targetProof.webDeployJobId,
         openIssues: targetProof.openIssues })
       report.client.sourceRevision = targetProof.driverRevision
       return
@@ -183,9 +206,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     const proof = await assertDeployedTarget({ env, event, attestation: targetProof, fetchImpl, now })
     targetProof = proof
     Object.assign(report, { targetMode: proof.targetMode, applicationSha: proof.applicationSha,
-      driverRevision: proof.driverRevision, driverRunId: proof.driverRunId, driverRunAttempt: proof.driverRunAttempt,
-      webDeployRunId: proof.webDeployRunId, webAttempt: proof.webAttempt, webDeployJobId: proof.webDeployJobId,
-      deploymentId: proof.deploymentId })
+      driverRevision: proof.driverRevision, driverRunId: proof.driverRunId, driverRunAttempt: proof.driverRunAttempt })
     // This client comes from the real driver checkout, not the separately deployed application.
     report.client.sourceRevision = proof.driverRevision
   }
@@ -202,7 +223,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   async function owner(path, method = 'GET', body, cookieOverride) {
     const known = new Set(['/api/auth/sign-in/email', '/api/auth/sign-out',
       '/api/auth/get-session?disableCookieCache=true', '/api/auth/get-session', '/api/workspace', '/api/mobile/home',
-      '/api/device-tokens', '/api/devices/enrollment', '/api/rpc', '/renderer-manifest.json'])
+      '/api/device-tokens', '/api/devices/enrollment', '/api/rpc', '/renderer-manifest.json', '/renderer-actions.json'])
     check(known.has(path) || (core && method === 'GET' && body === undefined && (path === '/api/desktop/discovery'
       || ownerLiveWorkspaceId && path === '/api/live/ticket?workspace=' + ownerLiveWorkspaceId))
       || (method === 'GET' && body === undefined && isTeamWorkspaceReadPath(BASE + path))
@@ -281,8 +302,8 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     const target = deviceId ?? unusedDeviceId
     check(url.origin === ORIGIN && !url.search && !url.hash
       && ((method === 'POST' && url.pathname === BASE + '/v1/devices/register')
-        || (method === 'POST' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/heartbeat')
-        || (core && method === 'GET' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/gateway')
+        || (method === 'POST' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/report')
+        || ((core || releaseWitness) && method === 'GET' && deviceId && url.pathname === BASE + '/v1/devices/' + deviceId + '/gateway')
         || (method === 'GET' && url.pathname === BASE + '/v1/devices/' + target + '/repos'))
       && headers.get('authorization') === 'Bearer ' + credential && !headers.has('cookie')
       && headers.get('x-mikka-client-version') === contract.version, 'request_rejected')
@@ -318,7 +339,11 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   }
 
   try {
-    proofConfiguration(env, event)
+    if (releaseWitness) {
+      check(isSmokeAccountEmail(env.SMOKE_OWNER_EMAIL) && Boolean(env.SMOKE_OWNER_PASSWORD), 'configuration_invalid')
+    } else {
+      proofConfiguration(env, event)
+    }
     phase = 'deployment'
     await verifyDeployment()
     report.checks.deployment = true
@@ -383,7 +408,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       report.checks.discoveryAndFlags = true
     }
     phase = 'resource-baseline'
-    const manifest = await owner('/renderer-manifest.json')
+    const manifest = await readRendererActions(owner)
     check(manifest.status === 200, 'manifest_unavailable')
     const used = publishedActions(manifest.body)
     check(ACTIONS.every(action => used.has(action)), 'manifest_unavailable')
@@ -448,7 +473,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     check(disabled.success === true && (await devices()).find(row => row.id === deviceId)?.enabled === false,
       'device_disable_failed')
     report.checks.schedulingDisabled = true
-    if (core) {
+    if (core || releaseWitness) {
       phase = 'core-device-gateway'
       const ticket = await client.deviceGateway(deviceId)
       deviceSocket = coreDeviceSocket(ticket, { deviceId, now, socketFactory })
@@ -456,14 +481,14 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
       await deviceSocket.ping()
       report.checks.deviceGateway = true
     }
+    // The device report replaces the heartbeat (decision 2026-11-17-2215): it renews
+    // nothing and records no presence, which follows the gateway socket.
     phase = 'heartbeat'
-    const beat = await client.heartbeat(deviceId, { harnesses: [], runs: [], worktreeDiskBytes: 0,
-      computerUse: { installed: false, version: null }, deviceType: 'server' })
-    check(beat && typeof beat.leases === 'object' && Object.keys(beat.leases).length === 0
-      && (beat.revoked ?? []).length === 0 && (beat.deviceCommands ?? []).length === 0
+    const beat = await client.report(deviceId, { harnesses: [], computerUse: { installed: false, version: null }, deviceType: 'server' })
+    check(beat && !('leases' in beat) && (beat.deviceCommands ?? []).length === 0
       && !beat.cloudCredential, 'heartbeat_failed')
     const present = (await devices()).find(row => row.id === deviceId)
-    check(present?.name === marker && present.online === true && present.enabled === false, 'heartbeat_failed')
+    check(present?.name === marker && present.enabled === false, 'heartbeat_failed')
     report.checks.heartbeat = true
     primaryPassed = true
   } catch (cause) { error(cause) }
@@ -556,7 +581,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
     jar.clear()
     credential = undefined
   }
-  if ((core || env.MIKKA_ACCEPTANCE_TARGET_MODE === 'deployed-target') && report.checks.deployment) {
+  if ((core || deployed || releaseWitness) && report.checks.deployment) {
     // Failure attribution needs an actual after-observation too. This never
     // suppresses the original business or cleanup errors, nor repeats a mutation.
     try {
@@ -574,7 +599,7 @@ export async function runMobileDaemonProof({ env = process.env, event, attestati
   if (primaryPassed && !report.errors.length) {
     try {
       phase = 'final-deployment'
-      if (!core && env.MIKKA_ACCEPTANCE_TARGET_MODE !== 'deployed-target') {
+      if (!core && !deployed && !releaseWitness) {
         await verifyDeployment()
         report.checks.finalDeployment = true
       }

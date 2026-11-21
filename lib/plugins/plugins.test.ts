@@ -8,7 +8,7 @@ import { fetchSkillSource } from './skill-source'
 import { pinnedLookup, publicMcpFetch } from './public-fetch'
 import { runMcpCommand } from './mcp'
 import { createPersonalMcpRuntime } from './mcp'
-import { assertCatalogToolkit, isNoAuthToolkit, listStoreCatalog, resetStoreCatalogCache } from './catalog'
+import { assertCatalogToolkit, findCredentialAlternative, isNoAuthToolkit, listStoreCatalog, resetStoreCatalogCache } from './catalog'
 import { executeComposioAction } from '@/lib/composio-actions'
 
 test('MCP input rejects credential URLs, private targets, forwarded headers and credential moves', () => {
@@ -143,10 +143,25 @@ for (const type of ['http', 'sse'] as const) test(`real MCP ${type} handshake, d
   } finally { stream?.end(); server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())) }
 })
 
+test('OAuth-only apps link to a unique matching API-key variant, not an unrelated or ambiguous one', () => {
+  const variants = [
+    { id: 'snowflake', name: 'Snowflake', connect: 'oauthSetupRequired' as const },
+    { id: 'snowflake_basic', name: 'Snowflake Basic', connect: 'credentials' as const },
+    { id: 'ahrefs_mcp', name: 'Ahrefs MCP', connect: 'oauthSetupRequired' as const },
+    { id: 'ahrefs', name: 'Ahrefs', connect: 'credentials' as const },
+    { id: 'airtable', name: 'Airtable', connect: 'credentials' as const },
+  ]
+  assert.deepEqual(findCredentialAlternative(variants[0], variants), { id: 'snowflake_basic', name: 'Snowflake Basic' })
+  assert.deepEqual(findCredentialAlternative(variants[2], variants), { id: 'ahrefs', name: 'Ahrefs' })
+  assert.equal(findCredentialAlternative(variants[4], variants), null)
+  assert.equal(findCredentialAlternative({ id: 'unknown', connect: 'unsupported' }, variants), null)
+  assert.equal(findCredentialAlternative(variants[0], [...variants, { id: 'snowflake_api', name: 'Snowflake API', connect: 'credentials' as const }]), null)
+})
+
 test('store lists every Composio toolkit but local ones and own integrations, in Composio order, with how each connects', async () => {
   const toolkit = (slug: string, extra: Record<string, unknown> = {}, created = '2026-01-01T00:00:00Z', categories = [{ id: 'email', name: 'email' }]) => ({ slug, name: slug.toUpperCase(), is_local_toolkit: false, no_auth: false, composio_managed_auth_schemes: ['OAUTH2'], meta: { description: 'One\nline', logo: 'https://cdn.acme.dev/icon.svg', created_at: created, categories }, ...extra })
   const pages = [
-    { items: [toolkit('gmail'), toolkit('github'), toolkit('own_keys', { composio_managed_auth_schemes: [], auth_schemes: ['API_KEY'] }), toolkit('free', { no_auth: true, composio_managed_auth_schemes: [] }), toolkit('dev_app', { composio_managed_auth_schemes: [], auth_schemes: ['OAUTH2'] }), toolkit('on_device', { is_local_toolkit: true })], next_cursor: 'p2' },
+    { items: [toolkit('gmail'), toolkit('github'), toolkit('own_keys', { composio_managed_auth_schemes: [], auth_schemes: ['API_KEY'] }), toolkit('free', { no_auth: true, composio_managed_auth_schemes: [] }), toolkit('dev_app', { composio_managed_auth_schemes: [], auth_schemes: ['OAUTH2'] }), toolkit('dcr_app', { composio_managed_auth_schemes: [], auth_schemes: ['DCR_OAUTH'] }), toolkit('on_device', { is_local_toolkit: true })], next_cursor: 'p2' },
     { items: [toolkit('slack', {}, '2026-10-30T00:00:00Z', [{ id: 'chat', name: 'team chat' }, { id: 'email', name: 'email' }]), toolkit('BAD SLUG'), toolkit('gmail'), toolkit('box', { meta: { logo: 'http://insecure.acme.dev/x.svg' } })], next_cursor: null },
   ]
   const queries: unknown[] = []
@@ -154,22 +169,25 @@ test('store lists every Composio toolkit but local ones and own integrations, in
   const catalog = await listStoreCatalog(async query => { queries.push(query); return pages[queries.length - 1] })
   assert.deepEqual(queries, [{ sort_by: 'usage', limit: 1000 }, { sort_by: 'usage', limit: 1000, cursor: 'p2' }])
   // Usage order kept; own integrations (GitHub), local toolkits, bad slugs and duplicates left out.
-  assert.deepEqual(catalog.apps.map(app => app.id), ['gmail', 'own_keys', 'free', 'dev_app', 'slack', 'box'])
-  assert.deepEqual(catalog.apps.map(app => app.connect), ['managed', 'credentials', 'none', 'unsupported', 'managed', 'managed'])
+  assert.deepEqual(catalog.apps.map(app => app.id), ['gmail', 'own_keys', 'free', 'dev_app', 'dcr_app', 'slack', 'box'])
+  assert.deepEqual(catalog.apps.map(app => app.connect), ['managed', 'credentials', 'none', 'oauthSetupRequired', 'managed', 'managed', 'managed'])
   assert.equal(catalog.apps[0].description, 'One line'); assert.equal(catalog.apps[0].name, 'GMAIL')
-  assert.equal(catalog.apps[5].iconUrl, null); assert.equal(catalog.apps[5].description, '')
-  assert.deepEqual(catalog.popular, ['gmail', 'own_keys', 'free', 'dev_app', 'slack', 'box'])
-  assert.deepEqual(catalog.latest, ['slack', 'gmail', 'own_keys', 'free', 'dev_app'])
-  assert.deepEqual(catalog.categories, [{ id: 'email', name: 'email', apps: ['gmail', 'own_keys', 'free', 'dev_app', 'slack'] }, { id: 'chat', name: 'team chat', apps: ['slack'] }])
+  assert.equal(catalog.apps[6].iconUrl, null); assert.equal(catalog.apps[6].description, '')
+  assert.deepEqual(catalog.popular, ['gmail', 'own_keys', 'free', 'dev_app', 'dcr_app', 'slack', 'box'])
+  assert.deepEqual(catalog.latest, ['slack', 'gmail', 'own_keys', 'free', 'dev_app', 'dcr_app'])
+  assert.deepEqual(catalog.categories, [{ id: 'email', name: 'email', apps: ['gmail', 'own_keys', 'free', 'dev_app', 'dcr_app', 'slack'] }, { id: 'chat', name: 'team chat', apps: ['slack'] }])
   // Each connect flow accepts only the apps that connect its way.
   await assertCatalogToolkit(async () => pages[0], 'own_keys', 'credentials')
   await assert.rejects(assertCatalogToolkit(async () => pages[0], 'gmail', 'credentials'), /integrationToolkitNotSupported/)
+  await assert.rejects(assertCatalogToolkit(async () => pages[0], 'dev_app'), /integrationToolkitNotSupported/)
+  await assert.rejects(assertCatalogToolkit(async () => pages[0], 'dev_app', 'credentials'), /integrationToolkitNotSupported/)
   assert.equal(await isNoAuthToolkit(async () => pages[0], 'free'), true)
   assert.equal(await isNoAuthToolkit(async () => pages[0], 'gmail'), false)
   // Cached: a second read in the hour does not call Composio again.
   await listStoreCatalog(async () => { throw new Error('not cached') })
   await assert.rejects(assertCatalogToolkit(async () => pages[0], 'own_keys'), /integrationToolkitNotSupported/)
   await assertCatalogToolkit(async () => pages[0], 'slack')
+  await assertCatalogToolkit(async () => pages[0], 'dcr_app')
   // A failed read is not kept.
   resetStoreCatalogCache()
   await assert.rejects(listStoreCatalog(async () => { throw new Error('down') }))

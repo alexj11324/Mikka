@@ -42,6 +42,7 @@ export const IPC = {
   deviceStatus: "mikka:device:status",
   deviceLink: "mikka:device:link",
   devicePickRepo: "mikka:device:pick-repo",
+  deviceAgentLogins: "mikka:device:agent-logins",
   /** main -> renderer push of AuthState. */
   authChanged: "mikka:auth:changed",
 } as const

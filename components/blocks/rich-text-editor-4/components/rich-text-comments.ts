@@ -1,3 +1,4 @@
+import type { ThreadMessage, ThreadRecord } from '@/lib/task-discussion'
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model"
 import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state"
 import { Decoration, DecorationSet } from "@tiptap/pm/view"
@@ -21,21 +22,7 @@ export const THREAD_ORIGIN = "threads"
 /** A new thread's record; undo reverts it together with its anchor mark. */
 export const THREAD_CREATE_ORIGIN = "thread-create"
 
-export interface ThreadMessage {
-  id: string
-  author: string
-  authorUserId?: string
-  body: string
-  at: string
-}
-
-export interface ThreadRecord {
-  id: string
-  author: string
-  createdAt: string
-  resolved: boolean
-  messages: ThreadMessage[]
-}
+export type { ThreadMessage, ThreadRecord } from '@/lib/task-discussion'
 
 export interface ThreadSeed {
   id: string
@@ -318,14 +305,16 @@ export function addThread(doc: Y.Doc, seed: ThreadSeed, origin: unknown) {
 export function replyToThread(
   doc: Y.Doc,
   id: string,
-  message: Omit<ThreadMessage, "id">,
+  message: Omit<ThreadMessage, "id"> & { id?: string },
   origin: unknown = THREAD_ORIGIN
 ) {
   const messages = threadMap(doc).get(id)?.get("messages")
   if (!(messages instanceof Y.Array)) return false
   // The writer's client id keeps two replies sent apart (offline) distinct.
-  const messageId = `${id}-${doc.clientID}-${messages.length + 1}`
-  doc.transact(() => messages.push([{ id: messageId, ...message }]), origin)
+  const messageId = message.id ?? `${id}-${doc.clientID}-${messages.length + 1}`
+  if (message.id && messages.toArray().some(item => item.id === messageId)) return true
+  if (message.replyToMessageId && !messages.toArray().some(item => item.id === message.replyToMessageId)) return false
+  doc.transact(() => messages.push([{ ...message, id: messageId }]), origin)
   return true
 }
 

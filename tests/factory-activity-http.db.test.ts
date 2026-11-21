@@ -17,7 +17,7 @@ import { capturePosterBinary } from '../lib/captures/poster'
 import { decode, DESKTOP_RPC_VERSION, encode } from '../lib/desktop-rpc/wire'
 import type { FactoryActivityView } from '../lib/factory/activity'
 import { assertE2eTarget, disposableDatabase } from './helpers/e2e-target.mjs'
-import { dropTestDatabase } from './support/drop-test-database'
+import { createTestDatabase, dropTestDatabase } from './support/drop-test-database'
 import { seedAgent, seedBot, seedTeam, seedWorkspace } from './support/workspace-admin-db'
 import { WORKSPACE_SELECTION_HEADER } from '../lib/workspace-selection'
 
@@ -76,7 +76,7 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   {skip:!enabled,timeout:300_000},async t=>{
   const adminUrl=assertE2eTarget(base!), name=`activity_http_${randomUUID().replaceAll('-','')}_e2e`
   const admin=new Pool({connectionString:adminUrl.toString(),max:1})
-  await admin.query(`CREATE DATABASE ${name} TEMPLATE template0`)
+  await createTestDatabase(admin, name, 'template0')
   const target=new URL(adminUrl);target.pathname=`/${name}`
   const pool=new Pool({connectionString:target.toString(),max:5})
   const directory=await mkdtemp(join(tmpdir(),'factory-activity-http-'))
@@ -134,12 +134,16 @@ test('real Vite/Nitro HTTP: authenticated activity, all-run media, immutable ver
   await new Promise<void>((done,fail)=>{
     const timer=setTimeout(()=>fail(new Error('FACTORY_ACTIVITY_HTTP_START_TIMEOUT')),180_000)
     let recent=''
+    // The child's own refusal is the only thing that names a startup failure, so
+    // it travels with the error instead of being collected and dropped.
+    let stderrRecent=''
     const finish=(error?:Error)=>{clearTimeout(timer);if(error)fail(error);else done()}
     server!.once('error',error=>finish(new Error('FACTORY_ACTIVITY_HTTP_START_FAILED',{cause:error})))
-    server!.once('exit',()=>finish(new Error(`FACTORY_ACTIVITY_HTTP_START_EXITED:${[...startupCodes].join(',')}`)))
+    server!.once('exit',()=>finish(new Error(`FACTORY_ACTIVITY_HTTP_START_EXITED:${[...startupCodes].join(',')}${stderrRecent?`\n${stderrRecent}`:''}`)))
     server!.stdout!.on('data',(bytes:Buffer)=>{stdoutBytes+=bytes.length;recent=(recent+bytes.toString()).slice(-2048);if(/\[dev\] Ready in/.test(recent))finish()})
     server!.stderr!.on('data',(bytes:Buffer)=>{
       stderrBytes+=bytes.length
+      stderrRecent=(stderrRecent+bytes.toString()).slice(-2048)
       for(const match of bytes.toString().matchAll(/code:\s*['"]([A-Z][A-Z0-9_]+)['"]/g))startupCodes.add(match[1])
     })
   })

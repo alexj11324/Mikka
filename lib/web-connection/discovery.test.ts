@@ -28,3 +28,9 @@ test('discovery cannot select another origin, dot path, non-JSON or unbounded bo
   for (const basePath of ['//evil.test', '/a/../mikka', '/%2e%2e/mikka', '/mikka?redirect=evil']) assert.notEqual((await probeWebServer('https://self.test', { fetch: async () => Response.json({ ...document, basePath }) })).status, 'ok')
   assert.equal((await probeWebServer('https://self.test', { fetch: async () => new Response('x'.repeat(70_000), { headers: { 'content-type': 'application/json' } }) })).status, 'not_mikka')
 })
+
+test('an explicit installation path must match the discovered installation before login', async () => {
+  const fetch = async () => Response.json(document)
+  assert.equal((await probeWebServer('https://self.test/other', { fetch })).status, 'not_mikka')
+  assert.equal((await probeWebServer('https://self.test/mikka/', { fetch })).status, 'ok')
+})

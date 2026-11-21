@@ -2,6 +2,10 @@ import { spawn } from 'node:child_process'
 import { mkdir, readFile, realpath, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { createServer } from 'node:net'
+import { EVE_PARENT_WATCH } from './eve-parent-watch-source.mjs'
+
+/** The peer guard as `--import` takes it: a data URL, because a built chunk has no scripts/ beside it. */
+export const EVE_PARENT_WATCH_IMPORT = `data:text/javascript;base64,${Buffer.from(EVE_PARENT_WATCH).toString('base64')}`
 
 export async function availableEvePort() {
   const listener = createServer()
@@ -11,12 +15,53 @@ export async function availableEvePort() {
   return port
 }
 
+/** eve names its own local server exactly once, on stdout. That line, and only
+ * that line, means the peer is serving. */
+const READY_ADDRESS = /(?:Listening on:?|Local:|server[^\n]*?)\s*(http:\/\/127\.0\.0\.1:\d+)/i
+
+/** The peer's real reason for refusing to start is printed on stderr and
+ * nowhere else ("A dev server is already running for this eve agent"). Keep a
+ * bounded tail so a failed start can say what happened instead of only naming
+ * the exit. */
+const OUTPUT_LIMIT = 16_384
+
+/** eve colors every bundler diagnostic, so the readable reason is full of CSI
+ * sequences. Built from a string: the escape is this pattern's whole subject, and
+ * a control character written into a literal is exactly what the lint forbids. */
+const ANSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g')
+
+/** eve's stderr is mostly bundler diagnostics, and they are long enough to crowd
+ * the one sentence that explains a refusal out of any tail. Keep the raw text on
+ * the error, and hand callers the last sentences a developer can act on: no ANSI,
+ * no box drawing, no `[WARNING_CODE]` blocks. */
+export function eveFailureReason(stderr) {
+  return stderr.replace(ANSI, '').split('\n')
+    .filter(line => line.trim() && !/^\s*[│╭╰╮╯─]/.test(line) && !/\[[A-Z][A-Z0-9_]{3,}\]/.test(line))
+    .slice(-8)
+    .join('\n')
+}
+
+/** Stop the peer's whole process group. eve forks its own local server into a
+ * separate group, so signaling the pid alone leaves that server, its workflow
+ * world and its listening port behind — the residue that made every later start
+ * fail. A child without a pid (a test double, or one that never spawned) still
+ * gets the direct signal. */
+function signalProcess(child, signal) {
+  try { process.kill(-child.pid, signal); return }
+  catch { /* not a group leader, or already gone */ }
+  try { child.kill(signal) }
+  catch { /* nothing left to signal */ }
+}
+
 /** Start the pinned eve host as a peer process, with its own Workflow world.
  * It shares application credentials, never the main app's durable queue. */
 export async function startEveService({ root = process.cwd(), env = process.env, development = false,
   spawnProcess = spawn, allocatePort = availableEvePort } = {}) {
   if (env.VERCEL || env.MIKKA_EVE_ORIGIN) return { close: async () => {} }
   const directory = development ? join(root, 'apps/eve') : await packagedEveDirectory(root)
+  const world = development ? env.WORKFLOW_TARGET_WORLD
+    : JSON.parse(await readFile(join(directory, 'mikka-eve-build.json'), 'utf8')).world
+  const local = !world || world === 'local'
   const port = await allocatePort()
   const origin = `http://127.0.0.1:${port}`
   const childEnv = { ...env, HOST: '127.0.0.1', NITRO_HOST: '127.0.0.1', PORT: String(port), NITRO_PORT: String(port),
@@ -24,53 +69,83 @@ export async function startEveService({ root = process.cwd(), env = process.env,
     // For the local World its delivery base already contains the mount.
     // An additional prefix would duplicate it in browser callback URLs.
     EVE_PUBLIC_ROUTE_PREFIX: '',
-    WORKFLOW_TARGET_WORLD: 'local',
+    WORKFLOW_TARGET_WORLD: world ?? env.WORKFLOW_TARGET_WORLD ?? 'local',
     WORKFLOW_LOCAL_DATA_DIR: env.MIKKA_EVE_DATA_DIR ?? join(env.MIKKA_DATA_DIR ?? join(root, '.cache'), 'eve-workflow') }
-  // eve's local World deliberately uses cwd/.eve/.workflow-data rather than
-  // WORKFLOW_LOCAL_DATA_DIR. Bind that documented mount to persistent storage.
-  await mkdir(childEnv.WORKFLOW_LOCAL_DATA_DIR, { recursive: true, mode: 0o700 })
-  await mkdir(join(directory, '.eve'), { recursive: true })
-  const storage = join(directory, '.eve/.workflow-data')
-  const persistent = await realpath(childEnv.WORKFLOW_LOCAL_DATA_DIR)
-  try { await symlink(persistent, storage, 'dir') }
-  catch (error) {
-    if (error.code !== 'EEXIST') throw error
-    if (await realpath(storage) !== persistent) throw new Error('EVE_SERVICE_STORAGE_MISMATCH', { cause: error })
+  // This peer has its own HTTP loopback listener. The installation's public
+  // TLS certificate, key and optional socket belong only to the outer listener.
+  delete childEnv.NITRO_SSL_CERT
+  delete childEnv.NITRO_SSL_KEY
+  delete childEnv.NITRO_UNIX_SOCKET
+  if (local) {
+    // eve's local World deliberately uses cwd/.eve/.workflow-data rather than
+    // WORKFLOW_LOCAL_DATA_DIR. Bind that documented mount to persistent storage.
+    await mkdir(childEnv.WORKFLOW_LOCAL_DATA_DIR, { recursive: true, mode: 0o700 })
+    await mkdir(join(directory, '.eve'), { recursive: true })
+    const storage = join(directory, '.eve/.workflow-data')
+    const persistent = await realpath(childEnv.WORKFLOW_LOCAL_DATA_DIR)
+    try { await symlink(persistent, storage, 'dir') }
+    catch (error) {
+      if (error.code !== 'EEXIST') throw error
+      if (await realpath(storage) !== persistent) throw new Error('EVE_SERVICE_STORAGE_MISMATCH', { cause: error })
+    }
+    // Both the local World's deliveries and OAuth callbacks use eve's public
+    // namespaced mount, never the main application's root Workflow consumer.
+    childEnv.WORKFLOW_LOCAL_BASE_URL = new URL('/mikka/api/agents', env.BETTER_AUTH_URL ?? env.MIKKA_APP_ORIGIN ?? 'http://127.0.0.1:3000').href
+  } else {
+    childEnv.WORKFLOW_LOCAL_BASE_URL = origin
+    delete childEnv.WORKFLOW_LOCAL_DATA_DIR
   }
-  // Both the local World's deliveries and OAuth callbacks use eve's public
-  // namespaced mount, never the main application's root Workflow consumer.
-  childEnv.WORKFLOW_LOCAL_BASE_URL = new URL('/mikka/api/agents', env.BETTER_AUTH_URL ?? env.MIKKA_APP_ORIGIN ?? 'http://127.0.0.1:3000').href
   const args = development
     ? [join(root, 'node_modules/eve/bin/eve.js'), 'dev', '--no-ui', '--host', '127.0.0.1', '--port', String(port)]
     : [join(directory, 'server/index.mjs')]
-  const child = spawnProcess(process.execPath, args, { cwd: directory, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] })
-  child.stderr.resume()
+  // `--import` makes the peer stop when this process does, including after a
+  // `kill -9` that leaves no chance to clean up here. `detached` makes it a
+  // process-group leader, so one signal reaps everything it started.
+  const child = spawnProcess(process.execPath, ['--import', EVE_PARENT_WATCH_IMPORT, ...args], {
+    cwd: directory, env: { ...childEnv, MIKKA_EVE_PARENT_PID: String(process.pid) },
+    stdio: ['ignore', 'pipe', 'pipe'], detached: true,
+  })
+  let output = '', errors = ''
+  const remember = chunk => { output = (output + chunk).slice(-OUTPUT_LIMIT) }
+  child.stderr.on('data', chunk => { errors = (errors + chunk).slice(-OUTPUT_LIMIT) })
+  // The failure carries the peer's own last words: its exit status alone cannot
+  // distinguish a port clash from a module error from another instance already
+  // holding this app root.
+  const failure = (code, detail = {}) => {
+    const cause = { ...detail, reason: eveFailureReason(errors), stderr: errors.trim(), stdout: output.trim() }
+    return Object.assign(new Error(code, { cause }), { code, detail: cause })
+  }
   let closing
   const close = () => closing ??= new Promise(resolve => {
     if (child.exitCode !== null || child.signalCode !== null) { resolve(); return }
-    const timer = setTimeout(() => child.kill('SIGKILL'), 30_000).unref()
+    const timer = setTimeout(() => signalProcess(child, 'SIGKILL'), 30_000).unref()
     child.once('exit', () => { clearTimeout(timer); resolve() })
-    child.kill('SIGTERM')
+    signalProcess(child, 'SIGTERM')
   })
   try {
     await new Promise((resolve, reject) => {
-      let pending = ''
-      const timer = setTimeout(() => reject(new Error('EVE_SERVICE_START_TIMEOUT')), 180_000).unref()
-      const finish = (error, origin) => {
+      const timer = setTimeout(() => reject(failure('EVE_SERVICE_START_TIMEOUT')), 180_000).unref()
+      const finish = (error, address) => {
         clearTimeout(timer)
         child.stdout.off('data', onOutput)
-        if (error) reject(error); else resolve(origin)
+        child.off('close', onExit)
+        if (error) reject(error); else resolve(address)
       }
       const onOutput = chunk => {
-        pending = (pending + chunk.toString()).slice(-16_384)
-        const match = /(?:Listening on:?|Local:|server[^\n]*?)\s*(http:\/\/127\.0\.0\.1:\d+)/i.exec(pending)
+        remember(chunk)
+        const match = READY_ADDRESS.exec(output)
         if (match && match[1] === origin) finish(null, match[1])
       }
+      const onExit = (code, signal) => finish(failure('EVE_SERVICE_EXITED', { exitCode: code, signal }))
       child.stdout.on('data', onOutput)
-      child.once('error', cause => finish(new Error('EVE_SERVICE_START_FAILED', { cause })))
-      child.once('exit', () => finish(new Error('EVE_SERVICE_EXITED')))
+      child.once('error', cause => finish(Object.assign(new Error('EVE_SERVICE_START_FAILED', { cause }), { code: 'EVE_SERVICE_START_FAILED' })))
+      // 'close', not 'exit': a peer that dies mid-sentence still gets its last
+      // stderr line read before this reports the failure.
+      child.once('close', onExit)
     })
-    child.stdout.resume()
+    // Keep draining the peer's stdout, so a chatty host never blocks on a full
+    // pipe once nobody is waiting for its address.
+    child.stdout.on('data', remember)
     env.MIKKA_EVE_ORIGIN = origin
     return { origin, close }
   } catch (error) { await close(); throw error }
@@ -79,8 +154,6 @@ export async function startEveService({ root = process.cwd(), env = process.env,
 export async function packagedEveDirectory(root) {
   for (const directory of [join(root, 'eve'), join(root, '.output/eve')]) {
     try {
-      const manifest = JSON.parse(await readFile(join(directory, 'mikka-eve-build.json'), 'utf8'))
-      if (manifest.version !== 1 || manifest.eve !== '1.0.0-rc.9' || !/^[a-f0-9]{40}$/.test(manifest.revision)) throw new Error('EVE_SERVICE_BUILD_INVALID')
       await readFile(join(directory, 'server/index.mjs'))
       return directory
     } catch (error) { if (error.code !== 'ENOENT') throw error }

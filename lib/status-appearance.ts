@@ -23,7 +23,9 @@ export function statusTone(value: string): StatusTone {
   switch (value) {
     case 'doing': case 'started': case 'paused': case 'atRisk': case 'normal': return 'warning'
     case 'review': return 'info'
-    case 'done': case 'completed': case 'onTrack': case 'low': case 'open': return 'success'
+    case 'done': case 'completed': case 'onTrack': case 'open': return 'success'
+    // 低 is not "good": it is the quietest priority, so it takes the neutral tint like the rest of the grey values.
+    case 'low': return 'neutral'
     case 'urgent': case 'canceled': case 'offTrack': case 'closed': return 'destructive'
     case 'high': case 'merged': return 'focus'
     default: return 'neutral'

@@ -1,8 +1,8 @@
 'use client'
 
-import { useLocale, useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from '@/lib/intl/i18n-client'
 import { Button } from '@/components/ui/button'
-import { SettingRow, SettingsLoading, SettingsSection } from '@/components/settings/primitives'
+import { SettingRow, SettingsLoading, SettingsSaveError, SettingsSection } from '@/components/settings/primitives'
 import { BalanceSection } from '@/components/billing/balance-section'
 import { FreeAllowanceSection } from '@/components/billing/free-allowance-section'
 import type { SettingsBillingProps } from '@/components/slots/settings-billing-contract'
@@ -16,6 +16,7 @@ import { FieldError } from '@/components/ui/field'
  */
 export function BillingPageView({ plan: planState, balance, allowance, computerBilling }: SettingsBillingProps) {
   const t = useTranslations('Settings.billing')
+  const tCommon = useTranslations('Common')
   const locale = useLocale()
   const actionError = useActionError()
   const { pending, actionError: error } = planState
@@ -29,7 +30,7 @@ export function BillingPageView({ plan: planState, balance, allowance, computerB
   </>
 
   if (planState.loading) return <SettingsLoading label={t('loading')} rows={3} />
-  if (!data) return <FieldError>{planState.error}</FieldError>
+  if (!data) return <SettingsSaveError message={planState.error ?? t('loadFailed')} retryLabel={tCommon('retry')} onRetry={() => { planState.reload() }} />
   // No Stripe: card verification and 充值 cannot work, so only the state shows (and a balance already granted, read-only).
   if (!data.configured) return <>
     <BalanceSection balance={balance} purchasable={false} />

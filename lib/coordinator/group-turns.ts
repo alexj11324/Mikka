@@ -33,7 +33,7 @@ export type GroupRuntime = {
   /** Production classifies the action even for an explicit @mention; member selection stays constrained. */
   routeMention?: GroupRuntime['route']
   contribution?(message: GroupMessage, member: GroupAgent, earlier: readonly { author: string; text: string }[]): Promise<{ contribute: boolean; execution?: import('./decide').DecisionExecution }>
-  tasks?(scope: { userId: string; conversationId: string }, client: PoolClient): Promise<import('./group-routing').GroupTaskReference[]>
+  tasks?(scope: { userId: string; workspaceId: string; conversationId: string }, client: PoolClient): Promise<import('./group-routing').GroupTaskReference[]>
   delegate?(scope: { userId: string; workspaceId: string; conversationId: string; messageId: string; reporter: GroupAgent; text: string; delegation: import('./group-routing').GroupDelegation }, client: PoolClient): Promise<GroupReply>
   correction(input: CorrectionInput): Promise<CorrectionJudgment>
   generate(agent: GroupAgent, input: { message: GroupMessage; earlier: { author: string; text: string }[]; followUp: string; members: RoutingMember[]; ask?: string; privatePeer?: RoutingMember; modelRuntime?: HostedRuntimeSnapshot; signal?: AbortSignal; attachmentContext?: { userId: string; conversationId: string } }): Promise<GroupReply>
@@ -176,24 +176,25 @@ export async function processGroupTurn(pool: Pool, conversationId: string, runti
     if (!claimed.rowCount) return true
     await groupChatChanged(client, conversationId)
     const authorized = async () => {
-      if (!await runtime.authorized(root.workspaceId, root.userId) || !await runtime.authorized(root.workspaceId, root.createdBy)) return false
+      if (!await runtime.authorized(root.workspaceId, root.userId)) return false
+      if (root.createdBy !== root.userId && !await runtime.authorized(root.workspaceId, root.createdBy)) return false
       const member = await client.query(`SELECT 1 FROM conversation_members WHERE "conversationId"=$1 AND "memberType"='user' AND "memberId"=$2 AND "leftAt" IS NULL`, [conversationId, root.userId])
       return Boolean(member.rowCount)
     }
-    if (!await authorized()) throw new Error('group_actor_no_longer_authorized')
-    const eligible = async () => {
-      if (!await authorized()) return []
+    const currentMembers = async () => {
       const members = (await client.query(`SELECT "memberType","memberId" FROM conversation_members WHERE "conversationId"=$1 AND "memberType" IN ('agent','bot') AND "leftAt" IS NULL ORDER BY "joinedAt","memberId"`, [conversationId])).rows
       const agents = await runtime.agents(root.createdBy, members.filter(m => m.memberType === 'agent').map(m => m.memberId), client)
       const bots = members.some(m => m.memberType === 'bot') && runtime.bots ? await runtime.bots(root.userId, root.workspaceId, members.filter(m => m.memberType === 'bot').map(m => m.memberId), client) : []
       return members.flatMap(m => { const actor = (m.memberType === 'bot' ? bots : agents).find(a => a.id === m.memberId); return actor ? [{ ...actor, ...(m.memberType === 'bot' ? { memberType: 'bot' as const } : {}) }] : [] })
     }
-    const members = await eligible()
+    const eligible = async () => await authorized() ? currentMembers() : []
+    if (!await authorized()) throw new Error('group_actor_no_longer_authorized')
+    const members = await currentMembers()
     const recent = await client.query(`SELECT id,"authorId" AS author,body AS text FROM conversation_messages m WHERE "conversationId"=$1 AND
       (position<$2 OR ("authorType" IN ('agent','bot') AND "replyToId" IN (SELECT id FROM conversation_messages WHERE "conversationId"=$1 AND position<$2))) ORDER BY position DESC LIMIT 10`, [conversationId, root.position])
     await initializeGroupDecisionTrace(client, messageId!, members, recent.rows.map(row => row.id).reverse())
     let generationCount = 0, wakeCount = 0
-    const input: GroupMessage = { text: root.body, mentions: root.mentions.filter((m: { memberType: string }) => m.memberType === 'agent' || m.memberType === 'bot').map((m: { memberId: string }) => m.memberId), recent: recent.rows.reverse().map(({ author, text }) => ({ author, text })), ...(runtime.tasks ? { tasks: await runtime.tasks({ userId:root.userId, conversationId },client) }: {}) }
+    const input: GroupMessage = { text: root.body, mentions: root.mentions.filter((m: { memberType: string }) => m.memberType === 'agent' || m.memberType === 'bot').map((m: { memberId: string }) => m.memberId), recent: recent.rows.reverse().map(({ author, text }) => ({ author, text })), ...(runtime.tasks ? { tasks: await runtime.tasks({ userId:root.userId, workspaceId:root.workspaceId, conversationId },client) }: {}) }
     // Validate before recording a correction or invoking any model.
     mentionRoute(input, members)
     const previous = await client.query(`SELECT t."messageId",m.body,t.route FROM group_turns t JOIN conversation_messages m ON m.id=t."messageId" WHERE t."conversationId"=$1 AND m.position<$2 AND t.route IS NOT NULL AND t.status='complete' ORDER BY m.position DESC LIMIT 1`, [conversationId, root.position])

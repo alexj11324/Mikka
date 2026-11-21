@@ -15,7 +15,7 @@ const translator = (namespace: string) => {
   }
   return Object.assign(lookup, { has: () => false })
 }
-mock.module('next-intl', { namedExports: { useLocale: () => 'zh-CN', useTranslations: translator } })
+mock.module('@/lib/intl/i18n-client', { namedExports: { useLocale: () => 'zh-CN', useTranslations: translator } })
 
 let general: unknown
 let capability: unknown

@@ -1,4 +1,5 @@
 import { runChanged } from './live/panels'
+import { scheduleThreadTitle } from '@/lib/thread-title-schedule'
 import { serverRunFailure } from './run-failure-details'
 import { CodedError } from '@mikka/protocol/coded-error'
 import 'server-only'
@@ -173,6 +174,8 @@ async function queueDeviceContinuation(tx: Tx, query: Query, run: Run, key: RunA
   const id = crypto.randomUUID()
   const copied = quotaContinuationPrompt(run)
   const { prompt } = copied
+  // The conversation is named once this commits (decision 2026-11-13-1405); a run that continues one takes its title.
+  scheduleThreadTitle(tx, id, run.userId, 'created')
   await tx.insert(agentRuns).values({
     id, userId: run.userId, workspaceId: run.workspaceId, issueId: run.issueId, agentId: run.agentId, botId: run.botId, source: run.source,
     // The continuation keeps the paused run's entry; a legacy run keeps the
@@ -354,7 +357,6 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
       const key = mode === 'apiKey' ? await quotaKey(client, run, scope) ?? null : null
       if (mode === 'apiKey' && !key) throw new ActionFailureError('apiKeyNotFound')
       if (scope.cloud) { cloud = { run, plan: scope, key }; return }
-      await assertRunProjectResources(client, run)
       if (!await endPausedRun(tx, run.id, userId, workspaceId)) throw new ActionFailureError('runNotActive')
       const retryRunId = await queueDeviceContinuation(tx, client, run, key)
       if (key) await recordCoordinatorEvent(tx, runCredentialSwitchedEvent(run, scope.from, key, retryRunId, run.quotaResetsAt?.toISOString() ?? null))
@@ -368,7 +370,10 @@ async function continuePausedRun(userId: string, runId: string, mode: 'apiKey' |
   if (!pending) throw new ActionFailureError('runNotActive')
   let retryRunId: string
   try { retryRunId = await queueCloudQuotaContinuation(pending.run, pending.plan.cloud!, pending.key) }
-  catch (error) { if (error instanceof ActionFailureError) throw error; throw new ActionFailureError('runInvalid') }
+  catch (cause) {
+    if (cause instanceof ActionFailureError) throw cause
+    throw new ActionFailureError('runInvalid', undefined, undefined, { cause })
+  }
   await db.transaction(async tx => {
     const ended = await endPausedRun(tx, pending.run.id, userId, workspaceId)
     if (ended && pending.key)

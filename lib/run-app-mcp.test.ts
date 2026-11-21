@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { authorizeRunApp, runAppTool } from './run-app-mcp'
+import { authorizeRunApp, runAppCall, runAppTool } from './run-app-mcp'
 
 const now = Date.parse('2026-10-31T12:00:00Z')
 const live = { token: 'mkw_owner', expiresAt: now / 1000 + 600, extra: { userId: 'owner', runId: 'run-1', botId: 'bot-1' } }
@@ -34,9 +34,35 @@ test('an expired, missing or non-run token is refused', async () => {
 })
 
 test('only a toolkit\'s own tools with object schemas are listed', () => {
-  assert.deepEqual(runAppTool({ slug: 'GMAIL_FETCH_EMAILS', name: 'Fetch', description: 'Fetch\n mail', tags: ['readOnlyHint'], toolkit: { slug: 'gmail' }, inputParameters: { type: 'object', properties: {} } }, 'gmail'),
-    { name: 'GMAIL_FETCH_EMAILS', description: 'Fetch mail', inputSchema: { type: 'object', properties: {} }, readOnly: true })
+  const listed = runAppTool({ slug: 'GMAIL_FETCH_EMAILS', name: 'Fetch', description: 'Fetch\n mail', tags: ['readOnlyHint'], toolkit: { slug: 'gmail' }, inputParameters: { type: 'object', properties: {} } }, 'gmail')!
+  assert.equal(listed.name, 'GMAIL_FETCH_EMAILS')
+  assert.equal(listed.description, 'Fetch mail')
+  assert.equal(listed.readOnly, true)
+  const selection = listed.inputSchema.properties.mikka_account_id as { type: string; description: string }
+  assert.equal(selection.type, 'string')
+  assert.match(selection.description, /accounts list.*integrationAccountSelectionRequired/)
   assert.equal(runAppTool({ slug: 'SLACK_SEND', name: 'Send', toolkit: { slug: 'slack' } }, 'gmail'), null)
   assert.equal(runAppTool({ slug: 'SLACK_SEND', name: 'Send', toolkit: { slug: 'gmail' } }, 'gmail'), null)
   assert.equal(runAppTool({ slug: 'GMAIL_X', name: 'X', toolkit: { slug: 'gmail' }, inputParameters: { type: 'string' } }, 'gmail'), null)
+})
+
+test('native account metadata is stripped while the provider account_id remains a business argument', () => {
+  const tool = { slug: 'GMAIL_FETCH_EMAILS', name: 'Fetch', toolkit: { slug: 'gmail' } }
+  assert.deepEqual(runAppCall(tool, 'gmail', { account_id: 'business-record', mikka_account_id: 'selected-connection' }), {
+    toolkit: 'gmail', tool: tool.slug, account_id: 'selected-connection', arguments: { account_id: 'business-record' },
+  })
+  for (const value of ['', 7, null, 'x'.repeat(256)]) assert.equal(runAppCall(tool, 'gmail', { mikka_account_id: value }), null)
+})
+
+test('a colliding provider field gets an explicit envelope and is never silently overwritten', () => {
+  const input = { type: 'object', properties: { mikka_account_id: { type: 'string', description: 'Business record' } }, required: ['mikka_account_id'], additionalProperties: false }
+  const tool = { slug: 'GMAIL_FETCH_EMAILS', name: 'Fetch', toolkit: { slug: 'gmail' }, inputParameters: input }
+  const listed = runAppTool(tool, 'gmail')!
+  assert.deepEqual(listed.inputSchema.properties.arguments, input)
+  assert.deepEqual(listed.inputSchema.required, ['arguments'])
+  assert.match(listed.description, /business inputs are under arguments/)
+  assert.deepEqual(runAppCall(tool, 'gmail', { mikka_account_id: 'selected-connection', arguments: { mikka_account_id: 'business-record' } }), {
+    toolkit: 'gmail', tool: tool.slug, account_id: 'selected-connection', arguments: { mikka_account_id: 'business-record' },
+  })
+  assert.equal(runAppCall(tool, 'gmail', { mikka_account_id: 'selected-connection', business: 'invalid' }), null)
 })

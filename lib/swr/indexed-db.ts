@@ -18,21 +18,40 @@ export class IndexedReadStorage implements ReadStorage {
   private database?: Promise<IDBDatabase>
 
   private open() {
-    this.database ??= new Promise<IDBDatabase>((resolve, reject) => {
+    if (this.database) return this.database
+    // A failed/blocked open must not poison this storage instance forever.
+    // Keep one in-flight open, but let the next authorized read try again.
+    let opening: Promise<IDBDatabase>
+    opening = new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open(DATABASE, 1)
+      let failed = false
       request.onupgradeneeded = () => {
         const database = request.result
         database.createObjectStore('reads', { keyPath: 'id' }).createIndex('savedAt', 'savedAt')
         database.createObjectStore('scope')
       }
       request.onsuccess = () => {
-        request.result.onversionchange = () => request.result.close()
-        resolve(request.result)
+        const database = request.result
+        // A blocked upgrade can later succeed, after its waiting caller
+        // already fell back to the network. Do not retain that orphan handle.
+        if (failed) { database.close(); return }
+        database.onversionchange = () => {
+          database.close()
+          if (this.database === opening) this.database = undefined
+        }
+        resolve(database)
       }
-      request.onerror = () => reject(request.error)
-      request.onblocked = () => reject(new DOMException('Read cache upgrade blocked', 'InvalidStateError'))
+      request.onerror = () => { failed = true; reject(request.error) }
+      request.onblocked = () => {
+        failed = true
+        reject(new DOMException('Read cache upgrade blocked', 'InvalidStateError'))
+      }
+    }).catch(error => {
+      if (this.database === opening) this.database = undefined
+      throw error
     })
-    return this.database
+    this.database = opening
+    return opening
   }
 
   private async transaction<T>(run: (reads: IDBObjectStore, scope: IDBObjectStore, result: (value: T) => void) => void): Promise<T> {

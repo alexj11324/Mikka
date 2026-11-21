@@ -21,7 +21,7 @@ stub('../../../../lib/audit/retention.ts', { sweepAuditRetention: async () => { 
 stub('../../../../lib/mobile-push-delivery.ts', { recoverPhonePushReceipts: async () => { ran.push('pushReceipts'); return { scanned: 1, pending: 0, failed: 0 } } })
 stub('../../../../lib/coding-workspace/retention.ts', { cleanupWorkspaceEphemera: async () => { ran.push('workspaceEphemera'); return { requests: 1, mentions: 1 } } })
 stub('../../../../lib/due-timer.ts', { armDueTimer: async (kind: string) => { ran.push(`arm:${kind}`) }, replaceStaleDueTimers: async () => {} })
-mock.module('next/server', { namedExports: { after: () => {} } })
+mock.module('@/lib/server-runtime/server', { namedExports: { after: () => {} } })
 let GET: typeof import('./route')['GET']
 before(async () => { ({ GET } = await import('./route')) })
 beforeEach(() => { process.env.CRON_SECRET = secret; due = { wakes: false, schedules: false, recovery: false, deletions: false, audit: false, pushReceipts: false, workspaceEphemera: false }; ran.length = 0; wakesThrow = false })

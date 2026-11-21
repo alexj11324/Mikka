@@ -1,4 +1,4 @@
-import { Cloud, Laptop, Terminal } from 'lucide-react'
+import { Cloud, Laptop, Terminal } from '@/components/icons'
 import type { DeviceIconProps } from '@/components/slots/device-icon-contract'
 import { cn } from '@/lib/utils'
 

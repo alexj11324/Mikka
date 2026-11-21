@@ -1,5 +1,5 @@
 // oxlint-disable-next-line no-restricted-imports -- the one place that schedules after() work
-import { after } from 'next/server'
+import { after } from '@/lib/server-runtime/server'
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { waitUntil } from '@vercel/functions'
 import { context } from '@opentelemetry/api'
@@ -43,7 +43,7 @@ const kindOf = (label: JobLabel): JobKind => (label.startsWith('cron:') ? 'cron'
  */
 export function afterJob(label: JobLabel, task: () => unknown, { orRun = false, retainContext = false, schedule = after }: AfterJobOptions = {}): void {
   const parent = context.active()
-  const job = () => context.with(parent, () => runJob(label, kindOf(label), () => withBackgroundDeviceAuthority(task), { detach: true }))
+  const job = () => context.with(parent, () => runJob(label, kindOf(label), () => withBackgroundDeviceAuthority(task)))
   const run = retainContext ? AsyncLocalStorage.bind(job) : job
   try { schedule(run) } catch (error) {
     if (!orRun) throw error

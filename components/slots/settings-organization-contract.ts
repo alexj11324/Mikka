@@ -1,2 +1,2 @@
-/** The Shared workspace whose 组织 page is open; personal workspaces cannot join an Organization (#1642). */
-export type SettingsOrganizationProps = { workspaceId: string }
+/** Organization settings use a Workspace for governance, or only the signed-in account's Organization membership. */
+export type SettingsOrganizationProps = { workspaceId: string; personal?: boolean }

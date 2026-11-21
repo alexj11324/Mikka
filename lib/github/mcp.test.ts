@@ -42,6 +42,9 @@ test('a call reaches the hosted GitHub MCP with only the caller\'s own token, an
   assert.deepEqual(asked, ['owner'])
   assert.equal(seen.url, GITHUB_MCP_URL); assert.equal(seen.origin, 'https://api.githubcopilot.com')
   assert.equal(seen.headers?.Authorization, `Bearer ${OWN}`)
+  // Every toolset GitHub offers, by its documented path; no subset is pinned in a header.
+  assert.equal(GITHUB_MCP_URL, 'https://api.githubcopilot.com/mcp/x/all')
+  assert.deepEqual(Object.keys(seen.headers ?? {}), ['Authorization'])
   assert.ok(!JSON.stringify(seen.headers).includes(OTHER))
   assert.deepEqual(seen.calls.map(call => { const { name, arguments: args } = call as { name: string; arguments: unknown }; return { name, args } }), [{ name: 'issue_comment', args: { body: 'hi' } }])
   const text = JSON.stringify(result)

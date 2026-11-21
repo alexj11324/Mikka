@@ -21,7 +21,7 @@ import { HomeProvider } from '@/lib/home'
 import { openPush } from '@/lib/navigate'
 import { colors, screenOptions } from '@/lib/theme'
 import { newSheetOptions, reviewSheetOptions } from '@/lib/sheet-options'
-import { currentAccount, servers } from '@/lib/config'
+import { conversationJournal, currentAccount, servers } from '@/lib/config'
 import { serverCopy as copy } from '@/lib/server-copy'
 
 /** HeroUI Native draws product content (DESIGN.md). Mikka has no toasts: a state shows in place. */
@@ -63,7 +63,10 @@ function SessionGate() {
     return () => { live = false }
   }, [account.id, data?.user?.id, data?.user?.name, data?.user?.email, attempt])
   // Establish the identity boundary before any child can read a cached answer.
-  apiCache.setIdentity(data?.user ? `${account.id}:${data.user.id}` : null, data?.user?.id ?? null)
+  if (!isPending || data?.session) {
+    try { conversationJournal.bind(account.id, data?.session?.id ?? null) } catch { /* The send control reports unavailable storage before writing. */ }
+  }
+  apiCache.setIdentity(data?.user ? `${account.id}:${data.user.id}` : null, data?.user?.id ?? null, data?.session?.id ?? null)
   if (isPending && !data) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.page }}><Spinner size={22} /></View>
   if (!data?.user) return <SignIn />
   if (account.user?.id !== data.user.id) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, backgroundColor: colors.page }}>
@@ -80,6 +83,7 @@ function SessionGate() {
         <Stack.Screen name="message" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.42], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
         <Stack.Screen name="attach" options={{ presentation: 'formSheet', sheetAllowedDetents: [0.22], sheetGrabberVisible: true, headerShown: false, contentStyle: { backgroundColor: colors.grouped } }} />
         {/* 新建 Bot and 新建群聊: full-height form sheets with the grabber (docs/design/mobile-comma, 06–07). */}
+        <Stack.Screen name="new-task" options={newSheetOptions(colors.page)} />
         <Stack.Screen name="new-bot" options={newSheetOptions(colors.page)} />
         <Stack.Screen name="new-group" options={newSheetOptions(colors.page)} />
         <Stack.Screen name="task/[id]/comment" options={reviewSheetOptions(colors.page)} />

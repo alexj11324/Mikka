@@ -10,7 +10,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT=true
 let currentTeam, submit, calls, choices, prompts
 const team={id:'team-explicit',identifier:'TEAM',name:'Synthetic'}
 window.confirm=()=>{prompts++;throw Error('Unexpected manual approval')}
-mock.module('next-intl',{namedExports:{useTranslations:()=>key=>key}})
+mock.module('@/lib/intl/i18n-client',{namedExports:{useTranslations:()=>key=>key}})
 mock.module('swr',{defaultExport:key=>key==='teams'?{data:[team]}:{data:currentTeam,mutate:async value=>{currentTeam=value}},namedExports:{useSWRConfig:()=>({mutate:async()=>{}})}})
 mock.module(new URL('../app/actions/teams.ts',import.meta.url).href,{namedExports:{listTeams:async()=>[team]}})
 mock.module(new URL('../app/actions/team-relations.ts',import.meta.url).href,{namedExports:{getIssueTeam:async()=>currentTeam,setIssueTeam:async input=>{calls.push(input);return submit(input)}}})
@@ -26,7 +26,7 @@ async function exercise(response) {
   const host=document.createElement('div');document.body.append(host)
   const root=createRoot(host)
   try {
-    await act(async()=>root.render(createElement(IssueTeamControl,{issueId:'issue-a',disabled:false,onChosen:(...args)=>choices.push(args)})))
+    await act(async()=>root.render(createElement(IssueTeamControl,{issueId:'issue-a',viewerId:'owner',disabled:false,onChosen:(...args)=>choices.push(args)})))
     await act(async()=>{const select=host.querySelector('select');select.value=team.id;select.dispatchEvent(new window.Event('change',{bubbles:true}))})
     assert.deepEqual(choices,[['issue-a',null]],'changing an unsaved choice invalidates earlier intent')
     await act(async()=>{host.querySelector('button').click();await new Promise(resolve=>setImmediate(resolve))})

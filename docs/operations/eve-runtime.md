@@ -39,6 +39,10 @@ For a separately supervised eve process, set `MIKKA_EVE_ORIGIN` to its HTTP
 origin. Mikka then proxies to that service and starts no additional process.
 The value must be an origin without credentials, a path or query parameters.
 Keep that service's model and database configuration consistent with Mikka.
+Keep the two hosts' clocks synchronized. Mikka signs self-hosted Eve requests
+for 59 seconds. A verifier up to one second behind the issuer can accept a
+new request within its existing 60-second upper bound. It rejects the
+credential at the signed expiry.
 
 `pnpm dev` starts `eve dev` before the API workers. Eve owns its authored-file
 watcher; API hot replacements reuse the existing service.
@@ -100,3 +104,38 @@ Eve's generated `.eve` snapshots and `.output` belong to its independent World
 and must never be discovered by the product compiler. Shared model descriptor
 validation stays in the pure `lib/hosted-model-selection.ts` module; provider,
 credential and database resolution remain on the Node side of the step boundary.
+
+## Cloudflare World storage
+
+The private `EveWorldAuthority` Durable Object commits the candidate run, its
+start Hook, the token decision, and the first event in one SQLite transaction.
+Direct starts and the queue's resilient startup call share that transaction.
+The same authority handles Hook delivery, retention, explicit disposal, forced
+claims and terminal run transitions. Its only external HTTP response is 404.
+The Worker has no public route or workers.dev endpoint.
+
+Run `pnpm --filter @mikka/eve-cloudflare-world test` to execute the pinned
+Workflow SDK's atomic-start conformance suite and the workerd restart test.
+`pnpm test:eve` includes both. The current application still starts its existing
+World. Enabling the Cloudflare World for a production Eve host requires complete
+official World event storage, Queue delivery, stream reads and writes, and live
+Eve acceptance under the release revision.
+
+The Cloudflare stream adapter implements the official v5 byte-stream methods
+over the community StreamDO's durable chunk format. The object key includes
+the run ID and stream name. Idle readers subscribe to a hibernatable change
+notification and read chunks only after a write or close. The Node reader
+uses a private service binding to release its subscription on cancellation,
+including when an idle HTTP client disconnects. Reconnects use the native
+chunk cursor. The named `WorldStreamService` entrypoint is for a trusted
+host binding and the default Worker accepts no stream requests.
+
+## Workflow inventory
+
+`inventoryWorkflowRuns(listRuns)` scans the supplied Workflow World's pending
+and running views. It groups Eve, Mikka and unclassified workflows, deduplicates
+status transitions and returns deployment identifiers with hashed run identifiers.
+Use a read-only storage client and retain unclassified workflows during a drain.
+
+Authorized operators can find the managed deployment procedure in the
+[private operations entry](https://github.com/alexj11324/mikka-cloud/blob/main/docs/operations/README.md).
