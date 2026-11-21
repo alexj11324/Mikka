@@ -1,5 +1,6 @@
 import 'server-only'
 import type { Pool } from 'pg'
+import type { ModelCandidateSnapshot } from './model-order'
 import { PaidResourceError } from './abuse/policy'
 
 /** The refusals that mean the workspace has no points to spend, not an outage. */
@@ -33,16 +34,16 @@ export type PointsFallback =
  * a key must reach chat and list the model, a subscription must be bound
  * here with quota left. Null when none can.
  */
-export async function pointsFallback(pool: Pool, scope: { ownerId: string; workspaceId: string }): Promise<PointsFallback | null> {
+export async function pointsFallback(pool: Pool, scope: { ownerId: string; workspaceId: string }, cached: ModelCandidateSnapshot = {}): Promise<PointsFallback | null> {
   const [{ orderCandidates, readOrder, credentialStates }, { usableApiKeys }, { apiKeyChatBaseUrl }, { ExecutionSettings }] = await Promise.all([
     import('./model-order'), import('./model-api-keys'), import('./model-api-key-providers'), import('./execution-settings'),
   ])
-  const candidates = await orderCandidates(pool, scope)
+  const candidates = await orderCandidates(pool, scope, cached)
   const { entries } = await readOrder(pool, scope, candidates)
   if (!entries.length) return null
   const states = await credentialStates(pool, scope, entries, candidates)
-  const keys = new Map((await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).map(key => [key.id, key]))
-  const bindings = await new ExecutionSettings(pool).chatModels(scope)
+  const keys = new Map((cached.keys ?? await usableApiKeys(pool, scope.ownerId, scope.workspaceId)).map(key => [key.id, key]))
+  const bindings = await new ExecutionSettings(pool).chatModels(scope, pool, cached.rows)
   for (const entry of entries) {
     const credential = states.get(entry.id)?.credential
     if (credential && !credential.usable && credential.reason === 'checking') return null

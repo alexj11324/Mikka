@@ -2,6 +2,8 @@ import 'server-only'
 import { randomUUID } from 'node:crypto'
 import { cloudModelSupport, type CloudModelState } from './cloud-template-models'
 import type { Pool, PoolClient } from 'pg'
+import type { UsableApiKey } from './model-api-keys'
+import type { ExecutionSettings } from './execution-settings'
 import { z } from 'zod'
 import { deviceOnlineStates } from './device-presence'
 import { deviceSchedulingView, type SchedulingNode } from './device-scheduling'
@@ -80,12 +82,17 @@ const toEntry = (row: EntryRow): StoredEntry => ({
 })
 const sourceId = (entry: Pick<OrderEntry, 'source'>) => entrySourceId(entry.source)
 
+export interface ModelCandidateSnapshot {
+  rows?: Awaited<ReturnType<ExecutionSettings['botModels']>>
+  keys?: UsableApiKey[]
+}
+
 /** What the person can add here: their usable subscriptions' models and their usable keys' models. */
-export async function orderCandidates(query: Query, scope: OrderScope): Promise<(OrderCandidate & { provider: string; credentialOwnerId: string })[]> {
+export async function orderCandidates(query: Query, scope: OrderScope, cached: ModelCandidateSnapshot = {}): Promise<(OrderCandidate & { provider: string; credentialOwnerId: string })[]> {
   const { ExecutionSettings } = await import('./execution-settings')
   const { usableApiKeys } = await import('./model-api-keys')
   const settings = new ExecutionSettings(query as Pool)
-  const rows = await settings.modelCandidates(scope, query)
+  const rows = cached.rows ?? await settings.modelCandidates(scope, query)
   // A subscription serves its owner only (decision 2026-11-17): no teammate's account is a candidate.
   // Each account's models in the order the account listed them (its catalogue): the default takes the first Codex model.
   const connectionIds = [...new Set(rows.map(row => String(row.connectionId)))]
@@ -100,7 +107,7 @@ export async function orderCandidates(query: Query, scope: OrderScope): Promise<
     ? rank(a.item.source.connectionId, a.item.model) - rank(b.item.source.connectionId, b.item.model) || a.at - b.at
     : a.at - b.at).map(({ item }) => item)
   // A key serves each Agent of each protocol it speaks: a DeepSeek or Kimi model is a candidate on both (model · Agent).
-  const keys = (await usableApiKeys(query, scope.ownerId, scope.workspaceId)).flatMap(key => key.models.flatMap(model => apiKeyHarnesses(key).map(harness => ({
+  const keys = (cached.keys ?? await usableApiKeys(query, scope.ownerId, scope.workspaceId)).flatMap(key => key.models.flatMap(model => apiKeyHarnesses(key).map(harness => ({
     harness: harness as OrderHarness, model, name: model,
     source: { kind: 'api_key' as const, keyId: key.id }, provider: key.provider, credentialOwnerId: key.ownerId,
   }))))
