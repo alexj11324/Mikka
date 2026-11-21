@@ -46,7 +46,9 @@ export function failureLine(failure: ChatFailure): FailureLine {
       text: { wake_failed: F.wakeWaiting, wake_start_unconfirmed: F.wakeUnconfirmed, wake_exhausted: F.wakeExhausted }[failure.code],
       retry: failure.code === 'wake_exhausted', recovery: null,
     }
-    case 'failed': return failure.reason === 'balance'
+    case 'failed': return failure.reason === 'modelRequired'
+      ? { text: mobileMessages.Coordinator.modelRequired, retry: false, recovery: 'models' }
+      : failure.reason === 'balance'
       ? { text: F.apiBalance, retry: false, recovery: 'model' }
       : failure.reason === 'tools' ? { text: F.replyIncomplete, retry: true, recovery: null }
       : { text: F.replyFailed, retry: true, recovery: null }

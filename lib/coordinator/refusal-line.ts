@@ -12,7 +12,7 @@ import { chatFailure, failureMessageKey, type ChatFailure } from '@/lib/chat-fai
 export function failureLine(error: string | null | undefined, locale: 'zh-CN' | 'en' = 'zh-CN'): string | null {
   if (!error) return null
   const failure = chatFailure({ working: false, error })
-  return failure && (failure.kind !== 'failed' || failure.cloudCode) ? lineFor(failure, locale) : null
+  return failure && (failure.kind !== 'failed' || failure.cloudCode || failure.reason === 'modelRequired') ? lineFor(failure, locale) : null
 }
 
 function lineFor(failure: ChatFailure, locale: 'zh-CN' | 'en'): string {

@@ -74,6 +74,22 @@ test('a failure line keeps its words and folds the stored codes under 详情 (de
   assert.match(details.textContent ?? '', /subscription_generation_failed \(provider_request_rejected\)/)
 })
 
+test('a missing model opens model settings instead of resending a request that cannot start', async () => {
+  let sent = 0
+  await render(<FailureReason failure={{ kind: 'failed', reason: 'modelRequired' }} botId="fixture-bot" onResend={() => { sent++ }} />)
+  assert.match(container.textContent ?? '', /Coordinator\.modelRequired/)
+  assert.equal(container.querySelector('a')?.getAttribute('href'), '/settings?section=models')
+  assert.equal(container.querySelector('button'), null)
+  assert.equal(sent, 0)
+})
+
+test('generic failure Details displays the stored safe reference', async () => {
+  await render(<FailureReason failure={{ kind: 'failed', raw: 'HOOK_FAILED · ref fixture-reference' }} botId="fixture-bot" onResend={() => {}} />)
+  const details = container.querySelector('[data-slot="run-error-details"]')!
+  await act(async () => (details.querySelector('button') as HTMLElement).click())
+  assert.match(details.textContent ?? '', /HOOK_FAILED · ref fixture-reference/)
+})
+
 test('without stored codes there is no 详情', async () => {
   await render(<FailureReason failure={{ kind: 'failed' }} botId="fixture-bot" onResend={() => {}} />)
   assert.equal(container.querySelector('[data-slot="run-error-details"]'), null)

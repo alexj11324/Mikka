@@ -4152,6 +4152,7 @@
     },
     "loadError": "线程加载失败。",
     "failedTitle": "回复失败",
+    "modelRequired": "任务未启动：未选择模型。",
     "replyToolUnavailable": "回复未完成，请重试",
     "apiBalance": "API 余额不足",
     "subscriptionRefusal": {

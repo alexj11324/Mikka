@@ -40,6 +40,9 @@ test('welcome and approved-write decisions wake through their stored event', { s
   let viewer: { user: { id: string; email: string; name: string }; session: { id: string } } | null = null
   const authenticated = { user: { id: owner, email: owner + '@example.invalid', name: 'Fixture' }, session: { id: sessionId } }
   let configured = true
+  let modelReady = false
+  const modelChoice = await import('../bot-model-choice')
+  t.mock.module('../bot-model-choice', { namedExports: { ...modelChoice, resolveBotModelChoice: async () => modelReady ? { kind: 'hosted', model: 'fixture/model', chosen: true } : { kind: 'none', chosen: false } } })
   const realAuth = await import('../auth')
   t.mock.module('../auth', { namedExports: { ...realAuth, auth: { api: { getSession: async () => viewer } } } })
   t.mock.module('@/lib/server-runtime/headers', { namedExports: { headers: async () => new Headers(), cookies: async () => ({ get: (key: string) => key === 'mikka-workspace' ? { value: workspaceId } : undefined }) } })
@@ -65,6 +68,11 @@ test('welcome and approved-write decisions wake through their stored event', { s
     configured = false
     assert.deepEqual(await welcomeCoordinator(botId), { queued: false })
     configured = true
+    assert.deepEqual(await welcomeCoordinator(botId), { queued: false, reason: 'modelRequired' })
+    assert.equal((await pool.query('SELECT count(*)::int count FROM coordinator_events WHERE "userId"=$1', [owner])).rows[0].count, 0)
+    assert.deepEqual(committed, [])
+    assert.deepEqual(direct, [])
+    modelReady = true
     const delivered = wake()
     assert.deepEqual(await welcomeCoordinator(botId), { queued: true })
     await delivered

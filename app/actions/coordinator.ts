@@ -13,7 +13,9 @@ import { z } from 'zod'
 import { ActionFailureError, runAction } from '@/lib/action-error'
 import type { ActionResult } from '@/lib/action-result'
 import { auth } from '@/lib/auth'
-import { db } from '@/lib/db'
+import { db, pool } from '@/lib/db'
+import { ExecutionSettings } from '@/lib/execution-settings'
+import { botModelPreference, resolveBotModelChoice } from '@/lib/bot-model-choice'
 import { recordCoordinatorEvent } from '@/lib/coordinator-event-store'
 import { userMessageEvent } from '@/lib/coordinator-events'
 import { personalSubmissionRecorded, recordPersonalSubmission, SubmissionConflictError } from '@/lib/coordinator-submission'
@@ -222,7 +224,7 @@ async function readBotChatSummaries() {
  * greeting and one question about where to start. Once only: nothing happens
  * when the chat already has messages or anything waiting.
  */
-export async function welcomeCoordinator(botId: string | null = null): Promise<ActionResult<{ queued: boolean }>> {
+export async function welcomeCoordinator(botId: string | null = null): Promise<ActionResult<{ queued: boolean; reason?: 'modelRequired' }>> {
   return runAction(async () => {
     const session = await auth.api.getSession({ headers: await headers() })
     if (!session?.user) throw new ActionFailureError('authRequired')
@@ -230,6 +232,9 @@ export async function welcomeCoordinator(botId: string | null = null): Promise<A
     if (!await coordinatorEnabled(session.user.id, bot.id)) return { queued: false }
     const chat = await chatView(session.user.id, 1, bot.id)
     if (chat.items.length || chat.working || chat.error) return { queued: false }
+    const scope = { ownerId: session.user.id, workspaceId: bot.workspaceId }
+    const choice = await resolveBotModelChoice(pool, new ExecutionSettings(pool), scope, bot.id, await botModelPreference(pool, scope, bot.id))
+    if (choice.kind === 'none') return { queued: false, reason: 'modelRequired' }
     const locale = (await cookies()).get('NEXT_LOCALE')?.value ?? 'zh-CN'
     const event = userMessageEvent(session.user.id, coordinatorWelcome(session.user.name ?? '', locale, bot.coordinator ? undefined : bot.name), { botId: bot.id })
     await recordCoordinatorEvent(db, { ...event, payload: { ...event.payload, source: 'coordinator_welcome' } })

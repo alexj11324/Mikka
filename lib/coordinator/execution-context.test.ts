@@ -97,6 +97,8 @@ test('a failure the person can act on becomes the words the web keeps under the 
   assert.equal(failureLine('verification_required'), 'Mikka 额度已用完')
   assert.equal(failureLine('usage_concurrency_limit'), '暂时不可用')
   assert.equal(failureLine('points_exhausted', 'en'), 'Out of Mikka credits')
+  assert.equal(failureLine('executionModelUnknown'), '任务未启动：未选择模型。')
+  assert.equal(failureLine('executionModelUnknown', 'en'), 'No task started: no model selected.')
   // The person's subscription refused the turn.
   assert.equal(failureLine('quota_exhausted'), '订阅额度已用完')
   assert.equal(failureLine('Step "model" failed after 3 retries: reconnect_required'), '订阅需要重新连接')

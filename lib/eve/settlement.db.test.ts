@@ -301,6 +301,27 @@ test('host settlement receipts preserve product publication across native RPC re
       const newer=(await pool.query('SELECT message FROM coordinator_messages WHERE "userId"=$1 AND message#>>\'{mikkaUserEvent,id}\'=$2',[ownerId,newerSource])).rows[0]
       assert.equal(newer.message.mikkaFailure,undefined)
     })
+    await t.test('unknown hook references survive settlement on the original request, history and session', async () => {
+      const { projectEveTurn, projectTurnState } = await import('./projection')
+      const { emptySessionView, foldEvents } = await import('eve/events')
+      const { chatItems } = await import('../coordinator/context')
+      const sessionId = await nativeSession(), source = randomUUID(), reference = randomUUID()
+      const text = 'Start a cloud machine and print the Node.js version.'
+      await pool.query(`INSERT INTO coordinator_events(id,"userId","botId",kind,"dedupeKey",payload)VALUES($1,$2,$3,'user_message',($1::uuid)::text,$4)`, [source, ownerId, botId, { text, source: 'person' }])
+      await pool.query('INSERT INTO eve_turn_sources(session_id,turn_id,source_event_id)VALUES($1,$2,$3)', [sessionId, 'turn_0', source])
+      await projectTurnState(scope, sessionId, 'turn_0', true)
+      const view = foldEvents(emptySessionView(), [
+        { type: 'turn.started', data: { turnId: 'turn_0', cause: { deliveryId: 'request' }, follows: null }, meta: { position: { line: 0, index: 0 }, at: '2026-11-11T00:00:00Z', endOfLine: true } },
+        { type: 'turn.settled', data: { turnId: 'turn_0', outcome: 'failed', error: { code: 'HOOK_FAILED', message: 'private provider diagnostic', id: reference } }, meta: { position: { line: 1, index: 0 }, at: '2026-11-11T00:00:01Z', endOfLine: true } },
+      ])
+      await finishEveTurn(scope, { sessionId, turnId: 'turn_0', outcome: 'failed', messages: projectEveTurn(view, sessionId, 'turn_0', 'failed') })
+      const rows = (await pool.query('SELECT position,message,"createdAt" FROM coordinator_messages WHERE "userId"=$1 AND "botId"=$2 ORDER BY position', [ownerId, botId])).rows
+      const request = chatItems(rows).find(item => item.text === text)!
+      assert.deepEqual(request.failure, { kind: 'failed', raw: `HOOK_FAILED · ref ${reference}` })
+      assert.equal(rows.find(row => row.message.mikkaUserEvent?.id === source)?.message.content, text)
+      assert.equal((await pool.query('SELECT "lastError" FROM coordinator_sessions WHERE "userId"=$1 AND "botId"=$2', [ownerId, botId])).rows[0].lastError, `HOOK_FAILED · ref ${reference}`)
+      assert.doesNotMatch(JSON.stringify(rows), /private provider diagnostic/)
+    })
     await t.test('native resend marks an owned failed row and recovers only the original submission receipt',async()=>{
       const {acceptEveMessage,commitEveIngress}=await import('./submission')
       const {chatItems}=await import('../coordinator/context')

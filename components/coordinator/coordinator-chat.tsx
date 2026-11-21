@@ -83,13 +83,10 @@ import { BrowserNoteChip, BrowserNoteLine, useBrowserNotesComposer } from '@/com
 import { SentSuggestion } from '@/components/suggestions/mobile-card'
 import { HostedRefusalNotice } from '@/components/billing/hosted-refusal-notice'
 import { usePaywall } from '@/components/billing/paywall'
-import { hostedRefusal } from '@/lib/billing/verification-client'
-import { subscriptionRefusal } from '@/lib/subscription-refusal'
-import { chatBalanceRefusal } from '@/lib/chat-balance'
 import { chatFailure } from '@/lib/chat-failure'
 import { SubscriptionRefusalNotice } from './subscription-refusal-notice'
 import { HostedUnavailableNotice } from './hosted-unavailable-notice'
-import { CloudFailureAction, FailureReason } from './failure-reason'
+import { CloudFailureAction, FailureReason, ModelSettingsAction } from './failure-reason'
 import { RunErrorDetails } from '@/components/workspace/run-error-text'
 import { QuotaNotice, QuotaSwitchLine } from './quota-notice'
 import { ChatEventLine } from './chat-event-line'
@@ -359,17 +356,19 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   })
   const workingEnter = loaded.current && !workingAtOpen.current
   const entering = (item: (typeof items)[number]) => arriving(`item-${item.position}`) && !(item.from === 'coordinator' && item.position <= streamedThrough.current)
+  const liveFailure = data?.error && !working ? chatFailure({ working: false, error: data.error, cause: data.cause }) : null
   // A turn the hosted model (Mikka 默认) refused: verification, allowance or pause (#523, #525, #526).
-  const refusal = working ? null : hostedRefusal(data?.error)
+  const refusal = liveFailure?.kind === 'hosted' ? liveFailure.code : null
   // The chosen subscription refused it: the mapped line, never the raw step error.
-  const declined = working || refusal ? null : subscriptionRefusal(data?.error)
-  const apiBalance = !working && !refusal && !declined && chatBalanceRefusal(data?.error)
+  const declined = liveFailure?.kind === 'subscription' ? liveFailure.notice : null
+  const apiBalance = liveFailure?.kind === 'failed' && liveFailure.reason === 'balance'
   // 重试 on any failed reply, never on a wake still being retried by the server.
   const retry = <RetryReplyButton botId={botId} onQueued={mutate} />
-  const liveFailure = data?.error && !working ? chatFailure({ working: false, error: data.error, cause: data.cause }) : null
   const cloudCode = liveFailure?.kind === 'failed' ? liveFailure.cloudCode : undefined
+  const [welcomeNeedsModel, setWelcomeNeedsModel] = useState(false)
+  const modelRequired = (liveFailure?.kind === 'failed' && liveFailure.reason === 'modelRequired') || (welcomeNeedsModel && !working && !items.length && !stream.replies.length)
   const liveRaw = liveFailure?.raw ?? null
-  const wakeError = data?.error === 'wake_failed' || data?.error === 'wake_start_unconfirmed' || data?.error === 'wake_exhausted' ? data.error : null
+  const wakeError = liveFailure?.kind === 'wake' ? liveFailure.code : null
   // With no Coordinator here, the person's last message gets no reply: show it as a failed turn instead of silence.
   // A failed turn's own line already says why; this one is only for a chat with no Coordinator to answer.
   const unanswered = data?.enabled === false && !data.error && items.findLast(item => item.from !== 'event')?.from === 'person'
@@ -391,6 +390,12 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     try {
       if (manual && !await checkPageBuildBeforeAction()) return
       const result = await (retryTurn ? retryCoordinatorTurn(botId) : welcomeCoordinator(botId))
+      if ('reason' in result && result.reason === 'modelRequired') {
+        setWelcomeNeedsModel(true)
+        setWelcomeError(null)
+        return
+      }
+      setWelcomeNeedsModel(false)
       if (result.error) { setWelcomeError(actionError(result.error)); return }
       await mutate()
       setWelcomeError(null)
@@ -406,17 +411,27 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   // arrived, a card was verified): only on a change from not runnable to runnable seen by this mount, never on open
   // (the menu can read runnable while the server still refuses), never for a passing usage limit, never in a hidden
   // tab, and once per failure (store.retryFailedTurn), so a visit never fires another refused turn.
-  const welcomeModel = useSWR<BotModelMenu>(welcomeFailed && refusal ? botModelMenuKey(botId ?? null) : null, () => getBotModelMenu(botId ?? null))
+  const welcomeModel = useSWR<BotModelMenu>(welcomeNeedsModel || (welcomeFailed && (refusal || modelRequired)) ? botModelMenuKey(botId ?? null) : null, () => getBotModelMenu(botId ?? null))
   const runnable = welcomeModel.data?.current?.available
+  const retriedWelcomeModel = useRef<string | null>(null)
   const wasRunnable = useRef<boolean | undefined>(undefined)
   const rewelcomed = useRef<string | null>(null)
   useEffect(() => {
-    if (!data?.enabled || working || resuming || !stream.session || welcomed.current) return
+    if (!data?.enabled || working || resuming || !stream.session) return
+    if (welcomeNeedsModel) {
+      if (runnable === false) retriedWelcomeModel.current = null
+      const model = welcomeModel.data?.current
+      if (items.length || document.visibilityState !== 'visible' || !model || model.kind === 'none' || !runnable || retriedWelcomeModel.current === model.id) return
+      retriedWelcomeModel.current = model.id
+      void requestWelcome()
+      return
+    }
+    if (welcomed.current) return
     if (data.error) {
       if (document.visibilityState !== 'visible') return
       const was = wasRunnable.current
       if (runnable !== undefined) wasRunnable.current = runnable
-      if (!welcomeFailed || !refusal || TRANSIENT_REFUSALS.has(refusal) || was !== false || runnable !== true || rewelcomed.current === data.error) return
+      if (!welcomeFailed || (!refusal && !modelRequired) || (refusal && TRANSIENT_REFUSALS.has(refusal)) || was !== false || runnable !== true || rewelcomed.current === data.error) return
       rewelcomed.current = data.error
       void requestWelcome(true)
       return
@@ -427,13 +442,14 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   })
   // The raw step error (workflow ids, retries, socket codes) is for the logs, never the chat: 回复失败 and 重试 (review C4).
   const failureNotice = <>
+    {modelRequired && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="model-required">{t('modelRequired')}</AlertTitle><ModelSettingsAction /></Alert>}
     {welcomeRequestFailed && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="welcome-request">{welcomeError}</AlertTitle><Button variant="ghost" size="sm" disabled={welcoming} onClick={() => { void requestWelcome(false, true) }}>{tCommon('retry')}</Button></Alert>}
     {cloudCode && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="cloud">{cloudErrors(`${cloudCode}.default`)}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><CloudFailureAction code={cloudCode} fallback={retry} /></span></Alert>}
     {refusal && <HostedRefusalNotice code={refusal} botId={botId} retry={retry} onQueued={mutate} />}
     {paywall.dialog}
     {declined && declined !== 'quotaUsed' && <SubscriptionRefusalNotice notice={declined} retry={retry} botId={botId} />}
     {apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="balance">{t('apiBalance')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1"><Button size="sm" onClick={() => openModelPicker(botId)}>{t('modelPicker.changeModel')}</Button></span></Alert>}
-    {data?.error && !working && !cloudCode && !refusal && !declined && !apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
+    {data?.error && !working && !modelRequired && !cloudCode && !refusal && !declined && !apiBalance && <Alert variant="destructive" className={COMPOSER_NOTICE}>{wakeError ? <AlertTitle>{t(`wakeErrors.${wakeError}`)}</AlertTitle> : <><AlertTitle className="min-w-0 flex-1 basis-48" data-chat-failure="failed">{t('failedTitle')}</AlertTitle><span className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">{retry}</span></>}</Alert>}
     {/* The stored codes, and the turn failure behind a wake code, only under 详情 (decision 2026-11-05-0330). */}
     {liveRaw && <RunErrorDetails code={liveRaw} />}
   </>
@@ -589,10 +605,10 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
   if (!embedded) {
     // The live failure as the thread's error line: a plain failure says 回复失败 (or why the wake failed) once, on the
     // line, with 重试 under it; a failure with its own reason (cloud, refusal, subscription, API balance) keeps its notice.
-    const plainFailure = Boolean(data?.error && !working && !cloudCode && !refusal && !declined && !apiBalance)
+    const plainFailure = Boolean(data?.error && !working && !modelRequired && !cloudCode && !refusal && !declined && !apiBalance)
     const liveFailurePart: ThreadEntryPart = plainFailure
       ? { kind: 'error', text: wakeError ? t(`wakeErrors.${wakeError}`) : t('failedTitle'), actions: <>{retry}{liveRaw && <RunErrorDetails code={liveRaw} />}</> }
-      : { kind: 'error', text: t('failedTitle'), actions: failureNotice }
+      : { kind: 'error', text: t(modelRequired ? 'modelRequired' : 'failedTitle'), actions: modelRequired ? <><ModelSettingsAction />{liveRaw && <RunErrorDetails code={liveRaw} />}</> : failureNotice }
     const rows = [...items.filter(item => !staleEvents.has(item.position) && item.line?.kind !== 'runQuestion').map(item => ({ item, live: undefined as CoordinatorLiveReply | undefined, key: String(item.pending ? `pending-${item.position}` : item.streamId ?? item.position) })),
       ...stream.replies.map(reply => ({ item: streamedItem(reply, stopping), live: stopping && reply.committedThrough === undefined ? { ...reply, committedThrough: -1 } : reply, key: reply.id }))]
     const entries: ThreadEntry[] = []
@@ -614,7 +630,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
         ]
         entries.push({ id: key, role: 'person', at, text, ...(attachments.length ? { attachments } : {}), status: item.pending ? 'sending' : 'sent',
           actions: item.text ? <MessageActions className={cn('items-start', REPLY_ACTIONS)}><CopyAction text={text} />{item.id && <MessageReactions reactions={reactions[item.id]} align="end" />}</MessageActions> : undefined })
-        if (item.failure) entries.push({ id: `${key}-failure`, role: 'bot', at, parts: [item.position === failedAt ? liveFailurePart : { kind: 'error', text: t('failedTitle'), actions: <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /> }] })
+        if (item.failure) entries.push({ id: `${key}-failure`, role: 'bot', at, parts: [item.position === failedAt ? liveFailurePart : { kind: 'error', text: t((item.failure.kind === 'failed' && item.failure.reason === 'modelRequired') ? 'modelRequired' : 'failedTitle'), actions: <FailureReason showReason={!(item.failure.kind === 'failed' && item.failure.reason === 'modelRequired')} retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { if (item.welcome) void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()); else void deliver(item.text, false, item.position) }} /> }] })
         continue
       }
       const parts: ThreadEntryPart[] = item.welcome ? [] : replyRows(item, live).map((segment, index): ThreadEntryPart => segment.kind === 'tools'
@@ -626,7 +642,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
       }
       const artifacts = item.artifacts.flatMap(id => data?.artifacts[id] ? [{ id, name: data.artifacts[id].title }] : [])
       if (artifacts.length) parts.push({ kind: 'artifacts', items: artifacts, onOpen: openArtifact })
-      if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t('failedTitle'), actions: <FailureReason retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
+      if (item.failure) parts.push(item.position === failedAt ? liveFailurePart : { kind: 'error', text: t((item.failure.kind === 'failed' && item.failure.reason === 'modelRequired') ? 'modelRequired' : 'failedTitle'), actions: <FailureReason showReason={!(item.failure.kind === 'failed' && item.failure.reason === 'modelRequired')} retry={item.welcome} failure={item.failure} botId={botId} sending={sending} onResend={() => { void (botId ? retryCoordinatorTurn(botId) : retryCoordinatorTurn()).then(() => mutate()) }} /> })
       if (!live && item.position === unreadItems.findLast(row => row.reportable)?.position)
         parts.push({ kind: 'text', text: '', node: <VisibleReadEnd onSeen={unread.reportEnd} /> })
       entries.push({ id: key, role: 'bot', at, parts, streaming, ...(item.stopped ? { stopped: true } : {}),
@@ -645,7 +661,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
     if (working && items.length > 0 && !stream.replies.length && !(lastSaid?.from === 'coordinator' && lastSaid.text) && !stopping)
       entries.push({ id: 'waiting', role: 'bot', at: Date.now(), parts: [], streaming: true })
     if (welcomeFailed && !items.length) entries.push({ id: 'welcome-failure', role: 'bot', at: Date.now(), parts: [liveFailurePart] })
-    const empty = data && !items.length && !stream.replies.length && !data.error && !welcomeRequestFailed ? (data.enabled
+    const empty = data && !items.length && !stream.replies.length && !data.error && !modelRequired && !welcomeRequestFailed ? (data.enabled
       ? <p role="status">{tNav('writingWelcome')}</p>
       : <p>{t('empty', { name })}</p>) : undefined
     const notices = <>
@@ -720,7 +736,7 @@ function CoordinatorChatSession({ onOpenIssue, prefill, placeholder, compact = f
             </div>}
             {/* The header pill and the 概览 panel already name the bot: an empty chat says one line, no third avatar (R-41). */}
             {welcomeFailed && !items.length && <div data-message-failure="welcome" className="flex w-full max-w-md flex-col gap-2 self-start">{failureNotice}</div>}
-            {data && !items.length && !stream.replies.length && !data.error && !welcomeRequestFailed && (data.enabled
+            {data && !items.length && !stream.replies.length && !data.error && !modelRequired && !welcomeRequestFailed && (data.enabled
               ? <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">{avatar('pill', 'thinking')}{tNav('writingWelcome')}</p>
               : <div className="m-auto flex flex-col items-center gap-3">
                 <p className="text-sm text-muted-foreground">{t('empty', { name })}</p>

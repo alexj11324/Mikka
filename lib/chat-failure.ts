@@ -20,14 +20,14 @@ export type ChatFailure = (
   | { kind: 'subscription'; notice: NonNullable<ReturnType<typeof subscriptionRefusal>> }
   | { kind: 'wake'; code: WakeCode }
   // Keep the existing discriminator readable by already-installed mobile clients.
-  | { kind: 'failed'; reason?: 'balance' | 'tools'; cloudCode?: CloudErrorCode }
+  | { kind: 'failed'; reason?: 'balance' | 'tools' | 'modelRequired'; cloudCode?: CloudErrorCode }
   // The stored code(s) as recorded, for 详情 only (decision 2026-11-05-0330): the
   // line's own code, then the turn failure behind a wake code. Never the words.
 ) & { raw?: string; failureDetails?: RunFailure }
 
 export function chatFailure(chat: { working: boolean; error: string | null; cause?: string | null; failureDetails?: unknown; items?: readonly { from: string; pending?: true; native?:true }[] }): ChatFailure | null {
   const details = chat.working || !chat.error ? null : readRunFailure(chat.failureDetails)
-  const legacy = failureOf(chat) ?? (details ? { kind: 'failed' as const } : null)
+  const legacy = failureOf({ ...chat, error: chat.error?.replace(/ · ref [A-Za-z0-9_-]{1,128}$/, '') ?? null }) ?? (details ? { kind: 'failed' as const } : null)
   const failure = legacy && details ? { ...legacy, failureDetails: details } : legacy
   if (!failure || !chat.error) return failure
   // A stored code (with its detail) always goes; other text only when nothing else names the failure,
@@ -35,7 +35,7 @@ export function chatFailure(chat: { working: boolean; error: string | null; caus
   const unknown = failure.kind === 'failed' && !failure.reason
   const lines = [...new Set([chat.error, chat.cause].flatMap(line => {
     const text = line?.trim()
-    const code = text ? CODE.exec(text)?.[1] : undefined
+    const code = text ? REFERENCED_CODE.test(text) ? text : CODE.exec(text)?.[1] : undefined
     return code ? [code] : text && unknown ? [text] : []
   }))]
   return lines.length ? { ...failure, raw: lines.join('\n') } : failure
@@ -43,6 +43,7 @@ export function chatFailure(chat: { working: boolean; error: string | null; caus
 
 // The code alone, or ending a wrapped message (`Error: …`, `Step "…" failed after 3 retries: …`).
 const CODE = /(?:^|: )([a-z][a-z0-9_]*(?: \([a-z][a-z0-9_]*\))?)$/
+const REFERENCED_CODE = /^[a-zA-Z][a-zA-Z0-9_.:-]{0,127} · ref [A-Za-z0-9_-]{1,128}$/
 // The model streaming boundary stores its closed refusal inside this SDK
 // envelope. Presentation only: tool text and other workflow steps do not
 // establish a cloud refusal, provider fallback or credential health.
@@ -52,6 +53,7 @@ function failureOf(chat: { working: boolean; error: string | null; items?: reado
   if (chat.working) return null
   // A turn that ended with no reply and nothing recorded (its lease ran out): the person's message is the newest.
   if (!chat.error) return chat.items?.findLast(item => item.from !== 'event')?.from === 'person' && !chat.items.at(-1)?.pending && !chat.items.at(-1)?.native ? { kind: 'failed' } : null
+  if (chat.error === 'executionModelUnknown') return { kind: 'failed', reason: 'modelRequired' }
   const cloudCode = cloudErrorCode(parseCodedErrorText(chat.error.trim().replace(CLOUD_STREAM_STEP, ''))?.code)
   if (cloudCode) return { kind: 'failed', cloudCode }
   const hosted = hostedRefusal(chat.error)
@@ -69,7 +71,7 @@ const TRANSIENT_HOSTED = new Set(['usage_in_progress', 'usage_concurrency_limit'
 /** Where a failure's words live in messages/*.json: the web line, Telegram and the phone all read this one key. */
 export type FailureMessageKey =
   | { namespace: 'Billing.refusal'; key: 'unavailable' | 'verificationRequiredPlain' | 'free_allowance_used' | 'points_exhausted' | 'platform_paused' | 'usage_budget_exhausted' | 'billing_authorization_revoked' }
-  | { namespace: 'Coordinator'; key: `subscriptionRefusal.${SubscriptionRefusalNotice}` | `wakeErrors.${WakeCode}` | 'failedTitle' | 'apiBalance' | 'replyToolUnavailable' }
+  | { namespace: 'Coordinator'; key: `subscriptionRefusal.${SubscriptionRefusalNotice}` | `wakeErrors.${WakeCode}` | 'failedTitle' | 'apiBalance' | 'replyToolUnavailable' | 'modelRequired' }
   | { namespace: 'RunErrors'; key: `${CloudErrorCode}.default` }
 
 export function failureMessageKey(failure: ChatFailure): FailureMessageKey {
@@ -78,6 +80,6 @@ export function failureMessageKey(failure: ChatFailure): FailureMessageKey {
       return { namespace: 'Billing.refusal', key: TRANSIENT_HOSTED.has(failure.code) ? 'unavailable' : failure.code === 'verification_required' ? 'verificationRequiredPlain' : failure.code as 'free_allowance_used' | 'points_exhausted' | 'platform_paused' | 'usage_budget_exhausted' | 'billing_authorization_revoked' }
     case 'subscription': return { namespace: 'Coordinator', key: `subscriptionRefusal.${failure.notice}` }
     case 'wake': return { namespace: 'Coordinator', key: `wakeErrors.${failure.code}` }
-    default: return failure.cloudCode ? { namespace: 'RunErrors', key: `${failure.cloudCode}.default` } : { namespace: 'Coordinator', key: failure.reason === 'balance' ? 'apiBalance' : failure.reason === 'tools' ? 'replyToolUnavailable' : 'failedTitle' }
+    default: return failure.cloudCode ? { namespace: 'RunErrors', key: `${failure.cloudCode}.default` } : { namespace: 'Coordinator', key: failure.reason === 'modelRequired' ? 'modelRequired' : failure.reason === 'balance' ? 'apiBalance' : failure.reason === 'tools' ? 'replyToolUnavailable' : 'failedTitle' }
   }
 }
