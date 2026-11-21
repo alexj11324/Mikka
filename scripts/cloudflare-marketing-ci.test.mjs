@@ -12,6 +12,8 @@ const env = { GITHUB_ACTIONS: 'true', GITHUB_REPOSITORY: 'alexj11324/Mikka', GIT
   GITHUB_REPOSITORY_OWNER_ID: '183887963', GITHUB_SHA: 'a'.repeat(40), GITHUB_REF: 'refs/heads/main',
   GITHUB_EVENT_NAME: 'workflow_dispatch', GITHUB_WORKFLOW_REF: 'alexj11324/Mikka/.github/workflows/marketing-build.yml@refs/heads/main',
   GITHUB_RUN_ID: '12345', GITHUB_RUN_ATTEMPT: '1', MIKKA_MARKETING_SOURCE_SHA: 'b'.repeat(40) }
+const transferredEnv = { ...env, GITHUB_REPOSITORY: 'aspectly-labs/Mikka', GITHUB_REPOSITORY_OWNER_ID: '359279274',
+  GITHUB_WORKFLOW_REF: 'aspectly-labs/Mikka/.github/workflows/marketing-build.yml@refs/heads/main' }
 const git = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 
 async function repository(path, remote) {
@@ -54,15 +56,28 @@ test('the private website source resolves by immutable identity before and after
 })
 
 test('marketing requires public supplier identity and an exact website pin without passing credentials to compilation', () => {
-  assert.equal(sourceContext(env, env.GITHUB_SHA).privateRepository, 'alexj11324/mikka-web')
-  for (const [patch, code] of [
-    [{ GITHUB_ACTIONS: undefined }, 'PROVIDER_REQUIRED'], [{ GITHUB_REPOSITORY_ID: '1429004608' }, 'REPOSITORY_REQUIRED'],
-    [{ GITHUB_SHA: 'c'.repeat(40) }, 'SOURCE_MISMATCH'], [{ GITHUB_REF: 'refs/heads/other' }, 'MAIN_REQUIRED'],
-    [{ GITHUB_ACTOR_ID: '42' }, 'ACTOR_REQUIRED'], [{ GITHUB_TRIGGERING_ACTOR: 'other' }, 'ACTOR_REQUIRED'],
-    [{ GITHUB_EVENT_NAME: 'pull_request' }, 'EVENT_REQUIRED'], [{ GITHUB_WORKFLOW_REF: 'other' }, 'WORKFLOW_REQUIRED'],
-    [{ MIKKA_MARKETING_SOURCE_SHA: 'main' }, 'PRIVATE_PIN_REQUIRED'],
-    [{ GITHUB_RUN_ID: '0' }, 'RUN_REQUIRED'], [{ GITHUB_RUN_ATTEMPT: '0' }, 'ATTEMPT_REQUIRED'],
-  ]) assert.throws(() => sourceContext({ ...env, ...patch }, env.GITHUB_SHA), new RegExp(code))
+  for (const selected of [env, transferredEnv]) {
+    const context = sourceContext(selected, selected.GITHUB_SHA)
+    assert.equal(context.repository, selected.GITHUB_REPOSITORY)
+    assert.equal(context.workflowRef, selected.GITHUB_WORKFLOW_REF)
+    assert.equal(context.privateRepository, 'alexj11324/mikka-web')
+    const other = selected === env ? transferredEnv : env
+    for (const [patch, code] of [
+      [{ GITHUB_ACTIONS: undefined }, 'PROVIDER_REQUIRED'], [{ GITHUB_REPOSITORY_ID: '1429004608' }, 'REPOSITORY_REQUIRED'],
+      [{ GITHUB_REPOSITORY_ID: undefined }, 'REPOSITORY_REQUIRED'], [{ GITHUB_REPOSITORY: 'someone/Mikka' }, 'REPOSITORY_REQUIRED'],
+      [{ GITHUB_REPOSITORY: 'aspectly-labs/mikka-cloud' }, 'REPOSITORY_REQUIRED'],
+      [{ GITHUB_REPOSITORY_OWNER_ID: undefined }, 'REPOSITORY_REQUIRED'], [{ GITHUB_REPOSITORY_OWNER_ID: '42' }, 'REPOSITORY_REQUIRED'],
+      [{ GITHUB_REPOSITORY_OWNER_ID: other.GITHUB_REPOSITORY_OWNER_ID }, 'REPOSITORY_REQUIRED'],
+      [{ GITHUB_REPOSITORY: other.GITHUB_REPOSITORY }, 'REPOSITORY_REQUIRED'],
+      [{ GITHUB_SHA: 'c'.repeat(40) }, 'SOURCE_MISMATCH'], [{ GITHUB_REF: 'refs/heads/other' }, 'MAIN_REQUIRED'],
+      [{ GITHUB_ACTOR_ID: '42' }, 'ACTOR_REQUIRED'], [{ GITHUB_ACTOR: 'other' }, 'ACTOR_REQUIRED'],
+      [{ GITHUB_TRIGGERING_ACTOR: 'other' }, 'ACTOR_REQUIRED'],
+      [{ GITHUB_EVENT_NAME: 'pull_request' }, 'EVENT_REQUIRED'], [{ GITHUB_EVENT_NAME: 'push' }, 'EVENT_REQUIRED'],
+      [{ GITHUB_WORKFLOW_REF: 'other' }, 'WORKFLOW_REQUIRED'], [{ GITHUB_WORKFLOW_REF: other.GITHUB_WORKFLOW_REF }, 'WORKFLOW_REQUIRED'],
+      [{ MIKKA_MARKETING_SOURCE_SHA: 'main' }, 'PRIVATE_PIN_REQUIRED'],
+      [{ GITHUB_RUN_ID: '0' }, 'RUN_REQUIRED'], [{ GITHUB_RUN_ATTEMPT: '0' }, 'ATTEMPT_REQUIRED'],
+    ]) assert.throws(() => sourceContext({ ...selected, ...patch }, selected.GITHUB_SHA), new RegExp(code))
+  }
   const child = buildEnvironment({ PATH: '/bin', HOME: '/home/ci', MIKKA_MARKETING_READ_TOKEN: 'fixture-only',
     GH_TOKEN: 'fixture-only', GITHUB_APP_ID: 'fixture-only', GITHUB_APP_PRIVATE_KEY: 'fixture-only',
     ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'fixture-only', ACTIONS_ID_TOKEN_REQUEST_URL: 'https://example.invalid',
@@ -75,24 +90,32 @@ test('marketing requires public supplier identity and an exact website pin witho
     'GITHUB_SHA', 'WORKERS_CI_COMMIT_SHA', 'NODE_OPTIONS']) assert.equal(child[key], undefined)
 })
 
-test('verification binds the public checkout, private checkout, public workflow run and exact private archive bytes', async t => {
+for (const publicEnv of [env, transferredEnv]) test(`verification binds the public checkout, private checkout, public workflow run and exact private archive bytes under ${publicEnv.GITHUB_REPOSITORY}`, async t => {
   t.mock.method(console, 'log', () => {})
   t.mock.method(console, 'error', () => {})
   const directory = await mkdtemp(join(tmpdir(), 'mikka-marketing-owner-'))
   const publicRoot = join(directory, 'public')
   try {
-    const publicSource = await repository(publicRoot, 'alexj11324/Mikka')
+    const publicSource = await repository(publicRoot, publicEnv.GITHUB_REPOSITORY)
     const privateRoot = join(publicRoot, '.mikka-web')
     const privateSource = await repository(privateRoot, 'alexj11324/mikka-web')
     const output = join(publicRoot, '.cloudflare-marketing')
     await mkdir(output)
     const bytes = Buffer.from('unit packaged website')
     await writeFile(join(output, 'marketing-worker.tgz'), bytes)
-    const receipt = { version: 1, context: { ...sourceContext(env, env.GITHUB_SHA), publicSource, privateSource },
+    const receipt = { version: 1, context: { provider: 'github-actions', repository: publicEnv.GITHUB_REPOSITORY, publicSource,
+      privateRepository: 'alexj11324/mikka-web', privateSource, ref: publicEnv.GITHUB_REF, workflowRef: publicEnv.GITHUB_WORKFLOW_REF,
+      runId: publicEnv.GITHUB_RUN_ID, runAttempt: publicEnv.GITHUB_RUN_ATTEMPT },
       archive: { name: 'marketing-worker.tgz', sha256: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.length, retention: 'private-github-release' }, publication: 'none' }
-    await writeFile(join(output, 'receipt.json'), JSON.stringify(receipt))
-    const selected = { ...env, GITHUB_SHA: publicSource, MIKKA_MARKETING_SOURCE_SHA: privateSource }
+    const originalReceipt = JSON.stringify(receipt)
+    await writeFile(join(output, 'receipt.json'), originalReceipt)
+    const selected = { ...publicEnv, GITHUB_SHA: publicSource, MIKKA_MARKETING_SOURCE_SHA: privateSource }
     assert.deepEqual(await runMarketingCi({ env: selected, verify: true, publicRoot }), receipt)
+    assert.equal(await readFile(join(output, 'receipt.json'), 'utf8'), originalReceipt)
+    const other = publicEnv === env ? transferredEnv : env
+    git(publicRoot, 'remote', 'set-url', 'origin', 'https://github.com/' + other.GITHUB_REPOSITORY + '.git')
+    await assert.rejects(runMarketingCi({ env: selected, verify: true, publicRoot }), /REPOSITORY_REQUIRED/)
+    git(publicRoot, 'remote', 'set-url', 'origin', 'https://github.com/' + publicEnv.GITHUB_REPOSITORY + '.git')
     const movedReceipt = structuredClone(receipt)
     movedReceipt.context.privateRepository = 'aspectly-labs/mikka-web'
     await writeFile(join(output, 'receipt.json'), JSON.stringify(movedReceipt))

@@ -5,14 +5,12 @@ import { mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { command } from './cloudflare-native-oci.mjs'
-import { hasGitHubOrigin } from './cloudflare-source.mjs'
+import { actionsMikkaRepository, hasGitHubOrigin } from './cloudflare-source.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const repository = 'alexj11324/Mikka'
 const privateRepositories = { 'alexj11324/mikka-web': { id: 183887963, login: 'alexj11324' },
   'aspectly-labs/mikka-web': { id: 359279274, login: 'aspectly-labs' } }
 const sha = /^[a-f0-9]{40}$/, positive = /^[1-9][0-9]*$/
-const workflow = 'alexj11324/Mikka/.github/workflows/marketing-build.yml@refs/heads/main'
 const archiveName = 'marketing-worker.tgz'
 const hash = bytes => createHash('sha256').update(bytes).digest('hex')
 const git = (cwd, args, env) => command('git', args, { cwd, env, stage: 'MARKETING_SOURCE', encoding: 'utf8', timeout: 120000 }).trim()
@@ -41,15 +39,14 @@ export async function resolveMarketingRepository(token, request = fetch) {
 
 export function sourceContext(env, publicSource, privateRepository = 'alexj11324/mikka-web') {
   assert.equal(env.GITHUB_ACTIONS, 'true', 'MARKETING_PUBLIC_CI_PROVIDER_REQUIRED')
-  assert.equal(env.GITHUB_REPOSITORY, repository, 'MARKETING_PUBLIC_CI_REPOSITORY_REQUIRED')
-  assert.equal(env.GITHUB_REPOSITORY_ID, '1427517699', 'MARKETING_PUBLIC_CI_REPOSITORY_REQUIRED')
-  assert.equal(env.GITHUB_REPOSITORY_OWNER_ID, '183887963', 'MARKETING_PUBLIC_CI_REPOSITORY_REQUIRED')
+  const repository = actionsMikkaRepository(env)
+  assert.ok(repository, 'MARKETING_PUBLIC_CI_REPOSITORY_REQUIRED')
   assert.equal(env.GITHUB_ACTOR_ID, '183887963', 'MARKETING_PUBLIC_CI_ACTOR_REQUIRED')
   assert.equal(env.GITHUB_ACTOR, 'alexj11324', 'MARKETING_PUBLIC_CI_ACTOR_REQUIRED')
   assert.equal(env.GITHUB_TRIGGERING_ACTOR, 'alexj11324', 'MARKETING_PUBLIC_CI_ACTOR_REQUIRED')
   assert.equal(env.GITHUB_REF, 'refs/heads/main', 'MARKETING_PUBLIC_CI_MAIN_REQUIRED')
   assert.equal(env.GITHUB_EVENT_NAME, 'workflow_dispatch', 'MARKETING_PUBLIC_CI_EVENT_REQUIRED')
-  assert.equal(env.GITHUB_WORKFLOW_REF, workflow, 'MARKETING_PUBLIC_CI_WORKFLOW_REQUIRED')
+  assert.equal(env.GITHUB_WORKFLOW_REF, repository + '/.github/workflows/marketing-build.yml@refs/heads/main', 'MARKETING_PUBLIC_CI_WORKFLOW_REQUIRED')
   assert.ok(sha.test(publicSource) && env.GITHUB_SHA === publicSource, 'MARKETING_PUBLIC_CI_SOURCE_MISMATCH')
   assert.match(env.MIKKA_MARKETING_SOURCE_SHA ?? '', sha, 'MARKETING_PUBLIC_CI_PRIVATE_PIN_REQUIRED')
   assert.match(env.GITHUB_RUN_ID ?? '', positive, 'MARKETING_PUBLIC_CI_RUN_REQUIRED')
@@ -81,10 +78,10 @@ export async function runMarketingCi({ env = process.env, verify = false, public
   env = withoutAppAuthority(env)
   if (!verify) assert.ok(Number(process.versions.node.split('.')[0]) >= 22, 'MARKETING_PUBLIC_CI_NODE_22_REQUIRED')
   publicRoot = await realpath(publicRoot)
+  const publicSource = git(publicRoot, ['rev-parse', 'HEAD'])
+  const { repository } = sourceContext(env, publicSource)
   assert.ok(git(publicRoot, ['rev-parse', '--show-toplevel']) === publicRoot
     && hasGitHubOrigin(git(publicRoot, ['remote', 'get-url', 'origin']), repository), 'MARKETING_PUBLIC_CI_REPOSITORY_REQUIRED')
-  const publicSource = git(publicRoot, ['rev-parse', 'HEAD'])
-  sourceContext(env, publicSource)
   const source = join(publicRoot, '.mikka-web'), output = join(publicRoot, '.cloudflare-marketing')
   const storedReceipt = verify ? JSON.parse(await readFile(join(output, 'receipt.json'), 'utf8')) : null
   const privateRepository = verify ? storedReceipt.context?.privateRepository : await resolveMarketingRepository(env.MIKKA_MARKETING_READ_TOKEN)

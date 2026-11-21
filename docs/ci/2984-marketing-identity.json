@@ -1,0 +1,258 @@
+{
+  "schemaVersion": 1,
+  "issue": "https://github.com/aspectly-labs/Mikka/issues/2984",
+  "finding": "SDLC-009",
+  "pullRequest": "https://github.com/aspectly-labs/Mikka/pull/3004",
+  "base": {
+    "sha": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+    "tree": "d28479a64b1bb54c13f44c745834cdd0cadda73e"
+  },
+  "scope": "Public marketing source admission and enrollment of its existing credential-free regression suite. No private source, production deployment or release acceptance is exercised.",
+  "rootCause": "The marketing job admits the immutable public repository ID, but sourceContext and runMarketingCi still pin the legacy full name and owner. The coherent transferred GitHub identity is rejected before the authorized private build input can be read. The existing marketing regression suite was also absent from the current CI command registry.",
+  "actualPublicIdentity": {
+    "repository": "aspectly-labs/Mikka",
+    "repositoryId": "1427517699",
+    "ownerId": "359279274",
+    "metadataUrl": "https://api.github.com/repos/aspectly-labs/Mikka",
+    "observation": "Canonical public metadata independently read during the transfer-delta audit and refreshed before the branch was created. Test environments and local Git repositories below are fixtures, not a dispatched marketing run."
+  },
+  "ownership": {
+    "governingIssues": [
+      1953,
+      1954,
+      2984
+    ],
+    "existingBuildOwnerPr": {
+      "number": 2839,
+      "head": "618f2d0e9488ab4efa39b78290a4590c5b4f1cd6",
+      "deduplication": "Its marketing-module diff removes an obsolete build environment variable; that change is already present on the selected main. It does not fix public source identity or enroll this suite."
+    },
+    "sharedProfile": "scripts/cloudflare-source.mjs: actionsMikkaRepository (already on main; unchanged)",
+    "productionOwnerRetained": true
+  },
+  "repair": {
+    "sourceBlobBefore": "09a53d795a718891355f623339cf0a7b14659f9e",
+    "sourceBlobAfter": "156d659fe07b45e178d398344bd6ab9d33d7b967",
+    "testBlob": "a6b28a430c4bd253695a3a9cf90425b8e45e9a28",
+    "workflowBlobBefore": "cd3fd311029ee6eaa58b82ab47a4ddb6710f3663",
+    "workflowBlobAfter": "060a1bff5abf490db72111743195ad96a2ac5707",
+    "changes": [
+      "Resolve the public identity through the existing finite actionsMikkaRepository profile.",
+      "Bind the workflow ref and public Git origin to that validated identity.",
+      "Append the original marketing suite to the existing credential-free source job; preserve its permissions, timeout, events and all prior tests."
+    ],
+    "preserved": [
+      "immutable public repository ID",
+      "coherent approved full-name and owner-ID pair",
+      "Alex actor ID, login and triggering actor",
+      "main ref and workflow_dispatch only",
+      "exact public and private commit pins",
+      "workflow path and matching public repository",
+      "public checkout top level and Git origin",
+      "private namespace, checkout, receipt run and archive digest validation",
+      "App credential scrub and exact private token boundaries"
+    ]
+  },
+  "verification": {
+    "originalSuite": {
+      "stage": "baseline-original-suite",
+      "startedAt": "2026-11-21T00:21:46.432045+00:00",
+      "completedAt": "2026-11-21T00:21:47.007599+00:00",
+      "command": [
+        "node",
+        "--test",
+        "scripts/cloudflare-marketing-ci.test.mjs"
+      ],
+      "sourceSha": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "tree": "d28479a64b1bb54c13f44c745834cdd0cadda73e",
+      "node": "v24.22.3",
+      "exitCode": 0,
+      "elapsedSeconds": 0.5751896039992062,
+      "stdoutSha256": "a42858bc14726a6c19b2e3e1dcea30a01d88007325e94dfc585515ab994ee64d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "counterexampleRed": {
+      "stage": "red-original-production-new-identity-regression",
+      "startedAt": "2026-11-21T00:22:21.366072+00:00",
+      "completedAt": "2026-11-21T00:22:22.021428+00:00",
+      "command": [
+        "node",
+        "--test",
+        "scripts/cloudflare-marketing-ci.test.mjs"
+      ],
+      "baseSha": "6fe25cf9413d4078ce350a97e284c33f1efa9de7",
+      "node": "v24.22.3",
+      "exitCode": 1,
+      "elapsedSeconds": 0.6541673129995615,
+      "sourceBlob": "09a53d795a718891355f623339cf0a7b14659f9e",
+      "testBlob": "a6b28a430c4bd253695a3a9cf90425b8e45e9a28",
+      "stdoutSha256": "ad1af2cb63e44c485ca8bf73802390c0bdad434b7a043237eecd48fb844bbc44",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "commit": "1c29fb48673183c0d766d82bba83621275831c70",
+      "tests": 8,
+      "passed": 6,
+      "failed": 2,
+      "skipped": 0,
+      "firstFailures": [
+        "sourceContext rejects the coherent aspectly-labs public identity before credential delivery",
+        "runMarketingCi rejects the canonical public Git origin before validating the local receipt fixture"
+      ]
+    },
+    "sourceAdmissionGreen": {
+      "stage": "green-minimal-source-admission-repair",
+      "startedAt": "2026-11-21T00:24:04.220669+00:00",
+      "completedAt": "2026-11-21T00:24:04.945610+00:00",
+      "command": [
+        "node",
+        "--test",
+        "scripts/cloudflare-marketing-ci.test.mjs"
+      ],
+      "parentSha": "1c29fb48673183c0d766d82bba83621275831c70",
+      "node": "v24.22.3",
+      "exitCode": 0,
+      "elapsedSeconds": 0.7246154369995566,
+      "sourceBlob": "156d659fe07b45e178d398344bd6ab9d33d7b967",
+      "testBlob": "a6b28a430c4bd253695a3a9cf90425b8e45e9a28",
+      "stdoutSha256": "01ecab62669ba8682b42036254759271fa4700231f611f257795b5606cc759ee",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "tests": 8,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    "existingSourceStepWithEnrollment": {
+      "startedAt": "2026-11-21T00:29:19.862Z",
+      "completedAt": "2026-11-21T00:29:34.996Z",
+      "node": "v24.22.3",
+      "command": [
+        "node",
+        "--test",
+        "scripts/cloudflare-ci.test.mjs",
+        "scripts/cloudflare-native-oci.test.mjs",
+        "scripts/cloudflare-cloud-ci.test.mjs",
+        "scripts/cloudflare-marketing-ci.test.mjs",
+        "scripts/cloudflare-runtime-release.test.mjs",
+        "scripts/cloudflare-registry-credentials.test.mjs",
+        "scripts/load-cloudflare-api-receipt.test.mjs",
+        "lib/deployment-id.test.mjs",
+        "scripts/release/service-builds.test.mjs",
+        "scripts/release/service-build-ci.test.mjs"
+      ],
+      "exitCode": 0,
+      "signal": null,
+      "elapsedSeconds": 15.132551042000001,
+      "head": "1c29fb48673183c0d766d82bba83621275831c70",
+      "workflowBlob": "060a1bff5abf490db72111743195ad96a2ac5707",
+      "sourceBlob": "156d659fe07b45e178d398344bd6ab9d33d7b967",
+      "testBlob": "a6b28a430c4bd253695a3a9cf90425b8e45e9a28",
+      "stdoutSha256": "7c0bbf8e75b98fd792e8ecef7c0accbfbe194490e9a6abb677eb88a7e8785c49",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "summary": [
+        "ℹ tests 86",
+        "ℹ suites 0",
+        "ℹ pass 86",
+        "ℹ fail 0",
+        "ℹ cancelled 0",
+        "ℹ skipped 0",
+        "ℹ todo 0",
+        "ℹ duration_ms 15065.544065"
+      ],
+      "tests": 86,
+      "passed": 86,
+      "failed": 0,
+      "skipped": 0,
+      "workflow": ".github/workflows/cloudflare-api-image.yml",
+      "job": "source",
+      "step": "Verify public API and runtime provenance without credentials"
+    },
+    "countsOverlap": true,
+    "additionalChecks": {
+      "oxlint": {
+        "startedAt": "2026-11-21T00:27:18.147259+00:00",
+        "completedAt": "2026-11-21T00:27:18.241108+00:00",
+        "command": [
+          "/workspace/scratch/b55cdf575d56/research/marketing-identity-deps/node_modules/.bin/oxlint",
+          "--deny-warnings",
+          "scripts/cloudflare-marketing-ci.mjs",
+          "scripts/cloudflare-marketing-ci.test.mjs"
+        ],
+        "oxlint": "1.89.0 exact pnpm-lock import",
+        "exitCode": 0,
+        "elapsedSeconds": 0.09362540900019667,
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "errorCausePolicy": {
+        "command": "node scripts/error-cause-policy.mjs",
+        "exitCode": 0
+      },
+      "pollingPolicy": {
+        "command": "node scripts/polling-policy.mjs",
+        "exitCode": 0
+      },
+      "cloudBoundaryPolicy": {
+        "command": "node scripts/cloud-boundary-policy.mjs",
+        "exitCode": 0
+      },
+      "syntax": {
+        "commands": [
+          "node --check scripts/cloudflare-marketing-ci.mjs",
+          "node --check scripts/cloudflare-marketing-ci.test.mjs"
+        ],
+        "exitCode": 0
+      },
+      "diffCheck": {
+        "command": "git diff --check",
+        "exitCode": 0
+      },
+      "dependencyNote": "Polling and cloud-boundary checks initially could not load TypeScript. The existing exact TypeScript 5.9.3 installation was linked into this worktree ignored node_modules; unchanged checks then completed successfully. Oxlint is the root lock version 1.89.0 in an isolated scratch installation."
+    }
+  },
+  "negativeCases": [
+    "missing, wrong or foreign repository ID",
+    "foreign full name",
+    "approved full name paired with the other owner ID",
+    "missing or foreign owner ID",
+    "wrong actor ID, actor login or triggering actor",
+    "non-main ref",
+    "push or pull_request event",
+    "foreign or other-approved-repository workflow ref",
+    "public SHA mismatch",
+    "unfixed private SHA",
+    "invalid run ID or attempt",
+    "other-approved public Git origin",
+    "wrong private Git origin or pin",
+    "receipt run mismatch",
+    "changed archive bytes",
+    "credential exposure to the local fake publisher"
+  ],
+  "metrics": {
+    "sampleDenominator": {
+      "originalSuiteRuns": 1,
+      "redRuns": 1,
+      "greenRuns": 1,
+      "existingSourceStepRuns": 1,
+      "actualMarketingDispatches": 0
+    },
+    "admissionCounterexample": {
+      "before": "2 failures of 8 regression tests with the original production code",
+      "after": "8 of 8 pass with the minimal source repair"
+    },
+    "ciRegistration": {
+      "beforeTestFiles": 9,
+      "afterTestFiles": 10,
+      "newJobs": 0
+    },
+    "claim": "Local source-admission correctness and CI coverage. Durations are descriptive single-run observations; no delivery-time improvement or actual build/release acceptance is inferred."
+  },
+  "releaseAcceptance": {
+    "actualMarketingDispatch": null,
+    "privateBuild": null,
+    "productionDeployment": null,
+    "reason": "Not executed. These remain with the existing build and production Owners."
+  }
+}
