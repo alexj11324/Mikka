@@ -2,6 +2,15 @@ import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk"
 import { expect, it } from "vitest"
 import { claudeChunks } from "../src/adapters/claude"
 
+it("reports both cache buckets from the Claude result", () => {
+  const message = {
+    type: "result", usage: { input_tokens: 10, output_tokens: 3, cache_read_input_tokens: 80, cache_creation_input_tokens: 20 },
+  } as SDKMessage
+  expect(claudeChunks(message)).toMatchObject([
+    { type: "data-usage", data: { inputTokens: 10, outputTokens: 3, cacheReadTokens: 80, cacheWriteTokens: 20 } },
+  ])
+})
+
 // Claude Code 2.1.305's ToolSearch result for a `select:` query, as sent to the model.
 it("shows the tools a ToolSearch loaded instead of an empty output", () => {
   const message = {

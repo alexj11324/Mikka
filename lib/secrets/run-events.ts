@@ -58,11 +58,17 @@ function subscriptionUsage(chunk: Record<string, unknown>, route: string) {
   if (chunk.type !== 'data-usage' || !chunk.data || typeof chunk.data !== 'object') return null
   const data = chunk.data as Record<string, unknown>
   // Older Codex daemons report a thread total, not a turn total.
-  const usage = route.startsWith('codex') ? data.turnUsage as typeof data | undefined : data
+  const codex = route.startsWith('codex')
+  const usage = codex ? data.turnUsage as typeof data | undefined : data
   const input = usage?.inputTokens, output = usage?.outputTokens
   if (typeof input !== 'number' || !Number.isSafeInteger(input) || input < 0 ||
       typeof output !== 'number' || !Number.isSafeInteger(output) || output < 0) return null
-  return { inputTokens: input, outputTokens: output, cacheReadTokens: null, cacheWriteTokens: null }
+  const cacheTokens = (value: unknown) =>
+    typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+  const cacheReadTokens = codex ? null : cacheTokens(data.cacheReadTokens)
+  const cacheWriteTokens = codex ? null : cacheTokens(data.cacheWriteTokens)
+  const inputTokens = input + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0)
+  return Number.isSafeInteger(inputTokens) ? { inputTokens, outputTokens: output, cacheReadTokens, cacheWriteTokens } : null
 }
 
 export async function persistRunEventBatch(runId: string, fromSeq: number, input: Record<string, unknown>[], mask: Masker) {

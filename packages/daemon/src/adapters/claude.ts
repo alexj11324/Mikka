@@ -234,6 +234,8 @@ export function claudeChunks(message: SDKMessage): RunChunk[] {
       data: {
         inputTokens: message.usage.input_tokens ?? 0,
         outputTokens: message.usage.output_tokens ?? 0,
+        cacheReadTokens: message.usage.cache_read_input_tokens ?? null,
+        cacheWriteTokens: message.usage.cache_creation_input_tokens ?? null,
         costUsd: message.total_cost_usd ?? null,
         source: "claude agent sdk result",
       },
