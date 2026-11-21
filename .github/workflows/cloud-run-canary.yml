@@ -1,0 +1,66 @@
+name: Cloud run canary
+on:
+  schedule:
+    - cron: '41 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: cloud-run-canary
+  cancel-in-progress: false
+env:
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+
+jobs:
+  canary:
+    if: (github.repository_id == '1427517699' && ((github.repository == 'alexj11324/Mikka' && github.repository_owner_id == '183887963') || (github.repository == 'aspectly-labs/Mikka' && github.repository_owner_id == '359279274'))) && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24
+      - name: Read the smoke account through Infisical workload identity
+        uses: Infisical/secrets-action@d2e351f16c6ca20d17c85e6c992e04bdeb64e87d # v1.0.18
+        with:
+          method: oidc
+          identity-id: 2cf9fa19-b9db-4c08-8ca0-b31859f2cbac
+          oidc-audience: mikka-infisical
+          project-id: 89850d6a-f020-4936-863e-df77380dfe40
+          env-slug: prod
+          secret-path: /
+          recursive: false
+          include-imports: false
+      - name: Dispatch, complete and clean up one cloud run
+        id: canary
+        run: node scripts/acceptance/cloud-startup.mjs --origin "$SMOKE_BASE_URL" --mode canary --runs 1 --harness claude_code --strategy official --output report.json
+        env:
+          SMOKE_BASE_URL: https://app.aspectlylabs.com
+      - name: Summarize canary
+        if: always()
+        env:
+          CANARY_OUTCOME: ${{ steps.canary.outcome }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs'
+          let report
+          try { report = JSON.parse(readFileSync('report.json', 'utf8')) } catch {}
+          const passed = process.env.CANARY_OUTCOME === 'success' && report?.status === 'canary_passed'
+          const duration = Date.parse(report?.finishedAt) - Date.parse(report?.startedAt)
+          const elapsed = Number.isFinite(duration) && duration >= 0 ? ` (${(duration / 1000).toFixed(1)}s)` : ''
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `cloud-run canary: ${passed ? 'PASS' : 'FAIL'}${elapsed}; see report.json artifact\n`)
+          if (!passed) process.exitCode = 1
+          NODE
+      - if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cloud-run-canary-report
+          path: report.json
+          retention-days: 7
