@@ -545,8 +545,8 @@ importers:
         specifier: 5.2.0
         version: 5.2.0(patch_hash=49973d376d0e5b104efa69e27c4e53f7545f3cb88626d6eb8103354e004548c6)(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(sql.js@1.16.0)(typescript@6.0.3)
       eve:
-        specifier: 1.0.0-rc.9
-        version: 1.0.0-rc.9(27929910d81bee2d3ed35d45af3f525e)
+        specifier: 1.3.0
+        version: 1.3.0(patch_hash=566e11a78eb561371d7783881b9609caf0a4d90daa003bac32a0f81069b281ed)(b99b53494634a2b2300a4f3b0e6df2e7)
 
   apps/frontend:
     devDependencies:
@@ -587,8 +587,8 @@ importers:
         specifier: 1.7.12
         version: 1.7.12(@opentelemetry/api@1.10.0)(drizzle-orm@0.45.4(@opentelemetry/api@1.10.0)(@types/pg@8.23.1)(kysely@0.29.7)(pg@8.23.1)(sql.js@1.16.0))(next@16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(pg@8.23.1)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(solid-js@2.0.0-rc.0)(vitest@5.0.5(@opentelemetry/api@1.10.0)(@types/node@25.9.9)(happy-dom@15.11.7)(vite@8.3.6(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.0)))
       eve:
-        specifier: 1.0.0-rc.9
-        version: 1.0.0-rc.9(4aaf463ec6a824bf7d01544661224474)
+        specifier: 1.3.0
+        version: 1.3.0(patch_hash=566e11a78eb561371d7783881b9609caf0a4d90daa003bac32a0f81069b281ed)(c1f34b3a2a8e20ff8997bcf8b6fe7f02)
       expo:
         specifier: ~58.0.22
         version: 58.0.22(@babel/core@7.29.7)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.16)(expo-router@58.0.29)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.1(@babel/core@7.29.7)(@react-native/metro-config@0.88.1(@babel/core@7.29.7))(@types/react@19.3.0)(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
@@ -7458,56 +7458,6 @@ packages:
   etag@1.8.1:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
-
-  eve@1.0.0-rc.9:
-    resolution: {integrity: sha512-eRCDQo1zvUBJW17/0gYWXsxXDAKTyzOl2/ECsSko0paDOx3VVqUcy0ou1lUlFjPtIfm/sE1tPIBzDonVkc01rA==}
-    engines: {node: '>=24'}
-    hasBin: true
-    peerDependencies:
-      '@linqapp/sdk': ^0.47.1
-      '@nuxt/kit': ^4.0.0
-      '@nuxt/schema': ^4.0.0
-      '@opentelemetry/api': ^1.0.0
-      '@vercel/connect': ^2.7.0
-      ai: ^7.0.137
-      braintrust: ^3.0.0
-      chat: ^4.42.0
-      dd-trace: ^6.13.0
-      just-bash: ^3.6.0
-      next: ^16.0.0
-      react: ^19.0.0
-      svelte: ^5.0.0
-      vite: ^8.3.1
-      vue: ^3.5.0
-    peerDependenciesMeta:
-      '@linqapp/sdk':
-        optional: true
-      '@nuxt/kit':
-        optional: true
-      '@nuxt/schema':
-        optional: true
-      '@opentelemetry/api':
-        optional: true
-      '@vercel/connect':
-        optional: true
-      braintrust:
-        optional: true
-      chat:
-        optional: true
-      dd-trace:
-        optional: true
-      just-bash:
-        optional: true
-      next:
-        optional: true
-      react:
-        optional: true
-      svelte:
-        optional: true
-      vite:
-        optional: true
-      vue:
-        optional: true
 
   eve@1.3.0:
     resolution: {integrity: sha512-cL1aaSwPLiUYPIp5ksivpd7GJpnl3H7xptT8/31utYC6HLWHJkf9gut++p46LaI2DhmVY1AdrrJ254BZGtlD6Q==}
@@ -20307,12 +20257,13 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@1.0.0-rc.9(27929910d81bee2d3ed35d45af3f525e):
+  eve@1.3.0(patch_hash=566e11a78eb561371d7783881b9609caf0a4d90daa003bac32a0f81069b281ed)(b99b53494634a2b2300a4f3b0e6df2e7):
     dependencies:
       ai: 7.0.179(zod@4.6.7)
+      core-js-pure: 3.51.0
       nitro: 3.0.261103-rc
-      rolldown: 1.2.16
-      undici: 8.12.3
+      rolldown: 1.3.2
+      undici: 8.12.4
     optionalDependencies:
       '@nuxt/kit': 4.4.8
       '@opentelemetry/api': 1.10.0
@@ -20320,14 +20271,16 @@ snapshots:
       just-bash: 3.6.0
       next: 16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react: 19.3.1
+      solid-js: 2.0.0-rc.0
       vite: 8.3.6(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.0)
 
-  eve@1.0.0-rc.9(4aaf463ec6a824bf7d01544661224474):
+  eve@1.3.0(patch_hash=566e11a78eb561371d7783881b9609caf0a4d90daa003bac32a0f81069b281ed)(c1f34b3a2a8e20ff8997bcf8b6fe7f02):
     dependencies:
       ai: 7.0.179(zod@4.6.7)
+      core-js-pure: 3.51.0
       nitro: 3.0.261103-rc
-      rolldown: 1.2.16
-      undici: 8.12.3
+      rolldown: 1.3.2
+      undici: 8.12.4
     optionalDependencies:
       '@nuxt/kit': 4.4.8
       '@opentelemetry/api': 1.10.0
@@ -20335,6 +20288,7 @@ snapshots:
       just-bash: 3.6.0
       next: 16.4.1(@babel/core@7.29.7)(@opentelemetry/api@1.10.0)(@playwright/test@1.64.1)(@types/node@25.9.9)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react: 19.3.0
+      solid-js: 2.0.0-rc.0
       vite: 8.3.6(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.0)
 
   eve@1.3.0(patch_hash=566e11a78eb561371d7783881b9609caf0a4d90daa003bac32a0f81069b281ed)(e8be5ef357352dc1433cb93bf866c46f):

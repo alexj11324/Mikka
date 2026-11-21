@@ -35,7 +35,7 @@ test('prebuilt packaging keeps queue triggers and rejects mixed app/agent revisi
   await mkdir(join(source, 'functions/eve/v1'), { recursive: true })
   await mkdir(join(output, 'functions/app.func'), { recursive: true })
   const revision = 'a'.repeat(40)
-  const agent = { version: 1, revision, eve: '1.0.0-rc.9', preset: 'vercel' }
+  const agent = { version: 1, revision, eve: '1.3.0', preset: 'vercel' }
   const contract = { handler: 'index.mjs', runtime: 'nodejs24.x', experimentalTriggers: [{ type: 'queue/v2beta', topic: '__eve_fixture_workflow_*' }] }
   const save = (path, value) => writeFile(path, JSON.stringify(value))
   await save(join(source, 'mikka-eve-build.json'), agent)

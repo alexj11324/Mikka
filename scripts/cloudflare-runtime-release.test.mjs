@@ -163,7 +163,7 @@ test('prebuilt packaging carries accepted API resource bytes into the official E
       deploymentId: release, preset: 'node-server', resources: [resource] }))
     await mkdir(join(work, 'apps/eve/.output/server'), { recursive: true })
     await writeFile(join(work, 'apps/eve/.output/server/index.mjs'), 'export default {}\n')
-    await writeFile(join(work, 'apps/eve/.output/mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.0.0-rc.9',
+    await writeFile(join(work, 'apps/eve/.output/mikka-eve-build.json'), JSON.stringify({ version: 1, eve: '1.3.0',
       revision: publicSha, preset: 'node-server', world: '@mikka/eve-cloudflare-world', worldVersion: '5.1.0' }))
     await cp(new URL('../cloudflare/eve-runtime/runtime', import.meta.url), join(work, 'cloudflare/eve-runtime/runtime'), { recursive: true })
     await packageEve({ root: work, preset: 'node-server' })
