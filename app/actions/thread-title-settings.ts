@@ -5,6 +5,7 @@ import { ActionFailureError } from '@/lib/action-error'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { threadTitleSettings } from '@/lib/db/schema'
+import { writeSettings } from '@/lib/settings/store'
 import { THREAD_TITLE_TRIGGERS, DEFAULT_TITLE_TRIGGERS, TITLE_INSTRUCTIONS_MAX, type ThreadTitleTriggers } from '@/lib/thread-title'
 import { currentWorkspaceActor } from '@/lib/workspace-admin/current'
 import { settingsWorkspaceAction, type SettingsActionResult } from '@/lib/workspace-admin/settings-action'
@@ -55,7 +56,7 @@ export async function saveThreadTitleSettings(raw: z.input<typeof input>): Promi
       ...(parsed.instructions !== undefined ? { threadTitleInstructions: parsed.instructions } : {}),
       ...(parsed.triggers !== undefined ? { threadTitleTriggers: parsed.triggers } : {}),
     }
-    await (await import('@/lib/settings/store')).writeSettings(actor, parsed.scope === 'workspace' ? 'workspace' : 'personal', { values })
+    await writeSettings(actor, parsed.scope === 'workspace' ? 'workspace' : 'personal', { values })
     return readSettings(actor)
   })
 }

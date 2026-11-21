@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { after, before, mock, test } from 'node:test'
+import { SETTINGS_REGISTRY } from './registry'
 import { disposableDatabase } from '../../tests/helpers/e2e-target.mjs'
 
 const target = process.env.E2E_DATABASE_URL
@@ -103,12 +104,14 @@ dbTest('typed values persist, inherit, reset, and mirror existing actions withou
   assert.equal(response.status, 200)
   assert.deepEqual((await response.json()).values.subagentMaxConcurrent, { value: 9, source: 'workspace' })
   assert.equal((await pool.query('SELECT "integerValue" FROM workspace_setting_values WHERE "workspaceId"=$1 AND key=\'subagentMaxConcurrent\'', [workspaceId])).rows[0].integerValue, 9)
+  assert.equal((await pool.query('SELECT instructions FROM thread_title_settings WHERE "workspaceId"=$1 AND "userId"=\'\'', [workspaceId])).rows[0].instructions, 'team title')
   as(member)
   assert.deepEqual((await (await personal.GET(request(`personal?workspaceId=${workspaceId}`))).json()).values.archiveIdleAfterDays, { value: 7, source: 'workspace' })
   let saved = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ archiveIdleAfterDays: 0, threadTitleInstructions: '' })))
   assert.equal(saved.status, 200)
   let view = await saved.json()
   assert.deepEqual(view.values.archiveIdleAfterDays, { value: 0, source: 'personal' })
+  assert.equal((await pool.query('SELECT "archiveIdleAfterDays" FROM user_preferences WHERE "userId"=$1', [member])).rows[0].archiveIdleAfterDays, 0)
   assert.deepEqual(view.values.threadTitleInstructions, { value: '', source: 'personal' })
   saved = await personal.PATCH(request(`personal?workspaceId=${workspaceId}`, 'PATCH', patch({ archiveIdleAfterDays: null })))
   assert.deepEqual((await saved.json()).values.archiveIdleAfterDays, { value: 7, source: 'workspace' })
@@ -121,9 +124,14 @@ dbTest('typed values persist, inherit, reset, and mirror existing actions withou
   assert.deepEqual((await (await personal.GET(request(`personal?workspaceId=${workspaceId}`))).json()).values.threadTitleTriggers, { value: 'pull_opened', source: 'personal' })
   const reset = await personalReset.POST(request(`personal/reset?workspaceId=${workspaceId}`, 'POST', { group: 'threads' }))
   assert.deepEqual((await reset.json()).values.archiveIdleAfterDays, { value: 7, source: 'workspace' })
+  assert.equal((await pool.query('SELECT "archiveIdleAfterDays" FROM user_preferences WHERE "userId"=$1', [member])).rows[0].archiveIdleAfterDays, SETTINGS_REGISTRY.archiveIdleAfterDays.defaultValue)
+  assert.equal((await pool.query('SELECT triggers FROM thread_title_settings WHERE "workspaceId"=$1 AND "userId"=$2', [workspaceId, member])).rows[0].triggers, null)
   as(owner)
   const resetWorkspace = await workspaceReset.POST(request(`workspace/${workspaceId}/reset`, 'POST', { group: 'threads' }), context())
   assert.deepEqual((await resetWorkspace.json()).values.archiveIdleAfterDays, { value: 30, source: 'default' })
+  assert.deepEqual((await pool.query('SELECT instructions, triggers FROM thread_title_settings WHERE "workspaceId"=$1 AND "userId"=\'\'', [workspaceId])).rows[0], {
+    instructions: SETTINGS_REGISTRY.threadTitleInstructions.defaultValue, triggers: SETTINGS_REGISTRY.threadTitleTriggers.defaultValue,
+  })
 })
 
 dbTest('migration upgrade preserves zero and scoped title overrides; replay preserves later resets', async () => {

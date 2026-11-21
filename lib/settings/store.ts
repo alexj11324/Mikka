@@ -2,11 +2,11 @@ import 'server-only'
 import { and, eq, isNull, or } from 'drizzle-orm'
 import type { ResolvedSetting, SettingScope, SettingValue, SettingsView } from '@mikka/protocol/settings'
 import { db } from '@/lib/db'
-import { threadTitleSettings, userPreferences, users } from '@/lib/db/schema'
+import { users } from '@/lib/db/schema'
 import { workspaceDb } from '@/lib/workspace-db'
 import { requireWorkspace } from '@/lib/workspace-access'
-import { DEFAULT_TITLE_TRIGGERS, type ThreadTitleTriggers } from '@/lib/thread-title'
-import { archivePreferenceChanged, workspaceListChanged } from '@/lib/live/lists'
+import { workspaceListChanged } from '@/lib/live/lists'
+import { mirrorLegacySetting } from './legacy-mirrors'
 import { SETTINGS_REGISTRY, parseSettingsPatch, resolveSettingValue, settingDefinition, settingsResetInput, type SettingDefinition } from './registry'
 import { personalSettingValues, workspaceSettingValues } from './schema'
 
@@ -66,19 +66,7 @@ async function writeRows(tx: Transaction, scope: SettingScope, context: Settings
       await tx.insert(workspaceSettingValues).values({ workspaceId: context.workspaceId, key, ...changed })
         .onConflictDoUpdate({ target: [workspaceSettingValues.workspaceId, workspaceSettingValues.key], set: changed })
     }
-    // Existing runtime readers and clients retain their typed columns during incremental adoption.
-    if (field.legacy === 'archive-days' && scope === 'personal') {
-      const days = value === null ? 30 : value as number
-      await tx.insert(userPreferences).values({ userId: context.userId, archiveIdleAfterDays: days })
-        .onConflictDoUpdate({ target: userPreferences.userId, set: { archiveIdleAfterDays: days, updatedAt: new Date() } })
-      await archivePreferenceChanged(tx, context.userId)
-    }
-    if (field.legacy === 'title-instructions' || field.legacy === 'title-triggers') {
-      const change = field.legacy === 'title-instructions' ? { instructions: (value ?? '') as string }
-        : { triggers: (value ?? (scope === 'workspace' ? DEFAULT_TITLE_TRIGGERS : null)) as ThreadTitleTriggers | null }
-      await tx.insert(threadTitleSettings).values({ workspaceId: context.workspaceId, userId: scope === 'workspace' ? '' : context.userId, ...change })
-        .onConflictDoUpdate({ target: [threadTitleSettings.workspaceId, threadTitleSettings.userId], set: { ...change, updatedAt: new Date() } })
-    }
+    await mirrorLegacySetting(key)?.(tx, scope, context, value)
   }
 }
 
