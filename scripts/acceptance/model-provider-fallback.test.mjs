@@ -424,7 +424,7 @@ test('an un-restorable Claude check order blocks only that path and still prefli
   assert.equal(report.cases[1].code, 'order_restore_unavailable')
   assert.equal(report.cases[2].preflight.orderAlreadyMatches, true)
   assert.equal(report.cases[2].preflight.checkModelsRestricted, true)
-  assert.ok(!calls.some(call => call.method === 'PUT' || (call.method === 'POST' && ['/mikka/api/bots', '/mikka/api/mobile/chat'].includes(call.path))))
+  assert.ok(!calls.some(call => call.method === 'PUT' || (call.method === 'POST' && ['/mikka/api/bots', '/mikka/api/agents/eve/v1/session'].includes(call.path))))
 })
 
 test('unconfirmed official worker release blocks before even reading smoke credentials or sending login', async () => {

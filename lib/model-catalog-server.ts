@@ -1,8 +1,8 @@
 import 'server-only'
+import { gatewayLiteLlm } from './model-gateway/config'
 import { CATALOG_SNAPSHOT, FEATURED_MODELS, parseGatewayModel, type CatalogModel } from './model-catalog'
 
-/** Vercel AI Gateway's public model list; no credential is sent or needed. */
-export const GATEWAY_MODELS_URL = 'https://ai-gateway.vercel.sh/v1/models'
+const CATALOG_PATH = '/v1/mikka/catalog'
 const TTL_MS = 24 * 60 * 60 * 1000
 const FAILED_RETRY_MS = 10 * 60 * 1000
 
@@ -22,7 +22,13 @@ export async function modelCatalog(fetcher: typeof fetch = fetch, now = Date.now
 
 async function read(fetcher: typeof fetch, now: number): Promise<CatalogModel[]> {
   try {
-    const response = await fetcher(GATEWAY_MODELS_URL, { signal: AbortSignal.timeout(5000), headers: { accept: 'application/json' } })
+    const config = gatewayLiteLlm()
+    if (!config) throw new Error('litellm_not_configured')
+    const response = await fetcher(config.url + CATALOG_PATH, {
+      signal: AbortSignal.timeout(5000),
+      headers: { accept: 'application/json', authorization: 'Bearer ' + config.masterKey },
+      redirect: 'error',
+    })
     if (!response.ok) throw new Error(`gateway_models_${response.status}`)
     const body = await response.json() as { data?: unknown[] }
     const models = (Array.isArray(body.data) ? body.data : []).map(parseGatewayModel).filter((model): model is CatalogModel => model !== null)

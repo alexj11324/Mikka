@@ -32,7 +32,8 @@ mock.module(new URL('../api-auth.ts', import.meta.url).href, { namedExports: { a
   },
 } } } })
 mock.module(new URL('./auth-bot.ts', import.meta.url).href, { namedExports: {
-  resolveEveRequestBot: async () => ({ botId, workspaceId }),
+  resolveEveRequestBot: async (_request: Request, _session: unknown, expectedWorkspaceId?: string) =>
+    expectedWorkspaceId && expectedWorkspaceId !== workspaceId ? null : { botId, workspaceId },
 } })
 mock.module(new URL('../task-workspace.ts', import.meta.url).href, { namedExports: {
   requireTaskWorkspace: async () => ({ id: workspaceId }),
@@ -88,6 +89,42 @@ beforeEach(() => {
   scopeReadFailure = undefined
   pauseAuthentication = undefined
   admittedOwners.length = 0
+})
+
+test('native submission rejects oversized or malformed bodies before delivery', async () => {
+  for (const current of [sendRoute, route('POST', '/eve/v1/session')]) {
+    const oversized = request(sessionId, { 'content-length': String(4 * 1024 * 1024) })
+    const response = await current.handler(oversized, args)
+    assert.equal(response.status, 413)
+    const malformed = new Request(oversized.url, {
+      method: 'POST', headers: { origin: 'https://app.test', cookie: 'owner=alice', 'content-type': 'application/json' }, body: '{',
+    })
+    assert.equal((await current.handler(malformed, args)).status, 400)
+    assert.deepEqual(admittedOwners, [])
+  }
+  // HTTP bridges can expose the body of a native sessions.create as an empty stream.
+  const create = route('POST', '/eve/v1/session')
+  const emptyBody = new Request('https://app.test/eve/v1/session', {
+    method: 'POST', headers: { origin: 'https://app.test', cookie: 'owner=alice' }, body: '',
+  })
+  assert.ok(emptyBody.body)
+  const response = await create.handler(emptyBody, args)
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { ok: true, sessionId })
+  assert.deepEqual(admittedOwners, [])
+})
+
+test('an authenticated send cannot use captured expectations to start another owner or Workspace session', async () => {
+  const create = route('POST', '/eve/v1/session')
+  const neverCreate = { ...args, from() { assert.fail('a stale selection must not create a session') } }
+  for (const clientContext of [{ expectedOwnerId: 'bob' }, { expectedWorkspaceId: '33333333-3333-4333-8333-333333333333' }]) {
+    const response = await create.handler(new Request('https://app.test/eve/v1/session', {
+      method: 'POST', headers: { origin: 'https://app.test', cookie: 'owner=alice', 'content-type': 'application/json' },
+      body: JSON.stringify({ message: 'Hello', clientContext }),
+    }), neverCreate)
+    assert.equal(response.status, 401)
+    assert.deepEqual(admittedOwners, [])
+  }
 })
 
 test('native existing and create-message routes authenticate once, including submission rewrites', async () => {

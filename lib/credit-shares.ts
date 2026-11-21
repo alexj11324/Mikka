@@ -106,7 +106,8 @@ const EMPTY_BALANCE = new Set(['verification_required', 'free_allowance_used', '
  */
 export async function withSharedCredits<T>(workspaceId: string, attempt: (payer: string) => Promise<T>, expected?: { payer: string; organizationId: string | null }): Promise<T> {
   const account = await resolvePlatformBillingAccount(workspaceId)
-  const run = (payer: string, creditShareOwnerId?: string) => hostedBillingScope.run({ ...hostedBillingScope.getStore(), workspaceId,
+  const scope = hostedBillingScope.getStore()
+  const run = (payer: string, creditShareOwnerId?: string) => hostedBillingScope.run({ ...scope, workspaceId, actorId: scope?.actorId ?? scope?.ownerId,
     billingAccountWorkspaceId: payer, billingOrganizationId: account.organizationId, creditShareOwnerId }, () => attempt(payer))
   if (expected) {
     if (expected.organizationId !== account.organizationId) throw new PaidResourceError('billing_authorization_revoked')

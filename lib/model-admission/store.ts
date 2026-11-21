@@ -8,8 +8,8 @@ import { writeTransaction } from '@/lib/operations/write-transaction'
 import { UNFINISHED_RUN_STATUSES } from '@/lib/agent-run-statuses'
 import { stopRunsForPolicyChange } from '@/lib/run-policy-stop'
 import { assertOrganizationModelProvider } from '@/lib/governance/resource-access'
-import { admitModelRoute, GATEWAY_MODEL_ENDPOINT, ModelAdmissionError, modelAdmissionRevision,
-  parseModelAdmissionPolicy, subscriptionModelRoute, ZEROCAT_MODEL_ENDPOINT, type GatewayAdmission } from './contract'
+import { admitModelRoute, ModelAdmissionError, modelAdmissionRevision,
+  parseModelAdmissionPolicy, subscriptionModelRoute } from './contract'
 
 export interface ModelAdmissionScope { workspaceId: string; ownerId: string }
 export class ModelAdmissionStore {
@@ -31,7 +31,8 @@ export class ModelAdmissionStore {
   }
   private async current(tx: PoolClient, workspaceId: string) {
     const { rows: [row] } = await tx.query(`SELECT model_admission FROM workspace_computer_policies WHERE "workspaceId"=$1 FOR SHARE`, [workspaceId])
-    const policy = row?.model_admission == null ? null : parseModelAdmissionPolicy(row.model_admission)
+    // Preserve invalid or retired policy bytes so an admin can explicitly replace them.
+    const policy: unknown = row?.model_admission ?? null
     return { policy, revision: modelAdmissionRevision(policy) }
   }
   read(scope: ModelAdmissionScope) {
@@ -71,28 +72,14 @@ export class ModelAdmissionStore {
       return value
     } })
   }
-  /** A configured policy requires a current principal; no inferred membership. */
-  async gateway(scope: { workspaceId: string; ownerId?: string }, model: string, endpoint = GATEWAY_MODEL_ENDPOINT,
-    options: { signal?: AbortSignal; auditAllowed?: boolean } = {}): Promise<(GatewayAdmission & { revision: string }) | null> {
-    const admission = await this.admit(scope, model, { provider: 'vercel-gateway', endpoint }, options)
-    return admission ? { ...admission, endpoint: GATEWAY_MODEL_ENDPOINT } : null
-  }
-  /** The default model's direct ZeroCat route (lib/abuse/zerocat.ts). */
-  zeroCat(scope: { workspaceId: string; ownerId?: string }, model: string, endpoint: string = ZEROCAT_MODEL_ENDPOINT,
+  /** A configured policy pins the alias and this installation's LiteLLM endpoint. */
+  litellm(scope: { workspaceId: string; ownerId?: string }, model: string, endpoint: string,
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
-    return this.admit(scope, model, { provider: 'zerocat', endpoint }, options)
-  }
-  workersAi(scope: { workspaceId: string; ownerId?: string }, model: string, endpoint: string,
-    options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
-    return this.admit(scope, model, { provider: 'cloudflare-workers-ai', endpoint }, options)
+    return this.admit(scope, model, { provider: 'litellm', endpoint }, options)
   }
   subscription(scope: { workspaceId: string; ownerId?: string }, model: string, route: string,
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
     return this.admit(scope, model, subscriptionModelRoute(route), options)
-  }
-  selfHosted(scope: { workspaceId: string; ownerId?: string }, model: string, endpoint: string,
-    options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
-    return this.admit(scope, model, { provider: 'openai-compatible', endpoint }, options)
   }
   private async admit(scope: { workspaceId: string; ownerId?: string }, model: string, transport: { provider: string; endpoint: string },
     options: { signal?: AbortSignal; auditAllowed?: boolean } = {}) {
@@ -107,13 +94,13 @@ export class ModelAdmissionStore {
     const outcome = await writeTransaction(this.pool, async tx => {
       const current = await this.current(tx, scope.workspaceId)
       // A cleared policy preserves ordinary existing model routing.
-      if (!current.policy) return { admission: null }
+      if (current.policy === null) return { admission: null }
       try {
-        const admission = { ...admitModelRoute(current.policy, { ownerId: identity.ownerId, model, ...transport }), revision: current.revision }
+        const admission = { ...admitModelRoute(parseModelAdmissionPolicy(current.policy), { ownerId: identity.ownerId, model, ...transport }), revision: current.revision }
         if (options.auditAllowed !== false) await withDatabaseClient(tx, () => recordAudit(db, {
           workspaceId: scope.workspaceId, actor: { type: 'user', id: identity.ownerId, name: identity.ownerId },
           action: 'model.admitted', metadata: { revision: current.revision, provider: admission.provider, model: admission.model,
-            endpoint: admission.provider === 'cloudflare-workers-ai' ? 'https://api.cloudflare.com' : admission.endpoint, dataRegion: admission.dataRegion },
+            endpoint: admission.endpoint, dataRegion: admission.dataRegion },
         }))
         return { admission }
       } catch (error) {

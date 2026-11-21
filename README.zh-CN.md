@@ -28,7 +28,7 @@ Mikka 把 Claude Code 和 Codex 跑在隔离的云端机器上，与你自己电
 
 **Mikka Cloud。** [打开应用](https://app.aspectlylabs.com/mikka)，直接注册账号即可开始使用 Mikka。具体步骤参见[快速入门指南](https://aspectlylabs.com/mikka/docs/quickstart)。
 
-**自托管服务器。** 你可以使用 Docker 和 PostgreSQL 在自己的 Linux 主机上运行 Mikka。数据库可以选择 Compose 自带的 PostgreSQL，也可以使用托管 PostgreSQL（**[推荐 Neon](docs/self-hosting.md#managed-postgresql-neon-recommended)**，但不强制）。按照[自托管指南](docs/self-hosting.md)下载匹配版本的 Compose 文件，并配置必要的私有凭证。
+**社区自托管。** 自托管由社区维护。你可以使用 Docker 和 PostgreSQL 在自己的 Linux 主机上运行 Mikka。数据库可以选择 Compose 自带的 PostgreSQL，也可以使用托管 PostgreSQL（**[推荐 Neon](docs/self-hosting.md#managed-postgresql-neon-recommended)**，但不强制）。按照[自托管指南](docs/self-hosting.md)下载匹配版本的 Compose 文件，并配置必要的私有凭证。
 
 使用自带 PostgreSQL：
 

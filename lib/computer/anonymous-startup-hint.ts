@@ -37,7 +37,7 @@ export function anonymousStartupHint(input: {
   const parsed = schema.safeParse({
     version: 1, profile: claude ? 'cloud_repository_claude_v1' : 'cloud_repository_codex_0166_v1', runId: input.runId,
     bootstrapSha256: typeof input.bootstrap === 'string' ? createHash('sha256').update(input.bootstrap).digest('hex') : input.bootstrap.sha256,
-    model: d.model, effort: d.agentProfile?.effort ?? d.modelDispatch?.routing?.effort,
+    model: d.model, effort: d.modelDispatch?.effort ?? d.agentProfile?.effort ?? d.modelDispatch?.routing?.effort,
     kind: input.kind, github: true, diagnostics: input.diagnostics === true || cloudStartupDiagnosticCandidate({
       deviceKind: 'cloud', repository: input.repository.slice('v2/github.com/'.length), harness: d.harness,
       subscriptionBindingId: d.subscription.bindingId, run: { userId: input.userId, botId: input.botId, agentDefinition: d },

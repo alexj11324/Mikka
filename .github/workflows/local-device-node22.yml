@@ -72,7 +72,7 @@ jobs:
         run: node scripts/runtime-compatibility-smoke.mjs
       - name: Startup contracts and Eve unit tests
         run: |
-          node --test scripts/start-app.test.mjs scripts/self-hosted-start.test.mjs scripts/node22-test-compat.test.mjs scripts/node-runtime-compat.test.mjs
+          node --test scripts/start-app.test.mjs scripts/node22-test-compat.test.mjs scripts/node-runtime-compat.test.mjs
           pnpm test:eve
       - name: Daemon and installer on the selected Node runtime
         run: |

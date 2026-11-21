@@ -1,18 +1,8 @@
 import { roundStep } from '@/lib/agent-rounds'
 
-/**
- * The default model (Mikka 默认): the Coordinator's, and the one behind action
- * titles, profile facts and group replies. It is called first on ZeroCat's
- * OpenAI-compatible API (`deepseek-v4.1-flash`, lib/abuse/zerocat.ts), with
- * ZEROCAT_BASE_URL and ZEROCAT_API_KEY from Infisical `prod:/vercel`. When
- * ZeroCat is unconfigured or fails before the first token, the same call goes
- * to this id on Vercel AI Gateway (lib/abuse/model.ts). Other hosted model ids
- * use Gateway only.
- */
-// User-selected project default. Existing immutable run snapshots still resolve
-// their own saved selection; changing this constant cannot rewrite their model.
-// This id names the model inside Mikka (snapshots, ledger, admission rules).
-export const COORDINATOR_MODEL = 'deepseek/deepseek-v4.1-flash'
+/** Built-in model assignments are managed by the LiteLLM administrator. */
+export const COORDINATOR_MODEL = 'mikka-default'
+export const TITLE_MODEL = 'mikka-title'
 
 /**
  * Settings for the Coordinator's next step under the shared round cap

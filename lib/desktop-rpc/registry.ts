@@ -43,7 +43,10 @@ import * as actions33 from '@/app/actions/workspace'
 import * as actions34 from '@/app/actions/workspace-secrets'
 import * as actions35 from '@/app/actions/workspace-settings'
 import * as actions36 from '@/app/actions/thread-title-settings'
+import * as issueStateActions from '@/app/actions/issue-states'
+import * as taskListActions from '@/app/actions/task-list'
 import * as automations from '@/app/actions/automations'
+import * as listViews from '@/app/actions/list-views'
 
 // This literal is the complete callable surface, independent of Next build IDs.
 const functions = {
@@ -112,6 +115,13 @@ const functions = {
   'bots.pollBots': actions6.pollBots,
   'bots.createBot': actions6.createBot,
   'bots.updateBot': actions6.updateBot,
+  'bots.getBotSettings': actions6.getBotSettings,
+  'bots.listBotEnvironments': actions6.listBotEnvironments,
+  'bots.setBotEffort': actions6.setBotEffort,
+  'bots.getBotAccess': actions6.getBotAccess,
+  'bots.setBotAccess': actions6.setBotAccess,
+  'bots.followBot': actions6.followBot,
+  'bots.transferBot': actions6.transferBot,
   'bots.archiveBot': actions6.archiveBot,
   'bots.deleteBot': actions6.deleteBot,
   'bots.listArchivedOwnBots': actions6.listArchivedOwnBots,
@@ -129,6 +139,9 @@ const functions = {
   'automations.pauseAutomation': automations.pauseAutomation,
   'automations.takeOverAutomation': automations.takeOverAutomation,
   'automations.automationWebhookKey': automations.automationWebhookKey,
+  'automations.duplicateAutomation': automations.duplicateAutomation,
+  'automations.setAutomationRunAs': automations.setAutomationRunAs,
+  'automations.automationRunAsChoices': automations.automationRunAsChoices,
   'automations.automationLinearLabels': automations.automationLinearLabels,
   'automations.automationLinearTeams': automations.automationLinearTeams,
   'automations.automationSlackChannels': automations.automationSlackChannels,
@@ -155,7 +168,6 @@ const functions = {
   'coordinator.coordinatorCitationSources': actions8.coordinatorCitationSources,
   'coordinator.coordinatorReasoning': actions8.coordinatorReasoning,
   'coordinator.pollBotChatSummaries': actions8.pollBotChatSummaries,
-  'coordinator.sendCoordinatorMessage': actions8.sendCoordinatorMessage,
   'coordinator.welcomeCoordinator': actions8.welcomeCoordinator,
   'coordinator.stopCoordinatorTurn': actions8.stopCoordinatorTurn,
   'coordinator.retryCoordinatorTurn': actions8.retryCoordinatorTurn,
@@ -166,6 +178,7 @@ const functions = {
   'execution-settings.refreshBotModelMenuAction': actions10.refreshBotModelMenuAction,
   'execution-settings.chooseBotModel': actions10.chooseBotModel,
   'issue-metadata.getIssuePropertyOptions': actions11.getIssuePropertyOptions,
+  'issue-metadata.getNewTaskOptions': actions11.getNewTaskOptions,
   'issue-metadata.updateIssueMetadata': actions11.updateIssueMetadata,
   'issue-operations.listIssueConnections': actions12.listIssueConnections,
   'issue-operations.updateIssueRelation': actions12.updateIssueRelation,
@@ -175,6 +188,15 @@ const functions = {
   'issue-operations.setIssueDeleted': actions12.setIssueDeleted,
   'issue-prefix.getIssuePrefixState': actions13.getIssuePrefixState,
   'issue-prefix.saveIssuePrefix': actions13.saveIssuePrefix,
+  'issue-states.getIssueStates': issueStateActions.getIssueStates,
+  'task-list.countTaskListViews': taskListActions.countTaskListViews,
+  'task-list.listUnreadTaskIds': taskListActions.listUnreadTaskIds,
+  'task-list.setTaskUnread': taskListActions.setTaskUnread,
+  'issue-states.createWorkspaceIssueState': issueStateActions.createWorkspaceIssueState,
+  'issue-states.updateWorkspaceIssueState': issueStateActions.updateWorkspaceIssueState,
+  'issue-states.reorderWorkspaceIssueStates': issueStateActions.reorderWorkspaceIssueStates,
+  'issue-states.setDefaultWorkspaceIssueState': issueStateActions.setDefaultWorkspaceIssueState,
+  'issue-states.deleteWorkspaceIssueState': issueStateActions.deleteWorkspaceIssueState,
   'thread-title-settings.getThreadTitleSettings': actions36.getThreadTitleSettings,
   'thread-title-settings.saveThreadTitleSettings': actions36.saveThreadTitleSettings,
   'issues.listIssues': actions14.listIssues,
@@ -268,6 +290,11 @@ const functions = {
   'task-runs.syncThreadList': actions26.syncThreadList,
   'task-runs.findThreadReferences': actions26.findThreadReferences,
   'task-runs.listConversations': actions26.listConversations,
+  'list-views.listPullPins': listViews.listPullPins,
+  'list-views.setPullPins': listViews.setPullPins,
+  'list-views.listSavedViews': listViews.listSavedViews,
+  'list-views.saveView': listViews.saveView,
+  'list-views.deleteSavedView': listViews.deleteSavedView,
   'task-runs.listConversationSidebar': actions26.listConversationSidebar,
   'task-runs.readConversationOrganization': actions26.readConversationOrganization,
   'task-runs.setConversationOrganization': actions26.setConversationOrganization,

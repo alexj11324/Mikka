@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { ThreadGroup } from '../thread-groups'
 
 /**
  * An Agent Profile's own mark (Alex, 2026-11-10): a small dotted glyph that says
@@ -15,6 +16,44 @@ export type ProfileGlyph = (typeof PROFILE_GLYPHS)[number]
 export const PROFILE_COLORS = ['blue', 'teal', 'emerald', 'violet', 'pink'] as const
 export type ProfileColor = (typeof PROFILE_COLORS)[number]
 export type ProfileMarkValue = { icon: ProfileGlyph; color: ProfileColor }
+
+/**
+ * The four visual states of a ProfileMark (Figma "Chat+右栏" section 21, #2932):
+ * `working` animates in the Profile's own colour, `idle` is still in the same colour,
+ * `needs-you` switches to warning (always paired with text), `failed` to destructive (always paired with text).
+ */
+export const PROFILE_MARK_STATES = ['working', 'idle', 'needs-you', 'failed'] as const
+export type ProfileMarkState = (typeof PROFILE_MARK_STATES)[number]
+
+const WORKING_STATUSES = new Set(['working', 'queued', 'preparing', 'running', 'finishing'])
+const NEEDS_YOU_STATUSES = new Set(['waiting-on-you', 'waiting_on_you', 'waiting_input', 'waiting', 'needs-you', 'needs_you'])
+const FAILED_STATUSES = new Set(['failed', 'error', 'blocked', 'paused'])
+
+/** Shared status-to-ProfileMarkState mapping for sidebar rows, thread headers, task cards and sub-agent cards. */
+export function profileMarkStateOf(input: {
+  status?: string | null
+  outcome?: string | null
+  waiting?: boolean
+  group?: ThreadGroup | null
+}): ProfileMarkState {
+  if (input.waiting) return 'needs-you'
+  if (input.group) {
+    if (input.group === 'running') return 'working'
+    if (input.group === 'waiting') return 'needs-you'
+    if (input.group === 'blocked') return 'failed'
+    return 'idle'
+  }
+  const status = input.status?.trim().toLowerCase() ?? ''
+  const outcome = input.outcome?.trim().toLowerCase() ?? ''
+  if (WORKING_STATUSES.has(status)) return 'working'
+  if (NEEDS_YOU_STATUSES.has(status) || outcome === 'needs_input') return 'needs-you'
+  if (FAILED_STATUSES.has(status) || outcome === 'failed' || outcome === 'blocked') return 'failed'
+  return 'idle'
+}
+
+/** `needs-you` and `failed` must always appear with adjacent state text, never colour alone (Figma 1346:5024). */
+export const profileMarkStateRequiresText = (state: ProfileMarkState): boolean =>
+  state === 'needs-you' || state === 'failed'
 
 /** The built-in Default profile's fixed mark. */
 export const DEFAULT_PROFILE_MARK: ProfileMarkValue = { icon: 'square', color: 'blue' }

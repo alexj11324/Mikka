@@ -67,8 +67,8 @@ test('CSV contains literal data, not spreadsheet formulas', () => {
   assert.equal(csvCell(null), '""')
 })
 
-test('organization policy offers each model source, including Workers AI, in both settings languages', () => {
-  assert.ok(ORGANIZATION_MODEL_PROVIDERS.includes('cloudflare-workers-ai'))
+test('organization policy offers each model source, including LiteLLM, in both settings languages', () => {
+  assert.ok(ORGANIZATION_MODEL_PROVIDERS.includes('litellm'))
   for (const locale of ['en', 'zh-CN']) {
     const catalog = JSON.parse(readFileSync(new URL(`../../messages/${locale}.json`, import.meta.url), 'utf8'))
     const names = catalog.Organization.policy.providers.names

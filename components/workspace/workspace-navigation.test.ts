@@ -149,6 +149,15 @@ test('the conversation directory has its own route alongside the default coordin
   assert.equal(readLocation(new URLSearchParams()).section, 'coordinator')
 })
 
+test('查看运行 is `section=conversations&directoryAutomation=<id>`; the editor keeps its own `automation=<id>`', () => {
+  const runs = workspaceLink({ section: 'conversations', directoryAutomation: RUN })
+  assert.equal(runs, `/?section=conversations&directoryAutomation=${RUN}`)
+  assert.equal(readLocation(new URL(runs, 'https://example.invalid').searchParams).directoryAutomation, RUN)
+  assert.equal(workspaceHref(at(`/mikka?section=conversations&directoryAutomation=${RUN}`), { section: 'all-issues' }), '/mikka?section=all-issues', 'another page drops the filter')
+  // An open automation in the editor survives a move inside its page, such as a task opened beside it.
+  assert.equal(workspaceHref(at(`/mikka?section=automations&automation=${RUN}`), { task: ISSUE }), `/mikka?section=automations&automation=${RUN}&task=${ISSUE}`)
+})
+
 test('a saved chat is `section=agent&session=<id>`', () => {
   assert.equal(workspaceLink({ section: 'agent', session: SESSION }), `/?section=agent&session=${SESSION}`)
   assert.equal(workspaceHref(at(`/mikka?section=agent&session=${SESSION}`), { section: 'coordinator' }), '/mikka')

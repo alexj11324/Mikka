@@ -2,7 +2,8 @@ import { decide, type DecisionModel } from 'eve/ai'
 import type { Experimental_DecisionModel } from 'ai'
 import { DECISION_MODEL } from '../coordinator/decision'
 
-export type SlackScope = { ownerId: string; botId: string; workspaceId: string }
+/** `routed` is set when `bot=<alias>`, or the Slack thread it started, chose one of the sender's Bots (lib/slack/eve-channel.ts). */
+export type SlackScope = { ownerId: string; botId: string; workspaceId: string; routed?: true }
 
 /** Public eve decision model backed by Mikka's existing credential, admission and billing boundary.
  * This adapter supports the one screening question; eve owns validation and retries. */
