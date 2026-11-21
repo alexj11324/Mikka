@@ -4,7 +4,7 @@ import { randomUUID,createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { before,after,beforeEach,mock,test } from 'node:test'
 import { Pool } from 'pg'
-import { browserEffects, type BrowserEffect, type VisualObservation } from './visual-contract'
+import { browserEffects, type BrowserEffect, type BrowserMutation, type VisualObservation } from './visual-contract'
 import type { judgeVisualBrowserAction } from './visual-model'
 
 const database=process.env.COMPUTER_TEST_DATABASE_URL ?? process.env.E2E_DATABASE_URL
@@ -14,7 +14,7 @@ if(database) {const url=new URL(database);assert.ok(['127.0.0.1','localhost'].in
 const schema='unattended_'+randomUUID().replaceAll('-','')
 let pool:Pool,admin:Pool
 let browserAction:typeof import('./action-reviews').browserAction
-let execute:typeof import('./action-reviews').executeApprovedBrowserAction
+let execute:typeof import('./action-reviews').executeBrowserAction
 let provision:typeof import('../computer/provision').ensureCloudMachine
 let proposeLogin:typeof import('./credential-reviews').proposeCredentialOperation
 const actor={userId:'alice',workspaceId:randomUUID()},botId=randomUUID(),subagentId=randomUUID(),credentialId=randomUUID()
@@ -52,10 +52,9 @@ before(async()=>{
  mock.module('./runtime',{namedExports:{
   runtimeRequest:async(_sandbox:string,_row:unknown,_path:string,body:any)=>{
    if(_path==='/action') {
-    const action=await stored(body.actionId)
-    assert.equal(action.status,'running')
-    assert.ok(action.input.mutation,'the private executor retains its mutation until completion')
-    executableInputs.set(body.actionId,action.input)
+    assert.ok(body.actionId,'the gateway call carries the durable action id')
+    assert.ok(body.expectedObservationId,'the gateway call pins the observation')
+    executableInputs.set(body.actionId,body)
    }
    if(mode==='stale')throw Error('observation_stale')
    if(mode==='unknown')throw Error('action_outcome_unknown')
@@ -69,7 +68,7 @@ before(async()=>{
  mock.module('@/lib/computer/e2b-provider',{namedExports:{connectComputer:async()=>({sandboxId:'isolated-test-machine'}),createComputer:async()=>({sandboxId:'isolated-test-machine'}),installComputerRuntime:async()=>undefined}})
  mock.module('./subagent-browser',{namedExports:{resolveSubagentBrowserTarget:async()=>target}})
  mock.module('@/lib/credentials/runtime',{namedExports:{credentialStore:{authorize:async()=>undefined,lease:async(_caller:unknown,_origin:unknown,_target:unknown,_username:unknown,_force:unknown,expected:any)=>{assert.equal(expected.credentialId,credentialId);assert.equal(expected.revision,'secret-version-1');leaseCalls++;return {status:'ready',lease:'synthetic-lease'}}},executeCredentialLease:async()=>({status:loginMode,origin:target.origin})}})
- const actions=await import('./action-reviews');browserAction=actions.browserAction;execute=actions.executeApprovedBrowserAction
+ const actions=await import('./action-reviews');browserAction=actions.browserAction;execute=actions.executeBrowserAction
  provision=(await import('../computer/provision')).ensureCloudMachine
  proposeLogin=(await import('./credential-reviews')).proposeCredentialOperation
 })
@@ -81,38 +80,39 @@ beforeEach(async()=>{
 after(async()=>{if(enabled){console.log(`Retained unattended DB schema: ${schema}`);globalThis.fetch=realFetch;await pool.end();await admin.end()}})
 async function propose(effect:BrowserEffect='browse') {return browserAction(pool,actor,botId,subagentId,{action:'click',x:20,y:40},'Open the requested control',observation(),judgment(effect))}
 async function stored(id:string){return (await pool.query('SELECT * FROM pending_actions WHERE id=$1',[id])).rows[0]}
+function inputFor(actionId:string,effect:BrowserEffect='browse',mutation:BrowserMutation={action:'click',x:20,y:40}):import('./action-reviews').BrowserActionInput {
+ return {actionId,workspaceId:actor.workspaceId,botId,subagentId,epoch:1,loaderId:'document',origin:target.origin,observationId:observation().observationId,effect,mutation,summary:'Open the requested control'}
+}
+async function bindAction(actionId:string,status:'running'|'needs_you'='needs_you') {
+ await pool.query(`UPDATE bot_subagents SET status=$2,"activeActionId"=$3 WHERE id=$1`,[subagentId,status,actionId])
+}
 
-test('authorized browsing runs without a human decision and exact replay returns the stored receipt',{skip:!enabled},async()=>{
+test('authorized browsing runs without a human decision; replaying the same action id returns the gateway receipt, never a second click',{skip:!enabled},async()=>{
  const result=await propose();assert.equal(result.state,'running');assert.equal(effects,1)
- const record=await stored(result.actionId);assert.equal(record.status,'done');assert.equal(record.decidedAt,null)
- assert.equal(record.input.mutation,undefined,'done: executable mutation scrubbed');assert.equal(record.input.mutationScrubbed,true)
- assert.deepEqual(await execute(pool,actor.userId,executableInputs.get(result.actionId),true),{data:{subagentId,accepted:true,replayed:true}})
- assert.ok('error' in await execute(pool,actor.userId,record.input,true),'a scrubbed row can never execute again');assert.equal(effects,1)
+ assert.equal(await stored(result.actionId),undefined,'no pending_actions row is written')
+ // Simulate the lost response: the action stays bound while the workflow is gone.
+ await bindAction(result.actionId)
+ assert.deepEqual(await execute(pool,actor,inputFor(result.actionId)),{data:{subagentId,accepted:true}});assert.equal(effects,1)
+ assert.equal((await pool.query('SELECT "activeActionId" FROM bot_subagents WHERE id=$1',[subagentId])).rows[0].activeActionId,null)
+ // Once the binding cleared, the same action id can never execute again.
+ const replayed=await execute(pool,actor,inputFor(result.actionId));assert.ok('error' in replayed);assert.equal(replayed.error,'browserActionExpired');assert.equal(effects,1)
 })
-test('#438 mutation lifecycle: kept only while executable; scrubbed on done, declined, failed and expired; never returned',{skip:!enabled},async()=>{
+test('#438 mutation lifecycle: no new approval rows; legacy pending rows still scrubbed on decline and expired by the sweep',{skip:!enabled},async()=>{
  const asked=await propose('write_external');assert.equal(asked.state,'running');assert.ok(!('mutation' in asked),'proposer gets no mutation')
- const original=executableInputs.get(asked.actionId)!
- assert.deepEqual(original.mutation,{action:'click',x:20,y:40},'running: kept for the private executor')
- const done=await stored(asked.actionId);assert.equal(done.status,'done');assert.equal(done.input.mutation,undefined)
- // Replay uses the original private payload, never the scrubbed database row.
- assert.deepEqual(await execute(pool,actor.userId,original,true),{data:{subagentId,accepted:true,replayed:true}});assert.equal(effects,1)
+ const sent=executableInputs.get(asked.actionId)!
+ assert.deepEqual({action:sent.action,x:sent.x,y:sent.y},{action:'click',x:20,y:40},'the gateway call carries the mutation fields flat')
+ assert.equal(await stored(asked.actionId),undefined,'the new path writes no pending_actions row')
  // Historical pending rows may still exist after deploy. Seed the old state
  // explicitly; the current automatic path must never manufacture an approval.
  const legacyPending=async()=>{
-  const next={version:original.version,actionId:randomUUID(),workspaceId:original.workspaceId,botId:original.botId,subagentId:original.subagentId,epoch:original.epoch,loaderId:original.loaderId,origin:original.origin,observationId:original.observationId,observedAt:Date.now(),mutation:{action:'click',x:20,y:40},summary:original.summary,effect:original.effect,policyRevision:original.policyRevision,judgment:{executionId:original.judgment.executionId,requestDigest:original.judgment.requestDigest,imageDigest:original.judgment.imageDigest}}
-  const input={...next,digest:createHash('sha256').update(JSON.stringify([actor.userId,next])).digest('hex')}
+  const input={version:1,actionId:randomUUID(),workspaceId:actor.workspaceId,botId,subagentId,epoch:1,loaderId:'document',origin:target.origin,observationId:observation().observationId,observedAt:Date.now(),mutation:{action:'click',x:20,y:40},summary:'Open the requested control',effect:'write_external'}
   await pool.query(`INSERT INTO pending_actions(id,"userId",action,input,status) VALUES($1,$2,'browser_operation',$3,'pending')`,[input.actionId,actor.userId,input])
-  await pool.query(`UPDATE bot_subagents SET status='needs_you',needs=$1,"activeActionId"=$2 WHERE id=$3`,[{kind:'approval',actionId:input.actionId},input.actionId,subagentId])
   return input
  }
  const dRaw=await legacyPending()
  await pool.query(`UPDATE pending_actions SET status='declined',"decidedAt"=now() WHERE id=$1`,[dRaw.actionId])
- assert.deepEqual(await execute(pool,actor.userId,dRaw,false),{data:{declined:true}})
- const declined=await stored(dRaw.actionId);assert.equal(declined.input.mutation,undefined);assert.equal(declined.input.summary,'Open the requested control');assert.equal(declined.input.digest,dRaw.digest)
- // failed (stale)
- mode='stale';await assert.rejects(propose(),/browserActionExpired/);mode='success'
- const failed=(await pool.query(`SELECT input,status FROM pending_actions WHERE status='failed' ORDER BY "createdAt" DESC LIMIT 1`)).rows[0]
- assert.equal(failed.input.mutation,undefined)
+ await propose() // the sweep inside a new proposal scrubs every terminal legacy row
+ const declined=await stored(dRaw.actionId);assert.equal(declined.input.mutation,undefined);assert.equal(declined.input.mutationScrubbed,true);assert.equal(declined.input.summary,'Open the requested control')
  // expired: an undecided action older than 5 minutes is failed and scrubbed by the next proposal's sweep
  const e=await legacyPending();await pool.query(`UPDATE pending_actions SET "createdAt"=now()-interval '6 minutes' WHERE id=$1`,[e.actionId])
  await pool.query(`UPDATE bot_subagents SET status='running',needs=NULL,"activeActionId"=NULL`)
@@ -131,24 +131,25 @@ test('default allow: with no workspace policy row every effect, payment and send
   for(const effect of browserEffects) {
    const result=await propose(effect)
    assert.equal(result.state,'running',effect)
-   const record=await stored(result.actionId)
-   assert.equal(record.status,'done',effect);assert.equal(record.decidedAt,null,effect)
    const row=(await pool.query('SELECT status,needs,"activeActionId" FROM bot_subagents WHERE id=$1',[subagentId])).rows[0]
    assert.deepEqual(row,{status:'running',needs:null,activeActionId:null},effect)
   }
   assert.equal(effects,browserEffects.length)
-  assert.equal((await pool.query(`SELECT 1 FROM pending_actions WHERE action='browser_operation' AND status='pending'`)).rowCount,0)
+  assert.equal((await pool.query(`SELECT 1 FROM pending_actions WHERE action='browser_operation' AND status IN ('pending','running')`)).rowCount,0,'no live browser approval row')
  } finally {await pool.query('INSERT INTO workspace_computer_policies("workspaceId") VALUES($1)',[actor.workspaceId])}
 })
-test('a legacy stored ask is not a human gate; concurrent replay produces one effect and other owners or payloads cannot reuse it',{skip:!enabled},async()=>{
+test('ask executes directly; concurrent replay of the bound action id produces one effect and other owners or ids cannot reuse it',{skip:!enabled},async()=>{
  await pool.query(`UPDATE workspace_computer_policies SET permission='ask'`)
  const result=await propose('write_external');assert.equal(result.state,'running');assert.equal(effects,1)
- const record=await stored(result.actionId);assert.equal(record.decidedAt,null);assert.equal(record.input.mutation,undefined)
- const original=executableInputs.get(result.actionId)!
- const outcomes=await Promise.all(Array.from({length:10},()=>execute(pool,actor.userId,original,true)))
- assert.ok(outcomes.every(result=>'data' in result));assert.equal(effects,1)
- assert.ok('error' in await execute(pool,'bob',original,true));assert.equal(effects,1)
- assert.ok('error' in await execute(pool,actor.userId,{...original,mutation:{action:'click',x:999,y:999}},true));assert.equal(effects,1)
+ assert.equal(await stored(result.actionId),undefined)
+ // The binding stays live only while the row keeps the action id; simulate the lost response.
+ await bindAction(result.actionId)
+ const outcomes=await Promise.all(Array.from({length:10},()=>execute(pool,actor,inputFor(result.actionId,'write_external'))))
+ assert.equal(outcomes.filter(result=>'data' in result).length,1,'exactly one binding holder executes; the rest see it cleared')
+ assert.equal(effects,1,'the action ran exactly once')
+ await bindAction(result.actionId)
+ assert.ok('error' in await execute(pool,{...actor,userId:'bob'},inputFor(result.actionId,'write_external')));assert.equal(effects,1)
+ assert.ok('error' in await execute(pool,actor,inputFor(randomUUID(),'write_external')),'an unbound action id cannot execute');assert.equal(effects,1)
 })
 test('deny blocks: a workspace effect deny wins over a Bot allow, and a workspace computer deny blocks every effect',{skip:!enabled},async()=>{
  await pool.query(`UPDATE agent_kit_heads SET external_write_permissions='{"browser_payment":"allow"}'`)
@@ -158,7 +159,7 @@ test('deny blocks: a workspace effect deny wins over a Bot allow, and a workspac
  await pool.query(`UPDATE workspace_computer_policies SET permission='deny',version=version+1,external_write_permissions='{}'`)
  for(const effect of browserEffects) await assert.rejects(propose(effect),/Browser action denied/)
  assert.equal(effects,1)
- assert.equal((await pool.query(`SELECT 1 FROM pending_actions WHERE status='pending'`)).rowCount,0)
+ assert.equal((await pool.query(`SELECT 1 FROM pending_actions WHERE status='pending' AND action='browser_operation'`)).rowCount,0)
 })
 test('stale observations resume observation, unknown outcomes are not silently retried',{skip:!enabled},async()=>{
  mode='stale';await assert.rejects(propose(),/browserActionExpired/)

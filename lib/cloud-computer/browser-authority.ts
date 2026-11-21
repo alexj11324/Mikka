@@ -1,5 +1,4 @@
 import 'server-only'
-import { createHash } from 'node:crypto'
 import type { PoolClient } from 'pg'
 import { browserPermission, type BrowserEffect } from './visual-contract'
 import type { Actor, Subagent } from './subagents'
@@ -17,6 +16,5 @@ export async function lockBrowserAuthority(tx: PoolClient, actor: Actor, botId: 
   if (!computer) throw new ComputerError(503,'Computer policy unavailable')
   const workspace=policy?.external_write_permissions ?? {}
   const permission=browserPermission(effect,computer,workspace)
-  const revision=createHash('sha256').update(JSON.stringify([computer,policy?.version ?? 0,policy?.external_write_policy_version ?? 0,workspace,effect])).digest('hex')
-  return {row,permission,revision}
+  return {row,permission}
 }

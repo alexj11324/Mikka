@@ -25,9 +25,9 @@ export async function decidePendingAction(userId: string, id: string, approve: b
       .returning()
     if (!row || (!isApprovalAction(row.action) && row.action !== 'browser_operation' && row.action !== 'credential_operation' && row.action !== APP_TOOL_ACTION)) throw new ActionFailureError('pendingActionUnavailable')
     await pendingActionsChanged(executor, row.id, userId)
-    if (!approve && row.action !== 'browser_operation' && row.action !== 'credential_operation') {
+    if (!approve && row.action !== 'credential_operation') {
       await recordCoordinatorEvent(executor, actionDecidedEvent(row, { status: 'declined', error: null, outcome: {} }, { botId: row.botId }))
-      return null
+      return row.action === 'browser_operation' ? { ...row, action: row.action } as const : null
     }
     return { ...row, action: row.action } as const
   }
@@ -35,6 +35,10 @@ export async function decidePendingAction(userId: string, id: string, approve: b
   // credential reviews still see the claimed decision before their own cleanup.
   const row = approve ? await claim(db) : await db.transaction(claim)
   if (!row) return { status: 'declined' as const, error: null }
+  if (!approve && row.action === 'browser_operation') {
+    await (await import('@/lib/cloud-computer/action-reviews')).scrubBrowserMutation(pool, row.id)
+    return { status: 'declined' as const, error: null }
+  }
 
   if ((row.action === 'browser_operation' || row.action === 'credential_operation') && Date.now() - row.createdAt.getTime() > 5 * 60_000) {
     await db.update(pendingActions).set({ status: 'failed', error: 'browserActionExpired' }).where(eq(pendingActions.id, row.id))
@@ -54,7 +58,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     const result = (row.action === 'browser_operation' || row.action === 'credential_operation')
       ? row.action === 'credential_operation'
         ? await (await import('@/lib/cloud-computer/credential-reviews')).executeCredentialOperation(pool, userId, row.input, approve)
-        : await (await import('@/lib/cloud-computer/action-reviews')).executeApprovedBrowserAction(pool, userId, row.input, approve)
+        : { error: 'pendingActionUnavailable' }
       : row.action === APP_TOOL_ACTION
         ? await runApprovedAppToolCall(userId, row.input, row.connectedAccountId ?? null)
         : !row.connectedAccountId
@@ -69,6 +73,7 @@ export async function decidePendingAction(userId: string, id: string, approve: b
     }
   }
   await db.update(pendingActions).set({ status, error, result: outcome }).where(eq(pendingActions.id, row.id))
+  if (row.action === 'browser_operation') await (await import('@/lib/cloud-computer/action-reviews')).scrubBrowserMutation(pool, row.id)
   await recordCoordinatorEvent(db, actionDecidedEvent({ id: row.id, userId, action: row.action, input: row.action === 'credential_operation' || row.action === 'browser_operation' ? { summary: (row.input as Record<string, unknown>).summary } : row.input }, { status, error, outcome }, { botId: row.botId }))
   return { status, error }
 }
