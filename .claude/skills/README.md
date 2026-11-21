@@ -8,7 +8,10 @@ by default (decision 2026-10-31): change the code, the R-entry in
 `docs/design/rules.md` and its `lint:ui` / `check-copy` check together. The
 exception is a skill rule that does not fit a dense SaaS product (marketing
 hero type, decorative motion, big whitespace in data views); skip it and say
-why. Where the two skills disagree, `interface-design` decides. A skill audit
+why. Where the two skills disagree, `interface-design` decides;
+`frontend-design` (2026-11-18) is the third visual voice and is read for
+judgement and defect hunting, while `interface-design` still decides the fix.
+A skill audit
 never changes the shell layout (R-35), and the generated gradient avatar for
 people is intentional (R-36). The example
 code and copy in a skill are illustrations, not Mikka's components or wording.
@@ -38,11 +41,13 @@ Vendored on 2026-10-29, unmodified, from these pinned commits:
 | [gannonh/skills](https://github.com/gannonh/skills) | `2ef000341d4e60af00e8934ba1d4cfef82b63b13` | MIT, (c) 2026 Gannon Hall | `update-docs` (`skills/update-docs/`, vendored 2026-11-08), unmodified. The optional `documentation-and-adrs` reference uses an available installed skill when relevant |
 | [wondelai/skills](https://github.com/wondelai/skills) | `6621b1f32cca2b9b17d7a18c076bf6e7da83f8a6` | MIT, (c) 2025 Wondel.ai sp. z o.o. Google guide attribution is retained in `SKILL.md` | `technical-documentation` (vendored 2026-11-08), unmodified, including all seven reference pages |
 | [openclaw/openclaw](https://github.com/openclaw/openclaw) | `4947e40db109a28c1fbdcf692eb431db19d46720` | MIT, (c) 2026 OpenClaw Foundation | `test-audit` (vendored 2026-11-12 at Alex's request, from `.agents/skills/test-audit/`), including `CAMPAIGN.md` and `references/audit.md`. Changed: added a Mikka usage pointer to `SKILL.md` and pinned the cross-repository boundary/proof links. Mikka's companion `README.md` routes OpenClaw-specific commands to existing project validation; no scripts or extra framework are included |
+| [anthropics/claude-plugins-public](https://github.com/anthropics/claude-plugins-public) (`plugins/frontend-design/skills/frontend-design/`) | `30202c767cfaf325212b3921ab484f83adaec850` (plugin version 1.1.1) | Apache-2.0, Anthropic | `frontend-design` (vendored 2026-11-18 at Alex's request), `SKILL.md` byte-identical to upstream. Changed: nothing; the skill ships no scripts. Its design-authoring advice (distinct palette, type and layout, and the catalogue of generated-page tells) is a design judgement checklist for Mikka's own UI; it never restyles a paid block and `docs/design/` still decides |
 
 Full license texts are in [`../skill-licenses/`](../skill-licenses/). The
 `update-docs` and `test-audit` licenses are retained in their skill directories:
 [`update-docs/LICENSE.md`](update-docs/LICENSE.md) and
-[`test-audit/LICENSE.md`](test-audit/LICENSE.md).
+[`test-audit/LICENSE.md`](test-audit/LICENSE.md). `frontend-design`'s Apache-2.0
+text is at [`../skill-licenses/anthropic-frontend-design/LICENSE`](../skill-licenses/anthropic-frontend-design/LICENSE).
 
 ## Which skill to use
 
@@ -57,6 +62,13 @@ Full license texts are in [`../skill-licenses/`](../skill-licenses/). The
   `/interface-design:design-deslop` (diff-scoped cleanup). Its design-system
   file is `docs/design/`: record decisions in `docs/design/decisions/`
   instead of `.interface-design/system.md`.
+- **Page-level visual judgement and defect hunting**: `frontend-design`. Read
+  it before reshaping a screen and while diagnosing why one looks wrong — its
+  two passes (a token/type/layout plan reviewed against the brief, then build
+  and self-critique) and its catalogue of generated-page tells are the
+  checklist. Where it asks for a new aesthetic direction, Mikka's answer is
+  already `docs/design/` plus the affected paid block's shipped look; the
+  skill judges the page, it does not re-theme the product.
 - **AI-looking UI**: `unslop` as an audit list (`references/signs.md`). Mikka
   already has a direction (`docs/design/`), so use its polish mode: fix the
   signs it finds and keep Mikka's palette, Geist and layout, as its own
